@@ -1,6 +1,6 @@
 #include <mpi.h>
 #include <cmath>
-
+#include <iostream>
 /*
  * initialize the local matrix
  * each element is equals to the sum of its row and column

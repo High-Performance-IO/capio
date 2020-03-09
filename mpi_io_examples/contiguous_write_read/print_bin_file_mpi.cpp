@@ -1,5 +1,5 @@
 #include <mpi.h>
-
+#include <iostream>
 int print_buf(int buf[], int size) {
     for (int i = 0; i < size; ++i) {
         std::cout << buf[i] << std::endl;

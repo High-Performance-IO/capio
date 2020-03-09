@@ -1,5 +1,5 @@
 #include <mpi.h>
-
+#include <iostream>
 int initialize_buffer(int buf[], int size) {
     for (int i = 0; i < size; ++i) {
         buf[i] = i;

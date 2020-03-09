@@ -1,7 +1,7 @@
 #include <mpi.h>
 #include <fstream>
 #include <cmath>
-
+#include <iostream>
 // each worker write its block in a different local file
 
 void print_partial_matrix(int array[], int blocks_side_length, int my_rank) {
