@@ -130,7 +130,7 @@ void print_error(int my_rank, int error_code, std::string additional_msg = "") {
                 std::cout << "input error: side length needed" << std::endl;
                 break;
             case 1:
-                std::cout << "input error: the number of worker must be a square number" << std::endl;
+                std::cout << "input error: the number of worker must be a square number != 0" << std::endl;
                 break;
             case 2:
                 std::cout << "input error: the matrix can't be divided in square blocks using the numbers"
@@ -165,7 +165,7 @@ bool get_inputs(int my_rank, int argc, char** argv, int& matrix_side_length,
         print_error(my_rank, 0);
         result = false;
     }
-    else if (! is_square_number(num_workers)) {
+    else if (! is_square_number(num_workers) || num_workers == 0) {
         print_error(my_rank, 1, "num of workers given: " + std::to_string(num_workers));
         result = false;
     }
