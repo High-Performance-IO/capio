@@ -4,7 +4,7 @@
 
 /*
  *  initialize the buffer  using the rank of the process
- *  
+ *
  *  parameters
  *  int buf[]: buffer to initialize
  *  int size: size of the buffer
