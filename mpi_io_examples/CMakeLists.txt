@@ -1,2 +1,3 @@
 add_subdirectory(non_contiguous_write_read)
 add_subdirectory(contiguous_write_read)
+add_subdirectory(repeated_writes)
