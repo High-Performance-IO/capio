@@ -3,15 +3,14 @@
 #include "../capio.hpp"
 
 int main(int argc, char** argv) {
-    capio_proxy<int> proxy("outputfile5","consumer",10);
+    capio_proxy<int> proxy("outputfile5", 10);
     std::cout << "after constuctor\n";
     int j = 0;
     while (! proxy.done()) {
-        int* i = proxy.read();
+        int i = proxy.read();
         std::cout << "read\n";
-        assert(*i == j);
-        std::cout << *i << "\n";
-        free(i);
+        assert(i == j);
+        std::cout << i << "\n";
         ++j;
     }
     std::cout << "before finished\n";
