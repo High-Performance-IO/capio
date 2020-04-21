@@ -49,20 +49,20 @@ public:
     }
 
     /*
-     * clean-up all the resources used for the shared memory
-     * parameters NONE
-     * returns NONE
+     * destructor frees the resources if the consumers have finished and if there aren't element in the buffer
      */
 
-    void clean_resources() {
-        m_mutex_finished.post();
-        m_shm.destroy_ptr(m_buffer);
-        m_shm.destroy_ptr(m_i_prod);
-        m_shm.destroy_ptr(m_i_cons);
-        named_semaphore::remove(("num_stored_" + m_shm_name).c_str());
-        named_semaphore::remove(("num_empty_" + m_shm_name).c_str());
-        named_semaphore::remove(("mutex_finished" + m_shm_name).c_str());
-        shared_memory_object::remove(m_shm_name.c_str());
+    ~capio_proxy() {
+        if (m_finished && (*m_i_cons == *m_i_prod)) {
+            m_mutex_finished.post();
+            m_shm.destroy_ptr(m_buffer);
+            m_shm.destroy_ptr(m_i_prod);
+            m_shm.destroy_ptr(m_i_cons);
+            named_semaphore::remove(("num_stored_" + m_shm_name).c_str());
+            named_semaphore::remove(("num_empty_" + m_shm_name).c_str());
+            named_semaphore::remove(("mutex_finished" + m_shm_name).c_str());
+            shared_memory_object::remove(m_shm_name.c_str());
+        }
     }
 
     /*

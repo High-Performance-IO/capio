@@ -30,7 +30,6 @@ int main(int argc, char** argv) {
         ++j;
     }
     std::cout << "before finished\n";
-    proxy.clean_resources();
     capio_proxy<struct elem> proxy2("outputfile4", 12);
     std::cout << "after constuctor\n";
     struct elem e;
@@ -43,7 +42,6 @@ int main(int argc, char** argv) {
         std::cout << e.i << " " << e.d << "\n";
         ++j;
     }
-    proxy2.clean_resources();
 }
 
 
