@@ -18,7 +18,7 @@ struct elem {
 int const num_writes = 45;
 
 int main(int argc, char** argv) {
-    capio_proxy<int> proxy("outputfile3", 10);
+    capio_proxy<int> proxy("outputfile7", 1, 10);
     std::cout << "after constuctor\n";
     for (int i = 0; i < num_writes; ++i) {
         proxy.write(i);
@@ -26,7 +26,7 @@ int main(int argc, char** argv) {
     }
     std::cout << "before finished\n";
     proxy.finished();
-    capio_proxy<struct elem> proxy2("outputfile4", 12);
+    capio_proxy<struct elem> proxy2("outputfile8", 1, 12);
     std::cout << "after constuctor\n";
     struct elem e;
     for (int i = 0; i < num_writes; ++i) {

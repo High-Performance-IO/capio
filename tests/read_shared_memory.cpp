@@ -19,23 +19,20 @@ struct elem {
 int const num_writes = 45;
 
 int main(int argc, char** argv) {
-    capio_proxy<int> proxy("outputfile3", 10);
+    capio_proxy<int> proxy("outputfile7", 1, 10);
     std::cout << "after constuctor\n";
-    int j = 0;
-    while (! proxy.done()) {
-        int i = proxy.read();
+    int i, j = 0;
+    while (proxy.read(& i)) {
         std::cout << "read\n";
         assert(i == j);
         std::cout << i << "\n";
         ++j;
     }
-    std::cout << "before finished\n";
-    capio_proxy<struct elem> proxy2("outputfile4", 12);
+    capio_proxy<struct elem> proxy2("outputfile8", 1, 12);
     std::cout << "after constuctor\n";
     struct elem e;
     j = 0;
-    while (! proxy2.done()) {
-        e = proxy2.read();
+    while (proxy2.read(&e)) {
         std::cout << "read\n";
         assert(e.i == j);
         assert(e.d == (double) j / num_writes);
