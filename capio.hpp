@@ -24,28 +24,28 @@ private:
     named_semaphore m_num_stored;
     // semaphore with value equals to the number of empty space in the circular buffer
     named_semaphore m_num_empty;
-    // semaphore used to implement critical section during the manipulation of the member m_num_consumers
-    named_semaphore m_mutex_num_consumers;
+    // semaphore used to implement critical section during the manipulation of the member m_num_producer
+    named_semaphore m_mutex_num_producers;
     // true if the consumers have finished with the buffer, false otherwise
-    int* m_num_consumers;
+    int* m_num_producers;
 public:
 
     /*
      * constructor
      */
 
-    capio_proxy(const std::string & name, int n_consumers, int buf_size = 1024) :
+    capio_proxy(const std::string & name, int n_producers, int buf_size = 1024) :
             m_mutex_buf(open_or_create, ("mutex_buf" + name + "_capio_shm").c_str(), 1),
             m_num_stored(open_or_create, ("num_stored_" + name + "_capio_shm").c_str() , 0),
             m_num_empty(open_or_create, ("num_empty_" + name + "_capio_shm").c_str(), buf_size),
-            m_mutex_num_consumers(open_or_create, ("mutex_finished" + name + "_capio_shm").c_str(), 1),
+            m_mutex_num_producers(open_or_create, ("mutex_num_producers" + name + "_capio_shm").c_str(), 1),
             m_buf_size(buf_size) {
         m_shm_name = name + "_capio_shm";
         m_shm = managed_shared_memory(open_or_create, m_shm_name.c_str(), 65536); //create only?
         m_buffer = m_shm.find_or_construct<T>("myshmvector")[buf_size]();
         m_i_prod =  m_shm.find_or_construct<int>((m_shm_name + "_m_i_prod").c_str())(0);
         m_i_cons = m_shm.find_or_construct<int>((m_shm_name + "_m_i_cons").c_str())(0);
-        m_num_consumers = m_shm.find_or_construct<int>((m_shm_name + "m_finished").c_str())(n_consumers);
+        m_num_producers = m_shm.find_or_construct<int>((m_shm_name + "m_num_producers").c_str())(n_producers);
         //named_semaphore start_sem(open_or_create_t(), "start_sem", 0);
         //named_semaphore end_sem(open_or_create_t(), "end_sem", 0);
 
@@ -56,14 +56,14 @@ public:
      */
 
     ~capio_proxy() {
-        if (*m_num_consumers == 0 && *m_i_cons == *m_i_prod) {
-            m_mutex_num_consumers.post();
+        if (*m_num_producers == 0 && *m_i_cons == *m_i_prod) {
+            m_shm.destroy_ptr(m_num_producers);
             m_shm.destroy_ptr(m_buffer);
             m_shm.destroy_ptr(m_i_prod);
             m_shm.destroy_ptr(m_i_cons);
             named_semaphore::remove(("num_stored_" + m_shm_name).c_str());
             named_semaphore::remove(("num_empty_" + m_shm_name).c_str());
-            named_semaphore::remove(("mutex_finished" + m_shm_name).c_str());
+            named_semaphore::remove(("mutex_num_producers" + m_shm_name).c_str());
             shared_memory_object::remove(m_shm_name.c_str());
         }
     }
@@ -115,9 +115,9 @@ public:
      * the consumer use this function to informs the it has finished to use the buffer
      */
     void finished() {
-        m_mutex_num_consumers.wait();
-        --(*m_num_consumers);
-        m_mutex_num_consumers.post();
+        m_mutex_num_producers.wait();
+        --(*m_num_producers);
+        m_mutex_num_producers.post();
     }
 
     /*
@@ -131,9 +131,9 @@ public:
 
     bool done() {
         bool finished;
-        m_mutex_num_consumers.wait();
-        finished = *m_num_consumers == 0;
-        m_mutex_num_consumers.post();
+        m_mutex_num_producers.wait();
+        finished = *m_num_producers == 0;
+        m_mutex_num_producers.post();
         return finished && (*m_i_prod == *m_i_cons);
     }
 };
