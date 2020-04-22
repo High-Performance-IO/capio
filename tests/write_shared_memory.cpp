@@ -1,9 +1,10 @@
 #include <iostream>
+#include <mpi.h>
 #include "../capio.hpp"
 
 struct elem {
     int i;
-    double d;
+    int d;
     elem() {
         i = 0;
         d = 0;
@@ -18,7 +19,10 @@ struct elem {
 int const num_writes = 45;
 
 int main(int argc, char** argv) {
-    capio_proxy<int> proxy("outputfile7", 1, 10);
+    MPI_Init(&argc, &argv);
+    int comm_size;
+    MPI_Comm_size(MPI_COMM_WORLD, &comm_size);
+    capio_proxy<int> proxy("outputfile", comm_size, false, 10);
     std::cout << "after constuctor\n";
     for (int i = 0; i < num_writes; ++i) {
         proxy.write(i);
@@ -26,15 +30,15 @@ int main(int argc, char** argv) {
     }
     std::cout << "before finished\n";
     proxy.finished();
-    capio_proxy<struct elem> proxy2("outputfile8", 1, 12);
+    capio_proxy<struct elem> proxy2("outputfile2", comm_size, false, 12);
     std::cout << "after constuctor\n";
     struct elem e;
     for (int i = 0; i < num_writes; ++i) {
         e.i = i;
-        e.d = (double) i / num_writes;
+        e.d = i + 1;
         proxy2.write(e);
         std::cout << "write\n";
     }
     proxy2.finished();
+    MPI_Finalize();
 }
-
