@@ -18,8 +18,10 @@ private:
     int* m_i_prod;
     // index of next data to read (for consumers). It resides in shared memory
     int* m_i_cons;
-    // semaphore esed to implement critical section during the manipulation of the buffer
-    named_semaphore m_mutex_buf;
+    // semaphore esed to implement critical section during the manipulation of the buffer for the producers
+    named_semaphore m_mutex_buf_prods;
+    // semaphore esed to implement critical section during the manipulation of the buffer for the consumers
+    named_semaphore m_mutex_buf_cons;
     // semaphore with value equals to the number of element stored in the circular buffer
     named_semaphore m_num_stored;
     // semaphore with value equals to the number of empty space in the circular buffer
@@ -35,7 +37,8 @@ public:
      */
 
     capio_proxy(const std::string & name, int n_producers, int buf_size = 1024) :
-            m_mutex_buf(open_or_create, ("mutex_buf" + name + "_capio_shm").c_str(), 1),
+            m_mutex_buf_prods(open_or_create, ("mutex_buf_prods" + name + "_capio_shm").c_str(), 1),
+            m_mutex_buf_cons(open_or_create, ("mutex_buf_cons" + name + "_capio_shm").c_str(), 1),
             m_num_stored(open_or_create, ("num_stored_" + name + "_capio_shm").c_str() , 0),
             m_num_empty(open_or_create, ("num_empty_" + name + "_capio_shm").c_str(), buf_size),
             m_mutex_num_producers(open_or_create, ("mutex_num_producers" + name + "_capio_shm").c_str(), 1),
@@ -64,6 +67,8 @@ public:
             named_semaphore::remove(("num_stored_" + m_shm_name).c_str());
             named_semaphore::remove(("num_empty_" + m_shm_name).c_str());
             named_semaphore::remove(("mutex_num_producers" + m_shm_name).c_str());
+            named_semaphore::remove(("mutex_buf_prods" + m_shm_name).c_str());
+            named_semaphore::remove(("mutex_buf_cons" + m_shm_name).c_str());
             shared_memory_object::remove(m_shm_name.c_str());
         }
     }
@@ -78,10 +83,10 @@ public:
     */
     void write(const T& data){
         m_num_empty.wait();
-        m_mutex_buf.wait();
+        m_mutex_buf_prods.wait();
         m_buffer[*m_i_prod % m_buf_size] = data;
         ++(*m_i_prod);
-        m_mutex_buf.post();
+        m_mutex_buf_prods.post();
         m_num_stored.post();
 
     }
@@ -99,15 +104,15 @@ public:
 
     bool read(T* data){
         bool res = false;
+        m_mutex_buf_cons.wait();
         if (! done()) {
             m_num_stored.wait();
-            m_mutex_buf.wait();
             *data = m_buffer[*m_i_cons % m_buf_size];
             ++(*m_i_cons);
-            m_mutex_buf.post();
             m_num_empty.post();
             res = true;
         }
+        m_mutex_buf_cons.post();
         return res;
     }
 
@@ -132,7 +137,7 @@ public:
     bool done() {
         bool finished;
         m_mutex_num_producers.wait();
-        finished = *m_num_producers == 0;
+        finished = (*m_num_producers) == 0;
         m_mutex_num_producers.post();
         return finished && (*m_i_prod == *m_i_cons);
     }
