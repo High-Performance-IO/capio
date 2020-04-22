@@ -30,13 +30,15 @@ private:
     named_semaphore m_mutex_num_producers;
     // true if the consumers have finished with the buffer, false otherwise
     int* m_num_producers;
+    // true if the process must free the resource when the proxy is destroyed, false otherwise
+    bool m_owner;
 public:
 
     /*
      * constructor
      */
 
-    capio_proxy(const std::string & name, int n_producers, int buf_size = 1024) :
+    capio_proxy(const std::string & name, int n_producers, bool owner, int buf_size = 1024) :
             m_mutex_buf_prods(open_or_create, ("mutex_buf_prods" + name + "_capio_shm").c_str(), 1),
             m_mutex_buf_cons(open_or_create, ("mutex_buf_cons" + name + "_capio_shm").c_str(), 1),
             m_num_stored(open_or_create, ("num_stored_" + name + "_capio_shm").c_str() , 0),
@@ -49,17 +51,19 @@ public:
         m_i_prod =  m_shm.find_or_construct<int>((m_shm_name + "_m_i_prod").c_str())(0);
         m_i_cons = m_shm.find_or_construct<int>((m_shm_name + "_m_i_cons").c_str())(0);
         m_num_producers = m_shm.find_or_construct<int>((m_shm_name + "m_num_producers").c_str())(n_producers);
+        m_owner = owner;
         //named_semaphore start_sem(open_or_create_t(), "start_sem", 0);
         //named_semaphore end_sem(open_or_create_t(), "end_sem", 0);
 
     }
 
     /*
-     * destructor frees the resources if the consumers have finished and if there aren't element in the buffer
+     * destructor frees the resources if the producers have finished and if there aren't element in the buffer
      */
 
     ~capio_proxy() {
-        if (*m_num_producers == 0 && *m_i_cons == *m_i_prod) {
+        if (*m_num_producers == 0 && *m_i_cons == *m_i_prod && m_owner) {
+            std::cout << "a consumer frees the resources" << std::endl;
             m_shm.destroy_ptr(m_num_producers);
             m_shm.destroy_ptr(m_buffer);
             m_shm.destroy_ptr(m_i_prod);
@@ -104,24 +108,36 @@ public:
 
     bool read(T* data){
         bool res = false;
-        m_mutex_buf_cons.wait();
-        if (! done()) {
-            m_num_stored.wait();
+        m_num_stored.wait();
+        if (done()) {
+            m_num_stored.post(); // avoid that someone is  blocked by m_num_stored if it's call this function again
+        }
+        else {
+            m_mutex_buf_cons.wait();
             *data = m_buffer[*m_i_cons % m_buf_size];
             ++(*m_i_cons);
+            m_mutex_buf_cons.post();
             m_num_empty.post();
             res = true;
         }
-        m_mutex_buf_cons.post();
         return res;
     }
 
     /*
      * the consumer use this function to informs the it has finished to use the buffer
+     *
+     * parameters NONE
+     *
+     * returns NONE
+     *
      */
+
     void finished() {
         m_mutex_num_producers.wait();
         --(*m_num_producers);
+        if ((*m_num_producers) == 0) {
+            m_num_stored.post(); // avoid that someone is  blocked by m_num_stored if it's call the function read again
+        }
         m_mutex_num_producers.post();
     }
 
