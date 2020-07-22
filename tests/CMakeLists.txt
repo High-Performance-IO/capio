@@ -1,8 +1,8 @@
 add_executable(write_shared_memory write_shared_memory.cpp ../capio.hpp)
 add_executable(read_shared_memory read_shared_memory.cpp ../capio.hpp)
 
-target_link_libraries(write_shared_memory ${MPI_LIBRARIES})
-target_link_libraries(read_shared_memory ${MPI_LIBRARIES})
+target_link_libraries(write_shared_memory ${MPI_LIBRARIES} rt Threads::Threads)
+target_link_libraries(read_shared_memory ${MPI_LIBRARIES} rt Threads::Threads)
 # Include MPI includes
 include_directories(${MPI_INCLUDE_PATH})
 if(MPI_COMPILE_FLAGS)

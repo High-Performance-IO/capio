@@ -69,12 +69,21 @@ void test_sequence_of_structs(int num_producers, int rank) {
 }
 
 int main(int argc, char** argv) {
-    int num_producers = std::stoi(argv[1]);
+    int num_producers;
     int rank;
     MPI_Init(&argc, &argv);
+    bool correct_input = true;
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
-    test_sequence_of_integers(num_producers, rank);
-    test_sequence_of_structs(num_producers, rank);
+    if (argc != 2) {
+        if (rank == 0)
+            std::cout << "input error: launch the program passing the number of producers as argument" << std::endl;
+        correct_input = false;
+    }
+    if (correct_input) {
+        num_producers = std::stoi(argv[1]);
+        test_sequence_of_integers(num_producers, rank);
+        test_sequence_of_structs(num_producers, rank);
+    }
     MPI_Finalize();
 }
 
