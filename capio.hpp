@@ -96,6 +96,27 @@ public:
     }
 
     /*
+    * It applies the data transformation and then it
+    * puts the data into the shared memory
+    *
+    * parameter:
+    * const T& data: data to put in shared memory
+    * const std::function<T(Q)>& func: function to be applied to data
+    * returns NONE
+    */
+
+    template <class Q>
+    void write(const Q& data, const std::function<T(Q)>& func){
+        m_num_empty.wait();
+        m_mutex_buf_prods.wait();
+        m_buffer[*m_i_prod % m_buf_size] = func(data);
+        ++(*m_i_prod);
+        m_mutex_buf_prods.post();
+        m_num_stored.post();
+
+    }
+
+    /*
      * read one unit of data from the shared memory
      *
      * parameters
