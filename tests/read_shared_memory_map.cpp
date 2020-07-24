@@ -1,7 +1,7 @@
 #include <iostream>
 #include <cassert>
 #include <mpi.h>
-#include "../capio.hpp"
+#include "../capio_proxy.hpp"
 
 /*
  * consumers that read a sequence of integers and a sequence of structs through the capio proxy

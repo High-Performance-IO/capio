@@ -1,6 +1,6 @@
 #include <iostream>
 #include <mpi.h>
-#include "../capio.hpp"
+#include "../capio_proxy.hpp"
 
 struct elem {
     int i;

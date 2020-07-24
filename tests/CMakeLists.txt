@@ -1,7 +1,7 @@
-add_executable(write_shared_memory write_shared_memory.cpp ../capio.hpp)
-add_executable(write_shared_memory_map write_shared_memory_map.cpp ../capio.hpp)
-add_executable(read_shared_memory read_shared_memory.cpp ../capio.hpp)
-add_executable(read_shared_memory_map read_shared_memory_map.cpp ../capio.hpp)
+add_executable(write_shared_memory write_shared_memory.cpp ../capio_proxy.hpp)
+add_executable(write_shared_memory_map write_shared_memory_map.cpp ../capio_proxy.hpp)
+add_executable(read_shared_memory read_shared_memory.cpp ../capio_proxy.hpp)
+add_executable(read_shared_memory_map read_shared_memory_map.cpp ../capio_proxy.hpp)
 
 target_link_libraries(write_shared_memory ${MPI_LIBRARIES} rt Threads::Threads)
 target_link_libraries(write_shared_memory_map ${MPI_LIBRARIES} rt Threads::Threads)
