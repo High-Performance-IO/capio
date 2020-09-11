@@ -1,5 +1,4 @@
 #include <iostream>
-#include <cassert>
 #include <mpi.h>
 #include "../capio_proxy.hpp"
 

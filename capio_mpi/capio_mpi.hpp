@@ -2,6 +2,8 @@
 #include <boost/interprocess/sync/named_semaphore.hpp>
 #include <string>
 
+#include "../queues/mpcs_queue.hpp"
+
 using namespace boost::interprocess;
 const int buf_size = 128;
 
@@ -12,67 +14,59 @@ private:
     int* m_num_active_recipients;
     int m_num_recipients;
     named_semaphore m_mutex_num_recipients;
-    named_semaphore** m_buffer_mutex_prods_array;
-    named_semaphore** m_buffers_num_empty;
-    named_semaphore** m_buffers_num_stored;
-    int** buffers_recipients;
-    int* prod_indexes;
-    int* cons_indexes;
+    mpsc_queue** queues_recipients;
+    mpsc_queue** collective_queues_recipients;
     int m_rank;
     bool m_recipient;
 
     void capio_init(int num_recipients) {
-
         std::string m_shm_name = "capio_shm";
         m_shm = managed_shared_memory(open_or_create, m_shm_name.c_str(),65536); //create only?
         m_num_active_recipients = m_shm.find_or_construct<int>("num_recipients")(num_recipients);
-        if (m_recipient) {
-            cons_indexes = m_shm.find_or_construct<int>("cons_indexes" )[num_recipients](0);
-        }
-        else {
-            prod_indexes = m_shm.find_or_construct<int>("prod_indexes" )[num_recipients](0);
-        }
+        queues_recipients = new mpsc_queue*[num_recipients];
+        collective_queues_recipients = new mpsc_queue*[num_recipients];
         for (int i = 0; i < num_recipients; ++i) {
-            int* buffer = m_shm.find_or_construct<int>(("consumer_buffer" + std::to_string(i)).c_str())[buf_size]();
-            const char* buffer_mutex_name = ("mutex_buffer_" + std::to_string(i)).c_str();
-            m_buffer_mutex_prods_array[i] = new named_semaphore(open_or_create, buffer_mutex_name, 1);
-            const char* num_empty_mutex_name = ("mutex_empty_" + std::to_string(i)).c_str();
-            m_buffers_num_empty[i] = new named_semaphore(open_or_create, num_empty_mutex_name, buf_size);
-            const char* num_stored_mutex_name = ("mutex_stored_" + std::to_string(i)).c_str();
-            m_buffers_num_stored[i] = new named_semaphore(open_or_create, num_stored_mutex_name, 0);
-            buffers_recipients[i] = buffer;
+            queues_recipients[i] = new mpsc_queue(m_shm, buf_size, i, m_recipient, "norm");
+            collective_queues_recipients[i] = new mpsc_queue(m_shm, buf_size, i, m_recipient, "coll");
         }
 
     }
 
     void capio_finalize() {
-        for (int i = 0; i < m_num_recipients; ++i) {
-            free(m_buffer_mutex_prods_array[i]);
-            free(m_buffers_num_empty[i]);
-            free(m_buffers_num_stored[i]);
-        }
-        free(m_buffer_mutex_prods_array);
-        free(m_buffers_num_empty);
-        free(m_buffers_num_stored);
-        free(buffers_recipients);
-
         if (m_recipient) {
             m_mutex_num_recipients.wait();
             --*m_num_active_recipients;
             m_mutex_num_recipients.post();
-            int* m_buffer = m_shm.find<int>(("consumer_buffer" + std::to_string(m_rank)).c_str()).first;
-            m_shm.destroy_ptr(m_buffer);
-            named_semaphore::remove(("mutex_buffer_" + std::to_string(m_rank)).c_str());
-            named_semaphore::remove(("mutex_empty_" + std::to_string(m_rank)).c_str());
-            named_semaphore::remove(("mutex_stored_" + std::to_string(m_rank)).c_str());
+            queues_recipients[m_rank]->clean_shared_memory(m_shm);
+            collective_queues_recipients[m_rank]->clean_shared_memory(m_shm);
             if (*m_num_active_recipients == 0) {
                 shared_memory_object::remove("num_recipients");
-                shared_memory_object::remove("prod_indexes");
-                shared_memory_object::remove("cons_indexes");
                 named_semaphore::remove("mutex_num_recipients_capio_shm");
                 shared_memory_object::remove("capio_shm");
             }
         }
+        for (int i = 0; i < m_num_recipients; ++i) {
+            free(queues_recipients[i]);
+            free(collective_queues_recipients[i]);
+        }
+        free(queues_recipients);
+        free(collective_queues_recipients);
+    }
+
+    void capio_recv(int* data, int count, mpsc_queue** queues) {
+        queues[m_rank]->read(data, count);
+    }
+
+    /*
+ * if sender and recipient are in the same machine, the sender
+ * write directly in the buffer of the recipient.
+ * Otherwise the sender wrote in the buffer of the capio process.
+ * The capio process will send the data to the capio process that resides
+ * in the same machine of the recipient
+ */
+
+    void capio_send(int* data, int count, int rank, mpsc_queue** queues) {
+        queues[rank]->write(data, count);
     }
 
 public:
@@ -81,10 +75,6 @@ public:
         m_mutex_num_recipients(open_or_create, "mutex_num_recipients_capio_shm", num_recipients) {
         m_recipient = recipient;
         m_rank = rank;
-        m_buffer_mutex_prods_array = new named_semaphore*[num_recipients];
-        m_buffers_num_empty = new named_semaphore*[num_recipients];
-        m_buffers_num_stored = new named_semaphore*[num_recipients];
-        buffers_recipients = new int*[num_recipients];
         capio_init(num_recipients);
         m_num_recipients = num_recipients;
     }
@@ -93,44 +83,36 @@ public:
         capio_finalize();
     }
 
+
     void capio_recv(int* data, int count) {
-        for (int i = 0; i < count; ++i) {
-            m_buffers_num_stored[m_rank]->wait();
-            *data =  buffers_recipients[m_rank][cons_indexes[m_rank]];
-            m_buffers_num_empty[m_rank]->post();
-            if (cons_indexes[m_rank] < buf_size - 1) {
-                ++cons_indexes[m_rank];
-            }
-            else {
-                cons_indexes[m_rank] = 0;
-            }
-        }
+        capio_recv(data, count, queues_recipients);
     }
-
-
-/*
- * if sender and recipient are in the same machine, the sender
- * write directly in the buffer of the recipient.
- * Otherwise the sender wrote in the buffer of the capio process.
- * The capio process will send the data to the capio process that resides
- * in the same machine of the recipient
- */
 
     void capio_send(int* data, int count, int rank) {
-        m_buffer_mutex_prods_array[rank]->wait();
-        int j = prod_indexes[rank];
-        for (int i = 0; i < count; ++i) {
-            m_buffers_num_empty[rank]->wait();
-            buffers_recipients[rank][j] = data[i];
-            m_buffers_num_stored[rank]->post();
-            if (prod_indexes[rank] < buf_size - 1) {
-                ++prod_indexes[rank];
-            }
-            else {
-                prod_indexes[rank] = 0;
-            }
-        }
-        m_buffer_mutex_prods_array[rank]->post();
+        capio_send(data, count, rank, queues_recipients);
     }
+
+    void capio_scatter(int* send_data, int send_count, int* recv_data, int recv_count) {
+        if (m_recipient) {
+            capio_recv(recv_data, recv_count, collective_queues_recipients);
+        }
+        else {
+                for (int j = 0; j < m_num_recipients; ++j) {
+                    capio_send(send_data + j * recv_count, recv_count, j, collective_queues_recipients);
+                }
+        }
+    }
+
+    void capio_gather(int* send_data, int send_count, int* recv_data, int recv_count, int root) {
+        if (m_recipient) {
+          if (m_rank == root) {
+              capio_recv(recv_data, recv_count, collective_queues_recipients);
+          }
+        }
+        else {
+            capio_send(send_data, send_count, root, collective_queues_recipients);
+        }
+    }
+    
 
 };
