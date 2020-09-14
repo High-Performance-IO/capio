@@ -22,9 +22,9 @@ int main(int argc, char** argv) {
     if (NUM_ELEM % size == 0) {
         int array_length = NUM_ELEM / size;
         data = new int[array_length];
-        capio.capio_scatter(nullptr, 0, data, array_length);
+        capio.capio_scatter(nullptr, data, array_length);
         print_array(data, array_length, rank);
-        capio.capio_scatter(nullptr, 0, data, array_length);
+        capio.capio_scatter(nullptr, data, array_length);
         print_array(data, array_length, rank);
         free(data);
     }

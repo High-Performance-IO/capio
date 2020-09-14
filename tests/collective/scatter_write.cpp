@@ -28,9 +28,9 @@ int main(int argc, char** argv) {
 
     if (rank == 0) {
         initialize(data, 0);
-        capio.capio_scatter(data, NUM_ELEM, nullptr, NUM_ELEM / num_cons);
+        capio.capio_scatter(data, nullptr, NUM_ELEM / num_cons);
         initialize(data, 1);
-        capio.capio_scatter(data, NUM_ELEM, nullptr, NUM_ELEM / num_cons);
+        capio.capio_scatter(data, nullptr, NUM_ELEM / num_cons);
     }
     std::cout << "writer " << rank << "ended " << std::endl;
     MPI_Finalize();
