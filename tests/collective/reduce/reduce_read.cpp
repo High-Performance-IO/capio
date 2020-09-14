@@ -24,6 +24,10 @@ int main(int argc, char** argv) {
     if (rank == 0) {
         print_array(data, NUM_ELEM, rank);
     }
+    capio.capio_reduce(nullptr, data, NUM_ELEM, MPI_INT, nullptr, 0, 0);
+    if (rank == 0) {
+        print_array(data, NUM_ELEM, rank);
+    }
     free(data);
     std::cout << "reader " << rank << " ended " << std::endl;
     MPI_Finalize();
