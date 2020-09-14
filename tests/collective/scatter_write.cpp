@@ -4,9 +4,10 @@
 
 int const NUM_ELEM = 100;
 
-void initialize(int data[]) {
+void initialize(int data[], int num) {
     for (int i = 0; i < NUM_ELEM; ++i) {
-        data[i] = i;
+        data[i] = num;
+        ++num;
     }
 }
 
@@ -24,8 +25,11 @@ int main(int argc, char** argv) {
     int num_cons = std::stoi(argv[1]);
     capio_mpi capio(num_cons, false);
     std::cout << "writer " << rank << "created capio object" << std::endl;
-    initialize(data);
+
     if (rank == 0) {
+        initialize(data, 0);
+        capio.capio_scatter(data, NUM_ELEM, nullptr, NUM_ELEM / num_cons);
+        initialize(data, 1);
         capio.capio_scatter(data, NUM_ELEM, nullptr, NUM_ELEM / num_cons);
     }
     std::cout << "writer " << rank << "ended " << std::endl;
