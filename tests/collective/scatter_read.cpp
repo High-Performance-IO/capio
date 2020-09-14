@@ -26,6 +26,7 @@ int main(int argc, char** argv) {
         print_array(data, array_length, rank);
         capio.capio_scatter(nullptr, 0, data, array_length);
         print_array(data, array_length, rank);
+        free(data);
     }
     std::cout << "reader " << rank << " ended " << std::endl;
     MPI_Finalize();
