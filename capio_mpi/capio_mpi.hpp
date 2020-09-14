@@ -57,15 +57,24 @@ private:
     }
 
     /*
- * if sender and recipient are in the same machine, the sender
- * write directly in the buffer of the recipient.
- * Otherwise the sender wrote in the buffer of the capio process.
- * The capio process will send the data to the capio process that resides
- * in the same machine of the recipient
- */
+     * if sender and recipient are in the same machine, the sender
+     * write directly in the buffer of the recipient.
+     * Otherwise the sender wrote in the buffer of the capio process.
+     * The capio process will send the data to the capio process that resides
+     * in the same machine of the recipient
+     */
 
     void capio_send(int* data, int count, int rank, mpsc_queue** queues) {
         queues[rank]->write(data, count);
+    }
+
+    /*
+     * return the rank of a producer that resides in the same machine
+     * of the consumer with rank equals to root
+     */
+
+    int get_process_same_machine(int root) {
+        return root;
     }
 
 public:
@@ -130,6 +139,38 @@ public:
                     MPI_Send(nullptr, 0, MPI_INT, 0, 0, MPI_COMM_WORLD);
                 }
             }
+        }
+    }
+
+    /*
+     * MPI_Reduce(
+    void* send_data,
+    void* recv_data,
+    int count,
+    MPI_Datatype datatype,
+    MPI_Op op,
+    int root,
+    MPI_Comm communicator)
+
+     */
+    void capio_reduce(int* send_data, int* recv_data, int count, MPI_Datatype data_type, void(*func)(void*, void*, int*, MPI_Datatype*), int root, int prod_rank) {
+        MPI_Op operation;
+        int* tmp_buf;
+        int process_same_machine = get_process_same_machine(root);
+        if (! m_recipient) {
+            MPI_Op_create(func, 1, &operation);
+            tmp_buf = new int[count];
+            std::cout << "process rank " << prod_rank << "before reduce" << std::endl;
+            MPI_Reduce(send_data, tmp_buf, count, data_type, operation, process_same_machine, MPI_COMM_WORLD);
+            std::cout << "process rank " << prod_rank << "after reduce" << std::endl;
+            if (prod_rank == process_same_machine) {
+                capio_send(tmp_buf, count, root);
+            }
+            free(tmp_buf);
+            MPI_Op_free(&operation);
+        }
+        else if (root == m_rank) {
+            capio_recv(recv_data, count);
         }
     }
 
