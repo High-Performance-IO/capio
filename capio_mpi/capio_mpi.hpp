@@ -142,17 +142,7 @@ public:
         }
     }
 
-    /*
-     * MPI_Reduce(
-    void* send_data,
-    void* recv_data,
-    int count,
-    MPI_Datatype datatype,
-    MPI_Op op,
-    int root,
-    MPI_Comm communicator)
 
-     */
     void capio_reduce(int* send_data, int* recv_data, int count, MPI_Datatype data_type, void(*func)(void*, void*, int*, MPI_Datatype*), int root, int prod_rank) {
         MPI_Op operation;
         int* tmp_buf;
@@ -164,13 +154,13 @@ public:
             MPI_Reduce(send_data, tmp_buf, count, data_type, operation, process_same_machine, MPI_COMM_WORLD);
             std::cout << "process rank " << prod_rank << "after reduce" << std::endl;
             if (prod_rank == process_same_machine) {
-                capio_send(tmp_buf, count, root);
+                capio_send(tmp_buf, count, root, collective_queues_recipients);
             }
             free(tmp_buf);
             MPI_Op_free(&operation);
         }
         else if (root == m_rank) {
-            capio_recv(recv_data, count);
+            capio_recv(recv_data, count, collective_queues_recipients);
         }
     }
 
