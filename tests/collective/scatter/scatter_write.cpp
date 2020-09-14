@@ -1,18 +1,18 @@
 #include <iostream>
 #include <mpi.h>
-#include "../../capio_mpi/capio_mpi.hpp"
+#include "../../../capio_mpi/capio_mpi.hpp"
 
 int const NUM_ELEM = 100;
 
-void initialize(int data[], int size, int num) {
-    for (int i = 0; i < size; ++i) {
+void initialize(int data[], int num) {
+    for (int i = 0; i < NUM_ELEM; ++i) {
         data[i] = num;
         ++num;
     }
 }
 
 int main(int argc, char** argv) {
-    int* data;
+    int data[NUM_ELEM];
     int rank, size;
     MPI_Init(&argc, &argv);
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
@@ -25,14 +25,12 @@ int main(int argc, char** argv) {
     int num_cons = std::stoi(argv[1]);
     capio_mpi capio(num_cons, false);
     std::cout << "writer " << rank << "created capio object" << std::endl;
-    if (NUM_ELEM % size == 0) {
-        int array_length = NUM_ELEM / size;
-        data = new int[array_length];
-        initialize(data, array_length, rank);
-        capio.capio_gather(data, array_length, nullptr, -1, 0);
-        initialize(data, array_length, rank + 1);
-        capio.capio_gather(data, array_length, nullptr, -1, 0);
-        free(data);
+
+    if (rank == 0) {
+        initialize(data, 0);
+        capio.capio_scatter(data, nullptr, NUM_ELEM / num_cons);
+        initialize(data, 1);
+        capio.capio_scatter(data, nullptr, NUM_ELEM / num_cons);
     }
     std::cout << "writer " << rank << "ended " << std::endl;
     MPI_Finalize();

@@ -1,6 +1,6 @@
 #include <iostream>
 #include <mpi.h>
-#include "../../capio_mpi/capio_mpi.hpp"
+#include "../../../capio_mpi/capio_mpi.hpp"
 
 int const NUM_ELEM = 100;
 
