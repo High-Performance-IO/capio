@@ -23,6 +23,8 @@ int main(int argc, char** argv) {
         data = new int[NUM_ELEM];
         capio.capio_gather(nullptr, 0, data, NUM_ELEM, 0);
         print_array(data, NUM_ELEM, rank);
+        capio.capio_gather(nullptr, 0, data, NUM_ELEM, 0);
+        print_array(data, NUM_ELEM, rank);
         free(data);
     }
     std::cout << "reader " << rank << " ended " << std::endl;

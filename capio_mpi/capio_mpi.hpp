@@ -110,15 +110,25 @@ public:
         }
         else {
             int num_prods; //number of producers
-            int rank, msg = 0;
+            int rank;
             MPI_Comm_size(MPI_COMM_WORLD, &num_prods);
             MPI_Comm_rank(MPI_COMM_WORLD, &rank);
             if (rank > 0) {
-                MPI_Recv(&msg, 1, MPI_INT, rank - 1, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+                MPI_Recv(nullptr, 0, MPI_INT, rank - 1, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
             }
             capio_send(send_data, send_count, root, collective_queues_recipients);
             if (rank < (num_prods - 1)) {
-                MPI_Send(&msg, 0, MPI_INT, rank + 1, 0, MPI_COMM_WORLD);
+                MPI_Send(nullptr, 0, MPI_INT, rank + 1, 0, MPI_COMM_WORLD);
+            }
+
+            // to avoid that the two calls of capio_gather interfere with each other
+            if (num_prods > 1) {
+                if (rank == 0) {
+                    MPI_Recv(nullptr, 0, MPI_INT, num_prods - 1, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+                }
+                else if (rank == num_prods - 1) {
+                    MPI_Send(nullptr, 0, MPI_INT, 0, 0, MPI_COMM_WORLD);
+                }
             }
         }
     }

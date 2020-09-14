@@ -30,6 +30,8 @@ int main(int argc, char** argv) {
         data = new int[array_length];
         initialize(data, array_length, rank);
         capio.capio_gather(data, array_length, nullptr, -1, 0);
+        initialize(data, array_length, rank + 1);
+        capio.capio_gather(data, array_length, nullptr, -1, 0);
         free(data);
     }
     std::cout << "writer " << rank << "ended " << std::endl;
