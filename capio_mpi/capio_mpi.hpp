@@ -1,7 +1,6 @@
+#include <string>
 #include <boost/interprocess/managed_shared_memory.hpp>
 #include <boost/interprocess/sync/named_semaphore.hpp>
-#include <string>
-
 #include "../queues/mpcs_queue.hpp"
 
 using namespace boost::interprocess;
@@ -110,7 +109,17 @@ public:
           }
         }
         else {
+            int num_prods; //number of producers
+            int rank, msg = 0;
+            MPI_Comm_size(MPI_COMM_WORLD, &num_prods);
+            MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+            if (rank > 0) {
+                MPI_Recv(&msg, 1, MPI_INT, rank - 1, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+            }
             capio_send(send_data, send_count, root, collective_queues_recipients);
+            if (rank < (num_prods - 1)) {
+                MPI_Send(&msg, 0, MPI_INT, rank + 1, 0, MPI_COMM_WORLD);
+            }
         }
     }
     
