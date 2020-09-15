@@ -29,9 +29,9 @@ int main(int argc, char** argv) {
         int array_length = NUM_ELEM / num_cons;
         data = new int[array_length];
         initialize(data, array_length, rank);
-        capio.capio_gather_all(data, array_length, nullptr, -1);
+        capio.capio_all_gather(data, array_length, nullptr, -1);
         initialize(data, array_length, rank + 1);
-        capio.capio_gather_all(data, array_length, nullptr, -1);
+        capio.capio_all_gather(data, array_length, nullptr, -1);
         free(data);
     }
     std::cout << "writer " << rank << "ended " << std::endl;

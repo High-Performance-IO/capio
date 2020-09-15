@@ -143,7 +143,7 @@ public:
     }
 
 
-    void capio_gather_all(int* send_data, int send_count, int* recv_data, int recv_count) {
+    void capio_all_gather(int* send_data, int send_count, int* recv_data, int recv_count) {
         if (m_recipient) {
                 capio_recv(recv_data, recv_count, collective_queues_recipients);
         }
