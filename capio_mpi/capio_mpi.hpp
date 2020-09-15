@@ -143,6 +143,38 @@ public:
     }
 
 
+    void capio_gather_all(int* send_data, int send_count, int* recv_data, int recv_count) {
+        if (m_recipient) {
+                capio_recv(recv_data, recv_count, collective_queues_recipients);
+        }
+        else {
+            int num_prods; //number of producers
+            int rank;
+            MPI_Comm_size(MPI_COMM_WORLD, &num_prods);
+            MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+
+            for (int i = 0; i < m_num_recipients; ++i) {
+                if (rank > 0) {
+                    MPI_Recv(nullptr, 0, MPI_INT, rank - 1, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+                }
+                capio_send(send_data, send_count, i, collective_queues_recipients);
+                if (rank < (num_prods - 1)) {
+                    MPI_Send(nullptr, 0, MPI_INT, rank + 1, 0, MPI_COMM_WORLD);
+                }
+            }
+            // to avoid that the two calls of capio_gather interfere with each other
+            if (num_prods > 1) {
+                if (rank == 0) {
+                    MPI_Recv(nullptr, 0, MPI_INT, num_prods - 1, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+                }
+                else if (rank == num_prods - 1) {
+                    MPI_Send(nullptr, 0, MPI_INT, 0, 0, MPI_COMM_WORLD);
+                }
+            }
+        }
+    }
+
+
     void capio_reduce(int* send_data, int* recv_data, int count, MPI_Datatype data_type, void(*func)(void*, void*, int*, MPI_Datatype*), int root, int prod_rank) {
         MPI_Op operation;
         int* tmp_buf;
@@ -165,7 +197,7 @@ public:
     }
 
     /*
-     * capio_all_to_all is an extension of capio_all_to_all to the case where each process
+     * capio_all_to_all is an extension of capio_gather_all to the case where each process
      * sends distinct data to each of the receivers. The j-th block sent from process i is received
      * by process j and is placed in the i-th block of recv_data.
      */

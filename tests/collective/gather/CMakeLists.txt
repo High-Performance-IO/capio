@@ -1,4 +1,3 @@
-
 add_executable(gather_write gather_write.cpp ../../../capio_mpi/capio_mpi.hpp)
 add_executable(gather_read gather_read.cpp ../../../capio_mpi/capio_mpi.hpp)
 

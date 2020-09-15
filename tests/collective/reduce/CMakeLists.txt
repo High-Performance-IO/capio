@@ -1,4 +1,3 @@
-
 add_executable(reduce_write reduce_write.cpp ../../../capio_mpi/capio_mpi.hpp)
 add_executable(reduce_read reduce_read.cpp ../../../capio_mpi/capio_mpi.hpp)
 

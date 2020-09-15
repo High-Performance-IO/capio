@@ -1,4 +1,3 @@
-
 add_executable(scatter_write scatter_write.cpp ../../../capio_mpi/capio_mpi.hpp)
 add_executable(scatter_read scatter_read.cpp ../../../capio_mpi/capio_mpi.hpp)
 

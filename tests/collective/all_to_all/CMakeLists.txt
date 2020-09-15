@@ -1,4 +1,3 @@
-
 add_executable(all_to_all_write all_to_all_write.cpp ../../../capio_mpi/capio_mpi.hpp)
 add_executable(all_to_all_read all_to_all_read.cpp ../../../capio_mpi/capio_mpi.hpp)
 
