@@ -1,6 +1,7 @@
 #include <string>
 #include <boost/interprocess/managed_shared_memory.hpp>
 #include <boost/interprocess/sync/named_semaphore.hpp>
+#include <vector>
 #include "../queues/mpcs_queue.hpp"
 
 using namespace boost::interprocess;
@@ -73,8 +74,8 @@ private:
      * of the consumer with rank equals to root
      */
 
-    int get_process_same_machine(int root) {
-        return root;
+    int get_process_same_machine(int root, int size) {
+        return root % size;
     }
 
 public:
@@ -178,8 +179,10 @@ public:
     void capio_reduce(int* send_data, int* recv_data, int count, MPI_Datatype data_type, void(*func)(void*, void*, int*, MPI_Datatype*), int root, int prod_rank) {
         MPI_Op operation;
         int* tmp_buf;
-        int process_same_machine = get_process_same_machine(root);
         if (! m_recipient) {
+            int size;
+            MPI_Comm_size(MPI_COMM_WORLD, &size);
+            int process_same_machine = get_process_same_machine(root, size);
             MPI_Op_create(func, 1, &operation);
             tmp_buf = new int[count];
             std::cout << "process rank " << prod_rank << "before reduce" << std::endl;
@@ -192,6 +195,34 @@ public:
             MPI_Op_free(&operation);
         }
         else if (root == m_rank) {
+            capio_recv(recv_data, count, collective_queues_recipients);
+        }
+    }
+
+    void capio_all_reduce(int* send_data, int* recv_data, int count, MPI_Datatype data_type,
+                          void(*func)(void*, void*, int*, MPI_Datatype*), int prod_rank) {
+        MPI_Op operation;
+        int* tmp_buf;
+        if (! m_recipient) {
+            int size;
+            MPI_Comm_size(MPI_COMM_WORLD, &size);
+            std::vector<std::vector<int>> processes_same_machine(size);
+            for (int i = 0; i < m_num_recipients; ++i) {
+                processes_same_machine[get_process_same_machine(i, size)].push_back(i);
+            }
+            MPI_Op_create(func, 1, &operation);
+            tmp_buf = new int[count];
+            std::cout << "process rank " << prod_rank << "before reduce" << std::endl;
+            MPI_Allreduce(send_data, tmp_buf, count, data_type, operation, MPI_COMM_WORLD);
+            std::cout << "process rank " << prod_rank << "after reduce" << std::endl;
+            std::vector<int> recipients = processes_same_machine[prod_rank];
+            for (int recipient : recipients) {
+                capio_send(tmp_buf, count, recipient, collective_queues_recipients);
+            }
+            free(tmp_buf);
+            MPI_Op_free(&operation);
+        }
+        else {
             capio_recv(recv_data, count, collective_queues_recipients);
         }
     }
