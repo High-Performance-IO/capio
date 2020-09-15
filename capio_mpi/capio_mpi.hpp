@@ -164,4 +164,42 @@ public:
         }
     }
 
+    /*
+     * capio_all_to_all is an extension of capio_all_to_all to the case where each process
+     * sends distinct data to each of the receivers. The j-th block sent from process i is received
+     * by process j and is placed in the i-th block of recv_data.
+     */
+
+    void capio_all_to_all(int* send_data, int send_count, int* recv_data, int num_prods) {
+        if (m_recipient) {
+            for (int i = 0; i < num_prods; ++i) {
+                capio_recv(recv_data + i * send_count, send_count, collective_queues_recipients);
+            }
+        }
+        else {
+            int rank;
+            MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+            if (rank > 0) {
+                MPI_Recv(nullptr, 0, MPI_INT, rank - 1, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+            }
+            for (int i = 0; i < m_num_recipients; ++i) {
+                capio_send(send_data + i * send_count, send_count, i, collective_queues_recipients);
+            }
+            if (rank < (num_prods - 1)) {
+                MPI_Send(nullptr, 0, MPI_INT, rank + 1, 0, MPI_COMM_WORLD);
+            }
+
+            // to avoid that the two calls of capio_gather interfere with each other
+            if (num_prods > 1) {
+                if (rank == 0) {
+                    MPI_Recv(nullptr, 0, MPI_INT, num_prods - 1, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+                }
+                else if (rank == num_prods - 1) {
+                    MPI_Send(nullptr, 0, MPI_INT, 0, 0, MPI_COMM_WORLD);
+                }
+            }
+        }
+    }
+
+
 };
