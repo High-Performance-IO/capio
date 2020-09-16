@@ -265,4 +265,19 @@ public:
     }
 
 
+    void capio_broadcast(int* buffer, int count, int root) {
+        if (m_recipient) {
+            capio_recv(buffer, count, collective_queues_recipients);
+        }
+        else {
+            int rank;
+            MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+            if (rank == root) {
+                for (int i = 0; i < m_num_recipients; ++i) {
+                    capio_send(buffer, count, i, collective_queues_recipients);
+                }
+            }
+        }
+    }
+
 };
