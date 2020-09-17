@@ -24,14 +24,10 @@ int main(int argc, char** argv) {
     if (rank == 0) {
         capio.capio_gather(nullptr, 0, data, NUM_ELEM, 0);
         compute_expected_result_gather(expected_result, NUM_ELEM, num_prods, 0);
-        print_array(data, NUM_ELEM, rank);
-        std::cout << "expected: " << std::endl;
-        print_array(expected_result, NUM_ELEM, rank);
+        compare_expected_actual(data, expected_result, NUM_ELEM);
         capio.capio_gather(nullptr, 0, data, NUM_ELEM, 0);
         compute_expected_result_gather(expected_result, NUM_ELEM, num_prods, 1);
-        print_array(data, NUM_ELEM, rank);
-        std::cout << "expected: " << std::endl;
-        print_array(expected_result, NUM_ELEM, rank);
+        compare_expected_actual(data, expected_result, NUM_ELEM);
     }
     std::cout << "reader " << rank << " ended " << std::endl;
     MPI_Finalize();
