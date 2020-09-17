@@ -14,3 +14,13 @@ void compare_expected_actual(int* actual, int* expected, int array_length) {
     }
 }
 
+void compute_expected_result_gather(int* expected_result, int array_length, int num_prods, int start) {
+    for (int i = 0, num = start; i < array_length; ++i) {
+        expected_result[i] = num;
+        ++num;
+        if ((i + 1) % (array_length / num_prods) == 0) {
+            ++start;
+            num = start;
+        }
+    }
+}
