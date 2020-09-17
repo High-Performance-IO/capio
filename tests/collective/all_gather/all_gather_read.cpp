@@ -2,6 +2,7 @@
 #include <assert.h>
 #include <mpi.h>
 #include "../../../capio_mpi/capio_mpi.hpp"
+#include "../../common/utils.hpp"
 
 int const NUM_ELEM = 100;
 
@@ -13,12 +14,6 @@ void compute_expected_result(int* expected_result, int array_length, int num_pro
            ++start;
            num = start;
        }
-    }
-}
-
-void compare_expected_actual(int* actual, int* expected, int array_length) {
-    for (int i = 0; i < array_length; ++i) {
-        assert(actual[i] == expected[i]);
     }
 }
 
