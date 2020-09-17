@@ -24,3 +24,12 @@ void compute_expected_result_gather(int* expected_result, int array_length, int 
         }
     }
 }
+
+void compute_expected_result_reduce(int* expected_result, int array_length, int num_prods, int start) {
+    for (int i = 0; i < array_length; ++i) {
+        expected_result[i] = 0;
+        for (int j = 0; j < num_prods; ++j) {
+            expected_result[i] += j + start + i;
+        }
+    }
+}

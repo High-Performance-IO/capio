@@ -1,5 +1,4 @@
 #include <iostream>
-#include <assert.h>
 #include <mpi.h>
 #include "../../../capio_mpi/capio_mpi.hpp"
 #include "../../common/utils.hpp"

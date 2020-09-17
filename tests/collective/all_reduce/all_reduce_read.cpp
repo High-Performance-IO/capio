@@ -6,18 +6,6 @@ int const NUM_ELEM = 100;
 
 
 
-void compute_expected_result(int* expected_result, int array_length, int num_prods, int start) {
-    for (int i = 0; i < array_length; ++i) {
-        expected_result[i] = 0;
-        for (int j = 0; j < num_prods; ++j) {
-            expected_result[i] += j + start + i;
-        }
-    }
-}
-
-
-
-
 int main(int argc, char** argv) {
     int* data, *expected_result;
     int rank, size;
@@ -36,10 +24,10 @@ int main(int argc, char** argv) {
         data = new int[NUM_ELEM];
         expected_result = new int[NUM_ELEM];
         capio.capio_all_reduce(nullptr, data, NUM_ELEM, MPI_INT, nullptr, -1);
-        compute_expected_result(expected_result, NUM_ELEM, num_prods, 0);
+        compute_expected_result_reduce(expected_result, NUM_ELEM, num_prods, 0);
         compare_expected_actual(data, expected_result, NUM_ELEM);
         capio.capio_all_reduce(nullptr, data, NUM_ELEM, MPI_INT, nullptr, -1);
-        compute_expected_result(expected_result, NUM_ELEM, num_prods, 1);
+        compute_expected_result_reduce(expected_result, NUM_ELEM, num_prods, 1);
         compare_expected_actual(data, expected_result, NUM_ELEM);
         free(data);
         free(expected_result);
