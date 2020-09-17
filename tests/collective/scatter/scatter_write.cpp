@@ -1,15 +1,9 @@
 #include <iostream>
 #include <mpi.h>
 #include "../../../capio_mpi/capio_mpi.hpp"
+#include "../../common/utils.hpp"
 
 int const NUM_ELEM = 100;
-
-void initialize(int data[], int num) {
-    for (int i = 0; i < NUM_ELEM; ++i) {
-        data[i] = num;
-        ++num;
-    }
-}
 
 int main(int argc, char** argv) {
     int data[NUM_ELEM];
@@ -27,9 +21,9 @@ int main(int argc, char** argv) {
     std::cout << "writer " << rank << "created capio object" << std::endl;
 
     if (rank == 0) {
-        initialize(data, 0);
+        initialize(data, NUM_ELEM, 0);
         capio.capio_scatter(data, nullptr, NUM_ELEM / num_cons);
-        initialize(data, 1);
+        initialize(data, NUM_ELEM, 1);
         capio.capio_scatter(data, nullptr, NUM_ELEM / num_cons);
     }
     std::cout << "writer " << rank << "ended " << std::endl;

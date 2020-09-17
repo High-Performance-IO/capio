@@ -1,6 +1,7 @@
 #include <iostream>
 #include <mpi.h>
 #include "../../../capio_mpi/capio_mpi.hpp"
+#include "../../common/utils.hpp"
 
 int const NUM_ELEM = 100;
 
@@ -10,14 +11,6 @@ void sum(void* input_data, void* output_data, int* count, MPI_Datatype* data_typ
 
     for(int i = 0; i < *count; i++) {
         output[i] += input[i];
-    }
-}
-
-
-void initialize(int data[], int size, int num) {
-    for (int i = 0; i < size; ++i) {
-        data[i] = num;
-        ++num;
     }
 }
 

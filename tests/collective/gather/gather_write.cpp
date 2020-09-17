@@ -1,15 +1,9 @@
 #include <iostream>
 #include <mpi.h>
 #include "../../../capio_mpi/capio_mpi.hpp"
+#include "../../common/utils.hpp"
 
 int const NUM_ELEM = 100;
-
-void initialize(int data[], int size, int num) {
-    for (int i = 0; i < size; ++i) {
-        data[i] = num;
-        ++num;
-    }
-}
 
 int main(int argc, char** argv) {
     int* data;

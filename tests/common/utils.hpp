@@ -1,6 +1,13 @@
 #include <iostream>
 #include <assert.h>
 
+void initialize(int data[], int size, int num) {
+    for (int i = 0; i < size; ++i) {
+        data[i] = num;
+        ++num;
+    }
+}
+
 void print_array(int data[], int array_length, int rank) {
     std::cout << "array_length: " << array_length << std::endl;
     for (int i = 0; i < array_length; ++i) {
