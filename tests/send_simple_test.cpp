@@ -12,7 +12,6 @@
  */
 
 int main(int argc, char** argv) {
-    int num = 0;
     int rank, recipient_rank, size;
     MPI_Init(&argc, &argv);
     MPI_Comm_size(MPI_COMM_WORLD, &size);
@@ -21,9 +20,7 @@ int main(int argc, char** argv) {
     std::cout << "writer " << rank << "created capio object" << std::endl;
     recipient_rank = rank;
     for (int i = 0; i < 100; ++i) {
-        std::cout << "writer " << rank << ": " << num << std::endl;
-        capio.capio_send(&num, 1, recipient_rank);
-        ++num;
+        capio.capio_send(&i, 1, recipient_rank);
     }
     std::cout << "writer " << rank << "ended " << std::endl;
     MPI_Finalize();

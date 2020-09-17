@@ -1,7 +1,7 @@
 #include <iostream>
 #include <mpi.h>
 #include "../capio_mpi/capio_mpi.hpp"
-
+#include "common/utils.hpp"
 
 /*
  * test capio_recv. To use with send_simple_test.cpp
@@ -22,7 +22,7 @@ int main(int argc, char** argv) {
     std::cout << "reader " << rank << "created capio object" << std::endl;
     for (int i = 0; i < 100; ++i) {
         capio.capio_recv(&num, 1);
-        std::cout << "reader " << rank << ": " << num << std::endl;
+        compare_expected_actual(&num, &i, 1);
     }
     std::cout << "reader " << rank << "ended " << std::endl;
     MPI_Finalize();
