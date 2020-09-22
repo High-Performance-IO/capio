@@ -1,4 +1,5 @@
 add_subdirectory(collective)
+add_subdirectory(config_reader)
 
 add_executable(write_shared_memory write_shared_memory.cpp ../capio_proxy.hpp)
 add_executable(write_shared_memory_map write_shared_memory_map.cpp ../capio_proxy.hpp)
