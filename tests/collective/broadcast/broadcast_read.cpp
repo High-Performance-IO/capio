@@ -19,7 +19,13 @@ int main(int argc, char** argv) {
     MPI_Init(&argc, &argv);
     MPI_Comm_size(MPI_COMM_WORLD, &size);
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
-    capio_mpi capio(size, true, rank);
+    if (argc != 2) {
+        std::cout << "input error: config file needed" << std::endl;
+        MPI_Finalize();
+        return 1;
+    }
+    std::string config_path = argv[1];
+    capio_mpi capio(size, true, rank, config_path);
     std::cout << "reader " << rank << " before created capio object" << std::endl;
     compute_expected_result(expected_result, NUM_ELEM);
     capio.capio_broadcast(data, NUM_ELEM, 0);
@@ -28,4 +34,5 @@ int main(int argc, char** argv) {
     compare_expected_actual(data, expected_result, NUM_ELEM);
     std::cout << "reader " << rank << " ended " << std::endl;
     MPI_Finalize();
+    return 0;
 }

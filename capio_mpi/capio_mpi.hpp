@@ -2,7 +2,9 @@
 #include <boost/interprocess/managed_shared_memory.hpp>
 #include <boost/interprocess/sync/named_semaphore.hpp>
 #include <vector>
+#include <mpi.h>
 #include "../queues/mpcs_queue.hpp"
+#include "../config_reader/config_reader.hpp"
 
 using namespace boost::interprocess;
 const int buf_size = 128;
@@ -16,6 +18,8 @@ private:
     named_semaphore m_mutex_num_recipients;
     mpsc_queue** queues_recipients;
     mpsc_queue** collective_queues_recipients;
+    mpsc_queue* capio_queue;
+    config_type config;
     int m_rank;
     bool m_recipient;
 
@@ -23,6 +27,7 @@ private:
         std::string m_shm_name = "capio_shm";
         m_shm = managed_shared_memory(open_or_create, m_shm_name.c_str(),65536); //create only?
         m_num_active_recipients = m_shm.find_or_construct<int>("num_recipients")(num_recipients);
+        capio_queue = new mpsc_queue(m_shm, 128, 0, false, "capio");
         queues_recipients = new mpsc_queue*[num_recipients];
         collective_queues_recipients = new mpsc_queue*[num_recipients];
         for (int i = 0; i < num_recipients; ++i) {
@@ -30,6 +35,27 @@ private:
             collective_queues_recipients[i] = new mpsc_queue(m_shm, buf_size, i, m_recipient, "coll");
         }
 
+    }
+    /*
+     * for each node, the producer with minimum rank in that node sends a msg for terminating the capio processes
+     * in that node
+     */
+
+    void terminate_capio_process() {
+        std::unordered_map<int, int> prod_node_map = config["app1"];
+        int i = 0;
+        auto it = prod_node_map.find(i);
+        int machine = -1;
+        int prod_machine;
+        int end_msg = -1;
+        while (it != prod_node_map.end()) {
+            prod_machine = it->second;
+            if (prod_machine != machine) {
+                capio_queue->write(&end_msg, 1);
+            }
+            ++i;
+            it = prod_node_map.find(i);
+        }
     }
 
     void capio_finalize() {
@@ -45,12 +71,35 @@ private:
                 shared_memory_object::remove("capio_shm");
             }
         }
+        else {
+            terminate_capio_process();
+        }
+        free(capio_queue);
         for (int i = 0; i < m_num_recipients; ++i) {
             free(queues_recipients[i]);
             free(collective_queues_recipients[i]);
         }
         free(queues_recipients);
         free(collective_queues_recipients);
+    }
+
+    int get_machine(int rank, bool recipient) {
+        int machine;
+        if (recipient) {
+            machine = config["app2"][rank];
+        }
+        else {
+            machine = config["app1"][rank];
+        }
+        return machine;
+    }
+
+    /*
+     * called by the producer
+     */
+
+    bool same_machine(int rank) {
+        return get_machine(m_rank, false) == get_machine(rank, true);
     }
 
     void capio_recv(int* data, int count, mpsc_queue** queues) {
@@ -66,26 +115,61 @@ private:
      */
 
     void capio_send(int* data, int count, int rank, mpsc_queue** queues) {
-        queues[rank]->write(data, count);
+        mpsc_queue* queue = queues[rank];
+        if (same_machine(rank)) {
+            queue->write(data, count);
+        }
+        else {
+            int tmp[count + 3];
+            tmp[0] = count;
+            tmp[1] = rank;
+            if (queue == queues_recipients[rank]) {
+                tmp[2] = 0;
+            }
+            else {
+                tmp[2] = 1;
+            }
+            for (int i = 0; i < count; ++count) {
+                tmp[i + 3] = data[i];
+            }
+            capio_queue->write(tmp, count);
+        }
     }
 
+
+
     /*
-     * return the rank of a producer that resides in the same machine
+     * return the rank of the producer with minimum rank that resides in the same machine
      * of the consumer with rank equals to root
      */
 
     int get_process_same_machine(int root, int size) {
-        return root % size;
+        int root_machine = get_machine(root, true);
+        const std::unordered_map<int, int>& rank_node_map = config["app1"];
+        int i = 0;
+        int prod_machine;
+        bool found = false;
+        auto it = rank_node_map.find(i);
+        while (it != rank_node_map.end() && !found) {
+            prod_machine = it->second;
+            found = prod_machine == root_machine;
+            ++i;
+            it = rank_node_map.find(i);
+        }
+        if (i > 0)
+            --i;
+        return i;
     }
 
 public:
 
-    capio_mpi(int num_recipients, bool recipient, int rank = 0) :
+    capio_mpi(int num_recipients, bool recipient, int rank, std::string path) :
         m_mutex_num_recipients(open_or_create, "mutex_num_recipients_capio_shm", num_recipients) {
         m_recipient = recipient;
         m_rank = rank;
         capio_init(num_recipients);
         m_num_recipients = num_recipients;
+        config = get_deployment_config(path);
     }
 
     ~capio_mpi(){
@@ -99,6 +183,15 @@ public:
 
     void capio_send(int* data, int count, int rank) {
         capio_send(data, count, rank, queues_recipients);
+    }
+
+    void capio_send_proxy(int* data, int count, int rank, int type) {
+        if (type == 0) {
+            queues_recipients[rank]->write(data, count);
+        }
+        else {
+            collective_queues_recipients[rank]->write(data, count);
+        }
     }
 
     void capio_scatter(int* send_data, int* recv_data, int recv_count) {
@@ -185,9 +278,7 @@ public:
             int process_same_machine = get_process_same_machine(root, size);
             MPI_Op_create(func, 1, &operation);
             tmp_buf = new int[count];
-            std::cout << "process rank " << prod_rank << "before reduce" << std::endl;
             MPI_Reduce(send_data, tmp_buf, count, data_type, operation, process_same_machine, MPI_COMM_WORLD);
-            std::cout << "process rank " << prod_rank << "after reduce" << std::endl;
             if (prod_rank == process_same_machine) {
                 capio_send(tmp_buf, count, root, collective_queues_recipients);
             }
@@ -212,9 +303,7 @@ public:
             }
             MPI_Op_create(func, 1, &operation);
             tmp_buf = new int[count];
-            std::cout << "process rank " << prod_rank << "before reduce" << std::endl;
             MPI_Allreduce(send_data, tmp_buf, count, data_type, operation, MPI_COMM_WORLD);
-            std::cout << "process rank " << prod_rank << "after reduce" << std::endl;
             std::vector<int> recipients = processes_same_machine[prod_rank];
             for (int recipient : recipients) {
                 capio_send(tmp_buf, count, recipient, collective_queues_recipients);

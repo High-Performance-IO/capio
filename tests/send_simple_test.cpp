@@ -15,8 +15,14 @@ int main(int argc, char** argv) {
     int rank, recipient_rank, size;
     MPI_Init(&argc, &argv);
     MPI_Comm_size(MPI_COMM_WORLD, &size);
-    capio_mpi capio(size, false);
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+    if (argc != 2) {
+        std::cout << "input error: config file nedded" << std::endl;
+        MPI_Finalize();
+        return 1;
+    }
+    std::string config_path = argv[1];
+    capio_mpi capio(size, false, rank, config_path);
     std::cout << "writer " << rank << "created capio object" << std::endl;
     recipient_rank = rank;
     for (int i = 0; i < 100; ++i) {
@@ -24,6 +30,7 @@ int main(int argc, char** argv) {
     }
     std::cout << "writer " << rank << "ended " << std::endl;
     MPI_Finalize();
+    return 0;
 }
 
 

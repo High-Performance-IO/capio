@@ -17,7 +17,11 @@ int main(int argc, char** argv) {
     MPI_Init(&argc, &argv);
     MPI_Comm_size(MPI_COMM_WORLD, &size);
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
-    capio_mpi capio(size, true, rank);
+    if (argc != 2) {
+        std::cout << "input error: config file needed" << std::endl;
+    }
+    std::string config_path = argv[1];
+    capio_mpi capio(size, true, rank, config_path);
     std::cout << "reader " << rank << " before created capio object" << std::endl;
     if (NUM_ELEM % size == 0) {
         int array_length = NUM_ELEM / size;

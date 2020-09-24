@@ -7,10 +7,7 @@ int main(int argc, char** argv) {
         std::cout << "{" << pair1.first << std::endl;
         for (auto const& pair2: pair1.second) {
             std::cout << "{" << pair2.first << std::endl;
-            for (auto const& rank: pair2.second) {
-                std::cout << rank << std::endl;
-            }
-            std::cout << "}" << std::endl;
+            std::cout << pair2.second << "}" << std::endl;
         }
         std::cout << "}" << std::endl;
     }

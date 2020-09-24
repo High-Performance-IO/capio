@@ -19,3 +19,5 @@ if(MPI_LINK_FLAGS)
     set_target_properties(all_gather_read PROPERTIES
             LINK_FLAGS "${MPI_LINK_FLAGS}")
 endif()
+
+configure_file(all_gather_write.cpp run_all_gather_tests.sh  COPYONLY)
