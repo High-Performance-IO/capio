@@ -143,7 +143,7 @@ private:
      * of the consumer with rank equals to root
      */
 
-    int get_process_same_machine(int root, int size) {
+    int get_process_same_machine(int root) {
         int root_machine = get_machine(root, true);
         const std::unordered_map<int, int>& rank_node_map = config["app1"];
         int i = 0;
@@ -275,7 +275,7 @@ public:
         if (! m_recipient) {
             int size;
             MPI_Comm_size(MPI_COMM_WORLD, &size);
-            int process_same_machine = get_process_same_machine(root, size);
+            int process_same_machine = get_process_same_machine(root);
             MPI_Op_create(func, 1, &operation);
             tmp_buf = new int[count];
             MPI_Reduce(send_data, tmp_buf, count, data_type, operation, process_same_machine, MPI_COMM_WORLD);
@@ -299,7 +299,7 @@ public:
             MPI_Comm_size(MPI_COMM_WORLD, &size);
             std::vector<std::vector<int>> processes_same_machine(size);
             for (int i = 0; i < m_num_recipients; ++i) {
-                processes_same_machine[get_process_same_machine(i, size)].push_back(i);
+                processes_same_machine[get_process_same_machine(i)].push_back(i);
             }
             MPI_Op_create(func, 1, &operation);
             tmp_buf = new int[count];
