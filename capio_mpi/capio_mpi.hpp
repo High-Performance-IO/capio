@@ -14,19 +14,25 @@ class capio_mpi {
 private:
     managed_shared_memory m_shm;
     int* m_num_active_recipients;
+    int* m_num_active_producers;
     int m_num_recipients;
+    int m_num_producers;
     named_semaphore m_mutex_num_recipients;
+    named_semaphore m_mutex_num_prods;
+    named_semaphore m_sem_num_prods;
     mpsc_queue** queues_recipients;
     mpsc_queue** collective_queues_recipients;
     mpsc_queue* capio_queue;
     config_type config;
     int m_rank;
     bool m_recipient;
+    bool m_producer;
 
     void capio_init(int num_recipients) {
         std::string m_shm_name = "capio_shm";
         m_shm = managed_shared_memory(open_or_create, m_shm_name.c_str(),65536); //create only?
         m_num_active_recipients = m_shm.find_or_construct<int>("num_recipients")(num_recipients);
+        m_num_active_producers = m_shm.find_or_construct<int>("num_producers")(m_num_producers);
         capio_queue = new mpsc_queue(m_shm, 128, 0, false, "capio");
         queues_recipients = new mpsc_queue*[num_recipients];
         collective_queues_recipients = new mpsc_queue*[num_recipients];
@@ -62,16 +68,37 @@ private:
         if (m_recipient) {
             m_mutex_num_recipients.wait();
             --*m_num_active_recipients;
-            m_mutex_num_recipients.post();
-            queues_recipients[m_rank]->clean_shared_memory(m_shm);
-            collective_queues_recipients[m_rank]->clean_shared_memory(m_shm);
             if (*m_num_active_recipients == 0) {
+                m_mutex_num_prods.wait();
+                while (*m_num_active_producers > 0) {
+                    m_mutex_num_prods.post();
+                    m_sem_num_prods.wait();
+                    m_mutex_num_prods.wait();
+                }
+                for (int i = 0; i < m_num_recipients; ++i) {
+                    queues_recipients[i]->clean_shared_memory(m_shm);
+                    collective_queues_recipients[i]->clean_shared_memory(m_shm);
+                }
                 shared_memory_object::remove("num_recipients");
+                shared_memory_object::remove("num_producers");
                 named_semaphore::remove("mutex_num_recipients_capio_shm");
+                named_semaphore::remove("mutex_num_prods_capio_shm");
+                named_semaphore::remove("sem_num_prods");
                 shared_memory_object::remove("capio_shm");
             }
+            else {
+                free(capio_queue);
+                for (int i = 0; i < m_num_recipients; ++i) {
+                    free(queues_recipients[i]);
+                    free(collective_queues_recipients[i]);
+                }
+                free(queues_recipients);
+                free(collective_queues_recipients);
+                m_mutex_num_recipients.post();
+                return;
+            }
         }
-        else {
+        else if (m_producer){
             terminate_capio_process();
         }
         free(capio_queue);
@@ -81,6 +108,12 @@ private:
         }
         free(queues_recipients);
         free(collective_queues_recipients);
+        if (m_producer){
+            m_mutex_num_prods.wait();
+            --*m_num_active_producers;
+            m_mutex_num_prods.post();
+            m_sem_num_prods.post();
+        }
     }
 
     int get_machine(int rank, bool recipient) {
@@ -163,9 +196,13 @@ private:
 
 public:
 
-    capio_mpi(int num_recipients, bool recipient, int rank, std::string path) :
-        m_mutex_num_recipients(open_or_create, "mutex_num_recipients_capio_shm", num_recipients) {
+    capio_mpi(int num_recipients, int num_producers, bool recipient, bool producer, int rank, std::string path) :
+        m_mutex_num_recipients(open_or_create, "mutex_num_recipients_capio_shm", 1),
+        m_sem_num_prods(open_or_create, "sem_num_prods", 0),
+        m_mutex_num_prods(open_or_create, "mutex_num_prods_capio_shm", 1){
         m_recipient = recipient;
+        m_producer = producer;
+        m_num_producers = num_producers;
         m_rank = rank;
         capio_init(num_recipients);
         m_num_recipients = num_recipients;

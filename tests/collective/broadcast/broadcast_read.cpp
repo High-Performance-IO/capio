@@ -19,13 +19,15 @@ int main(int argc, char** argv) {
     MPI_Init(&argc, &argv);
     MPI_Comm_size(MPI_COMM_WORLD, &size);
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
-    if (argc != 2) {
-        std::cout << "input error: config file needed" << std::endl;
+    if (argc != 3) {
+        std::cout << "input error: number of producers and config file needed" << std::endl;
         MPI_Finalize();
         return 1;
     }
-    std::string config_path = argv[1];
-    capio_mpi capio(size, true, rank, config_path);
+    std::cout << "argv[1] " << argv[1] << std::endl;
+    int num_prods = std::stoi(argv[1]);
+    std::string config_path = argv[2];
+    capio_mpi capio(size, num_prods, true, false, rank, config_path);
     std::cout << "reader " << rank << " before created capio object" << std::endl;
     compute_expected_result(expected_result, NUM_ELEM);
     capio.capio_broadcast(data, NUM_ELEM, 0);

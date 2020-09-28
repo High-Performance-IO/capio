@@ -18,7 +18,7 @@ int main(int argc, char** argv) {
     }
     int num_cons = std::stoi(argv[1]);
     std::string config_path = argv[2];
-    capio_mpi capio(num_cons, false, rank, config_path);
+    capio_mpi capio(num_cons, size, false, true, rank, config_path);
     std::cout << "writer " << rank << "created capio object" << std::endl;
     data = new int[NUM_ELEM];
     initialize(data, NUM_ELEM, rank);

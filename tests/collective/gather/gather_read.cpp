@@ -20,7 +20,7 @@ int main(int argc, char** argv) {
     }
     int num_prods= std::stoi(argv[1]);
     std::string config_path = argv[2];
-    capio_mpi capio(size, true, rank, config_path);
+    capio_mpi capio(size, num_prods, true, false, rank, config_path);
     std::cout << "reader " << rank << " before created capio object" << std::endl;
     if (rank == 0) {
         capio.capio_gather(nullptr, 0, data, NUM_ELEM, 0);
