@@ -29,9 +29,9 @@ int main(int argc, char** argv) {
     std::cout << "writer " << rank << "created capio object" << std::endl;
     data = new int[NUM_ELEM];
     initialize(data, NUM_ELEM, rank);
-    capio.capio_reduce(data, nullptr, NUM_ELEM, MPI_INT, sum, 0, rank);
+    capio.capio_reduce(data, nullptr, NUM_ELEM, MPI_INT, sum, 0);
     initialize(data, NUM_ELEM, rank + 1);
-    capio.capio_reduce(data, nullptr, NUM_ELEM, MPI_INT, sum, 0, rank);
+    capio.capio_reduce(data, nullptr, NUM_ELEM, MPI_INT, sum, 0);
     free(data);
     std::cout << "writer " << rank << "ended " << std::endl;
     MPI_Finalize();

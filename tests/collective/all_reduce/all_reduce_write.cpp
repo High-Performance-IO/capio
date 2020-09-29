@@ -31,9 +31,9 @@ int main(int argc, char** argv) {
     if (NUM_ELEM % size == 0) {
         data = new int[NUM_ELEM];
         initialize(data, NUM_ELEM, rank);
-        capio.capio_all_reduce(data, nullptr, NUM_ELEM, MPI_INT, sum, rank);
+        capio.capio_all_reduce(data, nullptr, NUM_ELEM, MPI_INT, sum);
         initialize(data, NUM_ELEM, rank + 1);
-        capio.capio_all_reduce(data, nullptr, NUM_ELEM, MPI_INT, sum, rank);
+        capio.capio_all_reduce(data, nullptr, NUM_ELEM, MPI_INT, sum);
         free(data);
     }
     std::cout << "writer " << rank << "ended " << std::endl;

@@ -21,12 +21,12 @@ int main(int argc, char** argv) {
     std::string config_path = argv[2];
     std::cout << "reader " << rank << " before created capio object" << std::endl;
     capio_mpi capio(true, false, rank, config_path);
-    capio.capio_reduce(nullptr, data, NUM_ELEM, MPI_INT, nullptr, 0, 0);
+    capio.capio_reduce(nullptr, data, NUM_ELEM, MPI_INT, nullptr, 0);
     if (rank == 0) {
         compute_expected_result_reduce(expected_result, NUM_ELEM, num_prods, 0);
         compare_expected_actual(data, expected_result, NUM_ELEM);
     }
-    capio.capio_reduce(nullptr, data, NUM_ELEM, MPI_INT, nullptr, 0, 0);
+    capio.capio_reduce(nullptr, data, NUM_ELEM, MPI_INT, nullptr, 0);
     if (rank == 0) {
         compute_expected_result_reduce(expected_result, NUM_ELEM, num_prods, 1);
         compare_expected_actual(data, expected_result, NUM_ELEM);

@@ -26,12 +26,12 @@ int main(int argc, char** argv) {
         data = new int[NUM_ELEM];
         expected_result = new int[NUM_ELEM];
         std::cout << "reader " << rank << " before capio_all_reduce" << std::endl;
-        capio.capio_all_reduce(nullptr, data, NUM_ELEM, MPI_INT, nullptr, -1);
+        capio.capio_all_reduce(nullptr, data, NUM_ELEM, MPI_INT, nullptr);
         std::cout << "reader " << rank << " after capio_all_reduce" << std::endl;
         compute_expected_result_reduce(expected_result, NUM_ELEM, num_prods, 0);
         compare_expected_actual(data, expected_result, NUM_ELEM);
         std::cout << "reader " << rank << " before capio_all_reduce 2" << std::endl;
-        capio.capio_all_reduce(nullptr, data, NUM_ELEM, MPI_INT, nullptr, -1);
+        capio.capio_all_reduce(nullptr, data, NUM_ELEM, MPI_INT, nullptr);
         std::cout << "reader " << rank << " after capio_all_reduce 2" << std::endl;
         compute_expected_result_reduce(expected_result, NUM_ELEM, num_prods, 1);
         compare_expected_actual(data, expected_result, NUM_ELEM);

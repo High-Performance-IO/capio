@@ -355,7 +355,7 @@ public:
     }
 
 
-    void capio_reduce(int* send_data, int* recv_data, int count, MPI_Datatype data_type, void(*func)(void*, void*, int*, MPI_Datatype*), int root, int prod_rank) {
+    void capio_reduce(int* send_data, int* recv_data, int count, MPI_Datatype data_type, void(*func)(void*, void*, int*, MPI_Datatype*), int root) {
         MPI_Op operation;
         int* tmp_buf;
         if (! m_recipient) {
@@ -365,7 +365,7 @@ public:
             MPI_Op_create(func, 1, &operation);
             tmp_buf = new int[count];
             MPI_Reduce(send_data, tmp_buf, count, data_type, operation, process_same_machine, MPI_COMM_WORLD);
-            if (prod_rank == process_same_machine) {
+            if (m_rank == process_same_machine) {
                 capio_send(tmp_buf, count, root, collective_queues_recipients);
             }
             free(tmp_buf);
@@ -377,7 +377,7 @@ public:
     }
 
     void capio_all_reduce(int* send_data, int* recv_data, int count, MPI_Datatype data_type,
-                          void(*func)(void*, void*, int*, MPI_Datatype*), int prod_rank) {
+                          void(*func)(void*, void*, int*, MPI_Datatype*)) {
         MPI_Op operation;
         int* tmp_buf;
         if (! m_recipient) {
@@ -390,7 +390,7 @@ public:
             MPI_Op_create(func, 1, &operation);
             tmp_buf = new int[count];
             MPI_Allreduce(send_data, tmp_buf, count, data_type, operation, MPI_COMM_WORLD);
-            std::vector<int> recipients = processes_same_machine[prod_rank];
+            std::vector<int> recipients = processes_same_machine[m_rank];
             for (int recipient : recipients) {
                 capio_send(tmp_buf, count, recipient, collective_queues_recipients);
             }
