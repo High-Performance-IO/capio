@@ -16,18 +16,16 @@ void sum(void* input_data, void* output_data, int* count, MPI_Datatype* data_typ
 
 int main(int argc, char** argv) {
     int* data;
-    int rank, size;
+    int rank;
     MPI_Init(&argc, &argv);
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
-    MPI_Comm_size(MPI_COMM_WORLD, &size);
-    if (argc != 3) {
-        std::cout << "input error: number of consumers and config file needed " << std::endl;
+    if (argc != 2) {
+        std::cout << "input error: config file needed " << std::endl;
         MPI_Finalize();
         return 0;
     }
-    int num_cons = std::stoi(argv[1]);
-    std::string config_path = argv[2];
-    capio_mpi capio(num_cons, size, false, true, rank, config_path);
+    std::string config_path = argv[1];
+    capio_mpi capio(false, true, rank, config_path);
     std::cout << "writer " << rank << "created capio object" << std::endl;
     data = new int[NUM_ELEM];
     initialize(data, NUM_ELEM, rank);

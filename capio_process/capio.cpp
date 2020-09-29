@@ -43,12 +43,12 @@ void sender(mpsc_queue& queue, int* data, int rank, const std::string &config_pa
     MPI_Send(&dest, 1, MPI_INT, rank + 1, 0, MPI_COMM_WORLD);
 }
 
-void listener(int* data, int num_consumers, int num_producers, const std::string &config_path) {
+void listener(int* data, const std::string &config_path, int rank) {
     int dest, type;
     int effective_size;
     bool end = false;
     MPI_Status status;
-    capio_mpi capio(num_consumers, num_producers, false, false, 1, config_path);
+    capio_mpi capio(false, false, rank, config_path);
     while (!end) {
         std::cout << "listener before recv" << std::endl;
         MPI_Recv(data, 128, MPI_INT, MPI_ANY_SOURCE, MPI_ANY_TAG, MPI_COMM_WORLD, &status);
@@ -80,14 +80,12 @@ int main(int argc, char** argv) {
     std::string m_shm_name = "capio_shm";
     int rank;
     int data[128];
-    if (argc != 4) {
-        std::cout << "input error: number of consumers, number of producers and config file needed " << std::endl;
+    if (argc != 2) {
+        std::cout << "input error: config file needed " << std::endl;
         MPI_Finalize();
-        return 0;
+        return 1;
     }
-    int num_cons = std::stoi(argv[1]);
-    int num_prods = std::stoi(argv[2]);
-    std::string config_path = argv[3];
+    std::string config_path = argv[1];
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
     if (rank % 2 == 0) {
         managed_shared_memory shm(open_or_create, m_shm_name.c_str(),65536); //create only?
@@ -97,8 +95,9 @@ int main(int argc, char** argv) {
         std::cout << "sender terminated" << std::endl;
     }
     else {
-        listener(data, num_cons, num_prods, config_path);
+        listener(data, config_path, rank);
         std::cout << "listener terminated" << std::endl;
     }
     MPI_Finalize();
+    return 0;
 }

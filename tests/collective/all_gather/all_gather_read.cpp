@@ -19,7 +19,7 @@ int main(int argc, char** argv) {
     }
     int num_prods= std::stoi(argv[1]);
     std::string config_path = argv[2];
-    capio_mpi capio(size, num_prods, true, false, rank, config_path);
+    capio_mpi capio(true, false, rank, config_path);
     std::cout << "reader " << rank << " before created capio object" << std::endl;
     if (NUM_ELEM % size == 0) {
         int array_length = NUM_ELEM / size * num_prods;
@@ -27,21 +27,9 @@ int main(int argc, char** argv) {
         expected_result = new int[array_length];
         capio.capio_all_gather(nullptr, 0, data, array_length);
         compute_expected_result_gather(expected_result, array_length, num_prods, 0);
-        if (rank == 1) {
-            std::cout << "print actual result:" << std::endl;
-            print_array(data, array_length, rank);
-            std::cout << "print expected_result:" << std::endl;
-            print_array(expected_result, array_length, rank);
-        }
         compare_expected_actual(data, expected_result, array_length);
         capio.capio_all_gather(nullptr, 0, data, array_length);
         compute_expected_result_gather(expected_result, array_length, num_prods, 1);
-        if (rank == 1) {
-            std::cout << "print actual result:" << std::endl;
-            print_array(data, array_length, rank);
-            std::cout << "print expected_result:" << std::endl;
-            print_array(expected_result, array_length, rank);
-        }
         compare_expected_actual(data, expected_result, array_length);
         free(data);
         free(expected_result);

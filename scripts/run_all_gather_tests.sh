@@ -1,6 +1,6 @@
 #!/bin/bash
 
-mpiexec -n 2 ../build/capio_process/capio 2 2 ../one_node_2_2.yaml > all_gather_2_2_capio.txt &
+mpiexec -n 2 ../build/capio_process/capio ../one_node_2_2.yaml > all_gather_2_2_capio.txt &
 sleep .1
 mpiexec -n 2 ../build/tests/collective/all_gather/all_gather_read 2 ../one_node_2_2.yaml > all_gather_2_2_cons.txt &
 sleep .1
@@ -11,7 +11,7 @@ then
 fi
 sleep .1
 
-mpiexec -n 2 ../build/capio_process/capio 4 2 ../one_node_2_4.yaml > all_gather_2_4_capio.txt &
+mpiexec -n 2 ../build/capio_process/capio ../one_node_2_4.yaml > all_gather_2_4_capio.txt &
 sleep .1
 mpiexec -n 4 ../build/tests/collective/all_gather/all_gather_read 2 ../one_node_2_4.yaml > all_gather_2_4_cons.txt &
 sleep .1
@@ -22,7 +22,7 @@ then
 fi
 sleep .1
 
-mpiexec -n 2 ../build/capio_process/capio 2 4 ../one_node_4_2.yaml > all_gather_4_2_capio.txt &
+mpiexec -n 2 ../build/capio_process/capio ../one_node_4_2.yaml > all_gather_4_2_capio.txt &
 sleep .1
 mpiexec -n 2 ../build/tests/collective/all_gather/all_gather_read 4 ../one_node_4_2.yaml > all_gather_4_2_cons.txt &
 sleep .1
