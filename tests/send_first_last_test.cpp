@@ -15,21 +15,22 @@ int main(int argc, char** argv) {
     int rank, recipient_rank;
     MPI_Init(&argc, &argv);
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
-    if (argc != 2) {
-        std::cout << "input error: config file nedded" << std::endl;
+    if (argc != 3) {
+        std::cout << "input error: number of consumers and config file needed" << std::endl;
         MPI_Finalize();
         return 1;
     }
-    std::string config_path = argv[1];
+    int num_consumers = std::stoi(argv[1]);
+    std::string config_path = argv[2];
     capio_mpi capio(false, true, rank, config_path);
     std::cout << "writer " << rank << "created capio object" << std::endl;
-    recipient_rank = rank;
-    for (int i = 0; i < 100; ++i) {
-        capio.capio_send(&i, 1, recipient_rank);
+    if (rank == 0) {
+        recipient_rank = num_consumers - 1;
+        for (int i = 0; i < 100; ++i) {
+            capio.capio_send(&i, 1, recipient_rank);
+        }
     }
     std::cout << "writer " << rank << "ended " << std::endl;
     MPI_Finalize();
     return 0;
 }
-
-
