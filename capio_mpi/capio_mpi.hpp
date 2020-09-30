@@ -7,7 +7,7 @@
 #include "../config_reader/config_reader.hpp"
 
 using namespace boost::interprocess;
-const int buf_size = 128;
+const int buf_size = 1024 * 64;
 
 
 class capio_mpi {
@@ -29,12 +29,12 @@ private:
 
     void capio_init() {
         std::string m_shm_name = "capio_shm";
-        m_shm = managed_shared_memory(open_or_create, m_shm_name.c_str(),65536); //create only?
+        m_shm = managed_shared_memory(open_or_create, m_shm_name.c_str(),1024 * 1024 * 8); //create only?
         int active_producers_node = get_num_processes_same_node("app1");
         int active_recipients_node = get_num_processes_same_node("app2");
         m_num_active_recipients_node = m_shm.find_or_construct<int>("num_recipients")(active_recipients_node);
         m_num_active_producers_node = m_shm.find_or_construct<int>("num_producers")(active_producers_node);
-        capio_queue = new mpsc_queue(m_shm, 128, 0, false, "capio");
+        capio_queue = new mpsc_queue(m_shm, buf_size, 0, false, "capio");
         std::vector<int> recipients_rank_same_node = get_recipients_rank_same_node();
         for (int rank : recipients_rank_same_node) {
             queues_recipients[rank] = new mpsc_queue(m_shm, buf_size, rank, m_recipient, "norm");
@@ -99,13 +99,18 @@ private:
         std::unordered_map<int, int> prod_node_map = config["app1"];
         int i = 0;
         auto it = prod_node_map.find(i);
-        int machine = -1;
+        int machine = 0;
         int prod_machine;
         int end_msg = -1;
         while (it != prod_node_map.end()) {
             prod_machine = it->second;
-            if (prod_machine != machine) {
-                capio_queue->write(&end_msg, 1);
+            if (prod_machine == machine) {
+                if (m_rank == i) {
+                    std::cout << "terminate capio prod_machine " << prod_machine << " machine " << machine << " m_rank "
+                              << m_rank << " i " << i << std::endl;
+                    capio_queue->write(&end_msg, 1);
+                }
+                ++machine;
             }
             ++i;
             it = prod_node_map.find(i);
@@ -186,7 +191,10 @@ private:
     }
 
     void capio_recv(int* data, int count, std::unordered_map<int, mpsc_queue*> &queues) {
+        std::cout << "process " << m_rank << " before recv" << std::endl;
         queues[m_rank]->read(data, count);
+        std::cout << "process " << m_rank << " after recv" << std::endl;
+
     }
 
     /*
@@ -200,6 +208,7 @@ private:
     void capio_send(int* data, int count, int rank, std::unordered_map<int, mpsc_queue*> &queues) {
         mpsc_queue* queue = queues[rank];
         if (same_machine(rank)) {
+            std::cout << "same machine" << std::endl;
             queue->write(data, count);
         }
         else {
@@ -337,7 +346,9 @@ public:
                 if (rank > 0) {
                     MPI_Recv(nullptr, 0, MPI_INT, rank - 1, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
                 }
+                std::cout << "all_gather process " << m_rank << " send to " << i << std::endl;
                 capio_send(send_data, send_count, i, collective_queues_recipients);
+                std::cout << "all_gather process " << m_rank << " after sent to " << i << std::endl;
                 if (rank < (num_prods - 1)) {
                     MPI_Send(nullptr, 0, MPI_INT, rank + 1, 0, MPI_COMM_WORLD);
                 }

@@ -88,8 +88,8 @@ int main(int argc, char** argv) {
     std::string config_path = argv[1];
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
     if (rank % 2 == 0) {
-        managed_shared_memory shm(open_or_create, m_shm_name.c_str(),65536); //create only?
-        mpsc_queue queue(shm, 128, 0, true, "capio");
+        managed_shared_memory shm(open_or_create, m_shm_name.c_str(),1024 * 1024 * 8); //create only?
+        mpsc_queue queue(shm, buf_size, 0, true, "capio");
         sender(queue, data, rank, config_path);
         queue.clean_shared_memory(shm);
         std::cout << "sender terminated" << std::endl;
