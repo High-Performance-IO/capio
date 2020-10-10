@@ -7,7 +7,7 @@
 #include "../config_reader/config_reader.hpp"
 
 using namespace boost::interprocess;
-const int buf_size = 1024 * 64;
+const int buf_size = 1024 * 1024;
 
 
 class capio_mpi {
@@ -16,6 +16,7 @@ private:
     int* m_num_active_recipients_node;
     int* m_num_active_producers_node;
     int m_tot_num_recipients;
+    int m_tot_num_producers;
     named_semaphore m_mutex_num_recipients;
     named_semaphore m_mutex_num_prods;
     named_semaphore m_sem_num_prods;
@@ -29,24 +30,44 @@ private:
 
     void capio_init() {
         std::string m_shm_name = "capio_shm";
-        m_shm = managed_shared_memory(open_or_create, m_shm_name.c_str(),1024 * 1024 * 8); //create only?
+        long long int dim = 1024 * 1024 * 1024 * 4LL;
+        m_shm = managed_shared_memory(open_or_create, m_shm_name.c_str(),dim); //create only?
         int active_producers_node = get_num_processes_same_node("app1");
         int active_recipients_node = get_num_processes_same_node("app2");
         m_num_active_recipients_node = m_shm.find_or_construct<int>("num_recipients")(active_recipients_node);
+        //std::cout << "debug 1" << std::endl;
         m_num_active_producers_node = m_shm.find_or_construct<int>("num_producers")(active_producers_node);
-        capio_queue = new mpsc_queue(m_shm, buf_size, 0, false, "capio");
-        std::vector<int> recipients_rank_same_node = get_recipients_rank_same_node();
-        for (int rank : recipients_rank_same_node) {
-            queues_recipients[rank] = new mpsc_queue(m_shm, buf_size, rank, m_recipient, "norm");
-            collective_queues_recipients[rank] = new mpsc_queue(m_shm, buf_size, rank, m_recipient, "coll");
-        }
+        //std::cout << "debug 2" << std::endl;
 
+        capio_queue = new mpsc_queue(m_shm, buf_size, 0, "capio");
+        //std::cout << "debug 3" << std::endl;
+        std::vector<int> recipients_rank_same_node = get_recipients_rank_same_node();
+        //std::cout << "debug 4" << std::endl;
+        for (int rank : recipients_rank_same_node) {
+           // std::cout << " m_rank and rank are in the same node" << m_rank << " " << rank << std::endl;
+            queues_recipients[rank] = new mpsc_queue(m_shm, buf_size, rank, "norm");
+            collective_queues_recipients[rank] = new mpsc_queue(m_shm, buf_size, rank, "coll");
+        }
+        //std::cout << "debug 5" << std::endl;
+
+    }
+
+    int get_id_capio_process_same_node() {
+        int node;
+        if (m_recipient) {
+            node = config.at("app2").at(m_rank);
+        }
+        else if (m_producer) {
+            node = config.at("app1").at(m_rank);
+        }
+        return node * 2;
     }
 
     int get_num_processes_same_node(std::string app) {
         int num_processes = 0;
         const std::unordered_map<int, int> &app_processes = config[app];
         int node;
+   //     std::cout << "get_num_processes_same_node before if" << std::endl;
         if (m_recipient) {
             node = config.at("app2").at(m_rank);
         }
@@ -60,6 +81,7 @@ private:
             if (pair_k_v.second == node)
                 ++num_processes;
         }
+    //    std::cout << "get_num_processes_same_node after if" << std::endl;
         return num_processes;
     }
 
@@ -154,6 +176,7 @@ private:
             }
         }
         else if (m_producer){
+            std::cout << "producer " << m_rank << " destroy capio object" << std::endl;
             terminate_capio_process();
         }
         free(capio_queue);
@@ -206,25 +229,32 @@ private:
      */
 
     void capio_send(int* data, int count, int rank, std::unordered_map<int, mpsc_queue*> &queues) {
-        mpsc_queue* queue = queues[rank];
+
         if (same_machine(rank)) {
-            std::cout << "same machine" << std::endl;
+            mpsc_queue* queue = queues[rank];
+            std::cout << " same machine m_rank" << m_rank << " rank " << rank << std::endl;
             queue->write(data, count);
         }
         else {
+            std::cout << " not same machine m_rank" << m_rank << " rank " << rank << std::endl;
             int tmp[count + 3];
             tmp[0] = count;
             tmp[1] = rank;
-            if (queue == queues_recipients[rank]) {
+            if (&queues == &queues_recipients) {
                 tmp[2] = 0;
+                std::cout << "tmp[2]: " << tmp[2] << std::endl;
             }
             else {
                 tmp[2] = 1;
+                std::cout << "tmp[2]: " << tmp[2] << std::endl;
             }
-            for (int i = 0; i < count; ++count) {
+            for (int i = 0; i < count; ++i) {
                 tmp[i + 3] = data[i];
             }
-            capio_queue->write(tmp, count);
+            std::cout << "tmp[0]: " << tmp[0] << std::endl;
+            std::cout << "count + 3 = " << count + 3 << std::endl;
+            capio_queue->write(&tmp[0], count + 3);
+            //std::cout << "not same machine after write" << std::endl;
         }
     }
 
@@ -264,6 +294,7 @@ public:
         m_rank = rank;
         config = get_deployment_config(path);
         m_tot_num_recipients = set_num_processes("app2");
+        m_tot_num_producers = set_num_processes("app1");
         capio_init();
     }
 
@@ -301,10 +332,63 @@ public:
     }
 
     void capio_gather(int* send_data, int send_count, int* recv_data, int recv_count, int root) {
+        if (m_tot_num_producers == m_tot_num_recipients) {
+            std::cout << "capio_gather_balanced" << std::endl;
+            capio_gather_balanced(send_data, send_count, recv_data, recv_count, root);
+        }
+        else {
+            std::cout << "capio_gather_unbalanced" << std::endl;
+            capio_gather_not_balanced(send_data, send_count, recv_data, recv_count, root);
+        }
+    }
+
+    void capio_gather_balanced(int* send_data, int send_count, int* recv_data, int recv_count, int root) {
         if (m_recipient) {
-          if (m_rank == root) {
-              capio_recv(recv_data, recv_count, collective_queues_recipients);
-          }
+            if (m_rank == root) {
+                std::cout << "gather rank == root " <<  m_rank << std::endl;
+                capio_recv(recv_data + root * recv_count / m_tot_num_producers, recv_count / m_tot_num_producers, collective_queues_recipients);
+                std::cout << "before MPI_Gather " <<  m_rank << std::endl;
+                MPI_Gather(MPI_IN_PLACE, 0, MPI_INT, recv_data, recv_count / m_tot_num_producers, MPI_INT, root, MPI_COMM_WORLD);
+                std::cout << "after MPI_Gather " <<  m_rank << std::endl;
+            }
+            else {
+                int* tmp = new int[recv_count / m_tot_num_producers];
+                std::cout << "gather rank != root " <<  m_rank << std::endl;
+                capio_recv(tmp, recv_count / m_tot_num_producers, collective_queues_recipients);
+                std::cout << "before MPI_Gather " <<  m_rank << std::endl;
+                MPI_Gather(tmp, recv_count / m_tot_num_producers, MPI_INT, nullptr, 0, MPI_INT, root, MPI_COMM_WORLD);
+                std::cout << "after MPI_Gather " <<  m_rank << std::endl;
+                free(tmp);
+            }
+        }
+        else {
+            int num_prods; //number of producers
+            int rank;
+            MPI_Comm_size(MPI_COMM_WORLD, &num_prods);
+            MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+
+            std::cout << "gather producer before capio_send " << m_rank << std::endl;
+            capio_send(send_data, send_count, m_rank, collective_queues_recipients);
+            std::cout << "gather producer after capio_send " << m_rank << std::endl;
+
+
+            // to avoid that the two calls of capio_gather interfere with each other
+            if (num_prods > 1) {
+                if (rank == 0) {
+                    MPI_Recv(nullptr, 0, MPI_INT, num_prods - 1, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+                }
+                else if (rank == num_prods - 1) {
+                    MPI_Send(nullptr, 0, MPI_INT, 0, 0, MPI_COMM_WORLD);
+                }
+            }
+        }
+    }
+
+    void capio_gather_not_balanced(int* send_data, int send_count, int* recv_data, int recv_count, int root) {
+        if (m_recipient) {
+            if (m_rank == root) {
+                capio_recv(recv_data, recv_count, collective_queues_recipients);
+            }
         }
         else {
             int num_prods; //number of producers
@@ -333,8 +417,49 @@ public:
 
 
     void capio_all_gather(int* send_data, int send_count, int* recv_data, int recv_count) {
+        if (m_tot_num_producers == m_tot_num_recipients) {
+            capio_all_gather_balanced(send_data, send_count, recv_data, recv_count);
+        }
+        else {
+            capio_all_gather_unbalanced(send_data, send_count, recv_data, recv_count);
+        }
+    }
+
+    void capio_all_gather_balanced(int* send_data, int send_count, int* recv_data, int recv_count) {
         if (m_recipient) {
-                capio_recv(recv_data, recv_count, collective_queues_recipients);
+            std::cout << "capio_all_gather_balanced recv " <<  m_rank << " index " << m_rank * (recv_count / m_tot_num_producers) <<  std::endl;
+            capio_recv(recv_data + m_rank * (recv_count / m_tot_num_producers), recv_count / m_tot_num_producers, collective_queues_recipients);
+            std::cout << "before MPI_Gather " <<  m_rank << std::endl;
+            MPI_Allgather(MPI_IN_PLACE, 0, MPI_INT, recv_data, recv_count / m_tot_num_producers, MPI_INT, MPI_COMM_WORLD);
+            std::cout << "after MPI_Gather " <<  m_rank << std::endl;
+
+        }
+        else {
+            int num_prods; //number of producers
+            int rank;
+            MPI_Comm_size(MPI_COMM_WORLD, &num_prods);
+            MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+
+            std::cout << "gather producer before capio_send " << m_rank << std::endl;
+            capio_send(send_data, send_count, m_rank, collective_queues_recipients);
+            std::cout << "gather producer after capio_send " << m_rank << std::endl;
+
+
+            // to avoid that the two calls of capio_gather interfere with each other
+            if (num_prods > 1) {
+                if (rank == 0) {
+                    MPI_Recv(nullptr, 0, MPI_INT, num_prods - 1, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+                }
+                else if (rank == num_prods - 1) {
+                    MPI_Send(nullptr, 0, MPI_INT, 0, 0, MPI_COMM_WORLD);
+                }
+            }
+        }
+    }
+
+    void capio_all_gather_unbalanced(int* send_data, int send_count, int* recv_data, int recv_count) {
+        if (m_recipient) {
+            capio_recv(recv_data, recv_count, collective_queues_recipients);
         }
         else {
             int num_prods; //number of producers
@@ -389,6 +514,33 @@ public:
 
     void capio_all_reduce(int* send_data, int* recv_data, int count, MPI_Datatype data_type,
                           void(*func)(void*, void*, int*, MPI_Datatype*)) {
+        if (m_tot_num_recipients == m_tot_num_producers) {
+            capio_all_reduce_balanced(send_data, recv_data, count, data_type, func);
+        }
+        else {
+            capio_all_reduce_unbalanced(send_data, recv_data, count, data_type, func);
+        }
+    }
+
+    void capio_all_reduce_balanced(int* send_data, int* recv_data, int count, MPI_Datatype data_type,
+                          void(*func)(void*, void*, int*, MPI_Datatype*)) {
+        MPI_Op operation;
+        if (! m_recipient) {
+            int size;
+            MPI_Comm_size(MPI_COMM_WORLD, &size);
+            MPI_Op_create(func, 1, &operation);
+            MPI_Allreduce(MPI_IN_PLACE, send_data, count, data_type, operation, MPI_COMM_WORLD);
+            capio_send(send_data, count, m_rank, collective_queues_recipients);
+            MPI_Op_free(&operation);
+        }
+        else {
+            capio_recv(recv_data, count, collective_queues_recipients);
+        }
+
+    }
+
+    void capio_all_reduce_unbalanced(int* send_data, int* recv_data, int count, MPI_Datatype data_type,
+                                   void(*func)(void*, void*, int*, MPI_Datatype*)) {
         MPI_Op operation;
         int* tmp_buf;
         if (! m_recipient) {
@@ -413,15 +565,36 @@ public:
         }
     }
 
+
     /*
      * capio_all_to_all is an extension of capio_gather_all to the case where each process
      * sends distinct data to each of the receivers. The j-th block sent from process i is received
      * by process j and is placed in the i-th block of recv_data.
      */
 
-    void capio_all_to_all(int* send_data, int send_count, int* recv_data, int num_prods) {
+    void capio_all_to_all(int* send_data, int send_count, int* recv_data) {
+        if (m_tot_num_producers == m_tot_num_recipients) {
+            capio_all_to_all_balanced(send_data, send_count, recv_data);
+        }
+        else {
+            capio_all_to_all_unbalanced(send_data, send_count, recv_data);
+        }
+    }
+
+
+    void capio_all_to_all_balanced(int* send_data, int send_count, int* recv_data) {
+        if (! m_recipient) {
+            MPI_Alltoall(MPI_IN_PLACE, 0, MPI_INT, send_data, send_count, MPI_INT, MPI_COMM_WORLD);
+            capio_send(send_data, send_count * m_tot_num_recipients, m_rank, collective_queues_recipients);
+        }
+        else {
+            capio_recv(recv_data, send_count  * m_tot_num_recipients, collective_queues_recipients);
+        }
+    }
+
+    void capio_all_to_all_unbalanced(int* send_data, int send_count, int* recv_data) {
         if (m_recipient) {
-            for (int i = 0; i < num_prods; ++i) {
+            for (int i = 0; i < m_tot_num_producers; ++i) {
                 capio_recv(recv_data + i * send_count, send_count, collective_queues_recipients);
             }
         }
@@ -434,22 +607,21 @@ public:
             for (int i = 0; i < m_tot_num_recipients; ++i) {
                 capio_send(send_data + i * send_count, send_count, i, collective_queues_recipients);
             }
-            if (rank < (num_prods - 1)) {
+            if (rank < (m_tot_num_producers - 1)) {
                 MPI_Send(nullptr, 0, MPI_INT, rank + 1, 0, MPI_COMM_WORLD);
             }
 
             // to avoid that the two calls of capio_gather interfere with each other
-            if (num_prods > 1) {
+            if (m_tot_num_producers > 1) {
                 if (rank == 0) {
-                    MPI_Recv(nullptr, 0, MPI_INT, num_prods - 1, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+                    MPI_Recv(nullptr, 0, MPI_INT, m_tot_num_producers - 1, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
                 }
-                else if (rank == num_prods - 1) {
+                else if (rank == m_tot_num_producers - 1) {
                     MPI_Send(nullptr, 0, MPI_INT, 0, 0, MPI_COMM_WORLD);
                 }
             }
         }
     }
-
 
     void capio_broadcast(int* buffer, int count, int root) {
         if (m_recipient) {

@@ -22,8 +22,8 @@ int main(int argc, char** argv) {
     std::cout << "writer " << rank << "created capio object" << std::endl;
     data = new int[NUM_ELEM];
     initialize(data, NUM_ELEM, rank);
-    capio.capio_all_to_all(data, NUM_ELEM / num_cons, nullptr, size);
-    capio.capio_all_to_all(data, NUM_ELEM / num_cons, nullptr, size);
+    capio.capio_all_to_all(data, NUM_ELEM / num_cons, nullptr);
+    capio.capio_all_to_all(data, NUM_ELEM / num_cons, nullptr);
     free(data);
     std::cout << "writer " << rank << "ended " << std::endl;
     MPI_Finalize();

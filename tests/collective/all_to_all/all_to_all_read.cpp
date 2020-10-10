@@ -35,10 +35,10 @@ int main(int argc, char** argv) {
     std::cout << "reader " << rank << " before created capio object" << std::endl;
     data = new int[array_length];
     expected_result = new int[array_length];
-    capio.capio_all_to_all(nullptr, NUM_ELEM / size, data, num_prods);
+    capio.capio_all_to_all(nullptr, NUM_ELEM / size, data);
     compute_expected_result(expected_result, array_length, size, rank);
     compare_expected_actual(data, expected_result, array_length);
-    capio.capio_all_to_all(nullptr, NUM_ELEM / size, data, num_prods);
+    capio.capio_all_to_all(nullptr, NUM_ELEM / size, data);
     compare_expected_actual(data, expected_result, array_length);
     free(data);
     free(expected_result);

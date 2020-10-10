@@ -37,4 +37,26 @@ config_type get_deployment_config(std::string path) {
     return config;
 }
 
+/*
+ * num rank and num node are incresing
+ */
+
+int get_num_nodes(config_type config) {
+    int sum = 0;
+    std::unordered_map<int, int> rank_node_map = config.at("app1");
+    int i = 0;
+    int machine = -1;
+    bool found = false;
+    auto it = rank_node_map.find(i);
+    while (it != rank_node_map.end() && !found) {
+        if (machine != it->second) {
+            ++sum;
+            machine = it->second;
+        }
+        ++i;
+        it = rank_node_map.find(i);
+    }
+    return sum;
+}
+
 #endif //CONFIG_READER_AAA_H

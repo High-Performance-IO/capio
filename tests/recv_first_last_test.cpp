@@ -20,6 +20,7 @@ int main(int argc, char** argv) {
         std::cout << "reader " << rank << "created capio object" << std::endl;
         for (int i = 0; i < 100; ++i) {
             capio.capio_recv(&num, 1);
+            std::cout << "received elem" << num << std::endl;
             compare_expected_actual(&num, &i, 1);
         }
     }

@@ -18,15 +18,20 @@ int main(int argc, char** argv) {
     }
     int num_cons = std::stoi(argv[1]);
     std::string config_path = argv[2];
+    std::cout << "writer " << rank << "before created capio object" << std::endl;
     capio_mpi capio(false, true, rank, config_path);
     std::cout << "writer " << rank << "created capio object" << std::endl;
     if (NUM_ELEM % size == 0) {
         int array_length = NUM_ELEM / num_cons;
         data = new int[array_length];
         initialize(data, array_length, rank);
+        std::cout << "before all gather process " << rank << std::endl;
         capio.capio_all_gather(data, array_length, nullptr, -1);
+        std::cout << "after all gather process " << rank << std::endl;
         initialize(data, array_length, rank + 1);
+        std::cout << "before all gather process " << rank << std::endl;
         capio.capio_all_gather(data, array_length, nullptr, -1);
+        std::cout << "after all gather process " << rank << std::endl;
         free(data);
     }
     std::cout << "writer " << rank << "ended " << std::endl;
