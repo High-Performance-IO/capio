@@ -1,0 +1,3 @@
+add_subdirectory(capio_comm)
+add_subdirectory(files_comm)
+add_subdirectory(queues)
