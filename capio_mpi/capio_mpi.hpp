@@ -35,39 +35,20 @@ private:
         int active_producers_node = get_num_processes_same_node("app1");
         int active_recipients_node = get_num_processes_same_node("app2");
         m_num_active_recipients_node = m_shm.find_or_construct<int>("num_recipients")(active_recipients_node);
-        //std::cout << "debug 1" << std::endl;
         m_num_active_producers_node = m_shm.find_or_construct<int>("num_producers")(active_producers_node);
-        //std::cout << "debug 2" << std::endl;
-
         capio_queue = new mpsc_queue(m_shm, buf_size, 0, "capio");
-        //std::cout << "debug 3" << std::endl;
         std::vector<int> recipients_rank_same_node = get_recipients_rank_same_node();
-        //std::cout << "debug 4" << std::endl;
         for (int rank : recipients_rank_same_node) {
-           // std::cout << " m_rank and rank are in the same node" << m_rank << " " << rank << std::endl;
             queues_recipients[rank] = new mpsc_queue(m_shm, buf_size, rank, "norm");
             collective_queues_recipients[rank] = new mpsc_queue(m_shm, buf_size, rank, "coll");
         }
-        //std::cout << "debug 5" << std::endl;
-
     }
 
-    int get_id_capio_process_same_node() {
-        int node;
-        if (m_recipient) {
-            node = config.at("app2").at(m_rank);
-        }
-        else if (m_producer) {
-            node = config.at("app1").at(m_rank);
-        }
-        return node * 2;
-    }
 
     int get_num_processes_same_node(std::string app) {
         int num_processes = 0;
         const std::unordered_map<int, int> &app_processes = config[app];
         int node;
-   //     std::cout << "get_num_processes_same_node before if" << std::endl;
         if (m_recipient) {
             node = config.at("app2").at(m_rank);
         }
@@ -81,7 +62,6 @@ private:
             if (pair_k_v.second == node)
                 ++num_processes;
         }
-    //    std::cout << "get_num_processes_same_node after if" << std::endl;
         return num_processes;
     }
 
@@ -128,8 +108,6 @@ private:
             prod_machine = it->second;
             if (prod_machine == machine) {
                 if (m_rank == i) {
-                    std::cout << "terminate capio prod_machine " << prod_machine << " machine " << machine << " m_rank "
-                              << m_rank << " i " << i << std::endl;
                     capio_queue->write(&end_msg, 1);
                 }
                 ++machine;
@@ -176,7 +154,6 @@ private:
             }
         }
         else if (m_producer){
-            std::cout << "producer " << m_rank << " destroy capio object" << std::endl;
             terminate_capio_process();
         }
         free(capio_queue);
@@ -214,9 +191,7 @@ private:
     }
 
     void capio_recv(int* data, int count, std::unordered_map<int, mpsc_queue*> &queues) {
-        std::cout << "process " << m_rank << " before recv" << std::endl;
         queues[m_rank]->read(data, count);
-        std::cout << "process " << m_rank << " after recv" << std::endl;
 
     }
 
@@ -232,29 +207,22 @@ private:
 
         if (same_machine(rank)) {
             mpsc_queue* queue = queues[rank];
-            std::cout << " same machine m_rank" << m_rank << " rank " << rank << std::endl;
             queue->write(data, count);
         }
         else {
-            std::cout << " not same machine m_rank" << m_rank << " rank " << rank << std::endl;
             int tmp[count + 3];
             tmp[0] = count;
             tmp[1] = rank;
             if (&queues == &queues_recipients) {
                 tmp[2] = 0;
-                std::cout << "tmp[2]: " << tmp[2] << std::endl;
             }
             else {
                 tmp[2] = 1;
-                std::cout << "tmp[2]: " << tmp[2] << std::endl;
             }
             for (int i = 0; i < count; ++i) {
                 tmp[i + 3] = data[i];
             }
-            std::cout << "tmp[0]: " << tmp[0] << std::endl;
-            std::cout << "count + 3 = " << count + 3 << std::endl;
             capio_queue->write(&tmp[0], count + 3);
-            //std::cout << "not same machine after write" << std::endl;
         }
     }
 
@@ -333,11 +301,9 @@ public:
 
     void capio_gather(int* send_data, int send_count, int* recv_data, int recv_count, int root) {
         if (m_tot_num_producers == m_tot_num_recipients) {
-            std::cout << "capio_gather_balanced" << std::endl;
             capio_gather_balanced(send_data, send_count, recv_data, recv_count, root);
         }
         else {
-            std::cout << "capio_gather_unbalanced" << std::endl;
             capio_gather_not_balanced(send_data, send_count, recv_data, recv_count, root);
         }
     }
@@ -345,20 +311,13 @@ public:
     void capio_gather_balanced(int* send_data, int send_count, int* recv_data, int recv_count, int root) {
         if (m_recipient) {
             if (m_rank == root) {
-                std::cout << "gather rank == root " <<  m_rank << std::endl;
                 capio_recv(recv_data + root * recv_count / m_tot_num_producers, recv_count / m_tot_num_producers, collective_queues_recipients);
-                std::cout << "before MPI_Gather " <<  m_rank << std::endl;
                 MPI_Gather(MPI_IN_PLACE, 0, MPI_INT, recv_data, recv_count / m_tot_num_producers, MPI_INT, root, MPI_COMM_WORLD);
-                std::cout << "after MPI_Gather " <<  m_rank << std::endl;
             }
             else {
                 int* tmp = new int[recv_count / m_tot_num_producers];
-                std::cout << "gather rank != root " <<  m_rank << std::endl;
                 capio_recv(tmp, recv_count / m_tot_num_producers, collective_queues_recipients);
-                std::cout << "before MPI_Gather " <<  m_rank << std::endl;
                 MPI_Gather(tmp, recv_count / m_tot_num_producers, MPI_INT, nullptr, 0, MPI_INT, root, MPI_COMM_WORLD);
-                std::cout << "after MPI_Gather " <<  m_rank << std::endl;
-                free(tmp);
             }
         }
         else {
@@ -367,9 +326,7 @@ public:
             MPI_Comm_size(MPI_COMM_WORLD, &num_prods);
             MPI_Comm_rank(MPI_COMM_WORLD, &rank);
 
-            std::cout << "gather producer before capio_send " << m_rank << std::endl;
             capio_send(send_data, send_count, m_rank, collective_queues_recipients);
-            std::cout << "gather producer after capio_send " << m_rank << std::endl;
 
 
             // to avoid that the two calls of capio_gather interfere with each other
@@ -427,11 +384,8 @@ public:
 
     void capio_all_gather_balanced(int* send_data, int send_count, int* recv_data, int recv_count) {
         if (m_recipient) {
-            std::cout << "capio_all_gather_balanced recv " <<  m_rank << " index " << m_rank * (recv_count / m_tot_num_producers) <<  std::endl;
             capio_recv(recv_data + m_rank * (recv_count / m_tot_num_producers), recv_count / m_tot_num_producers, collective_queues_recipients);
-            std::cout << "before MPI_Gather " <<  m_rank << std::endl;
             MPI_Allgather(MPI_IN_PLACE, 0, MPI_INT, recv_data, recv_count / m_tot_num_producers, MPI_INT, MPI_COMM_WORLD);
-            std::cout << "after MPI_Gather " <<  m_rank << std::endl;
 
         }
         else {
@@ -439,10 +393,7 @@ public:
             int rank;
             MPI_Comm_size(MPI_COMM_WORLD, &num_prods);
             MPI_Comm_rank(MPI_COMM_WORLD, &rank);
-
-            std::cout << "gather producer before capio_send " << m_rank << std::endl;
             capio_send(send_data, send_count, m_rank, collective_queues_recipients);
-            std::cout << "gather producer after capio_send " << m_rank << std::endl;
 
 
             // to avoid that the two calls of capio_gather interfere with each other
@@ -471,9 +422,7 @@ public:
                 if (rank > 0) {
                     MPI_Recv(nullptr, 0, MPI_INT, rank - 1, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
                 }
-                std::cout << "all_gather process " << m_rank << " send to " << i << std::endl;
                 capio_send(send_data, send_count, i, collective_queues_recipients);
-                std::cout << "all_gather process " << m_rank << " after sent to " << i << std::endl;
                 if (rank < (num_prods - 1)) {
                     MPI_Send(nullptr, 0, MPI_INT, rank + 1, 0, MPI_COMM_WORLD);
                 }
