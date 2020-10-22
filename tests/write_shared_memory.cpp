@@ -1,6 +1,6 @@
 #include <iostream>
 #include <mpi.h>
-#include "../capio_proxy.hpp"
+#include "../capio_unordered.hpp"
 
 struct elem {
     int i;
@@ -22,7 +22,7 @@ int main(int argc, char** argv) {
     MPI_Init(&argc, &argv);
     int comm_size;
     MPI_Comm_size(MPI_COMM_WORLD, &comm_size);
-    capio_proxy<int> proxy("outputfile", comm_size, false, 10);
+    capio_unordered<int> proxy("outputfile", comm_size, false, 10);
     std::cout << "after constuctor\n";
     for (int i = 0; i < num_writes; ++i) {
         proxy.write(i);
@@ -30,7 +30,7 @@ int main(int argc, char** argv) {
     }
     std::cout << "before finished\n";
     proxy.finished();
-    capio_proxy<struct elem> proxy2("outputfile2", comm_size, false, 12);
+    capio_unordered<struct elem> proxy2("outputfile2", comm_size, false, 12);
     std::cout << "after constuctor\n";
     struct elem e;
     for (int i = 0; i < num_writes; ++i) {

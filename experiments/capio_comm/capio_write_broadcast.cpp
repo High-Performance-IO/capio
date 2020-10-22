@@ -1,15 +1,8 @@
 #include <iostream>
 #include <mpi.h>
-#include "../../capio_mpi/capio_mpi.hpp"
+#include "../../capio_ordered/capio_ordered.hpp"
+#include "../commons/utils_exp.hpp"
 
-int **alloc_2d_int(int rows, int cols) {
-    int *data = (int *)malloc(rows*cols*sizeof(int));
-    int **array= (int **)malloc(rows*sizeof(int*));
-    for (int i=0; i<rows; i++)
-        array[i] = &(data[cols*i]);
-
-    return array;
-}
 int main(int argc, char** argv) {
     int rank, **matrix;
     MPI_Init(&argc, &argv);
@@ -22,7 +15,7 @@ int main(int argc, char** argv) {
     int num_cols = std::stoi(argv[2]);
     std::string config_path(argv[3]);
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
-    capio_mpi capio(false, true, rank, config_path);
+    capio_ordered capio(false, true, rank, config_path);
     std::cout << "writer " << rank << "created capio object" << std::endl;
     if (rank == 0) {
         matrix = alloc_2d_int(num_rows , num_cols);

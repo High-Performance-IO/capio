@@ -1,24 +1,6 @@
 #include <iostream>
 #include <mpi.h>
-#include "../../capio_mpi/capio_mpi.hpp"
-
-int **alloc_2d_int(int rows, int cols) {
-    int *data = (int *)malloc(rows*cols*sizeof(int));
-    int **array= (int **)malloc(rows*sizeof(int*));
-    for (int i=0; i<rows; i++)
-        array[i] = &(data[cols*i]);
-
-    return array;
-}
-
-void print_matrix(int** matrix, int num_rows, int num_cols) {
-    for (int i = 0; i < num_rows; ++i) {
-        for (int j = 0; j < num_cols; ++j) {
-            std::cout << matrix[i][j] << " " << std::endl;
-        }
-        std::cout << std::endl;
-    }
-}
+#include "../../capio_ordered/capio_ordered.hpp"
 
 int main(int argc, char** argv) {
     int size, rank, *matrix;
@@ -33,7 +15,7 @@ int main(int argc, char** argv) {
     std::string config_path(argv[3]);
     MPI_Comm_size(MPI_COMM_WORLD, &size);
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
-    capio_mpi capio(true, false, rank, config_path);
+    capio_ordered capio(true, false, rank, config_path);
     if (rank == 0) {
         matrix = new int[num_rows * num_cols * size];
         std::cout << "exp before recv" << std::endl;

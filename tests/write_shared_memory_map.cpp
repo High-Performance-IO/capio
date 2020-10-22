@@ -1,6 +1,6 @@
 #include <iostream>
 #include <mpi.h>
-#include "../capio_proxy.hpp"
+#include "../capio_unordered.hpp"
 
 
 /*
@@ -15,7 +15,7 @@ int main(int argc, char** argv) {
     int comm_size, rank;
     MPI_Comm_size(MPI_COMM_WORLD, &comm_size);
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
-    capio_proxy<int> proxy("outputfile", comm_size, false, 10);
+    capio_unordered<int> proxy("outputfile", comm_size, false, 10);
     std::cout << "after constuctor\n";
     for (int i = 0; i < num_writes; ++i) {
         proxy.write<std::string>(std::to_string(i), [](std::string str) {return std::stoi(str);});

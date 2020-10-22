@@ -1,5 +1,5 @@
-add_executable(all_gather_write all_gather_write.cpp ../../../capio_mpi/capio_mpi.hpp)
-add_executable(all_gather_read all_gather_read.cpp ../../../capio_mpi/capio_mpi.hpp)
+add_executable(all_gather_write all_gather_write.cpp ../../../capio_ordered/capio_ordered.hpp)
+add_executable(all_gather_read all_gather_read.cpp ../../../capio_ordered/capio_ordered.hpp)
 
 target_link_libraries(all_gather_write ${MPI_LIBRARIES} rt Threads::Threads)
 target_link_libraries(all_gather_read ${MPI_LIBRARIES} rt Threads::Threads)

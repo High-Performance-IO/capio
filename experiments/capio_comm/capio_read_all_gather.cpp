@@ -1,6 +1,6 @@
 #include <iostream>
 #include <mpi.h>
-#include "../../capio_mpi/capio_mpi.hpp"
+#include "../../capio_ordered/capio_ordered.hpp"
 
 
 int main(int argc, char** argv) {
@@ -18,7 +18,7 @@ int main(int argc, char** argv) {
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
     MPI_Comm_size(MPI_COMM_WORLD, &size);
     matrix = new int [num_rows * num_cols * size];
-    capio_mpi capio(true, false, rank, config_path);
+    capio_ordered capio(true, false, rank, config_path);
     capio.capio_all_gather(nullptr, 0,matrix, num_rows * num_cols * size);
     std::ofstream output_file("output_capio_all_gather_" + std::to_string(rank) + ".txt");
     for (int i = 0; i < num_rows *size; ++i) {

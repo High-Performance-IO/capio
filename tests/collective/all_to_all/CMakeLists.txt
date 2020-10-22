@@ -1,5 +1,5 @@
-add_executable(all_to_all_write all_to_all_write.cpp ../../../capio_mpi/capio_mpi.hpp)
-add_executable(all_to_all_read all_to_all_read.cpp ../../../capio_mpi/capio_mpi.hpp)
+add_executable(all_to_all_write all_to_all_write.cpp ../../../capio_ordered/capio_ordered.hpp)
+add_executable(all_to_all_read all_to_all_read.cpp ../../../capio_ordered/capio_ordered.hpp)
 
 target_link_libraries(all_to_all_write ${MPI_LIBRARIES} rt Threads::Threads)
 target_link_libraries(all_to_all_read ${MPI_LIBRARIES} rt Threads::Threads)

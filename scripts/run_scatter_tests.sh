@@ -10,7 +10,7 @@ then
     echo "scatter test case 1 failed"
 fi
 sleep .1
-
+rm /dev/shm/*
 mpiexec -n 2 ../build/capio_process/capio ../one_node_2_4.yaml > scatter_2_4_capio.txt &
 sleep .1
 mpiexec -n 4 ../build/tests/collective/scatter/scatter_read ../one_node_2_4.yaml > scatter_2_4_cons.txt &
@@ -21,7 +21,7 @@ then
     echo "scatter test case 2 failed"
 fi
 sleep .1
-
+rm /dev/shm/*
 mpiexec -n 2 ../build/capio_process/capio ../one_node_4_2.yaml > scatter_4_2_capio.txt &
 sleep .1
 mpiexec -n 2 ../build/tests/collective/scatter/scatter_read ../one_node_4_2.yaml > scatter_4_2_cons.txt &
@@ -31,3 +31,4 @@ if [ $? -ne 0 ];
 then
     echo "scatter test case 3 failed"
 fi
+rm /dev/shm/*

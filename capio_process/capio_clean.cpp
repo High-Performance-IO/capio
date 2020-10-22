@@ -1,7 +1,7 @@
 #include <boost/interprocess/managed_shared_memory.hpp>
 #include <boost/interprocess/sync/named_semaphore.hpp>
 #include <mpi.h>
-#include "../capio_mpi/capio_mpi.hpp"
+#include "../capio_ordered/capio_ordered.hpp"
 
 #include <boost/interprocess/sync/named_mutex.hpp>
 #include <boost/interprocess/sync/named_condition.hpp>

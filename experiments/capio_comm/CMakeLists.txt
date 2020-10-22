@@ -1,5 +1,5 @@
-add_executable(capio_write_matrix_independent capio_write_matrix_independent.cpp)
-add_executable(capio_reduce_matrix_one_matrix capio_reduce_matrix_one_matrix.cpp)
+add_executable(capio_write_reduce_matrix_one_matrix capio_write_reduce_matrix_one_matrix.cpp)
+add_executable(capio_read_reduce_matrix_one_matrix capio_read_reduce_matrix_one_matrix.cpp)
 add_executable(capio_send_matrix_to_one capio_send_matrix_to_one.cpp)
 add_executable(capio_read_gather capio_read_gather.cpp)
 add_executable(capio_write_gather capio_write_gather.cpp)
@@ -18,8 +18,8 @@ add_executable(capio_write_all_to_all capio_write_all_to_all.cpp)
 add_executable(capio_read_broadcast capio_read_broadcast.cpp)
 add_executable(capio_write_broadcast capio_write_broadcast.cpp)
 
-target_link_libraries(capio_write_matrix_independent ${MPI_LIBRARIES} rt Threads::Threads)
-target_link_libraries(capio_reduce_matrix_one_matrix ${MPI_LIBRARIES} rt Threads::Threads)
+target_link_libraries(capio_write_reduce_matrix_one_matrix ${MPI_LIBRARIES} rt Threads::Threads)
+target_link_libraries(capio_read_reduce_matrix_one_matrix ${MPI_LIBRARIES} rt Threads::Threads)
 target_link_libraries(capio_send_matrix_to_one ${MPI_LIBRARIES} rt Threads::Threads)
 target_link_libraries(capio_read_gather ${MPI_LIBRARIES} rt Threads::Threads)
 target_link_libraries(capio_write_gather ${MPI_LIBRARIES} rt Threads::Threads)
@@ -41,9 +41,9 @@ target_link_libraries(capio_write_broadcast ${MPI_LIBRARIES} rt Threads::Threads
 # includes MPI
 include_directories(${MPI_INCLUDE_PATH})
 if(MPI_COMPILE_FLAGS)
-    set_target_properties(capio_write_matrix_independent PROPERTIES
+    set_target_properties(capio_write_reduce_matrix_one_matrix PROPERTIES
             COMPILE_FLAGS "${MPI_COMPILE_FLAGS}")
-    set_target_properties(capio_reduce_matrix_one_matrix PROPERTIES
+    set_target_properties(capio_read_reduce_matrix_one_matrix PROPERTIES
             COMPILE_FLAGS "${MPI_COMPILE_FLAGS}")
     set_target_properties(capio_send_matrix_to_one PROPERTIES
             COMPILE_FLAGS "${MPI_COMPILE_FLAGS}")
@@ -82,9 +82,9 @@ if(MPI_COMPILE_FLAGS)
 endif()
 
 if(MPI_LINK_FLAGS)
-    set_target_properties(capio_write_matrix_independent PROPERTIES
+    set_target_properties(capio_write_reduce_matrix_one_matrix PROPERTIES
             LINK_FLAGS "${MPI_LINK_FLAGS}")
-    set_target_properties(capio_reduce_matrix_one_matrix PROPERTIES
+    set_target_properties(capio_read_reduce_matrix_one_matrix PROPERTIES
             LINK_FLAGS "${MPI_LINK_FLAGS}")
     set_target_properties(capio_send_matrix_to_one PROPERTIES
             LINK_FLAGS "${MPI_LINK_FLAGS}")

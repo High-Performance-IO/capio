@@ -1,14 +1,6 @@
-#include "../../capio_mpi/capio_mpi.hpp"
+#include "../../capio_ordered/capio_ordered.hpp"
 #include <mpi.h>
-
-int **alloc_2d_int(int rows, int cols) {
-    int *data = (int *)malloc(rows*cols*sizeof(int));
-    int **array= (int **)malloc(rows*sizeof(int*));
-    for (int i=0; i<rows; i++)
-        array[i] = &(data[cols*i]);
-
-    return array;
-}
+#include "../commons/utils_exp.hpp"
 
 
 int main(int argc, char** argv) {
@@ -24,7 +16,7 @@ int main(int argc, char** argv) {
     std::string config_path(argv[3]);
     matrix = alloc_2d_int(num_rows, num_cols);
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
-    capio_mpi capio(true, false, rank, config_path);
+    capio_ordered capio(true, false, rank, config_path);
     capio.capio_broadcast(matrix[0], num_rows * num_cols, 0);
     std::ofstream output_file("output_file_capio_broadcast_" + std::to_string(rank) + ".txt");
     for (int i = 0; i < num_rows; ++i) {

@@ -1,6 +1,6 @@
 #include <iostream>
 #include <mpi.h>
-#include "../../../capio_mpi/capio_mpi.hpp"
+#include "../../../capio_ordered/capio_ordered.hpp"
 #include "../../common/utils.hpp"
 
 int const NUM_ELEM = 100;
@@ -21,7 +21,7 @@ int main(int argc, char** argv) {
         std::cout << "input error: config file needed" << std::endl;
     }
     std::string config_path = argv[1];
-    capio_mpi capio(true, false, rank, config_path);
+    capio_ordered capio(true, false, rank, config_path);
     std::cout << "reader " << rank << " before created capio object" << std::endl;
     if (NUM_ELEM % size == 0) {
         int array_length = NUM_ELEM / size;

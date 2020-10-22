@@ -10,7 +10,7 @@ using namespace boost::interprocess;
 const int buf_size = 1024 * 1024;
 
 
-class capio_mpi {
+class capio_ordered {
 private:
     managed_shared_memory m_shm;
     int* m_num_active_recipients_node;
@@ -253,7 +253,7 @@ private:
 
 public:
 
-    capio_mpi(bool recipient, bool producer, int rank, std::string path) :
+    capio_ordered(bool recipient, bool producer, int rank, std::string path) :
         m_mutex_num_recipients(open_or_create, "mutex_num_recipients_capio_shm", 1),
         m_sem_num_prods(open_or_create, "sem_num_prods", 0),
         m_mutex_num_prods(open_or_create, "mutex_num_prods_capio_shm", 1){
@@ -266,7 +266,7 @@ public:
         capio_init();
     }
 
-    ~capio_mpi(){
+    ~capio_ordered(){
         capio_finalize();
     }
 

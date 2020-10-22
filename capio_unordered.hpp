@@ -4,7 +4,7 @@
 
 using namespace boost::interprocess;
 template <class T>
-class capio_proxy {
+class capio_unordered {
 private:
     // name of the segment of shared memory used
     std::string m_shm_name;
@@ -38,7 +38,7 @@ public:
      * constructor
      */
 
-    capio_proxy(const std::string & name, int n_producers, bool owner, int buf_size = 1024) :
+    capio_unordered(const std::string & name, int n_producers, bool owner, int buf_size = 1024) :
             m_mutex_buf_prods(open_or_create, ("mutex_buf_prods" + name + "_capio_shm").c_str(), 1),
             m_mutex_buf_cons(open_or_create, ("mutex_buf_cons" + name + "_capio_shm").c_str(), 1),
             m_num_stored(open_or_create, ("num_stored_" + name + "_capio_shm").c_str() , 0),
@@ -61,7 +61,7 @@ public:
      * destructor frees the resources if the producers have finished and if there aren't element in the buffer
      */
 
-    ~capio_proxy() {
+    ~capio_unordered() {
         if (*m_num_producers == 0 && *m_i_cons == *m_i_prod && m_owner) {
             std::cout << "a consumer frees the resources" << std::endl;
             m_shm.destroy_ptr(m_num_producers);

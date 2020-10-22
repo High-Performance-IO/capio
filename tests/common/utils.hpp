@@ -1,6 +1,13 @@
 #include <iostream>
 #include <assert.h>
 
+
+#ifndef CAPIO_UTILS_H
+#define CAPIO_UTILS_H
+
+
+
+
 void initialize(int data[], int size, int num) {
     for (int i = 0; i < size; ++i) {
         data[i] = num;
@@ -40,3 +47,5 @@ void compute_expected_result_reduce(int* expected_result, int array_length, int 
         }
     }
 }
+
+#endif //CAPIO_QAA_H

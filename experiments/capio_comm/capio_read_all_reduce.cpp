@@ -1,24 +1,7 @@
 #include <iostream>
 #include <mpi.h>
-#include "../../capio_mpi/capio_mpi.hpp"
-
-int **alloc_2d_int(int rows, int cols) {
-    int *data = (int *)malloc(rows*cols*sizeof(int));
-    int **array= (int **)malloc(rows*sizeof(int*));
-    for (int i=0; i<rows; i++)
-        array[i] = &(data[cols*i]);
-
-    return array;
-}
-
-void sum(void* input_data, void* output_data, int* count, MPI_Datatype* data_type) {
-    int* input = (int*)input_data;
-    int* output = (int*)output_data;
-
-    for(int i = 0; i < *count; i++) {
-        output[i] += input[i];
-    }
-}
+#include "../../capio_ordered/capio_ordered.hpp"
+#include "../commons/utils_exp.hpp"
 
 
 int main(int argc, char** argv) {
@@ -32,9 +15,8 @@ int main(int argc, char** argv) {
     int num_rows = std::stoi(argv[1]);
     int num_cols = std::stoi(argv[2]);
     std::string config_path(argv[3]);
-    //matrix = alloc_2d_int(num_rows, num_cols);
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
-    capio_mpi capio(true, false, rank, config_path);
+    capio_ordered capio(true, false, rank, config_path);
     matrix =  alloc_2d_int(num_rows, num_cols);
     capio.capio_all_reduce(nullptr, matrix[0], num_rows * num_cols, MPI_INT, sum);
     std::ofstream output_file("output_file_capio_all_reduce_" + std::to_string(rank) + ".txt");
@@ -42,7 +24,7 @@ int main(int argc, char** argv) {
         for (int j = 0; j < num_cols; ++j) {
             output_file << matrix[i][j] << " ";
         }
-        output_file << "\n"; // vs std::endl
+        output_file << "\n";
     }
     output_file.close();
     free(matrix[0]);

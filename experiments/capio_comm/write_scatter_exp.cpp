@@ -1,6 +1,6 @@
 #include <iostream>
 #include <mpi.h>
-#include "../../capio_mpi/capio_mpi.hpp"
+#include "../../capio_ordered/capio_ordered.hpp"
 
 
 
@@ -17,7 +17,7 @@ int main(int argc, char** argv) {
     std::string config_path(argv[3]);
     MPI_Comm_size(MPI_COMM_WORLD, &size);
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
-    capio_mpi capio(false, true, rank, config_path);
+    capio_ordered capio(false, true, rank, config_path);
     std::cout << "writer " << rank << "created capio object" << std::endl;
     if (rank == 0) {
         matrix = new int[num_rows * num_cols];

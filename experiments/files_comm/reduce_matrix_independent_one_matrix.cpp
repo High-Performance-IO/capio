@@ -1,26 +1,7 @@
 #include <fstream>
 #include <iostream>
 #include <mpi.h>
-
-
-
-int **alloc_2d_int(int rows, int cols) {
-    int *data = (int *)malloc(rows*cols*sizeof(int));
-    int **array= (int **)malloc(rows*sizeof(int*));
-    for (int i=0; i<rows; i++)
-        array[i] = &(data[cols*i]);
-
-    return array;
-}
-
-void print_matrix(int** matrix, int num_rows, int num_cols) {
-    for (int i = 0; i < num_rows; ++i) {
-        for (int j = 0; j < num_cols; ++j) {
-            std::cout << matrix[i][j] << " " << std::endl;
-        }
-        std::cout << std::endl;
-    }
-}
+#include "../commons/utils_exp.hpp"
 
 int main(int argc, char** argv) {
     int rank, **matrix;
@@ -45,10 +26,6 @@ int main(int argc, char** argv) {
             file >> matrix[i][j];
         }
     }
-    /*if (rank == 0) {
-        std::cout << "matrix read" << std::endl;
-        print_matrix(matrix, num_rows, num_cols);
-    }*/
     if (rank == 0)
         MPI_Reduce(MPI_IN_PLACE, matrix[0], num_rows * num_cols, MPI_INT, MPI_SUM, 0, MPI_COMM_WORLD);
     else
@@ -59,7 +36,7 @@ int main(int argc, char** argv) {
             for (int j = 0; j < num_cols; ++j) {
                 output_file << matrix[i][j] << " ";
             }
-            output_file << "\n"; // vs std::endl
+            output_file << "\n";
         }
         output_file.close();
     }

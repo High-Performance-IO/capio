@@ -2,16 +2,6 @@
 #include <iostream>
 #include <mpi.h>
 
-
-void print_matrix(int** matrix, int num_rows, int num_cols) {
-    for (int i = 0; i < num_rows; ++i) {
-        for (int j = 0; j < num_cols; ++j) {
-            std::cout << matrix[i][j] << " " << std::endl;
-        }
-        std::cout << std::endl;
-    }
-}
-
 int main(int argc, char** argv) {
     int rank, size, *matrix;
     MPI_Init(&argc, &argv);

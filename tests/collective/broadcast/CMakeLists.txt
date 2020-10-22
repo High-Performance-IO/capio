@@ -1,5 +1,5 @@
-add_executable(broadcast_write broadcast_write.cpp ../../../capio_mpi/capio_mpi.hpp)
-add_executable(broadcast_read broadcast_read.cpp ../../../capio_mpi/capio_mpi.hpp)
+add_executable(broadcast_write broadcast_write.cpp ../../../capio_ordered/capio_ordered.hpp)
+add_executable(broadcast_read broadcast_read.cpp ../../../capio_ordered/capio_ordered.hpp)
 
 target_link_libraries(broadcast_write ${MPI_LIBRARIES} rt Threads::Threads)
 target_link_libraries(broadcast_read ${MPI_LIBRARIES} rt Threads::Threads)

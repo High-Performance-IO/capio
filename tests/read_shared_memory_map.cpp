@@ -1,6 +1,6 @@
 #include <iostream>
 #include <mpi.h>
-#include "../capio_proxy.hpp"
+#include "../capio_unordered.hpp"
 
 /*
  * consumers that read a sequence of integers and a sequence of structs through the capio proxy
@@ -10,7 +10,7 @@
 int const num_writes = 45;
 
 void test_read(int num_producers, int rank) {
-    capio_proxy<int> proxy("outputfile", num_producers, true, 10);
+    capio_unordered<int> proxy("outputfile", num_producers, true, 10);
     if (rank == 0)
         std::cout << "process " << rank << " after constuctor" << std::endl;
     int i, actual_tot = 0, desidered_tot = 0;

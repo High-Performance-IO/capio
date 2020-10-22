@@ -1,5 +1,5 @@
-add_executable(scatter_write scatter_write.cpp ../../../capio_mpi/capio_mpi.hpp)
-add_executable(scatter_read scatter_read.cpp ../../../capio_mpi/capio_mpi.hpp)
+add_executable(scatter_write scatter_write.cpp ../../../capio_ordered/capio_ordered.hpp)
+add_executable(scatter_read scatter_read.cpp ../../../capio_ordered/capio_ordered.hpp)
 
 target_link_libraries(scatter_write ${MPI_LIBRARIES} rt Threads::Threads)
 target_link_libraries(scatter_read ${MPI_LIBRARIES} rt Threads::Threads)

@@ -1,4 +1,4 @@
-#include "../capio_mpi/capio_mpi.hpp"
+#include "../capio_ordered/capio_ordered.hpp"
 #include "../config_reader/config_reader.hpp"
 #include <mpi.h>
 #include <iostream>
@@ -75,7 +75,7 @@ void listener(const std::string &config_path, int rank, int num_nodes, int mpi_b
     std::string processor_name(str);
     std::cout << "listener " << std::to_string(rank) << processor_name << std::endl;
     std::cout << "capio process before create capio object rank: "  << rank << std::endl;
-    capio_mpi capio(false, false, rank, config_path);
+    capio_ordered capio(false, false, rank, config_path);
     std::cout << "capio process after create capio object rank: "  << rank << std::endl;
     int ended_capio_process = 0;
     while (!end) {

@@ -1,6 +1,6 @@
 #include <iostream>
 #include <mpi.h>
-#include "../capio_mpi/capio_mpi.hpp"
+#include "../capio_ordered/capio_ordered.hpp"
 
 /*
  * test capio_send. To use with recv_simple_test.cpp
@@ -21,7 +21,7 @@ int main(int argc, char** argv) {
         return 1;
     }
     std::string config_path = argv[1];
-    capio_mpi capio(false, true, rank, config_path);
+    capio_ordered capio(false, true, rank, config_path);
     std::cout << "writer " << rank << "created capio object" << std::endl;
     recipient_rank = rank;
     for (int i = 0; i < 100; ++i) {

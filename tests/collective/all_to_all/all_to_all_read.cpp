@@ -1,6 +1,6 @@
 #include <iostream>
 #include <mpi.h>
-#include "../../../capio_mpi/capio_mpi.hpp"
+#include "../../../capio_ordered/capio_ordered.hpp"
 #include "../../common/utils.hpp"
 
 int const NUM_ELEM = 100;
@@ -31,7 +31,7 @@ int main(int argc, char** argv) {
     int num_prods= std::stoi(argv[1]);
     std::string config_path = argv[2];
     int array_length = NUM_ELEM / size * num_prods;
-    capio_mpi capio(true, false, rank, config_path);
+    capio_ordered capio(true, false, rank, config_path);
     std::cout << "reader " << rank << " before created capio object" << std::endl;
     data = new int[array_length];
     expected_result = new int[array_length];
