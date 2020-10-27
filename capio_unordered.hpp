@@ -80,7 +80,7 @@ public:
     /*
     * Puts the data into the shared memory
     *
-    * parameter:
+    * inputs
     * const T& data: data to put in shared memory
     *
     * returns NONE
@@ -99,9 +99,10 @@ public:
     * It applies the data transformation and then it
     * puts the data into the shared memory
     *
-    * parameter:
+    * inputs
     * const T& data: data to put in shared memory
     * const std::function<T(Q)>& func: function to be applied to data
+     *
     * returns NONE
     */
 
@@ -119,7 +120,7 @@ public:
     /*
      * read one unit of data from the shared memory
      *
-     * parameters
+     * outputs
      * T* data: pointer of the data in producer memory
      *
      * returns
@@ -147,8 +148,6 @@ public:
     /*
      * the consumer use this function to informs the it has finished to use the buffer
      *
-     * parameters NONE
-     *
      * returns NONE
      *
      */
@@ -164,8 +163,6 @@ public:
 
     /*
      * checks if the producer can stop to read the buffer
-     *
-     * parameters NONE
      *
      * returns
      * true if there are data to read (in the present or in the future), false otherwise

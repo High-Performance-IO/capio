@@ -484,6 +484,8 @@ public:
      *
      * outputs
      * int* data : starting address of receive buffer
+     *
+     * returns NONE
      */
 
     void capio_recv(int* data, int count) {
@@ -494,12 +496,14 @@ public:
      * The producer send count element in the buffer data to the process of the second
      * application represented by the argument rank.
      *
-     *  inputs
-     *  int count: number of elements to send
-     *  int rank: rank of receiving process
+     * inputs
+     * int count: number of elements to send
+     * int rank: rank of receiving process
      *
-     *  outputs
-     *  int* data : starting address of send buffer
+     * outputs
+     * int* data : starting address of send buffer
+     *
+     * returns NONE
      */
 
     void capio_send(int* data, int count, int rank) {
@@ -520,12 +524,14 @@ public:
      * is divided in N blocks of recv_count elements where N is equals to the number
      * of consumers. The i-th block is sended to the i-th consumer.
      *
-     *  inputs
-     *  int recv_count: number of elements to receive
+     * inputs
+     * int recv_count: number of elements to receive
      *
-     *  outputs
-     *  int* send_data : starting address of sender buffer
-     *  int* recv_data: starting address of receiver buffer
+     * outputs
+     * int* send_data : starting address of sender buffer
+     * int* recv_data: starting address of receiver buffer
+     *
+     * returns NONE
      */
 
     void capio_scatter(int* send_data, int* recv_data, int recv_count) {
@@ -554,6 +560,8 @@ public:
      * outputs
      * int* send_data: starting address of send buffer
      * int* recv_data: starting address of receive buffer
+     *
+     * returns NONE
      */
 
     void capio_gather(int* send_data, int send_count, int* recv_data, int recv_count, int root) {
@@ -580,6 +588,7 @@ public:
      * int* send_data: starting address of send buffer
      * int* recv_data: starting address of receive buffer
      *
+     * returns NONE
      */
 
     void capio_all_gather(int* send_data, int send_count, int* recv_data, int recv_count) {
@@ -610,6 +619,8 @@ public:
      * MPI_Datatype data_type: data type of the elements used in the reduction function
      * void(*func)(void*, void*, int*, MPI_Datatype*): user defined function to perfrom the reduce
      * int root: rank of the process that wants the final result
+     *
+     * returns NONE
      */
 
 
@@ -646,6 +657,8 @@ public:
      * outputs
      * int* send_data: starting address of send buffer
      * int* recv_data: starting address of receive buffer
+     *
+     * returns NONE
      */
 
     void capio_all_reduce(int* send_data, int* recv_data, int count, MPI_Datatype data_type,
@@ -675,6 +688,7 @@ public:
      * int* send_data: starting address of sender buffer
      * int* recv_data: starting address of receiver buffer
      *
+     * returns NONE
      */
 
     void capio_all_to_all(int* send_data, int send_count, int* recv_data) {
@@ -699,6 +713,8 @@ public:
      *
      * outputs
      * int* buffer: starting address of buffer
+     *
+     * returns NONE
      */
 
     void capio_broadcast(int* buffer, int count, int root) {
