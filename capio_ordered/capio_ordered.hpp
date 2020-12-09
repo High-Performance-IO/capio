@@ -7,7 +7,6 @@
 #include "../config_reader/config_reader.hpp"
 
 using namespace boost::interprocess;
-const int buf_size = 1024 * 1024;
 
 
 class capio_ordered {
@@ -27,7 +26,7 @@ private:
     int m_rank;
     bool m_recipient;
     bool m_producer;
-
+    const int m_buf_size;
     void capio_init() {
         std::string m_shm_name = "capio_shm";
         long long int dim = 1024 * 1024 * 1024 * 4LL;
@@ -36,11 +35,11 @@ private:
         int active_recipients_node = get_num_processes_same_node("app2");
         m_num_active_recipients_node = m_shm.find_or_construct<int>("num_recipients")(active_recipients_node);
         m_num_active_producers_node = m_shm.find_or_construct<int>("num_producers")(active_producers_node);
-        capio_queue = new mpsc_queue(m_shm, buf_size, 0, "capio");
+        capio_queue = new mpsc_queue(m_shm, m_buf_size, 0, "capio");
         std::vector<int> recipients_rank_same_node = get_recipients_rank_same_node();
         for (int rank : recipients_rank_same_node) {
-            queues_recipients[rank] = new mpsc_queue(m_shm, buf_size, rank, "norm");
-            collective_queues_recipients[rank] = new mpsc_queue(m_shm, buf_size, rank, "coll");
+            queues_recipients[rank] = new mpsc_queue(m_shm, m_buf_size, rank, "norm");
+            collective_queues_recipients[rank] = new mpsc_queue(m_shm, m_buf_size, rank, "coll");
         }
     }
 
@@ -252,12 +251,12 @@ private:
     }
 
     void capio_all_to_all_balanced(int* send_data, int send_count, int* recv_data) {
-        if (! m_recipient) {
-            MPI_Alltoall(MPI_IN_PLACE, 0, MPI_INT, send_data, send_count, MPI_INT, MPI_COMM_WORLD);
-            capio_send(send_data, send_count * m_tot_num_recipients, m_rank, collective_queues_recipients);
+        if (m_recipient) {
+            capio_recv(recv_data, send_count  * m_tot_num_producers, collective_queues_recipients);
+            MPI_Alltoall(MPI_IN_PLACE, 0, MPI_INT, recv_data, send_count, MPI_INT, MPI_COMM_WORLD);
         }
         else {
-            capio_recv(recv_data, send_count  * m_tot_num_recipients, collective_queues_recipients);
+            capio_send(send_data, send_count * m_tot_num_producers, m_rank, collective_queues_recipients);
         }
     }
 
@@ -459,7 +458,8 @@ private:
 
 public:
 
-    capio_ordered(bool recipient, bool producer, int rank, std::string path) :
+    capio_ordered(bool recipient, bool producer, int rank, int buf_size, std::string path) :
+        m_buf_size(buf_size),
         m_mutex_num_recipients(open_or_create, "mutex_num_recipients_capio_shm", 1),
         m_sem_num_prods(open_or_create, "sem_num_prods", 0),
         m_mutex_num_prods(open_or_create, "mutex_num_prods_capio_shm", 1){

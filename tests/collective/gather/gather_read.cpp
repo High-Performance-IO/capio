@@ -12,14 +12,15 @@ int main(int argc, char** argv) {
     int rank;
     MPI_Init(&argc, &argv);
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
-    if (argc != 3) {
-        std::cout << "input error: number of producers and config file needed " << std::endl;
+    if (argc != 4) {
+        std::cout << "input error: capio buffer size, number of producers and config file needed " << std::endl;
         MPI_Finalize();
         return 0;
     }
-    int num_prods= std::stoi(argv[1]);
-    std::string config_path = argv[2];
-    capio_ordered capio(true, false, rank, config_path);
+    int buf_size = std::stoi(argv[1]);
+    int num_prods= std::stoi(argv[2]);
+    std::string config_path = argv[3];
+    capio_ordered capio(true, false, rank, buf_size, config_path);
     std::cout << "reader " << rank << " before created capio object" << std::endl;
     if (rank == 0) {
         capio.capio_gather(nullptr, 0, data, NUM_ELEM, 0);

@@ -24,6 +24,7 @@ void print_array(int data[], int array_length, int rank) {
 
 void compare_expected_actual(int* actual, int* expected, int array_length) {
     for (int i = 0; i < array_length; ++i) {
+        std::cout << "i, actual[i], expected[i]: " << i << ", " << actual[i] << ", " << expected[i] << std::endl;
         assert(actual[i] == expected[i]);
     }
 }

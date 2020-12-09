@@ -63,7 +63,7 @@ void sender(mpsc_queue& queue, int rank, const std::string &config_path, int num
     }
 }
 
-void listener(const std::string &config_path, int rank, int num_nodes, int mpi_buf) {
+void listener(const std::string &config_path, int rank, int num_nodes, int mpi_buf, int buf_size) {
     int dest, type;
     int effective_size;
     bool end = false;
@@ -75,7 +75,7 @@ void listener(const std::string &config_path, int rank, int num_nodes, int mpi_b
     std::string processor_name(str);
     std::cout << "listener " << std::to_string(rank) << processor_name << std::endl;
     std::cout << "capio process before create capio object rank: "  << rank << std::endl;
-    capio_ordered capio(false, false, rank, config_path);
+    capio_ordered capio(false, false, rank, buf_size, config_path);
     std::cout << "capio process after create capio object rank: "  << rank << std::endl;
     int ended_capio_process = 0;
     while (!end) {
@@ -117,13 +117,14 @@ int main(int argc, char** argv) {
     MPI_Init(&argc, &argv);
     std::string m_shm_name = "capio_shm";
     int rank;
-    if (argc != 3) {
-        std::cout << "input error: mpi_buf and config file needed " << std::endl;
+    if (argc != 4) {
+        std::cout << "input error:capio buffer size, mpi_buf and config file needed " << std::endl;
         MPI_Finalize();
         return 1;
     }
-    int mpi_buf = std::stoi(argv[1]);
-    std::string config_path = argv[2];
+    int buf_size = std::stoi(argv[1]);
+    int mpi_buf = std::stoi(argv[2]);
+    std::string config_path = argv[3];
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
     int num_nodes = get_num_nodes(get_deployment_config(config_path));
     std::cout << "num_nodes: " << num_nodes << std::endl;
@@ -136,7 +137,7 @@ int main(int argc, char** argv) {
         std::cout << "sender " << rank << " terminated" << std::endl;
     }
     else {
-        listener(config_path, rank, num_nodes, mpi_buf);
+        listener(config_path, rank, num_nodes, mpi_buf, buf_size);
         std::cout << "listener " << rank << " terminated" << std::endl;
     }
     MPI_Barrier(MPI_COMM_WORLD);

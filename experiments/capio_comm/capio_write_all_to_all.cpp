@@ -4,20 +4,21 @@
 
 
 int main(int argc, char** argv) {
-    int size, rank, num_rows, num_cols, **matrix;
+    int size, rank, num_rows, num_cols, buf_size, **matrix;
     MPI_Init(&argc, &argv);
-    if (argc != 4) {
-        std::cout << "input error: num of rows, num of columns and config file needed" << std::endl;
+    if (argc != 5) {
+        std::cout << "input error: capio buffer size, num of rows, num of columns and config file needed" << std::endl;
         MPI_Finalize();
         return 1;
     }
-    num_rows = std::stoi(argv[1]);
-    num_cols = std::stoi(argv[2]);
-    std::string config_path(argv[3]);
+    buf_size = std::stoi(argv[1]);
+    num_rows = std::stoi(argv[2]);
+    num_cols = std::stoi(argv[3]);
+    std::string config_path(argv[4]);
     matrix = alloc_2d_int(num_rows, num_cols);
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
     MPI_Comm_size(MPI_COMM_WORLD, &size);
-    capio_ordered capio(false, true, rank, config_path);
+    capio_ordered capio(false, true, rank, buf_size, config_path);
     for (int i = 0; i < num_rows; ++i) {
         for (int j = 0; j < num_cols; ++j) {
             matrix[i][j] = i + j + rank;

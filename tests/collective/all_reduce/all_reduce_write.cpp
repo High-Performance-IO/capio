@@ -20,13 +20,14 @@ int main(int argc, char** argv) {
     MPI_Init(&argc, &argv);
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
     MPI_Comm_size(MPI_COMM_WORLD, &size);
-    if (argc != 2) {
-        std::cout << "input error: config file needed " << std::endl;
+    if (argc != 3) {
+        std::cout << "input error: capio buffer size and config file needed " << std::endl;
         MPI_Finalize();
         return 0;
     }
-    std::string config_path = argv[1];
-    capio_ordered capio(false, true, rank, config_path);
+    int buf_size = std::stoi(argv[1]);
+    std::string config_path = argv[2];
+    capio_ordered capio(false, true, rank, buf_size, config_path);
     std::cout << "writer " << rank << "created capio object" << std::endl;
     if (NUM_ELEM % size == 0) {
         data = new int[NUM_ELEM];
