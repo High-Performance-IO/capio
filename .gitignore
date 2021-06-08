@@ -3,3 +3,5 @@ build
 .idea
 *.yaml
 scripts/*.txt
+mountdir
+rootdir
