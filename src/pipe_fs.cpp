@@ -1,3 +1,20 @@
+/*
+  CAPIO File System.
+
+
+	This program is based on the skeleton of the Big Brother File System
+	Copyright (C) 2012 Joseph J. Pfeiffer, Jr., Ph.D. <pfeiffer@cs.nmsu.edu>
+	This filesystem was based on FUSE2 while CAPIO is based on FUSE3.
+
+	CAPIO can be distrbuted under the terms of the GNU GPLv3.
+
+	The Big Brother File System can also be distributed under the terms of the GNU GPLv3.
+
+	This Big Brother File System is derived from function prototypes found /usr/include/fuse/fuse.h of the version 2 of libfuse.
+	Copyright (C) 2001-2007  Miklos Szeredi <miklos@szeredi.hu>
+	His code is licensed under the LGPLv2.
+
+								  */
 #include "params.h"
 #include "capio_broker.hpp"
 
