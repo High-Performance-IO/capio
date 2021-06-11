@@ -16,6 +16,7 @@
 #include <cstring>
 #include "params.h"
 #include "log.hpp"
+#include "capio_file.hpp"
 
 class files_table {
 	private:
@@ -23,9 +24,8 @@ class files_table {
 		 * The key of the map is the equivalent of the file decsriptor.
 		 * The value of the map is the pointer to the current region of the file. 
 		 */
-		std::unordered_map<int, std::tuple<char**, int, struct stat*, int*>> table;
-		std::unordered_map<std::string, char*> files_mem;
-		std::unordered_map<std::string, std::pair<struct stat, int>> files_metadata;
+		std::unordered_map<int, std::pair<capio_file*, int>> table;
+		std::unordered_map<std::string, capio_file> capio_files;
 		
 		std::unordered_map<int, std::pair<std::vector<struct dirent>*, int>> dirs_table;
 		std::unordered_map<std::string, std::vector<struct dirent>*> dirs_mem;
@@ -44,26 +44,16 @@ class files_table {
 		//destructor
 
 		~files_table() {
-			for (auto& pair : files_mem) {
-				free(pair.second);
-			}
-			for (auto& pair : dirs_mem) {
+			for (auto& pair: capio_files) 
+				pair.second.free_memory();
+			for (auto& pair : dirs_mem) 
 				delete pair.second;
-			}
-		}
-
-		char** get_pointer(int fd) {
-			char** p = nullptr;
-			auto it = table.find(fd);
-			if (it != table.end()) 
-				p = std::get<0>(it->second);	
-			return p;	
 		}
 
 		int get_metadata(const char *path, struct stat *statbuf) {
 			int res = 0;
-			auto it = files_metadata.find(path);	
-			if (it == files_metadata.end()) {
+			auto it = capio_files.find(path);	
+			if (it == capio_files.end()) {
 				auto dirs_it = dirs_metadata.find(path);
 				if (dirs_it == dirs_metadata.end()) {
 					res = -1;
@@ -73,7 +63,7 @@ class files_table {
 					*statbuf = dirs_it->second;
 			}
 			else
-				*statbuf = it->second.first;
+				*statbuf = it->second.get_metadata();
 			
 			return res;
 		}
@@ -96,38 +86,21 @@ class files_table {
 			return res;
 		}
 
-		struct stat create_metadata() {
-			struct stat res;
-			res.st_dev = 66307;
-			res.st_ino = 22675854;
-			res.st_mode = 0100644;
-			res.st_nlink = 1;
-			res.st_uid = 1000;
-			res.st_gid = 1000;
-			res.st_rdev = 0;
-			res.st_size = 0;
-			res.st_blksize = 4096;
-			res.st_blocks = 0;
-			res.st_atime = time(NULL); 
-			res.st_mtime = time(NULL);
-			res.st_ctime = time(NULL);
-			return res;
-		}
 
 		int mknod(const char* path, mode_t mode, dev_t dev) {
 			int res = 0;
-			auto it = files_mem.find(path);
-			if (it == files_mem.end()) {
+			auto it = capio_files.find(path);
+			if (it != capio_files.end()) {
 				res = -1;
 				errno = EEXIST;
 			}
 			else {
-				char* p = (char*)malloc(128 * sizeof(char)); 
+				int fd = count;
 				++count;
-				files_mem[std::string(path)] = p;
+				capio_files[path] = capio_file();
 				//metadata
-				files_metadata[std::string(path)].first = create_metadata();
-				files_metadata[std::string(path)].second = 128;
+				capio_files[path].set_metadata();
+				capio_files[path].allocate_memory();
 				//update metadata of the directory of the file
 				std::string str_path(path);
 				int pos = get_pos_last_slash(str_path);
@@ -139,7 +112,7 @@ class files_table {
 					dirs_mem[dir] = new std::vector<struct dirent>;
 				int dirs_length = (*dirs_mem[dir]).size();
 				dirs_mem[dir]->push_back(create_dirent(file_name, dirs_length));
-				table[count] = std::make_tuple(&files_mem[path], 0, &files_metadata[path].first, &files_metadata[path].second);
+				table[fd] = std::pair<capio_file*, int>(&capio_files[path], 0);
 			}
 			
 			return res;
@@ -176,15 +149,14 @@ class files_table {
 
 		int open(const char* path) {
 			int fd = count;
-			char* p;
 			++count;
-			auto it = files_mem.find(path);
-			if (it == files_mem.end()) { 
-				p = (char*) malloc(128 * sizeof(char)); 
-				files_mem[path] = p;
-				files_metadata[path].first = create_metadata();
-				files_metadata[path].second = 128;
-				//update metadata of the directory of the file
+			auto it = capio_files.find(path);
+			capio_file* p_cf;
+			if (it == capio_files.end()) { 
+				capio_files[path] = capio_file();
+				p_cf = &capio_files[path];
+				p_cf->set_metadata();
+				p_cf->allocate_memory();	
 				std::string str_path(path);
 				int pos = get_pos_last_slash(str_path) + 1;
 				std::string dir(str_path.substr(0, pos));
@@ -198,9 +170,9 @@ class files_table {
 
 			}
 			else { 
-				p = it->second;
+				p_cf = &it->second;
 			}
-			table[fd] = std::make_tuple(&files_mem[path], 0, &files_metadata[path].first, &files_metadata[path].second);
+			table[fd] = std::pair<capio_file*, int>(p_cf, 0); 
 			return fd;
 		}
 
@@ -267,37 +239,19 @@ class files_table {
 
 
 		int write(int fd, const char* buf, size_t nbytes) {
-			char** pp = get_pointer(fd);
-			int offset = std::get<1>(table[fd]);
-			int* p_inmemory_size = std::get<3>(table[fd]);
-			std::cout << "inmemory size: " << *p_inmemory_size << " offset: " << offset << " nbytes: " << nbytes << std::endl;
-			if (*p_inmemory_size < offset + nbytes) {
-				if (*p_inmemory_size * 2 >= offset + nbytes)
-					*p_inmemory_size *= 2;
-				else
-					*p_inmemory_size = offset + nbytes + *p_inmemory_size;
-				//rellocate memory
-				*pp = (char*) realloc(*pp, *p_inmemory_size * sizeof(char));
-			}
-			memcpy(*pp + offset, buf, nbytes);
-			std::get<1>(table[fd]) = offset + nbytes;
-			//update metadata
-			std::get<2>(table[fd])->st_size = nbytes;
-			return nbytes;
+			capio_file* p_cf = table[fd].first;
+			int offset = table[fd].second;
+			table[fd].second = offset + nbytes;
+			return p_cf->write(buf, offset, nbytes);
 		}
 
 
 		int read(int fd, char* buf, size_t nbytes) {
-			char** pp = get_pointer(fd);
-			auto opened_file = table[fd];
-			int offset = std::get<1>(opened_file);
-			int size = std::get<2>(opened_file)->st_size;
-			int nbytes_read = size - offset;
-			if (nbytes_read > nbytes)
-				nbytes_read = nbytes;
-			memcpy(buf, *pp, nbytes_read);
-			std::cout << "buf " << buf << std::endl;
-			std::get<1>(table[fd]) = offset + nbytes_read;
+			capio_file* p_cf = table[fd].first;
+			int offset = table[fd].second;
+			int nbytes_read = p_cf->read(buf, offset, nbytes);
+			//std::cout << "buf " << buf << std::endl;
+			table[fd].second = offset + nbytes_read;
 			return nbytes_read;
 		}
 };
