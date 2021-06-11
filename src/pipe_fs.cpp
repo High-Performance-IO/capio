@@ -18,6 +18,7 @@
 #include "params.h"
 #include "capio_broker.hpp"
 
+#include <mpi.h>
 #include <ctype.h>
 #include <dirent.h>
 #include <errno.h>
@@ -896,6 +897,7 @@ int main(int argc, char *argv[])
     int fuse_stat;
     struct bb_state *bb_data;
 	int rank, size;
+	MPI_Init(&argc, &argv);
     // bbfs doesn't do any access checking on its own (the comment
     // blocks in fuse.h mention some of the functions that need
     // accesses checked -- but note there are other functions, like
@@ -907,8 +909,12 @@ int main(int argc, char *argv[])
     // I don't want to parse the options string.
     if ((getuid() == 0) || (geteuid() == 0)) {
     	fprintf(stderr, "Running BBFS as root opens unnacceptable security holes\n");
-    	return 1;
+		MPI_Finalize();
+    	return -1;
     }
+
+	MPI_Comm_size(MPI_COMM_WORLD, &size);
+	MPI_Comm_rank(MPI_COMM_WORLD, &rank);
 
     // See which version of fuse we're running
     //fprintf(stderr, "Fuse library version %d.%d\n", FUSE_MAJOR_VERSION, FUSE_MINOR_VERSION);
@@ -919,8 +925,8 @@ int main(int argc, char *argv[])
     // rootpoint or mountpoint whose name starts with a hyphen, but so
     // will a zillion other programs)
 	std::cout << "argc: " << argc << "\n";
-	if (argc != 4){
-	   if (rank ==0) {
+	if (argc != (size + 3)){
+	   if (rank == 0) {
 	   	bb_usage();
 	   }
 	   return 1;
@@ -938,8 +944,8 @@ int main(int argc, char *argv[])
     // internal data
     std::cout << "rootdir process " << rank << " : " << argv[1] << std::endl; 
 	std::string str = "string";
-	argv[1] = argv[2];
-	argv[2] = argv[3];
+	argv[1] = argv[2 + rank];
+	argv[2] = argv[2 + size];
 	std::cout << "mountdir process " << rank << " : " << argv[1] << std::endl; 
     argc=3;
     
@@ -949,5 +955,6 @@ int main(int argc, char *argv[])
 	fuse_stat = fuse_main(argc, argv, &bb_oper, bb_data);
 	
 	fprintf(stderr, "fuse_main returned %d\n", fuse_stat);
+	MPI_Finalize();
     return fuse_stat;
 }
