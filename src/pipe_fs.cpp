@@ -23,7 +23,7 @@
 #include <dirent.h>
 #include <errno.h>
 #include <fcntl.h>
-#include </usr/local/include/fuse3/fuse.h>
+#include <fuse3/fuse.h>
 #include <libgen.h>
 #include <limits.h>
 #include <stdlib.h>

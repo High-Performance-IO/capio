@@ -16,7 +16,7 @@
 #include "params.h"
 
 #include <errno.h>
-#include </usr/local/include/fuse3/fuse.h>
+#include <fuse3/fuse.h>
 #include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
