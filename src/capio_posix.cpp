@@ -136,22 +136,24 @@ int add_open_request(const char* pathname) {
 	std::string str ("open " + std::to_string(getpid()) + " " + std::string(pathname));
 	const char* c_str = str.c_str();
 	memcpy(buf_requests.buf + *buf_requests.i, c_str, strlen(c_str) + 1);
+	std::cout << "open before response" << std::endl;
+	char tmp_str[1024];
+	printf("c_str %s, len c_str %i\n", c_str, strlen(c_str));
+	sprintf(tmp_str, "%s", (char*) buf_requests.buf + *buf_requests.i);
+	printf("add open msg sent: %s\n", tmp_str);
+
+	//for (int i = 0; i < strlen(c_str) + 1; ++i) {
+	//	std::cout << ((char*)buf_requests.buf)[i];
+	//}
+	std::cout << "before wait sem response" << std::endl;
+
 	*buf_requests.i = *buf_requests.i + strlen(c_str) + 1;
+	std::cout << "*buf_requests.i == " << *buf_requests.i << std::endl;
 	sem_post(sem_requests);
 	sem_post(sem_new_msgs);
 
 	//wait for response
-	std::cout << "open before response" << std::endl;
-	char tmp_str[1024];
-	printf("c_str %s, len c_str %i\n", c_str, strlen(c_str));
-	sprintf(tmp_str, "%s", (char*) buf_requests.buf);
-	printf("msg sent: %s\n");
-
-	for (int i = 0; i < strlen(c_str) + 1; ++i) {
-		std::cout << ((char*)buf_requests.buf)[i];
-	}
-	std::cout << "before wait sem response" << std::endl;
-	
+		
 	sem_wait(sem_response);
 	std::cout << "Open after response" << std::endl;
 	fd = buf_response[i_resp];
@@ -164,7 +166,12 @@ int add_close_request(int fd) {
 	const char* c_str = ("clos " +std::to_string(getpid()) + " "  + std::to_string(fd)).c_str();
     sem_wait(sem_requests);
 	memcpy(buf_requests.buf + *buf_requests.i, c_str, strlen(c_str) + 1);
+	char tmp_str[1024];
+	printf("c_str %s, len c_str %i\n", c_str, strlen(c_str));
+	sprintf(tmp_str, "%s", (char*) buf_requests.buf + *buf_requests.i);
+	printf("add read msg sent: %s\n", tmp_str);
 	*buf_requests.i = *buf_requests.i + strlen(c_str) + 1;
+	std::cout << "*buf_requests.i == " << *buf_requests.i << std::endl;
 	sem_post(sem_requests);
 	sem_post(sem_new_msgs);
 	return 0;
@@ -179,8 +186,9 @@ int add_read_request(int fd, size_t count) {
 	char tmp_str[1024];
 	printf("c_str %s, len c_str %i\n", c_str, strlen(c_str));
 	sprintf(tmp_str, "%s", (char*) buf_requests.buf + *buf_requests.i);
-	printf("msg sent: %s\n", c_str);
+	printf("add read msg sent: %s\n", tmp_str);
 	*buf_requests.i = *buf_requests.i + strlen(c_str) + 1;
+	std::cout << "*buf_requests.i == " << *buf_requests.i << std::endl;
 	sem_post(sem_requests);
 	sem_post(sem_new_msgs);
 	//read response (offest)
@@ -203,8 +211,9 @@ void add_write_request(int fd, size_t count) {
 	char tmp_str[1024];
 	printf("c_str %s, len c_str %i\n", c_str, strlen(c_str));
 	sprintf(tmp_str, "%s", (char*) buf_requests.buf + *buf_requests.i);
-	printf("msg sent: %s\n", c_str);
+	printf("add write msg sent: %s\n", tmp_str);
 	*buf_requests.i = *buf_requests.i + strlen(c_str) + 1;
+	std::cout << "*buf_requests.i == " << *buf_requests.i << std::endl;
 	sem_post(sem_requests);
 	sem_post(sem_new_msgs);
 	
@@ -230,8 +239,8 @@ int open(const char *pathname, int flags, ...) {
 	printf("Opening of the file %s captured\n", pathname);
 	if (real_open == NULL)
 		mtrace_init();
-
-	if (strcmp(pathname, "file_0.txt") == 0 || strcmp(pathname, "file_1.txt") == 0) {
+	const char* prefix = "file_";
+	if (strncmp("file_", pathname, strlen(prefix)) == 0) {
 		printf("calling my open...\n");
 		//create shm
 		int fd = add_open_request(pathname);
