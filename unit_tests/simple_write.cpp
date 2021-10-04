@@ -29,7 +29,14 @@ int main (int argc, char** argv) {
 	std::string file_name = "file_" + std::to_string(rank) + ".txt";
 	int fd = open(file_name.c_str(), O_CREAT | O_WRONLY, 0644);
 	for (int i = 0; i < num_writes; ++i) {
-		write(fd, data + i * num_elements, num_elements * sizeof(int));
+		int res, k = 0;
+    	int num_elements_written;
+    	while (k < num_elements) {
+        	res = write(fd, data + i * num_elements + k, sizeof(int) * (num_elements - k));
+        	num_elements_written = (res / sizeof(int));
+        	std::cout << "num_elements_written " << num_elements_written << std::endl;
+        	k += num_elements_written;
+    	}
 	}
 	if (close(fd) == -1)
 		std::cerr << "process " << rank << ", error closing the file\n";
