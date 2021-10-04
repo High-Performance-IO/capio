@@ -28,7 +28,7 @@ struct circular_buffer {
 	int* i;
 };
 
-std::unordered_map<int, std::pair<void*, int>> files;
+std::unordered_map<int, std::pair<void*, long int>> files;
 circular_buffer buf_requests; 
 int* buf_response;
 int i_resp;
@@ -228,8 +228,10 @@ void read_shm(void* shm, int offset, void* buffer, size_t count) {
 	memcpy(buffer, shm + offset, count); 
 }
 
-void write_shm(void* shm, int offset, const void* buffer, size_t count) {	
+void write_shm(void* shm, size_t offset, const void* buffer, size_t count) {	
+	std::cout << "before wrote " << std::endl;
 	memcpy(shm + offset, buffer, count); 
+	std::cout << "after wrote " << count << " bytes" << std::endl;
 }
 		
 
@@ -240,7 +242,8 @@ int open(const char *pathname, int flags, ...) {
 	if (real_open == NULL)
 		mtrace_init();
 	const char* prefix = "file_";
-	if (strncmp("file_", pathname, strlen(prefix)) == 0) {
+	const char* prefix_2 = "output_file_";
+	if (strncmp("file_", pathname, strlen(prefix)) == 0 || strncmp("output_file_", pathname, strlen(prefix_2)) == 0) {
 		printf("calling my open...\n");
 		//create shm
 		int fd = add_open_request(pathname);

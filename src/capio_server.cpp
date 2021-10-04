@@ -23,7 +23,7 @@ struct circular_buffer {
 int next_fd = -1;
 
 // pid -> fd ->(file_shm, index)
-std::unordered_map<int, std::unordered_map<int, std::pair<void*, int>>> processes_files;
+std::unordered_map<int, std::unordered_map<int, std::pair<void*, long int>>> processes_files;
 
 // pid -> fd -> pathname
 std::unordered_map<int, std::unordered_map<int, std::string>> processes_files_metadata;
@@ -32,7 +32,7 @@ std::unordered_map<int, std::unordered_map<int, std::string>> processes_files_me
 std::unordered_map<int, std::pair<void*, int>> response_buffers;
 
 // pathname -> (file_shm, file_size)
-std::unordered_map<std::string, std::pair<void*, int*>> files_metadata;
+std::unordered_map<std::string, std::pair<void*, long int*>> files_metadata;
 
 // pathname -> node
 std::unordered_map<std::string, char*> files_location;
@@ -41,7 +41,7 @@ std::unordered_map<std::string, char*> files_location;
 std::unordered_map<std::string, int> nodes_helper_rank;
 
 // path -> (pid, fd, numbytes)
-std::unordered_map<std::string, std::tuple<int, int, int>>  remote_pending_reads;
+std::unordered_map<std::string, std::tuple<int, int, long int>>  remote_pending_reads;
 
 //name of the node
 
@@ -55,6 +55,7 @@ static int index_not_read = 0;
 
 void err_exit(std::string error_msg) {
 	std::cout << "error: " << error_msg << std::endl;
+	printf("code error: %i str error: %s\n",errno, strerror(errno));
 	exit(1);
 }
 
@@ -87,12 +88,29 @@ sem_t* get_sem_requests() {
 	return sem_open("sem_requests", 0);
 }
 
+void* create_shm_circular_buffer(std::string shm_name) {
+	void* p = nullptr;
+	// if we are not creating a new object, mode is equals to 0
+	int fd = shm_open(shm_name.c_str(), O_CREAT | O_RDWR,  S_IRUSR | S_IWUSR); //to be closed
+	struct stat sb;
+	const long int size = 4096;
+	if (fd == -1)
+		err_exit("shm_open");
+	if (ftruncate(fd, size) == -1)
+		err_exit("ftruncate");
+	p = mmap(NULL, size, PROT_READ|PROT_WRITE, MAP_SHARED, fd, 0);
+	if (p == MAP_FAILED)
+		err_exit("mmap");
+//	if (close(fd) == -1);
+//		err_exit("close");
+	return p;
+}
 void* create_shm(std::string shm_name) {
 	void* p = nullptr;
 	// if we are not creating a new object, mode is equals to 0
 	int fd = shm_open(shm_name.c_str(), O_CREAT | O_RDWR,  S_IRUSR | S_IWUSR); //to be closed
 	struct stat sb;
-	const int size = 4096;
+	const long int size = 1024L * 1024 * 1024 * 4;
 	if (fd == -1)
 		err_exit("shm_open");
 	if (ftruncate(fd, size) == -1)
@@ -121,6 +139,23 @@ int* create_shm_int(std::string shm_name) {
 //		err_exit("close");
 	return (int*) p;
 }
+long int* create_shm_long_int(std::string shm_name) {
+	void* p = nullptr;
+	// if we are not creating a new object, mode is equals to 0
+	int fd = shm_open(shm_name.c_str(), O_CREAT | O_RDWR,  S_IRUSR | S_IWUSR); //to be closed
+	struct stat sb;
+	const int size = sizeof(long int);
+	if (fd == -1)
+		err_exit("shm_open");
+	if (ftruncate(fd, size) == -1)
+		err_exit("ftruncate");
+	p = mmap(NULL, size, PROT_READ|PROT_WRITE, MAP_SHARED, fd, 0);
+	if (p == MAP_FAILED)
+		err_exit("mmap");
+//	if (close(fd) == -1);
+//		err_exit("close");
+	return (long int*) p;
+}
 //TODO: same function in capio_posix, to put in common
 struct circular_buffer get_circular_buffer() {
 	//open shm
@@ -134,8 +169,8 @@ struct circular_buffer get_circular_buffer() {
 
 struct circular_buffer create_circular_buffer() {
 	//open shm
-	void* buf = create_shm("circular_buffer");
-	int* i = (int*) create_shm("index_buf");
+	void* buf = create_shm_circular_buffer("circular_buffer");
+	int* i = (int*) create_shm_int("index_buf");
 	*i = 0;
 	circular_buffer br;
 	br.buf = buf;
@@ -311,7 +346,7 @@ void read_next_msg(int rank) {
 		if (files_metadata.find(path) == files_metadata.end()) {
 			std::cout << "server " << rank << "updating file metadata for " << path << std::endl;
 			files_metadata[path].first = processes_files[pid][fd].first;	
-			files_metadata[path].second = create_shm_int(path + "_size");	
+			files_metadata[path].second = create_shm_long_int(path + "_size");	
 			if (files_metadata.find(path) == files_metadata.end()) {//debug
 				std::cout << "server " << rank << " error updating" <<std ::endl;
 				exit(1);
@@ -326,7 +361,7 @@ void read_next_msg(int rank) {
 			std::cout << "server handling a write" << std::endl;
 			int pid = strtol(str + 5, &p, 10);;
 			int fd = strtol(p, &p, 10);
-			int data_size = strtol(p, &p, 10);
+			long int data_size = strtol(p, &p, 10);
 			std::cout << "pid " << pid << std::endl;
 			std::cout << "fd " << fd << std::endl;
 			std::cout << "data_size " << data_size << std::endl;
@@ -352,7 +387,7 @@ void read_next_msg(int rank) {
 				std::cout << "server handling a read" << std::endl;
 				int pid = strtol(str + 5, &p, 10);;
 				int fd = strtol(p, &p, 10);
-				int count = strtol(p, &p, 10);
+				long int count = strtol(p, &p, 10);
 				std::cout << "pid " << pid << std::endl;
 				std::cout << "fd " << fd << std::endl;
 				std::cout << "count " << count << std::endl;
@@ -368,6 +403,7 @@ void read_next_msg(int rank) {
 				}
 				if (files_location[processes_files_metadata[pid][fd]] == node_name) {
 					std::cout << "read local file" << std::endl;
+					#ifdef MYDEBUG
 					int* tmp = (int*) malloc(count);
 					memcpy(tmp, processes_files[pid][fd].first + processes_files[pid][fd].second, count); 
 					for (int i = 0; i < count / sizeof(int); ++i) {
@@ -375,6 +411,7 @@ void read_next_msg(int rank) {
 					}
 				
 					free(tmp);
+					#endif
 					std::pair<void*, int> tmp_pair = response_buffers[pid];
 					((int*) tmp_pair.first)[tmp_pair.second] = processes_files[pid][fd].second; 
 					processes_files[pid][fd].second += count;
@@ -387,7 +424,7 @@ void read_next_msg(int rank) {
 					std::string str_msg;
 					std::cout << " files_location[processes_files_metadata[pid][fd]] " << files_location[processes_files_metadata[pid][fd]] << std::endl;
 					int dest = nodes_helper_rank[files_location[processes_files_metadata[pid][fd]]];
-					int offset = processes_files[pid][fd].second;
+					long int offset = processes_files[pid][fd].second;
 					str_msg = "read " + processes_files_metadata[pid][fd] + " " + std::to_string(rank + 1) + " " + std::to_string(offset) + " " + std::to_string(count); 
 					msg = str_msg.c_str();
 					MPI_Send(msg, strlen(msg) + 1, MPI_CHAR, dest, 0, MPI_COMM_WORLD);
@@ -405,12 +442,13 @@ void read_next_msg(int rank) {
 				else {
 					bool is_remote_read = strncmp(str, "ream", 4) == 0;
 					if (is_remote_read) {
-						int bytes_received;
+						long int bytes_received;
 						std::string tmpstr(str + 5);	
 						std::string path = tmpstr.substr(0, tmpstr.find(" ")); // token is "scott"
 						bytes_received = std::stoi(tmpstr.substr(path.length() + 1));
 						std::cout << "server " << rank << " path " << path << " bytes_received " << bytes_received << std::endl;
-						int pid, fd, count;
+						int pid, fd;
+						long int count;
 						pid = std::get<0>(remote_pending_reads[path]);
 						fd = std::get<1>(remote_pending_reads[path]);
 						count = std::get<2>(remote_pending_reads[path]);
