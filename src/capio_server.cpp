@@ -93,7 +93,7 @@ void* create_shm_circular_buffer(std::string shm_name) {
 	// if we are not creating a new object, mode is equals to 0
 	int fd = shm_open(shm_name.c_str(), O_CREAT | O_RDWR,  S_IRUSR | S_IWUSR); //to be closed
 	struct stat sb;
-	const long int size = 4096;
+	const long int size = 1024L * 1024 * 1024;
 	if (fd == -1)
 		err_exit("shm_open");
 	if (ftruncate(fd, size) == -1)
@@ -110,7 +110,7 @@ void* create_shm(std::string shm_name) {
 	// if we are not creating a new object, mode is equals to 0
 	int fd = shm_open(shm_name.c_str(), O_CREAT | O_RDWR,  S_IRUSR | S_IWUSR); //to be closed
 	struct stat sb;
-	const long int size = 1024L * 1024 * 1024 * 4;
+	const long int size = 1024L * 1024 * 1024* 2;
 	if (fd == -1)
 		err_exit("shm_open");
 	if (ftruncate(fd, size) == -1)
@@ -299,8 +299,8 @@ bool check_remote_file(const std::string& file_name, int rank, std::string path_
 
 void read_next_msg(int rank) {
 	sem_wait(sem_new_msgs);
-	char str[1024];
-	std::fill(str, str + 1024, 0);
+	char str[4096];
+	std::fill(str, str + 4096, 0);
 	//memcpy(buf_requests.buf, pathname, strlen(pathname));
 	int k = buf_requests.k;
 	std::cout << "k = " << k << std::endl;
@@ -342,17 +342,24 @@ void read_next_msg(int rank) {
 		std::pair<void*, int> tmp_pair = response_buffers[pid];
 		((int*) tmp_pair.first)[tmp_pair.second] = fd; 
 		++response_buffers[pid].second;
+		std::cout << "before post sems_respons 2" << std::endl;
 		sem_post(sems_response[pid]);
+		std::cout << "after post sems_respons" << std::endl;
 		if (files_metadata.find(path) == files_metadata.end()) {
 			std::cout << "server " << rank << "updating file metadata for " << path << std::endl;
 			files_metadata[path].first = processes_files[pid][fd].first;	
+			std::cout<< "debug 1" << std::endl;
 			files_metadata[path].second = create_shm_long_int(path + "_size");	
+			std::cout<< "debug 2" << std::endl;
 			if (files_metadata.find(path) == files_metadata.end()) {//debug
 				std::cout << "server " << rank << " error updating" <<std ::endl;
 				exit(1);
 			}
+			std::cout<< "debug 3" << std::endl;
 		}
+			std::cout<< "debug 4" << std::endl;
 		processes_files_metadata[pid][fd] = path;
+			std::cout<< "debug 5" << std::endl;
 	}
 	else {
 		bool is_write = strncmp(str, "writ", 4) == 0;
@@ -373,7 +380,7 @@ void read_next_msg(int rank) {
 			
 			processes_files[pid][fd].second += data_size;
 			std::string path = processes_files_metadata[pid][fd];
-			*files_metadata[path].second += data_size; //works only if there is only one writer at time	
+			*files_metadata[path].second += data_size; //works only if there is only one writer at time	for each file
 			//char* tmp = (char*) malloc(data_size);
 			//memcpy(tmp, processes_files[pid][fd].first, data_size); 
 			//for (int i = 0; i < data_size; ++i) {
@@ -453,6 +460,7 @@ void read_next_msg(int rank) {
 						fd = std::get<1>(remote_pending_reads[path]);
 						count = std::get<2>(remote_pending_reads[path]);
 						//this part is equals to the local read (TODO: function)
+						#ifdef MYDEBUG
 						int* tmp = (int*) malloc(count);
 						memcpy(tmp, processes_files[pid][fd].first + processes_files[pid][fd].second, count); 
 						for (int i = 0; i < count / sizeof(int); ++i) {
@@ -460,6 +468,7 @@ void read_next_msg(int rank) {
 						}
 				
 						free(tmp);
+						#endif
 						std::pair<void*, int> tmp_pair = response_buffers[pid];
 						((int*) tmp_pair.first)[tmp_pair.second] = processes_files[pid][fd].second; 
 						processes_files[pid][fd].second += count;
@@ -478,7 +487,9 @@ void read_next_msg(int rank) {
 			}
 		}
 	}
+	std::cout << "end request" << std::endl;
 	    //sem_post(sem_requests);
+	return;
 }
 
 void capio_server(int rank) {
@@ -549,6 +560,7 @@ void capio_helper(int rank) {
 			//send data
 			void* file_shm = get_shm(path_c);
 			int* size_shm = (int*) get_shm(std::string(path_c) + "_size");
+			#ifdef MYDEBUG
 			int* tmp = (int*) malloc(*size_shm);
 			std::cout << "helper sending " << *size_shm << " bytes" << std::endl;
 			memcpy(tmp, file_shm, *size_shm); 
@@ -557,6 +569,7 @@ void capio_helper(int rank) {
 			}
 				
 			free(tmp);
+			#endif
 			MPI_Send(file_shm, *size_shm, MPI_BYTE, dest, 0, MPI_COMM_WORLD); 
 		}
 		else if(strncmp(buf_recv, "sending", 7) == 0) { //receiving a file
@@ -565,17 +578,18 @@ void capio_helper(int rank) {
 			int bytes_received;
 			int source = status.MPI_SOURCE;
 			std::cout << "helper receiving data file " << path << " from process rank " << source << std::endl;
-			MPI_Recv(file_shm, 4096, MPI_BYTE, source, 0, MPI_COMM_WORLD, &status);//TODO; 4096 should be a parameter
+			MPI_Recv(file_shm, 1024L * 1024 * 1024, MPI_BYTE, source, 0, MPI_COMM_WORLD, &status);//TODO; 4096 should be a parameter
 			MPI_Get_count(&status, MPI_CHAR, &bytes_received);
 			bytes_received *= sizeof(char);
 			std::cout << "helper " << rank << " sending wake up call to my server" << std::endl;
+			#ifdef MYDEBUG
 			int* tmp = (int*) malloc(bytes_received);
 			memcpy(tmp, file_shm, bytes_received); 
 			for (int i = 0; i < bytes_received / sizeof(int); ++i) {
 				std::cout << "helper receiving tmp[i] " << tmp[i] << std::endl;
-			}
-				
-						free(tmp);
+			}	
+			free(tmp);
+			#endif
 			std::string msg = "ream " + path + + " " + std::to_string(bytes_received);
 			sem_wait(sem_requests);
 			const char* c_str = msg.c_str();

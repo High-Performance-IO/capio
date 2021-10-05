@@ -229,7 +229,7 @@ void read_shm(void* shm, int offset, void* buffer, size_t count) {
 }
 
 void write_shm(void* shm, size_t offset, const void* buffer, size_t count) {	
-	std::cout << "before wrote " << std::endl;
+	std::cout << "before wrote offset" << offset << " count " << count <<std::endl;
 	memcpy(shm + offset, buffer, count); 
 	std::cout << "after wrote " << count << " bytes" << std::endl;
 }
@@ -304,6 +304,10 @@ ssize_t write(int fd, const  void *buffer, size_t count) {
 	printf("writing of the file %i captured\n", fd);
 	if (fd <= -1) {
 		add_write_request(fd, count);
+		if (files.find(fd) == files.end()) { //only for debug
+			std::cout << "error write to invalid adress" << std::endl;
+			exit(1);
+		}
 		write_shm(files[fd].first, files[fd].second, buffer, count);
 		files[fd].second += count;
 		return count;
