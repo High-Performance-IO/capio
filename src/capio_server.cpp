@@ -14,11 +14,8 @@
 
 #include <mpi.h>
 
-struct circular_buffer {
-	void* buf;
-	int* i;
-	int k;
-};
+#include "utils/common.hpp"
+
 
 int next_fd = -1;
 
@@ -53,35 +50,11 @@ sem_t* sem_new_msgs;
 std::unordered_map<int, sem_t*> sems_response;
 static int index_not_read = 0;
 
-void err_exit(std::string error_msg) {
-	std::cout << "error: " << error_msg << std::endl;
-	printf("code error: %i str error: %s\n",errno, strerror(errno));
-	exit(1);
-}
 
 sem_t* create_sem_requests() {
 	return sem_open("sem_requests", O_CREAT | O_RDWR, S_IRUSR | S_IWUSR, 1);
 }
 
-void* get_shm(std::string shm_name) {
-	void* p = nullptr;
-	// if we are not creating a new object, mode is equals to 0
-	int fd = shm_open(shm_name.c_str(), O_RDWR, 0); //to be closed
-	struct stat sb;
-	if (fd == -1)
-		err_exit("shm_open");
-	/* Open existing object */
-	/* Use shared memory object size as length argument for mmap()
-	and as number of bytes to write() */
-	if (fstat(fd, &sb) == -1)
-		err_exit("fstat");
-	p = mmap(NULL, sb.st_size, PROT_READ|PROT_WRITE, MAP_SHARED, fd, 0);
-	if (p == MAP_FAILED)
-		err_exit("mmap");
-//	if (close(fd) == -1);
-//		err_exit("close");
-	return p;
-}
 
 //TODO: same function in capio_posix, to put in common
 sem_t* get_sem_requests() {
@@ -105,23 +78,7 @@ void* create_shm_circular_buffer(std::string shm_name) {
 //		err_exit("close");
 	return p;
 }
-void* create_shm(std::string shm_name) {
-	void* p = nullptr;
-	// if we are not creating a new object, mode is equals to 0
-	int fd = shm_open(shm_name.c_str(), O_CREAT | O_RDWR,  S_IRUSR | S_IWUSR); //to be closed
-	struct stat sb;
-	const long int size = 1024L * 1024 * 1024* 2;
-	if (fd == -1)
-		err_exit("shm_open");
-	if (ftruncate(fd, size) == -1)
-		err_exit("ftruncate");
-	p = mmap(NULL, size, PROT_READ|PROT_WRITE, MAP_SHARED, fd, 0);
-	if (p == MAP_FAILED)
-		err_exit("mmap");
-//	if (close(fd) == -1);
-//		err_exit("close");
-	return p;
-}
+
 int* create_shm_int(std::string shm_name) {
 	void* p = nullptr;
 	// if we are not creating a new object, mode is equals to 0
@@ -155,16 +112,6 @@ long int* create_shm_long_int(std::string shm_name) {
 //	if (close(fd) == -1);
 //		err_exit("close");
 	return (long int*) p;
-}
-//TODO: same function in capio_posix, to put in common
-struct circular_buffer get_circular_buffer() {
-	//open shm
-	void* buf = get_shm("circular_buffer");
-	int* i = (int*) get_shm("index_buf");
-	circular_buffer br;
-	br.buf = buf;
-	br.i = i;
-	return br;
 }
 
 struct circular_buffer create_circular_buffer() {
@@ -336,7 +283,7 @@ void read_next_msg(int rank) {
 		std::cout << "path file " << path << std::endl;
 		int fd = next_fd;
 		--next_fd;
-		processes_files[pid][fd] = std::pair<void*, int>(create_shm(path), 0); //TODO: what happens if a process open the same file twice?
+		processes_files[pid][fd] = std::pair<void*, int>(create_shm(path, 1024L * 1024 * 1024* 2), 0); //TODO: what happens if a process open the same file twice?
 		std::cout << "before post sems_respons" << std::endl;
 		std::cout << sems_response[pid] << std::endl;
 		std::pair<void*, int> tmp_pair = response_buffers[pid];

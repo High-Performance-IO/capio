@@ -18,15 +18,13 @@
 #include <semaphore.h>
 #include <stdarg.h>
 
+#include "utils/common.hpp"
+
 static int (*real_open)(const char* pathname, int flags, ...) = NULL;
 static ssize_t (*real_read)(int fd, void* buffer, size_t count) = NULL;
 static ssize_t (*real_write)(int fd, const void* buffer, size_t count) = NULL;
 static int (*real_close)(int fd) = NULL;
 
-struct circular_buffer {
-	void* buf;
-	int* i;
-};
 
 std::unordered_map<int, std::pair<void*, long int>> files;
 circular_buffer buf_requests; 
@@ -36,61 +34,11 @@ sem_t* sem_requests;
 sem_t* sem_new_msgs;
 sem_t* sem_response;
 
-void err_exit(std::string error_msg) {
-	std::cout << "error: " << error_msg << std::endl;
-	exit(1);
-}
-
-void* get_shm(std::string shm_name) {
-	void* p = nullptr;
-	// if we are not creating a new object, mode is equals to 0
-	int fd = shm_open(shm_name.c_str(), O_RDWR, 0); //to be closed
-	struct stat sb;
-	if (fd == -1)
-		err_exit("shm_open");
-	/* Open existing object */
-	/* Use shared memory object size as length argument for mmap()
-	and as number of bytes to write() */
-	if (fstat(fd, &sb) == -1)
-		err_exit("fstat");
-	p = mmap(NULL, sb.st_size, PROT_READ|PROT_WRITE, MAP_SHARED, fd, 0);
-	if (p == MAP_FAILED)
-		err_exit("mmap");
-//	if (close(fd) == -1);
-//		err_exit("close");
-	return p;
-}
 
 
-struct circular_buffer get_circular_buffer() {
-	//open shm
-	void* buf = get_shm("circular_buffer");
-	int* i = (int*) get_shm("index_buf");
-	circular_buffer br;
-	br.buf = buf;
-	br.i = i;
-	return br;
-}
 
 sem_t* get_sem_requests() {
 	return sem_open("sem_requests", 0);
-}
-void* create_shm(std::string shm_name) {
-	void* p = nullptr;
-	// if we are not creating a new object, mode is equals to 0
-	int fd = shm_open(shm_name.c_str(), O_CREAT | O_RDWR,  S_IRUSR | S_IWUSR); //to be closed
-	struct stat sb;
-	const int size = 4096;
-	if (fd == -1)
-		err_exit("shm_open");
-	if (ftruncate(fd, size) == -1)
-		err_exit("ftruncate");
-	p = mmap(NULL, size, PROT_READ|PROT_WRITE, MAP_SHARED, fd, 0);
-	if (p == MAP_FAILED)
-		err_exit("mmap");
-//	if (close(fd) == -1);
-//		err_exit("close");
-	return p;
 }
 
 
@@ -124,7 +72,7 @@ static void mtrace_init(void) {
 	sem_requests = get_sem_requests();
 	sem_new_msgs = sem_open("sem_new_msgs", O_RDWR);
 	sem_response = sem_open(("sem_response" + std::to_string(getpid())).c_str(),  O_CREAT | O_RDWR, S_IRUSR | S_IWUSR, 0);
-	buf_response = (int*) create_shm("buf_response" + std::to_string(getpid()));
+	buf_response = (int*) create_shm("buf_response" + std::to_string(getpid()), 4096);
 	i_resp = 0;
 
 }
@@ -158,7 +106,7 @@ int add_open_request(const char* pathname) {
 	std::cout << "Open after response" << std::endl;
 	fd = buf_response[i_resp];
 	++i_resp;
-	return fd; //works only with one file
+	return fd; 
 }
 
 int add_close_request(int fd) {
@@ -217,9 +165,6 @@ void add_write_request(int fd, size_t count) {
 	sem_post(sem_requests);
 	sem_post(sem_new_msgs);
 	
-
-	
-
 	//read response (offest)
 	return;
 }
@@ -274,7 +219,7 @@ int close(int fd) {
 	printf("Closing of the file %i captured\n", fd);
 	if (fd <= -1) {
 		printf("calling my close...\n");
-		//only the CAPIO deamon will free the shared memory in the real implementation
+		//TODO: only the CAPIO deamon will free the shared memory
 		return add_close_request(fd);
 	}
 	else {

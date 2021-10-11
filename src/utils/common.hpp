@@ -1,0 +1,57 @@
+struct circular_buffer {
+	void* buf;
+	int* i;
+	int k;
+};
+
+void err_exit(std::string error_msg) {
+	std::cout << "error: " << error_msg << std::endl;
+	exit(1);
+}
+
+void* get_shm(std::string shm_name) {
+	void* p = nullptr;
+	// if we are not creating a new object, mode is equals to 0
+	int fd = shm_open(shm_name.c_str(), O_RDWR, 0); //to be closed
+	struct stat sb;
+	if (fd == -1)
+		err_exit("shm_open");
+	/* Open existing object */
+	/* Use shared memory object size as length argument for mmap()
+	and as number of bytes to write() */
+	if (fstat(fd, &sb) == -1)
+		err_exit("fstat");
+	p = mmap(NULL, sb.st_size, PROT_READ|PROT_WRITE, MAP_SHARED, fd, 0);
+	if (p == MAP_FAILED)
+		err_exit("mmap");
+//	if (close(fd) == -1);
+//		err_exit("close");
+	return p;
+}
+
+void* create_shm(std::string shm_name, const long int size) {
+	void* p = nullptr;
+	// if we are not creating a new object, mode is equals to 0
+	int fd = shm_open(shm_name.c_str(), O_CREAT | O_RDWR,  S_IRUSR | S_IWUSR); //to be closed
+	struct stat sb;
+	if (fd == -1)
+		err_exit("shm_open");
+	if (ftruncate(fd, size) == -1)
+		err_exit("ftruncate");
+	p = mmap(NULL, size, PROT_READ|PROT_WRITE, MAP_SHARED, fd, 0);
+	if (p == MAP_FAILED)
+		err_exit("mmap");
+//	if (close(fd) == -1);
+//		err_exit("close");
+	return p;
+}
+
+struct circular_buffer get_circular_buffer() {
+	//open shm
+	void* buf = get_shm("circular_buffer");
+	int* i = (int*) get_shm("index_buf");
+	circular_buffer br;
+	br.buf = buf;
+	br.i = i;
+	return br;
+}
