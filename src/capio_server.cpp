@@ -17,7 +17,7 @@
 #include "utils/common.hpp"
 
 
-int next_fd = -1;
+int next_fd = -2;
 
 // pid -> fd ->(file_shm, index)
 std::unordered_map<int, std::unordered_map<int, std::pair<void*, long int>>> processes_files;
