@@ -17,8 +17,6 @@
 #include "utils/common.hpp"
 
 
-int next_fd = -2;
-
 // pid -> fd ->(file_shm, index)
 std::unordered_map<int, std::unordered_map<int, std::pair<void*, long int>>> processes_files;
 
@@ -281,8 +279,12 @@ void read_next_msg(int rank) {
 		}
 		std::string path(p + 1);
 		std::cout << "path file " << path << std::endl;
-		int fd = next_fd;
-		--next_fd;
+		int fd = open(path.c_str(), O_CREAT | O_RDWR, S_IRUSR | S_IRWXU);
+		if (fd == -1) {
+			std::cout << "capio server, error to open the file " << path << std::endl;
+			MPI_Finalize();
+			exit(1);
+		}
 		processes_files[pid][fd] = std::pair<void*, int>(create_shm(path, 1024L * 1024 * 1024* 2), 0); //TODO: what happens if a process open the same file twice?
 		std::cout << "before post sems_respons" << std::endl;
 		std::cout << sems_response[pid] << std::endl;
@@ -390,8 +392,19 @@ void read_next_msg(int rank) {
 			}
 			else {
 				bool is_close = strncmp(str, "clos", 4) == 0;
-				if (is_close) {
+				if (is_close) { //TODO: more cleaning
 					std::cout << "server handling close" << std::endl;
+					int pid = strtol(str + 5, &p, 10);;
+					int fd = strtol(p, &p, 10);
+					std::cout << "pid " << pid << std::endl;
+					std::cout << "fd " << fd << std::endl;
+				
+
+					if (close(fd) == -1) {
+						std::cout << "capio server, error: impossible close the file with fd = " << fd << std::endl;
+						MPI_Finalize();
+						exit(1);
+					}
 				}
 				else {
 					bool is_remote_read = strncmp(str, "ream", 4) == 0;

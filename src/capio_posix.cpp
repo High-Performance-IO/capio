@@ -2,9 +2,11 @@
 #define _GNU_SOURCE
 #endif
 
-#include<unordered_map>
-#include<string>
-#include<iostream>
+#include <unordered_map>
+#include <unordered_set>
+#include <set>
+#include <string>
+#include <iostream>
 
 #include <unistd.h>
 #include <stdio.h>
@@ -20,11 +22,13 @@
 
 #include "utils/common.hpp"
 
-static int (*real_open)(const char* pathname, int flags, ...) = NULL;
-static ssize_t (*real_read)(int fd, void* buffer, size_t count) = NULL;
-static ssize_t (*real_write)(int fd, const void* buffer, size_t count) = NULL;
-static int (*real_close)(int fd) = NULL;
-
+int (*real_open)(const char* pathname, int flags, ...) = NULL;
+ssize_t (*real_read)(int fd, void* buffer, size_t count) = NULL;
+ssize_t (*real_write)(int fd, const void* buffer, size_t count) = NULL;
+int (*real_close)(int fd) = NULL;
+int (*real_access)(const char *pathname, int mode) = NULL;
+int (*real_stat)(const char *__restrict pathname, struct stat *__restrict statbuf) = NULL;
+int (*real_fstat)(int fd, struct stat *statbuf) = NULL;
 
 std::unordered_map<int, std::pair<void*, long int>> files;
 circular_buffer buf_requests; 
@@ -34,7 +38,8 @@ sem_t* sem_requests;
 sem_t* sem_new_msgs;
 sem_t* sem_response;
 
-
+std::set<int> capio_files_descriptors; //TODO: with unordered_set FORTRAN produces a arithmetic exception
+std::unordered_set<std::string> capio_files_paths;
 
 
 sem_t* get_sem_requests() {
@@ -47,7 +52,7 @@ sem_t* get_sem_requests() {
  *
  */
 
-static void mtrace_init(void) {
+void mtrace_init(void) {
 	real_open = (int (*)(const char*, int, ...)) dlsym(RTLD_NEXT, "open");
 	if (NULL == real_open) {
 		fprintf(stderr, "Error in `dlsym open`: %s\n", dlerror());
@@ -66,6 +71,24 @@ static void mtrace_init(void) {
 	real_close = (int (*)(int)) dlsym(RTLD_NEXT, "close");
 	if (NULL == real_close) {	
 		fprintf(stderr, "Error in `dlsym close`: %s\n", dlerror());
+		return;
+	}
+	real_access = (int (*)(const char*, int)) dlsym(RTLD_NEXT, "access");
+	if (NULL == real_access) {	
+		fprintf(stderr, "Error in `dlsym access`: %s\n", dlerror());
+		exit(1);
+		return;
+	}
+	real_stat = (int (*)(const char *__restrict, struct stat *__restrict)) dlsym(RTLD_NEXT, "stat");
+	if (NULL == real_stat) {	
+		fprintf(stderr, "Error in `dlsym stat`: %s\n", dlerror());
+		exit(1);
+		return;
+	}
+	real_fstat = (int (*)(int, struct stat*)) dlsym(RTLD_NEXT, "fstat");
+	if (NULL == real_fstat) {	
+		fprintf(stderr, "Error in `dlsym fstat`: %s\n", dlerror());
+		exit(1);
 		return;
 	}
 	buf_requests = get_circular_buffer();
@@ -193,7 +216,9 @@ int open(const char *pathname, int flags, ...) {
 		//create shm
 		int fd = add_open_request(pathname);
 		files[fd] = std::pair<void*, int>(get_shm(pathname), 0);
-		std::cout << "result of add_open_request" << std::endl;
+		std::cout << "result of add_open_request, fd: " << fd << std::endl;
+		capio_files_descriptors.insert(fd);
+		capio_files_paths.insert(pathname);
 		return fd;
 	}
 	else {
@@ -217,10 +242,12 @@ int close(int fd) {
 	if (real_close == NULL)
 		mtrace_init();
 	printf("Closing of the file %i captured\n", fd);
-	if (fd <= -1) {
+	if (capio_files_descriptors.find(fd) != capio_files_descriptors.end()) {
 		printf("calling my close...\n");
 		//TODO: only the CAPIO deamon will free the shared memory
-		return add_close_request(fd);
+		int res = add_close_request(fd);
+		capio_files_descriptors.erase(fd);
+		return res;
 	}
 	else {
 		printf("calling real close...\n");
@@ -232,7 +259,7 @@ int close(int fd) {
 
 ssize_t read(int fd, void *buffer, size_t count) {
 	printf("reading of the file %i captured\n", fd);
-	if (fd <= -1) {
+	if (capio_files_descriptors.find(fd) != capio_files_descriptors.end()) {
 		printf("calling my read...\n");
 		int offset = add_read_request(fd, count);
 		read_shm(files[fd].first, offset, buffer, count);
@@ -247,7 +274,7 @@ ssize_t read(int fd, void *buffer, size_t count) {
 
 ssize_t write(int fd, const  void *buffer, size_t count) {
 	printf("writing of the file %i captured\n", fd);
-	if (fd <= -1) {
+	if (capio_files_descriptors.find(fd) != capio_files_descriptors.end()) {
 		add_write_request(fd, count);
 		if (files.find(fd) == files.end()) { //only for debug
 			std::cout << "error write to invalid adress" << std::endl;
@@ -260,6 +287,46 @@ ssize_t write(int fd, const  void *buffer, size_t count) {
 	else {
 		printf("calling real write\n");
 		return real_write(fd, buffer, count);
+	}
+}
+
+int access(const char *pathname, int mode) {
+	if (real_access == NULL)
+		mtrace_init();
+	printf("access of the file %s captured\n", pathname);
+	if (capio_files_paths.find(pathname) != capio_files_paths.end()) {
+		return 0;
+	}
+	else {
+		printf("calling real access\n");
+		return real_access(pathname, mode);
+	}
+}
+
+int stat(const char *__restrict pathname, struct stat *__restrict statbuf) {
+	if (real_stat == NULL)
+		mtrace_init();
+	printf("stat of the file %s captured\n", pathname);
+	if (capio_files_paths.find(pathname) != capio_files_paths.end()) {
+		return 0;	
+	}
+	else {
+		printf("calling real stat\n");
+		return real_stat(pathname, statbuf);
+	}
+}
+
+int fstat(int fd, struct stat *statbuf) { 
+	if (real_fstat == NULL)
+		mtrace_init();
+	printf("fstat of the file %i captured\n", fd);
+	if (capio_files_descriptors.find(fd) != capio_files_descriptors.end()) {
+		std::cout << "calling my fstat" << std::endl;
+		return 0;
+	}
+	else {
+		printf("calling real fstat\n");
+		return real_fstat(fd, statbuf);
 	}
 }
 
