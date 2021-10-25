@@ -11,6 +11,7 @@
 #include <dlfcn.h>
 #include <fcntl.h>
 #include <semaphore.h>
+#include <signal.h>
 
 #include <mpi.h>
 
@@ -48,6 +49,35 @@ sem_t* sem_new_msgs;
 std::unordered_map<int, sem_t*> sems_response;
 static int index_not_read = 0;
 
+void sig_term_handler(int signum, siginfo_t *info, void *ptr) {
+	std::cout << "handling sigterm" << std::endl;
+	//free all the memory used
+	for (auto& pair : files_metadata) {
+		shm_unlink(pair.first.c_str());
+		shm_unlink((pair.first + "_size").c_str());
+	}
+	for (auto& pair : response_buffers) {
+		shm_unlink(("buf_response" + std::to_string(pair.first)).c_str()); 
+		sem_unlink(("sem_response" + std::to_string(pair.first)).c_str());
+	}
+	shm_unlink("circular_buffer");
+	shm_unlink("index_buf");
+	sem_unlink("sem_new_msgs");
+	sem_unlink("sem_requests");
+	MPI_Finalize();
+	exit(0);
+}
+
+void catch_sigterm() {
+    static struct sigaction sigact;
+	memset(&sigact, 0, sizeof(sigact));
+	sigact.sa_sigaction = sig_term_handler;
+	sigact.sa_flags = SA_SIGINFO;
+	int res = sigaction(SIGTERM, &sigact, NULL);
+	if (res == -1) {
+		err_exit("sigaction for SIGTERM");
+	}
+}
 
 sem_t* create_sem_requests() {
 	return sem_open("sem_requests", O_CREAT | O_RDWR, S_IRUSR | S_IWUSR, 1);
@@ -411,11 +441,11 @@ void read_next_msg(int rank) {
 					if (is_remote_read) {
 						long int bytes_received;
 						std::string tmpstr(str + 5);	
-						std::string path = tmpstr.substr(0, tmpstr.find(" ")); // token is "scott"
+						std::string path = tmpstr.substr(0, tmpstr.find(" "));
 						bytes_received = std::stoi(tmpstr.substr(path.length() + 1));
 						std::cout << "server " << rank << " path " << path << " bytes_received " << bytes_received << std::endl;
 						int pid, fd;
-						long int count;
+						long int count; //TODO: diff between count and bytes_received
 						pid = std::get<0>(remote_pending_reads[path]);
 						fd = std::get<1>(remote_pending_reads[path]);
 						count = std::get<2>(remote_pending_reads[path]);
@@ -592,6 +622,7 @@ int main(int argc, char** argv) {
 	MPI_Get_processor_name(node_name, &len);
 	std::cout << "processor name " << node_name << std::endl;
 	if (rank % 2 == 0) {
+		catch_sigterm();
 		handshake_servers(rank, size);
 	    for (auto const &pair: nodes_helper_rank) {
 			std::cout << "{" << pair.first << ": " << pair.second << "}\n";
