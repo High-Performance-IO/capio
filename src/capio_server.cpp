@@ -1,6 +1,7 @@
-#include<string>
-#include<cstring>
-#include<unordered_map>
+#include <string>
+#include <cstring>
+#include <unordered_map>
+#include <unordered_set>
 #include <iostream>
 
 #include <unistd.h>
@@ -17,6 +18,9 @@
 
 #include "utils/common.hpp"
 
+const long int max_shm_size = 1024L * 4;
+bool shm_full = false;
+int total_bytes_shm = 0;
 
 // pid -> fd ->(file_shm, index)
 std::unordered_map<int, std::unordered_map<int, std::pair<void*, long int>>> processes_files;
@@ -26,6 +30,22 @@ std::unordered_map<int, std::unordered_map<int, std::string>> processes_files_me
 
 // pid -> (response shared buffer, index)
 std::unordered_map<int, std::pair<void*, int>> response_buffers;
+
+/*
+ * Regarding the map caching info.
+ * The pointer int* points to a buffer in shared memory.
+ * This buffer is composed by pairs. The first element of the pair is a file descriptor.
+ * The second element can be 0 (in case the file is in shared memory) or 1 (in case
+ * the file is in the disk). This information will be used by the client when it performs
+ * a read or a write into a file in order to know where to read/write the data.
+ *
+ * Another alternative would be to have only one caching_info buffer for all the
+ * processes of an application. Neither solution is better for all the possible cases.
+ *
+ */
+
+// pid -> (response shared buffer, size)
+std::unordered_map<int, std::pair<int*, int*>> caching_info;
 
 // pathname -> (file_shm, file_size)
 std::unordered_map<std::string, std::pair<void*, long int*>> files_metadata;
@@ -38,6 +58,9 @@ std::unordered_map<std::string, int> nodes_helper_rank;
 
 // path -> (pid, fd, numbytes)
 std::unordered_map<std::string, std::tuple<int, int, long int>>  remote_pending_reads;
+
+// it contains the file saved on disk
+std::unordered_set<std::string> on_disk;
 
 //name of the node
 
@@ -59,6 +82,8 @@ void sig_term_handler(int signum, siginfo_t *info, void *ptr) {
 	for (auto& pair : response_buffers) {
 		shm_unlink(("buf_response" + std::to_string(pair.first)).c_str()); 
 		sem_unlink(("sem_response" + std::to_string(pair.first)).c_str());
+		shm_unlink(("caching_info" + std::to_string(pair.first)).c_str()); 
+		shm_unlink(("caching_info_size" + std::to_string(pair.first)).c_str()); 
 	}
 	shm_unlink("circular_buffer");
 	shm_unlink("index_buf");
@@ -272,6 +297,20 @@ bool check_remote_file(const std::string& file_name, int rank, std::string path_
     return res;
 }
 
+void flush_file_to_disk(int pid, int fd) {
+	void* buf = processes_files[pid][fd].first;
+	std::string path = processes_files_metadata[pid][fd];
+	long int file_size = *files_metadata[path].second;	
+	long int num_bytes_written, k = 0;
+	while (k < file_size) {
+    	num_bytes_written = write(fd, buf + k, (file_size - k));
+    	std::cout << "num_bytes_written " << num_bytes_written << std::endl;
+    	k += num_bytes_written;
+    }
+}
+
+//TODO: function too long
+
 void read_next_msg(int rank) {
 	sem_wait(sem_new_msgs);
 	char str[4096];
@@ -305,6 +344,8 @@ void read_next_msg(int rank) {
 			}
 			response_buffers[pid].first = (int*) get_shm("buf_response" + std::to_string(pid));
 			response_buffers[pid].second = 0; 
+			caching_info[pid].first = (int*) get_shm("caching_info" + std::to_string(pid));
+			caching_info[pid].second = (int*) get_shm("caching_info_size" + std::to_string(pid));
 
 		}
 		std::string path(p + 1);
@@ -315,7 +356,22 @@ void read_next_msg(int rank) {
 			MPI_Finalize();
 			exit(1);
 		}
-		processes_files[pid][fd] = std::pair<void*, int>(create_shm(path, 1024L * 1024 * 1024* 2), 0); //TODO: what happens if a process open the same file twice?
+		void* p = create_shm(path, 1024L * 1024 * 1024* 4);
+		int index = *caching_info[pid].second;
+		caching_info[pid].first[index] = fd;
+		if (on_disk.find(path) == on_disk.end()) {
+			p = create_shm(path, 1024L * 1024 * 1024* 4);
+			caching_info[pid].first[index + 1] = 0;
+		}
+		else {
+			std::cout << "open file is on disk" << std::endl;
+			p = nullptr;
+			caching_info[pid].first[index + 1] = 1;
+		}
+		//TODO: check the size that the user wrote in the configuration file
+		processes_files[pid][fd] = std::pair<void*, int>(p, 0); //TODO: what happens if a process open the same file twice?
+		*caching_info[pid].second += 2;
+		std::cout << "fd " << fd << "inserted in caching and caching info size = " << *caching_info[pid].second << std::endl; 
 		std::cout << "before post sems_respons" << std::endl;
 		std::cout << sems_response[pid] << std::endl;
 		std::pair<void*, int> tmp_pair = response_buffers[pid];
@@ -360,12 +416,41 @@ void read_next_msg(int rank) {
 			processes_files[pid][fd].second += data_size;
 			std::string path = processes_files_metadata[pid][fd];
 			*files_metadata[path].second += data_size; //works only if there is only one writer at time	for each file
+			total_bytes_shm += data_size;
+			std::cout << "total_bytes_shm = " << total_bytes_shm << " max_shm_size = " << max_shm_size << std::endl;
+			if (total_bytes_shm > max_shm_size && on_disk.find(path) == on_disk.end()) {
+				std::cout << "flushing file " << fd << " to disk" << std::endl;
+				shm_full = true;
+				flush_file_to_disk(pid, fd);
+				int i = 0;
+				bool found = false;
+				while (!found && i < *caching_info[pid].second) {
+					if (caching_info[pid].first[i] == fd) {
+						found = true;
+					}
+					else {
+						i += 2;
+					}
+				}
+				if (i >= *caching_info[pid].second) {
+					std::cout << "capio error: check caching info, file not found" << std::endl;
+					MPI_Finalize();
+					exit(1);
+				}
+				if (found) {
+					caching_info[pid].first[i + 1] = 1;
+				}
+				std::cout << "updated caching info of file " << path << std::endl;
+				on_disk.insert(path);
+			}
+			sem_post(sems_response[pid]);
 			//char* tmp = (char*) malloc(data_size);
 			//memcpy(tmp, processes_files[pid][fd].first, data_size); 
 			//for (int i = 0; i < data_size; ++i) {
 			//	std::cout << "tmp[i] " << tmp[i] << std::endl;
 			//}
 			//free(tmp);
+
 		}
 		else {
 			bool is_read = strncmp(str, "read", 4) == 0;
@@ -403,6 +488,9 @@ void read_next_msg(int rank) {
 					processes_files[pid][fd].second += count;
 					//TODO: check if there is data that can be read in the local memory file
 					++response_buffers[pid].second;
+
+					//TODO: check if the file was moved to the disk
+
 					sem_post(sems_response[pid]); 
 				}
 				else {

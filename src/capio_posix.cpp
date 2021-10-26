@@ -29,6 +29,7 @@ int (*real_close)(int fd) = NULL;
 int (*real_access)(const char *pathname, int mode) = NULL;
 int (*real_stat)(const char *__restrict pathname, struct stat *__restrict statbuf) = NULL;
 int (*real_fstat)(int fd, struct stat *statbuf) = NULL;
+off_t (*real_lseek) (int fd, off_t offset, int whence) = NULL;
 
 std::unordered_map<int, std::pair<void*, long int>> files;
 circular_buffer buf_requests; 
@@ -37,8 +38,11 @@ int i_resp;
 sem_t* sem_requests;
 sem_t* sem_new_msgs;
 sem_t* sem_response;
+int* client_caching_info;
+int* caching_info_size;
 
-std::set<int> capio_files_descriptors; //TODO: with unordered_set FORTRAN produces a arithmetic exception
+// fd -> pathname
+std::unordered_map<int, std::string> capio_files_descriptors; 
 std::unordered_set<std::string> capio_files_paths;
 
 
@@ -91,12 +95,21 @@ void mtrace_init(void) {
 		exit(1);
 		return;
 	}
+	real_lseek = (off_t (*)(int, off_t, int)) dlsym(RTLD_NEXT, "lseek");
+	if (NULL == real_fstat) {	
+		fprintf(stderr, "Error in `dlsym lseek`: %s\n", dlerror());
+		exit(1);
+		return;
+	}
 	buf_requests = get_circular_buffer();
 	sem_requests = get_sem_requests();
 	sem_new_msgs = sem_open("sem_new_msgs", O_RDWR);
 	sem_response = sem_open(("sem_response" + std::to_string(getpid())).c_str(),  O_CREAT | O_RDWR, S_IRUSR | S_IWUSR, 0);
 	buf_response = (int*) create_shm("buf_response" + std::to_string(getpid()), 4096);
 	i_resp = 0;
+	client_caching_info = (int*) create_shm("caching_info" + std::to_string(getpid()), 4096);
+	caching_info_size = (int*) create_shm("caching_info_size" + std::to_string(getpid()), sizeof(int));
+	*caching_info_size = 0; 
 
 }
 
@@ -187,8 +200,7 @@ void add_write_request(int fd, size_t count) {
 	std::cout << "*buf_requests.i == " << *buf_requests.i << std::endl;
 	sem_post(sem_requests);
 	sem_post(sem_new_msgs);
-	
-	//read response (offest)
+	sem_wait(sem_response);
 	return;
 }
 
@@ -201,7 +213,86 @@ void write_shm(void* shm, size_t offset, const void* buffer, size_t count) {
 	memcpy(shm + offset, buffer, count); 
 	std::cout << "after wrote " << count << " bytes" << std::endl;
 }
-		
+
+/*
+ * Returns true if the file with file descriptor fd is in shared memory, false
+ * if the file is in the disk
+ */
+
+bool check_cache(int fd) {
+	int info, i = 0;
+	bool found = false;
+	while (!found && i < *caching_info_size) {
+		if (fd == client_caching_info[i]) {
+			found = true;
+		}
+		else {
+			i += 2;
+		}
+	}
+	if (!found) {
+		std::cout << "error check cache: file not found" << std::endl;
+		exit(1);
+	}
+	return client_caching_info[i + 1] == 0;
+}
+
+void write_to_disk(const int fd, const int offset, const void* buffer, const size_t count) {
+	std::cout << "writing to disk " << count << " bytes" << std::endl;
+	auto it = capio_files_descriptors.find(fd);
+	if (it == capio_files_descriptors.end()) {
+		std::cout << "capio error in write to disk: file descriptor does not exist" << std::endl;
+	}
+	std::string path = it->second;
+	int filesystem_fd = real_open(path.c_str(), O_WRONLY);//TODO: maybe not efficient open in each write and why O_APPEND (without lseek) does not work?
+	if (filesystem_fd == -1) {
+		std::cout << "capio client error: impossible write to disk capio file " << fd << std::endl;
+		exit(1);
+	}
+	lseek(filesystem_fd, offset, SEEK_SET);
+	for (int i = 0; i < count / sizeof(int); ++i) {
+		std::cout << ((int*)buffer)[i] << std::endl;
+	}
+	ssize_t res = real_write(filesystem_fd, buffer, count);
+	for (int i = 0; i < count / sizeof(int); ++i) {
+		std::cout << ((int*)buffer)[i] << std::endl;
+	}
+	if (res == -1) {
+		err_exit("capio error writing to disk capio file ");
+	}	
+	if (res != count) {
+		std::cout << "capio error write to disk: only " << res << " bytes written of " << count << std::endl; 
+		exit(1);
+	}
+	if (real_close(filesystem_fd) == -1) {
+		std::cout << "capio impossible close file " << filesystem_fd << std::endl;
+		exit(1);
+	}
+}
+
+void read_from_disk(int fd, int offset, void* buffer, size_t count) {
+	auto it = capio_files_descriptors.find(fd);
+	if (it == capio_files_descriptors.end()) {
+		std::cout << "capio error in write to disk: file descriptor does not exist" << std::endl;
+	}
+	std::string path = it->second;
+	int filesystem_fd = real_open(path.c_str(), O_RDONLY);//TODO: maybe not efficient open in each read
+	if (filesystem_fd == -1) {
+		err_exit("capio client error: impossible to open file for read from disk"); 
+	}
+	off_t res_lseek = real_lseek(filesystem_fd, offset, SEEK_SET);
+	if (res_lseek == -1) {
+		err_exit("capio client error: lseek in read from disk");
+	}
+	std::cout << "read from disk, offset: " << offset << " res_lseek: " << res_lseek << std::endl;
+	ssize_t res_read = real_read(filesystem_fd, buffer, count);
+	if (res_read == -1) {
+		err_exit("capio client error: read in read from disk");
+	}
+	if (real_close(filesystem_fd) == -1) {
+		err_exit("capio client error: close in read from disk");
+	}
+}
 
 extern "C" {
 
@@ -217,7 +308,7 @@ int open(const char *pathname, int flags, ...) {
 		int fd = add_open_request(pathname);
 		files[fd] = std::pair<void*, int>(get_shm(pathname), 0);
 		std::cout << "result of add_open_request, fd: " << fd << std::endl;
-		capio_files_descriptors.insert(fd);
+		capio_files_descriptors[fd] = pathname;
 		capio_files_paths.insert(pathname);
 		return fd;
 	}
@@ -262,7 +353,15 @@ ssize_t read(int fd, void *buffer, size_t count) {
 	if (capio_files_descriptors.find(fd) != capio_files_descriptors.end()) {
 		printf("calling my read...\n");
 		int offset = add_read_request(fd, count);
-		read_shm(files[fd].first, offset, buffer, count);
+		bool in_shm = check_cache(fd);
+		if (in_shm) {
+			std::cout << "reading from shared memory file " << fd << std::endl;
+			read_shm(files[fd].first, offset, buffer, count);
+		}
+		else {
+			std::cout << "reading from disk file " << fd << std::endl;
+			read_from_disk(fd, offset, buffer, count);
+		}
 		files[fd].second = offset;
 		return count;
 	}
@@ -280,7 +379,15 @@ ssize_t write(int fd, const  void *buffer, size_t count) {
 			std::cout << "error write to invalid adress" << std::endl;
 			exit(1);
 		}
-		write_shm(files[fd].first, files[fd].second, buffer, count);
+		bool in_shm = check_cache(fd);
+		if (in_shm) {
+			std::cout << "writing to shared memory file " << fd << std::endl;
+			write_shm(files[fd].first, files[fd].second, buffer, count);
+		}
+		else {
+			std::cout << "writing to disk file " << fd << std::endl;
+			write_to_disk(fd, files[fd].second, buffer, count);
+		}
 		files[fd].second += count;
 		return count;
 	}
@@ -330,5 +437,17 @@ int fstat(int fd, struct stat *statbuf) {
 	}
 }
 
+
+off_t lseek(int fd, off_t offset, int whence) { 
+	printf("lseek of the file %i captured\n", fd);
+	if (capio_files_descriptors.find(fd) != capio_files_descriptors.end()) {
+		std::cout << "calling my lseek" << std::endl; //TODO: implement my lseek
+		return 0;
+	}
+	else {
+		printf("calling real lseek\n");
+		return real_lseek(fd, offset, whence);
+	}
+}
 
 }
