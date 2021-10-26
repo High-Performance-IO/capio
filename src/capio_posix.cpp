@@ -119,10 +119,10 @@ int add_open_request(const char* pathname) {
 	sem_wait(sem_requests);
 	std::string str ("open " + std::to_string(getpid()) + " " + std::string(pathname));
 	const char* c_str = str.c_str();
-	memcpy(buf_requests.buf + *buf_requests.i, c_str, strlen(c_str) + 1);
+	memcpy(((char*)buf_requests.buf) + *buf_requests.i, c_str, strlen(c_str) + 1);
 	std::cout << "open before response" << std::endl;
 	char tmp_str[1024];
-	printf("c_str %s, len c_str %i\n", c_str, strlen(c_str));
+	printf("c_str %s, len c_str %li\n", c_str, strlen(c_str));
 	sprintf(tmp_str, "%s", (char*) buf_requests.buf + *buf_requests.i);
 	printf("add open msg sent: %s\n", tmp_str);
 
@@ -149,9 +149,9 @@ int add_close_request(int fd) {
 	std::cout << "close request" << std::endl;
 	const char* c_str = ("clos " +std::to_string(getpid()) + " "  + std::to_string(fd)).c_str();
     sem_wait(sem_requests);
-	memcpy(buf_requests.buf + *buf_requests.i, c_str, strlen(c_str) + 1);
+	memcpy(((char*)buf_requests.buf) + *buf_requests.i, c_str, strlen(c_str) + 1);
 	char tmp_str[1024];
-	printf("c_str %s, len c_str %i\n", c_str, strlen(c_str));
+	printf("c_str %s, len c_str %li\n", c_str, strlen(c_str));
 	sprintf(tmp_str, "%s", (char*) buf_requests.buf + *buf_requests.i);
 	printf("add read msg sent: %s\n", tmp_str);
 	*buf_requests.i = *buf_requests.i + strlen(c_str) + 1;
@@ -166,9 +166,9 @@ int add_read_request(int fd, size_t count) {
 	std::string str = "read " + std::to_string(getpid()) + " " + std::to_string(fd) + " " + std::to_string(count);
 	const char* c_str = str.c_str();
     sem_wait(sem_requests);
-	memcpy(buf_requests.buf + *buf_requests.i, c_str, strlen(c_str) + 1);
+	memcpy(((char*)buf_requests.buf) + *buf_requests.i, c_str, strlen(c_str) + 1);
 	char tmp_str[1024];
-	printf("c_str %s, len c_str %i\n", c_str, strlen(c_str));
+	printf("c_str %s, len c_str %li\n", c_str, strlen(c_str));
 	sprintf(tmp_str, "%s", (char*) buf_requests.buf + *buf_requests.i);
 	printf("add read msg sent: %s\n", tmp_str);
 	*buf_requests.i = *buf_requests.i + strlen(c_str) + 1;
@@ -189,11 +189,11 @@ void add_write_request(int fd, size_t count) {
 	std::string str = "writ " + std::to_string(getpid()) +  " " + std::to_string(fd) + " " + std::to_string(count);
 	const char* c_str = str.c_str();    
 	sem_wait(sem_requests);
-	memcpy(buf_requests.buf + *buf_requests.i, c_str, strlen(c_str) + 1);
+	memcpy(((char*)buf_requests.buf) + *buf_requests.i, c_str, strlen(c_str) + 1);
 	std::cout << "write before response" << std::endl;
 	std::cout << "i: " << *buf_requests.i << std::endl;
 	char tmp_str[1024];
-	printf("c_str %s, len c_str %i\n", c_str, strlen(c_str));
+	printf("c_str %s, len c_str %li\n", c_str, strlen(c_str));
 	sprintf(tmp_str, "%s", (char*) buf_requests.buf + *buf_requests.i);
 	printf("add write msg sent: %s\n", tmp_str);
 	*buf_requests.i = *buf_requests.i + strlen(c_str) + 1;
@@ -205,12 +205,12 @@ void add_write_request(int fd, size_t count) {
 }
 
 void read_shm(void* shm, int offset, void* buffer, size_t count) {
-	memcpy(buffer, shm + offset, count); 
+	memcpy(buffer, ((char*)shm) + offset, count); 
 }
 
 void write_shm(void* shm, size_t offset, const void* buffer, size_t count) {	
 	std::cout << "before wrote offset" << offset << " count " << count <<std::endl;
-	memcpy(shm + offset, buffer, count); 
+	memcpy(((char*)shm) + offset, buffer, count); 
 	std::cout << "after wrote " << count << " bytes" << std::endl;
 }
 
@@ -220,7 +220,7 @@ void write_shm(void* shm, size_t offset, const void* buffer, size_t count) {
  */
 
 bool check_cache(int fd) {
-	int info, i = 0;
+	int i = 0;
 	bool found = false;
 	while (!found && i < *caching_info_size) {
 		if (fd == client_caching_info[i]) {
@@ -250,17 +250,11 @@ void write_to_disk(const int fd, const int offset, const void* buffer, const siz
 		exit(1);
 	}
 	lseek(filesystem_fd, offset, SEEK_SET);
-	for (int i = 0; i < count / sizeof(int); ++i) {
-		std::cout << ((int*)buffer)[i] << std::endl;
-	}
 	ssize_t res = real_write(filesystem_fd, buffer, count);
-	for (int i = 0; i < count / sizeof(int); ++i) {
-		std::cout << ((int*)buffer)[i] << std::endl;
-	}
 	if (res == -1) {
 		err_exit("capio error writing to disk capio file ");
 	}	
-	if (res != count) {
+	if ((size_t)res != count) {
 		std::cout << "capio error write to disk: only " << res << " bytes written of " << count << std::endl; 
 		exit(1);
 	}

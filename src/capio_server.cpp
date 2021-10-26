@@ -18,7 +18,7 @@
 
 #include "utils/common.hpp"
 
-const long int max_shm_size = 1024L * 4;
+const long int max_shm_size = 1024L * 1024 * 1024 * 16;
 bool shm_full = false;
 int total_bytes_shm = 0;
 
@@ -303,7 +303,7 @@ void flush_file_to_disk(int pid, int fd) {
 	long int file_size = *files_metadata[path].second;	
 	long int num_bytes_written, k = 0;
 	while (k < file_size) {
-    	num_bytes_written = write(fd, buf + k, (file_size - k));
+    	num_bytes_written = write(fd, ((char*) buf) + k, (file_size - k));
     	std::cout << "num_bytes_written " << num_bytes_written << std::endl;
     	k += num_bytes_written;
     }
@@ -671,7 +671,7 @@ void capio_helper(int rank) {
 			std::string msg = "ream " + path + + " " + std::to_string(bytes_received);
 			sem_wait(sem_requests);
 			const char* c_str = msg.c_str();
-			memcpy(buf_requests.buf + *buf_requests.i, c_str, strlen(c_str) + 1);
+			memcpy(((char*)buf_requests.buf) + *buf_requests.i, c_str, strlen(c_str) + 1);
 			std::cout << "open before response" << std::endl;
 			char tmp_str[1024];
 			printf("c_str %s, len c_str %i\n", c_str, strlen(c_str));

@@ -33,7 +33,6 @@ void* create_shm(std::string shm_name, const long int size) {
 	void* p = nullptr;
 	// if we are not creating a new object, mode is equals to 0
 	int fd = shm_open(shm_name.c_str(), O_CREAT | O_RDWR,  S_IRUSR | S_IWUSR); //to be closed
-	struct stat sb;
 	if (fd == -1)
 		err_exit("shm_open " + shm_name);
 	if (ftruncate(fd, size) == -1)
