@@ -3,6 +3,7 @@
 #include <unordered_map>
 #include <unordered_set>
 #include <iostream>
+#include <pthread.h>
 
 #include <unistd.h>
 #include <stdio.h>
@@ -71,6 +72,8 @@ sem_t* sem_requests;
 sem_t* sem_new_msgs;
 std::unordered_map<int, sem_t*> sems_response;
 static int index_not_read = 0;
+
+sem_t internal_server_sem;
 
 void sig_term_handler(int signum, siginfo_t *info, void *ptr) {
 	std::cout << "handling sigterm" << std::endl;
@@ -570,27 +573,47 @@ void read_next_msg(int rank) {
 	return;
 }
 
-void capio_server(int rank) {
+void handshake_servers(int rank, int size) {
+	char* buf;	
+	for (int i = 0; i < size; i += 2) {
+		if (i != rank) {
+			MPI_Send(node_name, strlen(node_name), MPI_CHAR, i, 0, MPI_COMM_WORLD); //TODO: possible deadlock
+			buf = (char*) malloc(MPI_MAX_PROCESSOR_NAME * sizeof(char));//TODO: free
+			MPI_Recv(buf, MPI_MAX_PROCESSOR_NAME, MPI_CHAR, i, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+			nodes_helper_rank[buf] = i + 1;//store the rank of the helper not the server
+		}
+	}
+}
+void* capio_server(void* pthread_arg) {
+	int rank, size;
+	MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+	MPI_Comm_size(MPI_COMM_WORLD, &size);
+	catch_sigterm();
+	handshake_servers(rank, size);
+	for (auto const &pair: nodes_helper_rank) {
+		std::cout << "{" << pair.first << ": " << pair.second << "}\n";
+	}
+	std::cout << "capio server, rank " << rank << std::endl;
 	buf_requests = create_circular_buffer();
 	sem_requests = create_sem_requests();
 	sem_new_msgs = sem_open("sem_new_msgs", O_CREAT | O_RDWR, S_IRUSR | S_IWUSR, 0);
-	MPI_Send(NULL, 0, MPI_INT, rank + 1, 0, MPI_COMM_WORLD);
+	sem_post(&internal_server_sem);
 	while(true) {
 		std::cout << "serving" << std::endl;
 		read_next_msg(rank);
 
 		//respond();
 	}
+	return nullptr; //pthreads always needs a return value
 }
 
-void capio_helper(int rank) {
+void* capio_helper(void* pthread_arg) {
 	char buf_recv[2048];
 	char* buf_send;
 	MPI_Status status;
-	MPI_Recv(NULL, 0, MPI_INT, rank - 1, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
-	buf_requests = get_circular_buffer();
-	sem_requests = get_sem_requests();
-	sem_new_msgs = sem_open("sem_new_msgs", O_RDWR);
+	int rank;
+	MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+	sem_wait(&internal_server_sem);
 	while(true) {
 		std::cout << "helper" << std::endl;
 		MPI_Recv(buf_recv, 2048, MPI_CHAR, MPI_ANY_SOURCE, 0, MPI_COMM_WORLD, &status); //receive from server
@@ -687,41 +710,57 @@ void capio_helper(int rank) {
 			std::cout << "helper error receiving message" << std::endl;
 		}
 	}
+	return nullptr; //pthreads always needs a return value
 }
 
 
-void handshake_servers(int rank, int size) {
-	char* buf;	
-	for (int i = 0; i < size; i += 2) {
-		if (i != rank) {
-			MPI_Send(node_name, strlen(node_name), MPI_CHAR, i, 0, MPI_COMM_WORLD); //TODO: possible deadlock
-			buf = (char*) malloc(MPI_MAX_PROCESSOR_NAME * sizeof(char));//TODO: free
-			MPI_Recv(buf, MPI_MAX_PROCESSOR_NAME, MPI_CHAR, i, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
-			nodes_helper_rank[buf] = i + 1;//store the rank of the helper not the server
-		}
-	}
-}
 
 int main(int argc, char** argv) {
-	int rank, size, len;
-	MPI_Init(&argc, &argv);
-	MPI_Comm_rank(MPI_COMM_WORLD, &rank);
-	MPI_Comm_size(MPI_COMM_WORLD, &size);
+	int rank, size, len, provided;
+	MPI_Init_thread(&argc, &argv, MPI_THREAD_MULTIPLE, &provided);
+    if(provided != MPI_THREAD_MULTIPLE)
+    {
+        printf("The threading support level is lesser than that demanded.\n");
+        MPI_Abort(MPI_COMM_WORLD, EXIT_FAILURE);
+    }
+    else
+    {
+        printf("The threading support level corresponds to that demanded.\n");
+    }
 	MPI_Get_processor_name(node_name, &len);
 	std::cout << "processor name " << node_name << std::endl;
-	if (rank % 2 == 0) {
-		catch_sigterm();
-		handshake_servers(rank, size);
-	    for (auto const &pair: nodes_helper_rank) {
-			std::cout << "{" << pair.first << ": " << pair.second << "}\n";
-		}
-		std::cout << "capio server, rank " << rank << std::endl;
-		capio_server(rank);
+	pthread_t server_thread, helper_thread;
+	int res = sem_init(&internal_server_sem,0,0);
+	if (res !=0) {
+		std::cout << __FILE__ << ":" << __LINE__ << " - " << std::flush;
+		perror("sem_init failed"); exit(res);
 	}
-	else {
-		std::cout << "capio helper, rank " << rank << std::endl;
-		capio_helper(rank);
-	}	
+	res = pthread_create(&server_thread, NULL, capio_server, &rank);
+	if (res != 0) {
+		std::cout << "error creation of capio server thread" << std::endl;
+		MPI_Finalize();
+		return 1;
+	}
+	res = pthread_create(&helper_thread, NULL, capio_helper, &rank);
+	if (res != 0) {
+		std::cout << "error creation of helper server thread" << std::endl;
+		MPI_Finalize();
+		return 1;
+	}
+    void* status;
+    int t = pthread_join(server_thread, &status);
+    if (t != 0) {
+    	std::cout << "Error in thread join: " << t << std::endl;
+    }
+    t = pthread_join(helper_thread, &status);
+    if (t != 0) {
+    	std::cout << "Error in thread join: " << t << std::endl;
+    }
+	res = sem_destroy(&internal_server_sem);
+	if (res !=0) {
+		std::cout << __FILE__ << ":" << __LINE__ << " - " << std::flush;
+		perror("sem_destroy failed"); exit(res);
+	}
 	MPI_Finalize();
 	return 0;
 }
