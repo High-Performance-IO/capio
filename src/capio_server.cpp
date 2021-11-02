@@ -58,6 +58,9 @@ std::unordered_map<std::string, char*> files_location;
 std::unordered_map<std::string, int> nodes_helper_rank;
 
 // path -> (pid, fd, numbytes)
+std::unordered_map<std::string, std::tuple<int, int, long int>>  pending_reads;
+
+// path -> (pid, fd, numbytes)
 std::unordered_map<std::string, std::tuple<int, int, long int>>  remote_pending_reads;
 
 // it contains the file saved on disk
@@ -312,6 +315,219 @@ void flush_file_to_disk(int pid, int fd) {
     }
 }
 
+void handle_open(char* str, char* p, int rank) {
+	int pid;
+	pid = strtol(str + 5, &p, 10);
+	std::cout << "pid " << pid << std::endl;
+	if (sems_response.find(pid) == sems_response.end()) {
+	std::cout << "opening sem_response" << std::endl;
+	sems_response[pid] = sem_open(("sem_response" + std::to_string(pid)).c_str(), O_RDWR);
+	if (sems_response[pid] == SEM_FAILED) {
+		std::cout << "error creating the response semafore for pid " << pid << std::endl;  	
+	}
+	response_buffers[pid].first = (int*) get_shm("buf_response" + std::to_string(pid));
+	response_buffers[pid].second = 0; 
+	caching_info[pid].first = (int*) get_shm("caching_info" + std::to_string(pid));
+	caching_info[pid].second = (int*) get_shm("caching_info_size" + std::to_string(pid));
+	}
+	std::string path(p + 1);
+	std::cout << "path file " << path << std::endl;
+	int fd = open(path.c_str(), O_CREAT | O_RDWR, S_IRUSR | S_IRWXU);
+	if (fd == -1) {
+	std::cout << "capio server, error to open the file " << path << std::endl;
+	MPI_Finalize();
+	exit(1);
+	}
+	void* p_shm;
+	int index = *caching_info[pid].second;
+	caching_info[pid].first[index] = fd;
+	if (on_disk.find(path) == on_disk.end()) {
+		p_shm = create_shm(path, 1024L * 1024 * 1024* 4);
+		caching_info[pid].first[index + 1] = 0;
+	}
+	else {
+		std::cout << "open file is on disk" << std::endl;
+		p_shm = nullptr;
+		caching_info[pid].first[index + 1] = 1;
+	}
+		//TODO: check the size that the user wrote in the configuration file
+	processes_files[pid][fd] = std::pair<void*, int>(p_shm, 0); //TODO: what happens if a process open the same file twice?
+	*caching_info[pid].second += 2;
+	std::cout << "fd " << fd << "inserted in caching and caching info size = " << *caching_info[pid].second << std::endl; 
+	std::cout << "before post sems_respons" << std::endl;
+	std::cout << sems_response[pid] << std::endl;
+	std::pair<void*, int> tmp_pair = response_buffers[pid];
+	((int*) tmp_pair.first)[tmp_pair.second] = fd; 
+	++response_buffers[pid].second;
+	std::cout << "before post sems_respons 2" << std::endl;
+	sem_post(sems_response[pid]);
+	std::cout << "after post sems_respons" << std::endl;
+	if (files_metadata.find(path) == files_metadata.end()) {
+		std::cout << "server " << rank << "updating file metadata for " << path << std::endl;
+		files_metadata[path].first = processes_files[pid][fd].first;	
+		std::cout<< "debug 1" << std::endl;
+		files_metadata[path].second = create_shm_long_int(path + "_size");	
+		std::cout<< "debug 2" << std::endl;
+
+		if (files_metadata.find(path) == files_metadata.end()) {//debug
+			std::cout << "server " << rank << " error updating" <<std ::endl;
+			exit(1);
+		}
+		std::cout<< "debug 3" << std::endl;
+	}
+	std::cout<< "debug 4" << std::endl;
+	processes_files_metadata[pid][fd] = path;
+	std::cout<< "debug 5" << std::endl;
+}
+
+
+void handle_write(char* str, char* p, int rank) {
+	//check if another process is waiting for this data
+	std::cout << "server handling a write" << std::endl;
+	int pid = strtol(str + 5, &p, 10);;
+	int fd = strtol(p, &p, 10);
+	long int data_size = strtol(p, &p, 10);
+	std::cout << "pid " << pid << std::endl;
+	std::cout << "fd " << fd << std::endl;
+	std::cout << "data_size " << data_size << std::endl;
+	if (processes_files[pid][fd].second == 0) {
+		write_file_location("files_location.txt", rank, processes_files_metadata[pid][fd]);
+		std::cout << "wrote files_location.txt " << std::endl;
+	}
+	processes_files[pid][fd].second += data_size;
+	std::string path = processes_files_metadata[pid][fd];
+	*files_metadata[path].second += data_size; //works only if there is only one writer at time	for each file
+	total_bytes_shm += data_size;
+	std::cout << "total_bytes_shm = " << total_bytes_shm << " max_shm_size = " << max_shm_size << std::endl;
+	if (total_bytes_shm > max_shm_size && on_disk.find(path) == on_disk.end()) {
+		std::cout << "flushing file " << fd << " to disk" << std::endl;
+		shm_full = true;
+		flush_file_to_disk(pid, fd);
+		int i = 0;
+		bool found = false;
+		while (!found && i < *caching_info[pid].second) {
+			if (caching_info[pid].first[i] == fd) {
+				found = true;
+			}
+			else {
+				i += 2;
+			}
+		}
+		if (i >= *caching_info[pid].second) {
+			std::cout << "capio error: check caching info, file not found" << std::endl;
+			MPI_Finalize();
+			exit(1);
+		}
+		if (found) {
+			caching_info[pid].first[i + 1] = 1;
+		}
+		std::cout << "updated caching info of file " << path << std::endl;
+		on_disk.insert(path);
+	}
+	sem_post(sems_response[pid]);
+	//char* tmp = (char*) malloc(data_size);
+	//memcpy(tmp, processes_files[pid][fd].first, data_size); 
+	//for (int i = 0; i < data_size; ++i) {
+	//	std::cout << "tmp[i] " << tmp[i] << std::endl;
+	//}
+	//free(tmp);
+}
+
+void handle_read(char* str, char* p, int rank) {
+	std::cout << "server handling a read" << std::endl;
+	int pid = strtol(str + 5, &p, 10);;
+	int fd = strtol(p, &p, 10);
+	long int count = strtol(p, &p, 10);
+	std::cout << "pid " << pid << std::endl;
+	std::cout << "fd " << fd << std::endl;
+	std::cout << "count " << count << std::endl;
+	if (processes_files[pid][fd].second == 0 && files_location.find(processes_files_metadata[pid][fd]) == files_location.end()) {
+		check_remote_file("files_location.txt", rank, processes_files_metadata[pid][fd]);
+		std::cout << "read files_location.txt " << std::endl;
+		if (files_location.find(processes_files_metadata[pid][fd]) == files_location.end()) {
+			std::cout << "read before relative write" << std::endl;
+			pending_reads[processes_files_metadata[pid][fd]] = std::make_tuple(pid, fd, count);
+			return;
+		}
+	}
+	if (files_location[processes_files_metadata[pid][fd]] == node_name) {
+		std::cout << "read local file" << std::endl;
+		#ifdef MYDEBUG
+		int* tmp = (int*) malloc(count);
+		memcpy(tmp, processes_files[pid][fd].first + processes_files[pid][fd].second, count); 
+		for (int i = 0; i < count / sizeof(int); ++i) {
+			std::cout << "server local read tmp[i] " << tmp[i] << std::endl;
+		}
+		free(tmp);
+		#endif
+		std::pair<void*, int> tmp_pair = response_buffers[pid];
+		((int*) tmp_pair.first)[tmp_pair.second] = processes_files[pid][fd].second; 
+		processes_files[pid][fd].second += count;
+		//TODO: check if there is data that can be read in the local memory file
+		++response_buffers[pid].second;
+		//TODO: check if the file was moved to the disk
+		sem_post(sems_response[pid]); 
+	}
+	else {
+		const char* msg;
+		std::string str_msg;
+		std::cout << " files_location[processes_files_metadata[pid][fd]] " << files_location[processes_files_metadata[pid][fd]] << std::endl;
+		int dest = nodes_helper_rank[files_location[processes_files_metadata[pid][fd]]];
+		long int offset = processes_files[pid][fd].second;
+		str_msg = "read " + processes_files_metadata[pid][fd] + " " + std::to_string(rank + 1) + " " + std::to_string(offset) + " " + std::to_string(count); 
+		msg = str_msg.c_str();
+		MPI_Send(msg, strlen(msg) + 1, MPI_CHAR, dest, 0, MPI_COMM_WORLD);
+		printf("server msg MPI_Send %s\n", msg);
+		std::cout << "msg sent to dest " << dest << std::endl;
+		std::cout << "read remote file" << std::endl;
+		remote_pending_reads[processes_files_metadata[pid][fd]] = std::make_tuple(pid, fd, count);
+		}
+	
+}
+
+void handle_close(char* str, char* p) {
+	std::cout << "server handling close" << std::endl;
+	int pid = strtol(str + 5, &p, 10);;
+	int fd = strtol(p, &p, 10);
+	std::cout << "pid " << pid << std::endl;
+	std::cout << "fd " << fd << std::endl;
+	if (close(fd) == -1) {
+		std::cout << "capio server, error: impossible close the file with fd = " << fd << std::endl;
+		MPI_Finalize();
+		exit(1);
+	}
+}
+
+void handle_remote_read(char* str, char* p, int rank) {
+	long int bytes_received;
+	std::string tmpstr(str + 5);	
+	std::string path = tmpstr.substr(0, tmpstr.find(" "));
+	bytes_received = std::stoi(tmpstr.substr(path.length() + 1));
+	std::cout << "server " << rank << " path " << path << " bytes_received " << bytes_received << std::endl;
+	int pid, fd;
+	long int count; //TODO: diff between count and bytes_received
+	pid = std::get<0>(remote_pending_reads[path]);
+	fd = std::get<1>(remote_pending_reads[path]);
+	count = std::get<2>(remote_pending_reads[path]);
+	//this part is equals to the local read (TODO: function)
+	#ifdef MYDEBUG
+	int* tmp = (int*) malloc(count);
+	memcpy(tmp, processes_files[pid][fd].first + processes_files[pid][fd].second, count); 
+	for (int i = 0; i < count / sizeof(int); ++i) {
+		std::cout << "server remote read tmp[i] " << tmp[i] << std::endl;
+	}
+	free(tmp);
+	#endif
+	std::pair<void*, int> tmp_pair = response_buffers[pid];
+	((int*) tmp_pair.first)[tmp_pair.second] = processes_files[pid][fd].second; 
+	processes_files[pid][fd].second += count;
+	//TODO: check if there is data that can be read in the local memory file
+	++response_buffers[pid].second;
+	sem_post(sems_response[pid]); 
+	*files_metadata[path].second += bytes_received;
+}
+
+
 //TODO: function too long
 
 void read_next_msg(int rank) {
@@ -337,227 +553,27 @@ void read_next_msg(int rank) {
 	std::cout << "is_open " << is_open << std::endl;
 	int pid;
 	if (is_open) {
-		pid = strtol(str + 5, &p, 10);
-		std::cout << "pid " << pid << std::endl;
-		if (sems_response.find(pid) == sems_response.end()) {
-			std::cout << "opening sem_response" << std::endl;
-			sems_response[pid] = sem_open(("sem_response" + std::to_string(pid)).c_str(), O_RDWR);
-			if (sems_response[pid] == SEM_FAILED) {
-				std::cout << "error creating the response semafore for pid " << pid << std::endl;  	
-			}
-			response_buffers[pid].first = (int*) get_shm("buf_response" + std::to_string(pid));
-			response_buffers[pid].second = 0; 
-			caching_info[pid].first = (int*) get_shm("caching_info" + std::to_string(pid));
-			caching_info[pid].second = (int*) get_shm("caching_info_size" + std::to_string(pid));
-
-		}
-		std::string path(p + 1);
-		std::cout << "path file " << path << std::endl;
-		int fd = open(path.c_str(), O_CREAT | O_RDWR, S_IRUSR | S_IRWXU);
-		if (fd == -1) {
-			std::cout << "capio server, error to open the file " << path << std::endl;
-			MPI_Finalize();
-			exit(1);
-		}
-		void* p = create_shm(path, 1024L * 1024 * 1024* 4);
-		int index = *caching_info[pid].second;
-		caching_info[pid].first[index] = fd;
-		if (on_disk.find(path) == on_disk.end()) {
-			p = create_shm(path, 1024L * 1024 * 1024* 4);
-			caching_info[pid].first[index + 1] = 0;
-		}
-		else {
-			std::cout << "open file is on disk" << std::endl;
-			p = nullptr;
-			caching_info[pid].first[index + 1] = 1;
-		}
-		//TODO: check the size that the user wrote in the configuration file
-		processes_files[pid][fd] = std::pair<void*, int>(p, 0); //TODO: what happens if a process open the same file twice?
-		*caching_info[pid].second += 2;
-		std::cout << "fd " << fd << "inserted in caching and caching info size = " << *caching_info[pid].second << std::endl; 
-		std::cout << "before post sems_respons" << std::endl;
-		std::cout << sems_response[pid] << std::endl;
-		std::pair<void*, int> tmp_pair = response_buffers[pid];
-		((int*) tmp_pair.first)[tmp_pair.second] = fd; 
-		++response_buffers[pid].second;
-		std::cout << "before post sems_respons 2" << std::endl;
-		sem_post(sems_response[pid]);
-		std::cout << "after post sems_respons" << std::endl;
-		if (files_metadata.find(path) == files_metadata.end()) {
-			std::cout << "server " << rank << "updating file metadata for " << path << std::endl;
-			files_metadata[path].first = processes_files[pid][fd].first;	
-			std::cout<< "debug 1" << std::endl;
-			files_metadata[path].second = create_shm_long_int(path + "_size");	
-			std::cout<< "debug 2" << std::endl;
-			if (files_metadata.find(path) == files_metadata.end()) {//debug
-				std::cout << "server " << rank << " error updating" <<std ::endl;
-				exit(1);
-			}
-			std::cout<< "debug 3" << std::endl;
-		}
-			std::cout<< "debug 4" << std::endl;
-		processes_files_metadata[pid][fd] = path;
-			std::cout<< "debug 5" << std::endl;
+		handle_open(str, p, rank);
 	}
 	else {
 		bool is_write = strncmp(str, "writ", 4) == 0;
 		if (is_write) {
-			//check if another process is waiting for this data
-			std::cout << "server handling a write" << std::endl;
-			int pid = strtol(str + 5, &p, 10);;
-			int fd = strtol(p, &p, 10);
-			long int data_size = strtol(p, &p, 10);
-			std::cout << "pid " << pid << std::endl;
-			std::cout << "fd " << fd << std::endl;
-			std::cout << "data_size " << data_size << std::endl;
-			
-			if (processes_files[pid][fd].second == 0) {
-				write_file_location("files_location.txt", rank, processes_files_metadata[pid][fd]);
-				std::cout << "wrote files_location.txt " << std::endl;
-			}
-			
-			processes_files[pid][fd].second += data_size;
-			std::string path = processes_files_metadata[pid][fd];
-			*files_metadata[path].second += data_size; //works only if there is only one writer at time	for each file
-			total_bytes_shm += data_size;
-			std::cout << "total_bytes_shm = " << total_bytes_shm << " max_shm_size = " << max_shm_size << std::endl;
-			if (total_bytes_shm > max_shm_size && on_disk.find(path) == on_disk.end()) {
-				std::cout << "flushing file " << fd << " to disk" << std::endl;
-				shm_full = true;
-				flush_file_to_disk(pid, fd);
-				int i = 0;
-				bool found = false;
-				while (!found && i < *caching_info[pid].second) {
-					if (caching_info[pid].first[i] == fd) {
-						found = true;
-					}
-					else {
-						i += 2;
-					}
-				}
-				if (i >= *caching_info[pid].second) {
-					std::cout << "capio error: check caching info, file not found" << std::endl;
-					MPI_Finalize();
-					exit(1);
-				}
-				if (found) {
-					caching_info[pid].first[i + 1] = 1;
-				}
-				std::cout << "updated caching info of file " << path << std::endl;
-				on_disk.insert(path);
-			}
-			sem_post(sems_response[pid]);
-			//char* tmp = (char*) malloc(data_size);
-			//memcpy(tmp, processes_files[pid][fd].first, data_size); 
-			//for (int i = 0; i < data_size; ++i) {
-			//	std::cout << "tmp[i] " << tmp[i] << std::endl;
-			//}
-			//free(tmp);
-
+			handle_write(str, p, rank);
 		}
 		else {
-			bool is_read = strncmp(str, "read", 4) == 0;
+		bool is_read = strncmp(str, "read", 4) == 0;
 			if (is_read) {
-				std::cout << "server handling a read" << std::endl;
-				int pid = strtol(str + 5, &p, 10);;
-				int fd = strtol(p, &p, 10);
-				long int count = strtol(p, &p, 10);
-				std::cout << "pid " << pid << std::endl;
-				std::cout << "fd " << fd << std::endl;
-				std::cout << "count " << count << std::endl;
-				
-				if (processes_files[pid][fd].second == 0 && files_location.find(processes_files_metadata[pid][fd]) == files_location.end()) {
-					check_remote_file("files_location.txt", rank, processes_files_metadata[pid][fd]);
-					std::cout << "read files_location.txt " << std::endl;
-					if (files_location.find(processes_files_metadata[pid][fd]) == files_location.end()) {
-						std::cout << "error read before relative write" << std::endl;
-						exit(1);
-
-					}
-				}
-				if (files_location[processes_files_metadata[pid][fd]] == node_name) {
-					std::cout << "read local file" << std::endl;
-					#ifdef MYDEBUG
-					int* tmp = (int*) malloc(count);
-					memcpy(tmp, processes_files[pid][fd].first + processes_files[pid][fd].second, count); 
-					for (int i = 0; i < count / sizeof(int); ++i) {
-						std::cout << "server local read tmp[i] " << tmp[i] << std::endl;
-					}
-				
-					free(tmp);
-					#endif
-					std::pair<void*, int> tmp_pair = response_buffers[pid];
-					((int*) tmp_pair.first)[tmp_pair.second] = processes_files[pid][fd].second; 
-					processes_files[pid][fd].second += count;
-					//TODO: check if there is data that can be read in the local memory file
-					++response_buffers[pid].second;
-
-					//TODO: check if the file was moved to the disk
-
-					sem_post(sems_response[pid]); 
-				}
-				else {
-					const char* msg;
-					std::string str_msg;
-					std::cout << " files_location[processes_files_metadata[pid][fd]] " << files_location[processes_files_metadata[pid][fd]] << std::endl;
-					int dest = nodes_helper_rank[files_location[processes_files_metadata[pid][fd]]];
-					long int offset = processes_files[pid][fd].second;
-					str_msg = "read " + processes_files_metadata[pid][fd] + " " + std::to_string(rank + 1) + " " + std::to_string(offset) + " " + std::to_string(count); 
-					msg = str_msg.c_str();
-					MPI_Send(msg, strlen(msg) + 1, MPI_CHAR, dest, 0, MPI_COMM_WORLD);
-					printf("server msg MPI_Send %s\n", msg);
-					std::cout << "msg sent to dest " << dest << std::endl;
-					std::cout << "read remote file" << std::endl;
-					remote_pending_reads[processes_files_metadata[pid][fd]] = std::make_tuple(pid, fd, count);
-				}
-			}
+				handle_read(str, p, rank);
+		}
 			else {
 				bool is_close = strncmp(str, "clos", 4) == 0;
 				if (is_close) { //TODO: more cleaning
-					std::cout << "server handling close" << std::endl;
-					int pid = strtol(str + 5, &p, 10);;
-					int fd = strtol(p, &p, 10);
-					std::cout << "pid " << pid << std::endl;
-					std::cout << "fd " << fd << std::endl;
-				
-
-					if (close(fd) == -1) {
-						std::cout << "capio server, error: impossible close the file with fd = " << fd << std::endl;
-						MPI_Finalize();
-						exit(1);
-					}
+					handle_close(str, p);
 				}
 				else {
 					bool is_remote_read = strncmp(str, "ream", 4) == 0;
 					if (is_remote_read) {
-						long int bytes_received;
-						std::string tmpstr(str + 5);	
-						std::string path = tmpstr.substr(0, tmpstr.find(" "));
-						bytes_received = std::stoi(tmpstr.substr(path.length() + 1));
-						std::cout << "server " << rank << " path " << path << " bytes_received " << bytes_received << std::endl;
-						int pid, fd;
-						long int count; //TODO: diff between count and bytes_received
-						pid = std::get<0>(remote_pending_reads[path]);
-						fd = std::get<1>(remote_pending_reads[path]);
-						count = std::get<2>(remote_pending_reads[path]);
-						//this part is equals to the local read (TODO: function)
-						#ifdef MYDEBUG
-						int* tmp = (int*) malloc(count);
-						memcpy(tmp, processes_files[pid][fd].first + processes_files[pid][fd].second, count); 
-						for (int i = 0; i < count / sizeof(int); ++i) {
-							std::cout << "server remote read tmp[i] " << tmp[i] << std::endl;
-						}
-				
-						free(tmp);
-						#endif
-						std::pair<void*, int> tmp_pair = response_buffers[pid];
-						((int*) tmp_pair.first)[tmp_pair.second] = processes_files[pid][fd].second; 
-						processes_files[pid][fd].second += count;
-						//TODO: check if there is data that can be read in the local memory file
-						++response_buffers[pid].second;
-						sem_post(sems_response[pid]); 
-						*files_metadata[path].second += bytes_received;
-
+						handle_remote_read(str, p, rank);
 					}
 					else {
 						std::cout << "error msg read" << std::endl;
