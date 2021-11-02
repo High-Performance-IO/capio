@@ -315,20 +315,22 @@ void flush_file_to_disk(int pid, int fd) {
     }
 }
 
+//TODO: function too long
+
 void handle_open(char* str, char* p, int rank) {
 	int pid;
 	pid = strtol(str + 5, &p, 10);
 	std::cout << "pid " << pid << std::endl;
 	if (sems_response.find(pid) == sems_response.end()) {
-	std::cout << "opening sem_response" << std::endl;
-	sems_response[pid] = sem_open(("sem_response" + std::to_string(pid)).c_str(), O_RDWR);
-	if (sems_response[pid] == SEM_FAILED) {
-		std::cout << "error creating the response semafore for pid " << pid << std::endl;  	
-	}
-	response_buffers[pid].first = (int*) get_shm("buf_response" + std::to_string(pid));
-	response_buffers[pid].second = 0; 
-	caching_info[pid].first = (int*) get_shm("caching_info" + std::to_string(pid));
-	caching_info[pid].second = (int*) get_shm("caching_info_size" + std::to_string(pid));
+		std::cout << "opening sem_response" << std::endl;
+		sems_response[pid] = sem_open(("sem_response" + std::to_string(pid)).c_str(), O_RDWR);
+		if (sems_response[pid] == SEM_FAILED) {
+			std::cout << "error creating the response semafore for pid " << pid << std::endl;  	
+		}
+		response_buffers[pid].first = (int*) get_shm("buf_response" + std::to_string(pid));
+		response_buffers[pid].second = 0; 
+		caching_info[pid].first = (int*) get_shm("caching_info" + std::to_string(pid));
+		caching_info[pid].second = (int*) get_shm("caching_info_size" + std::to_string(pid));
 	}
 	std::string path(p + 1);
 	std::cout << "path file " << path << std::endl;
@@ -452,6 +454,13 @@ void handle_read(char* str, char* p, int rank) {
 	}
 	if (files_location[processes_files_metadata[pid][fd]] == node_name) {
 		std::cout << "read local file" << std::endl;
+		std::string path = processes_files_metadata[pid][fd];
+		long int file_size = *files_metadata[path].second;
+		int process_offset = processes_files[pid][fd].second;
+	    if (process_offset + count > file_size) {
+			std::cout << "error: attempt to read a portion of a file that does not exist" << std::endl;
+			exit(1);
+		}
 		#ifdef MYDEBUG
 		int* tmp = (int*) malloc(count);
 		memcpy(tmp, processes_files[pid][fd].first + processes_files[pid][fd].second, count); 
@@ -528,7 +537,6 @@ void handle_remote_read(char* str, char* p, int rank) {
 }
 
 
-//TODO: function too long
 
 void read_next_msg(int rank) {
 	sem_wait(sem_new_msgs);
