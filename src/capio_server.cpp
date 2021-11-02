@@ -2,6 +2,7 @@
 #include <cstring>
 #include <unordered_map>
 #include <unordered_set>
+#include <vector>
 #include <iostream>
 #include <pthread.h>
 
@@ -58,7 +59,7 @@ std::unordered_map<std::string, char*> files_location;
 std::unordered_map<std::string, int> nodes_helper_rank;
 
 // path -> (pid, fd, numbytes)
-std::unordered_map<std::string, std::tuple<int, int, long int>>  pending_reads;
+std::unordered_map<std::string, std::vector<std::tuple<int, int, long int>>>  pending_reads;
 
 // path -> (pid, fd, numbytes)
 std::unordered_map<std::string, std::tuple<int, int, long int>>  remote_pending_reads;
@@ -74,6 +75,7 @@ circular_buffer buf_requests;
 sem_t* sem_requests;
 sem_t* sem_new_msgs;
 std::unordered_map<int, sem_t*> sems_response;
+std::unordered_map<int, sem_t*> sems_write;
 static int index_not_read = 0;
 
 sem_t internal_server_sem;
@@ -88,6 +90,7 @@ void sig_term_handler(int signum, siginfo_t *info, void *ptr) {
 	for (auto& pair : response_buffers) {
 		shm_unlink(("buf_response" + std::to_string(pair.first)).c_str()); 
 		sem_unlink(("sem_response" + std::to_string(pair.first)).c_str());
+		sem_unlink(("sem_write" + std::to_string(pair.first)).c_str());
 		shm_unlink(("caching_info" + std::to_string(pair.first)).c_str()); 
 		shm_unlink(("caching_info_size" + std::to_string(pair.first)).c_str()); 
 	}
@@ -327,6 +330,10 @@ void handle_open(char* str, char* p, int rank) {
 		if (sems_response[pid] == SEM_FAILED) {
 			std::cout << "error creating the response semafore for pid " << pid << std::endl;  	
 		}
+		sems_write[pid] = sem_open(("sem_write" + std::to_string(pid)).c_str(), O_RDWR);
+		if (sems_write[pid] == SEM_FAILED) {
+			std::cout << "error creating the write semafore for pid " << pid << std::endl;  	
+		}
 		response_buffers[pid].first = (int*) get_shm("buf_response" + std::to_string(pid));
 		response_buffers[pid].second = 0; 
 		caching_info[pid].first = (int*) get_shm("caching_info" + std::to_string(pid));
@@ -382,6 +389,24 @@ void handle_open(char* str, char* p, int rank) {
 	std::cout<< "debug 5" << std::endl;
 }
 
+void handle_pending_read(int pid, int fd, long int process_offset, long int count) {
+	#ifdef MYDEBUG
+	int* tmp = (int*) malloc(count);
+	memcpy(tmp, processes_files[pid][fd].first + process_offset, count); 
+	for (int i = 0; i < count / sizeof(int); ++i) {
+		std::cout << "server local read tmp[i] " << tmp[i] << std::endl;
+	}
+	free(tmp);
+	#endif
+
+	std::pair<void*, int> tmp_pair = response_buffers[pid];
+	((int*) tmp_pair.first)[tmp_pair.second] = process_offset; 
+	processes_files[pid][fd].second += count;
+	++response_buffers[pid].second;
+	//TODO: check if the file was moved to the disk
+	sem_post(sems_response[pid]); 
+
+}
 
 void handle_write(char* str, char* p, int rank) {
 	//check if another process is waiting for this data
@@ -433,6 +458,31 @@ void handle_write(char* str, char* p, int rank) {
 	//	std::cout << "tmp[i] " << tmp[i] << std::endl;
 	//}
 	//free(tmp);
+	auto it = pending_reads.find(path);
+	if (it != pending_reads.end()) { //TODO: works only if a file have at most one pending read
+		sem_wait(sems_write[pid]);
+		auto& pending_reads_this_file = it->second;	
+		int i = 0;
+		for (auto it_vec = pending_reads_this_file.begin(); it_vec != pending_reads_this_file.end(); it++) {
+			auto tuple = *it_vec;
+			int pending_pid = std::get<0>(tuple);
+			int fd = std::get<1>(tuple);
+			long int process_offset = processes_files[pending_pid][fd].second;
+			long int count = std::get<2>(tuple);
+			long int file_size = *files_metadata[path].second; 
+			if (process_offset + count <= file_size) {
+				handle_pending_read(pending_pid, fd, process_offset, count);
+			}
+			pending_reads_this_file.erase(it_vec);
+			std::cout << "resolved a pending read" << std::endl;
+			std::cout << "pending reads for this file: " << pending_reads_this_file.size() << std::endl;
+			++i;
+		}
+	}
+	else {
+		sem_wait(sems_write[pid]);
+	}
+	
 }
 
 void handle_read(char* str, char* p, int rank) {
@@ -448,7 +498,7 @@ void handle_read(char* str, char* p, int rank) {
 		std::cout << "read files_location.txt " << std::endl;
 		if (files_location.find(processes_files_metadata[pid][fd]) == files_location.end()) {
 			std::cout << "read before relative write" << std::endl;
-			pending_reads[processes_files_metadata[pid][fd]] = std::make_tuple(pid, fd, count);
+			pending_reads[processes_files_metadata[pid][fd]].push_back(std::make_tuple(pid, fd, count));
 			return;
 		}
 	}
@@ -459,20 +509,20 @@ void handle_read(char* str, char* p, int rank) {
 		int process_offset = processes_files[pid][fd].second;
 	    if (process_offset + count > file_size) {
 			std::cout << "error: attempt to read a portion of a file that does not exist" << std::endl;
-			exit(1);
+			pending_reads[path].push_back(std::make_tuple(pid, fd, count));
+			return;
 		}
 		#ifdef MYDEBUG
 		int* tmp = (int*) malloc(count);
-		memcpy(tmp, processes_files[pid][fd].first + processes_files[pid][fd].second, count); 
+		memcpy(tmp, processes_files[pid][fd].first + process_offset, count); 
 		for (int i = 0; i < count / sizeof(int); ++i) {
 			std::cout << "server local read tmp[i] " << tmp[i] << std::endl;
 		}
 		free(tmp);
 		#endif
 		std::pair<void*, int> tmp_pair = response_buffers[pid];
-		((int*) tmp_pair.first)[tmp_pair.second] = processes_files[pid][fd].second; 
+		((int*) tmp_pair.first)[tmp_pair.second] = process_offset; 
 		processes_files[pid][fd].second += count;
-		//TODO: check if there is data that can be read in the local memory file
 		++response_buffers[pid].second;
 		//TODO: check if the file was moved to the disk
 		sem_post(sems_response[pid]); 

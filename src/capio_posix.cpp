@@ -38,6 +38,7 @@ int i_resp;
 sem_t* sem_requests;
 sem_t* sem_new_msgs;
 sem_t* sem_response;
+sem_t* sem_write;
 int* client_caching_info;
 int* caching_info_size;
 
@@ -105,6 +106,7 @@ void mtrace_init(void) {
 	sem_requests = get_sem_requests();
 	sem_new_msgs = sem_open("sem_new_msgs", O_RDWR);
 	sem_response = sem_open(("sem_response" + std::to_string(getpid())).c_str(),  O_CREAT | O_RDWR, S_IRUSR | S_IWUSR, 0);
+	sem_write = sem_open(("sem_write" + std::to_string(getpid())).c_str(),  O_CREAT | O_RDWR, S_IRUSR | S_IWUSR, 0);
 	buf_response = (int*) create_shm("buf_response" + std::to_string(getpid()), 4096);
 	i_resp = 0;
 	client_caching_info = (int*) create_shm("caching_info" + std::to_string(getpid()), 4096);
@@ -211,6 +213,7 @@ void read_shm(void* shm, int offset, void* buffer, size_t count) {
 void write_shm(void* shm, size_t offset, const void* buffer, size_t count) {	
 	std::cout << "before wrote offset" << offset << " count " << count <<std::endl;
 	memcpy(((char*)shm) + offset, buffer, count); 
+	sem_post(sem_write);
 	std::cout << "after wrote " << count << " bytes" << std::endl;
 }
 
