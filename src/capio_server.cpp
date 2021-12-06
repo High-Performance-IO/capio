@@ -3,6 +3,7 @@
 #include <unordered_map>
 #include <unordered_set>
 #include <vector>
+#include <list>
 #include <iostream>
 #include <pthread.h>
 
@@ -61,11 +62,15 @@ std::unordered_map<std::string, int> nodes_helper_rank;
 // path -> (pid, fd, numbytes)
 std::unordered_map<std::string, std::vector<std::tuple<int, int, long int>>>  pending_reads;
 
-// path -> (pid, fd, numbytes)
-std::unordered_map<std::string, std::tuple<int, int, long int>>  remote_pending_reads;
+// path -> [(pid, fd, numbytes), ...]
+std::unordered_map<std::string, std::list<std::tuple<int, int, long int>>>  my_remote_pending_reads;
+
+// path -> [(offset, numbytes, sem_pointer), ...]
+std::unordered_map<std::string, std::list<std::tuple<long int, long int, sem_t*>>> clients_remote_pending_reads;
 
 // it contains the file saved on disk
 std::unordered_set<std::string> on_disk;
+
 
 //name of the node
 
@@ -482,7 +487,37 @@ void handle_write(char* str, char* p, int rank) {
 	else {
 		sem_wait(sems_write[pid]);
 	}
-	
+	auto it_client = clients_remote_pending_reads.find(path);
+	std::list<std::tuple<long int, long int, sem_t*>>::iterator it_list, prev_it_list;
+	std::cout << "server trying to resolve clients remote pending reads" << std::endl;
+	if (it_client !=  clients_remote_pending_reads.end()) {
+		std::cout << "debug inside if clients remote pending reads" << std::endl;
+		while (it_list != it_client->second.end()) {
+			long int offset = std::get<0>(*it_list);
+			long int nbytes = std::get<1>(*it_list);
+			std::cout << "offset " << offset << "nbytes " << nbytes << std::endl;
+			sem_t* sem = std::get<2>(*it_list);
+			if (offset + nbytes <  processes_files[pid][fd].second + data_size) {
+				std::cout << "server going to resolve one client remote pending read" << std::endl;		
+				sem_post(sem);
+				if (it_list == it_client->second.begin()) {
+					it_client->second.erase(it_list);
+					it_list == it_client->second.begin();
+				}
+				else {
+					it_client->second.erase(it_list);
+					it_list = std::next(prev_it_list);
+				}
+			}
+			else {
+				prev_it_list = it_list;
+				++it_list;
+			}
+		}
+	}
+	else {
+
+	}
 }
 
 void handle_read(char* str, char* p, int rank) {
@@ -533,13 +568,13 @@ void handle_read(char* str, char* p, int rank) {
 		std::cout << " files_location[processes_files_metadata[pid][fd]] " << files_location[processes_files_metadata[pid][fd]] << std::endl;
 		int dest = nodes_helper_rank[files_location[processes_files_metadata[pid][fd]]];
 		long int offset = processes_files[pid][fd].second;
-		str_msg = "read " + processes_files_metadata[pid][fd] + " " + std::to_string(rank + 1) + " " + std::to_string(offset) + " " + std::to_string(count); 
+		str_msg = "read " + processes_files_metadata[pid][fd] + " " + std::to_string(rank) + " " + std::to_string(offset) + " " + std::to_string(count); 
 		msg = str_msg.c_str();
 		MPI_Send(msg, strlen(msg) + 1, MPI_CHAR, dest, 0, MPI_COMM_WORLD);
 		printf("server msg MPI_Send %s\n", msg);
 		std::cout << "msg sent to dest " << dest << std::endl;
 		std::cout << "read remote file" << std::endl;
-		remote_pending_reads[processes_files_metadata[pid][fd]] = std::make_tuple(pid, fd, count);
+		my_remote_pending_reads[processes_files_metadata[pid][fd]].push_back(std::make_tuple(pid, fd, count));
 		}
 	
 }
@@ -558,32 +593,51 @@ void handle_close(char* str, char* p) {
 }
 
 void handle_remote_read(char* str, char* p, int rank) {
-	long int bytes_received;
-	std::string tmpstr(str + 5);	
-	std::string path = tmpstr.substr(0, tmpstr.find(" "));
-	bytes_received = std::stoi(tmpstr.substr(path.length() + 1));
-	std::cout << "server " << rank << " path " << path << " bytes_received " << bytes_received << std::endl;
+	long int bytes_received, offset;
+	char path_c[30];
+	sscanf(str, "ream %s %li %li", path_c, &bytes_received, &offset);
+	std::string path(path_c);
+	std::cout << "server " << rank << " path " << path << " offset " << offset << " bytes_received " << bytes_received << std::endl;
 	int pid, fd;
 	long int count; //TODO: diff between count and bytes_received
-	pid = std::get<0>(remote_pending_reads[path]);
-	fd = std::get<1>(remote_pending_reads[path]);
-	count = std::get<2>(remote_pending_reads[path]);
-	//this part is equals to the local read (TODO: function)
-	#ifdef MYDEBUG
-	int* tmp = (int*) malloc(count);
-	memcpy(tmp, processes_files[pid][fd].first + processes_files[pid][fd].second, count); 
-	for (int i = 0; i < count / sizeof(int); ++i) {
-		std::cout << "server remote read tmp[i] " << tmp[i] << std::endl;
+
+	std::list<std::tuple<int, int, long int>>& list_remote_reads = my_remote_pending_reads[path];
+	auto it = list_remote_reads.begin();
+	std::list<std::tuple<int, int, long int>>::iterator prev_it;
+	while (it != list_remote_reads.end()) {
+		pid = std::get<0>(*it);
+		fd = std::get<1>(*it);
+		count = std::get<2>(*it);
+		long int fd_offset = processes_files[pid][fd].second;
+		if (fd_offset + count <= offset + bytes_received) {
+			//this part is equals to the local read (TODO: function)
+			#ifdef MYDEBUG
+			int* tmp = (int*) malloc(count);
+			memcpy(tmp, processes_files[pid][fd].first + processes_files[pid][fd].second, count); 
+			for (int i = 0; i < count / sizeof(int); ++i) {
+				std::cout << "server remote read tmp[i] " << tmp[i] << std::endl;
+			}
+			free(tmp);
+			#endif
+			std::pair<void*, int> tmp_pair = response_buffers[pid];
+			((int*) tmp_pair.first)[tmp_pair.second] = processes_files[pid][fd].second; 
+			processes_files[pid][fd].second += count;
+			//TODO: check if there is data that can be read in the local memory file
+			++response_buffers[pid].second;
+			sem_post(sems_response[pid]); 
+			if (it == list_remote_reads.begin()) {
+				list_remote_reads.erase(it);
+				it = list_remote_reads.begin();
+			}
+			else {
+				it = std::next(prev_it);
+			}
+		}
+		else {
+			prev_it = it;
+			++it;
+		}
 	}
-	free(tmp);
-	#endif
-	std::pair<void*, int> tmp_pair = response_buffers[pid];
-	((int*) tmp_pair.first)[tmp_pair.second] = processes_files[pid][fd].second; 
-	processes_files[pid][fd].second += count;
-	//TODO: check if there is data that can be read in the local memory file
-	++response_buffers[pid].second;
-	sem_post(sems_response[pid]); 
-	*files_metadata[path].second += bytes_received;
 }
 
 
@@ -649,12 +703,12 @@ void read_next_msg(int rank) {
 
 void handshake_servers(int rank, int size) {
 	char* buf;	
-	for (int i = 0; i < size; i += 2) {
+	for (int i = 0; i < size; i += 1) {
 		if (i != rank) {
 			MPI_Send(node_name, strlen(node_name), MPI_CHAR, i, 0, MPI_COMM_WORLD); //TODO: possible deadlock
 			buf = (char*) malloc(MPI_MAX_PROCESSOR_NAME * sizeof(char));//TODO: free
 			MPI_Recv(buf, MPI_MAX_PROCESSOR_NAME, MPI_CHAR, i, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
-			nodes_helper_rank[buf] = i + 1;//store the rank of the helper not the server
+			nodes_helper_rank[buf] = i;
 		}
 	}
 }
@@ -681,6 +735,69 @@ void* capio_server(void* pthread_arg) {
 	return nullptr; //pthreads always needs a return value
 }
 
+struct remote_read_metadata {
+	char* path;
+	long int offset;
+	int dest;
+	long int nbytes;
+	sem_t* sem;
+};
+
+//TODO: refactor offset_str and offset
+
+void serve_remote_read(const char* path_c, const char* offset_str, int dest, long int offset, long int nbytes) {
+	char* buf_send;
+	const char* s1 = "sending";
+	const size_t len1 = strlen(s1);
+	const size_t len2 = strlen(path_c);
+	const size_t len3 = strlen(offset_str);
+	buf_send = (char*) malloc((len1 + len2 + len3 + 3) * sizeof(char));//TODO:add malloc check
+	std::cout << "offset_str: " << offset_str << std::endl;
+	sprintf(buf_send, "%s %s %s", s1, path_c, offset_str);
+	printf("helper warning sent: %s\n", buf_send);
+	std::cout << "helper dest warning = " << dest << std::endl;
+	//send warning
+	MPI_Send(buf_send, strlen(buf_send) + 1, MPI_CHAR, dest, 0, MPI_COMM_WORLD);
+	std::cout << "helper sending data" << std::endl;
+	free(buf_send);
+	//send data
+	void* file_shm = get_shm(path_c);
+	int* size_shm = (int*) get_shm(std::string(path_c) + "_size");
+	#ifdef MYDEBUG
+	int* tmp = (int*) malloc(*size_shm);
+	std::cout << "helper sending " << *size_shm << " bytes" << std::endl;
+	memcpy(tmp, file_shm, *size_shm); 
+	for (int i = 0; i < *size_shm / sizeof(int); ++i) {
+		std::cout << "helper sending tmp[i] " << tmp[i] << std::endl;
+	}
+	free(tmp);
+	#endif
+	MPI_Send(((char*)file_shm) + offset, nbytes, MPI_BYTE, dest, 0, MPI_COMM_WORLD); 
+}
+
+void* wait_for_data(void* pthread_arg) {
+	struct remote_read_metadata* rr_metadata = (struct remote_read_metadata*) pthread_arg;
+	const char* path = rr_metadata->path;
+	long int offset = rr_metadata->offset;
+	int dest = rr_metadata->dest;
+	long int nbytes = rr_metadata->nbytes;
+	const char * offset_str = std::to_string(offset).c_str();
+	std::cout << "server thread before wait" << std::endl;
+	sem_wait(rr_metadata->sem);
+	serve_remote_read(path, offset_str, dest, offset, nbytes);
+	free(rr_metadata->sem);
+	free(rr_metadata->path);
+	free(rr_metadata);
+	std::cout << "server thread after wait" << std::endl;
+	return nullptr;
+}
+
+
+bool data_avaiable(const char* path_c, long int offset, long int nbytes_requested) {
+	long int file_size = *files_metadata[path_c].second;
+	return offset + nbytes_requested <= file_size;
+}
+
 void* capio_helper(void* pthread_arg) {
 	char buf_recv[2048];
 	char* buf_send;
@@ -694,9 +811,10 @@ void* capio_helper(void* pthread_arg) {
 		std::cout << "helper rank " << rank << " msg received" << buf_recv << std::endl;
 		bool remote_request_to_read = strncmp(buf_recv, "read", 4) == 0;
 		if (remote_request_to_read) {
+		    // schema msg received: "read path dest offset nbytes"
 			char** p_tmp;
 			std::cout << "before strtok" << std::endl;
-			char path_c[512];
+			char* path_c = (char*) malloc(sizeof(char) * 512);
 			int i = 5;
 			int j = 0;
 			while (buf_recv[i] != ' ') {
@@ -708,53 +826,76 @@ void* capio_helper(void* pthread_arg) {
 			char dest_str[128];
 			j = 0;
 			++i;
-			while (buf_recv[j] != '\0') {
+			while (buf_recv[i] != ' ') {
 				dest_str[j] = buf_recv[i];
 				++i;
 				++j;
 			}
 			dest_str[j] = '\0';
 			int dest = std::atoi(dest_str);
+			char offset_str[128];
+			j = 0;
+			++i;
+			while (buf_recv[i] != ' ') {
+				offset_str[j] = buf_recv[i];
+				++i;
+				++j;
+			}
+			offset_str[j] = '\0';
+			long int offset = std::atoi(offset_str);
+			char nbytes_str[128];
+			j = 0;
+			++i;
+			while (buf_recv[i] != '\0') {
+				nbytes_str[j] = buf_recv[i];
+				++i;
+				++j;
+			}
+			nbytes_str[j] = '\0';
+			long int nbytes = std::atoi(nbytes_str);
 			std::cout << "helper " << rank << " path " << path_c << std::endl;
 			std::cout << "helper " << rank << " dest " << dest << std::endl;
-			//int offset; at the moment ignored
-			//int count; at the moment ignored
-			const char* s1 = "sending ";
-			const size_t len1 = strlen(s1);
-			const size_t len2 = strlen(path_c);
-			// in real code you would check for errors in malloc here
-			buf_send = (char*) malloc((len1 + len2 + 1) * sizeof(char));
-			memcpy(buf_send, s1, len1);
-			memcpy(buf_send + len1, path_c, len2 + 1); // +1 to copy the null-terminator
-		    printf("helper warning sent: %s\n", buf_send);
-			std::cout << "helper dest warning = " << dest << std::endl;
-			//send warning
-			MPI_Send(buf_send, strlen(buf_send) + 1, MPI_CHAR, dest, 0, MPI_COMM_WORLD);
-			std::cout << "helper sending data" << std::endl;
-			free(buf_send);
-			//send data
-			void* file_shm = get_shm(path_c);
-			int* size_shm = (int*) get_shm(std::string(path_c) + "_size");
-			#ifdef MYDEBUG
-			int* tmp = (int*) malloc(*size_shm);
-			std::cout << "helper sending " << *size_shm << " bytes" << std::endl;
-			memcpy(tmp, file_shm, *size_shm); 
-			for (int i = 0; i < *size_shm / sizeof(int); ++i) {
-				std::cout << "helper sending tmp[i] " << tmp[i] << std::endl;
+			//check if the data is avaiable
+			if (data_avaiable(path_c, offset, nbytes)) {
+				serve_remote_read(path_c, offset_str, dest, offset, nbytes);
 			}
-				
-			free(tmp);
-			#endif
-			MPI_Send(file_shm, *size_shm, MPI_BYTE, dest, 0, MPI_COMM_WORLD); 
+			else {
+				std::cout << "data unavaiable " << path_c << " offset " << offset << " nbytes " << nbytes << std::endl; 
+				pthread_t t;
+				struct remote_read_metadata* rr_metadata = (struct remote_read_metadata*) malloc(sizeof(struct remote_read_metadata));
+				rr_metadata->path = path_c;
+				rr_metadata->offset = offset;
+				rr_metadata->dest = dest;
+				rr_metadata->nbytes = nbytes;
+				rr_metadata->sem = (sem_t*) malloc(sizeof(sem_t));
+				int res = sem_init(rr_metadata->sem, 0, 0);
+				if (res !=0) {
+					std::cout << __FILE__ << ":" << __LINE__ << " - " << std::flush;
+					perror("sem_init failed"); 
+					exit(1);
+				}
+				res = pthread_create(&t, NULL, wait_for_data, (void*) rr_metadata);
+				if (res != 0) {
+					std::cout << "error creation of capio server thread" << std::endl;
+					MPI_Finalize();
+					exit(1);
+				}
+				clients_remote_pending_reads[path_c].push_back(std::make_tuple(offset, nbytes, rr_metadata->sem));
+			}
 		}
 		else if(strncmp(buf_recv, "sending", 7) == 0) { //receiving a file
+			int pos = std::string((buf_recv + 8)).find(" ");
 			std::string path(buf_recv + 8);
+			path = path.substr(0, pos);
 			void* file_shm =  get_shm(path);
 			int bytes_received;
 			int source = status.MPI_SOURCE;
-			std::cout << "helper receiving data file " << path << " from process rank " << source << std::endl;
-			MPI_Recv(file_shm, 1024L * 1024 * 1024, MPI_BYTE, source, 0, MPI_COMM_WORLD, &status);//TODO; 4096 should be a parameter
-			MPI_Get_count(&status, MPI_CHAR, &bytes_received);
+			int offset = std::atoi(buf_recv + pos + 9);
+			std::cout << "buf_recv + pos + 9" << buf_recv + pos + 9 << std::endl;
+
+			std::cout << "helper receiving data file " << path << " from process rank " << source << "offset " << offset << std::endl;
+			MPI_Recv(file_shm + offset, 1024L * 1024 * 1024, MPI_BYTE, source, 0, MPI_COMM_WORLD, &status);//TODO; 4096 should be a parameter
+			MPI_Get_count(&status, MPI_CHAR, &bytes_received); //why in recv MPI_BYTE while ehre MPI_CHAR?
 			bytes_received *= sizeof(char);
 			std::cout << "helper " << rank << " sending wake up call to my server" << std::endl;
 			#ifdef MYDEBUG
@@ -765,7 +906,7 @@ void* capio_helper(void* pthread_arg) {
 			}	
 			free(tmp);
 			#endif
-			std::string msg = "ream " + path + + " " + std::to_string(bytes_received);
+			std::string msg = "ream " + path + + " " + std::to_string(bytes_received) + " " + std::to_string(offset);
 			sem_wait(sem_requests);
 			const char* c_str = msg.c_str();
 			memcpy(((char*)buf_requests.buf) + *buf_requests.i, c_str, strlen(c_str) + 1);
