@@ -97,7 +97,7 @@ void mtrace_init(void) {
 		return;
 	}
 	real_lseek = (off_t (*)(int, off_t, int)) dlsym(RTLD_NEXT, "lseek");
-	if (NULL == real_fstat) {	
+	if (NULL == real_lseek) {	
 		fprintf(stderr, "Error in `dlsym lseek`: %s\n", dlerror());
 		exit(1);
 		return;
