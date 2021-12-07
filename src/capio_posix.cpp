@@ -11,10 +11,9 @@
 #include <unistd.h>
 #include <stdio.h>
 #include <string.h>
-#include <stddef.h>
+#include <dirent.h>
 #include <sys/stat.h>
 #include <sys/mman.h>
-#include <stddef.h>
 #include <dlfcn.h>
 #include <fcntl.h>
 #include <semaphore.h>
@@ -30,6 +29,8 @@ int (*real_access)(const char *pathname, int mode) = NULL;
 int (*real_stat)(const char *__restrict pathname, struct stat *__restrict statbuf) = NULL;
 int (*real_fstat)(int fd, struct stat *statbuf) = NULL;
 off_t (*real_lseek) (int fd, off_t offset, int whence) = NULL;
+struct dirent* (*real_readdir) (DIR *dirp);
+DIR* (*real_opendir)(const char *name);
 
 std::unordered_map<int, std::pair<void*, long int>> files;
 circular_buffer buf_requests; 
@@ -99,6 +100,18 @@ void mtrace_init(void) {
 	real_lseek = (off_t (*)(int, off_t, int)) dlsym(RTLD_NEXT, "lseek");
 	if (NULL == real_lseek) {	
 		fprintf(stderr, "Error in `dlsym lseek`: %s\n", dlerror());
+		exit(1);
+		return;
+	}
+	real_readdir = (struct dirent* (*)(DIR*)) dlsym(RTLD_NEXT, "readdir");
+	if (NULL == real_readdir) {	
+		fprintf(stderr, "Error in `dlsym readdir`: %s\n", dlerror());
+		exit(1);
+		return;
+	}
+	real_opendir = (DIR* (*)(const char*)) dlsym(RTLD_NEXT, "opendir");
+	if (NULL == real_opendir) {	
+		fprintf(stderr, "Error in `dlsym opendir`: %s\n", dlerror());
 		exit(1);
 		return;
 	}
@@ -291,6 +304,7 @@ void read_from_disk(int fd, int offset, void* buffer, size_t count) {
 	}
 }
 
+
 extern "C" {
 
 int open(const char *pathname, int flags, ...) {
@@ -446,5 +460,16 @@ off_t lseek(int fd, off_t offset, int whence) {
 		return real_lseek(fd, offset, whence);
 	}
 }
+
+DIR* opendir(const char* name) {
+	printf("opendir of the directory %s captured\n", name);
+	return real_opendir(name);
+}
+
+struct dirent* readdir(DIR* dirp) { 
+	printf("readdir of the dir captured\n");
+	return real_readdir(dirp);
+}
+
 
 }
