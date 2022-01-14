@@ -118,7 +118,7 @@ void mtrace_init(void) {
 	buf_requests = get_circular_buffer();
 	sem_requests = get_sem_requests();
 	sem_new_msgs = sem_open("sem_new_msgs", O_RDWR);
-	sem_response = sem_open(("sem_response" + std::to_string(getpid())).c_str(),  O_CREAT | O_RDWR, S_IRUSR | S_IWUSR, 0);
+	sem_response = sem_open(("sem_response_read" + std::to_string(getpid())).c_str(),  O_CREAT | O_RDWR, S_IRUSR | S_IWUSR, 0);
 	sem_write = sem_open(("sem_write" + std::to_string(getpid())).c_str(),  O_CREAT | O_RDWR, S_IRUSR | S_IWUSR, 0);
 	buf_response = (int*) create_shm("buf_response" + std::to_string(getpid()), 4096);
 	i_resp = 0;

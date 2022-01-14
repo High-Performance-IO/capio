@@ -59,13 +59,31 @@ std::unordered_map<std::string, char*> files_location;
 // node -> rank
 std::unordered_map<std::string, int> nodes_helper_rank;
 
-// path -> (pid, fd, numbytes)
+/*
+ *
+ * It contains all the reads requested by local processes to read files that are in the local node for which the data is not yet avaiable.
+ * path -> [(pid, fd, numbytes), ...]
+ *
+ */
+
 std::unordered_map<std::string, std::vector<std::tuple<int, int, long int>>>  pending_reads;
 
-// path -> [(pid, fd, numbytes), ...]
+/*
+ *
+ * It contains all the reads requested to the remote nodes that are not yet satisfied 
+ * path -> [(pid, fd, numbytes), ...]
+ *
+ */
+
 std::unordered_map<std::string, std::list<std::tuple<int, int, long int>>>  my_remote_pending_reads;
 
-// path -> [(offset, numbytes, sem_pointer), ...]
+/*
+ *
+ * It contains all the read requested by other nodes for which the data is not yet avaiable 
+ * path -> [(offset, numbytes, sem_pointer), ...]
+ *
+ */
+
 std::unordered_map<std::string, std::list<std::tuple<long int, long int, sem_t*>>> clients_remote_pending_reads;
 
 // it contains the file saved on disk
@@ -76,10 +94,15 @@ std::unordered_set<std::string> on_disk;
 
 char node_name[MPI_MAX_PROCESSOR_NAME];
 
+struct rw_sems {
+	sem_t* sem_write;
+	sem_t* sem_read;
+};
+
 circular_buffer buf_requests; 
 sem_t* sem_requests;
 sem_t* sem_new_msgs;
-std::unordered_map<int, sem_t*> sems_response;
+std::unordered_map<int, struct rw_sems> sems_response;
 std::unordered_map<int, sem_t*> sems_write;
 static int index_not_read = 0;
 
@@ -94,7 +117,10 @@ void sig_term_handler(int signum, siginfo_t *info, void *ptr) {
 	}
 	for (auto& pair : response_buffers) {
 		shm_unlink(("buf_response" + std::to_string(pair.first)).c_str()); 
-		sem_unlink(("sem_response" + std::to_string(pair.first)).c_str());
+		sem_unlink(("sem_response_read" + std::to_string(pair.first)).c_str());
+		std::cout <<  "unlink " << "sem_response_read" + std::to_string(pair.first) << std::endl;
+		std::cout <<  "unlink " << "sem_response_write" + std::to_string(pair.first) << std::endl;
+		sem_unlink(("sem_response_write" + std::to_string(pair.first)).c_str());
 		sem_unlink(("sem_write" + std::to_string(pair.first)).c_str());
 		shm_unlink(("caching_info" + std::to_string(pair.first)).c_str()); 
 		shm_unlink(("caching_info_size" + std::to_string(pair.first)).c_str()); 
@@ -249,7 +275,7 @@ bool check_remote_file(const std::string& file_name, int rank, std::string path_
     bool res = true;
     struct flock lock;
     memset(&lock, 0, sizeof(lock));
-    lock.l_type = F_RDLCK;    /* read/write (exclusive) lock */
+    lock.l_type = F_RDLCK;    /* shared lock for read*/
     lock.l_whence = SEEK_SET; /* base for seek offsets */
     lock.l_start = 0;         /* 1st byte in file */
     lock.l_len = 0;           /* 0 here means 'until EOF' */
@@ -331,9 +357,14 @@ void handle_open(char* str, char* p, int rank) {
 	std::cout << "pid " << pid << std::endl;
 	if (sems_response.find(pid) == sems_response.end()) {
 		std::cout << "opening sem_response" << std::endl;
-		sems_response[pid] = sem_open(("sem_response" + std::to_string(pid)).c_str(), O_RDWR);
-		if (sems_response[pid] == SEM_FAILED) {
-			std::cout << "error creating the response semafore for pid " << pid << std::endl;  	
+		sems_response[pid].sem_read = sem_open(("sem_response_read" + std::to_string(pid)).c_str(), O_RDWR);
+		if (sems_response[pid].sem_read == SEM_FAILED) {
+			std::cout << "error creating the read response semafore for pid " << pid << std::endl;  	
+		}
+		sems_response[pid].sem_write = sem_open(("sem_response_write" + std::to_string(pid)).c_str(),  O_CREAT | O_RDWR, S_IRUSR | S_IWUSR, 1);
+		std::cout << "sem_response_write" + std::to_string(pid)<< std::endl;
+		if (sems_response[pid].sem_write == SEM_FAILED) {
+			std::cout << "error creating the read response semafore for pid " << pid << std::endl;  	
 		}
 		sems_write[pid] = sem_open(("sem_write" + std::to_string(pid)).c_str(), O_RDWR);
 		if (sems_write[pid] == SEM_FAILED) {
@@ -369,12 +400,14 @@ void handle_open(char* str, char* p, int rank) {
 	*caching_info[pid].second += 2;
 	std::cout << "fd " << fd << "inserted in caching and caching info size = " << *caching_info[pid].second << std::endl; 
 	std::cout << "before post sems_respons" << std::endl;
-	std::cout << sems_response[pid] << std::endl;
+	std::cout << sems_response[pid].sem_read << std::endl;
+	sem_wait(sems_response[pid].sem_write); 
 	std::pair<void*, int> tmp_pair = response_buffers[pid];
 	((int*) tmp_pair.first)[tmp_pair.second] = fd; 
 	++response_buffers[pid].second;
 	std::cout << "before post sems_respons 2" << std::endl;
-	sem_post(sems_response[pid]);
+	sem_post(sems_response[pid].sem_write);
+	sem_post(sems_response[pid].sem_read); 
 	std::cout << "after post sems_respons" << std::endl;
 	if (files_metadata.find(path) == files_metadata.end()) {
 		std::cout << "server " << rank << "updating file metadata for " << path << std::endl;
@@ -404,12 +437,14 @@ void handle_pending_read(int pid, int fd, long int process_offset, long int coun
 	free(tmp);
 	#endif
 
+	sem_wait(sems_response[pid].sem_write); 
 	std::pair<void*, int> tmp_pair = response_buffers[pid];
 	((int*) tmp_pair.first)[tmp_pair.second] = process_offset; 
 	processes_files[pid][fd].second += count;
 	++response_buffers[pid].second;
 	//TODO: check if the file was moved to the disk
-	sem_post(sems_response[pid]); 
+	sem_post(sems_response[pid].sem_write); 
+	sem_post(sems_response[pid].sem_read); 
 
 }
 
@@ -456,7 +491,7 @@ void handle_write(char* str, char* p, int rank) {
 		std::cout << "updated caching info of file " << path << std::endl;
 		on_disk.insert(path);
 	}
-	sem_post(sems_response[pid]);
+	sem_post(sems_response[pid].sem_read);
 	//char* tmp = (char*) malloc(data_size);
 	//memcpy(tmp, processes_files[pid][fd].first, data_size); 
 	//for (int i = 0; i < data_size; ++i) {
@@ -464,7 +499,7 @@ void handle_write(char* str, char* p, int rank) {
 	//}
 	//free(tmp);
 	auto it = pending_reads.find(path);
-	if (it != pending_reads.end()) { //TODO: works only if a file have at most one pending read
+	if (it != pending_reads.end()) {
 		sem_wait(sems_write[pid]);
 		auto& pending_reads_this_file = it->second;	
 		int i = 0;
@@ -520,49 +555,45 @@ void handle_write(char* str, char* p, int rank) {
 	}
 }
 
-void handle_read(char* str, char* p, int rank) {
-	std::cout << "server handling a read" << std::endl;
-	int pid = strtol(str + 5, &p, 10);;
-	int fd = strtol(p, &p, 10);
-	long int count = strtol(p, &p, 10);
-	std::cout << "pid " << pid << std::endl;
-	std::cout << "fd " << fd << std::endl;
-	std::cout << "count " << count << std::endl;
-	if (processes_files[pid][fd].second == 0 && files_location.find(processes_files_metadata[pid][fd]) == files_location.end()) {
-		check_remote_file("files_location.txt", rank, processes_files_metadata[pid][fd]);
-		std::cout << "read files_location.txt " << std::endl;
-		if (files_location.find(processes_files_metadata[pid][fd]) == files_location.end()) {
-			std::cout << "read before relative write" << std::endl;
-			pending_reads[processes_files_metadata[pid][fd]].push_back(std::make_tuple(pid, fd, count));
-			return;
-		}
-	}
-	if (files_location[processes_files_metadata[pid][fd]] == node_name) {
+/*
+ * Multithread function
+ *
+ */
+
+void handle_local_read(int pid, int fd, long int count) {
 		std::cout << "read local file" << std::endl;
 		std::string path = processes_files_metadata[pid][fd];
 		long int file_size = *files_metadata[path].second;
 		int process_offset = processes_files[pid][fd].second;
-	    if (process_offset + count > file_size) {
+		if (process_offset + count > file_size) {
 			std::cout << "error: attempt to read a portion of a file that does not exist" << std::endl;
 			pending_reads[path].push_back(std::make_tuple(pid, fd, count));
 			return;
 		}
-		#ifdef MYDEBUG
+#ifdef MYDEBUG
 		int* tmp = (int*) malloc(count);
 		memcpy(tmp, processes_files[pid][fd].first + process_offset, count); 
 		for (int i = 0; i < count / sizeof(int); ++i) {
 			std::cout << "server local read tmp[i] " << tmp[i] << std::endl;
 		}
 		free(tmp);
-		#endif
+#endif
+		sem_wait(sems_response[pid].sem_write);
 		std::pair<void*, int> tmp_pair = response_buffers[pid];
 		((int*) tmp_pair.first)[tmp_pair.second] = process_offset; 
 		processes_files[pid][fd].second += count;
 		++response_buffers[pid].second;
 		//TODO: check if the file was moved to the disk
-		sem_post(sems_response[pid]); 
-	}
-	else {
+		sem_post(sems_response[pid].sem_write); 
+		sem_post(sems_response[pid].sem_read); 
+}
+
+/*
+ * Multithread function
+ *
+ */
+
+void handle_remote_read(int pid, int fd, long int count, int rank) {
 		const char* msg;
 		std::string str_msg;
 		std::cout << " files_location[processes_files_metadata[pid][fd]] " << files_location[processes_files_metadata[pid][fd]] << std::endl;
@@ -575,7 +606,146 @@ void handle_read(char* str, char* p, int rank) {
 		std::cout << "msg sent to dest " << dest << std::endl;
 		std::cout << "read remote file" << std::endl;
 		my_remote_pending_reads[processes_files_metadata[pid][fd]].push_back(std::make_tuple(pid, fd, count));
+}
+
+struct wait_for_file_metadata{
+	int pid;
+	int fd;
+	long int count;
+};
+
+void* wait_for_file(void* pthread_arg) {
+	struct wait_for_file_metadata* metadata = (struct wait_for_file_metadata*) pthread_arg;
+	int pid = metadata->pid;
+	int fd = metadata-> fd;
+	long int count = metadata->count;
+	//check if the data is created
+	FILE* fp;
+	bool found = false;
+	char * line = NULL;
+    size_t len = 0;
+    ssize_t read;
+    struct flock lock;
+    memset(&lock, 0, sizeof(lock));
+    lock.l_type = F_RDLCK;    /* shared lock for read*/
+    lock.l_whence = SEEK_SET; /* base for seek offsets */
+    lock.l_start = 0;         /* 1st byte in file */
+    lock.l_len = 0;           /* 0 here means 'until EOF' */
+    lock.l_pid = getpid();    /* process id */
+	int rank;
+	MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+    int fd_locations; /* file descriptor to identify a file within a process */
+
+	
+	
+	std::string path_to_check(processes_files_metadata[pid][fd]);
+	const char* path_to_check_cstr = path_to_check.c_str();
+
+	while (!found) {
+		sleep(1);
+		int tot_chars = 0;
+    	fp = fopen("files_location.txt", "r");
+		if (fp == NULL) {
+			std::cout << "capio server " << rank << " failed to open the location file" << std::endl;
+			MPI_Finalize();
+			exit(1);
 		}
+		fd_locations = fileno(fp);
+		if (fcntl(fd_locations, F_SETLKW, &lock) < 0) {
+        	std::cout << "capio server " << rank << " failed to lock the file" << std::endl;
+        	close(fd_locations);
+			MPI_Finalize();
+			exit(1);
+    	}
+		fseek(fp, tot_chars, SEEK_SET);
+
+        while ((read = getline(&line, &len, fp)) != -1 && !found) {
+        	printf("Retrieved line of length %zu:\n", read);
+        	printf("%s", line);
+			if (read != -1) {
+				tot_chars += read;
+				char path[1024]; //TODO: heap memory
+				int i = 0;
+				while(line[i] != ' ') {
+					path[i] = line[i];
+					++i;
+				}
+				path[i] = '\0';
+				//char* path = strtok_r(p_line, " ", &p_tmp);
+				std::cout << "path " << path << std::endl;
+				//char* node_str = strtok_r(NULL, "\n", &p_tmp);
+				char node_str[1024]; //TODO: heap memory 
+				++i;
+				int j = 0;
+				while(line[i] != '\n') {
+					node_str[j] = line[i];
+					++i;
+					++j;
+				}
+				node_str[j] = '\0';
+				printf("node %s\n", node_str);
+				files_location[path_to_check] = (char*) malloc(sizeof(node_str) + 1); //TODO:free the memory
+				if (strcmp(path, path_to_check_cstr) == 0) {
+					found = true;
+					strcpy(files_location[path_to_check], node_str);
+				}
+			}
+		}
+		/* Release the lock explicitly. */
+		lock.l_type = F_UNLCK;
+		if (fcntl(fd, F_SETLK, &lock) < 0) {
+			std::cout << "reader " << rank << " failed to unlock the file" << std::endl;
+		}
+		fclose(fp);
+	}
+	//check if the file is local or remote
+	if (files_location[path_to_check] == node_name) {
+			handle_local_read(pid, fd, count);
+	}
+	else {
+			handle_remote_read(pid, fd, count, rank);
+	}
+
+	free(metadata);
+	return nullptr;
+}
+
+
+void handle_read(char* str, char* p, int rank) {
+	std::cout << "server handling a read" << std::endl;
+	int pid = strtol(str + 5, &p, 10);
+	int fd = strtol(p, &p, 10);
+	long int count = strtol(p, &p, 10);
+	std::cout << "pid " << pid << std::endl;
+	std::cout << "fd " << fd << std::endl;
+	std::cout << "count " << count << std::endl;
+	if (processes_files[pid][fd].second == 0 && files_location.find(processes_files_metadata[pid][fd]) == files_location.end()) {
+		check_remote_file("files_location.txt", rank, processes_files_metadata[pid][fd]);
+		std::cout << "read files_location.txt " << std::endl;
+		if (files_location.find(processes_files_metadata[pid][fd]) == files_location.end()) {
+			std::cout << "read before relative write" << std::endl;
+			std::string path = processes_files_metadata[pid][fd];
+			//launch a thread that checks when the file is created
+			pthread_t t;
+			struct wait_for_file_metadata* metadata = (struct wait_for_file_metadata*)  malloc(sizeof(wait_for_file_metadata));
+			metadata->pid = pid;
+			metadata->fd = fd;
+			int res = pthread_create(&t, NULL, wait_for_file, (void*) metadata);
+			if (res != 0) {
+				std::cout << "error creation of capio server thread" << std::endl;
+				MPI_Finalize();
+				exit(1);
+			}
+
+			return;
+		}
+	}
+	if (files_location[processes_files_metadata[pid][fd]] == node_name) {
+		handle_local_read(pid, fd, count);
+	}
+	else {
+		handle_remote_read(pid, fd, count, rank);
+	}
 	
 }
 
@@ -619,12 +789,14 @@ void handle_remote_read(char* str, char* p, int rank) {
 			}
 			free(tmp);
 			#endif
+			sem_wait(sems_response[pid].sem_write); 
 			std::pair<void*, int> tmp_pair = response_buffers[pid];
 			((int*) tmp_pair.first)[tmp_pair.second] = processes_files[pid][fd].second; 
 			processes_files[pid][fd].second += count;
 			//TODO: check if there is data that can be read in the local memory file
 			++response_buffers[pid].second;
-			sem_post(sems_response[pid]); 
+			sem_post(sems_response[pid].sem_write); 
+			sem_post(sems_response[pid].sem_read); 
 			if (it == list_remote_reads.begin()) {
 				list_remote_reads.erase(it);
 				it = list_remote_reads.begin();
