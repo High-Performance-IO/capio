@@ -6,6 +6,7 @@
 #include <list>
 #include <iostream>
 #include <pthread.h>
+#include <sstream>
 
 #include <unistd.h>
 #include <stdio.h>
@@ -448,12 +449,14 @@ void handle_pending_read(int pid, int fd, long int process_offset, long int coun
 
 }
 
-void handle_write(char* str, char* p, int rank) {
+void handle_write(const char* str, int rank) {
 	//check if another process is waiting for this data
 	std::cout << "server handling a write" << std::endl;
-	int pid = strtol(str + 5, &p, 10);;
-	int fd = strtol(p, &p, 10);
-	long int data_size = strtol(p, &p, 10);
+	std::string request;
+	int pid, fd, res;
+	long int data_size;
+	std::istringstream stream(str);
+	stream >> request >> pid >> fd >> data_size;
 	std::cout << "pid " << pid << std::endl;
 	std::cout << "fd " << fd << std::endl;
 	std::cout << "data_size " << data_size << std::endl;
@@ -711,11 +714,13 @@ void* wait_for_file(void* pthread_arg) {
 }
 
 
-void handle_read(char* str, char* p, int rank) {
+void handle_read(char* str, int rank) {
 	std::cout << "server handling a read" << std::endl;
-	int pid = strtol(str + 5, &p, 10);
-	int fd = strtol(p, &p, 10);
-	long int count = strtol(p, &p, 10);
+	std::string request;
+	int pid, fd;
+	long int count;
+	std::istringstream stream(str);
+	stream >> request >> pid >> fd >> count;
 	std::cout << "pid " << pid << std::endl;
 	std::cout << "fd " << fd << std::endl;
 	std::cout << "count " << count << std::endl;
@@ -815,9 +820,13 @@ void handle_remote_read(char* str, char* p, int rank) {
 
 
 void read_next_msg(int rank) {
+	std::cout << "debug 1" << std::endl;
 	sem_wait(sem_new_msgs);
+	std::cout << "debug 2" << std::endl;
 	char str[4096];
+	std::cout << "debug 3" << std::endl;
 	std::fill(str, str + 4096, 0);
+	std::cout << "debug 4" << std::endl;
 	//memcpy(buf_requests.buf, pathname, strlen(pathname));
 	int k = buf_requests.k;
 	std::cout << "k = " << k << std::endl;
@@ -828,10 +837,10 @@ void read_next_msg(int rank) {
 		++k;
 		++i;
 	}
-	str[k] = ((char*) buf_requests.buf)[k];
+	str[i] = ((char*) buf_requests.buf)[k];
 	buf_requests.k = k + 1;
 	char* p = str;
-	printf("msg read after loop: %s\n", str);
+	std::cout << "msg read after loop: " << str << std::endl;
 	index_not_read += strlen(str) + 1;
 	is_open = strncmp(str, "open", 4) == 0;
 	std::cout << "is_open " << is_open << std::endl;
@@ -842,13 +851,15 @@ void read_next_msg(int rank) {
 	else {
 		bool is_write = strncmp(str, "writ", 4) == 0;
 		if (is_write) {
-			handle_write(str, p, rank);
+			str[i + 1] ='\0';
+			handle_write(str, rank);
 		}
 		else {
 		bool is_read = strncmp(str, "read", 4) == 0;
 			if (is_read) {
-				handle_read(str, p, rank);
-		}
+				str[i + 1] ='\0';
+				handle_read(str, rank);
+			}
 			else {
 				bool is_close = strncmp(str, "clos", 4) == 0;
 				if (is_close) { //TODO: more cleaning
