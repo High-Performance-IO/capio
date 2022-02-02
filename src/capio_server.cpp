@@ -702,7 +702,7 @@ void* wait_for_file(void* pthread_arg) {
 		fclose(fp);
 	}
 	//check if the file is local or remote
-	if (files_location[path_to_check] == node_name) {
+	if (strcmp(files_location[path_to_check], node_name) == 0) {
 			handle_local_read(pid, fd, count);
 	}
 	else {
@@ -745,7 +745,7 @@ void handle_read(char* str, int rank) {
 			return;
 		}
 	}
-	if (files_location[processes_files_metadata[pid][fd]] == node_name) {
+	if (strcmp(files_location[processes_files_metadata[pid][fd]], node_name) == 0) {
 		handle_local_read(pid, fd, count);
 	}
 	else {
