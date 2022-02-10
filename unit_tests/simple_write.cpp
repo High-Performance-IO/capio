@@ -5,9 +5,9 @@
 #include <mpi.h>
 
 void initialize_data(int* data, long int num_elements, long int num_writes, int rank) {
-	for (int k = 0; k < num_writes; ++k) {
-		for (int i = 0; i < num_elements; ++i) {
-			data[i + k * num_elements] = i + k * num_elements + rank;
+	for (long int k = 0; k < num_writes; ++k) {
+		for (long int i = 0; i < num_elements; ++i) {
+			data[i + k * num_elements] = i % 10;
 		}
 	}
 }
@@ -28,9 +28,10 @@ int main (int argc, char** argv) {
 	initialize_data(data, num_elements, num_writes, rank);
 	std::string file_name = "file_" + std::to_string(rank) + ".txt";
 	int fd = open(file_name.c_str(), O_CREAT | O_WRONLY, 0644);
-	for (int i = 0; i < num_writes; ++i) {
-		int res, k = 0;
-    	int num_elements_written;
+	for (long int i = 0; i < num_writes; ++i) {
+		int res = 0;
+		long int k = 0;
+    	long int num_elements_written;
     	while (k < num_elements) {
         	res = write(fd, data + i * num_elements + k, sizeof(int) * (num_elements - k));
         	num_elements_written = (res / sizeof(int));

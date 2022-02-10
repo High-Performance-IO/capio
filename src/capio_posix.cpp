@@ -34,7 +34,7 @@ DIR* (*real_opendir)(const char *name);
 
 std::unordered_map<int, std::pair<void*, long int>> files;
 circular_buffer buf_requests; 
-int* buf_response;
+long int* buf_response;
 int i_resp;
 sem_t* sem_requests;
 sem_t* sem_new_msgs;
@@ -120,7 +120,7 @@ void mtrace_init(void) {
 	sem_new_msgs = sem_open("sem_new_msgs", O_RDWR);
 	sem_response = sem_open(("sem_response_read" + std::to_string(getpid())).c_str(),  O_CREAT | O_RDWR, S_IRUSR | S_IWUSR, 0);
 	sem_write = sem_open(("sem_write" + std::to_string(getpid())).c_str(),  O_CREAT | O_RDWR, S_IRUSR | S_IWUSR, 0);
-	buf_response = (int*) create_shm("buf_response" + std::to_string(getpid()), 4096);
+	buf_response = (long int*) create_shm("buf_response" + std::to_string(getpid()), 4096);
 	i_resp = 0;
 	client_caching_info = (int*) create_shm("caching_info" + std::to_string(getpid()), 4096);
 	caching_info_size = (int*) create_shm("caching_info_size" + std::to_string(getpid()), sizeof(int));
@@ -176,7 +176,7 @@ int add_close_request(int fd) {
 	return 0;
 }
 
-int add_read_request(int fd, size_t count) {
+long int add_read_request(int fd, size_t count) {
 	std::cout << "read request" << std::endl;
 	std::string str = "read " + std::to_string(getpid()) + " " + std::to_string(fd) + " " + std::to_string(count);
 	const char* c_str = str.c_str();
@@ -194,7 +194,7 @@ int add_read_request(int fd, size_t count) {
 	std::cout << "read before wait sem response" << std::endl;
 	sem_wait(sem_response);
 	std::cout << "read after response" << std::endl;
-	int offset = buf_response[i_resp];
+	long int offset = buf_response[i_resp];
 	++i_resp;
 	return offset;
 }
@@ -219,8 +219,18 @@ void add_write_request(int fd, size_t count) {
 	return;
 }
 
-void read_shm(void* shm, int offset, void* buffer, size_t count) {
+void read_shm(void* shm, long int offset, void* buffer, size_t count) {
 	memcpy(buffer, ((char*)shm) + offset, count); 
+#ifdef MYDEBUG
+		int* tmp = (int*) malloc(count);
+		memcpy(tmp, ((char*)shm) + offset, count); 
+		for (int i = 0; i < count / sizeof(int); ++i) {
+			if (tmp[i] != i % 10) 
+				std::cerr << "posix library local read tmp[i] " << tmp[i] << std::endl;
+		}
+		free(tmp);
+#endif
+
 }
 
 void write_shm(void* shm, size_t offset, const void* buffer, size_t count) {	
@@ -363,7 +373,7 @@ ssize_t read(int fd, void *buffer, size_t count) {
 	printf("reading of the file %i captured\n", fd);
 	if (capio_files_descriptors.find(fd) != capio_files_descriptors.end()) {
 		printf("calling my read...\n");
-		int offset = add_read_request(fd, count);
+		long int offset = add_read_request(fd, count);
 		bool in_shm = check_cache(fd);
 		if (in_shm) {
 			std::cout << "reading from shared memory file " << fd << std::endl;

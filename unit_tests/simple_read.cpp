@@ -1,13 +1,17 @@
 #include <iostream>
+#include <limits>
 #include <sys/stat.h>
 #include <fcntl.h>
 #include <unistd.h>
 #include <mpi.h>
 
-int sum_all(int *data, int num_elements, int num_reads) {
+int sum_all(int *data, long int num_elements, long int num_reads) {
 	int sum = 0;
-	for (int k = 0; k < num_reads; ++k) {
-		for (int i = 0; i < num_elements; ++i) {
+	for (long int k = 0; k < num_reads; ++k) {
+		for (long int i = 0; i < num_elements; ++i) {
+        	if (sum > std::numeric_limits<int>::max() - data[i + k * num_elements]) {
+            	sum = 0;
+        	}
 				sum += data[i + k * num_elements];
 		}
 	}
@@ -34,11 +38,11 @@ int main (int argc, char** argv) {
 		return 0;
 	}*/
 	int* data = new int[num_elements * num_reads];
-	for (int i = 0; i < num_reads; ++i) {
-		int k = 0;
+	for (long int i = 0; i < num_reads; ++i) {
+		long int k = 0;
     	while (k < num_elements) {
-        	int read_res = read(fd, data + i * num_elements + k, sizeof(int) * (num_elements - k));
-        	int num_elements_read = (read_res / sizeof(int));
+        	long int read_res = read(fd, data + i * num_elements + k, sizeof(int) * (num_elements - k));
+        	long int num_elements_read = (read_res / sizeof(int));
         	std::cout << "num_elements_read " << num_elements_read << std::endl;
         	k += num_elements_read;
         	if (read_res < 0) {
