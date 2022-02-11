@@ -110,7 +110,6 @@ static int index_not_read = 0;
 sem_t internal_server_sem;
 
 void sig_term_handler(int signum, siginfo_t *info, void *ptr) {
-	std::cout << "handling sigterm" << std::endl;
 	//free all the memory used
 	for (auto& pair : files_metadata) {
 		shm_unlink(pair.first.c_str());
@@ -119,8 +118,6 @@ void sig_term_handler(int signum, siginfo_t *info, void *ptr) {
 	for (auto& pair : response_buffers) {
 		shm_unlink(("buf_response" + std::to_string(pair.first)).c_str()); 
 		sem_unlink(("sem_response_read" + std::to_string(pair.first)).c_str());
-		std::cout <<  "unlink " << "sem_response_read" + std::to_string(pair.first) << std::endl;
-		std::cout <<  "unlink " << "sem_response_write" + std::to_string(pair.first) << std::endl;
 		sem_unlink(("sem_response_write" + std::to_string(pair.first)).c_str());
 		sem_unlink(("sem_write" + std::to_string(pair.first)).c_str());
 		shm_unlink(("caching_info" + std::to_string(pair.first)).c_str()); 
@@ -225,7 +222,7 @@ void write_file_location(const std::string& file_name, int rank, std::string pat
     memset(&lock, 0, sizeof(lock));
     int fd;
     if ((fd = open(file_name.c_str(), O_WRONLY|O_APPEND, 0664)) == -1) {
-        std::cout << "writer " << rank << " error opening file, errno = " << errno << " strerror(errno): " << strerror(errno) << std::endl;
+        std::cerr << "writer " << rank << " error opening file, errno = " << errno << " strerror(errno): " << strerror(errno) << std::endl;
         MPI_Finalize();
         exit(1);
     }
@@ -239,7 +236,7 @@ void write_file_location(const std::string& file_name, int rank, std::string pat
     lock.l_pid = getpid();
 
     if (fcntl(fd, F_SETLKW, &lock) == -1) { // F_SETLK doesn't block, F_SETLKW does
-        std::cout << "write " << rank << "failed to lock the file" << std::endl;
+        std::cerr << "write " << rank << "failed to lock the file" << std::endl;
     }
     int res, k = 0;
     int num_elements_written;
@@ -256,12 +253,11 @@ void write_file_location(const std::string& file_name, int rank, std::string pat
 	file_location[len1 + len2 + len3] = '\n';
 	file_location[len1 + len2 + len3 + 1] = '\0';
 	res = write(fd, file_location, sizeof(char) * strlen(file_location));
-    printf("wrote file location: %s \n", file_location);
 	files_location[path_to_write] = node_name;
 	// Now release the lock explicitly.
     lock.l_type = F_UNLCK;
     if (fcntl(fd, F_SETLKW, &lock) == - 1) {
-        std::cout << "write " << rank << "failed to unlock the file" << std::endl;
+        std::cerr << "write " << rank << "failed to unlock the file" << std::endl;
     }
 	free(file_location);
     close(fd); // close the file: would unlock if needed
@@ -286,20 +282,18 @@ bool check_remote_file(const std::string& file_name, int rank, std::string path_
     //fd = open(file_name.c_str(), O_RDONLY);  /* -1 signals an error */
     fp = fopen(file_name.c_str(), "r");
 	if (fp == NULL) {
-		std::cout << "capio server " << rank << " failed to open the location file" << std::endl;
+		std::cerr << "capio server " << rank << " failed to open the location file" << std::endl;
 		return false;
 	}
 	fd = fileno(fp);
     if (fcntl(fd, F_SETLKW, &lock) < 0) {
-        std::cout << "capio server " << rank << " failed to lock the file" << std::endl;
+        std::cerr << "capio server " << rank << " failed to lock the file" << std::endl;
         close(fd);
         return false;
     }
 	const char* path_to_check_cstr = path_to_check.c_str();
 	bool found = false;
     while ((read = getline(&line, &len, fp)) != -1 && !found) {
-        printf("Retrieved line of length %zu:\n", read);
-        printf("%s", line);
 		char path[1024]; //TODO: heap memory
 		int i = 0;
 		while(line[i] != ' ') {
@@ -307,9 +301,6 @@ bool check_remote_file(const std::string& file_name, int rank, std::string path_
 			++i;
 		}
 		path[i] = '\0';
-		//char* path = strtok_r(p_line, " ", &p_tmp);
-		std::cout << "path " << path << std::endl;
-		//char* node_str = strtok_r(NULL, "\n", &p_tmp);
 		char node_str[1024]; //TODO: heap memory 
 		++i;
 		int j = 0;
@@ -319,7 +310,6 @@ bool check_remote_file(const std::string& file_name, int rank, std::string path_
 			++j;
 		}
 		node_str[j] = '\0';
-		printf("node %s\n", node_str);
 		files_location[path_to_check] = (char*) malloc(sizeof(node_str) + 1); //TODO:free the memory
 		if (strcmp(path, path_to_check_cstr) == 0) {
 			found = true;
@@ -331,7 +321,7 @@ bool check_remote_file(const std::string& file_name, int rank, std::string path_
     /* Release the lock explicitly. */
     lock.l_type = F_UNLCK;
     if (fcntl(fd, F_SETLK, &lock) < 0) {
-        std::cout << "reader " << rank << " failed to unlock the file" << std::endl;
+        std::cerr << "reader " << rank << " failed to unlock the file" << std::endl;
         res = false;
     }
     fclose(fp);
@@ -345,7 +335,6 @@ void flush_file_to_disk(int pid, int fd) {
 	long int num_bytes_written, k = 0;
 	while (k < file_size) {
     	num_bytes_written = write(fd, ((char*) buf) + k, (file_size - k));
-    	std::cout << "num_bytes_written " << num_bytes_written << std::endl;
     	k += num_bytes_written;
     }
 }
@@ -355,21 +344,18 @@ void flush_file_to_disk(int pid, int fd) {
 void handle_open(char* str, char* p, int rank) {
 	int pid;
 	pid = strtol(str + 5, &p, 10);
-	std::cout << "pid " << pid << std::endl;
 	if (sems_response.find(pid) == sems_response.end()) {
-		std::cout << "opening sem_response" << std::endl;
 		sems_response[pid].sem_read = sem_open(("sem_response_read" + std::to_string(pid)).c_str(), O_RDWR);
 		if (sems_response[pid].sem_read == SEM_FAILED) {
-			std::cout << "error creating the read response semafore for pid " << pid << std::endl;  	
+			std::cerr << "error creating the read response semafore for pid " << pid << std::endl;  	
 		}
 		sems_response[pid].sem_write = sem_open(("sem_response_write" + std::to_string(pid)).c_str(),  O_CREAT | O_RDWR, S_IRUSR | S_IWUSR, 1);
-		std::cout << "sem_response_write" + std::to_string(pid)<< std::endl;
 		if (sems_response[pid].sem_write == SEM_FAILED) {
-			std::cout << "error creating the read response semafore for pid " << pid << std::endl;  	
+			std::cerr << "error creating the read response semafore for pid " << pid << std::endl;  	
 		}
 		sems_write[pid] = sem_open(("sem_write" + std::to_string(pid)).c_str(), O_RDWR);
 		if (sems_write[pid] == SEM_FAILED) {
-			std::cout << "error creating the write semafore for pid " << pid << std::endl;  	
+			std::cerr << "error creating the write semafore for pid " << pid << std::endl;  	
 		}
 		response_buffers[pid].first = (long int*) get_shm("buf_response" + std::to_string(pid));
 		response_buffers[pid].second = 0; 
@@ -377,10 +363,9 @@ void handle_open(char* str, char* p, int rank) {
 		caching_info[pid].second = (int*) get_shm("caching_info_size" + std::to_string(pid));
 	}
 	std::string path(p + 1);
-	std::cout << "path file " << path << std::endl;
 	int fd = open(path.c_str(), O_CREAT | O_RDWR, S_IRUSR | S_IRWXU);
 	if (fd == -1) {
-	std::cout << "capio server, error to open the file " << path << std::endl;
+	std::cerr << "capio server, error to open the file " << path << std::endl;
 	MPI_Finalize();
 	exit(1);
 	}
@@ -392,40 +377,28 @@ void handle_open(char* str, char* p, int rank) {
 		caching_info[pid].first[index + 1] = 0;
 	}
 	else {
-		std::cout << "open file is on disk" << std::endl;
 		p_shm = nullptr;
 		caching_info[pid].first[index + 1] = 1;
 	}
 		//TODO: check the size that the user wrote in the configuration file
 	processes_files[pid][fd] = std::pair<void*, int>(p_shm, 0); //TODO: what happens if a process open the same file twice?
 	*caching_info[pid].second += 2;
-	std::cout << "fd " << fd << "inserted in caching and caching info size = " << *caching_info[pid].second << std::endl; 
-	std::cout << "before post sems_respons" << std::endl;
-	std::cout << sems_response[pid].sem_read << std::endl;
 	sem_wait(sems_response[pid].sem_write); 
 	std::pair<void*, int> tmp_pair = response_buffers[pid];
 	((long int*) tmp_pair.first)[tmp_pair.second] = fd; 
 	++response_buffers[pid].second;
-	std::cout << "before post sems_respons 2" << std::endl;
 	sem_post(sems_response[pid].sem_write);
 	sem_post(sems_response[pid].sem_read); 
-	std::cout << "after post sems_respons" << std::endl;
 	if (files_metadata.find(path) == files_metadata.end()) {
-		std::cout << "server " << rank << "updating file metadata for " << path << std::endl;
 		files_metadata[path].first = processes_files[pid][fd].first;	
-		std::cout<< "debug 1" << std::endl;
 		files_metadata[path].second = create_shm_long_int(path + "_size");	
-		std::cout<< "debug 2" << std::endl;
 
 		if (files_metadata.find(path) == files_metadata.end()) {//debug
-			std::cout << "server " << rank << " error updating" <<std ::endl;
+			std::cerr << "server " << rank << " error updating" <<std ::endl;
 			exit(1);
 		}
-		std::cout<< "debug 3" << std::endl;
 	}
-	std::cout<< "debug 4" << std::endl;
 	processes_files_metadata[pid][fd] = path;
-	std::cout<< "debug 5" << std::endl;
 }
 
 void handle_pending_read(int pid, int fd, long int process_offset, long int count) {
@@ -451,26 +424,19 @@ void handle_pending_read(int pid, int fd, long int process_offset, long int coun
 
 void handle_write(const char* str, int rank) {
 	//check if another process is waiting for this data
-	std::cout << "server handling a write" << std::endl;
 	std::string request;
 	int pid, fd, res;
 	long int data_size;
 	std::istringstream stream(str);
 	stream >> request >> pid >> fd >> data_size;
-	std::cout << "pid " << pid << std::endl;
-	std::cout << "fd " << fd << std::endl;
-	std::cout << "data_size " << data_size << std::endl;
 	if (processes_files[pid][fd].second == 0) {
 		write_file_location("files_location.txt", rank, processes_files_metadata[pid][fd]);
-		std::cout << "wrote files_location.txt " << std::endl;
 	}
 	processes_files[pid][fd].second += data_size;
 	std::string path = processes_files_metadata[pid][fd];
 	*files_metadata[path].second += data_size; //works only if there is only one writer at time	for each file
 	total_bytes_shm += data_size;
-	std::cout << "total_bytes_shm = " << total_bytes_shm << " max_shm_size = " << max_shm_size << std::endl;
 	if (total_bytes_shm > max_shm_size && on_disk.find(path) == on_disk.end()) {
-		std::cout << "flushing file " << fd << " to disk" << std::endl;
 		shm_full = true;
 		flush_file_to_disk(pid, fd);
 		int i = 0;
@@ -484,23 +450,15 @@ void handle_write(const char* str, int rank) {
 			}
 		}
 		if (i >= *caching_info[pid].second) {
-			std::cout << "capio error: check caching info, file not found" << std::endl;
 			MPI_Finalize();
 			exit(1);
 		}
 		if (found) {
 			caching_info[pid].first[i + 1] = 1;
 		}
-		std::cout << "updated caching info of file " << path << std::endl;
 		on_disk.insert(path);
 	}
 	sem_post(sems_response[pid].sem_read);
-	//char* tmp = (char*) malloc(data_size);
-	//memcpy(tmp, processes_files[pid][fd].first, data_size); 
-	//for (int i = 0; i < data_size; ++i) {
-	//	std::cout << "tmp[i] " << tmp[i] << std::endl;
-	//}
-	//free(tmp);
 	auto it = pending_reads.find(path);
 	if (it != pending_reads.end()) {
 		sem_wait(sems_write[pid]);
@@ -517,8 +475,6 @@ void handle_write(const char* str, int rank) {
 				handle_pending_read(pending_pid, fd, process_offset, count);
 			}
 			pending_reads_this_file.erase(it_vec);
-			std::cout << "resolved a pending read" << std::endl;
-			std::cout << "pending reads for this file: " << pending_reads_this_file.size() << std::endl;
 			++i;
 		}
 	}
@@ -527,16 +483,12 @@ void handle_write(const char* str, int rank) {
 	}
 	auto it_client = clients_remote_pending_reads.find(path);
 	std::list<std::tuple<long int, long int, sem_t*>>::iterator it_list, prev_it_list;
-	std::cout << "server trying to resolve clients remote pending reads" << std::endl;
 	if (it_client !=  clients_remote_pending_reads.end()) {
-		std::cout << "debug inside if clients remote pending reads" << std::endl;
 		while (it_list != it_client->second.end()) {
 			long int offset = std::get<0>(*it_list);
 			long int nbytes = std::get<1>(*it_list);
-			std::cout << "offset " << offset << "nbytes " << nbytes << std::endl;
 			sem_t* sem = std::get<2>(*it_list);
 			if (offset + nbytes <  processes_files[pid][fd].second + data_size) {
-				std::cout << "server going to resolve one client remote pending read" << std::endl;		
 				sem_post(sem);
 				if (it_list == it_client->second.begin()) {
 					it_client->second.erase(it_list);
@@ -564,12 +516,10 @@ void handle_write(const char* str, int rank) {
  */
 
 void handle_local_read(int pid, int fd, long int count) {
-		std::cout << "read local file" << std::endl;
 		std::string path = processes_files_metadata[pid][fd];
 		long int file_size = *files_metadata[path].second;
 		long int process_offset = processes_files[pid][fd].second;
 		if (process_offset + count > file_size) {
-			std::cout << "error: attempt to read a portion of a file that does not exist" << std::endl;
 			pending_reads[path].push_back(std::make_tuple(pid, fd, count));
 			return;
 		}
@@ -600,15 +550,11 @@ void handle_local_read(int pid, int fd, long int count) {
 void handle_remote_read(int pid, int fd, long int count, int rank) {
 		const char* msg;
 		std::string str_msg;
-		std::cout << " files_location[processes_files_metadata[pid][fd]] " << files_location[processes_files_metadata[pid][fd]] << std::endl;
 		int dest = nodes_helper_rank[files_location[processes_files_metadata[pid][fd]]];
 		long int offset = processes_files[pid][fd].second;
 		str_msg = "read " + processes_files_metadata[pid][fd] + " " + std::to_string(rank) + " " + std::to_string(offset) + " " + std::to_string(count); 
 		msg = str_msg.c_str();
 		MPI_Send(msg, strlen(msg) + 1, MPI_CHAR, dest, 0, MPI_COMM_WORLD);
-		printf("server msg MPI_Send %s\n", msg);
-		std::cout << "msg sent to dest " << dest << std::endl;
-		std::cout << "read remote file" << std::endl;
 		my_remote_pending_reads[processes_files_metadata[pid][fd]].push_back(std::make_tuple(pid, fd, count));
 }
 
@@ -650,13 +596,11 @@ void* wait_for_file(void* pthread_arg) {
 		int tot_chars = 0;
     	fp = fopen("files_location.txt", "r");
 		if (fp == NULL) {
-			std::cout << "capio server " << rank << " failed to open the location file" << std::endl;
 			MPI_Finalize();
 			exit(1);
 		}
 		fd_locations = fileno(fp);
 		if (fcntl(fd_locations, F_SETLKW, &lock) < 0) {
-        	std::cout << "capio server " << rank << " failed to lock the file" << std::endl;
         	close(fd_locations);
 			MPI_Finalize();
 			exit(1);
@@ -664,8 +608,6 @@ void* wait_for_file(void* pthread_arg) {
 		fseek(fp, tot_chars, SEEK_SET);
 
         while ((read = getline(&line, &len, fp)) != -1 && !found) {
-        	printf("Retrieved line of length %zu:\n", read);
-        	printf("%s", line);
 			if (read != -1) {
 				tot_chars += read;
 				char path[1024]; //TODO: heap memory
@@ -675,9 +617,6 @@ void* wait_for_file(void* pthread_arg) {
 					++i;
 				}
 				path[i] = '\0';
-				//char* path = strtok_r(p_line, " ", &p_tmp);
-				std::cout << "path " << path << std::endl;
-				//char* node_str = strtok_r(NULL, "\n", &p_tmp);
 				char node_str[1024]; //TODO: heap memory 
 				++i;
 				int j = 0;
@@ -687,7 +626,6 @@ void* wait_for_file(void* pthread_arg) {
 					++j;
 				}
 				node_str[j] = '\0';
-				printf("node %s\n", node_str);
 				files_location[path_to_check] = (char*) malloc(sizeof(node_str) + 1); //TODO:free the memory
 				if (strcmp(path, path_to_check_cstr) == 0) {
 					found = true;
@@ -698,7 +636,7 @@ void* wait_for_file(void* pthread_arg) {
 		/* Release the lock explicitly. */
 		lock.l_type = F_UNLCK;
 		if (fcntl(fd, F_SETLK, &lock) < 0) {
-			std::cout << "reader " << rank << " failed to unlock the file" << std::endl;
+			std::cerr << "reader " << rank << " failed to unlock the file" << std::endl;
 		}
 		fclose(fp);
 	}
@@ -716,20 +654,14 @@ void* wait_for_file(void* pthread_arg) {
 
 
 void handle_read(char* str, int rank) {
-	std::cout << "server handling a read" << std::endl;
 	std::string request;
 	int pid, fd;
 	long int count;
 	std::istringstream stream(str);
 	stream >> request >> pid >> fd >> count;
-	std::cout << "pid " << pid << std::endl;
-	std::cout << "fd " << fd << std::endl;
-	std::cout << "count " << count << std::endl;
 	if (processes_files[pid][fd].second == 0 && files_location.find(processes_files_metadata[pid][fd]) == files_location.end()) {
 		check_remote_file("files_location.txt", rank, processes_files_metadata[pid][fd]);
-		std::cout << "read files_location.txt " << std::endl;
 		if (files_location.find(processes_files_metadata[pid][fd]) == files_location.end()) {
-			std::cout << "read before relative write" << std::endl;
 			std::string path = processes_files_metadata[pid][fd];
 			//launch a thread that checks when the file is created
 			pthread_t t;
@@ -738,7 +670,7 @@ void handle_read(char* str, int rank) {
 			metadata->fd = fd;
 			int res = pthread_create(&t, NULL, wait_for_file, (void*) metadata);
 			if (res != 0) {
-				std::cout << "error creation of capio server thread" << std::endl;
+				std::cerr << "error creation of capio server thread" << std::endl;
 				MPI_Finalize();
 				exit(1);
 			}
@@ -756,13 +688,10 @@ void handle_read(char* str, int rank) {
 }
 
 void handle_close(char* str, char* p) {
-	std::cout << "server handling close" << std::endl;
 	int pid = strtol(str + 5, &p, 10);;
 	int fd = strtol(p, &p, 10);
-	std::cout << "pid " << pid << std::endl;
-	std::cout << "fd " << fd << std::endl;
 	if (close(fd) == -1) {
-		std::cout << "capio server, error: impossible close the file with fd = " << fd << std::endl;
+		std::cerr << "capio server, error: impossible close the file with fd = " << fd << std::endl;
 		MPI_Finalize();
 		exit(1);
 	}
@@ -773,7 +702,6 @@ void handle_remote_read(char* str, char* p, int rank) {
 	char path_c[30];
 	sscanf(str, "ream %s %li %li", path_c, &bytes_received, &offset);
 	std::string path(path_c);
-	std::cout << "server " << rank << " path " << path << " offset " << offset << " bytes_received " << bytes_received << std::endl;
 	int pid, fd;
 	long int count; //TODO: diff between count and bytes_received
 
@@ -821,16 +749,11 @@ void handle_remote_read(char* str, char* p, int rank) {
 
 
 void read_next_msg(int rank) {
-	std::cout << "debug 1" << std::endl;
 	sem_wait(sem_new_msgs);
-	std::cout << "debug 2" << std::endl;
 	char str[4096];
-	std::cout << "debug 3" << std::endl;
 	std::fill(str, str + 4096, 0);
-	std::cout << "debug 4" << std::endl;
 	//memcpy(buf_requests.buf, pathname, strlen(pathname));
 	int k = buf_requests.k;
-	std::cout << "k = " << k << std::endl;
 	bool is_open = false;
 	int i = 0;
 	while (((char*)buf_requests.buf)[k] != '\0') {
@@ -841,10 +764,8 @@ void read_next_msg(int rank) {
 	str[i] = ((char*) buf_requests.buf)[k];
 	buf_requests.k = k + 1;
 	char* p = str;
-	std::cout << "msg read after loop: " << str << std::endl;
 	index_not_read += strlen(str) + 1;
 	is_open = strncmp(str, "open", 4) == 0;
-	std::cout << "is_open " << is_open << std::endl;
 	int pid;
 	if (is_open) {
 		handle_open(str, p, rank);
@@ -872,7 +793,7 @@ void read_next_msg(int rank) {
 						handle_remote_read(str, p, rank);
 					}
 					else {
-						std::cout << "error msg read" << std::endl;
+						std::cerr << "error msg read" << std::endl;
 						MPI_Finalize();
 						exit(1);
 					}
@@ -880,8 +801,6 @@ void read_next_msg(int rank) {
 			}
 		}
 	}
-	std::cout << "end request" << std::endl;
-	    //sem_post(sem_requests);
 	return;
 }
 
@@ -902,16 +821,11 @@ void* capio_server(void* pthread_arg) {
 	MPI_Comm_size(MPI_COMM_WORLD, &size);
 	catch_sigterm();
 	handshake_servers(rank, size);
-	for (auto const &pair: nodes_helper_rank) {
-		std::cout << "{" << pair.first << ": " << pair.second << "}\n";
-	}
-	std::cout << "capio server, rank " << rank << std::endl;
 	buf_requests = create_circular_buffer();
 	sem_requests = create_sem_requests();
 	sem_new_msgs = sem_open("sem_new_msgs", O_CREAT | O_RDWR, S_IRUSR | S_IWUSR, 0);
 	sem_post(&internal_server_sem);
 	while(true) {
-		std::cout << "serving" << std::endl;
 		read_next_msg(rank);
 
 		//respond();
@@ -936,13 +850,9 @@ void serve_remote_read(const char* path_c, const char* offset_str, int dest, lon
 	const size_t len2 = strlen(path_c);
 	const size_t len3 = strlen(offset_str);
 	buf_send = (char*) malloc((len1 + len2 + len3 + 3) * sizeof(char));//TODO:add malloc check
-	std::cout << "offset_str: " << offset_str << std::endl;
 	sprintf(buf_send, "%s %s %s", s1, path_c, offset_str);
-	printf("helper warning sent: %s\n", buf_send);
-	std::cout << "helper dest warning = " << dest << std::endl;
 	//send warning
 	MPI_Send(buf_send, strlen(buf_send) + 1, MPI_CHAR, dest, 0, MPI_COMM_WORLD);
-	std::cout << "helper sending data" << std::endl;
 	free(buf_send);
 	//send data
 	void* file_shm = get_shm(path_c);
@@ -966,13 +876,11 @@ void* wait_for_data(void* pthread_arg) {
 	int dest = rr_metadata->dest;
 	long int nbytes = rr_metadata->nbytes;
 	const char * offset_str = std::to_string(offset).c_str();
-	std::cout << "server thread before wait" << std::endl;
 	sem_wait(rr_metadata->sem);
 	serve_remote_read(path, offset_str, dest, offset, nbytes);
 	free(rr_metadata->sem);
 	free(rr_metadata->path);
 	free(rr_metadata);
-	std::cout << "server thread after wait" << std::endl;
 	return nullptr;
 }
 
@@ -990,14 +898,11 @@ void* capio_helper(void* pthread_arg) {
 	MPI_Comm_rank(MPI_COMM_WORLD, &rank);
 	sem_wait(&internal_server_sem);
 	while(true) {
-		std::cout << "helper" << std::endl;
 		MPI_Recv(buf_recv, 2048, MPI_CHAR, MPI_ANY_SOURCE, 0, MPI_COMM_WORLD, &status); //receive from server
-		std::cout << "helper rank " << rank << " msg received" << buf_recv << std::endl;
 		bool remote_request_to_read = strncmp(buf_recv, "read", 4) == 0;
 		if (remote_request_to_read) {
 		    // schema msg received: "read path dest offset nbytes"
 			char** p_tmp;
-			std::cout << "before strtok" << std::endl;
 			char* path_c = (char*) malloc(sizeof(char) * 512);
 			int i = 5;
 			int j = 0;
@@ -1037,14 +942,11 @@ void* capio_helper(void* pthread_arg) {
 			}
 			nbytes_str[j] = '\0';
 			long int nbytes = std::atoi(nbytes_str);
-			std::cout << "helper " << rank << " path " << path_c << std::endl;
-			std::cout << "helper " << rank << " dest " << dest << std::endl;
 			//check if the data is avaiable
 			if (data_avaiable(path_c, offset, nbytes)) {
 				serve_remote_read(path_c, offset_str, dest, offset, nbytes);
 			}
 			else {
-				std::cout << "data unavaiable " << path_c << " offset " << offset << " nbytes " << nbytes << std::endl; 
 				pthread_t t;
 				struct remote_read_metadata* rr_metadata = (struct remote_read_metadata*) malloc(sizeof(struct remote_read_metadata));
 				rr_metadata->path = path_c;
@@ -1054,13 +956,13 @@ void* capio_helper(void* pthread_arg) {
 				rr_metadata->sem = (sem_t*) malloc(sizeof(sem_t));
 				int res = sem_init(rr_metadata->sem, 0, 0);
 				if (res !=0) {
-					std::cout << __FILE__ << ":" << __LINE__ << " - " << std::flush;
+					std::cerr << __FILE__ << ":" << __LINE__ << " - " << std::flush;
 					perror("sem_init failed"); 
 					exit(1);
 				}
 				res = pthread_create(&t, NULL, wait_for_data, (void*) rr_metadata);
 				if (res != 0) {
-					std::cout << "error creation of capio server thread" << std::endl;
+					std::cerr << "error creation of capio server thread" << std::endl;
 					MPI_Finalize();
 					exit(1);
 				}
@@ -1075,13 +977,9 @@ void* capio_helper(void* pthread_arg) {
 			int bytes_received;
 			int source = status.MPI_SOURCE;
 			int offset = std::atoi(buf_recv + pos + 9);
-			std::cout << "buf_recv + pos + 9" << buf_recv + pos + 9 << std::endl;
-
-			std::cout << "helper receiving data file " << path << " from process rank " << source << "offset " << offset << std::endl;
 			MPI_Recv(file_shm + offset, 1024L * 1024 * 1024, MPI_BYTE, source, 0, MPI_COMM_WORLD, &status);//TODO; 4096 should be a parameter
 			MPI_Get_count(&status, MPI_CHAR, &bytes_received); //why in recv MPI_BYTE while ehre MPI_CHAR?
 			bytes_received *= sizeof(char);
-			std::cout << "helper " << rank << " sending wake up call to my server" << std::endl;
 			#ifdef MYDEBUG
 			int* tmp = (int*) malloc(bytes_received);
 			memcpy(tmp, file_shm, bytes_received); 
@@ -1094,19 +992,13 @@ void* capio_helper(void* pthread_arg) {
 			sem_wait(sem_requests);
 			const char* c_str = msg.c_str();
 			memcpy(((char*)buf_requests.buf) + *buf_requests.i, c_str, strlen(c_str) + 1);
-			std::cout << "open before response" << std::endl;
-			char tmp_str[1024];
-			printf("c_str %s, len c_str %i\n", c_str, strlen(c_str));
-			sprintf(tmp_str, "%s", (char*) buf_requests.buf + *buf_requests.i);
-			printf("add open msg sent: %s\n", tmp_str);
 			*buf_requests.i = *buf_requests.i + strlen(c_str) + 1;
-			std::cout << "*buf_requests.i == " << *buf_requests.i << std::endl;
 			sem_post(sem_requests);
 			sem_post(sem_new_msgs);
 
 		}
 		else {
-			std::cout << "helper error receiving message" << std::endl;
+			std::cerr << "helper error receiving message" << std::endl;
 		}
 	}
 	return nullptr; //pthreads always needs a return value
@@ -1119,45 +1011,40 @@ int main(int argc, char** argv) {
 	MPI_Init_thread(&argc, &argv, MPI_THREAD_MULTIPLE, &provided);
     if(provided != MPI_THREAD_MULTIPLE)
     {
-        printf("The threading support level is lesser than that demanded.\n");
+        std::cerr << "The threading support level is lesser than that demanded" << std::endl;
         MPI_Abort(MPI_COMM_WORLD, EXIT_FAILURE);
     }
-    else
-    {
-        printf("The threading support level corresponds to that demanded.\n");
-    }
 	MPI_Get_processor_name(node_name, &len);
-	std::cout << "processor name " << node_name << std::endl;
 	pthread_t server_thread, helper_thread;
 	int res = sem_init(&internal_server_sem,0,0);
 	if (res !=0) {
-		std::cout << __FILE__ << ":" << __LINE__ << " - " << std::flush;
+		std::cerr << __FILE__ << ":" << __LINE__ << " - " << std::flush;
 		perror("sem_init failed"); exit(res);
 	}
 	res = pthread_create(&server_thread, NULL, capio_server, &rank);
 	if (res != 0) {
-		std::cout << "error creation of capio server thread" << std::endl;
+		std::cerr << "error creation of capio server thread" << std::endl;
 		MPI_Finalize();
 		return 1;
 	}
 	res = pthread_create(&helper_thread, NULL, capio_helper, &rank);
 	if (res != 0) {
-		std::cout << "error creation of helper server thread" << std::endl;
+		std::cerr << "error creation of helper server thread" << std::endl;
 		MPI_Finalize();
 		return 1;
 	}
     void* status;
     int t = pthread_join(server_thread, &status);
     if (t != 0) {
-    	std::cout << "Error in thread join: " << t << std::endl;
+    	std::cerr << "Error in thread join: " << t << std::endl;
     }
     t = pthread_join(helper_thread, &status);
     if (t != 0) {
-    	std::cout << "Error in thread join: " << t << std::endl;
+    	std::cerr << "Error in thread join: " << t << std::endl;
     }
 	res = sem_destroy(&internal_server_sem);
 	if (res !=0) {
-		std::cout << __FILE__ << ":" << __LINE__ << " - " << std::flush;
+		std::cerr << __FILE__ << ":" << __LINE__ << " - " << std::flush;
 		perror("sem_destroy failed"); exit(res);
 	}
 	MPI_Finalize();
