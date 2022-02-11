@@ -5,7 +5,7 @@ struct circular_buffer {
 };
 
 void err_exit(std::string error_msg) {
-	std::cout << "error: " << error_msg << " errno " <<  errno << " strerror(errno): " << strerror(errno) << std::endl;
+	std::cerr << "error: " << error_msg << " errno " <<  errno << " strerror(errno): " << strerror(errno) << std::endl;
 	exit(1);
 }
 
