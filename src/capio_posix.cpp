@@ -21,6 +21,13 @@
 
 #include "utils/common.hpp"
 
+#ifndef __x86_64__
+# define _STAT_VER_LINUX        3
+#else
+# define _STAT_VER_LINUX        1
+#endif
+#define _STAT_VER                _STAT_VER_LINUX
+
 int (*real_open)(const char* pathname, int flags, ...) = NULL;
 ssize_t (*real_read)(int fd, void* buffer, size_t count) = NULL;
 ssize_t (*real_write)(int fd, const void* buffer, size_t count) = NULL;
@@ -28,9 +35,12 @@ int (*real_close)(int fd) = NULL;
 int (*real_access)(const char *pathname, int mode) = NULL;
 int (*real_stat)(const char *__restrict pathname, struct stat *__restrict statbuf) = NULL;
 int (*real_fstat)(int fd, struct stat *statbuf) = NULL;
+int (*real_fxstat)(int ver, int fd, struct stat *statbuf) = NULL;
 off_t (*real_lseek) (int fd, off_t offset, int whence) = NULL;
 struct dirent* (*real_readdir) (DIR *dirp);
 DIR* (*real_opendir)(const char *name);
+
+static bool is_fstat = true;
 
 std::unordered_map<int, std::pair<void*, long int>> files;
 circular_buffer buf_requests; 
@@ -86,27 +96,34 @@ void mtrace_init(void) {
 	}
 	real_stat = (int (*)(const char *__restrict, struct stat *__restrict)) dlsym(RTLD_NEXT, "stat");
 	if (NULL == real_stat) {	
-		std::cerr << "Error in `dlsym open`: " << dlerror() << std::endl;;
-		exit(1);
+		real_stat = (int (*)(const char *__restrict, struct stat *__restrict)) dlsym(RTLD_NEXT, "__xstat");
+		if (NULL == real_stat) {	
+			std::cerr << "Error in `dlsym open`: " << dlerror() << std::endl;
+			exit(1);
+		}
 	}
 	real_fstat = (int (*)(int, struct stat*)) dlsym(RTLD_NEXT, "fstat");
 	if (NULL == real_fstat) {	
-		std::cerr << "Error in `dlsym open`: " << dlerror() << std::endl;;
-		exit(1);
+		real_fxstat = (int (*)(int, int, struct stat*)) dlsym(RTLD_NEXT, "__fxstat");
+		if (NULL == real_fxstat) {	
+			std::cerr << "Error in `dlsym open`: " << dlerror() << std::endl;
+			exit(1);
+		}
+		is_fstat = false;
 	}
 	real_lseek = (off_t (*)(int, off_t, int)) dlsym(RTLD_NEXT, "lseek");
 	if (NULL == real_lseek) {	
-		std::cerr << "Error in `dlsym open`: " << dlerror() << std::endl;;
+		std::cerr << "Error in `dlsym open`: " << dlerror() << std::endl;
 		exit(1);
 	}
 	real_readdir = (struct dirent* (*)(DIR*)) dlsym(RTLD_NEXT, "readdir");
 	if (NULL == real_readdir) {	
-		std::cerr << "Error in `dlsym open`: " << dlerror() << std::endl;;
+		std::cerr << "Error in `dlsym open`: " << dlerror() << std::endl;
 		exit(1);
 	}
 	real_opendir = (DIR* (*)(const char*)) dlsym(RTLD_NEXT, "opendir");
 	if (NULL == real_opendir) {	
-		std::cerr << "Error in `dlsym open`: " << dlerror() << std::endl;;
+		std::cerr << "Error in `dlsym open`: " << dlerror() << std::endl;
 		exit(1);
 	}
 	buf_requests = get_circular_buffer();
@@ -375,13 +392,17 @@ int stat(const char *__restrict pathname, struct stat *__restrict statbuf) {
 }
 
 int fstat(int fd, struct stat *statbuf) { 
-	if (real_fstat == NULL)
+	if (real_fstat == NULL && real_fxstat == NULL)
 		mtrace_init();
 	if (capio_files_descriptors.find(fd) != capio_files_descriptors.end()) {
 		return 0;
 	}
 	else {
-		return real_fstat(fd, statbuf);
+		std::cout << "_STAT_VER_LINUX " <<  _STAT_VER_LINUX << std::endl;
+		if (is_fstat)
+			return real_fstat(fd, statbuf);
+		else
+			return real_fxstat(_STAT_VER_LINUX, fd, statbuf);
 	}
 }
 
