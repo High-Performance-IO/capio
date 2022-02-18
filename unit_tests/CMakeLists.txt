@@ -18,3 +18,5 @@ if(MPI_LINK_FLAGS)
     set_target_properties(simple_read PROPERTIES
             LINK_FLAGS "${MPI_LINK_FLAGS}")
 endif()
+
+add_subdirectory(circular_buffer)
