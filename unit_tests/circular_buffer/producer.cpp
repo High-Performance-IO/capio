@@ -11,7 +11,7 @@ void sync_with_cons(sem_t* sem_prod, sem_t* sem_cons) {
 }
 
 void test_one_to_one(const std::string& buffer_name, long int buff_size, long int num_elems, int rank, sem_t* sem_prod, sem_t* sem_cons) {
-	Circular_buffer<int> c_buff(buffer_name + std::to_string(rank), buff_size, sizeof(int));
+	Circular_buffer<int> c_buff(buffer_name + std::to_string(rank), buff_size);
 	int val;
 	for (long int i = 0; i < num_elems; ++i) {
 		val = i % 10 + rank;
@@ -25,7 +25,7 @@ void test_one_to_one(const std::string& buffer_name, long int buff_size, long in
 
 
 void test_4(int rank, sem_t* sem_prod, sem_t* sem_cons) {
-	Circular_buffer<int> c_buff("test_buffer", 1024, sizeof(int));
+	Circular_buffer<int> c_buff("test_buffer", 1024);
 	int val;
 	for (int i = 0; i < 4096; ++i) {
 		val = i % 8;
