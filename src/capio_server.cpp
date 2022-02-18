@@ -342,6 +342,7 @@ void flush_file_to_disk(int pid, int fd) {
 //TODO: function too long
 
 void handle_open(char* str, char* p, int rank) {
+	std::cout << "handle open" << std::endl;
 	int pid;
 	pid = strtol(str + 5, &p, 10);
 	if (sems_response.find(pid) == sems_response.end()) {
@@ -423,6 +424,7 @@ void handle_pending_read(int pid, int fd, long int process_offset, long int coun
 }
 
 void handle_write(const char* str, int rank) {
+	std::cout << "handle write" << std::endl;
 	//check if another process is waiting for this data
 	std::string request;
 	int pid, fd, res;
@@ -516,6 +518,7 @@ void handle_write(const char* str, int rank) {
  */
 
 void handle_local_read(int pid, int fd, long int count) {
+		std::cout << "handle local read" << std::endl;
 		std::string path = processes_files_metadata[pid][fd];
 		long int file_size = *files_metadata[path].second;
 		long int process_offset = processes_files[pid][fd].second;
@@ -532,14 +535,27 @@ void handle_local_read(int pid, int fd, long int count) {
 		}
 		free(tmp);
 #endif
+		std::cout << "local read before wait" << std::endl;
 		sem_wait(sems_response[pid].sem_write);
+		std::cout << "local read after wait" << std::endl;
 		std::pair<void*, int> tmp_pair = response_buffers[pid];
 		((long int*) tmp_pair.first)[tmp_pair.second] = process_offset; 
+		std::cout << "process offset " << process_offset << std::endl;
+		std::cout << "index response buffer " << tmp_pair.second << std::endl;
 		processes_files[pid][fd].second += count;
 		++response_buffers[pid].second;
 		//TODO: check if the file was moved to the disk
-		sem_post(sems_response[pid].sem_write); 
-		sem_post(sems_response[pid].sem_read); 
+		if (sem_post(sems_response[pid].sem_write) == -1) {
+			std::cerr << "error in sem_post of sems_response[pid].sem_write: " << strerror(errno) << std::endl; 
+			exit(1);
+		}
+		std::cout << "after first sem post" << std::endl;
+		if (sem_post(sems_response[pid].sem_read) == -1) {
+			std::cerr << "error in sem_post of sems_response[pid].sem_read: " << strerror(errno) << std::endl; 
+			exit(1);
+		}
+		std::cout << "after second sem post" << std::endl;
+		
 }
 
 /*
@@ -548,6 +564,7 @@ void handle_local_read(int pid, int fd, long int count) {
  */
 
 void handle_remote_read(int pid, int fd, long int count, int rank) {
+		std::cout << "handle remote read" << std::endl;
 		const char* msg;
 		std::string str_msg;
 		int dest = nodes_helper_rank[files_location[processes_files_metadata[pid][fd]]];
@@ -654,6 +671,7 @@ void* wait_for_file(void* pthread_arg) {
 
 
 void handle_read(char* str, int rank) {
+	std::cout << "handle read" << std::endl;
 	std::string request;
 	int pid, fd;
 	long int count;
@@ -688,6 +706,7 @@ void handle_read(char* str, int rank) {
 }
 
 void handle_close(char* str, char* p) {
+	std::cout << "handle close" << std::endl;
 	int pid = strtol(str + 5, &p, 10);;
 	int fd = strtol(p, &p, 10);
 	if (close(fd) == -1) {
@@ -767,6 +786,7 @@ void read_next_msg(int rank) {
 	index_not_read += strlen(str) + 1;
 	is_open = strncmp(str, "open", 4) == 0;
 	int pid;
+	std::cout << "next msg " << str << std::endl;
 	if (is_open) {
 		handle_open(str, p, rank);
 	}

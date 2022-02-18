@@ -131,7 +131,7 @@ void mtrace_init(void) {
 	sem_new_msgs = sem_open("sem_new_msgs", O_RDWR);
 	sem_response = sem_open(("sem_response_read" + std::to_string(getpid())).c_str(),  O_CREAT | O_RDWR, S_IRUSR | S_IWUSR, 0);
 	sem_write = sem_open(("sem_write" + std::to_string(getpid())).c_str(),  O_CREAT | O_RDWR, S_IRUSR | S_IWUSR, 0);
-	buf_response = (long int*) create_shm("buf_response" + std::to_string(getpid()), 4096);
+	buf_response = (long int*) create_shm("buf_response" + std::to_string(getpid()), 128 * 1024 * 1024);
 	i_resp = 0;
 	client_caching_info = (int*) create_shm("caching_info" + std::to_string(getpid()), 4096);
 	caching_info_size = (int*) create_shm("caching_info_size" + std::to_string(getpid()), sizeof(int));
@@ -168,13 +168,17 @@ int add_close_request(int fd) {
 long int add_read_request(int fd, size_t count) {
 	std::string str = "read " + std::to_string(getpid()) + " " + std::to_string(fd) + " " + std::to_string(count);
 	const char* c_str = str.c_str();
+	std::cout << "add read req before first sem wait" << std::endl;
     sem_wait(sem_requests);
+	std::cout << "add read req after first sem wait" << std::endl;
 	memcpy(((char*)buf_requests.buf) + *buf_requests.i, c_str, strlen(c_str) + 1);
 	*buf_requests.i = *buf_requests.i + strlen(c_str) + 1;
 	sem_post(sem_requests);
 	sem_post(sem_new_msgs);
 	//read response (offest)
+	std::cout << "add read req before second sem wait" << std::endl;
 	sem_wait(sem_response);
+	std::cout << "add read req after second sem wait" << std::endl;
 	long int offset = buf_response[i_resp];
 	++i_resp;
 	return offset;
@@ -334,7 +338,9 @@ ssize_t read(int fd, void *buffer, size_t count) {
 		long int offset = add_read_request(fd, count);
 		bool in_shm = check_cache(fd);
 		if (in_shm) {
+			std::cout << "read shm before" << offset << std::endl;
 			read_shm(files[fd].first, offset, buffer, count);
+			std::cout << "read shm after" << offset << std::endl;
 		}
 		else {
 			read_from_disk(fd, offset, buffer, count);
@@ -398,7 +404,6 @@ int fstat(int fd, struct stat *statbuf) {
 		return 0;
 	}
 	else {
-		std::cout << "_STAT_VER_LINUX " <<  _STAT_VER_LINUX << std::endl;
 		if (is_fstat)
 			return real_fstat(fd, statbuf);
 		else
