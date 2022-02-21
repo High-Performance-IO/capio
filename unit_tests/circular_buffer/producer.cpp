@@ -11,7 +11,7 @@ void sync_with_cons(sem_t* sem_prod, sem_t* sem_cons) {
 }
 
 void test_one_to_one(const std::string& buffer_name, long int buff_size, long int num_elems, int rank, sem_t* sem_prod, sem_t* sem_cons) {
-	Circular_buffer<int> c_buff(buffer_name + std::to_string(rank), buff_size);
+	Circular_buffer<int> c_buff(buffer_name + std::to_string(rank), buff_size, sizeof(int));
 	int val;
 	for (long int i = 0; i < num_elems; ++i) {
 		val = i % 10 + rank;
@@ -22,10 +22,24 @@ void test_one_to_one(const std::string& buffer_name, long int buff_size, long in
 	c_buff.free_shm();
 }
 
+void test_one_to_one_str(const std::string& buffer_name, long int buff_size, long int num_elems, int rank, sem_t* sem_prod, sem_t* sem_cons) {
+	Circular_buffer<char> c_buff(buffer_name + std::to_string(rank), buff_size, 6 * sizeof(char));
+	int val;
+	std::string str;
+	for (long int i = 0; i < num_elems; ++i) {
+		val = i % 10;
+		str = "ciao" + std::to_string(val);
+		const char* c_str = str.c_str();
+		c_buff.write(c_str);
+	}
+	MPI_Barrier(MPI_COMM_WORLD);
+	sync_with_cons(sem_prod, sem_cons);
+	c_buff.free_shm();
+}
 
 
 void test_4(int rank, sem_t* sem_prod, sem_t* sem_cons) {
-	Circular_buffer<int> c_buff("test_buffer", 1024);
+	Circular_buffer<int> c_buff("test_buffer", 1024, sizeof(int));
 	int val;
 	for (int i = 0; i < 4096; ++i) {
 		val = i % 8;
@@ -82,6 +96,15 @@ int main(int argc, char** argv) {
 
 	test_4(rank, sem_prod, sem_cons);
 	std::cout << "test 4: success!" << std::endl;
+
+	test_one_to_one_str("teststr1_buffer", 1024, 16, rank, sem_prod, sem_cons);
+	std::cout << "test 5: success!" << std::endl;
+
+	test_one_to_one_str("teststr2_buffer", 16* 6, 16, rank, sem_prod, sem_cons);
+	std::cout << "test 6: success!" << std::endl;
+
+	test_one_to_one_str("teststr3_buffer", 1024, 4096, rank, sem_prod, sem_cons);
+	std::cout << "test 7: success!" << std::endl;
 
 	sem_close(sem_prod);
 	sem_close(sem_cons);

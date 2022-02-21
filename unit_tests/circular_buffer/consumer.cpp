@@ -3,6 +3,7 @@
 #include <cassert>
 #include <mpi.h>
 #include <semaphore.h>
+#include <string.h>
 
 
 void sync_with_cons(sem_t* sem_prod, sem_t* sem_cons) {
@@ -15,7 +16,7 @@ void sync_with_cons(sem_t* sem_prod, sem_t* sem_cons) {
 
 
 void test_one_to_one(const std::string& buff_name, long int buff_size, long int num_elems, int rank, sem_t* sem_prod, sem_t* sem_cons) {
-	Circular_buffer<int> c_buff(buff_name + std::to_string(rank), buff_size);	
+	Circular_buffer<int> c_buff(buff_name + std::to_string(rank), buff_size, sizeof(int));
 	int val;
 	for (long int i = 0; i < num_elems; ++i) {
 		c_buff.read(&val);
@@ -29,7 +30,7 @@ void test_one_to_one(const std::string& buff_name, long int buff_size, long int 
 
 
 void test_4(int rank, int num_prods, sem_t* sem_prod, sem_t* sem_cons) {
-	Circular_buffer<int> c_buff("test_buffer", 1024);
+	Circular_buffer<int> c_buff("test_buffer", 1024, sizeof(int));
 	int val, sum = 0, res = 0;
 	for (int i = 0; i < 4096; ++i) {
 		c_buff.read(&val);	
@@ -44,6 +45,21 @@ void test_4(int rank, int num_prods, sem_t* sem_prod, sem_t* sem_cons) {
 	c_buff.free_shm();
 }
 
+void test_one_to_one_str(const std::string& buff_name, long int buff_size, long int num_elems, int rank, sem_t* sem_prod, sem_t* sem_cons) {
+	Circular_buffer<char> c_buff(buff_name + std::to_string(rank), buff_size, 6 * sizeof(char));	
+	int val;
+	char c_str[6];
+	std::string str;
+	for (long int i = 0; i < num_elems; ++i) {
+		str = "ciao" + std::to_string(i % 10);
+		const char* expected_str = str.c_str();
+		c_buff.read(c_str);
+		assert(strcmp(c_str, expected_str) == 0);
+	}
+	MPI_Barrier(MPI_COMM_WORLD);
+	sync_with_cons(sem_prod, sem_cons);
+	c_buff.free_shm();
+}
 
 sem_t* get_sem(const std::string sem_name) {
 	sem_t* sem = sem_open(sem_name.c_str(), O_CREAT | O_RDWR, S_IRUSR | S_IWUSR, 0); //check the flags
@@ -94,6 +110,15 @@ int main(int argc, char** argv) {
 	test_4(rank, num_processes, sem_prod, sem_cons);
 	std::cout << "test 4: success!" << std::endl;
 
+	test_one_to_one_str("teststr1_buffer", 1024, 16, rank, sem_prod, sem_cons);
+	std::cout << "test 5: success!" << std::endl;
+
+	test_one_to_one_str("teststr2_buffer", 16* 6, 16, rank, sem_prod, sem_cons);
+	std::cout << "test 6: success!" << std::endl;
+
+	test_one_to_one_str("teststr3_buffer", 1024, 4096, rank, sem_prod, sem_cons);
+	std::cout << "test 7: success!" << std::endl;
+	
 	sem_close(sem_prod);
 	sem_close(sem_cons);
 	sem_unlink(sem_prod_name.c_str());

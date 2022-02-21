@@ -1,8 +1,3 @@
-struct circular_buffer {
-	void* buf;
-	int* i;
-	int k;
-};
 
 void err_exit(std::string error_msg) {
 	std::cerr << "error: " << error_msg << " errno " <<  errno << " strerror(errno): " << strerror(errno) << std::endl;
@@ -43,14 +38,4 @@ void* create_shm(std::string shm_name, const long int size) {
 //	if (close(fd) == -1);
 //		err_exit("close");
 	return p;
-}
-
-struct circular_buffer get_circular_buffer() {
-	//open shm
-	void* buf = get_shm("circular_buffer");
-	int* i = (int*) get_shm("index_buf");
-	circular_buffer br;
-	br.buf = buf;
-	br.i = i;
-	return br;
 }

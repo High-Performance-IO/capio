@@ -7,7 +7,7 @@
 void initialize_data(int* data, long int num_elements, long int num_writes, int rank) {
 	for (long int k = 0; k < num_writes; ++k) {
 		for (long int i = 0; i < num_elements; ++i) {
-			data[i + k * num_elements] = i % 10;
+			data[i + k * num_elements] = i % 10 + rank;
 		}
 	}
 }

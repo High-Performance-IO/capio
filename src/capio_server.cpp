@@ -1,3 +1,5 @@
+#include "circular_buffer.hpp"
+
 #include <string>
 #include <cstring>
 #include <unordered_map>
@@ -33,7 +35,7 @@ std::unordered_map<int, std::unordered_map<int, std::pair<void*, long int>>> pro
 std::unordered_map<int, std::unordered_map<int, std::string>> processes_files_metadata;
 
 // pid -> (response shared buffer, index)
-std::unordered_map<int, std::pair<void*, int>> response_buffers;
+std::unordered_map<int, Circular_buffer<long int>*> response_buffers;
 
 /*
  * Regarding the map caching info.
@@ -95,17 +97,9 @@ std::unordered_set<std::string> on_disk;
 
 char node_name[MPI_MAX_PROCESSOR_NAME];
 
-struct rw_sems {
-	sem_t* sem_write;
-	sem_t* sem_read;
-};
-
-circular_buffer buf_requests; 
-sem_t* sem_requests;
-sem_t* sem_new_msgs;
-std::unordered_map<int, struct rw_sems> sems_response;
+Circular_buffer<char>* buf_requests; 
+std::unordered_map<int, sem_t*> sems_response;
 std::unordered_map<int, sem_t*> sems_write;
-static int index_not_read = 0;
 
 sem_t internal_server_sem;
 
@@ -116,7 +110,8 @@ void sig_term_handler(int signum, siginfo_t *info, void *ptr) {
 		shm_unlink((pair.first + "_size").c_str());
 	}
 	for (auto& pair : response_buffers) {
-		shm_unlink(("buf_response" + std::to_string(pair.first)).c_str()); 
+		pair.second->free_shm();
+		delete pair.second;
 		sem_unlink(("sem_response_read" + std::to_string(pair.first)).c_str());
 		sem_unlink(("sem_response_write" + std::to_string(pair.first)).c_str());
 		sem_unlink(("sem_write" + std::to_string(pair.first)).c_str());
@@ -125,8 +120,7 @@ void sig_term_handler(int signum, siginfo_t *info, void *ptr) {
 	}
 	shm_unlink("circular_buffer");
 	shm_unlink("index_buf");
-	sem_unlink("sem_new_msgs");
-	sem_unlink("sem_requests");
+	buf_requests->free_shm();
 	MPI_Finalize();
 	exit(0);
 }
@@ -140,16 +134,6 @@ void catch_sigterm() {
 	if (res == -1) {
 		err_exit("sigaction for SIGTERM");
 	}
-}
-
-sem_t* create_sem_requests() {
-	return sem_open("sem_requests", O_CREAT | O_RDWR, S_IRUSR | S_IWUSR, 1);
-}
-
-
-//TODO: same function in capio_posix, to put in common
-sem_t* get_sem_requests() {
-	return sem_open("sem_requests", 0);
 }
 
 void* create_shm_circular_buffer(std::string shm_name) {
@@ -203,18 +187,6 @@ long int* create_shm_long_int(std::string shm_name) {
 //	if (close(fd) == -1);
 //		err_exit("close");
 	return (long int*) p;
-}
-
-struct circular_buffer create_circular_buffer() {
-	//open shm
-	void* buf = create_shm_circular_buffer("circular_buffer");
-	int* i = (int*) create_shm_int("index_buf");
-	*i = 0;
-	circular_buffer br;
-	br.buf = buf;
-	br.i = i;
-	br.k = 0;
-	return br;
 }
 
 void write_file_location(const std::string& file_name, int rank, std::string path_to_write) {
@@ -346,25 +318,21 @@ void handle_open(char* str, char* p, int rank) {
 	int pid;
 	pid = strtol(str + 5, &p, 10);
 	if (sems_response.find(pid) == sems_response.end()) {
-		sems_response[pid].sem_read = sem_open(("sem_response_read" + std::to_string(pid)).c_str(), O_RDWR);
-		if (sems_response[pid].sem_read == SEM_FAILED) {
-			std::cerr << "error creating the read response semafore for pid " << pid << std::endl;  	
-		}
-		sems_response[pid].sem_write = sem_open(("sem_response_write" + std::to_string(pid)).c_str(),  O_CREAT | O_RDWR, S_IRUSR | S_IWUSR, 1);
-		if (sems_response[pid].sem_write == SEM_FAILED) {
-			std::cerr << "error creating the read response semafore for pid " << pid << std::endl;  	
+		sems_response[pid] = sem_open(("sem_response_read" + std::to_string(pid)).c_str(), O_RDWR);
+		if (sems_response[pid] == SEM_FAILED) {
+			err_exit("error creating sem_response_read" + std::to_string(pid));  	
 		}
 		sems_write[pid] = sem_open(("sem_write" + std::to_string(pid)).c_str(), O_RDWR);
 		if (sems_write[pid] == SEM_FAILED) {
-			std::cerr << "error creating the write semafore for pid " << pid << std::endl;  	
+			err_exit("error creating sem_write" + std::to_string(pid));
 		}
-		response_buffers[pid].first = (long int*) get_shm("buf_response" + std::to_string(pid));
-		response_buffers[pid].second = 0; 
+		Circular_buffer<long int>* cb = new Circular_buffer<long int>("buf_response" + std::to_string(pid), 4096, sizeof(long int));
+		response_buffers.insert({pid, cb});
 		caching_info[pid].first = (int*) get_shm("caching_info" + std::to_string(pid));
 		caching_info[pid].second = (int*) get_shm("caching_info_size" + std::to_string(pid));
 	}
 	std::string path(p + 1);
-	int fd = open(path.c_str(), O_CREAT | O_RDWR, S_IRUSR | S_IRWXU);
+	long int fd = open(path.c_str(), O_CREAT | O_RDWR, S_IRUSR | S_IRWXU);
 	if (fd == -1) {
 	std::cerr << "capio server, error to open the file " << path << std::endl;
 	MPI_Finalize();
@@ -384,12 +352,7 @@ void handle_open(char* str, char* p, int rank) {
 		//TODO: check the size that the user wrote in the configuration file
 	processes_files[pid][fd] = std::pair<void*, int>(p_shm, 0); //TODO: what happens if a process open the same file twice?
 	*caching_info[pid].second += 2;
-	sem_wait(sems_response[pid].sem_write); 
-	std::pair<void*, int> tmp_pair = response_buffers[pid];
-	((long int*) tmp_pair.first)[tmp_pair.second] = fd; 
-	++response_buffers[pid].second;
-	sem_post(sems_response[pid].sem_write);
-	sem_post(sems_response[pid].sem_read); 
+	response_buffers[pid]->write(&fd);
 	if (files_metadata.find(path) == files_metadata.end()) {
 		files_metadata[path].first = processes_files[pid][fd].first;	
 		files_metadata[path].second = create_shm_long_int(path + "_size");	
@@ -412,14 +375,9 @@ void handle_pending_read(int pid, int fd, long int process_offset, long int coun
 	free(tmp);
 	#endif
 
-	sem_wait(sems_response[pid].sem_write); 
-	std::pair<void*, int> tmp_pair = response_buffers[pid];
-	((long int*) tmp_pair.first)[tmp_pair.second] = process_offset; 
+	response_buffers[pid]->write(&process_offset);
 	processes_files[pid][fd].second += count;
-	++response_buffers[pid].second;
 	//TODO: check if the file was moved to the disk
-	sem_post(sems_response[pid].sem_write); 
-	sem_post(sems_response[pid].sem_read); 
 
 }
 
@@ -460,7 +418,7 @@ void handle_write(const char* str, int rank) {
 		}
 		on_disk.insert(path);
 	}
-	sem_post(sems_response[pid].sem_read);
+	sem_post(sems_response[pid]);
 	auto it = pending_reads.find(path);
 	if (it != pending_reads.end()) {
 		sem_wait(sems_write[pid]);
@@ -535,27 +493,10 @@ void handle_local_read(int pid, int fd, long int count) {
 		}
 		free(tmp);
 #endif
-		std::cout << "local read before wait" << std::endl;
-		sem_wait(sems_response[pid].sem_write);
-		std::cout << "local read after wait" << std::endl;
-		std::pair<void*, int> tmp_pair = response_buffers[pid];
-		((long int*) tmp_pair.first)[tmp_pair.second] = process_offset; 
+		response_buffers[pid]->write(&process_offset);
 		std::cout << "process offset " << process_offset << std::endl;
-		std::cout << "index response buffer " << tmp_pair.second << std::endl;
 		processes_files[pid][fd].second += count;
-		++response_buffers[pid].second;
 		//TODO: check if the file was moved to the disk
-		if (sem_post(sems_response[pid].sem_write) == -1) {
-			std::cerr << "error in sem_post of sems_response[pid].sem_write: " << strerror(errno) << std::endl; 
-			exit(1);
-		}
-		std::cout << "after first sem post" << std::endl;
-		if (sem_post(sems_response[pid].sem_read) == -1) {
-			std::cerr << "error in sem_post of sems_response[pid].sem_read: " << strerror(errno) << std::endl; 
-			exit(1);
-		}
-		std::cout << "after second sem post" << std::endl;
-		
 }
 
 /*
@@ -742,14 +683,9 @@ void handle_remote_read(char* str, char* p, int rank) {
 			}
 			free(tmp);
 			#endif
-			sem_wait(sems_response[pid].sem_write); 
-			std::pair<void*, int> tmp_pair = response_buffers[pid];
-			((long int*) tmp_pair.first)[tmp_pair.second] = processes_files[pid][fd].second; 
+			response_buffers[pid]->write(& processes_files[pid][fd].second);
 			processes_files[pid][fd].second += count;
 			//TODO: check if there is data that can be read in the local memory file
-			++response_buffers[pid].second;
-			sem_post(sems_response[pid].sem_write); 
-			sem_post(sems_response[pid].sem_read); 
 			if (it == list_remote_reads.begin()) {
 				list_remote_reads.erase(it);
 				it = list_remote_reads.begin();
@@ -768,22 +704,13 @@ void handle_remote_read(char* str, char* p, int rank) {
 
 
 void read_next_msg(int rank) {
-	sem_wait(sem_new_msgs);
 	char str[4096];
 	std::fill(str, str + 4096, 0);
-	//memcpy(buf_requests.buf, pathname, strlen(pathname));
-	int k = buf_requests.k;
 	bool is_open = false;
-	int i = 0;
-	while (((char*)buf_requests.buf)[k] != '\0') {
-		str[i] = ((char*) buf_requests.buf)[k];
-		++k;
-		++i;
-	}
-	str[i] = ((char*) buf_requests.buf)[k];
-	buf_requests.k = k + 1;
+	std::cout << " new msg" << std::endl;
+	buf_requests->read(str);
+	std::cout << " new msg after " << std::endl;
 	char* p = str;
-	index_not_read += strlen(str) + 1;
 	is_open = strncmp(str, "open", 4) == 0;
 	int pid;
 	std::cout << "next msg " << str << std::endl;
@@ -793,13 +720,11 @@ void read_next_msg(int rank) {
 	else {
 		bool is_write = strncmp(str, "writ", 4) == 0;
 		if (is_write) {
-			str[i + 1] ='\0';
 			handle_write(str, rank);
 		}
 		else {
 		bool is_read = strncmp(str, "read", 4) == 0;
 			if (is_read) {
-				str[i + 1] ='\0';
 				handle_read(str, rank);
 			}
 			else {
@@ -841,9 +766,7 @@ void* capio_server(void* pthread_arg) {
 	MPI_Comm_size(MPI_COMM_WORLD, &size);
 	catch_sigterm();
 	handshake_servers(rank, size);
-	buf_requests = create_circular_buffer();
-	sem_requests = create_sem_requests();
-	sem_new_msgs = sem_open("sem_new_msgs", O_CREAT | O_RDWR, S_IRUSR | S_IWUSR, 0);
+	buf_requests = new Circular_buffer<char>("circular_buffer", 4096, sizeof(char) * 128);
 	sem_post(&internal_server_sem);
 	while(true) {
 		read_next_msg(rank);
@@ -1009,12 +932,8 @@ void* capio_helper(void* pthread_arg) {
 			free(tmp);
 			#endif
 			std::string msg = "ream " + path + + " " + std::to_string(bytes_received) + " " + std::to_string(offset);
-			sem_wait(sem_requests);
 			const char* c_str = msg.c_str();
-			memcpy(((char*)buf_requests.buf) + *buf_requests.i, c_str, strlen(c_str) + 1);
-			*buf_requests.i = *buf_requests.i + strlen(c_str) + 1;
-			sem_post(sem_requests);
-			sem_post(sem_new_msgs);
+			buf_requests->write(c_str);
 
 		}
 		else {

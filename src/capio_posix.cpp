@@ -1,6 +1,7 @@
 #ifndef _GNU_SOURCE
 #define _GNU_SOURCE
 #endif
+#include "circular_buffer.hpp"
 
 #include <unordered_map>
 #include <unordered_set>
@@ -43,11 +44,9 @@ DIR* (*real_opendir)(const char *name);
 static bool is_fstat = true;
 
 std::unordered_map<int, std::pair<void*, long int>> files;
-circular_buffer buf_requests; 
-long int* buf_response;
-int i_resp;
-sem_t* sem_requests;
-sem_t* sem_new_msgs;
+Circular_buffer<char> buf_requests("circular_buffer", 4096, sizeof(char) * 128);
+ 
+Circular_buffer<long int>* buf_response;
 sem_t* sem_response;
 sem_t* sem_write;
 int* client_caching_info;
@@ -56,11 +55,6 @@ int* caching_info_size;
 // fd -> pathname
 std::unordered_map<int, std::string> capio_files_descriptors; 
 std::unordered_set<std::string> capio_files_paths;
-
-
-sem_t* get_sem_requests() {
-	return sem_open("sem_requests", 0);
-}
 
 
 /*
@@ -126,13 +120,9 @@ void mtrace_init(void) {
 		std::cerr << "Error in `dlsym open`: " << dlerror() << std::endl;
 		exit(1);
 	}
-	buf_requests = get_circular_buffer();
-	sem_requests = get_sem_requests();
-	sem_new_msgs = sem_open("sem_new_msgs", O_RDWR);
 	sem_response = sem_open(("sem_response_read" + std::to_string(getpid())).c_str(),  O_CREAT | O_RDWR, S_IRUSR | S_IWUSR, 0);
 	sem_write = sem_open(("sem_write" + std::to_string(getpid())).c_str(),  O_CREAT | O_RDWR, S_IRUSR | S_IWUSR, 0);
-	buf_response = (long int*) create_shm("buf_response" + std::to_string(getpid()), 128 * 1024 * 1024);
-	i_resp = 0;
+	buf_response = new Circular_buffer<long int>("buf_response" + std::to_string(getpid()), 1024, sizeof(long int));
 	client_caching_info = (int*) create_shm("caching_info" + std::to_string(getpid()), 4096);
 	caching_info_size = (int*) create_shm("caching_info_size" + std::to_string(getpid()), sizeof(int));
 	*caching_info_size = 0; 
@@ -140,58 +130,34 @@ void mtrace_init(void) {
 }
 
 int add_open_request(const char* pathname) {
-	int fd;
-	sem_wait(sem_requests);
+	long int fd;
 	std::string str ("open " + std::to_string(getpid()) + " " + std::string(pathname));
 	const char* c_str = str.c_str();
-	memcpy(((char*)buf_requests.buf) + *buf_requests.i, c_str, strlen(c_str) + 1);
-	*buf_requests.i = *buf_requests.i + strlen(c_str) + 1;
-	sem_post(sem_requests);
-	sem_post(sem_new_msgs);
-	//wait for response
-	sem_wait(sem_response);
-	fd = buf_response[i_resp];
-	++i_resp;
+	buf_requests.write(c_str); //TODO: max upperbound for pathname
+	buf_response->read(&fd);
 	return fd; 
 }
 
 int add_close_request(int fd) {
 	const char* c_str = ("clos " +std::to_string(getpid()) + " "  + std::to_string(fd)).c_str();
-    sem_wait(sem_requests);
-	memcpy(((char*)buf_requests.buf) + *buf_requests.i, c_str, strlen(c_str) + 1);
-	*buf_requests.i = *buf_requests.i + strlen(c_str) + 1;
-	sem_post(sem_requests);
-	sem_post(sem_new_msgs);
+	buf_requests.write(c_str);
 	return 0;
 }
 
 long int add_read_request(int fd, size_t count) {
 	std::string str = "read " + std::to_string(getpid()) + " " + std::to_string(fd) + " " + std::to_string(count);
 	const char* c_str = str.c_str();
-	std::cout << "add read req before first sem wait" << std::endl;
-    sem_wait(sem_requests);
-	std::cout << "add read req after first sem wait" << std::endl;
-	memcpy(((char*)buf_requests.buf) + *buf_requests.i, c_str, strlen(c_str) + 1);
-	*buf_requests.i = *buf_requests.i + strlen(c_str) + 1;
-	sem_post(sem_requests);
-	sem_post(sem_new_msgs);
+	buf_requests.write(c_str);
 	//read response (offest)
-	std::cout << "add read req before second sem wait" << std::endl;
-	sem_wait(sem_response);
-	std::cout << "add read req after second sem wait" << std::endl;
-	long int offset = buf_response[i_resp];
-	++i_resp;
+	long int offset;
+	buf_response->read(&offset);
 	return offset;
 }
 
 void add_write_request(int fd, size_t count) {
 	std::string str = "writ " + std::to_string(getpid()) +  " " + std::to_string(fd) + " " + std::to_string(count);
 	const char* c_str = str.c_str();    
-	sem_wait(sem_requests);
-	memcpy(((char*)buf_requests.buf) + *buf_requests.i, c_str, strlen(c_str) + 1);
-	*buf_requests.i = *buf_requests.i + strlen(c_str) + 1;
-	sem_post(sem_requests);
-	sem_post(sem_new_msgs);
+	buf_requests.write(c_str);
 	sem_wait(sem_response);
 	return;
 }
