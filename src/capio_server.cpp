@@ -766,7 +766,7 @@ void* capio_server(void* pthread_arg) {
 	MPI_Comm_size(MPI_COMM_WORLD, &size);
 	catch_sigterm();
 	handshake_servers(rank, size);
-	buf_requests = new Circular_buffer<char>("circular_buffer", 4096, sizeof(char) * 128);
+	buf_requests = new Circular_buffer<char>("circular_buffer", 4096 * 4096, sizeof(char) * 128);
 	sem_post(&internal_server_sem);
 	while(true) {
 		read_next_msg(rank);

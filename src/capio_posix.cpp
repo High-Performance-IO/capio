@@ -122,8 +122,8 @@ void mtrace_init(void) {
 	}
 	sem_response = sem_open(("sem_response_read" + std::to_string(getpid())).c_str(),  O_CREAT | O_RDWR, S_IRUSR | S_IWUSR, 0);
 	sem_write = sem_open(("sem_write" + std::to_string(getpid())).c_str(),  O_CREAT | O_RDWR, S_IRUSR | S_IWUSR, 0);
-	buf_requests = new Circular_buffer<char>("circular_buffer", 4096, sizeof(char) * 128);
-	buf_response = new Circular_buffer<long int>("buf_response" + std::to_string(getpid()), 1024, sizeof(long int));
+	buf_requests = new Circular_buffer<char>("circular_buffer", 4096 * 4096, sizeof(char) * 128);
+	buf_response = new Circular_buffer<long int>("buf_response" + std::to_string(getpid()), 4096 * 4096, sizeof(long int));
 	client_caching_info = (int*) create_shm("caching_info" + std::to_string(getpid()), 4096);
 	caching_info_size = (int*) create_shm("caching_info_size" + std::to_string(getpid()), sizeof(int));
 	*caching_info_size = 0; 
