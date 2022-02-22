@@ -5,6 +5,8 @@ set(CMAKE_VERBOSE_MAKEFILE ON)
 set(CMAKE_CXX_STANDARD 14)
 find_package(Threads REQUIRED)
 find_package(MPI REQUIRED)
+set(CMAKE_CXX_FLAGS_DEBUG "-g -O0")
+set(CMAKE_CXX_FLAGS_RELEASE "-O3")
 add_library(capio_posix SHARED
     src/capio_posix.cpp
 )
