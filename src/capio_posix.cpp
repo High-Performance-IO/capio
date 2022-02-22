@@ -44,7 +44,7 @@ DIR* (*real_opendir)(const char *name);
 static bool is_fstat = true;
 
 std::unordered_map<int, std::pair<void*, long int>> files;
-Circular_buffer<char> buf_requests("circular_buffer", 4096, sizeof(char) * 128);
+Circular_buffer<char>* buf_requests;
  
 Circular_buffer<long int>* buf_response;
 sem_t* sem_response;
@@ -122,6 +122,7 @@ void mtrace_init(void) {
 	}
 	sem_response = sem_open(("sem_response_read" + std::to_string(getpid())).c_str(),  O_CREAT | O_RDWR, S_IRUSR | S_IWUSR, 0);
 	sem_write = sem_open(("sem_write" + std::to_string(getpid())).c_str(),  O_CREAT | O_RDWR, S_IRUSR | S_IWUSR, 0);
+	buf_requests = new Circular_buffer<char>("circular_buffer", 4096, sizeof(char) * 128);
 	buf_response = new Circular_buffer<long int>("buf_response" + std::to_string(getpid()), 1024, sizeof(long int));
 	client_caching_info = (int*) create_shm("caching_info" + std::to_string(getpid()), 4096);
 	caching_info_size = (int*) create_shm("caching_info_size" + std::to_string(getpid()), sizeof(int));
@@ -133,21 +134,21 @@ int add_open_request(const char* pathname) {
 	long int fd;
 	std::string str ("open " + std::to_string(getpid()) + " " + std::string(pathname));
 	const char* c_str = str.c_str();
-	buf_requests.write(c_str); //TODO: max upperbound for pathname
+	buf_requests->write(c_str); //TODO: max upperbound for pathname
 	buf_response->read(&fd);
 	return fd; 
 }
 
 int add_close_request(int fd) {
 	const char* c_str = ("clos " +std::to_string(getpid()) + " "  + std::to_string(fd)).c_str();
-	buf_requests.write(c_str);
+	buf_requests->write(c_str);
 	return 0;
 }
 
 long int add_read_request(int fd, size_t count) {
 	std::string str = "read " + std::to_string(getpid()) + " " + std::to_string(fd) + " " + std::to_string(count);
 	const char* c_str = str.c_str();
-	buf_requests.write(c_str);
+	buf_requests->write(c_str);
 	//read response (offest)
 	long int offset;
 	buf_response->read(&offset);
@@ -157,7 +158,7 @@ long int add_read_request(int fd, size_t count) {
 void add_write_request(int fd, size_t count) {
 	std::string str = "writ " + std::to_string(getpid()) +  " " + std::to_string(fd) + " " + std::to_string(count);
 	const char* c_str = str.c_str();    
-	buf_requests.write(c_str);
+	buf_requests->write(c_str);
 	sem_wait(sem_response);
 	return;
 }
