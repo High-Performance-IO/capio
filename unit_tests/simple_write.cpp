@@ -12,20 +12,7 @@ void initialize_data(int* data, long int num_elements, long int num_writes, int 
 	}
 }
 
-int main (int argc, char** argv) {
-	int rank;
-	long int num_elements, num_writes;
-	MPI_Init(&argc, &argv);
-	if (argc != 3) {
-		std::cout << "simple read input error" << std::endl;
-		MPI_Finalize();
-		return 0;
-	}
-	num_elements = std::atol(argv[1]);
-	num_writes = std::atol(argv[2]);
-	MPI_Comm_rank(MPI_COMM_WORLD, &rank);
-	int* data = new int[num_elements * num_writes];
-	initialize_data(data, num_elements, num_writes, rank);
+void write_to_file(int* data, long int num_elements, long int num_writes, int rank) {
 	std::string file_name = "file_" + std::to_string(rank) + ".txt";
 	int fd = open(file_name.c_str(), O_CREAT | O_WRONLY, 0644);
 	for (long int i = 0; i < num_writes; ++i) {
@@ -35,12 +22,28 @@ int main (int argc, char** argv) {
     	while (k < num_elements) {
         	res = write(fd, data + i * num_elements + k, sizeof(int) * (num_elements - k));
         	num_elements_written = (res / sizeof(int));
-        	std::cout << "num_elements_written " << num_elements_written << std::endl;
         	k += num_elements_written;
     	}
 	}
 	if (close(fd) == -1)
 		std::cerr << "process " << rank << ", error closing the file\n";
+}
+
+int main (int argc, char** argv) {
+	int rank;
+	long int num_elements, num_writes;
+	MPI_Init(&argc, &argv);
+	if (argc != 3) {
+		std::cout << "simple write input error" << std::endl;
+		MPI_Finalize();
+		return 0;
+	}
+	num_elements = std::atol(argv[1]);
+	num_writes = std::atol(argv[2]);
+	MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+	int* data = new int[num_elements * num_writes];
+	initialize_data(data, num_elements, num_writes, rank);
+	write_to_file(data, num_elements, num_writes, rank);
 	delete[] data;
 	MPI_Finalize();
 }

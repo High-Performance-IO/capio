@@ -43,7 +43,8 @@ DIR* (*real_opendir)(const char *name);
 
 static bool is_fstat = true;
 
-std::unordered_map<int, std::pair<void*, long int>> files;
+// fd -> (shm*, offset, file_size)
+std::unordered_map<int, std::tuple<void*, long int, long int>> files;
 Circular_buffer<char>* buf_requests;
  
 Circular_buffer<long int>* buf_response;
@@ -122,8 +123,8 @@ void mtrace_init(void) {
 	}
 	sem_response = sem_open(("sem_response_read" + std::to_string(getpid())).c_str(),  O_CREAT | O_RDWR, S_IRUSR | S_IWUSR, 0);
 	sem_write = sem_open(("sem_write" + std::to_string(getpid())).c_str(),  O_CREAT | O_RDWR, S_IRUSR | S_IWUSR, 0);
-	buf_requests = new Circular_buffer<char>("circular_buffer", 4096 * 4096, sizeof(char) * 128);
-	buf_response = new Circular_buffer<long int>("buf_response" + std::to_string(getpid()), 4096 * 4096, sizeof(long int));
+	buf_requests = new Circular_buffer<char>("circular_buffer", 256L * 1024 * 1024, sizeof(char) * 64);
+	buf_response = new Circular_buffer<long int>("buf_response" + std::to_string(getpid()), 256L * 1024 * 1024, sizeof(long int));
 	client_caching_info = (int*) create_shm("caching_info" + std::to_string(getpid()), 4096);
 	caching_info_size = (int*) create_shm("caching_info_size" + std::to_string(getpid()), sizeof(int));
 	*caching_info_size = 0; 
@@ -145,21 +146,22 @@ int add_close_request(int fd) {
 	return 0;
 }
 
-long int add_read_request(int fd, size_t count) {
+void add_read_request(int fd, size_t count) {
 	std::string str = "read " + std::to_string(getpid()) + " " + std::to_string(fd) + " " + std::to_string(count);
 	const char* c_str = str.c_str();
 	buf_requests->write(c_str);
 	//read response (offest)
-	long int offset;
-	buf_response->read(&offset);
-	return offset;
+	long int file_size;
+	buf_response->read(&file_size);
+	std::get<2>(files[fd]) = file_size;
+	return;
 }
 
 void add_write_request(int fd, size_t count) {
-	std::string str = "writ " + std::to_string(getpid()) +  " " + std::to_string(fd) + " " + std::to_string(count);
-	const char* c_str = str.c_str();    
+	char c_str[64];
+	sprintf(c_str, "writ %d %d %ld", getpid(),fd, count);
 	buf_requests->write(c_str);
-	sem_wait(sem_response);
+	//sem_wait(sem_response);
 	return;
 }
 
@@ -265,7 +267,7 @@ int open(const char *pathname, int flags, ...) {
 	if (strncmp("file_", pathname, strlen(prefix)) == 0 || strncmp("output_file_", pathname, strlen(prefix_2)) == 0) {
 		//create shm
 		int fd = add_open_request(pathname);
-		files[fd] = std::pair<void*, int>(get_shm(pathname), 0);
+		files[fd] = std::make_tuple<void*, long int, long int>(get_shm(pathname), 0, 0);
 		capio_files_descriptors[fd] = pathname;
 		capio_files_paths.insert(pathname);
 		return fd;
@@ -302,17 +304,17 @@ int close(int fd) {
 
 ssize_t read(int fd, void *buffer, size_t count) {
 	if (capio_files_descriptors.find(fd) != capio_files_descriptors.end()) {
-		long int offset = add_read_request(fd, count);
-		bool in_shm = check_cache(fd);
-		if (in_shm) {
-			std::cout << "read shm before" << offset << std::endl;
-			read_shm(files[fd].first, offset, buffer, count);
-			std::cout << "read shm after" << offset << std::endl;
-		}
-		else {
-			read_from_disk(fd, offset, buffer, count);
-		}
-		files[fd].second = offset;
+		long int offset = std::get<1>(files[fd]);
+		//bool in_shm = check_cache(fd);
+		//if (in_shm) {
+			if (offset + count > std::get<2>(files[fd]))
+				add_read_request(fd, count);
+			read_shm(std::get<0>(files[fd]), offset, buffer, count);
+		//}
+		//else {
+			//read_from_disk(fd, offset, buffer, count);
+		//}
+		std::get<1>(files[fd]) = offset + count;
 		return count;
 	}
 	else { 
@@ -322,19 +324,15 @@ ssize_t read(int fd, void *buffer, size_t count) {
 
 ssize_t write(int fd, const  void *buffer, size_t count) {
 	if (capio_files_descriptors.find(fd) != capio_files_descriptors.end()) {
-		add_write_request(fd, count);
-		if (files.find(fd) == files.end()) { //only for debug
-			std::cerr << "error write to invalid adress" << std::endl;
-			exit(1);
-		}
-		bool in_shm = check_cache(fd);
-		if (in_shm) {
-			write_shm(files[fd].first, files[fd].second, buffer, count);
-		}
-		else {
-			write_to_disk(fd, files[fd].second, buffer, count);
-		}
-		files[fd].second += count;
+		add_write_request(fd, count); //bottleneck
+		//bool in_shm = check_cache(fd);
+		//if (in_shm) {
+		write_shm(std::get<0>(files[fd]), std::get<1>(files[fd]), buffer, count);
+		//}
+		//else {
+			//write_to_disk(fd, files[fd].second, buffer, count);
+		//}
+		std::get<1>(files[fd]) += count;
 		return count;
 	}
 	else {

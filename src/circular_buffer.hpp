@@ -42,7 +42,7 @@ class Circular_buffer {
 				err_exit("shm_open " + shm_name);
 			if (ftruncate(fd, size) == -1)
 				err_exit("ftruncate " + shm_name);
-			p = mmap(NULL, size * _elem_size, PROT_READ|PROT_WRITE, MAP_SHARED, fd, 0);
+			p = mmap(NULL, size, PROT_READ|PROT_WRITE, MAP_SHARED, fd, 0);
 			if (p == MAP_FAILED)
 				err_exit("mmap " + shm_name);
 
