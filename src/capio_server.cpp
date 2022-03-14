@@ -206,7 +206,6 @@ void write_file_location(const std::string& file_name, int rank, std::string pat
     lock.l_len = 0;           // len is zero, which is a special value representing end
     // of file (no matter how large the file grows in future)
     lock.l_pid = getpid();
-
     if (fcntl(fd, F_SETLKW, &lock) == -1) { // F_SETLK doesn't block, F_SETLKW does
         std::cerr << "write " << rank << "failed to lock the file" << std::endl;
     }
@@ -857,6 +856,22 @@ bool data_avaiable(const char* path_c, long int offset, long int nbytes_requeste
 	return offset + nbytes_requested <= file_size;
 }
 
+void lightweight_MPI_Recv(char* buf_recv) {
+	MPI_Request request;
+	int received = 0;
+	MPI_Irecv(buf_recv, 2048, MPI_CHAR, MPI_ANY_SOURCE, 0, MPI_COMM_WORLD, &request); //receive from server
+	struct timespec sleepTime;
+    struct timespec returnTime;
+    sleepTime.tv_sec = 0;
+    sleepTime.tv_nsec = 200000;
+
+	while (!received) {
+		MPI_Test(&request, &received, MPI_STATUS_IGNORE);
+		nanosleep(&sleepTime, &returnTime);
+	}
+}
+
+
 void* capio_helper(void* pthread_arg) {
 	char buf_recv[2048];
 	char* buf_send;
@@ -865,7 +880,7 @@ void* capio_helper(void* pthread_arg) {
 	MPI_Comm_rank(MPI_COMM_WORLD, &rank);
 	sem_wait(&internal_server_sem);
 	while(true) {
-		MPI_Recv(buf_recv, 2048, MPI_CHAR, MPI_ANY_SOURCE, 0, MPI_COMM_WORLD, &status); //receive from server
+		lightweight_MPI_Recv(buf_recv); //receive from server
 		bool remote_request_to_read = strncmp(buf_recv, "read", 4) == 0;
 		if (remote_request_to_read) {
 		    // schema msg received: "read path dest offset nbytes"
