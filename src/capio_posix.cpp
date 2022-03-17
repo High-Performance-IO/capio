@@ -42,7 +42,8 @@ struct dirent* (*real_readdir) (DIR *dirp);
 DIR* (*real_opendir)(const char *name);
 
 static bool is_fstat = true;
-
+int num_writes_batch = 1;
+int actual_num_writes = 1;
 // fd -> (shm*, offset, file_size)
 std::unordered_map<int, std::tuple<void*, long int, long int>> files;
 Circular_buffer<char>* buf_requests;
@@ -64,6 +65,16 @@ std::unordered_set<std::string> capio_files_paths;
  */
 
 void mtrace_init(void) {
+	char* val;
+	val = getenv("GW_BATCH");
+	if (val != NULL) {
+		num_writes_batch = std::stoi(val);
+		std::cout << num_writes_batch << std::endl;
+		if (num_writes_batch <= 0) {
+			std::cerr << "error: GW_BATCH variable must be >= 0";
+			exit(1);
+		}
+	}
 	real_open = (int (*)(const char*, int, ...)) dlsym(RTLD_NEXT, "open");
 	if (NULL == real_open) {
 		std::cerr << "Error in `dlsym open`: " << dlerror() << std::endl;;
@@ -157,10 +168,17 @@ void add_read_request(int fd, size_t count) {
 	return;
 }
 
+
 void add_write_request(int fd, size_t count) {
 	char c_str[64];
-	sprintf(c_str, "writ %d %d %ld", getpid(),fd, count);
-	buf_requests->write(c_str);
+	std::get<1>(files[fd]) += count;
+	sprintf(c_str, "writ %d %d %ld", getpid(),fd, std::get<1>(files[fd]));
+	if (actual_num_writes == num_writes_batch) {
+		buf_requests->write(c_str);
+		actual_num_writes = 1;
+	}
+	else
+		++actual_num_writes;
 	//sem_wait(sem_response);
 	return;
 }
@@ -324,15 +342,14 @@ ssize_t read(int fd, void *buffer, size_t count) {
 
 ssize_t write(int fd, const  void *buffer, size_t count) {
 	if (capio_files_descriptors.find(fd) != capio_files_descriptors.end()) {
-		add_write_request(fd, count); //bottleneck
 		//bool in_shm = check_cache(fd);
 		//if (in_shm) {
 		write_shm(std::get<0>(files[fd]), std::get<1>(files[fd]), buffer, count);
+		add_write_request(fd, count); //bottleneck
 		//}
 		//else {
 			//write_to_disk(fd, files[fd].second, buffer, count);
 		//}
-		std::get<1>(files[fd]) += count;
 		return count;
 	}
 	else {

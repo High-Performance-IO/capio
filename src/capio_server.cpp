@@ -388,89 +388,90 @@ struct handle_write_metadata{
 };
 
 void handle_write(const char* str, int rank) {
-	#ifdef CAPIOLOG
-	std::cout << "handle write" << std::endl;
-	#endif
-	//check if another process is waiting for this data
-	std::string request;
-	int pid, fd, res;
-	long int data_size;
-	std::istringstream stream(str);
-	stream >> request >> pid >> fd >> data_size;
-	if (processes_files[pid][fd].second == 0) {
-		write_file_location("files_location.txt", rank, processes_files_metadata[pid][fd]);
-	}
-	processes_files[pid][fd].second += data_size;
-	std::string path = processes_files_metadata[pid][fd];
-	*files_metadata[path].second += data_size; //works only if there is only one writer at time	for each file
-	/*total_bytes_shm += data_size;
-	if (total_bytes_shm > max_shm_size && on_disk.find(path) == on_disk.end()) {
-		shm_full = true;
-		flush_file_to_disk(pid, fd);
-		int i = 0;
-		bool found = false;
-		while (!found && i < *caching_info[pid].second) {
-			if (caching_info[pid].first[i] == fd) {
-				found = true;
-			}
-			else {
-				i += 2;
-			}
-		}
-		if (i >= *caching_info[pid].second) {
-			MPI_Finalize();
-			exit(1);
-		}
-		if (found) {
-			caching_info[pid].first[i + 1] = 1;
-		}
-		on_disk.insert(path);
-	}*/
-	//sem_post(sems_response[pid]);
-	auto it = pending_reads.find(path);
-	sem_wait(sems_write[pid]);
-	if (it != pending_reads.end()) {
-		auto& pending_reads_this_file = it->second;	
-		int i = 0;
-		for (auto it_vec = pending_reads_this_file.begin(); it_vec != pending_reads_this_file.end(); it++) {
-			auto tuple = *it_vec;
-			int pending_pid = std::get<0>(tuple);
-			int fd = std::get<1>(tuple);
-			long int process_offset = processes_files[pending_pid][fd].second;
-			long int count = std::get<2>(tuple);
-			long int file_size = *files_metadata[path].second; 
-			if (process_offset + count <= file_size) {
-				handle_pending_read(pending_pid, fd, process_offset, count);
-			}
-			pending_reads_this_file.erase(it_vec);
-			++i;
-		}
-	}
-	auto it_client = clients_remote_pending_reads.find(path);
-	std::list<std::tuple<long int, long int, sem_t*>>::iterator it_list, prev_it_list;
-	if (it_client !=  clients_remote_pending_reads.end()) {
-		while (it_list != it_client->second.end()) {
-			long int offset = std::get<0>(*it_list);
-			long int nbytes = std::get<1>(*it_list);
-			sem_t* sem = std::get<2>(*it_list);
-			if (offset + nbytes <  processes_files[pid][fd].second + data_size) {
-				sem_post(sem);
-				if (it_list == it_client->second.begin()) {
-					it_client->second.erase(it_list);
-					it_list = it_client->second.begin();
-				}
-				else {
-					it_client->second.erase(it_list);
-					it_list = std::next(prev_it_list);
-				}
-			}
-			else {
-				prev_it_list = it_list;
-				++it_list;
-			}
-		}
-	}
+        #ifdef CAPIOLOG
+        std::cout << "handle write" << std::endl;
+        #endif
+        //check if another process is waiting for this data
+        std::string request;
+        int pid, fd, res;
+        long int data_size;
+        std::istringstream stream(str);
+        stream >> request >> pid >> fd >> data_size;
+        if (processes_files[pid][fd].second == 0) {
+                write_file_location("files_location.txt", rank, processes_files_metadata[pid][fd]);
+        }
+        processes_files[pid][fd].second = data_size;
+        std::string path = processes_files_metadata[pid][fd];
+        *files_metadata[path].second = data_size; //works only if there is only one writer at time      for each file
+        /*total_bytes_shm += data_size;
+        if (total_bytes_shm > max_shm_size && on_disk.find(path) == on_disk.end()) {
+                shm_full = true;
+                flush_file_to_disk(pid, fd);
+                int i = 0;
+                bool found = false;
+                while (!found && i < *caching_info[pid].second) {
+                        if (caching_info[pid].first[i] == fd) {
+                                found = true;
+                        }
+                        else {
+                                i += 2;
+								                       }
+                }
+                if (i >= *caching_info[pid].second) {
+                        MPI_Finalize();
+                        exit(1);
+                }
+                if (found) {
+                        caching_info[pid].first[i + 1] = 1;
+                }
+                on_disk.insert(path);
+        }*/
+        //sem_post(sems_response[pid]);
+        auto it = pending_reads.find(path);
+        sem_wait(sems_write[pid]);
+        if (it != pending_reads.end()) {
+                auto& pending_reads_this_file = it->second;
+                int i = 0;
+                for (auto it_vec = pending_reads_this_file.begin(); it_vec != pending_reads_this_file.end(); it++) {
+                        auto tuple = *it_vec;
+                        int pending_pid = std::get<0>(tuple);
+                        int fd = std::get<1>(tuple);
+                        long int process_offset = processes_files[pending_pid][fd].second;
+                        long int count = std::get<2>(tuple);
+                        long int file_size = *files_metadata[path].second;
+                        if (process_offset + count <= file_size) {
+                                handle_pending_read(pending_pid, fd, process_offset, count);
+                        }
+                        pending_reads_this_file.erase(it_vec);
+                        ++i;
+                }
+        }
+        auto it_client = clients_remote_pending_reads.find(path);
+		std::list<std::tuple<long int, long int, sem_t*>>::iterator it_list, prev_it_list;
+        if (it_client !=  clients_remote_pending_reads.end()) {
+                while (it_list != it_client->second.end()) {
+                        long int offset = std::get<0>(*it_list);
+                        long int nbytes = std::get<1>(*it_list);
+                        sem_t* sem = std::get<2>(*it_list);
+                        if (offset + nbytes < data_size) {
+                                sem_post(sem);
+                                if (it_list == it_client->second.begin()) {
+                                        it_client->second.erase(it_list);
+                                        it_list = it_client->second.begin();
+                                }
+                                else {
+                                        it_client->second.erase(it_list);
+                                        it_list = std::next(prev_it_list);
+                                }
+                        }
+                        else {
+                                prev_it_list = it_list;
+                                ++it_list;
+                        }
+                }
+        }
 }
+
 
 /*
  * Multithread function
