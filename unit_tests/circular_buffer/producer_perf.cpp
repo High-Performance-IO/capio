@@ -9,9 +9,9 @@ void test_one_to_one(const std::string& buffer_name, long int buff_size, int* da
 	}
 }
 
-void initialize_data(int* data, long int num_elems, long int num_writes, int rank) {
-	for (long int k = 0; k < num_writes; ++k) {
-		for (long int i = 0; i < num_elems; ++i) {
+void initialize_data(int* data, size_t num_elems, size_t num_writes, int rank) {
+	for (size_t k = 0; k < num_writes; ++k) {
+		for (size_t i = 0; i < num_elems; ++i) {
 			data[i + k * num_elems] = i % 10 + rank;
 		}
 	}
@@ -19,7 +19,7 @@ void initialize_data(int* data, long int num_elems, long int num_writes, int ran
 
 int main(int argc, char** argv) {
 	int rank;
-	long int num_elems, num_writes, buff_size;
+	size_t num_elems, num_writes, buff_size;
 	MPI_Init(&argc, &argv);
 	if (argc != 4) {
 		std::cerr << "input error: 4 parameters must be passed" << std::endl;

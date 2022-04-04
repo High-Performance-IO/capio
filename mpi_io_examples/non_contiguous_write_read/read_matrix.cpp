@@ -45,7 +45,7 @@ void write_matrix(int buf[], int blocks_size, int num_processes, int blocks_side
 // master : process with rank equals to 0
 
 void master(int num_elems, int blocks_side_length, int num_processes) {
-    int buf[num_elems];
+    int* buf = (int*) malloc(num_elems * sizeof(int));
     MPI_Status status;
     int blocks_size;
     blocks_size = blocks_side_length * blocks_side_length;
@@ -56,6 +56,7 @@ void master(int num_elems, int blocks_side_length, int num_processes) {
     }
     write_matrix(buf, blocks_size, num_processes, blocks_side_length);
         std::cout << "master ended computation " << std::endl;
+	free(buf);
 }
 
 // Create a datatype representing a distributed array using specific parameters for the problem
@@ -102,7 +103,7 @@ void read_block(int worker_rank, MPI_Comm workers_comm, int local_array[], int l
 // worker : process with rank > 0
 
 void worker(int blocks_side_length, int matrix_side_length, MPI_Comm workers_comm) {
-    int local_array[blocks_side_length * blocks_side_length];
+    int* local_array = (int*) malloc(blocks_side_length * blocks_side_length * sizeof(int));
     int local_array_size;
     int worker_rank;
     int mpi_error;
@@ -119,6 +120,7 @@ void worker(int blocks_side_length, int matrix_side_length, MPI_Comm workers_com
         std::cout << "worker " << worker_rank << " error during send" << std::endl;
     }
     std::cout << "worker " << worker_rank << " ended its computation " << std::endl;
+	free(local_array);
 }
 
 // function used by the master to print error messages
