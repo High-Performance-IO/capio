@@ -768,8 +768,22 @@ void read_next_msg(int rank) {
 	return;
 }
 
+void clean_files_location() {
+	int fd;
+	if ((fd = open("files_location.txt", O_CREAT|O_TRUNC, 0664)) == -1) {
+		err_exit("open files_location");
+	}
+	
+	if (close(fd) == -1) {
+		std::cerr << "impossible close the file files_location" << std::endl;
+	}
+}
+
 void handshake_servers(int rank, int size) {
 	char* buf;	
+	if (rank == 0) {
+		clean_files_location();
+	}
 	for (int i = 0; i < size; i += 1) {
 		if (i != rank) {
 			MPI_Send(node_name, strlen(node_name), MPI_CHAR, i, 0, MPI_COMM_WORLD); //TODO: possible deadlock
