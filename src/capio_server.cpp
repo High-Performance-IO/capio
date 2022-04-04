@@ -148,7 +148,7 @@ void* create_shm_circular_buffer(std::string shm_name) {
 		err_exit("ftruncate");
 	p = mmap(NULL, size, PROT_READ|PROT_WRITE, MAP_SHARED, fd, 0);
 	if (p == MAP_FAILED)
-		err_exit("mmap");
+		err_exit("mmap create_shm_circular_buffer");
 //	if (close(fd) == -1);
 //		err_exit("close");
 	return p;
@@ -166,7 +166,7 @@ int* create_shm_int(std::string shm_name) {
 		err_exit("ftruncate");
 	p = mmap(NULL, size, PROT_READ|PROT_WRITE, MAP_SHARED, fd, 0);
 	if (p == MAP_FAILED)
-		err_exit("mmap");
+		err_exit("mmap create_shm_int");
 //	if (close(fd) == -1);
 //		err_exit("close");
 	return (int*) p;
@@ -183,7 +183,7 @@ long int* create_shm_long_int(std::string shm_name) {
 		err_exit("ftruncate");
 	p = mmap(NULL, size, PROT_READ|PROT_WRITE, MAP_SHARED, fd, 0);
 	if (p == MAP_FAILED)
-		err_exit("mmap");
+		err_exit("mmap create_shm_long_int");
 //	if (close(fd) == -1);
 //		err_exit("close");
 	return (long int*) p;
