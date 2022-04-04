@@ -47,7 +47,6 @@ void test_4(int rank, int num_prods, sem_t* sem_prod, sem_t* sem_cons) {
 
 void test_one_to_one_str(const std::string& buff_name, long int buff_size, long int num_elems, int rank, sem_t* sem_prod, sem_t* sem_cons) {
 	Circular_buffer<char> c_buff(buff_name + std::to_string(rank), buff_size, 6 * sizeof(char));	
-	int val;
 	char c_str[6];
 	std::string str;
 	for (long int i = 0; i < num_elems; ++i) {

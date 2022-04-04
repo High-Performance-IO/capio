@@ -45,10 +45,10 @@ static bool is_fstat = true;
 int num_writes_batch = 1;
 int actual_num_writes = 1;
 // fd -> (shm*, offset, file_size)
-std::unordered_map<int, std::tuple<void*, long int, long int>> files;
+std::unordered_map<int, std::tuple<void*, size_t, size_t>> files;
 Circular_buffer<char>* buf_requests;
  
-Circular_buffer<long int>* buf_response;
+Circular_buffer<size_t>* buf_response;
 sem_t* sem_response;
 sem_t* sem_write;
 int* client_caching_info;
@@ -135,7 +135,7 @@ void mtrace_init(void) {
 	sem_response = sem_open(("sem_response_read" + std::to_string(getpid())).c_str(),  O_CREAT | O_RDWR, S_IRUSR | S_IWUSR, 0);
 	sem_write = sem_open(("sem_write" + std::to_string(getpid())).c_str(),  O_CREAT | O_RDWR, S_IRUSR | S_IWUSR, 0);
 	buf_requests = new Circular_buffer<char>("circular_buffer", 256L * 1024 * 1024, sizeof(char) * 64);
-	buf_response = new Circular_buffer<long int>("buf_response" + std::to_string(getpid()), 256L * 1024 * 1024, sizeof(long int));
+	buf_response = new Circular_buffer<size_t>("buf_response" + std::to_string(getpid()), 256L * 1024 * 1024, sizeof(long int));
 	client_caching_info = (int*) create_shm("caching_info" + std::to_string(getpid()), 4096);
 	caching_info_size = (int*) create_shm("caching_info_size" + std::to_string(getpid()), sizeof(int));
 	*caching_info_size = 0; 
@@ -143,7 +143,7 @@ void mtrace_init(void) {
 }
 
 int add_open_request(const char* pathname) {
-	long int fd;
+	size_t fd;
 	std::string str ("open " + std::to_string(getpid()) + " " + std::string(pathname));
 	const char* c_str = str.c_str();
 	buf_requests->write(c_str); //TODO: max upperbound for pathname
@@ -162,7 +162,7 @@ void add_read_request(int fd, size_t count) {
 	const char* c_str = str.c_str();
 	buf_requests->write(c_str);
 	//read response (offest)
-	long int file_size;
+	size_t file_size;
 	buf_response->read(&file_size);
 	std::get<2>(files[fd]) = file_size;
 	return;
@@ -322,7 +322,7 @@ int close(int fd) {
 
 ssize_t read(int fd, void *buffer, size_t count) {
 	if (capio_files_descriptors.find(fd) != capio_files_descriptors.end()) {
-		long int offset = std::get<1>(files[fd]);
+		size_t offset = std::get<1>(files[fd]);
 		//bool in_shm = check_cache(fd);
 		//if (in_shm) {
 			if (offset + count > std::get<2>(files[fd]))

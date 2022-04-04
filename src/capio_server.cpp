@@ -35,7 +35,7 @@ std::unordered_map<int, std::unordered_map<int, std::pair<void*, long int>>> pro
 std::unordered_map<int, std::unordered_map<int, std::string>> processes_files_metadata;
 
 // pid -> (response shared buffer, index)
-std::unordered_map<int, Circular_buffer<long int>*> response_buffers;
+std::unordered_map<int, Circular_buffer<size_t>*> response_buffers;
 
 /*
  * Regarding the map caching info.
@@ -54,7 +54,7 @@ std::unordered_map<int, Circular_buffer<long int>*> response_buffers;
 std::unordered_map<int, std::pair<int*, int*>> caching_info;
 
 // pathname -> (file_shm, file_size)
-std::unordered_map<std::string, std::pair<void*, long int*>> files_metadata;
+std::unordered_map<std::string, std::pair<void*, size_t*>> files_metadata;
 
 // pathname -> node
 std::unordered_map<std::string, char*> files_location;
@@ -140,7 +140,6 @@ void* create_shm_circular_buffer(std::string shm_name) {
 	void* p = nullptr;
 	// if we are not creating a new object, mode is equals to 0
 	int fd = shm_open(shm_name.c_str(), O_CREAT | O_RDWR,  S_IRUSR | S_IWUSR); //to be closed
-	struct stat sb;
 	const long int size = 1024L * 1024 * 1024;
 	if (fd == -1)
 		err_exit("shm_open");
@@ -158,7 +157,6 @@ int* create_shm_int(std::string shm_name) {
 	void* p = nullptr;
 	// if we are not creating a new object, mode is equals to 0
 	int fd = shm_open(shm_name.c_str(), O_CREAT | O_RDWR,  S_IRUSR | S_IWUSR); //to be closed
-	struct stat sb;
 	const int size = sizeof(int);
 	if (fd == -1)
 		err_exit("shm_open");
@@ -171,22 +169,21 @@ int* create_shm_int(std::string shm_name) {
 //		err_exit("close");
 	return (int*) p;
 }
-long int* create_shm_long_int(std::string shm_name) {
+size_t* create_shm_size_t(std::string shm_name) {
 	void* p = nullptr;
 	// if we are not creating a new object, mode is equals to 0
 	int fd = shm_open(shm_name.c_str(), O_CREAT | O_RDWR,  S_IRUSR | S_IWUSR); //to be closed
-	struct stat sb;
-	const int size = sizeof(long int);
+	const int size = sizeof(size_t);
 	if (fd == -1)
 		err_exit("shm_open");
 	if (ftruncate(fd, size) == -1)
 		err_exit("ftruncate");
 	p = mmap(NULL, size, PROT_READ|PROT_WRITE, MAP_SHARED, fd, 0);
 	if (p == MAP_FAILED)
-		err_exit("mmap create_shm_long_int");
+		err_exit("mmap create_shm_size_t");
 //	if (close(fd) == -1);
 //		err_exit("close");
-	return (long int*) p;
+	return (size_t*) p;
 }
 
 void write_file_location(const std::string& file_name, int rank, std::string path_to_write) {
@@ -209,8 +206,6 @@ void write_file_location(const std::string& file_name, int rank, std::string pat
     if (fcntl(fd, F_SETLKW, &lock) == -1) { // F_SETLK doesn't block, F_SETLKW does
         std::cerr << "write " << rank << "failed to lock the file" << std::endl;
     }
-    int res, k = 0;
-    int num_elements_written;
     
 	const char* path_to_write_cstr = path_to_write.c_str();
 	const char* space_str = " ";
@@ -223,7 +218,7 @@ void write_file_location(const std::string& file_name, int rank, std::string pat
 	memcpy(file_location + len1 + len2, node_name, len3);
 	file_location[len1 + len2 + len3] = '\n';
 	file_location[len1 + len2 + len3 + 1] = '\0';
-	res = write(fd, file_location, sizeof(char) * strlen(file_location));
+	write(fd, file_location, sizeof(char) * strlen(file_location));
 	files_location[path_to_write] = node_name;
 	// Now release the lock explicitly.
     lock.l_type = F_UNLCK;
@@ -327,13 +322,13 @@ void handle_open(char* str, char* p, int rank) {
 		if (sems_write[pid] == SEM_FAILED) {
 			err_exit("error creating sem_write" + std::to_string(pid));
 		}
-		Circular_buffer<long int>* cb = new Circular_buffer<long int>("buf_response" + std::to_string(pid), 256L * 1024 * 1024, sizeof(long int));
+		Circular_buffer<size_t>* cb = new Circular_buffer<size_t>("buf_response" + std::to_string(pid), 256L * 1024 * 1024, sizeof(long int));
 		response_buffers.insert({pid, cb});
 		caching_info[pid].first = (int*) get_shm("caching_info" + std::to_string(pid));
 		caching_info[pid].second = (int*) get_shm("caching_info_size" + std::to_string(pid));
 	}
 	std::string path(p + 1);
-	long int fd = open(path.c_str(), O_CREAT | O_RDWR, S_IRUSR | S_IRWXU);
+	int fd = open(path.c_str(), O_CREAT | O_RDWR, S_IRUSR | S_IRWXU);
 	if (fd == -1) {
 	std::cerr << "capio server, error to open the file " << path << std::endl;
 	MPI_Finalize();
@@ -353,10 +348,11 @@ void handle_open(char* str, char* p, int rank) {
 		//TODO: check the size that the user wrote in the configuration file
 	processes_files[pid][fd] = std::pair<void*, int>(p_shm, 0); //TODO: what happens if a process open the same file twice?
 	*caching_info[pid].second += 2;
-	response_buffers[pid]->write(&fd);
+	size_t fdt = fd;
+	response_buffers[pid]->write(&fdt);
 	if (files_metadata.find(path) == files_metadata.end()) {
 		files_metadata[path].first = processes_files[pid][fd].first;	
-		files_metadata[path].second = create_shm_long_int(path + "_size");	
+		files_metadata[path].second = create_shm_size_t(path + "_size");	
 
 		if (files_metadata.find(path) == files_metadata.end()) {//debug
 			std::cerr << "server " << rank << " error updating" <<std ::endl;
@@ -393,7 +389,7 @@ void handle_write(const char* str, int rank) {
         #endif
         //check if another process is waiting for this data
         std::string request;
-        int pid, fd, res;
+        int pid, fd;
         long int data_size;
         std::istringstream stream(str);
         stream >> request >> pid >> fd >> data_size;
@@ -478,13 +474,13 @@ void handle_write(const char* str, int rank) {
  *
  */
 
-void handle_local_read(int pid, int fd, long int count) {
+void handle_local_read(int pid, int fd, size_t count) {
 		#ifdef CAPIOLOG
 		std::cout << "handle local read" << std::endl;
 		#endif
 		std::string path = processes_files_metadata[pid][fd];
-		long int file_size = *files_metadata[path].second;
-		long int process_offset = processes_files[pid][fd].second;
+		size_t file_size = *files_metadata[path].second;
+		size_t process_offset = processes_files[pid][fd].second;
 		if (process_offset + count > file_size) {
 			pending_reads[path].push_back(std::make_tuple(pid, fd, count));
 			return;
@@ -528,14 +524,14 @@ void handle_remote_read(int pid, int fd, long int count, int rank) {
 struct wait_for_file_metadata{
 	int pid;
 	int fd;
-	long int count;
+	size_t count;
 };
 
 void* wait_for_file(void* pthread_arg) {
 	struct wait_for_file_metadata* metadata = (struct wait_for_file_metadata*) pthread_arg;
 	int pid = metadata->pid;
 	int fd = metadata-> fd;
-	long int count = metadata->count;
+	size_t count = metadata->count;
 	//check if the data is created
 	FILE* fp;
 	bool found = false;
@@ -661,7 +657,7 @@ void handle_close(char* str, char* p) {
 	#ifdef CAPIOLOG
 	std::cout << "handle close" << std::endl;
 	#endif
-	int pid = strtol(str + 5, &p, 10);;
+	strtol(str + 5, &p, 10);;
 	int fd = strtol(p, &p, 10);
 	if (close(fd) == -1) {
 		std::cerr << "capio server, error: impossible close the file with fd = " << fd << std::endl;
@@ -723,7 +719,6 @@ void read_next_msg(int rank) {
 	buf_requests->read(str);
 	char* p = str;
 	is_open = strncmp(str, "open", 4) == 0;
-	int pid;
 	#ifdef CAPIOLOG
 	std::cout << "next msg " << str << std::endl;
 	#endif
@@ -823,7 +818,6 @@ void serve_remote_read(const char* path_c, const char* offset_str, int dest, lon
 	free(buf_send);
 	//send data
 	void* file_shm = get_shm(path_c);
-	int* size_shm = (int*) get_shm(std::string(path_c) + "_size");
 	#ifdef MYDEBUG
 	int* tmp = (int*) malloc(*size_shm);
 	std::cout << "helper sending " << *size_shm << " bytes" << std::endl;
@@ -875,7 +869,6 @@ void lightweight_MPI_Recv(char* buf_recv) {
 
 void* capio_helper(void* pthread_arg) {
 	char buf_recv[2048];
-	char* buf_send;
 	MPI_Status status;
 	int rank;
 	MPI_Comm_rank(MPI_COMM_WORLD, &rank);
@@ -885,7 +878,6 @@ void* capio_helper(void* pthread_arg) {
 		bool remote_request_to_read = strncmp(buf_recv, "read", 4) == 0;
 		if (remote_request_to_read) {
 		    // schema msg received: "read path dest offset nbytes"
-			char** p_tmp;
 			char* path_c = (char*) malloc(sizeof(char) * 512);
 			int i = 5;
 			int j = 0;
@@ -960,7 +952,7 @@ void* capio_helper(void* pthread_arg) {
 			int bytes_received;
 			int source = status.MPI_SOURCE;
 			int offset = std::atoi(buf_recv + pos + 9);
-			MPI_Recv(file_shm + offset, 1024L * 1024 * 1024, MPI_BYTE, source, 0, MPI_COMM_WORLD, &status);//TODO; 4096 should be a parameter
+			MPI_Recv((char*)file_shm + offset, 1024L * 1024 * 1024, MPI_BYTE, source, 0, MPI_COMM_WORLD, &status);//TODO; 4096 should be a parameter
 			MPI_Get_count(&status, MPI_CHAR, &bytes_received); //why in recv MPI_BYTE while ehre MPI_CHAR?
 			bytes_received *= sizeof(char);
 			#ifdef MYDEBUG
@@ -986,7 +978,7 @@ void* capio_helper(void* pthread_arg) {
 
 
 int main(int argc, char** argv) {
-	int rank, size, len, provided;
+	int rank, len, provided;
 	MPI_Init_thread(&argc, &argv, MPI_THREAD_MULTIPLE, &provided);
     if(provided != MPI_THREAD_MULTIPLE)
     {

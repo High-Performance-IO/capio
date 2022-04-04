@@ -25,7 +25,7 @@ int sum_all(int *data, long int num_elements, long int num_reads) {
 
 int main(int argc, char** argv) {
 	int rank;
-	long int num_elems, num_reads, buff_size;
+	long unsigned int num_elems, num_reads, buff_size;
 	MPI_Init(&argc, &argv);
 	if (argc != 4) {
 		std::cerr << "input error: 4 parameter must be passed" << std::endl;

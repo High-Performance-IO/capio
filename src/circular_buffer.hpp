@@ -116,7 +116,7 @@ class Circular_buffer {
 			if (sem_wait(_mutex) == -1)
 				err_exit("sem_wait _mutex in write");
 			
-			memcpy(_shm + *_last_elem, data, _elem_size);
+			memcpy((char*) _shm + *_last_elem, data, _elem_size);
 			*_last_elem = (*_last_elem + _elem_size) % _buff_size;
 
 			if (sem_post(_mutex) == -1)
@@ -127,14 +127,13 @@ class Circular_buffer {
 		}
 	
 		void read(T* buff_rcv) {
-			int res;
 			if (sem_wait(_sem_num_elems) == -1)
 				err_exit("sem_wait _sem_num_elems");
 
 			if (sem_wait(_mutex) == -1)
 				err_exit("sem_wait _mutex in write");
 
-			memcpy(buff_rcv, _shm + *_first_elem, _elem_size);
+			memcpy( buff_rcv, (char*) _shm + *_first_elem, _elem_size);
 			*_first_elem = (*_first_elem + _elem_size) % _buff_size;
 
 			if (sem_post(_mutex) == -1)
