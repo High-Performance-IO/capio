@@ -6,6 +6,7 @@
 #include <unordered_set>
 #include <vector>
 #include <list>
+#include <tuple>
 #include <iostream>
 #include <pthread.h>
 #include <sstream>
@@ -25,6 +26,13 @@
 #include "utils/common.hpp"
 
 const long int max_shm_size = 1024L * 1024 * 1024 * 16;
+
+// maximum size of shm for each file
+const long int max_shm_size_file = 1024L * 1024 * 1024 * 8;
+
+// initial size for each file (can be overwritten by the user)
+const size_t file_initial_size = 1024L * 1024 * 1024 * 4;
+
 bool shm_full = false;
 long int total_bytes_shm = 0;
 
@@ -53,8 +61,13 @@ std::unordered_map<int, Circular_buffer<size_t>*> response_buffers;
 // pid -> (response shared buffer, size)
 std::unordered_map<int, std::pair<int*, int*>> caching_info;
 
-// pathname -> (file_shm, file_size)
-std::unordered_map<std::string, std::pair<void*, size_t*>> files_metadata;
+/* pathname -> (file_shm, file_size, mapped_shm_size)
+ * The mapped shm size isn't the the size of the file shm
+ * but it's the mapped shm size in the virtual adress space
+ * of the server process. The effective size can ge greater
+ * in a given moment.
+ */
+std::unordered_map<std::string, std::tuple<void*, size_t*, size_t>> files_metadata;
 
 // pathname -> node
 std::unordered_map<std::string, char*> files_location;
@@ -87,7 +100,7 @@ std::unordered_map<std::string, std::list<std::tuple<int, int, long int>>>  my_r
  *
  */
 
-std::unordered_map<std::string, std::list<std::tuple<long int, long int, sem_t*>>> clients_remote_pending_reads;
+std::unordered_map<std::string, std::list<std::tuple<size_t, size_t, sem_t*>>> clients_remote_pending_reads;
 
 // it contains the file saved on disk
 std::unordered_set<std::string> on_disk;
@@ -297,7 +310,7 @@ bool check_remote_file(const std::string& file_name, int rank, std::string path_
 void flush_file_to_disk(int pid, int fd) {
 	void* buf = processes_files[pid][fd].first;
 	std::string path = processes_files_metadata[pid][fd];
-	long int file_size = *files_metadata[path].second;	
+	long int file_size = *std::get<1>(files_metadata[path]);	
 	long int num_bytes_written, k = 0;
 	while (k < file_size) {
     	num_bytes_written = write(fd, ((char*) buf) + k, (file_size - k));
@@ -351,8 +364,9 @@ void handle_open(char* str, char* p, int rank) {
 	size_t fdt = fd;
 	response_buffers[pid]->write(&fdt);
 	if (files_metadata.find(path) == files_metadata.end()) {
-		files_metadata[path].first = processes_files[pid][fd].first;	
-		files_metadata[path].second = create_shm_size_t(path + "_size");	
+		 p_shm = processes_files[pid][fd].first;	
+		size_t* p_shm_size = create_shm_size_t(path + "_size");	
+		files_metadata[path] = std::make_tuple(p_shm, p_shm_size, file_initial_size);
 
 		if (files_metadata.find(path) == files_metadata.end()) {//debug
 			std::cerr << "server " << rank << " error updating" <<std ::endl;
@@ -372,7 +386,7 @@ void handle_pending_read(int pid, int fd, long int process_offset, long int coun
 	free(tmp);
 	#endif
 	std::string path = processes_files_metadata[pid][fd];
-	response_buffers[pid]->write(files_metadata[path].second);
+	response_buffers[pid]->write(std::get<1>(files_metadata[path]));
 	processes_files[pid][fd].second += count;
 	//TODO: check if the file was moved to the disk
 
@@ -390,7 +404,7 @@ void handle_write(const char* str, int rank) {
         //check if another process is waiting for this data
         std::string request;
         int pid, fd;
-        long int data_size;
+        size_t data_size;
         std::istringstream stream(str);
         stream >> request >> pid >> fd >> data_size;
         if (processes_files[pid][fd].second == 0) {
@@ -398,7 +412,22 @@ void handle_write(const char* str, int rank) {
         }
         processes_files[pid][fd].second = data_size;
         std::string path = processes_files_metadata[pid][fd];
-        *files_metadata[path].second = data_size; //works only if there is only one writer at time      for each file
+        *std::get<1>(files_metadata[path]) = data_size; //works only if there is only one writer at time      for each file
+		size_t file_shm_size = std::get<2>(files_metadata[path]);
+		if (data_size > file_shm_size) {
+			//remap
+			size_t new_size;
+			if (data_size > file_shm_size * 2)
+				new_size = data_size;
+			else
+				new_size = file_shm_size * 2;
+
+			void* p = mremap(std::get<0>(files_metadata[path]), file_shm_size, new_size, MREMAP_MAYMOVE);
+			if (p == MAP_FAILED)
+				err_exit("mremap " + path);
+			std::get<0>(files_metadata[path]) = p;
+			std::get<2>(files_metadata[path]) = new_size;
+		}
         /*total_bytes_shm += data_size;
         if (total_bytes_shm > max_shm_size && on_disk.find(path) == on_disk.end()) {
                 shm_full = true;
@@ -434,7 +463,7 @@ void handle_write(const char* str, int rank) {
                         int fd = std::get<1>(tuple);
                         long int process_offset = processes_files[pending_pid][fd].second;
                         long int count = std::get<2>(tuple);
-                        long int file_size = *files_metadata[path].second;
+                        long int file_size = *std::get<1>(files_metadata[path]);
                         if (process_offset + count <= file_size) {
                                 handle_pending_read(pending_pid, fd, process_offset, count);
                         }
@@ -443,11 +472,11 @@ void handle_write(const char* str, int rank) {
                 }
         }
         auto it_client = clients_remote_pending_reads.find(path);
-		std::list<std::tuple<long int, long int, sem_t*>>::iterator it_list, prev_it_list;
+		std::list<std::tuple<size_t, size_t, sem_t*>>::iterator it_list, prev_it_list;
         if (it_client !=  clients_remote_pending_reads.end()) {
                 while (it_list != it_client->second.end()) {
-                        long int offset = std::get<0>(*it_list);
-                        long int nbytes = std::get<1>(*it_list);
+                        size_t offset = std::get<0>(*it_list);
+                        size_t nbytes = std::get<1>(*it_list);
                         sem_t* sem = std::get<2>(*it_list);
                         if (offset + nbytes < data_size) {
                                 sem_post(sem);
@@ -479,7 +508,7 @@ void handle_local_read(int pid, int fd, size_t count) {
 		std::cout << "handle local read" << std::endl;
 		#endif
 		std::string path = processes_files_metadata[pid][fd];
-		size_t file_size = *files_metadata[path].second;
+		size_t file_size = *std::get<1>(files_metadata[path]);
 		size_t process_offset = processes_files[pid][fd].second;
 		if (process_offset + count > file_size) {
 			pending_reads[path].push_back(std::make_tuple(pid, fd, count));
@@ -692,7 +721,7 @@ void handle_remote_read(char* str, char* p, int rank) {
 			}
 			free(tmp);
 			#endif
-			response_buffers[pid]->write(files_metadata[path].second);
+			response_buffers[pid]->write(std::get<1>(files_metadata[path]));
 			processes_files[pid][fd].second += count;
 			//TODO: check if there is data that can be read in the local memory file
 			if (it == list_remote_reads.begin()) {
@@ -861,7 +890,7 @@ void* wait_for_data(void* pthread_arg) {
 
 
 bool data_avaiable(const char* path_c, long int offset, long int nbytes_requested) {
-	long int file_size = *files_metadata[path_c].second;
+	long int file_size = *std::get<1>(files_metadata[path_c]);
 	return offset + nbytes_requested <= file_size;
 }
 

@@ -44,8 +44,18 @@ DIR* (*real_opendir)(const char *name);
 static bool is_fstat = true;
 int num_writes_batch = 1;
 int actual_num_writes = 1;
-// fd -> (shm*, offset, file_size)
-std::unordered_map<int, std::tuple<void*, size_t, size_t>> files;
+
+// initial size for each file (can be overwritten by the user)
+const size_t file_initial_size = 1024L * 1024;
+
+/* fd -> (shm*, offset, file_size, mapped_shm_size )
+ * The mapped shm size isn't the the size of the file shm
+ * but it's the mapped shm size in the virtual adress space
+ * of the server process. The effective size can ge greater
+ * in a given moment.
+ */
+
+std::unordered_map<int, std::tuple<void*, size_t, size_t, size_t>> files;
 Circular_buffer<char>* buf_requests;
  
 Circular_buffer<size_t>* buf_response;
@@ -165,6 +175,20 @@ void add_read_request(int fd, size_t count) {
 	size_t file_size;
 	buf_response->read(&file_size);
 	std::get<2>(files[fd]) = file_size;
+	size_t file_shm_size = std::get<3>(files[fd]);
+	if (file_size > file_shm_size) {
+		size_t new_size;
+		if (file_size > file_shm_size * 2)
+			new_size = file_size;
+		else
+			new_size = file_shm_size * 2;
+
+		void* p = mremap(std::get<0>(files[fd]), file_shm_size, new_size, MREMAP_MAYMOVE);
+		if (p == MAP_FAILED)
+			err_exit("mremap " + std::to_string(fd));
+		std::get<0>(files[fd]) = p;
+		std::get<3>(files[fd]) = new_size;
+	}
 	return;
 }
 
@@ -285,7 +309,7 @@ int open(const char *pathname, int flags, ...) {
 	if (strncmp("file_", pathname, strlen(prefix)) == 0 || strncmp("output_file_", pathname, strlen(prefix_2)) == 0) {
 		//create shm
 		int fd = add_open_request(pathname);
-		files[fd] = std::make_tuple<void*, long int, long int>(get_shm(pathname), 0, 0);
+		files[fd] = std::make_tuple<void*, long int, long int>(get_shm(pathname), 0, 0, file_initial_size);
 		capio_files_descriptors[fd] = pathname;
 		capio_files_paths.insert(pathname);
 		return fd;
@@ -344,6 +368,25 @@ ssize_t write(int fd, const  void *buffer, size_t count) {
 	if (capio_files_descriptors.find(fd) != capio_files_descriptors.end()) {
 		//bool in_shm = check_cache(fd);
 		//if (in_shm) {
+		size_t file_shm_size = std::get<3>(files[fd]);
+		if (std::get<1>(files[fd]) > file_shm_size) {
+			size_t file_size = std::get<1>(files[fd]);
+			size_t new_size;
+			if (file_size + count > file_shm_size * 2)
+				new_size = file_size + count;
+			else
+				new_size = file_shm_size * 2;
+			std::string shm_name = capio_files_descriptors[fd];
+			int fd_shm = shm_open(shm_name.c_str(), O_RDWR,  S_IRUSR | S_IWUSR); 
+			if (fd == -1)
+				err_exit(" write_shm shm_open " + shm_name);
+			if (ftruncate(fd_shm, new_size) == -1)
+				err_exit("ftruncate " + shm_name);
+			void* p = mremap(std::get<0>(files[fd]), file_size, new_size, MREMAP_MAYMOVE);
+			if (p == MAP_FAILED)
+				err_exit("mremap " + shm_name);
+			close(fd_shm);
+		}
 		write_shm(std::get<0>(files[fd]), std::get<1>(files[fd]), buffer, count);
 		add_write_request(fd, count); //bottleneck
 		//}
