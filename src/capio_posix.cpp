@@ -46,7 +46,7 @@ int num_writes_batch = 1;
 int actual_num_writes = 1;
 
 // initial size for each file (can be overwritten by the user)
-const size_t file_initial_size = 1024L * 1024;
+const size_t file_initial_size = 1024L * 1024 * 1024 * 4;
 
 /* fd -> (shm*, offset, file_size, mapped_shm_size )
  * The mapped shm size isn't the the size of the file shm
