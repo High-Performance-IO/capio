@@ -696,9 +696,10 @@ void handle_close(char* str, char* p) {
 }
 
 void handle_remote_read(char* str, char* p, int rank) {
-	long int bytes_received, offset;
+	size_t bytes_received, offset;
 	char path_c[30];
 	sscanf(str, "ream %s %li %li", path_c, &bytes_received, &offset);
+	*std::get<1>(files_metadata[path_c]) += bytes_received;
 	std::string path(path_c);
 	int pid, fd;
 	long int count; //TODO: diff between count and bytes_received
@@ -861,8 +862,10 @@ void serve_remote_read(const char* path_c, const char* offset_str, int dest, lon
 	free(buf_send);
 	//send data
 	void* file_shm;
+	size_t file_size;
 	if (files_metadata.find(path_c) != files_metadata.end()) {
 		file_shm = std::get<0>(files_metadata[path_c]);
+		file_size = *std::get<1>(files_metadata[path_c]);
 		}
 	else {
 		std::cout << "error capio_helper file " << path_c << " not in shared memory" << std::endl;
@@ -877,7 +880,9 @@ void serve_remote_read(const char* path_c, const char* offset_str, int dest, lon
 	}
 	free(tmp);
 	#endif
-	MPI_Send(((char*)file_shm) + offset, nbytes, MPI_BYTE, dest, 0, MPI_COMM_WORLD); 
+	// Send all the rest of the file not only the number of bytes requested
+	// Useful for caching
+	MPI_Send(((char*)file_shm) + offset, file_size - offset, MPI_BYTE, dest, 0, MPI_COMM_WORLD); 
 }
 
 void* wait_for_data(void* pthread_arg) {
@@ -1023,7 +1028,6 @@ void* capio_helper(void* pthread_arg) {
 			std::string msg = "ream " + path + + " " + std::to_string(bytes_received) + " " + std::to_string(offset);
 			const char* c_str = msg.c_str();
 			buf_requests->write(c_str);
-
 		}
 		else {
 			std::cerr << "helper error receiving message" << std::endl;
