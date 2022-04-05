@@ -860,7 +860,14 @@ void serve_remote_read(const char* path_c, const char* offset_str, int dest, lon
 	MPI_Send(buf_send, strlen(buf_send) + 1, MPI_CHAR, dest, 0, MPI_COMM_WORLD);
 	free(buf_send);
 	//send data
-	void* file_shm = get_shm(path_c);
+	void* file_shm;
+	if (files_metadata.find(path_c) != files_metadata.end()) {
+		file_shm = std::get<0>(files_metadata[path_c]);
+		}
+	else {
+		std::cout << "error capio_helper file " << path_c << " not in shared memory" << std::endl;
+		exit(1);
+	}
 	#ifdef MYDEBUG
 	int* tmp = (int*) malloc(*size_shm);
 	std::cout << "helper sending " << *size_shm << " bytes" << std::endl;
@@ -991,7 +998,14 @@ void* capio_helper(void* pthread_arg) {
 			int pos = std::string((buf_recv + 8)).find(" ");
 			std::string path(buf_recv + 8);
 			path = path.substr(0, pos);
-			void* file_shm =  get_shm(path);
+			void* file_shm; 
+			if (files_metadata.find(path) != files_metadata.end()) {
+				file_shm = std::get<0>(files_metadata[path]);
+			}
+			else {
+				std::cout << "error capio_helper file " << path << " not in shared memory" << std::endl;
+				exit(1);
+			}
 			int bytes_received;
 			int source = status.MPI_SOURCE;
 			int offset = std::atoi(buf_recv + pos + 9);
