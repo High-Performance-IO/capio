@@ -37,7 +37,7 @@ bool shm_full = false;
 long int total_bytes_shm = 0;
 
 // pid -> fd ->(file_shm, index)
-std::unordered_map<int, std::unordered_map<int, std::pair<void*, long int>>> processes_files;
+std::unordered_map<int, std::unordered_map<int, std::pair<void*, size_t*>>> processes_files;
 
 // pid -> fd -> pathname
 std::unordered_map<int, std::unordered_map<int, std::string>> processes_files_metadata;
@@ -61,13 +61,13 @@ std::unordered_map<int, Circular_buffer<size_t>*> response_buffers;
 // pid -> (response shared buffer, size)
 std::unordered_map<int, std::pair<int*, int*>> caching_info;
 
-/* pathname -> (file_shm, file_size, mapped_shm_size)
+/* pathname -> (file_shm, file_size, mapped_shm_size, first_write)
  * The mapped shm size isn't the the size of the file shm
  * but it's the mapped shm size in the virtual adress space
  * of the server process. The effective size can ge greater
  * in a given moment.
  */
-std::unordered_map<std::string, std::tuple<void*, size_t*, size_t>> files_metadata;
+std::unordered_map<std::string, std::tuple<void*, size_t*, size_t, bool>> files_metadata;
 
 // pathname -> node
 std::unordered_map<std::string, char*> files_location;
@@ -121,6 +121,11 @@ void sig_term_handler(int signum, siginfo_t *info, void *ptr) {
 	for (auto& pair : files_metadata) {
 		shm_unlink(pair.first.c_str());
 		shm_unlink((pair.first + "_size").c_str());
+	}
+	for (auto& p1 : processes_files) {
+		for(auto& p2 : p1.second) {
+			shm_unlink(("offset_" + std::to_string(p1.first) +  "_" + std::to_string(p2.first)).c_str());
+		}
 	}
 	for (auto& pair : response_buffers) {
 		pair.second->free_shm();
@@ -181,22 +186,6 @@ int* create_shm_int(std::string shm_name) {
 //	if (close(fd) == -1);
 //		err_exit("close");
 	return (int*) p;
-}
-size_t* create_shm_size_t(std::string shm_name) {
-	void* p = nullptr;
-	// if we are not creating a new object, mode is equals to 0
-	int fd = shm_open(shm_name.c_str(), O_CREAT | O_RDWR,  S_IRUSR | S_IWUSR); //to be closed
-	const int size = sizeof(size_t);
-	if (fd == -1)
-		err_exit("shm_open");
-	if (ftruncate(fd, size) == -1)
-		err_exit("ftruncate");
-	p = mmap(NULL, size, PROT_READ|PROT_WRITE, MAP_SHARED, fd, 0);
-	if (p == MAP_FAILED)
-		err_exit("mmap create_shm_size_t");
-//	if (close(fd) == -1);
-//		err_exit("close");
-	return (size_t*) p;
 }
 
 void write_file_location(const std::string& file_name, int rank, std::string path_to_write) {
@@ -318,6 +307,23 @@ void flush_file_to_disk(int pid, int fd) {
     }
 }
 
+size_t* create_shm_size_t(std::string shm_name) {
+	void* p = nullptr;
+	// if we are not creating a new object, mode is equals to 0
+	int fd = shm_open(shm_name.c_str(), O_CREAT | O_RDWR,  S_IRUSR | S_IWUSR); //to be closed
+	const int size = sizeof(size_t);
+	if (fd == -1)
+		err_exit("shm_open");
+	if (ftruncate(fd, size) == -1)
+		err_exit("ftruncate");
+	p = mmap(NULL, size, PROT_READ|PROT_WRITE, MAP_SHARED, fd, 0);
+	if (p == MAP_FAILED)
+		err_exit("mmap create_shm_size_t");
+//	if (close(fd) == -1);
+//		err_exit("close");
+	return (size_t*) p;
+}
+
 //TODO: function too long
 
 void handle_open(char* str, char* p, int rank) {
@@ -359,14 +365,16 @@ void handle_open(char* str, char* p, int rank) {
 		caching_info[pid].first[index + 1] = 1;
 	}
 		//TODO: check the size that the user wrote in the configuration file
-	processes_files[pid][fd] = std::pair<void*, int>(p_shm, 0); //TODO: what happens if a process open the same file twice?
+	size_t* p_offset = create_shm_size_t("offset_" + std::to_string(pid) + "_" + std::to_string(fd));
+	*p_offset = 0;
+	processes_files[pid][fd] = std::pair<void*, size_t*>(p_shm, p_offset); //TODO: what happens if a process open the same file twice?
 	*caching_info[pid].second += 2;
 	size_t fdt = fd;
 	response_buffers[pid]->write(&fdt);
 	if (files_metadata.find(path) == files_metadata.end()) {
 		 p_shm = processes_files[pid][fd].first;	
 		size_t* p_shm_size = create_shm_size_t(path + "_size");	
-		files_metadata[path] = std::make_tuple(p_shm, p_shm_size, file_initial_size);
+		files_metadata[path] = std::make_tuple(p_shm, p_shm_size, file_initial_size, true);
 
 		if (files_metadata.find(path) == files_metadata.end()) {//debug
 			std::cerr << "server " << rank << " error updating" <<std ::endl;
@@ -387,7 +395,7 @@ void handle_pending_read(int pid, int fd, long int process_offset, long int coun
 	#endif
 	std::string path = processes_files_metadata[pid][fd];
 	response_buffers[pid]->write(std::get<1>(files_metadata[path]));
-	processes_files[pid][fd].second += count;
+	*processes_files[pid][fd].second += count;
 	//TODO: check if the file was moved to the disk
 
 }
@@ -407,11 +415,12 @@ void handle_write(const char* str, int rank) {
         size_t data_size;
         std::istringstream stream(str);
         stream >> request >> pid >> fd >> data_size;
-        if (processes_files[pid][fd].second == 0) {
+        std::string path = processes_files_metadata[pid][fd];
+        if (std::get<3>(files_metadata[path])) {
+			std::get<3>(files_metadata[path]) = false;
                 write_file_location("files_location.txt", rank, processes_files_metadata[pid][fd]);
         }
-        processes_files[pid][fd].second = data_size;
-        std::string path = processes_files_metadata[pid][fd];
+        *processes_files[pid][fd].second = data_size;
         *std::get<1>(files_metadata[path]) = data_size; //works only if there is only one writer at time      for each file
 		size_t file_shm_size = std::get<2>(files_metadata[path]);
 		if (data_size > file_shm_size) {
@@ -461,9 +470,9 @@ void handle_write(const char* str, int rank) {
                         auto tuple = *it_vec;
                         int pending_pid = std::get<0>(tuple);
                         int fd = std::get<1>(tuple);
-                        long int process_offset = processes_files[pending_pid][fd].second;
-                        long int count = std::get<2>(tuple);
-                        long int file_size = *std::get<1>(files_metadata[path]);
+                        size_t process_offset = *processes_files[pending_pid][fd].second;
+                        size_t count = std::get<2>(tuple);
+                        size_t file_size = *std::get<1>(files_metadata[path]);
                         if (process_offset + count <= file_size) {
                                 handle_pending_read(pending_pid, fd, process_offset, count);
                         }
@@ -509,7 +518,7 @@ void handle_local_read(int pid, int fd, size_t count) {
 		#endif
 		std::string path = processes_files_metadata[pid][fd];
 		size_t file_size = *std::get<1>(files_metadata[path]);
-		size_t process_offset = processes_files[pid][fd].second;
+		size_t process_offset = *processes_files[pid][fd].second;
 		if (process_offset + count > file_size) {
 			pending_reads[path].push_back(std::make_tuple(pid, fd, count));
 			return;
@@ -527,7 +536,7 @@ void handle_local_read(int pid, int fd, size_t count) {
 		#ifdef CAPIOLOG
 		std::cout << "process offset " << process_offset << std::endl;
 		#endif
-		processes_files[pid][fd].second += count;
+		*processes_files[pid][fd].second += count;
 		//TODO: check if the file was moved to the disk
 }
 
@@ -543,7 +552,7 @@ void handle_remote_read(int pid, int fd, long int count, int rank) {
 		const char* msg;
 		std::string str_msg;
 		int dest = nodes_helper_rank[files_location[processes_files_metadata[pid][fd]]];
-		long int offset = processes_files[pid][fd].second;
+		size_t offset = *processes_files[pid][fd].second;
 		str_msg = "read " + processes_files_metadata[pid][fd] + " " + std::to_string(rank) + " " + std::to_string(offset) + " " + std::to_string(count); 
 		msg = str_msg.c_str();
 		MPI_Send(msg, strlen(msg) + 1, MPI_CHAR, dest, 0, MPI_COMM_WORLD);
@@ -654,7 +663,7 @@ void handle_read(char* str, int rank) {
 	long int count;
 	std::istringstream stream(str);
 	stream >> request >> pid >> fd >> count;
-	if (processes_files[pid][fd].second == 0 && files_location.find(processes_files_metadata[pid][fd]) == files_location.end()) {
+	if (*processes_files[pid][fd].second == 0 && files_location.find(processes_files_metadata[pid][fd]) == files_location.end()) {
 		check_remote_file("files_location.txt", rank, processes_files_metadata[pid][fd]);
 		if (files_location.find(processes_files_metadata[pid][fd]) == files_location.end()) {
 			std::string path = processes_files_metadata[pid][fd];
@@ -698,7 +707,7 @@ void handle_close(char* str, char* p) {
 void handle_remote_read(char* str, char* p, int rank) {
 	size_t bytes_received, offset;
 	char path_c[30];
-	sscanf(str, "ream %s %li %li", path_c, &bytes_received, &offset);
+	sscanf(str, "ream %s %zu %zu", path_c, &bytes_received, &offset);
 	*std::get<1>(files_metadata[path_c]) += bytes_received;
 	std::string path(path_c);
 	int pid, fd;
@@ -711,19 +720,19 @@ void handle_remote_read(char* str, char* p, int rank) {
 		pid = std::get<0>(*it);
 		fd = std::get<1>(*it);
 		count = std::get<2>(*it);
-		long int fd_offset = processes_files[pid][fd].second;
+		size_t fd_offset = *processes_files[pid][fd].second;
 		if (fd_offset + count <= offset + bytes_received) {
 			//this part is equals to the local read (TODO: function)
 			#ifdef MYDEBUG
 			int* tmp = (int*) malloc(count);
-			memcpy(tmp, processes_files[pid][fd].first + processes_files[pid][fd].second, count); 
+			memcpy(tmp, processes_files[pid][fd].first + *processes_files[pid][fd].second, count); 
 			for (int i = 0; i < count / sizeof(int); ++i) {
 				std::cout << "server remote read tmp[i] " << tmp[i] << std::endl;
 			}
 			free(tmp);
 			#endif
 			response_buffers[pid]->write(std::get<1>(files_metadata[path]));
-			processes_files[pid][fd].second += count;
+			*processes_files[pid][fd].second += count;
 			//TODO: check if there is data that can be read in the local memory file
 			if (it == list_remote_reads.begin()) {
 				list_remote_reads.erase(it);
@@ -868,7 +877,7 @@ void serve_remote_read(const char* path_c, const char* offset_str, int dest, lon
 		file_size = *std::get<1>(files_metadata[path_c]);
 		}
 	else {
-		std::cout << "error capio_helper file " << path_c << " not in shared memory" << std::endl;
+		std::cerr << "error capio_helper file " << path_c << " not in shared memory" << std::endl;
 		exit(1);
 	}
 	#ifdef MYDEBUG
@@ -882,7 +891,10 @@ void serve_remote_read(const char* path_c, const char* offset_str, int dest, lon
 	#endif
 	// Send all the rest of the file not only the number of bytes requested
 	// Useful for caching
-	MPI_Send(((char*)file_shm) + offset, file_size - offset, MPI_BYTE, dest, 0, MPI_COMM_WORLD); 
+	nbytes = file_size - offset;
+	if (nbytes > 1024L * 1024 * 1024)
+		nbytes = 1024L* 1024 * 1024;
+	MPI_Send(((char*)file_shm) + offset, nbytes, MPI_BYTE, dest, 0, MPI_COMM_WORLD); 
 }
 
 void* wait_for_data(void* pthread_arg) {
@@ -1008,7 +1020,7 @@ void* capio_helper(void* pthread_arg) {
 				file_shm = std::get<0>(files_metadata[path]);
 			}
 			else {
-				std::cout << "error capio_helper file " << path << " not in shared memory" << std::endl;
+				std::cerr << "error capio_helper file " << path << " not in shared memory" << std::endl;
 				exit(1);
 			}
 			int bytes_received;

@@ -55,7 +55,7 @@ const size_t file_initial_size = 1024L * 1024 * 1024 * 4;
  * in a given moment.
  */
 
-std::unordered_map<int, std::tuple<void*, size_t, size_t, size_t>> files;
+std::unordered_map<int, std::tuple<void*, size_t*, size_t, size_t>> files;
 Circular_buffer<char>* buf_requests;
  
 Circular_buffer<size_t>* buf_response;
@@ -79,7 +79,6 @@ void mtrace_init(void) {
 	val = getenv("GW_BATCH");
 	if (val != NULL) {
 		num_writes_batch = std::stoi(val);
-		std::cout << num_writes_batch << std::endl;
 		if (num_writes_batch <= 0) {
 			std::cerr << "error: GW_BATCH variable must be >= 0";
 			exit(1);
@@ -195,8 +194,8 @@ void add_read_request(int fd, size_t count) {
 
 void add_write_request(int fd, size_t count) {
 	char c_str[64];
-	std::get<1>(files[fd]) += count;
-	sprintf(c_str, "writ %d %d %ld", getpid(),fd, std::get<1>(files[fd]));
+	*std::get<1>(files[fd]) += count;
+	sprintf(c_str, "writ %d %d %ld", getpid(),fd, *std::get<1>(files[fd]));
 	if (actual_num_writes == num_writes_batch) {
 		buf_requests->write(c_str);
 		actual_num_writes = 1;
@@ -309,7 +308,8 @@ int open(const char *pathname, int flags, ...) {
 	if (strncmp("file_", pathname, strlen(prefix)) == 0 || strncmp("output_file_", pathname, strlen(prefix_2)) == 0) {
 		//create shm
 		int fd = add_open_request(pathname);
-		files[fd] = std::make_tuple<void*, long int, long int>(get_shm(pathname), 0, 0, file_initial_size);
+		size_t* p_offset = (size_t*) get_shm("offset_" + std::to_string(getpid()) + "_" + std::to_string(fd));
+		files[fd] = std::make_tuple(get_shm(pathname), p_offset, 0, file_initial_size);
 		capio_files_descriptors[fd] = pathname;
 		capio_files_paths.insert(pathname);
 		return fd;
@@ -346,7 +346,7 @@ int close(int fd) {
 
 ssize_t read(int fd, void *buffer, size_t count) {
 	if (capio_files_descriptors.find(fd) != capio_files_descriptors.end()) {
-		size_t offset = std::get<1>(files[fd]);
+		size_t offset = *std::get<1>(files[fd]);
 		//bool in_shm = check_cache(fd);
 		//if (in_shm) {
 			if (offset + count > std::get<2>(files[fd]))
@@ -356,7 +356,7 @@ ssize_t read(int fd, void *buffer, size_t count) {
 		//else {
 			//read_from_disk(fd, offset, buffer, count);
 		//}
-		std::get<1>(files[fd]) = offset + count;
+		*std::get<1>(files[fd]) = offset + count;
 		return count;
 	}
 	else { 
@@ -369,8 +369,8 @@ ssize_t write(int fd, const  void *buffer, size_t count) {
 		//bool in_shm = check_cache(fd);
 		//if (in_shm) {
 		size_t file_shm_size = std::get<3>(files[fd]);
-		if (std::get<1>(files[fd]) > file_shm_size) {
-			size_t file_size = std::get<1>(files[fd]);
+		if (*std::get<1>(files[fd]) > file_shm_size) {
+			size_t file_size = *std::get<1>(files[fd]);
 			size_t new_size;
 			if (file_size + count > file_shm_size * 2)
 				new_size = file_size + count;
@@ -387,7 +387,7 @@ ssize_t write(int fd, const  void *buffer, size_t count) {
 				err_exit("mremap " + shm_name);
 			close(fd_shm);
 		}
-		write_shm(std::get<0>(files[fd]), std::get<1>(files[fd]), buffer, count);
+		write_shm(std::get<0>(files[fd]), *std::get<1>(files[fd]), buffer, count);
 		add_write_request(fd, count); //bottleneck
 		//}
 		//else {

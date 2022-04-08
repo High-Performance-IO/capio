@@ -4,6 +4,7 @@ void err_exit(std::string error_msg) {
 	exit(1);
 }
 
+
 void* get_shm(std::string shm_name) {
 	void* p = nullptr;
 	// if we are not creating a new object, mode is equals to 0
