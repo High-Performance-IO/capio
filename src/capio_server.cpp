@@ -395,7 +395,7 @@ void handle_pending_read(int pid, int fd, long int process_offset, long int coun
 	#endif
 	std::string path = processes_files_metadata[pid][fd];
 	response_buffers[pid]->write(std::get<1>(files_metadata[path]));
-	*processes_files[pid][fd].second += count;
+	//*processes_files[pid][fd].second += count;
 	//TODO: check if the file was moved to the disk
 
 }
@@ -535,7 +535,7 @@ void handle_local_read(int pid, int fd, size_t count) {
 		#ifdef CAPIOLOG
 		std::cout << "process offset " << process_offset << std::endl;
 		#endif
-		*processes_files[pid][fd].second += count;
+		//*processes_files[pid][fd].second += count;
 		//TODO: check if the file was moved to the disk
 }
 
@@ -594,7 +594,7 @@ void* wait_for_file(void* pthread_arg) {
 	while (!found) {
 		sleep(1);
 		int tot_chars = 0;
-    	fp = fopen("files_location.txt", "r");
+    		fp = fopen("files_location.txt", "r");
 		if (fp == NULL) {
 			MPI_Finalize();
 			exit(1);
@@ -731,7 +731,6 @@ void handle_remote_read(char* str, char* p, int rank) {
 			free(tmp);
 			#endif
 			response_buffers[pid]->write(std::get<1>(files_metadata[path]));
-			*processes_files[pid][fd].second += count;
 			//TODO: check if there is data that can be read in the local memory file
 			if (it == list_remote_reads.begin()) {
 				list_remote_reads.erase(it);
