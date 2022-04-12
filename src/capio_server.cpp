@@ -420,8 +420,7 @@ void handle_write(const char* str, int rank) {
 			std::get<3>(files_metadata[path]) = false;
                 write_file_location("files_location.txt", rank, processes_files_metadata[pid][fd]);
         }
-        *processes_files[pid][fd].second = data_size;
-        *std::get<1>(files_metadata[path]) = data_size; //works only if there is only one writer at time      for each file
+        *std::get<1>(files_metadata[path]) = data_size; 
 		size_t file_shm_size = std::get<2>(files_metadata[path]);
 		if (data_size > file_shm_size) {
 			//remap

@@ -48,11 +48,13 @@ int actual_num_writes = 1;
 // initial size for each file (can be overwritten by the user)
 const size_t file_initial_size = 1024L * 1024 * 1024 * 4;
 
-/* fd -> (shm*, offset, file_size, mapped_shm_size )
+/* fd -> (shm*, *offset, file_size, mapped_shm_size )
  * The mapped shm size isn't the the size of the file shm
  * but it's the mapped shm size in the virtual adress space
- * of the server process. The effective size can ge greater
+ * of the server process. The effective size can be greater
  * in a given moment.
+ *
+ * TODO: offset for now is the size of the file
  */
 
 std::unordered_map<int, std::tuple<void*, size_t*, size_t, size_t>> files;
@@ -194,7 +196,7 @@ void add_read_request(int fd, size_t count) {
 
 void add_write_request(int fd, size_t count) {
 	char c_str[64];
-	*std::get<1>(files[fd]) += count;
+	*std::get<1>(files[fd]) += count; //works only if there is only one writer at time for each file
 	sprintf(c_str, "writ %d %d %ld", getpid(),fd, *std::get<1>(files[fd]));
 	if (actual_num_writes == num_writes_batch) {
 		buf_requests->write(c_str);
