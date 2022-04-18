@@ -55,7 +55,7 @@ void read_from_file(const std::string file_name, int* data, long int num_element
 	MPI_Barrier(MPI_COMM_WORLD);
 	if (rank == 0) {
 		const sec duration = cclock::now() - before;
-		file << "total write time: " << duration.count() << " secs" << std::endl;
+		file << "total read time: " << duration.count() << " secs" << std::endl;
 		file.close();
 	}
 
