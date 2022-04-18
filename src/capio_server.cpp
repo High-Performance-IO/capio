@@ -31,7 +31,7 @@ const long int max_shm_size = 1024L * 1024 * 1024 * 16;
 const long int max_shm_size_file = 1024L * 1024 * 1024 * 8;
 
 // initial size for each file (can be overwritten by the user)
-const size_t file_initial_size = 1024L * 1024 * 1024 * 4;
+const size_t file_initial_size = 1024L * 1024 * 1024 * 2;
 
 bool shm_full = false;
 long int total_bytes_shm = 0;
@@ -357,7 +357,7 @@ void handle_open(char* str, char* p, int rank) {
 	int index = *caching_info[pid].second;
 	caching_info[pid].first[index] = fd;
 	if (on_disk.find(path) == on_disk.end()) {
-		p_shm = create_shm(path, 1024L * 1024 * 1024* 6);
+		p_shm = create_shm(path, 1024L * 1024 * 1024* 2);
 		caching_info[pid].first[index + 1] = 0;
 	}
 	else {
