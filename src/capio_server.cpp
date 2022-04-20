@@ -545,15 +545,19 @@ void handle_local_read(int pid, int fd, size_t count) {
  */
 
 void handle_remote_read(int pid, int fd, long int count, int rank) {
-		#ifdef CAPIOLOG
-		std::cout << "handle remote read" << std::endl;
-		#endif
 		const char* msg;
 		std::string str_msg;
 		int dest = nodes_helper_rank[files_location[processes_files_metadata[pid][fd]]];
 		size_t offset = *processes_files[pid][fd].second;
 		str_msg = "read " + processes_files_metadata[pid][fd] + " " + std::to_string(rank) + " " + std::to_string(offset) + " " + std::to_string(count); 
 		msg = str_msg.c_str();
+		#ifdef CAPIOLOG
+		std::cout << "handle remote read" << std::endl;
+		std::cout << "msg sent " << msg << std::endl;
+		std::cout << processes_files_metadata[pid][fd] << std::endl;
+		std::cout << "dest " << dest << std::endl;
+		std::cout << "rank" << rank << std::endl;
+		#endif
 		MPI_Send(msg, strlen(msg) + 1, MPI_CHAR, dest, 0, MPI_COMM_WORLD);
 		my_remote_pending_reads[processes_files_metadata[pid][fd]].push_back(std::make_tuple(pid, fd, count));
 }
@@ -707,6 +711,9 @@ void handle_remote_read(char* str, char* p, int rank) {
 	size_t bytes_received, offset;
 	char path_c[30];
 	sscanf(str, "ream %s %zu %zu", path_c, &bytes_received, &offset);
+	#ifdef CAPIOLOG
+		std::cout << "serving the remote read: " << str << std::endl;
+	#endif
 	*std::get<1>(files_metadata[path_c]) += bytes_received;
 	std::string path(path_c);
 	int pid, fd;
@@ -864,6 +871,9 @@ void serve_remote_read(const char* path_c, const char* offset_str, int dest, lon
 	const size_t len3 = strlen(offset_str);
 	buf_send = (char*) malloc((len1 + len2 + len3 + 3) * sizeof(char));//TODO:add malloc check
 	sprintf(buf_send, "%s %s %s", s1, path_c, offset_str);
+	#ifdef CAPIOLOG
+		std::cout << "helper serve remote read msg sent: " << buf_send << " to " << dest << std::endl;
+	#endif
 	//send warning
 	MPI_Send(buf_send, strlen(buf_send) + 1, MPI_CHAR, dest, 0, MPI_COMM_WORLD);
 	free(buf_send);
@@ -892,7 +902,13 @@ void serve_remote_read(const char* path_c, const char* offset_str, int dest, lon
 	nbytes = file_size - offset;
 	if (nbytes > 1024L * 1024 * 1024)
 		nbytes = 1024L* 1024 * 1024;
+	#ifdef CAPIOLOG
+		std::cout << "before sending part of the file to : " << dest << std::endl;
+	#endif
 	MPI_Send(((char*)file_shm) + offset, nbytes, MPI_BYTE, dest, 0, MPI_COMM_WORLD); 
+	#ifdef CAPIOLOG
+		std::cout << "after sending part of the file to : " << dest << std::endl;
+	#endif
 }
 
 void* wait_for_data(void* pthread_arg) {
@@ -916,7 +932,7 @@ bool data_avaiable(const char* path_c, long int offset, long int nbytes_requeste
 	return offset + nbytes_requested <= file_size;
 }
 
-void lightweight_MPI_Recv(char* buf_recv) {
+void lightweight_MPI_Recv(char* buf_recv, MPI_Status* status) {
 	MPI_Request request;
 	int received = 0;
 	MPI_Irecv(buf_recv, 2048, MPI_CHAR, MPI_ANY_SOURCE, 0, MPI_COMM_WORLD, &request); //receive from server
@@ -926,7 +942,7 @@ void lightweight_MPI_Recv(char* buf_recv) {
     sleepTime.tv_nsec = 200000;
 
 	while (!received) {
-		MPI_Test(&request, &received, MPI_STATUS_IGNORE);
+		MPI_Test(&request, &received, status);
 		nanosleep(&sleepTime, &returnTime);
 	}
 }
@@ -939,9 +955,12 @@ void* capio_helper(void* pthread_arg) {
 	MPI_Comm_rank(MPI_COMM_WORLD, &rank);
 	sem_wait(&internal_server_sem);
 	while(true) {
-		lightweight_MPI_Recv(buf_recv); //receive from server
+		lightweight_MPI_Recv(buf_recv, &status); //receive from server
 		bool remote_request_to_read = strncmp(buf_recv, "read", 4) == 0;
 		if (remote_request_to_read) {
+		#ifdef CAPIOLOG
+		std::cout << "helper remote req to read" << std::endl;
+		#endif
 		    // schema msg received: "read path dest offset nbytes"
 			char* path_c = (char*) malloc(sizeof(char) * 512);
 			int i = 5;
@@ -984,9 +1003,15 @@ void* capio_helper(void* pthread_arg) {
 			long int nbytes = std::atoi(nbytes_str);
 			//check if the data is avaiable
 			if (data_avaiable(path_c, offset, nbytes)) {
+				#ifdef CAPIOLOG
+					std::cout << "helper data avaiable" << std::endl;
+				#endif
 				serve_remote_read(path_c, offset_str, dest, offset, nbytes);
 			}
 			else {
+				#ifdef CAPIOLOG
+					std::cout << "helper data not avaiable" << std::endl;
+				#endif
 				pthread_t t;
 				struct remote_read_metadata* rr_metadata = (struct remote_read_metadata*) malloc(sizeof(struct remote_read_metadata));
 				rr_metadata->path = path_c;
@@ -1010,6 +1035,9 @@ void* capio_helper(void* pthread_arg) {
 			}
 		}
 		else if(strncmp(buf_recv, "sending", 7) == 0) { //receiving a file
+			#ifdef CAPIOLOG
+				std::cout << "helper received sending msg" << std::endl;
+			#endif
 			int pos = std::string((buf_recv + 8)).find(" ");
 			std::string path(buf_recv + 8);
 			path = path.substr(0, pos);
@@ -1024,8 +1052,14 @@ void* capio_helper(void* pthread_arg) {
 			int bytes_received;
 			int source = status.MPI_SOURCE;
 			int offset = std::atoi(buf_recv + pos + 9);
+			#ifdef CAPIOLOG
+				std::cout << "helper before received part of the file from process " << source << std::endl;
+			#endif
 			MPI_Recv((char*)file_shm + offset, 1024L * 1024 * 1024, MPI_BYTE, source, 0, MPI_COMM_WORLD, &status);//TODO; 4096 should be a parameter
 			MPI_Get_count(&status, MPI_CHAR, &bytes_received); //why in recv MPI_BYTE while ehre MPI_CHAR?
+			#ifdef CAPIOLOG
+				std::cout << "helper received part of the file" << std::endl;
+			#endif
 			bytes_received *= sizeof(char);
 			#ifdef MYDEBUG
 			int* tmp = (int*) malloc(bytes_received);
