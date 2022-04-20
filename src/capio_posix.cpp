@@ -168,15 +168,15 @@ int add_close_request(int fd) {
 	return 0;
 }
 
-void add_read_request(int fd, size_t count) {
+void add_read_request(int fd, size_t count, std::tuple<void*, size_t*, size_t, size_t>& t) {
 	std::string str = "read " + std::to_string(getpid()) + " " + std::to_string(fd) + " " + std::to_string(count);
 	const char* c_str = str.c_str();
 	buf_requests->write(c_str);
 	//read response (offest)
 	size_t file_size;
 	buf_response->read(&file_size);
-	std::get<2>(files[fd]) = file_size;
-	size_t file_shm_size = std::get<3>(files[fd]);
+	std::get<2>(t) = file_size;
+	size_t file_shm_size = std::get<3>(t);
 	if (file_size > file_shm_size) {
 		size_t new_size;
 		if (file_size > file_shm_size * 2)
@@ -184,11 +184,11 @@ void add_read_request(int fd, size_t count) {
 		else
 			new_size = file_shm_size * 2;
 
-		void* p = mremap(std::get<0>(files[fd]), file_shm_size, new_size, MREMAP_MAYMOVE);
+		void* p = mremap(std::get<0>(t), file_shm_size, new_size, MREMAP_MAYMOVE);
 		if (p == MAP_FAILED)
 			err_exit("mremap " + std::to_string(fd));
-		std::get<0>(files[fd]) = p;
-		std::get<3>(files[fd]) = new_size;
+		std::get<0>(t) = p;
+		std::get<3>(t) = new_size;
 	}
 	return;
 }
@@ -348,17 +348,18 @@ int close(int fd) {
 
 ssize_t read(int fd, void *buffer, size_t count) {
 	if (capio_files_descriptors.find(fd) != capio_files_descriptors.end()) {
-		size_t offset = *std::get<1>(files[fd]);
+		std::tuple<void*, size_t*, size_t, size_t>* t = &files[fd];
+		size_t* offset = std::get<1>(*t);
 		//bool in_shm = check_cache(fd);
 		//if (in_shm) {
-			if (offset + count > std::get<2>(files[fd]))
-				add_read_request(fd, count);
-			read_shm(std::get<0>(files[fd]), offset, buffer, count);
+			if (*offset + count > std::get<2>(*t))
+				add_read_request(fd, count, *t);
+			read_shm(std::get<0>(*t), *offset, buffer, count);
 		//}
 		//else {
 			//read_from_disk(fd, offset, buffer, count);
 		//}
-		*std::get<1>(files[fd]) = offset + count;
+		*offset = *offset + count;
 		return count;
 	}
 	else { 
