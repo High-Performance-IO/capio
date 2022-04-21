@@ -861,23 +861,23 @@ struct remote_read_metadata {
 	sem_t* sem;
 };
 
+void send_file(char* shm, long int nbytes, int dest) {
+	long int num_elements_to_send = 0;
+	for (long int k = 0; k < nbytes; k += num_elements_to_send) {
+			if (nbytes - num_elements_to_send > 1024L * 1024 * 1024)
+				num_elements_to_send = 1024L * 1024 * 1024;
+			else
+				num_elements_to_send = nbytes - num_elements_to_send;
+			MPI_Send(shm + k, num_elements_to_send, MPI_BYTE, dest, 0, MPI_COMM_WORLD); 
+	}
+}
+
 //TODO: refactor offset_str and offset
 
 void serve_remote_read(const char* path_c, const char* offset_str, int dest, long int offset, long int nbytes) {
 	char* buf_send;
-	const char* s1 = "sending";
-	const size_t len1 = strlen(s1);
-	const size_t len2 = strlen(path_c);
-	const size_t len3 = strlen(offset_str);
-	buf_send = (char*) malloc((len1 + len2 + len3 + 3) * sizeof(char));//TODO:add malloc check
-	sprintf(buf_send, "%s %s %s", s1, path_c, offset_str);
-	#ifdef CAPIOLOG
-		std::cout << "helper serve remote read msg sent: " << buf_send << " to " << dest << std::endl;
-	#endif
-	//send warning
-	MPI_Send(buf_send, strlen(buf_send) + 1, MPI_CHAR, dest, 0, MPI_COMM_WORLD);
-	free(buf_send);
-	//send data
+	// Send all the rest of the file not only the number of bytes requested
+	// Useful for caching
 	void* file_shm;
 	size_t file_size;
 	if (files_metadata.find(path_c) != files_metadata.end()) {
@@ -888,6 +888,23 @@ void serve_remote_read(const char* path_c, const char* offset_str, int dest, lon
 		std::cerr << "error capio_helper file " << path_c << " not in shared memory" << std::endl;
 		exit(1);
 	}
+	nbytes = file_size - offset;
+	std::string nbytes_str = std::to_string(nbytes);
+	const char* nbytes_cstr = nbytes_str.c_str();
+	const char* s1 = "sending";
+	const size_t len1 = strlen(s1);
+	const size_t len2 = strlen(path_c);
+	const size_t len3 = strlen(offset_str);
+	const size_t len4 = strlen(nbytes_cstr);
+	buf_send = (char*) malloc((len1 + len2 + len3 + len4 + 4) * sizeof(char));//TODO:add malloc check
+	sprintf(buf_send, "%s %s %s %s", s1, path_c, offset_str, nbytes_cstr);
+	#ifdef CAPIOLOG
+		std::cout << "helper serve remote read msg sent: " << buf_send << " to " << dest << std::endl;
+	#endif
+	//send warning
+	MPI_Send(buf_send, strlen(buf_send) + 1, MPI_CHAR, dest, 0, MPI_COMM_WORLD);
+	free(buf_send);
+	//send data
 	#ifdef MYDEBUG
 	int* tmp = (int*) malloc(*size_shm);
 	std::cout << "helper sending " << *size_shm << " bytes" << std::endl;
@@ -897,15 +914,10 @@ void serve_remote_read(const char* path_c, const char* offset_str, int dest, lon
 	}
 	free(tmp);
 	#endif
-	// Send all the rest of the file not only the number of bytes requested
-	// Useful for caching
-	nbytes = file_size - offset;
-	if (nbytes > 1024L * 1024 * 1024)
-		nbytes = 1024L* 1024 * 1024;
 	#ifdef CAPIOLOG
 		std::cout << "before sending part of the file to : " << dest << std::endl;
 	#endif
-	MPI_Send(((char*)file_shm) + offset, nbytes, MPI_BYTE, dest, 0, MPI_COMM_WORLD); 
+	send_file(((char*) file_shm) + offset, nbytes, dest);
 	#ifdef CAPIOLOG
 		std::cout << "after sending part of the file to : " << dest << std::endl;
 	#endif
@@ -947,6 +959,14 @@ void lightweight_MPI_Recv(char* buf_recv, MPI_Status* status) {
 	}
 }
 
+void recv_file(char* shm, int source, long int bytes_expected) {
+	MPI_Status status;
+	int bytes_received;
+	for (long int k = 0; k < bytes_expected; k += bytes_received) {
+		MPI_Recv(shm + k, bytes_expected - k, MPI_BYTE, source, 0, MPI_COMM_WORLD, &status);//TODO; 4096 should be a parameter
+		MPI_Get_count(&status, MPI_CHAR, &bytes_received); //why in recv MPI_BYTE while ehre MPI_CHAR?
+	}
+}
 
 void* capio_helper(void* pthread_arg) {
 	char buf_recv[2048];
@@ -1038,9 +1058,12 @@ void* capio_helper(void* pthread_arg) {
 			#ifdef CAPIOLOG
 				std::cout << "helper received sending msg" << std::endl;
 			#endif
-			int pos = std::string((buf_recv + 8)).find(" ");
-			std::string path(buf_recv + 8);
-			path = path.substr(0, pos);
+			long int bytes_received;
+			int source = status.MPI_SOURCE;
+			long int offset; 
+			char path_c[1024];
+			sscanf(buf_recv, "sending %s %zu %zu", path_c, &offset, &bytes_received);
+			std::string path(path_c);
 			void* file_shm; 
 			if (files_metadata.find(path) != files_metadata.end()) {
 				file_shm = std::get<0>(files_metadata[path]);
@@ -1049,14 +1072,12 @@ void* capio_helper(void* pthread_arg) {
 				std::cerr << "error capio_helper file " << path << " not in shared memory" << std::endl;
 				exit(1);
 			}
-			int bytes_received;
-			int source = status.MPI_SOURCE;
-			int offset = std::atoi(buf_recv + pos + 9);
 			#ifdef CAPIOLOG
 				std::cout << "helper before received part of the file from process " << source << std::endl;
+				std::cout << "offset " << offset << std::endl;
+				std::cout << "bytes received " << bytes_received << std::endl;
 			#endif
-			MPI_Recv((char*)file_shm + offset, 1024L * 1024 * 1024, MPI_BYTE, source, 0, MPI_COMM_WORLD, &status);//TODO; 4096 should be a parameter
-			MPI_Get_count(&status, MPI_CHAR, &bytes_received); //why in recv MPI_BYTE while ehre MPI_CHAR?
+			recv_file((char*)file_shm + offset, source, bytes_received);
 			#ifdef CAPIOLOG
 				std::cout << "helper received part of the file" << std::endl;
 			#endif
