@@ -728,6 +728,9 @@ void handle_remote_read(char* str, char* p, int rank) {
 		count = std::get<2>(*it);
 		size_t fd_offset = *processes_files[pid][fd].second;
 		if (fd_offset + count <= offset + bytes_received) {
+		#ifdef CAPIOLOG
+			std::cout << "handling others remote reads fd_offset " << fd_offset << " count " << count << " offset " << offset << " bytes received " << bytes_received << std::endl;
+		#endif
 			//this part is equals to the local read (TODO: function)
 			#ifdef MYDEBUG
 			int* tmp = (int*) malloc(count);
@@ -915,7 +918,7 @@ void serve_remote_read(const char* path_c, const char* offset_str, int dest, lon
 	free(tmp);
 	#endif
 	#ifdef CAPIOLOG
-		std::cout << "before sending part of the file to : " << dest << std::endl;
+		std::cout << "before sending part of the file to : " << dest << " with offset " << offset << " nbytes" << nbytes << std::endl;
 	#endif
 	send_file(((char*) file_shm) + offset, nbytes, dest);
 	#ifdef CAPIOLOG
