@@ -482,6 +482,7 @@ void handle_write(const char* str, int rank) {
         auto it_client = clients_remote_pending_reads.find(path);
 		std::list<std::tuple<size_t, size_t, sem_t*>>::iterator it_list, prev_it_list;
         if (it_client !=  clients_remote_pending_reads.end()) {
+			it_list = it_client->second.begin();
                 while (it_list != it_client->second.end()) {
                         size_t offset = std::get<0>(*it_list);
                         size_t nbytes = std::get<1>(*it_list);
