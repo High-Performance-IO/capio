@@ -1,18 +1,39 @@
 #include <iostream>
-#include <mpi.h>
 #include <limits>
+#include <fstream>
+#include <chrono>
+
+#include <mpi.h>
+
+using cclock = std::chrono::system_clock;
+using sec = std::chrono::duration<double>;
 
 void writer(int rank, int* array, long int num_writes, long int num_elements, int receiver) {
-    for (long int i = 0; i < num_writes; ++ i) {
+	std::ofstream file;
+	cclock::time_point before;
+	if (rank == 0) {
+		file.open("time_mpi_sender.txt", std::fstream::app);
+		// for milliseconds, use using ms = std::chrono::duration<double, std::milli>;
+		before = cclock::now();
+	}
+
+    for (long int i = 0; i < num_writes; ++i) {
 		long int num_elements_to_send = 0;
 		for (long int k = 0; k < num_elements; k += num_elements_to_send) {
-			if (num_elements - num_elements_to_send > 1024L * 1024 * 1024 / sizeof(int))
+			if (num_elements - k > 1024L * 1024 * 1024 / sizeof(int))
 				num_elements_to_send = 1024L * 1024 * 1024 / sizeof(int);
 			else
 				num_elements_to_send = num_elements - num_elements_to_send;
+            //std::cout << "num elements to send: " << num_elements_to_send << " k: " << k << " n * i: " << num_elements * i << " rank: " << rank << std::endl;
         	MPI_Send(array + num_elements * i + k, num_elements_to_send, MPI_INT, receiver, 0, MPI_COMM_WORLD);
 		}
     }
+	MPI_Barrier(MPI_COMM_WORLD);
+	if (rank == 0) {
+		const sec duration = cclock::now() - before;
+		file << "total mpi send time: " << duration.count() << " secs" << std::endl;
+		file.close();
+	}
 }
 
 int sum_all(int *data, long int num_elements, long int num_reads) {
@@ -28,8 +49,15 @@ int sum_all(int *data, long int num_elements, long int num_reads) {
 	return sum;
 }
 
-void reader(int rank, int* array, long int num_reads, long int num_elements, int sender) {
+void reader(int rank, int master_rank, int* array, long int num_reads, long int num_elements, int sender) {
 	MPI_Status status;
+	std::ofstream file;
+	cclock::time_point before;
+	if (rank == master_rank) {
+		file.open("time_mpi_receiver.txt", std::fstream::app);
+		// for milliseconds, use using ms = std::chrono::duration<double, std::milli>;
+		before = cclock::now();
+	}
     for (long int i = 0; i < num_reads; ++i) {
 		int num_elements_received = 0;
 		for (long int k = 0; k < num_elements; k += num_elements_received) {
@@ -37,6 +65,12 @@ void reader(int rank, int* array, long int num_reads, long int num_elements, int
 			MPI_Get_count(&status, MPI_INT, &num_elements_received);
 		}
     }
+	MPI_Barrier(MPI_COMM_WORLD);
+	if (rank == master_rank) {
+		const sec duration = cclock::now() - before;
+		file << "total mpi receive time: " << duration.count() << " secs" << std::endl;
+		file.close();
+	}
 	int sum = sum_all(array, num_elements, num_reads);
     std::cout << "reader " << rank << " sum: " << sum << std::endl;
 }
@@ -54,6 +88,11 @@ int main(int argc, char** argv) {
 	long int num_elements, num_io_ops;
     MPI_Init(&argc, &argv);
     MPI_Comm_size(MPI_COMM_WORLD, &size);
+	if (size % 2 != 0) {
+		std::cerr << "input error: the total number of MPI processes must be a multiple of 2" << std::endl;
+		MPI_Finalize();
+		return 0;
+	}
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
     if (argc != 3) {
         std::cerr << "input error: number of elements and number of I/O operations needed" << std::endl;
@@ -68,7 +107,7 @@ int main(int argc, char** argv) {
         writer(rank, data, num_io_ops, num_elements, size / 2 + rank);
     }
     else {
-        reader(rank, data, num_io_ops, num_elements, rank - size / 2 );
+        reader(rank, size / 2, data, num_io_ops, num_elements, rank - size / 2 );
     }
     delete[] data;
     MPI_Finalize();
