@@ -278,8 +278,8 @@ bool check_remote_file(const std::string& file_name, int rank, std::string path_
 			++j;
 		}
 		node_str[j] = '\0';
-		files_location[path_to_check] = (char*) malloc(sizeof(node_str) + 1); //TODO:free the memory
 		if (strcmp(path, path_to_check_cstr) == 0) {
+			files_location[path_to_check] = (char*) malloc(sizeof(node_str) + 1); //TODO:free the memory
 			found = true;
 			strcpy(files_location[path_to_check], node_str);
 		}
@@ -592,6 +592,9 @@ void* wait_for_file(void* pthread_arg) {
     int fd_locations; /* file descriptor to identify a file within a process */
 
 	
+	#ifdef CAPIOLOG
+	std::cout << "wait for file" << std::endl;
+	#endif
 	
 	std::string path_to_check(processes_files_metadata[pid][fd]);
 	const char* path_to_check_cstr = path_to_check.c_str();
@@ -660,7 +663,7 @@ void* wait_for_file(void* pthread_arg) {
 
 void handle_read(char* str, int rank) {
 	#ifdef CAPIOLOG
-	std::cout << "handle read" << std::endl;
+	std::cout << "handle read str" << str << std::endl;
 	#endif
 	std::string request;
 	int pid, fd;
@@ -676,6 +679,7 @@ void handle_read(char* str, int rank) {
 			struct wait_for_file_metadata* metadata = (struct wait_for_file_metadata*)  malloc(sizeof(wait_for_file_metadata));
 			metadata->pid = pid;
 			metadata->fd = fd;
+			metadata->count = count;
 			int res = pthread_create(&t, NULL, wait_for_file, (void*) metadata);
 			if (res != 0) {
 				std::cerr << "error creation of capio server thread" << std::endl;
@@ -851,6 +855,7 @@ void* capio_server(void* pthread_arg) {
 	sem_post(&internal_server_sem);
 	while(true) {
 		read_next_msg(rank);
+		std::cout << "after next msg " << std::endl;
 
 		//respond();
 	}
@@ -978,12 +983,14 @@ void* capio_helper(void* pthread_arg) {
 	int rank;
 	MPI_Comm_rank(MPI_COMM_WORLD, &rank);
 	sem_wait(&internal_server_sem);
+		#ifdef CAPIOLOG
+		#endif
 	while(true) {
 		lightweight_MPI_Recv(buf_recv, &status); //receive from server
 		bool remote_request_to_read = strncmp(buf_recv, "read", 4) == 0;
 		if (remote_request_to_read) {
 		#ifdef CAPIOLOG
-		std::cout << "helper remote req to read" << std::endl;
+		std::cout << "helper remote req to read " << buf_recv << std::endl;
 		#endif
 		    // schema msg received: "read path dest offset nbytes"
 			char* path_c = (char*) malloc(sizeof(char) * 512);
