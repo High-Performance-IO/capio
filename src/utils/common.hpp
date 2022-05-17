@@ -25,6 +25,23 @@ void* get_shm(std::string shm_name) {
 	return p;
 }
 
+size_t* create_shm_size_t(std::string shm_name) {
+	void* p = nullptr;
+	// if we are not creating a new object, mode is equals to 0
+	int fd = shm_open(shm_name.c_str(), O_CREAT | O_RDWR,  S_IRUSR | S_IWUSR); //to be closed
+	const int size = sizeof(size_t);
+	if (fd == -1)
+		err_exit("shm_open");
+	if (ftruncate(fd, size) == -1)
+		err_exit("ftruncate");
+	p = mmap(NULL, size, PROT_READ|PROT_WRITE, MAP_SHARED, fd, 0);
+	if (p == MAP_FAILED)
+		err_exit("mmap create_shm_size_t");
+//	if (close(fd) == -1);
+//		err_exit("close");
+	return (size_t*) p;
+}
+
 void* create_shm(std::string shm_name, const long int size) {
 	void* p = nullptr;
 	// if we are not creating a new object, mode is equals to 0

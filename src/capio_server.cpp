@@ -115,6 +115,7 @@ std::unordered_map<int, sem_t*> sems_response;
 std::unordered_map<int, sem_t*> sems_write;
 
 sem_t internal_server_sem;
+sem_t remote_read_sem;
 
 void sig_term_handler(int signum, siginfo_t *info, void *ptr) {
 	//free all the memory used
@@ -307,22 +308,6 @@ void flush_file_to_disk(int pid, int fd) {
     }
 }
 
-size_t* create_shm_size_t(std::string shm_name) {
-	void* p = nullptr;
-	// if we are not creating a new object, mode is equals to 0
-	int fd = shm_open(shm_name.c_str(), O_CREAT | O_RDWR,  S_IRUSR | S_IWUSR); //to be closed
-	const int size = sizeof(size_t);
-	if (fd == -1)
-		err_exit("shm_open");
-	if (ftruncate(fd, size) == -1)
-		err_exit("ftruncate");
-	p = mmap(NULL, size, PROT_READ|PROT_WRITE, MAP_SHARED, fd, 0);
-	if (p == MAP_FAILED)
-		err_exit("mmap create_shm_size_t");
-//	if (close(fd) == -1);
-//		err_exit("close");
-	return (size_t*) p;
-}
 
 //TODO: function too long
 
@@ -346,13 +331,8 @@ void handle_open(char* str, char* p, int rank) {
 		caching_info[pid].first = (int*) get_shm("caching_info" + std::to_string(pid));
 		caching_info[pid].second = (int*) get_shm("caching_info_size" + std::to_string(pid));
 	}
+	int fd = strtol(p + 1, &p, 10);
 	std::string path(p + 1);
-	int fd = open(path.c_str(), O_CREAT | O_RDWR, S_IRUSR | S_IRWXU);
-	if (fd == -1) {
-	std::cerr << "capio server, error to open the file " << path << std::endl;
-	MPI_Finalize();
-	exit(1);
-	}
 	void* p_shm;
 	int index = *caching_info[pid].second;
 	caching_info[pid].first[index] = fd;
@@ -366,11 +346,8 @@ void handle_open(char* str, char* p, int rank) {
 	}
 		//TODO: check the size that the user wrote in the configuration file
 	size_t* p_offset = create_shm_size_t("offset_" + std::to_string(pid) + "_" + std::to_string(fd));
-	*p_offset = 0;
 	processes_files[pid][fd] = std::pair<void*, size_t*>(p_shm, p_offset); //TODO: what happens if a process open the same file twice?
 	*caching_info[pid].second += 2;
-	size_t fdt = fd;
-	response_buffers[pid]->write(&fdt);
 	if (files_metadata.find(path) == files_metadata.end()) {
 		 p_shm = processes_files[pid][fd].first;	
 		size_t* p_shm_size = create_shm_size_t(path + "_size");	
@@ -703,13 +680,6 @@ void handle_close(char* str, char* p) {
 	#ifdef CAPIOLOG
 	std::cout << "handle close" << std::endl;
 	#endif
-	strtol(str + 5, &p, 10);;
-	int fd = strtol(p, &p, 10);
-	if (close(fd) == -1) {
-		std::cerr << "capio server, error: impossible close the file with fd = " << fd << std::endl;
-		MPI_Finalize();
-		exit(1);
-	}
 }
 
 void handle_remote_read(char* str, char* p, int rank) {
@@ -884,6 +854,7 @@ void send_file(char* shm, long int nbytes, int dest) {
 //TODO: refactor offset_str and offset
 
 void serve_remote_read(const char* path_c, const char* offset_str, int dest, long int offset, long int nbytes) {
+	sem_wait(&remote_read_sem);
 	char* buf_send;
 	// Send all the rest of the file not only the number of bytes requested
 	// Useful for caching
@@ -930,6 +901,7 @@ void serve_remote_read(const char* path_c, const char* offset_str, int dest, lon
 	#ifdef CAPIOLOG
 		std::cout << "after sending part of the file to : " << dest << std::endl;
 	#endif
+	sem_post(&remote_read_sem);
 }
 
 void* wait_for_data(void* pthread_arg) {
@@ -1124,7 +1096,12 @@ int main(int argc, char** argv) {
     }
 	MPI_Get_processor_name(node_name, &len);
 	pthread_t server_thread, helper_thread;
-	int res = sem_init(&internal_server_sem,0,0);
+	int res = sem_init(&internal_server_sem, 0, 0);
+	if (res !=0) {
+		std::cerr << __FILE__ << ":" << __LINE__ << " - " << std::flush;
+		perror("sem_init failed"); exit(res);
+	}
+	sem_init(&remote_read_sem, 0, 1);
 	if (res !=0) {
 		std::cerr << __FILE__ << ":" << __LINE__ << " - " << std::flush;
 		perror("sem_init failed"); exit(res);
@@ -1151,6 +1128,11 @@ int main(int argc, char** argv) {
     	std::cerr << "Error in thread join: " << t << std::endl;
     }
 	res = sem_destroy(&internal_server_sem);
+	if (res !=0) {
+		std::cerr << __FILE__ << ":" << __LINE__ << " - " << std::flush;
+		perror("sem_destroy failed"); exit(res);
+	}
+	res = sem_destroy(&remote_read_sem);
 	if (res !=0) {
 		std::cerr << __FILE__ << ":" << __LINE__ << " - " << std::flush;
 		perror("sem_destroy failed"); exit(res);

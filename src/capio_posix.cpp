@@ -153,13 +153,10 @@ void mtrace_init(void) {
 
 }
 
-int add_open_request(const char* pathname) {
-	size_t fd;
-	std::string str ("open " + std::to_string(getpid()) + " " + std::string(pathname));
+void add_open_request(const char* pathname, size_t fd) {
+	std::string str ("open " + std::to_string(getpid()) + " " + std::to_string(fd) + " " + std::string(pathname));
 	const char* c_str = str.c_str();
 	buf_requests->write(c_str); //TODO: max upperbound for pathname
-	buf_response->read(&fd);
-	return fd; 
 }
 
 int add_close_request(int fd) {
@@ -309,11 +306,15 @@ int open(const char *pathname, int flags, ...) {
 	const char* prefix_2 = "output_file_";
 	if (strncmp("file_", pathname, strlen(prefix)) == 0 || strncmp("output_file_", pathname, strlen(prefix_2)) == 0) {
 		//create shm
-		int fd = add_open_request(pathname);
-		size_t* p_offset = (size_t*) get_shm("offset_" + std::to_string(getpid()) + "_" + std::to_string(fd));
-		files[fd] = std::make_tuple(get_shm(pathname), p_offset, 0, file_initial_size);
-		capio_files_descriptors[fd] = pathname;
-		capio_files_paths.insert(pathname);
+		int fd = real_open(pathname, O_CREAT | O_RDWR, S_IRUSR | S_IRWXU);
+		if (fd != -1) {
+			add_open_request(pathname, fd);
+			size_t* p_offset = create_shm_size_t("offset_" + std::to_string(getpid()) + "_" + std::to_string(fd));
+			*p_offset = 0;
+			files[fd] = std::make_tuple(create_shm(pathname, 1024L * 1024 * 1024* 2), p_offset, 0, file_initial_size);
+			capio_files_descriptors[fd] = pathname;
+			capio_files_paths.insert(pathname);
+		}
 		return fd;
 	}
 	else {
@@ -336,9 +337,9 @@ int close(int fd) {
 		mtrace_init();
 	if (capio_files_descriptors.find(fd) != capio_files_descriptors.end()) {
 		//TODO: only the CAPIO deamon will free the shared memory
-		int res = add_close_request(fd);
+		add_close_request(fd);
 		capio_files_descriptors.erase(fd);
-		return res;
+		return real_close(fd);
 	}
 	else {
 		int res = real_close(fd);

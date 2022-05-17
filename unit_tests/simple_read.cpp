@@ -33,7 +33,7 @@ void read_from_file(const std::string file_name, int* data, long int num_element
 	std::ofstream file;
 	cclock::time_point before;
 	if (rank == 0) {
-		file.open(time_file, std::fstream::app);
+		file.open(time_file, std::ios_base::app);
 		// for milliseconds, use using ms = std::chrono::duration<double, std::milli>;
 		before = cclock::now();
 	}
