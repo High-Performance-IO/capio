@@ -306,15 +306,14 @@ int open(const char *pathname, int flags, ...) {
 	const char* prefix_2 = "output_file_";
 	if (strncmp("file_", pathname, strlen(prefix)) == 0 || strncmp("output_file_", pathname, strlen(prefix_2)) == 0) {
 		//create shm
-		int fd = real_open(pathname, O_CREAT | O_RDWR, S_IRUSR | S_IRWXU);
-		if (fd != -1) {
+			int fd;
+			void* p = create_shm(pathname, 1024L * 1024 * 1024* 2, &fd);
 			add_open_request(pathname, fd);
 			size_t* p_offset = create_shm_size_t("offset_" + std::to_string(getpid()) + "_" + std::to_string(fd));
 			*p_offset = 0;
-			files[fd] = std::make_tuple(create_shm(pathname, 1024L * 1024 * 1024* 2), p_offset, 0, file_initial_size);
+			files[fd] = std::make_tuple(p, p_offset, 0, file_initial_size);
 			capio_files_descriptors[fd] = pathname;
 			capio_files_paths.insert(pathname);
-		}
 		return fd;
 	}
 	else {
