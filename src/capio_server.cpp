@@ -36,6 +36,8 @@ const size_t file_initial_size = 1024L * 1024 * 1024 * 2;
 bool shm_full = false;
 long int total_bytes_shm = 0;
 
+MPI_Request req;
+
 // pid -> fd ->(file_shm, index)
 std::unordered_map<int, std::unordered_map<int, std::pair<void*, size_t*>>> processes_files;
 
@@ -847,7 +849,7 @@ void send_file(char* shm, long int nbytes, int dest) {
 				num_elements_to_send = 1024L * 1024 * 1024;
 			else
 				num_elements_to_send = nbytes - num_elements_to_send;
-			MPI_Send(shm + k, num_elements_to_send, MPI_BYTE, dest, 0, MPI_COMM_WORLD); 
+			MPI_Isend(shm + k, num_elements_to_send, MPI_BYTE, dest, 0, MPI_COMM_WORLD, &req); 
 	}
 }
 
