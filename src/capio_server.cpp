@@ -118,6 +118,8 @@ std::unordered_map<int, sem_t*> sems_write;
 
 sem_t internal_server_sem;
 sem_t remote_read_sem;
+sem_t handle_remote_read_sem;
+sem_t handle_local_read_sem;
 
 void sig_term_handler(int signum, siginfo_t *info, void *ptr) {
 	//free all the memory used
@@ -192,6 +194,9 @@ int* create_shm_int(std::string shm_name) {
 }
 
 void write_file_location(const std::string& file_name, int rank, std::string path_to_write) {
+        #ifdef CAPIOLOG
+        std::cout << "write file location before" << std::endl;
+        #endif
     struct flock lock;
     memset(&lock, 0, sizeof(lock));
     int fd;
@@ -232,6 +237,9 @@ void write_file_location(const std::string& file_name, int rank, std::string pat
     }
 	free(file_location);
     close(fd); // close the file: would unlock if needed
+        #ifdef CAPIOLOG
+        std::cout << "write file location after" << std::endl;
+        #endif
 	return;
 }
 
@@ -402,6 +410,10 @@ void handle_write(const char* str, int rank) {
         *std::get<1>(files_metadata[path]) = data_size; 
 		size_t file_shm_size = std::get<2>(files_metadata[path]);
 		if (data_size > file_shm_size) {
+
+        #ifdef CAPIOLOG
+        std::cout << "handle write data_size > file_shm_size" << std::endl;
+        #endif
 			//remap
 			size_t new_size;
 			if (data_size > file_shm_size * 2)
@@ -461,11 +473,18 @@ void handle_write(const char* str, int rank) {
         auto it_client = clients_remote_pending_reads.find(path);
 		std::list<std::tuple<size_t, size_t, sem_t*>>::iterator it_list, prev_it_list;
         if (it_client !=  clients_remote_pending_reads.end()) {
+
+        #ifdef CAPIOLOG
+        std::cout << "handle write serving remote pending reads" << std::endl;
+        #endif
 			it_list = it_client->second.begin();
                 while (it_list != it_client->second.end()) {
                         size_t offset = std::get<0>(*it_list);
                         size_t nbytes = std::get<1>(*it_list);
                         sem_t* sem = std::get<2>(*it_list);
+        #ifdef CAPIOLOG
+        std::cout << "handle write serving remote pending reads inside the loop" << std::endl;
+        #endif
                         if (offset + nbytes < data_size) {
                                 sem_post(sem);
                                 if (it_list == it_client->second.begin()) {
@@ -495,11 +514,16 @@ void handle_local_read(int pid, int fd, size_t count) {
 		#ifdef CAPIOLOG
 		std::cout << "handle local read" << std::endl;
 		#endif
+		sem_wait(&handle_local_read_sem);
 		std::string path = processes_files_metadata[pid][fd];
 		size_t file_size = *std::get<1>(files_metadata[path]);
 		size_t process_offset = *processes_files[pid][fd].second;
 		if (process_offset + count > file_size) {
+		#ifdef CAPIOLOG
+		std::cout << "add pending reads" << std::endl;
+		#endif
 			pending_reads[path].push_back(std::make_tuple(pid, fd, count));
+			sem_post(&handle_local_read_sem);
 			return;
 		}
 #ifdef MYDEBUG
@@ -515,6 +539,7 @@ void handle_local_read(int pid, int fd, size_t count) {
 		#ifdef CAPIOLOG
 		std::cout << "process offset " << process_offset << std::endl;
 		#endif
+		sem_post(&handle_local_read_sem);
 		//*processes_files[pid][fd].second += count;
 		//TODO: check if the file was moved to the disk
 }
@@ -525,6 +550,10 @@ void handle_local_read(int pid, int fd, size_t count) {
  */
 
 void handle_remote_read(int pid, int fd, long int count, int rank) {
+		#ifdef CAPIOLOG
+		std::cout << "handle remote read before sem_wait" << std::endl;
+		#endif
+		sem_wait(&handle_remote_read_sem);
 		const char* msg;
 		std::string str_msg;
 		int dest = nodes_helper_rank[files_location[processes_files_metadata[pid][fd]]];
@@ -540,6 +569,7 @@ void handle_remote_read(int pid, int fd, long int count, int rank) {
 		#endif
 		MPI_Send(msg, strlen(msg) + 1, MPI_CHAR, dest, 0, MPI_COMM_WORLD);
 		my_remote_pending_reads[processes_files_metadata[pid][fd]].push_back(std::make_tuple(pid, fd, count));
+		sem_post(&handle_remote_read_sem);
 }
 
 struct wait_for_file_metadata{
@@ -572,24 +602,29 @@ void* wait_for_file(void* pthread_arg) {
 
 	
 	#ifdef CAPIOLOG
-	std::cout << "wait for file" << std::endl;
+	std::cout << "wait for file before" << std::endl;
 	#endif
 	
 	std::string path_to_check(processes_files_metadata[pid][fd]);
 	const char* path_to_check_cstr = path_to_check.c_str();
 
+	struct timespec sleepTime;
+    struct timespec returnTime;
+    sleepTime.tv_sec = 0;
+    sleepTime.tv_nsec = 200000;
 	while (!found) {
-		sleep(1);
+
+
+		nanosleep(&sleepTime, &returnTime);
 		int tot_chars = 0;
     		fp = fopen("files_location.txt", "r");
 		if (fp == NULL) {
-			MPI_Finalize();
+			std::cerr << "error fopen files_location.txt" << std::endl;
 			exit(1);
 		}
 		fd_locations = fileno(fp);
 		if (fcntl(fd_locations, F_SETLKW, &lock) < 0) {
-        	close(fd_locations);
-			MPI_Finalize();
+			err_exit("error fcntl files_location.txt");
 			exit(1);
     	}
 		fseek(fp, tot_chars, SEEK_SET);
@@ -827,7 +862,9 @@ void* capio_server(void* pthread_arg) {
 	sem_post(&internal_server_sem);
 	while(true) {
 		read_next_msg(rank);
+		#ifdef CAPIOLOG
 		std::cout << "after next msg " << std::endl;
+		#endif
 
 		//respond();
 	}
@@ -913,11 +950,17 @@ void* wait_for_data(void* pthread_arg) {
 	int dest = rr_metadata->dest;
 	long int nbytes = rr_metadata->nbytes;
 	const char * offset_str = std::to_string(offset).c_str();
+			#ifdef CAPIOLOG
+				std::cout << "wait for data before" << std::endl;
+			#endif
 	sem_wait(rr_metadata->sem);
 	serve_remote_read(path, offset_str, dest, offset, nbytes);
 	free(rr_metadata->sem);
 	free(rr_metadata->path);
 	free(rr_metadata);
+			#ifdef CAPIOLOG
+				std::cout << "wait for data after" << std::endl;
+			#endif
 	return nullptr;
 }
 
@@ -1104,6 +1147,8 @@ int main(int argc, char** argv) {
 		perror("sem_init failed"); exit(res);
 	}
 	sem_init(&remote_read_sem, 0, 1);
+	sem_init(&handle_remote_read_sem, 0, 1);
+	sem_init(&handle_local_read_sem, 0, 1);
 	if (res !=0) {
 		std::cerr << __FILE__ << ":" << __LINE__ << " - " << std::flush;
 		perror("sem_init failed"); exit(res);

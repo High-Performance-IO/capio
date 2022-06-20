@@ -1,6 +1,6 @@
 #!/bin/bash
 
-for P in 1 #1 2 4 8 16 24
+for P in 1 2 4 8 16 24
 do
 	echo $P " " $1 " " $2 >> time_capio_writes.txt
 	echo $P " " $1 " " $2 >> time_capio_reads.txt
