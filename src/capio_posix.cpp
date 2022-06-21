@@ -8,6 +8,7 @@
 #include <set>
 #include <string>
 #include <iostream>
+#include <filesystem>
 
 #include <unistd.h>
 #include <stdio.h>
@@ -41,6 +42,8 @@ off_t (*real_lseek) (int fd, off_t offset, int whence) = NULL;
 struct dirent* (*real_readdir) (DIR *dirp);
 DIR* (*real_opendir)(const char *name);
 
+std::string capio_dir;
+
 static bool is_fstat = true;
 int num_writes_batch = 1;
 int actual_num_writes = 1;
@@ -70,6 +73,14 @@ int* caching_info_size;
 std::unordered_map<int, std::string> capio_files_descriptors; 
 std::unordered_set<std::string> capio_files_paths;
 
+int is_directory(const char *path) {
+   struct stat statbuf;
+   if (stat(path, &statbuf) != 0) {
+		std::cerr << "error: stat" << " errno " <<  errno << " strerror(errno): " << strerror(errno) << std::endl;
+		exit(1);
+   }
+   return S_ISDIR(statbuf.st_mode);
+}
 
 /*
  * This function must be called only once
@@ -78,6 +89,7 @@ std::unordered_set<std::string> capio_files_paths;
 
 void mtrace_init(void) {
 	char* val;
+
 	val = getenv("GW_BATCH");
 	if (val != NULL) {
 		num_writes_batch = std::stoi(val);
@@ -150,6 +162,26 @@ void mtrace_init(void) {
 	client_caching_info = (int*) create_shm("caching_info" + std::to_string(getpid()), 4096);
 	caching_info_size = (int*) create_shm("caching_info_size" + std::to_string(getpid()), sizeof(int));
 	*caching_info_size = 0; 
+	val = getenv("CAPIO_DIR");
+	try {
+		if (val == NULL) {
+			capio_dir = std::filesystem::canonical(".");	
+		}
+		else {
+			capio_dir = std::filesystem::canonical(val);
+		}
+	}
+	catch (const std::exception& ex){
+		std::cout << ex.what() << std::endl;
+		exit(1);
+	}
+
+	int res = is_directory(capio_dir.c_str());
+	if (res == 0) {
+		std::cerr << "dir " << capio_dir << " is not a directory" << std::endl;
+		exit(1);
+	}
+
 
 }
 
@@ -302,9 +334,39 @@ extern "C" {
 int open(const char *pathname, int flags, ...) {
 	if (real_open == NULL)
 		mtrace_init();
-	const char* prefix = "file_";
-	const char* prefix_2 = "output_file_";
-	if (strncmp("file_", pathname, strlen(prefix)) == 0 || strncmp("output_file_", pathname, strlen(prefix_2)) == 0) {
+	std::string path_to_check(pathname);
+	bool exists;
+	try {
+		path_to_check = std::filesystem::canonical(path_to_check);
+		exists = true;
+	}
+	catch (const std::exception& ex) {
+		exists = false;
+	}
+	if (! exists) { 
+		if (pathname[0] == '/' || pathname[0] == '.') {
+			bool found = false;
+			int i = path_to_check.size() - 1;
+			while (i >= 0 && !found) {
+				found = (path_to_check[i] == '/');
+				--i;
+			}
+			i += 2;
+			path_to_check = path_to_check.substr(0, i);
+			path_to_check = std::filesystem::canonical(path_to_check);
+		}
+		else {
+			std::string curr_dir = std::filesystem::current_path();
+			path_to_check = curr_dir + "/" + curr_dir;
+		}
+	}
+	auto res = std::mismatch(capio_dir.begin(), capio_dir.end(), path_to_check.begin());
+	if (res.first == capio_dir.end()) {
+		if (capio_dir.size() == path_to_check.size()) {
+			std::cerr << "open to the capio_dir" << std::endl;
+			exit(1);
+		}
+		else  {
 		//create shm
 			int fd;
 			void* p = create_shm(pathname, 1024L * 1024 * 1024* 2, &fd);
@@ -314,7 +376,8 @@ int open(const char *pathname, int flags, ...) {
 			files[fd] = std::make_tuple(p, p_offset, 0, file_initial_size);
 			capio_files_descriptors[fd] = pathname;
 			capio_files_paths.insert(pathname);
-		return fd;
+			return fd;
+		}
 	}
 	else {
 		mode_t mode = 0;
