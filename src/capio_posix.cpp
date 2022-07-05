@@ -1,6 +1,3 @@
-#ifndef _GNU_SOURCE
-#define _GNU_SOURCE
-#endif
 #include "circular_buffer.hpp"
 
 #include <unordered_map>
@@ -20,27 +17,11 @@
 #include <fcntl.h>
 #include <semaphore.h>
 #include <stdarg.h>
+#include <syscall.h>
+
+#include <libsyscall_intercept_hook_point.h>
 
 #include "utils/common.hpp"
-
-#ifndef __x86_64__
-# define _STAT_VER_LINUX        3
-#else
-# define _STAT_VER_LINUX        1
-#endif
-#define _STAT_VER                _STAT_VER_LINUX
-
-int (*real_open)(const char* pathname, int flags, ...) = NULL;
-ssize_t (*real_read)(int fd, void* buffer, size_t count) = NULL;
-ssize_t (*real_write)(int fd, const void* buffer, size_t count) = NULL;
-int (*real_close)(int fd) = NULL;
-int (*real_access)(const char *pathname, int mode) = NULL;
-int (*real_stat)(const char *__restrict pathname, struct stat *__restrict statbuf) = NULL;
-int (*real_fstat)(int fd, struct stat *statbuf) = NULL;
-int (*real_fxstat)(int ver, int fd, struct stat *statbuf) = NULL;
-off_t (*real_lseek) (int fd, off_t offset, int whence) = NULL;
-struct dirent* (*real_readdir) (DIR *dirp);
-DIR* (*real_opendir)(const char *name);
 
 std::string capio_dir;
 
@@ -82,6 +63,8 @@ int is_directory(const char *path) {
    return S_ISDIR(statbuf.st_mode);
 }
 
+static bool first_call = true;
+
 /*
  * This function must be called only once
  *
@@ -89,79 +72,7 @@ int is_directory(const char *path) {
 
 void mtrace_init(void) {
 	char* val;
-
-	val = getenv("GW_BATCH");
-	if (val != NULL) {
-		num_writes_batch = std::stoi(val);
-		if (num_writes_batch <= 0) {
-			std::cerr << "error: GW_BATCH variable must be >= 0";
-			exit(1);
-		}
-	}
-	real_open = (int (*)(const char*, int, ...)) dlsym(RTLD_NEXT, "open");
-	if (NULL == real_open) {
-		std::cerr << "Error in `dlsym open`: " << dlerror() << std::endl;;
-		exit(1);
-	}
-	real_read = (ssize_t (*)(int, void*, size_t)) dlsym(RTLD_NEXT, "read");
-	if (NULL == real_read) {
-		std::cerr << "Error in `dlsym open`: " << dlerror() << std::endl;;
-		exit(1);
-	}
-	real_write = (ssize_t (*)(int, const void*, size_t)) dlsym(RTLD_NEXT, "write");
-	if (NULL == real_write) {
-		std::cerr << "Error in `dlsym open`: " << dlerror() << std::endl;;
-		exit(1);
-	}
-	real_close = (int (*)(int)) dlsym(RTLD_NEXT, "close");
-	if (NULL == real_close) {	
-		std::cerr << "Error in `dlsym open`: " << dlerror() << std::endl;;
-		exit(1);
-	}
-	real_access = (int (*)(const char*, int)) dlsym(RTLD_NEXT, "access");
-	if (NULL == real_access) {	
-		std::cerr << "Error in `dlsym open`: " << dlerror() << std::endl;;
-		exit(1);
-	}
-	real_stat = (int (*)(const char *__restrict, struct stat *__restrict)) dlsym(RTLD_NEXT, "stat");
-	if (NULL == real_stat) {	
-		real_stat = (int (*)(const char *__restrict, struct stat *__restrict)) dlsym(RTLD_NEXT, "__xstat");
-		if (NULL == real_stat) {	
-			std::cerr << "Error in `dlsym open`: " << dlerror() << std::endl;
-			exit(1);
-		}
-	}
-	real_fstat = (int (*)(int, struct stat*)) dlsym(RTLD_NEXT, "fstat");
-	if (NULL == real_fstat) {	
-		real_fxstat = (int (*)(int, int, struct stat*)) dlsym(RTLD_NEXT, "__fxstat");
-		if (NULL == real_fxstat) {	
-			std::cerr << "Error in `dlsym open`: " << dlerror() << std::endl;
-			exit(1);
-		}
-		is_fstat = false;
-	}
-	real_lseek = (off_t (*)(int, off_t, int)) dlsym(RTLD_NEXT, "lseek");
-	if (NULL == real_lseek) {	
-		std::cerr << "Error in `dlsym open`: " << dlerror() << std::endl;
-		exit(1);
-	}
-	real_readdir = (struct dirent* (*)(DIR*)) dlsym(RTLD_NEXT, "readdir");
-	if (NULL == real_readdir) {	
-		std::cerr << "Error in `dlsym open`: " << dlerror() << std::endl;
-		exit(1);
-	}
-	real_opendir = (DIR* (*)(const char*)) dlsym(RTLD_NEXT, "opendir");
-	if (NULL == real_opendir) {	
-		std::cerr << "Error in `dlsym open`: " << dlerror() << std::endl;
-		exit(1);
-	}
-	sem_response = sem_open(("sem_response_read" + std::to_string(getpid())).c_str(),  O_CREAT | O_RDWR, S_IRUSR | S_IWUSR, 0);
-	sem_write = sem_open(("sem_write" + std::to_string(getpid())).c_str(),  O_CREAT | O_RDWR, S_IRUSR | S_IWUSR, 0);
-	buf_requests = new Circular_buffer<char>("circular_buffer", 256L * 1024 * 1024, sizeof(char) * 64);
-	buf_response = new Circular_buffer<size_t>("buf_response" + std::to_string(getpid()), 256L * 1024 * 1024, sizeof(long int));
-	client_caching_info = (int*) create_shm("caching_info" + std::to_string(getpid()), 4096);
-	caching_info_size = (int*) create_shm("caching_info_size" + std::to_string(getpid()), sizeof(int));
-	*caching_info_size = 0; 
+	first_call = false;
 	val = getenv("CAPIO_DIR");
 	try {
 		if (val == NULL) {
@@ -172,7 +83,6 @@ void mtrace_init(void) {
 		}
 	}
 	catch (const std::exception& ex){
-		std::cout << ex.what() << std::endl;
 		exit(1);
 	}
 
@@ -181,6 +91,22 @@ void mtrace_init(void) {
 		std::cerr << "dir " << capio_dir << " is not a directory" << std::endl;
 		exit(1);
 	}
+	val = getenv("GW_BATCH");
+	if (val != NULL) {
+		num_writes_batch = std::stoi(val);
+		if (num_writes_batch <= 0) {
+			std::cerr << "error: GW_BATCH variable must be >= 0";
+			exit(1);
+		}
+	}
+	sem_response = sem_open(("sem_response_read" + std::to_string(getpid())).c_str(),  O_CREAT | O_RDWR, S_IRUSR | S_IWUSR, 0);
+	sem_write = sem_open(("sem_write" + std::to_string(getpid())).c_str(),  O_CREAT | O_RDWR, S_IRUSR | S_IWUSR, 0);
+	buf_requests = new Circular_buffer<char>("circular_buffer", 256L * 1024 * 1024, sizeof(char) * 64);
+	buf_response = new Circular_buffer<size_t>("buf_response" + std::to_string(getpid()), 256L * 1024 * 1024, sizeof(long int));
+	client_caching_info = (int*) create_shm("caching_info" + std::to_string(getpid()), 4096);
+	caching_info_size = (int*) create_shm("caching_info_size" + std::to_string(getpid()), sizeof(int));
+	*caching_info_size = 0; 
+
 
 
 }
@@ -285,13 +211,13 @@ void write_to_disk(const int fd, const int offset, const void* buffer, const siz
 		std::cerr << "capio error in write to disk: file descriptor does not exist" << std::endl;
 	}
 	std::string path = it->second;
-	int filesystem_fd = real_open(path.c_str(), O_WRONLY);//TODO: maybe not efficient open in each write and why O_APPEND (without lseek) does not work?
+	int filesystem_fd = open(path.c_str(), O_WRONLY);//TODO: maybe not efficient open in each write and why O_APPEND (without lseek) does not work?
 	if (filesystem_fd == -1) {
 		std::cerr << "capio client error: impossible write to disk capio file " << fd << std::endl;
 		exit(1);
 	}
 	lseek(filesystem_fd, offset, SEEK_SET);
-	ssize_t res = real_write(filesystem_fd, buffer, count);
+	ssize_t res = write(filesystem_fd, buffer, count);
 	if (res == -1) {
 		err_exit("capio error writing to disk capio file ");
 	}	
@@ -299,7 +225,7 @@ void write_to_disk(const int fd, const int offset, const void* buffer, const siz
 		std::cerr << "capio error write to disk: only " << res << " bytes written of " << count << std::endl; 
 		exit(1);
 	}
-	if (real_close(filesystem_fd) == -1) {
+	if (close(filesystem_fd) == -1) {
 		std::cerr << "capio impossible close file " << filesystem_fd << std::endl;
 		exit(1);
 	}
@@ -311,28 +237,25 @@ void read_from_disk(int fd, int offset, void* buffer, size_t count) {
 		std::cerr << "capio error in write to disk: file descriptor does not exist" << std::endl;
 	}
 	std::string path = it->second;
-	int filesystem_fd = real_open(path.c_str(), O_RDONLY);//TODO: maybe not efficient open in each read
+	int filesystem_fd = open(path.c_str(), O_RDONLY);//TODO: maybe not efficient open in each read
 	if (filesystem_fd == -1) {
 		err_exit("capio client error: impossible to open file for read from disk"); 
 	}
-	off_t res_lseek = real_lseek(filesystem_fd, offset, SEEK_SET);
+	off_t res_lseek = lseek(filesystem_fd, offset, SEEK_SET);
 	if (res_lseek == -1) {
 		err_exit("capio client error: lseek in read from disk");
 	}
-	ssize_t res_read = real_read(filesystem_fd, buffer, count);
+	ssize_t res_read = read(filesystem_fd, buffer, count);
 	if (res_read == -1) {
 		err_exit("capio client error: read in read from disk");
 	}
-	if (real_close(filesystem_fd) == -1) {
+	if (close(filesystem_fd) == -1) {
 		err_exit("capio client error: close in read from disk");
 	}
 }
 
-
-extern "C" {
-
-int open(const char *pathname, int flags, ...) {
-	if (real_open == NULL)
+int capio_openat(int dirfd, const char* pathname, int flags) {
+	if (first_call)
 		mtrace_init();
 	std::string path_to_check(pathname);
 	bool exists;
@@ -353,7 +276,12 @@ int open(const char *pathname, int flags, ...) {
 			}
 			i += 2;
 			path_to_check = path_to_check.substr(0, i);
+			try{
 			path_to_check = std::filesystem::canonical(path_to_check);
+			}
+			catch (const std::exception& ex) {
+				std::cout << "exception canonical " << path_to_check << std::endl; //TODO: if O_CREAT is not a probelm beacuse it's ok if the file still doesn't exist
+			}
 		}
 		else {
 			std::string curr_dir = std::filesystem::current_path();
@@ -368,6 +296,7 @@ int open(const char *pathname, int flags, ...) {
 		}
 		else  {
 		//create shm
+			std::cout << "creating shm" << std::endl;
 			int fd;
 			void* p = create_shm(pathname, 1024L * 1024 * 1024* 2, &fd);
 			add_open_request(pathname, fd);
@@ -380,57 +309,11 @@ int open(const char *pathname, int flags, ...) {
 		}
 	}
 	else {
-		mode_t mode = 0;
-		if ((flags & O_CREAT) || (flags & O_TMPFILE) == O_TMPFILE) {
-			va_list ap;
-			va_start(ap, flags);
-			mode = va_arg(ap, mode_t);
-			va_end(ap);
-		}
-		int fd = real_open(pathname, flags, mode);
-		return fd;
+		return -2;
 	}
 }
 
-
-
-int close(int fd) {
-	if (real_close == NULL)
-		mtrace_init();
-	if (capio_files_descriptors.find(fd) != capio_files_descriptors.end()) {
-		//TODO: only the CAPIO deamon will free the shared memory
-		add_close_request(fd);
-		capio_files_descriptors.erase(fd);
-		return real_close(fd);
-	}
-	else {
-		int res = real_close(fd);
-		return res;
-	}
-}
-
-ssize_t read(int fd, void *buffer, size_t count) {
-	if (capio_files_descriptors.find(fd) != capio_files_descriptors.end()) {
-		std::tuple<void*, size_t*, size_t, size_t>* t = &files[fd];
-		size_t* offset = std::get<1>(*t);
-		//bool in_shm = check_cache(fd);
-		//if (in_shm) {
-			if (*offset + count > std::get<2>(*t))
-				add_read_request(fd, count, *t);
-			read_shm(std::get<0>(*t), *offset, buffer, count);
-		//}
-		//else {
-			//read_from_disk(fd, offset, buffer, count);
-		//}
-		*offset = *offset + count;
-		return count;
-	}
-	else { 
-		return real_read(fd, buffer, count);
-	}
-}
-
-ssize_t write(int fd, const  void *buffer, size_t count) {
+ssize_t capio_write(int fd, const  void *buffer, size_t count) {
 	if (capio_files_descriptors.find(fd) != capio_files_descriptors.end()) {
 		//bool in_shm = check_cache(fd);
 		//if (in_shm) {
@@ -462,10 +345,121 @@ ssize_t write(int fd, const  void *buffer, size_t count) {
 		return count;
 	}
 	else {
-		return real_write(fd, buffer, count);
+		return -2;	
+	}
+
+}
+
+int capio_close(int fd) {
+	if (first_call)
+		mtrace_init();
+	if (capio_files_descriptors.find(fd) != capio_files_descriptors.end()) {
+		//TODO: only the CAPIO deamon will free the shared memory
+		add_close_request(fd);
+		capio_files_descriptors.erase(fd);
+		return close(fd);
+	}
+	else {
+		return -2;
 	}
 }
 
+ssize_t capio_read(int fd, void *buffer, size_t count) {
+	if (capio_files_descriptors.find(fd) != capio_files_descriptors.end()) {
+		std::tuple<void*, size_t*, size_t, size_t>* t = &files[fd];
+		size_t* offset = std::get<1>(*t);
+		//bool in_shm = check_cache(fd);
+		//if (in_shm) {
+			if (*offset + count > std::get<2>(*t))
+				add_read_request(fd, count, *t);
+			read_shm(std::get<0>(*t), *offset, buffer, count);
+		//}
+		//else {
+			//read_from_disk(fd, offset, buffer, count);
+		//}
+		*offset = *offset + count;
+		return count;
+	}
+	else { 
+		return -2;
+	}
+}
+
+static int
+hook(long syscall_number,
+			long arg0, long arg1,
+			long arg2, long arg3,
+			long arg4, long arg5,
+			long *result)
+{
+	int hook_ret_value = 1;
+	int res = 0;
+	switch (syscall_number) {
+
+		case SYS_open:
+			*result = 0;
+			hook_ret_value = 0;
+			break;
+
+		case SYS_openat: {
+			int dirfd = static_cast<int>(arg0);
+			const char* pathname = reinterpret_cast<const char*>(arg1);
+			int flags = static_cast<int>(arg2);
+			int res = capio_openat(dirfd, pathname, flags);
+			if (res != -2) {
+				*result = res;
+				hook_ret_value = 0;
+			}
+			break;
+		}
+
+		case SYS_write: {
+			int fd = static_cast<int>(arg0);
+			const void* buf = reinterpret_cast<const void*>(arg1);
+			size_t count = static_cast<size_t>(arg2);
+			ssize_t res = capio_write(fd, buf, count);
+			if (res != -2) {
+				*result = res;
+				hook_ret_value = 0;
+			}
+			break;
+		}
+
+		case SYS_read: {
+			int fd = static_cast<int>(arg0);
+			void* buf = reinterpret_cast<void*>(arg1);
+			size_t count = static_cast<size_t>(arg2);
+			ssize_t res = capio_read(fd, buf, count);
+			if (res != -2) {
+				*result = res;
+				hook_ret_value = 0;
+			}
+			break;
+		}
+
+		case SYS_close: {
+			int fd = static_cast<int>(arg0);
+			int res = capio_close(fd);
+			if (res != -2) {
+				*result = res;
+				hook_ret_value = 0;
+			}
+			break;
+		}
+		default:
+			hook_ret_value = 1;
+	}
+	return hook_ret_value;
+}
+
+static __attribute__((constructor)) void
+init(void)
+{
+	// Set up the callback function
+	intercept_hook_point = hook;
+}
+
+/*
 int access(const char *pathname, int mode) {
 	if (real_access == NULL)
 		mtrace_init();
@@ -520,5 +514,4 @@ struct dirent* readdir(DIR* dirp) {
 	return real_readdir(dirp);
 }
 
-
-}
+*/

@@ -16,7 +16,7 @@ set(CMAKE_CXX_FLAGS_RELEASE "-O3")
 add_library(capio_posix SHARED
     src/capio_posix.cpp
 )
-target_link_libraries(capio_posix rt)
+target_link_libraries(capio_posix rt syscall_intercept)
 add_subdirectory(src)
 add_subdirectory(mpi_io_examples)
 add_subdirectory(unit_tests)
