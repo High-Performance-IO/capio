@@ -614,7 +614,25 @@ int capio_fcntl(int fd, int cmd, int arg) {
 	else 
 		return -2;
 }
+ssize_t capio_fgetxattr(int fd, const char* name, void* value, size_t size) {
+	auto it = fd_copies.find(fd);
+	if (it != fd_copies.end()) {
+		if (! it->second.second) {
+			fd = it->second.first[0];
+		}
+		if (strcmp(name, "system.posix_acl_access") == 0) {
+			errno = ENODATA;	
+			return -1;
+		}
+		else {
+			std::cerr << "fgetxattr with name " << name << " is not yet supporte in CAPIO" << std::endl;
+			exit(1);
+		}
+	}
+	else
+		return -2;
 
+}
 static int
 hook(long syscall_number,
 			long arg0, long arg1,
@@ -710,6 +728,19 @@ hook(long syscall_number,
 				hook_ret_value = 0;
 			}
 
+			break;
+		}
+
+		case SYS_fgetxattr: {
+			int fd = arg0;
+			const char* name = reinterpret_cast<const char*>(arg1);
+			void* value = reinterpret_cast<void*>(arg2);
+			size_t size = arg3;
+			ssize_t res = capio_fgetxattr(fd, name, value, size);
+			if (res != 2) {
+				*result = res;
+				hook_ret_value = 0;
+			}
 			break;
 		}
 
