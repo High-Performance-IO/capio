@@ -19,6 +19,7 @@
 #include <semaphore.h>
 #include <stdarg.h>
 #include <syscall.h>
+#include <sys/uio.h>
 
 #include <libsyscall_intercept_hook_point.h>
 
@@ -503,6 +504,26 @@ off_t capio_lseek(int fd, off64_t offset, int whence) {
 	}
 }
 
+ssize_t capio_writev(int fd, const struct iovec* iov, int iovcnt) {
+	if (capio_files_descriptors.find(fd) != capio_files_descriptors.end()) {
+		ssize_t tot_bytes = 0;
+		ssize_t res = 0;
+		int i = 0;
+		while (i < iovcnt && res >= 0) {
+			res = capio_write(fd, iov[i].iov_base, iov[i].iov_len);
+			tot_bytes += res;
+			++i;
+		}
+		if (res == -1)
+			return -1;
+		else
+			return tot_bytes;
+	}
+	else
+		return -2;
+
+}
+
 static int
 hook(long syscall_number,
 			long arg0, long arg1,
@@ -570,6 +591,18 @@ hook(long syscall_number,
 			off_t offset = static_cast<off_t>(arg1);
 			int whence = static_cast<int>(arg2);
 			off_t res = capio_lseek(fd, offset, whence);
+			if (res != -2) {
+				*result = res;
+				hook_ret_value = 0;
+			}
+			break;
+		}
+
+		case SYS_writev: {
+			int fd = static_cast<int>(arg0);
+			const struct iovec* iov = reinterpret_cast<const struct iovec*>(arg1);
+			int iovcnt = static_cast<int>(arg2);
+			ssize_t res = capio_writev(fd, iov, iovcnt);
 			if (res != -2) {
 				*result = res;
 				hook_ret_value = 0;

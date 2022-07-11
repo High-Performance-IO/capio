@@ -15,6 +15,10 @@ add_executable(capio_file_tests capio_file_tests.cpp)
 add_executable(test_lseek_write test_lseek_write.cpp)
 add_executable(test_lseek_read test_lseek_read.cpp)
 
+
+add_executable(writev_test writev_test.cpp)
+add_executable(writev_test_nc writev_test.cpp)
+
 target_link_libraries(simple_write ${MPI_LIBRARIES} rt capio_posix)
 target_link_libraries(simple_write_fopen ${MPI_LIBRARIES} rt capio_posix)
 target_link_libraries(simple_read ${MPI_LIBRARIES} rt capio_posix)
@@ -25,6 +29,7 @@ target_link_libraries(simple_read_nc ${MPI_LIBRARIES} rt)
 target_link_libraries(simple_read_fopen_nc ${MPI_LIBRARIES} rt)
 target_link_libraries(read_write_mpi ${MPI_LIBRARIES} rt)
 target_link_libraries(test_lseek_write rt capio_posix)
+target_link_libraries(writev_test capio_posix)
 target_link_libraries(test_lseek_read rt capio_posix)
 
 target_link_libraries(simple_fopen  rt capio_posix)
