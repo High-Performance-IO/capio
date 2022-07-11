@@ -2,6 +2,7 @@
 
 #include <unordered_map>
 #include <unordered_set>
+#include <vector>
 #include <set>
 #include <string>
 #include <iostream>
@@ -35,7 +36,7 @@ int actual_num_writes = 1;
 // initial size for each file (can be overwritten by the user)
 const size_t file_initial_size = 1024L * 1024 * 1024 * 4;
 
-/* fd -> (shm*, *offset, mapped_shm_size, offset_upper_bound, Capio_file)
+/* fd -> (shm*, *offset, mapped_shm_size, offset_upper_bound, Capio_file, file status flags, file_descriptor_flags)
  * The mapped shm size isn't the the size of the file shm
  * but it's the mapped shm size in the virtual adress space
  * of the server process. The effective size can be greater
@@ -43,7 +44,7 @@ const size_t file_initial_size = 1024L * 1024 * 1024 * 4;
  *
  */
 
-std::unordered_map<int, std::tuple<void*, off64_t*, off64_t, off64_t, Capio_file>> files;
+std::unordered_map<int, std::tuple<void*, off64_t*, off64_t, off64_t, Capio_file, int, int>> files;
 Circular_buffer<char>* buf_requests;
  
 Circular_buffer<off_t>* buf_response;
@@ -55,6 +56,8 @@ int* caching_info_size;
 // fd -> pathname
 std::unordered_map<int, std::string> capio_files_descriptors; 
 std::unordered_set<std::string> capio_files_paths;
+
+std::unordered_map<int, std::pair<std::vector<int>, bool>> fd_copies;
 
 int is_directory(const char *path) {
    struct stat statbuf;
@@ -125,7 +128,7 @@ int add_close_request(int fd) {
 	return 0;
 }
 
-void add_read_request(int fd, off64_t count, std::tuple<void*, off64_t*, off64_t, off64_t, Capio_file>& t) {
+void add_read_request(int fd, off64_t count, std::tuple<void*, off64_t*, off64_t, off64_t, Capio_file, int , int>& t) {
 	std::string str = "read " + std::to_string(getpid()) + " " + std::to_string(fd) + " " + std::to_string(count);
 	const char* c_str = str.c_str();
 	buf_requests->write(c_str);
@@ -309,8 +312,9 @@ int capio_openat(int dirfd, const char* pathname, int flags) {
 			add_open_request(pathname, fd);
 			off64_t* p_offset = create_shm_off64_t("offset_" + std::to_string(getpid()) + "_" + std::to_string(fd));
 			*p_offset = 0;
-			files[fd] = std::make_tuple(p, p_offset, file_initial_size, 0, Capio_file());
+			files[fd] = std::make_tuple(p, p_offset, file_initial_size, 0, Capio_file(), flags, 0);
 			capio_files_descriptors[fd] = pathname;
+			fd_copies[fd] = std::make_pair(std::vector<int>(), true);
 			capio_files_paths.insert(pathname);
 			return fd;
 		}
@@ -321,7 +325,11 @@ int capio_openat(int dirfd, const char* pathname, int flags) {
 }
 
 ssize_t capio_write(int fd, const  void *buffer, size_t count) {
-	if (capio_files_descriptors.find(fd) != capio_files_descriptors.end()) {
+	auto it = fd_copies.find(fd);
+	if (it != fd_copies.end()) {
+		if (! it->second.second) {
+			fd = it->second.first[0];
+		}
 		if (count > SSIZE_MAX) {
 			std::cerr << "Capio does not support writes bigger then SSIZE_MAX yet" << std::endl;
 			exit(1);
@@ -365,10 +373,32 @@ ssize_t capio_write(int fd, const  void *buffer, size_t count) {
 int capio_close(int fd) {
 	if (first_call)
 		mtrace_init();
-	if (capio_files_descriptors.find(fd) != capio_files_descriptors.end()) {
-		//TODO: only the CAPIO deamon will free the shared memory
+	auto it = fd_copies.find(fd);
+	if (it != fd_copies.end()) {
+		if (! it->second.second) {
+			fd = it->second.first[0];
+		}
 		add_close_request(fd);
+		auto& copies = fd_copies[fd].first;
+		if (copies.size() > 0) {
+			int master_fd = copies[0];
+			files[master_fd] = files[fd];
+			capio_files_descriptors[master_fd] = capio_files_descriptors[fd];
+			fd_copies[master_fd].second = true;
+			auto& master_copies = fd_copies[master_fd].first;
+			master_copies.erase(master_copies.begin());
+			for (int i = 1; i < copies.size(); ++i) {
+				int fd_copy = copies[i];
+				master_copies.push_back(fd_copy);
+				auto& copy_vec = fd_copies[fd_copy].first;
+				copy_vec.erase(copy_vec.begin());
+				copy_vec.push_back(master_fd);
+			}
+
+		}
 		capio_files_descriptors.erase(fd);
+		fd_copies.erase(fd);
+		files.erase(fd);
 		return close(fd);
 	}
 	else {
@@ -377,13 +407,17 @@ int capio_close(int fd) {
 }
 
 ssize_t capio_read(int fd, void *buffer, size_t count) {
-	if (capio_files_descriptors.find(fd) != capio_files_descriptors.end()) {
+	auto it = fd_copies.find(fd);
+	if (it != fd_copies.end()) {
+		if (! it->second.second) {
+			fd = it->second.first[0];
+		}
 		if (count >= SSIZE_MAX) {
 			std::cerr << "capio does not support read bigger then SSIZE_MAX yet" << std::endl;
 			exit(1);
 		}
 		off64_t count_off = count;
-		std::tuple<void*, off64_t*, off64_t, off64_t, Capio_file>* t = &files[fd];
+		std::tuple<void*, off64_t*, off64_t, off64_t, Capio_file, int, int>* t = &files[fd];
 		off64_t* offset = std::get<1>(*t);
 		//bool in_shm = check_cache(fd);
 		//if (in_shm) {
@@ -421,8 +455,12 @@ ssize_t capio_read(int fd, void *buffer, size_t count) {
 
 //TODO: EOVERFLOW is not adressed
 off_t capio_lseek(int fd, off64_t offset, int whence) { 
-	if (capio_files_descriptors.find(fd) != capio_files_descriptors.end()) {
-		std::tuple<void*, off64_t*, off64_t, off64_t, Capio_file>* t = &files[fd];
+	auto it = fd_copies.find(fd);
+	if (it != fd_copies.end()) {
+		if (! it->second.second) {
+			fd = it->second.first[0];
+		}
+		std::tuple<void*, off64_t*, off64_t, off64_t, Capio_file, int, int>* t = &files[fd];
 		off64_t* file_offset = std::get<1>(*t);
 		if (whence == SEEK_SET) {
 			if (offset >= 0) {
@@ -505,7 +543,11 @@ off_t capio_lseek(int fd, off64_t offset, int whence) {
 }
 
 ssize_t capio_writev(int fd, const struct iovec* iov, int iovcnt) {
-	if (capio_files_descriptors.find(fd) != capio_files_descriptors.end()) {
+	auto it = fd_copies.find(fd);
+	if (it != fd_copies.end()) {
+		if (! it->second.second) {
+			fd = it->second.first[0];
+		}
 		ssize_t tot_bytes = 0;
 		ssize_t res = 0;
 		int i = 0;
@@ -524,6 +566,55 @@ ssize_t capio_writev(int fd, const struct iovec* iov, int iovcnt) {
 
 }
 
+int capio_fcntl(int fd, int cmd, int arg) {
+	auto it = fd_copies.find(fd);
+	if (it != fd_copies.end()) {
+		if (! it->second.second) {
+			fd = it->second.first[0];
+		}
+		switch (cmd) {
+			case F_GETFD: {
+				return std::get<6>(files[fd]);
+			break;
+			}
+			case F_SETFD: {
+				std::get<6>(files[fd]) = arg;
+				return 0;
+			break;
+			}
+			case F_GETFL: {
+				return std::get<5>(files[fd]);
+
+			break;
+			}
+			case F_SETFL: {
+				std::get<5>(files[fd]) = arg;
+				return 0;
+			break;
+			}
+			case F_DUPFD_CLOEXEC: {
+				int dev_fd = open("/dev/null", O_RDONLY);
+				if (dev_fd == -1)
+					err_exit("open /dev/null");
+				int res = fcntl(dev_fd, F_DUPFD_CLOEXEC, arg); //
+				close(dev_fd);
+				if (res != -1) {
+					fd_copies[fd].first.push_back(res);
+					fd_copies[res].first.push_back(fd);
+					fd_copies[res].second = false;
+				}
+				return res;
+			break;
+			}
+			default:
+				std::cerr << "fcntl with cmd " << cmd << " is not yet supported" << std::endl;
+				exit(1);
+		}
+	}
+	else 
+		return -2;
+}
+
 static int
 hook(long syscall_number,
 			long arg0, long arg1,
@@ -536,8 +627,7 @@ hook(long syscall_number,
 	switch (syscall_number) {
 
 		case SYS_open:
-			*result = 0;
-			hook_ret_value = 0;
+			hook_ret_value = 1;
 			break;
 
 		case SYS_openat: {
@@ -607,6 +697,19 @@ hook(long syscall_number,
 				*result = res;
 				hook_ret_value = 0;
 			}
+			break;
+		}
+
+		case SYS_fcntl : {
+			int fd = arg0;		
+			int cmd = arg1;
+			int arg = arg2;
+			int res = capio_fcntl(fd, cmd, arg);
+			if (res != -2) {
+				*result = res;
+				hook_ret_value = 0;
+			}
+
 			break;
 		}
 
