@@ -1,3 +1,14 @@
+#ifndef CAPIO_COMMON_HPP_
+#define CAPIO_COMMON_HPP_
+
+#include <iostream>
+#include <string>
+#include <cstring>
+
+#include <sys/mman.h>
+#include <sys/stat.h>
+#include <fcntl.h>
+#include <unistd.h>
 
 void err_exit(std::string error_msg) {
 	std::cerr << "error: " << error_msg << " errno " <<  errno << " strerror(errno): " << strerror(errno) << std::endl;
@@ -25,11 +36,11 @@ void* get_shm(std::string shm_name) {
 	return p;
 }
 
-size_t* create_shm_size_t(std::string shm_name) {
+off64_t* create_shm_off64_t(std::string shm_name) {
 	void* p = nullptr;
 	// if we are not creating a new object, mode is equals to 0
 	int fd = shm_open(shm_name.c_str(), O_CREAT | O_RDWR,  S_IRUSR | S_IWUSR); //to be closed
-	const int size = sizeof(size_t);
+	const int size = sizeof(off64_t);
 	if (fd == -1)
 		err_exit("shm_open");
 	if (ftruncate(fd, size) == -1)
@@ -39,7 +50,7 @@ size_t* create_shm_size_t(std::string shm_name) {
 		err_exit("mmap create_shm_size_t");
 //	if (close(fd) == -1);
 //		err_exit("close");
-	return (size_t*) p;
+	return (off64_t*) p;
 }
 
 void* create_shm(std::string shm_name, const long int size) {
@@ -73,3 +84,5 @@ void* create_shm(std::string shm_name, const long int size, int* fd) {
 //		err_exit("close");
 	return p;
 }
+
+#endif

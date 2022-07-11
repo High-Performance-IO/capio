@@ -6,6 +6,7 @@
 #include <string>
 #include <iostream>
 #include <filesystem>
+#include <climits>
 
 #include <unistd.h>
 #include <stdio.h>
@@ -22,6 +23,7 @@
 #include <libsyscall_intercept_hook_point.h>
 
 #include "utils/common.hpp"
+#include "capio_file.hpp"
 
 std::string capio_dir;
 
@@ -32,19 +34,18 @@ int actual_num_writes = 1;
 // initial size for each file (can be overwritten by the user)
 const size_t file_initial_size = 1024L * 1024 * 1024 * 4;
 
-/* fd -> (shm*, *offset, file_size, mapped_shm_size )
+/* fd -> (shm*, *offset, mapped_shm_size, offset_upper_bound, Capio_file)
  * The mapped shm size isn't the the size of the file shm
  * but it's the mapped shm size in the virtual adress space
  * of the server process. The effective size can be greater
  * in a given moment.
  *
- * TODO: offset for now is the size of the file
  */
 
-std::unordered_map<int, std::tuple<void*, size_t*, size_t, size_t>> files;
+std::unordered_map<int, std::tuple<void*, off64_t*, off64_t, off64_t, Capio_file>> files;
 Circular_buffer<char>* buf_requests;
  
-Circular_buffer<size_t>* buf_response;
+Circular_buffer<off_t>* buf_response;
 sem_t* sem_response;
 sem_t* sem_write;
 int* client_caching_info;
@@ -102,7 +103,7 @@ void mtrace_init(void) {
 	sem_response = sem_open(("sem_response_read" + std::to_string(getpid())).c_str(),  O_CREAT | O_RDWR, S_IRUSR | S_IWUSR, 0);
 	sem_write = sem_open(("sem_write" + std::to_string(getpid())).c_str(),  O_CREAT | O_RDWR, S_IRUSR | S_IWUSR, 0);
 	buf_requests = new Circular_buffer<char>("circular_buffer", 256L * 1024 * 1024, sizeof(char) * 64);
-	buf_response = new Circular_buffer<size_t>("buf_response" + std::to_string(getpid()), 256L * 1024 * 1024, sizeof(long int));
+	buf_response = new Circular_buffer<off_t>("buf_response" + std::to_string(getpid()), 256L * 1024 * 1024, sizeof(off_t));
 	client_caching_info = (int*) create_shm("caching_info" + std::to_string(getpid()), 4096);
 	caching_info_size = (int*) create_shm("caching_info_size" + std::to_string(getpid()), sizeof(int));
 	*caching_info_size = 0; 
@@ -123,19 +124,20 @@ int add_close_request(int fd) {
 	return 0;
 }
 
-void add_read_request(int fd, size_t count, std::tuple<void*, size_t*, size_t, size_t>& t) {
+void add_read_request(int fd, off64_t count, std::tuple<void*, off64_t*, off64_t, off64_t, Capio_file>& t) {
 	std::string str = "read " + std::to_string(getpid()) + " " + std::to_string(fd) + " " + std::to_string(count);
 	const char* c_str = str.c_str();
 	buf_requests->write(c_str);
 	//read response (offest)
-	size_t file_size;
-	buf_response->read(&file_size);
-	std::get<2>(t) = file_size;
-	size_t file_shm_size = std::get<3>(t);
-	if (file_size > file_shm_size) {
+	off64_t offset_upperbound;
+	buf_response->read(&offset_upperbound);
+	std::get<3>(t) = offset_upperbound;
+	size_t file_shm_size = std::get<2>(t);
+	size_t end_of_read = *std::get<1>(t) + count;
+	if (end_of_read > file_shm_size) {
 		size_t new_size;
-		if (file_size > file_shm_size * 2)
-			new_size = file_size;
+		if (end_of_read > file_shm_size * 2)
+			new_size = end_of_read;
 		else
 			new_size = file_shm_size * 2;
 
@@ -143,17 +145,19 @@ void add_read_request(int fd, size_t count, std::tuple<void*, size_t*, size_t, s
 		if (p == MAP_FAILED)
 			err_exit("mremap " + std::to_string(fd));
 		std::get<0>(t) = p;
-		std::get<3>(t) = new_size;
+		std::get<2>(t) = new_size;
 	}
 	return;
 }
 
 
-void add_write_request(int fd, size_t count) {
+void add_write_request(int fd, off64_t count) { //da modifcare con capio_file sia per una normale scrittura sia per quando si fa il batch
 	char c_str[64];
+	long int old_offset = *std::get<1>(files[fd]);
 	*std::get<1>(files[fd]) += count; //works only if there is only one writer at time for each file
-	sprintf(c_str, "writ %d %d %ld", getpid(),fd, *std::get<1>(files[fd]));
 	if (actual_num_writes == num_writes_batch) {
+		sprintf(c_str, "writ %d %d %ld %ld", getpid(),fd, old_offset, count);
+		std::get<4>(files[fd]).insert_sector(old_offset, old_offset + count);
 		buf_requests->write(c_str);
 		actual_num_writes = 1;
 	}
@@ -163,7 +167,7 @@ void add_write_request(int fd, size_t count) {
 	return;
 }
 
-void read_shm(void* shm, long int offset, void* buffer, size_t count) {
+void read_shm(void* shm, long int offset, void* buffer, off64_t count) {
 	memcpy(buffer, ((char*)shm) + offset, count); 
 #ifdef MYDEBUG
 		int* tmp = (int*) malloc(count);
@@ -177,7 +181,7 @@ void read_shm(void* shm, long int offset, void* buffer, size_t count) {
 
 }
 
-void write_shm(void* shm, size_t offset, const void* buffer, size_t count) {	
+void write_shm(void* shm, size_t offset, const void* buffer, off64_t count) {	
 	memcpy(((char*)shm) + offset, buffer, count); 
 	sem_post(sem_write);
 }
@@ -229,6 +233,7 @@ void write_to_disk(const int fd, const int offset, const void* buffer, const siz
 		std::cerr << "capio impossible close file " << filesystem_fd << std::endl;
 		exit(1);
 	}
+	//SEEK_HOLE SEEK_DATA
 }
 
 void read_from_disk(int fd, int offset, void* buffer, size_t count) {
@@ -280,7 +285,8 @@ int capio_openat(int dirfd, const char* pathname, int flags) {
 			path_to_check = std::filesystem::canonical(path_to_check);
 			}
 			catch (const std::exception& ex) {
-				std::cout << "exception canonical " << path_to_check << std::endl; //TODO: if O_CREAT is not a probelm beacuse it's ok if the file still doesn't exist
+				//TODO: if O_CREAT is not a probelm beacuse it's ok if the file still doesn't exist
+				std::cout << "exception canonical " << path_to_check << std::endl; 
 			}
 		}
 		else {
@@ -300,9 +306,9 @@ int capio_openat(int dirfd, const char* pathname, int flags) {
 			int fd;
 			void* p = create_shm(pathname, 1024L * 1024 * 1024* 2, &fd);
 			add_open_request(pathname, fd);
-			size_t* p_offset = create_shm_size_t("offset_" + std::to_string(getpid()) + "_" + std::to_string(fd));
+			off64_t* p_offset = create_shm_off64_t("offset_" + std::to_string(getpid()) + "_" + std::to_string(fd));
 			*p_offset = 0;
-			files[fd] = std::make_tuple(p, p_offset, 0, file_initial_size);
+			files[fd] = std::make_tuple(p, p_offset, file_initial_size, 0, Capio_file());
 			capio_files_descriptors[fd] = pathname;
 			capio_files_paths.insert(pathname);
 			return fd;
@@ -315,14 +321,19 @@ int capio_openat(int dirfd, const char* pathname, int flags) {
 
 ssize_t capio_write(int fd, const  void *buffer, size_t count) {
 	if (capio_files_descriptors.find(fd) != capio_files_descriptors.end()) {
+		if (count > SSIZE_MAX) {
+			std::cerr << "Capio does not support writes bigger then SSIZE_MAX yet" << std::endl;
+			exit(1);
+		}
+		off64_t count_off = count;
 		//bool in_shm = check_cache(fd);
 		//if (in_shm) {
-		size_t file_shm_size = std::get<3>(files[fd]);
-		if (*std::get<1>(files[fd]) > file_shm_size) {
-			size_t file_size = *std::get<1>(files[fd]);
-			size_t new_size;
-			if (file_size + count > file_shm_size * 2)
-				new_size = file_size + count;
+		off64_t file_shm_size = std::get<2>(files[fd]);
+		if (*std::get<1>(files[fd]) + count_off > file_shm_size) {
+			off64_t file_size = *std::get<1>(files[fd]);
+			off64_t new_size;
+			if (file_size + count_off > file_shm_size * 2)
+				new_size = file_size + count_off;
 			else
 				new_size = file_shm_size * 2;
 			std::string shm_name = capio_files_descriptors[fd];
@@ -336,8 +347,8 @@ ssize_t capio_write(int fd, const  void *buffer, size_t count) {
 				err_exit("mremap " + shm_name);
 			close(fd_shm);
 		}
-		write_shm(std::get<0>(files[fd]), *std::get<1>(files[fd]), buffer, count);
-		add_write_request(fd, count); //bottleneck
+		write_shm(std::get<0>(files[fd]), *std::get<1>(files[fd]), buffer, count_off);
+		add_write_request(fd, count_off); //bottleneck
 		//}
 		//else {
 			//write_to_disk(fd, files[fd].second, buffer, count);
@@ -366,21 +377,128 @@ int capio_close(int fd) {
 
 ssize_t capio_read(int fd, void *buffer, size_t count) {
 	if (capio_files_descriptors.find(fd) != capio_files_descriptors.end()) {
-		std::tuple<void*, size_t*, size_t, size_t>* t = &files[fd];
-		size_t* offset = std::get<1>(*t);
+		if (count >= SSIZE_MAX) {
+			std::cerr << "capio does not support read bigger then SSIZE_MAX yet" << std::endl;
+			exit(1);
+		}
+		off64_t count_off = count;
+		std::tuple<void*, off64_t*, off64_t, off64_t, Capio_file>* t = &files[fd];
+		off64_t* offset = std::get<1>(*t);
 		//bool in_shm = check_cache(fd);
 		//if (in_shm) {
-			if (*offset + count > std::get<2>(*t))
-				add_read_request(fd, count, *t);
-			read_shm(std::get<0>(*t), *offset, buffer, count);
+			if (*offset + count_off > std::get<3>(*t)) 
+				add_read_request(fd, count_off, *t);
+			read_shm(std::get<0>(*t), *offset, buffer, count_off);
 		//}
 		//else {
 			//read_from_disk(fd, offset, buffer, count);
 		//}
-		*offset = *offset + count;
-		return count;
+		*offset = *offset + count_off;
+		return count_off;
 	}
 	else { 
+		return -2;
+	}
+}
+
+/*
+ * The lseek() function shall fail if:
+ *
+ *     EBADF  The fildes argument is not an open file descriptor.
+ *
+ *     EINVAL The whence argument is not a proper value, or  the  resulting
+ *            file  offset would be negative for a regular file, block spe‐
+ *            cial file, or directory.
+ *
+ *     EOVERFLOW
+ *            The resulting file offset would be a value  which  cannot  be
+ *            represented correctly in an object of type off_t.
+ *
+ *     ESPIPE The  fildes  argument  is  associated  with  a pipe, FIFO, or
+ *            socket.
+*/
+
+//TODO: EOVERFLOW is not adressed
+off_t capio_lseek(int fd, off64_t offset, int whence) { 
+	if (capio_files_descriptors.find(fd) != capio_files_descriptors.end()) {
+		std::tuple<void*, off64_t*, off64_t, off64_t, Capio_file>* t = &files[fd];
+		off64_t* file_offset = std::get<1>(*t);
+		if (whence == SEEK_SET) {
+			if (offset >= 0) {
+				*file_offset = offset;
+				char c_str[64];
+				sprintf(c_str, "seek %d %d %zu", getpid(),fd, *file_offset);
+				buf_requests->write(c_str);
+				off64_t offset_upperbound;
+				buf_response->read(&offset_upperbound);
+				std::get<3>(*t) = offset_upperbound;
+				return *file_offset;
+			}
+			else {
+				errno = EINVAL;
+				return -1;
+			}
+		}
+		else if (whence == SEEK_CUR) {
+			off64_t new_offset = *file_offset + offset;
+			if (new_offset >= 0) {
+				*file_offset = new_offset;
+				char c_str[64];
+				sprintf(c_str, "seek %d %d %zu", getpid(),fd, *file_offset);
+				buf_requests->write(c_str);
+				off64_t offset_upperbound;
+				buf_response->read(&offset_upperbound);
+				std::get<3>(*t) = offset_upperbound;
+				return *file_offset;
+			}
+			else {
+				errno = EINVAL;
+				return -1;
+			}
+		}
+		else if (whence == SEEK_END) {
+			//works only in batch mode or if we know tha size of the file
+			/*long int file_size = std::get<4>(*t).get_file_size();
+			off_t new_offset = file_size + offset;
+			if (new_offset >=0)
+				*file_offset = new_offset;
+			else {
+				errno = EINVAL;
+				return -1;
+			}
+			*/
+			std::cerr << "SEEK_END not supported yet" << std::endl;
+			exit(1);
+		}
+		else if (whence == SEEK_DATA) {
+				char c_str[64];
+				sprintf(c_str, "sdat %d %d %zu", getpid(),fd, *file_offset);
+				buf_requests->write(c_str);
+				off64_t offset_upperbound;
+				buf_response->read(&offset_upperbound);
+				std::get<3>(*t) = offset_upperbound;
+				buf_response->read(file_offset);
+				return *file_offset;
+
+		}
+		else if (whence == SEEK_HOLE) {
+				char c_str[64];
+				sprintf(c_str, "shol %d %d %zu", getpid(),fd, *file_offset);
+				buf_requests->write(c_str);
+				off64_t offset_upperbound;
+				buf_response->read(&offset_upperbound);
+				std::get<3>(*t) = offset_upperbound;
+				buf_response->read(file_offset);
+				return *file_offset;
+
+		}
+		else {
+			errno = EINVAL;
+			return -1;
+		}
+		
+	}
+	else {
 		return -2;
 	}
 }
@@ -446,6 +564,19 @@ hook(long syscall_number,
 			}
 			break;
 		}
+
+		case SYS_lseek: {
+			int fd = static_cast<int>(arg0);
+			off_t offset = static_cast<off_t>(arg1);
+			int whence = static_cast<int>(arg2);
+			off_t res = capio_lseek(fd, offset, whence);
+			if (res != -2) {
+				*result = res;
+				hook_ret_value = 0;
+			}
+			break;
+		}
+
 		default:
 			hook_ret_value = 1;
 	}
@@ -497,14 +628,6 @@ int fstat(int fd, struct stat *statbuf) {
 }
 
 
-off_t lseek(int fd, off_t offset, int whence) { 
-	if (capio_files_descriptors.find(fd) != capio_files_descriptors.end()) {
-		return 0;
-	}
-	else {
-		return real_lseek(fd, offset, whence);
-	}
-}
 
 DIR* opendir(const char* name) {
 	return real_opendir(name);
