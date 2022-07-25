@@ -22,7 +22,7 @@ void* get_shm(std::string shm_name) {
 	int fd = shm_open(shm_name.c_str(), O_RDWR, 0); //to be closed
 	struct stat sb;
 	if (fd == -1)
-		err_exit("shm_open " + shm_name);
+		err_exit("get_shm shm_open " + shm_name);
 	/* Open existing object */
 	/* Use shared memory object size as length argument for mmap()
 	and as number of bytes to write() */
@@ -42,7 +42,7 @@ off64_t* create_shm_off64_t(std::string shm_name) {
 	int fd = shm_open(shm_name.c_str(), O_CREAT | O_RDWR,  S_IRUSR | S_IWUSR); //to be closed
 	const int size = sizeof(off64_t);
 	if (fd == -1)
-		err_exit("shm_open");
+		err_exit("create_shm_off64_t shm_open");
 	if (ftruncate(fd, size) == -1)
 		err_exit("ftruncate");
 	p = mmap(NULL, size, PROT_READ|PROT_WRITE, MAP_SHARED, fd, 0);
@@ -58,7 +58,7 @@ void* create_shm(std::string shm_name, const long int size) {
 	// if we are not creating a new object, mode is equals to 0
 	int fd = shm_open(shm_name.c_str(), O_CREAT | O_RDWR,  S_IRUSR | S_IWUSR); //to be closed
 	if (fd == -1)
-		err_exit("shm_open " + shm_name);
+		err_exit("create_shm shm_open " + shm_name);
 	if (ftruncate(fd, size) == -1)
 		err_exit("ftruncate " + shm_name);
 	p = mmap(NULL, size, PROT_READ|PROT_WRITE, MAP_SHARED, fd, 0);
@@ -74,7 +74,7 @@ void* create_shm(std::string shm_name, const long int size, int* fd) {
 	// if we are not creating a new object, mode is equals to 0
 	*fd = shm_open(shm_name.c_str(), O_CREAT | O_RDWR,  S_IRUSR | S_IWUSR); //to be closed
 	if (*fd == -1)
-		err_exit("shm_open " + shm_name);
+		err_exit("create_shm 3 args shm_open " + shm_name);
 	if (ftruncate(*fd, size) == -1)
 		err_exit("ftruncate " + shm_name);
 	p = mmap(NULL, size, PROT_READ|PROT_WRITE, MAP_SHARED, *fd, 0);

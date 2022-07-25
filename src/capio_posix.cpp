@@ -21,6 +21,7 @@
 #include <stdarg.h>
 #include <syscall.h>
 #include <sys/uio.h>
+#include <sys/ioctl.h>
 
 #include <libsyscall_intercept_hook_point.h>
 
@@ -106,7 +107,7 @@ void mtrace_init(void) {
 	}
 	sem_response = sem_open(("sem_response_read" + std::to_string(getpid())).c_str(),  O_CREAT | O_RDWR, S_IRUSR | S_IWUSR, 0);
 	sem_write = sem_open(("sem_write" + std::to_string(getpid())).c_str(),  O_CREAT | O_RDWR, S_IRUSR | S_IWUSR, 0);
-	buf_requests = new Circular_buffer<char>("circular_buffer", 256L * 1024 * 1024, sizeof(char) * 64);
+	buf_requests = new Circular_buffer<char>("circular_buffer", 256L * 1024 * 1024, sizeof(char) * 600);
 	buf_response = new Circular_buffer<off_t>("buf_response" + std::to_string(getpid()), 256L * 1024 * 1024, sizeof(off_t));
 	client_caching_info = (int*) create_shm("caching_info" + std::to_string(getpid()), 4096);
 	caching_info_size = (int*) create_shm("caching_info_size" + std::to_string(getpid()), sizeof(int));
@@ -264,6 +265,7 @@ void read_from_disk(int fd, int offset, void* buffer, size_t count) {
 }
 
 int capio_openat(int dirfd, const char* pathname, int flags) {
+	std::cout << "capio_openat " << pathname << std::endl;
 	if (first_call)
 		mtrace_init();
 	std::string path_to_check(pathname);
@@ -295,7 +297,7 @@ int capio_openat(int dirfd, const char* pathname, int flags) {
 		}
 		else {
 			std::string curr_dir = std::filesystem::current_path();
-			path_to_check = curr_dir + "/" + curr_dir;
+			path_to_check = curr_dir + "/" + pathname;
 		}
 	}
 	auto res = std::mismatch(capio_dir.begin(), capio_dir.end(), path_to_check.begin());
@@ -306,14 +308,25 @@ int capio_openat(int dirfd, const char* pathname, int flags) {
 		}
 		else  {
 		//create shm
+			char shm_name[512];
+			int i = 0;
+			while (pathname[i] != '\0') {
+				if (pathname[i] == '/' && i > 0)
+					shm_name[i] = '_';
+				else
+					shm_name[i] = pathname[i];
+				++i;
+			}
+			shm_name[i] = '\0';
 			std::cout << "creating shm" << std::endl;
+			printf("%s\n", shm_name);
 			int fd;
-			void* p = create_shm(pathname, 1024L * 1024 * 1024* 2, &fd);
-			add_open_request(pathname, fd);
+			void* p = create_shm(shm_name, 1024L * 1024 * 1024* 2, &fd);
+			add_open_request(shm_name, fd);
 			off64_t* p_offset = create_shm_off64_t("offset_" + std::to_string(getpid()) + "_" + std::to_string(fd));
 			*p_offset = 0;
 			files[fd] = std::make_tuple(p, p_offset, file_initial_size, 0, Capio_file(), flags, 0);
-			capio_files_descriptors[fd] = pathname;
+			capio_files_descriptors[fd] = shm_name;
 			fd_copies[fd] = std::make_pair(std::vector<int>(), true);
 			capio_files_paths.insert(pathname);
 			return fd;
@@ -387,7 +400,7 @@ int capio_close(int fd) {
 			fd_copies[master_fd].second = true;
 			auto& master_copies = fd_copies[master_fd].first;
 			master_copies.erase(master_copies.begin());
-			for (int i = 1; i < copies.size(); ++i) {
+			for (size_t i = 1; i < copies.size(); ++i) {
 				int fd_copy = copies[i];
 				master_copies.push_back(fd_copy);
 				auto& copy_vec = fd_copies[fd_copy].first;
@@ -633,6 +646,39 @@ ssize_t capio_fgetxattr(int fd, const char* name, void* value, size_t size) {
 		return -2;
 
 }
+
+ssize_t capio_flistxattr(int fd, char* list, ssize_t size) {
+	auto it = fd_copies.find(fd);
+	if (it != fd_copies.end()) {
+		if (!it->second.second) {
+			fd = it->second.first[0];
+		}
+		if (list == NULL && size == 0) {
+			return 0;
+		}
+		else {
+			std::cerr << "flistxattr is not yet supported in CAPIO" << std::endl;
+			exit(1);
+		}
+	}
+	else
+		return -2;
+		
+}
+
+int capio_ioctl(int fd, unsigned long request) {
+	auto it = fd_copies.find(fd);
+	if (it != fd_copies.end()) {
+		if (!it->second.second) {
+			fd = it->second.first[0];
+		}
+		return 0;
+	}
+	else
+		return -2;
+	
+}
+
 static int
 hook(long syscall_number,
 			long arg0, long arg1,
@@ -737,7 +783,30 @@ hook(long syscall_number,
 			void* value = reinterpret_cast<void*>(arg2);
 			size_t size = arg3;
 			ssize_t res = capio_fgetxattr(fd, name, value, size);
-			if (res != 2) {
+			if (res != -2) {
+				*result = res;
+				hook_ret_value = 0;
+			}
+			break;
+		}
+		
+		case SYS_flistxattr: {
+			int fd = arg0;
+			char* list = reinterpret_cast<char*>(arg1);
+			size_t size = arg2;
+			ssize_t res = capio_flistxattr(fd, list, size);
+			if (res != -2) {
+				*result = res;
+				hook_ret_value = 0;
+			}
+			break;
+		}
+
+		case SYS_ioctl: {
+			int fd = arg0;
+			unsigned long request = arg1;
+			int res = capio_ioctl(fd, request);
+			if (res != -2) {
 				*result = res;
 				hook_ret_value = 0;
 			}
