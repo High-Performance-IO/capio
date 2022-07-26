@@ -129,7 +129,7 @@ int add_close_request(int fd) {
 	return 0;
 }
 
-void add_read_request(int fd, off64_t count, std::tuple<void*, off64_t*, off64_t, off64_t, Capio_file, int , int>& t) {
+off64_t add_read_request(int fd, off64_t count, std::tuple<void*, off64_t*, off64_t, off64_t, Capio_file, int , int>& t) {
 	std::string str = "read " + std::to_string(getpid()) + " " + std::to_string(fd) + " " + std::to_string(count);
 	const char* c_str = str.c_str();
 	buf_requests->write(c_str);
@@ -138,7 +138,10 @@ void add_read_request(int fd, off64_t count, std::tuple<void*, off64_t*, off64_t
 	buf_response->read(&offset_upperbound);
 	std::get<3>(t) = offset_upperbound;
 	size_t file_shm_size = std::get<2>(t);
-	size_t end_of_read = *std::get<1>(t) + count;
+	size_t end_of_read;
+	end_of_read = *std::get<1>(t) + count;
+	if (end_of_read > offset_upperbound)
+		end_of_read = offset_upperbound;
 	if (end_of_read > file_shm_size) {
 		size_t new_size;
 		if (end_of_read > file_shm_size * 2)
@@ -152,7 +155,7 @@ void add_read_request(int fd, off64_t count, std::tuple<void*, off64_t*, off64_t
 		std::get<0>(t) = p;
 		std::get<2>(t) = new_size;
 	}
-	return;
+	return offset_upperbound;
 }
 
 
@@ -434,15 +437,27 @@ ssize_t capio_read(int fd, void *buffer, size_t count) {
 		off64_t* offset = std::get<1>(*t);
 		//bool in_shm = check_cache(fd);
 		//if (in_shm) {
-			if (*offset + count_off > std::get<3>(*t)) 
-				add_read_request(fd, count_off, *t);
-			read_shm(std::get<0>(*t), *offset, buffer, count_off);
+		off64_t bytes_read;
+			if (*offset + count_off > std::get<3>(*t)) {
+				off64_t end_of_read;
+				end_of_read = add_read_request(fd, count_off, *t);
+				bytes_read = end_of_read - *offset;
+				if (bytes_read > count_off)
+					bytes_read = count_off;
+			}
+			else
+				bytes_read = count_off;
+			//std:: cout << "count_off " << count_off << std::endl; 
+			//std:: cout << "offset " << *offset << std::endl; 
+			//std::cout << "before read shm " << bytes_read << std::endl;
+			read_shm(std::get<0>(*t), *offset, buffer, bytes_read);
+			//std::cout << "after read shm " << bytes_read << std::endl;
 		//}
 		//else {
 			//read_from_disk(fd, offset, buffer, count);
 		//}
-		*offset = *offset + count_off;
-		return count_off;
+		*offset = *offset + bytes_read;
+		return bytes_read;
 	}
 	else { 
 		return -2;

@@ -39,8 +39,8 @@ long int total_bytes_shm = 0;
 
 MPI_Request req;
 
-// pid -> fd ->(file_shm, index)
-std::unordered_map<int, std::unordered_map<int, std::pair<void*, off64_t*>>> processes_files;
+// pid -> fd ->(file_shm, index, writer)
+std::unordered_map<int, std::unordered_map<int, std::tuple<void*, off64_t*>>> processes_files;
 
 // pid -> fd -> pathname
 std::unordered_map<int, std::unordered_map<int, std::string>> processes_files_metadata;
@@ -64,13 +64,15 @@ std::unordered_map<int, Circular_buffer<off_t>*> response_buffers;
 // pid -> (response shared buffer, size)
 std::unordered_map<int, std::pair<int*, int*>> caching_info;
 
-/* pathname -> (file_shm, file_size, mapped_shm_size, first_write)
+/* pathname -> (file_shm, file_size, mapped_shm_size, first_write, capio_file)
  * The mapped shm size isn't the the size of the file shm
  * but it's the mapped shm size in the virtual adress space
  * of the server process. The effective size can ge greater
  * in a given moment.
  */
 std::unordered_map<std::string, std::tuple<void*, off64_t*, off64_t, bool, Capio_file>> files_metadata;
+
+std::unordered_map<int, std::unordered_map<std::string, bool>> writers;
 
 // pathname -> node
 std::unordered_map<std::string, char*> files_location;
@@ -309,7 +311,7 @@ bool check_remote_file(const std::string& file_name, int rank, std::string path_
 }
 
 void flush_file_to_disk(int pid, int fd) {
-	void* buf = processes_files[pid][fd].first;
+	void* buf = std::get<0>(processes_files[pid][fd]);
 	std::string path = processes_files_metadata[pid][fd];
 	long int file_size = *std::get<1>(files_metadata[path]);	
 	long int num_bytes_written, k = 0;
@@ -357,10 +359,10 @@ void handle_open(char* str, char* p, int rank) {
 	}
 		//TODO: check the size that the user wrote in the configuration file
 	off64_t* p_offset = create_shm_off64_t("offset_" + std::to_string(pid) + "_" + std::to_string(fd));
-	processes_files[pid][fd] = std::make_pair(p_shm, p_offset);//TODO: what happens if a process open the same file twice?
+	processes_files[pid][fd] = std::make_tuple(p_shm, p_offset);//TODO: what happens if a process open the same file twice?
 	*caching_info[pid].second += 2;
 	if (files_metadata.find(path) == files_metadata.end()) {
-		 p_shm = processes_files[pid][fd].first;
+		 p_shm = std::get<0>(processes_files[pid][fd]);
 		off64_t* p_shm_size = create_shm_off64_t(path + "_size");	
 		files_metadata[path] = std::make_tuple(p_shm, p_shm_size, file_initial_size, true, Capio_file());
 
@@ -370,6 +372,16 @@ void handle_open(char* str, char* p, int rank) {
 		}
 	}
 	processes_files_metadata[pid][fd] = path;
+	auto it_files = writers.find(pid);
+	if (it_files != writers.end()) {
+		auto it_bools = it_files->second.find(path);
+		if (it_bools == it_files->second.end()) {
+			writers[pid][path] = false;
+		}
+	}
+	else {
+		writers[pid][path] = false;
+	}
 }
 
 void handle_pending_read(int pid, int fd, long int process_offset, long int count) {
@@ -387,9 +399,6 @@ struct handle_write_metadata{
 };
 
 void handle_write(const char* str, int rank) {
-        #ifdef CAPIOLOG
-        std::cout << "handle write" << std::endl;
-        #endif
         //check if another process is waiting for this data
         std::string request;
         int pid, fd;
@@ -400,10 +409,14 @@ void handle_write(const char* str, int rank) {
         stream >> request >> pid >> fd >> base_offset >> count;
 		data_size = base_offset + count;
         std::string path = processes_files_metadata[pid][fd];
+		writers[pid][path] = true;
 		Capio_file& c_file = std::get<4>(files_metadata[path]);
 		std::cout << "insert sector " << base_offset << ", " << data_size << std::endl;
 		c_file.insert_sector(base_offset, data_size);
 		c_file.print();
+        #ifdef CAPIOLOG
+        std::cout << "handle write pid fd " << pid << " " << fd << std::endl;
+        #endif
         if (std::get<3>(files_metadata[path])) {
 			std::get<3>(files_metadata[path]) = false;
                 write_file_location("files_location.txt", rank, path);
@@ -461,7 +474,7 @@ void handle_write(const char* str, int rank) {
                         auto tuple = *it_vec;
                         int pending_pid = std::get<0>(tuple);
                         int fd = std::get<1>(tuple);
-                        size_t process_offset = *processes_files[pending_pid][fd].second;
+                        size_t process_offset = *std::get<1>(processes_files[pending_pid][fd]);
                         size_t count = std::get<2>(tuple);
                         size_t file_size = *std::get<1>(files_metadata[path]);
                         if (process_offset + count <= file_size) {
@@ -518,18 +531,24 @@ void handle_local_read(int pid, int fd, off64_t count) {
 		std::string path = processes_files_metadata[pid][fd];
 		Capio_file & c_file = std::get<4>(files_metadata[path]);
 		off64_t process_offset = *std::get<1>(processes_files[pid][fd]);
+		bool writer = writers[pid][path];
 		off64_t end_of_sector = c_file.get_sector_end(process_offset);
 		std::cout << "process offset " << process_offset << std::endl;
 		std::cout << "count " << count << std::endl;
 		std::cout << "end of sector" << end_of_sector << std::endl;
 		c_file.print();
-		if (process_offset + count > end_of_sector) { // da modificare con capio_file
+		if (process_offset + count > end_of_sector) {
 		#ifdef CAPIOLOG
-		std::cout << "add pending reads" << std::endl;
+		std::cout << "Am I a writer? " << writer << std::endl;
 		#endif
-			pending_reads[path].push_back(std::make_tuple(pid, fd, count));
-			sem_post(&handle_local_read_sem);
-			return;
+			if (!writer) {
+				#ifdef CAPIOLOG
+				std::cout << "add pending reads" << std::endl;
+				#endif
+				pending_reads[path].push_back(std::make_tuple(pid, fd, count));
+				sem_post(&handle_local_read_sem);
+				return;
+			}
 		}
 		response_buffers[pid]->write(&end_of_sector);
 		#ifdef CAPIOLOG
@@ -553,7 +572,7 @@ void handle_remote_read(int pid, int fd, off64_t count, int rank) {
 		const char* msg;
 		std::string str_msg;
 		int dest = nodes_helper_rank[files_location[processes_files_metadata[pid][fd]]];
-		size_t offset = *processes_files[pid][fd].second;
+		size_t offset = *std::get<1>(processes_files[pid][fd]);
 		str_msg = "read " + processes_files_metadata[pid][fd] + " " + std::to_string(rank) + " " + std::to_string(offset) + " " + std::to_string(count); 
 		msg = str_msg.c_str();
 		#ifdef CAPIOLOG
@@ -680,7 +699,7 @@ void handle_read(char* str, int rank) {
 	off64_t count;
 	std::istringstream stream(str);
 	stream >> request >> pid >> fd >> count;
-	if (*processes_files[pid][fd].second == 0 && files_location.find(processes_files_metadata[pid][fd]) == files_location.end()) {
+	if (*std::get<1>(processes_files[pid][fd]) == 0 && files_location.find(processes_files_metadata[pid][fd]) == files_location.end()) {
 		check_remote_file("files_location.txt", rank, processes_files_metadata[pid][fd]);
 		if (files_location.find(processes_files_metadata[pid][fd]) == files_location.end()) {
 			std::string path = processes_files_metadata[pid][fd];
@@ -734,7 +753,7 @@ void handle_remote_read(char* str, char* p, int rank) {
 		pid = std::get<0>(*it);
 		fd = std::get<1>(*it);
 		count = std::get<2>(*it);
-		size_t fd_offset = *processes_files[pid][fd].second;
+		size_t fd_offset = *std::get<1>(processes_files[pid][fd]);
 		if (fd_offset + count <= offset + bytes_received) {
 		#ifdef CAPIOLOG
 			std::cout << "handling others remote reads fd_offset " << fd_offset << " count " << count << " offset " << offset << " bytes received " << bytes_received << std::endl;
