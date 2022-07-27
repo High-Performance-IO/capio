@@ -39,7 +39,7 @@ long int total_bytes_shm = 0;
 
 MPI_Request req;
 
-// pid -> fd ->(file_shm, index, writer)
+// pid -> fd ->(file_shm, index)
 std::unordered_map<int, std::unordered_map<int, std::tuple<void*, off64_t*>>> processes_files;
 
 // pid -> fd -> pathname
@@ -71,6 +71,10 @@ std::unordered_map<int, std::pair<int*, int*>> caching_info;
  * in a given moment.
  */
 std::unordered_map<std::string, std::tuple<void*, off64_t*, off64_t, bool, Capio_file>> files_metadata;
+
+/*
+ * pid -> pathname -> bool
+ */
 
 std::unordered_map<int, std::unordered_map<std::string, bool>> writers;
 
@@ -384,10 +388,13 @@ void handle_open(char* str, char* p, int rank) {
 	}
 }
 
+//TO DO: modificare with capio read
 void handle_pending_read(int pid, int fd, long int process_offset, long int count) {
 	
 	std::string path = processes_files_metadata[pid][fd];
-	response_buffers[pid]->write(std::get<1>(files_metadata[path]));
+	Capio_file & c_file = std::get<4>(files_metadata[path]);
+	off64_t end_of_sector = c_file.get_sector_end(process_offset);
+	response_buffers[pid]->write(&end_of_sector);
 	//*processes_files[pid][fd].second += count;
 	//TODO: check if the file was moved to the disk
 
@@ -540,8 +547,9 @@ void handle_local_read(int pid, int fd, off64_t count) {
 		if (process_offset + count > end_of_sector) {
 		#ifdef CAPIOLOG
 		std::cout << "Am I a writer? " << writer << std::endl;
+		std::cout << "Is the file completed? " << c_file.complete << std::endl;
 		#endif
-			if (!writer) {
+			if (!writer && !c_file.complete) {
 				#ifdef CAPIOLOG
 				std::cout << "add pending reads" << std::endl;
 				#endif
@@ -789,7 +797,7 @@ void handle_lseek(char* str) {
 void handle_sdat(char* str) {
 	int pid, fd;	
 	size_t offset;
-	sscanf(str, "seek %d %d %zu", &pid, &fd, &offset);
+	sscanf(str, "sdat %d %d %zu", &pid, &fd, &offset);
 	std::string path = processes_files_metadata[pid][fd];
 	Capio_file& c_file = std::get<4>(files_metadata[path]);
 	off64_t res = c_file.seek_data(offset);
@@ -799,11 +807,50 @@ void handle_sdat(char* str) {
 void handle_shol(char* str) {
 	int pid, fd;	
 	size_t offset;
-	sscanf(str, "seek %d %d %zu", &pid, &fd, &offset);
+	sscanf(str, "shol %d %d %zu", &pid, &fd, &offset);
 	std::string path = processes_files_metadata[pid][fd];
 	Capio_file& c_file = std::get<4>(files_metadata[path]);
 	off64_t res = c_file.seek_hole(offset);
 	response_buffers[pid]->write(&res);
+}
+
+void handle_exig(char* str) {
+	int pid;
+	sscanf(str, "exig %d", &pid);
+	#ifdef CAPIOLOG
+	std::cout << "handle exit group " << std::endl;
+	#endif	
+   // std::unordered_map<int, std::unordered_map<std::string, bool>> writers;
+   auto files = writers[pid];
+   for (auto& pair : files) {
+   	if (pair.second) {
+		std::string path = pair.first;	
+		std::get<4>(files_metadata[path]).complete = true;
+		auto it = pending_reads.find(path);
+        if (it != pending_reads.end()) {
+	#ifdef CAPIOLOG
+	std::cout << "handle pending read file " << path << std::endl;
+	#endif	
+                auto& pending_reads_this_file = it->second;
+                int i = 0;
+                for (auto it_vec = pending_reads_this_file.begin(); it_vec != pending_reads_this_file.end(); it++) {
+                        auto tuple = *it_vec;
+                        int pending_pid = std::get<0>(tuple);
+                        int fd = std::get<1>(tuple);
+                        size_t process_offset = *std::get<1>(processes_files[pending_pid][fd]);
+                        size_t count = std::get<2>(tuple);
+                        size_t file_size = *std::get<1>(files_metadata[path]);
+	#ifdef CAPIOLOG
+	std::cout << "pending read pid fd offset count " << pid << " " << fd << " " << process_offset <<" "<< count << std::endl;
+	#endif	
+                        handle_pending_read(pending_pid, fd, process_offset, count);
+                        pending_reads_this_file.erase(it_vec);
+                        ++i;
+                }
+        }
+
+	}
+   }
 }
 
 void read_next_msg(int rank) {
@@ -856,6 +903,8 @@ void read_next_msg(int rank) {
 						handle_sdat(str);
 					else if (strncmp(str, "shol", 4) == 0)
 						handle_shol(str);
+					else if (strncmp(str, "exig", 4) == 0)
+						handle_exig(str);
 					else {
 						std::cerr << "error msg read" << std::endl;
 						MPI_Finalize();

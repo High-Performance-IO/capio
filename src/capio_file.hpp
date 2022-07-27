@@ -24,6 +24,7 @@ class Capio_file {
 		std::set<std::pair<off64_t, off64_t>, compare> sectors;
 
 	public:
+		bool complete = false;
 
 		/*
 		 * Insert the new sector automatically modifying the
