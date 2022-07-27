@@ -313,15 +313,15 @@ int capio_openat(int dirfd, const char* pathname, int flags) {
 		//create shm
 			char shm_name[512];
 			int i = 0;
-			while (pathname[i] != '\0') {
-				if (pathname[i] == '/' && i > 0)
+			while (i < path_to_check.length()) {
+				if (path_to_check[i] == '/' && i > 0)
 					shm_name[i] = '_';
 				else
-					shm_name[i] = pathname[i];
+					shm_name[i] = path_to_check[i];
 				++i;
 			}
 			shm_name[i] = '\0';
-			std::cout << "creating shm" << std::endl;
+			std::cout << "creating shmm" << std::endl;
 			printf("%s\n", shm_name);
 			int fd;
 			void* p = create_shm(shm_name, 1024L * 1024 * 1024* 2, &fd);
