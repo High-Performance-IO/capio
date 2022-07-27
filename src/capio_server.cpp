@@ -826,6 +826,7 @@ void handle_exig(char* str) {
    	if (pair.second) {
 		std::string path = pair.first;	
 		std::get<4>(files_metadata[path]).complete = true;
+        sem_wait(sems_write[pid]);
 		auto it = pending_reads.find(path);
         if (it != pending_reads.end()) {
 	#ifdef CAPIOLOG
@@ -840,15 +841,15 @@ void handle_exig(char* str) {
                         size_t process_offset = *std::get<1>(processes_files[pending_pid][fd]);
                         size_t count = std::get<2>(tuple);
                         size_t file_size = *std::get<1>(files_metadata[path]);
-	#ifdef CAPIOLOG
-	std::cout << "pending read pid fd offset count " << pid << " " << fd << " " << process_offset <<" "<< count << std::endl;
-	#endif	
+						#ifdef CAPIOLOG
+						std::cout << "pending read pid fd offset count " << pid << " " << fd << " " << process_offset <<" "<< count << std::endl;
+						#endif	
                         handle_pending_read(pending_pid, fd, process_offset, count);
                         pending_reads_this_file.erase(it_vec);
                         ++i;
                 }
         }
-
+        sem_post(sems_write[pid]);
 	}
    }
 }
