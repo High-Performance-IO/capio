@@ -396,21 +396,13 @@ int capio_openat(int dirfd, const char* pathname, int flags) {
 	}
 	if (! exists) { 
 		if (pathname[0] == '/' || pathname[0] == '.') {
-			bool found = false;
-			int i = path_to_check.size() - 1;
-			while (i >= 0 && !found) {
-				found = (path_to_check[i] == '/');
-				--i;
+			std::string parent= std::filesystem::path(pathname).parent_path();
+			try {
+				parent = std::filesystem::canonical(parent);
+			} catch (const std::exception& ex) {
+				return -2;
 			}
-			i += 2;
-			path_to_check = path_to_check.substr(0, i);
-			try{
-			path_to_check = std::filesystem::canonical(path_to_check);
-			}
-			catch (const std::exception& ex) {
-				//TODO: if O_CREAT is not a probelm beacuse it's ok if the file still doesn't exist
-				std::cout << "exception canonical " << path_to_check << std::endl; 
-			}
+			path_to_check = parent + "/" + std::string(std::filesystem::path(pathname).filename());
 		}
 		else {
 			std::string curr_dir = std::filesystem::current_path();
@@ -420,7 +412,7 @@ int capio_openat(int dirfd, const char* pathname, int flags) {
 	auto res = std::mismatch(capio_dir.begin(), capio_dir.end(), path_to_check.begin());
 	if (res.first == capio_dir.end()) {
 		if (capio_dir.size() == path_to_check.size()) {
-			std::cerr << "open to the capio_dir" << std::endl;
+			std::cerr << "ERROR: open to the capio_dir " << path_to_check << std::endl;
 			exit(1);
 		}
 		else  {
