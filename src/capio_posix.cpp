@@ -696,7 +696,6 @@ int capio_ioctl(int fd, unsigned long request) {
 
 void capio_exit_group(int status) {
 	int pid = getpid();
-	std::cout << "exit group of process " << pid << " captured" << std::endl;
 	std::string str = "exig " + std::to_string(pid);
 	const char* c_str = str.c_str();
 	buf_requests->write(c_str);
