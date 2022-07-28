@@ -332,6 +332,9 @@ int capio_openat(int dirfd, const char* pathname, int flags) {
 			capio_files_descriptors[fd] = shm_name;
 			fd_copies[fd] = std::make_pair(std::vector<int>(), true);
 			capio_files_paths.insert(pathname);
+			if (flags & O_APPEND) {
+
+			}
 			return fd;
 		}
 	}
@@ -534,8 +537,16 @@ off_t capio_lseek(int fd, off64_t offset, int whence) {
 				return -1;
 			}
 			*/
-			std::cerr << "SEEK_END not supported yet" << std::endl;
-			exit(1);
+			char c_str[64];
+			off64_t file_size;
+			sprintf(c_str, "send %d %d", getpid(),fd);
+			buf_requests->write(c_str);
+			buf_response->read(&file_size);
+			off64_t offset_upperbound;
+			offset_upperbound = file_size;
+			*file_offset = file_size;	
+			std::get<3>(*t) = offset_upperbound;
+			return *file_offset;
 		}
 		else if (whence == SEEK_DATA) {
 				char c_str[64];

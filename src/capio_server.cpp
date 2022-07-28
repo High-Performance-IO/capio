@@ -824,6 +824,15 @@ void handle_shol(char* str) {
 	response_buffers[pid]->write(&res);
 }
 
+void handle_seek_end(char* str) {
+	int pid, fd;	
+	sscanf(str, "send %d %d", &pid, &fd);
+	std::string path = processes_files_metadata[pid][fd];
+	Capio_file& c_file = std::get<4>(files_metadata[path]);
+	off64_t res = c_file.get_file_size();
+	response_buffers[pid]->write(&res);
+}
+
 void handle_exig(char* str) {
 	int pid;
 	sscanf(str, "exig %d", &pid);
@@ -913,6 +922,8 @@ void read_next_msg(int rank) {
 						handle_sdat(str);
 					else if (strncmp(str, "shol", 4) == 0)
 						handle_shol(str);
+					else if (strncmp(str, "send", 4) == 0)
+						handle_seek_end(str);
 					else if (strncmp(str, "exig", 4) == 0)
 						handle_exig(str);
 					else {

@@ -26,6 +26,10 @@ class Capio_file {
 	public:
 		bool complete = false;
 
+		off64_t get_file_size() {
+			return sectors.rbegin()->first;	
+		}
+
 		/*
 		 * Insert the new sector automatically modifying the
 		 * existent sectors if needed.
