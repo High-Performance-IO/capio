@@ -344,7 +344,7 @@ off_t capio_lseek(int fd, off64_t offset, int whence) {
 			buf_response->read(&file_size);
 			off64_t offset_upperbound;
 			offset_upperbound = file_size;
-			*file_offset = file_size;	
+			*file_offset = file_size + offset;	
 			std::get<3>(*t) = offset_upperbound;
 			return *file_offset;
 		}
