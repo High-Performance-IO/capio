@@ -267,6 +267,120 @@ void read_from_disk(int fd, int offset, void* buffer, size_t count) {
 	}
 }
 
+/*
+ * The lseek() function shall fail if:
+ *
+ *     EBADF  The fildes argument is not an open file descriptor.
+ *
+ *     EINVAL The whence argument is not a proper value, or  the  resulting
+ *            file  offset would be negative for a regular file, block spe‐
+ *            cial file, or directory.
+ *
+ *     EOVERFLOW
+ *            The resulting file offset would be a value  which  cannot  be
+ *            represented correctly in an object of type off_t.
+ *
+ *     ESPIPE The  fildes  argument  is  associated  with  a pipe, FIFO, or
+ *            socket.
+*/
+
+//TODO: EOVERFLOW is not adressed
+off_t capio_lseek(int fd, off64_t offset, int whence) { 
+	auto it = fd_copies.find(fd);
+	if (it != fd_copies.end()) {
+		if (! it->second.second) {
+			fd = it->second.first[0];
+		}
+		std::tuple<void*, off64_t*, off64_t, off64_t, Capio_file, int, int>* t = &files[fd];
+		off64_t* file_offset = std::get<1>(*t);
+		if (whence == SEEK_SET) {
+			if (offset >= 0) {
+				*file_offset = offset;
+				char c_str[64];
+				sprintf(c_str, "seek %d %d %zu", getpid(),fd, *file_offset);
+				buf_requests->write(c_str);
+				off64_t offset_upperbound;
+				buf_response->read(&offset_upperbound);
+				std::get<3>(*t) = offset_upperbound;
+				return *file_offset;
+			}
+			else {
+				errno = EINVAL;
+				return -1;
+			}
+		}
+		else if (whence == SEEK_CUR) {
+			off64_t new_offset = *file_offset + offset;
+			if (new_offset >= 0) {
+				*file_offset = new_offset;
+				char c_str[64];
+				sprintf(c_str, "seek %d %d %zu", getpid(),fd, *file_offset);
+				buf_requests->write(c_str);
+				off64_t offset_upperbound;
+				buf_response->read(&offset_upperbound);
+				std::get<3>(*t) = offset_upperbound;
+				return *file_offset;
+			}
+			else {
+				errno = EINVAL;
+				return -1;
+			}
+		}
+		else if (whence == SEEK_END) {
+			//works only in batch mode or if we know tha size of the file
+			/*long int file_size = std::get<4>(*t).get_file_size();
+			off_t new_offset = file_size + offset;
+			if (new_offset >=0)
+				*file_offset = new_offset;
+			else {
+				errno = EINVAL;
+				return -1;
+			}
+			*/
+			char c_str[64];
+			off64_t file_size;
+			sprintf(c_str, "send %d %d", getpid(),fd);
+			buf_requests->write(c_str);
+			buf_response->read(&file_size);
+			off64_t offset_upperbound;
+			offset_upperbound = file_size;
+			*file_offset = file_size;	
+			std::get<3>(*t) = offset_upperbound;
+			return *file_offset;
+		}
+		else if (whence == SEEK_DATA) {
+				char c_str[64];
+				sprintf(c_str, "sdat %d %d %zu", getpid(),fd, *file_offset);
+				buf_requests->write(c_str);
+				off64_t offset_upperbound;
+				buf_response->read(&offset_upperbound);
+				std::get<3>(*t) = offset_upperbound;
+				buf_response->read(file_offset);
+				return *file_offset;
+
+		}
+		else if (whence == SEEK_HOLE) {
+				char c_str[64];
+				sprintf(c_str, "shol %d %d %zu", getpid(),fd, *file_offset);
+				buf_requests->write(c_str);
+				off64_t offset_upperbound;
+				buf_response->read(&offset_upperbound);
+				std::get<3>(*t) = offset_upperbound;
+				buf_response->read(file_offset);
+				return *file_offset;
+
+		}
+		else {
+			errno = EINVAL;
+			return -1;
+		}
+		
+	}
+	else {
+		return -2;
+	}
+}
+
 int capio_openat(int dirfd, const char* pathname, int flags) {
 	std::cout << "capio_openat " << pathname << std::endl;
 	if (first_call)
@@ -333,7 +447,7 @@ int capio_openat(int dirfd, const char* pathname, int flags) {
 			fd_copies[fd] = std::make_pair(std::vector<int>(), true);
 			capio_files_paths.insert(pathname);
 			if (flags & O_APPEND) {
-
+				capio_lseek(fd, 0, SEEK_END);
 			}
 			return fd;
 		}
@@ -467,119 +581,7 @@ ssize_t capio_read(int fd, void *buffer, size_t count) {
 	}
 }
 
-/*
- * The lseek() function shall fail if:
- *
- *     EBADF  The fildes argument is not an open file descriptor.
- *
- *     EINVAL The whence argument is not a proper value, or  the  resulting
- *            file  offset would be negative for a regular file, block spe‐
- *            cial file, or directory.
- *
- *     EOVERFLOW
- *            The resulting file offset would be a value  which  cannot  be
- *            represented correctly in an object of type off_t.
- *
- *     ESPIPE The  fildes  argument  is  associated  with  a pipe, FIFO, or
- *            socket.
-*/
 
-//TODO: EOVERFLOW is not adressed
-off_t capio_lseek(int fd, off64_t offset, int whence) { 
-	auto it = fd_copies.find(fd);
-	if (it != fd_copies.end()) {
-		if (! it->second.second) {
-			fd = it->second.first[0];
-		}
-		std::tuple<void*, off64_t*, off64_t, off64_t, Capio_file, int, int>* t = &files[fd];
-		off64_t* file_offset = std::get<1>(*t);
-		if (whence == SEEK_SET) {
-			if (offset >= 0) {
-				*file_offset = offset;
-				char c_str[64];
-				sprintf(c_str, "seek %d %d %zu", getpid(),fd, *file_offset);
-				buf_requests->write(c_str);
-				off64_t offset_upperbound;
-				buf_response->read(&offset_upperbound);
-				std::get<3>(*t) = offset_upperbound;
-				return *file_offset;
-			}
-			else {
-				errno = EINVAL;
-				return -1;
-			}
-		}
-		else if (whence == SEEK_CUR) {
-			off64_t new_offset = *file_offset + offset;
-			if (new_offset >= 0) {
-				*file_offset = new_offset;
-				char c_str[64];
-				sprintf(c_str, "seek %d %d %zu", getpid(),fd, *file_offset);
-				buf_requests->write(c_str);
-				off64_t offset_upperbound;
-				buf_response->read(&offset_upperbound);
-				std::get<3>(*t) = offset_upperbound;
-				return *file_offset;
-			}
-			else {
-				errno = EINVAL;
-				return -1;
-			}
-		}
-		else if (whence == SEEK_END) {
-			//works only in batch mode or if we know tha size of the file
-			/*long int file_size = std::get<4>(*t).get_file_size();
-			off_t new_offset = file_size + offset;
-			if (new_offset >=0)
-				*file_offset = new_offset;
-			else {
-				errno = EINVAL;
-				return -1;
-			}
-			*/
-			char c_str[64];
-			off64_t file_size;
-			sprintf(c_str, "send %d %d", getpid(),fd);
-			buf_requests->write(c_str);
-			buf_response->read(&file_size);
-			off64_t offset_upperbound;
-			offset_upperbound = file_size;
-			*file_offset = file_size;	
-			std::get<3>(*t) = offset_upperbound;
-			return *file_offset;
-		}
-		else if (whence == SEEK_DATA) {
-				char c_str[64];
-				sprintf(c_str, "sdat %d %d %zu", getpid(),fd, *file_offset);
-				buf_requests->write(c_str);
-				off64_t offset_upperbound;
-				buf_response->read(&offset_upperbound);
-				std::get<3>(*t) = offset_upperbound;
-				buf_response->read(file_offset);
-				return *file_offset;
-
-		}
-		else if (whence == SEEK_HOLE) {
-				char c_str[64];
-				sprintf(c_str, "shol %d %d %zu", getpid(),fd, *file_offset);
-				buf_requests->write(c_str);
-				off64_t offset_upperbound;
-				buf_response->read(&offset_upperbound);
-				std::get<3>(*t) = offset_upperbound;
-				buf_response->read(file_offset);
-				return *file_offset;
-
-		}
-		else {
-			errno = EINVAL;
-			return -1;
-		}
-		
-	}
-	else {
-		return -2;
-	}
-}
 
 ssize_t capio_writev(int fd, const struct iovec* iov, int iovcnt) {
 	auto it = fd_copies.find(fd);
