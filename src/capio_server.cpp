@@ -388,7 +388,6 @@ void handle_open(char* str, char* p, int rank) {
 	}
 }
 
-//TO DO: modificare with capio read
 void handle_pending_read(int pid, int fd, long int process_offset, long int count) {
 	
 	std::string path = processes_files_metadata[pid][fd];
@@ -475,22 +474,33 @@ void handle_write(const char* str, int rank) {
         auto it = pending_reads.find(path);
         sem_wait(sems_write[pid]);
         if (it != pending_reads.end()) {
+        #ifdef CAPIOLOG
+        std::cout << "There were pending reads for" << path << std::endl;
+        #endif
                 auto& pending_reads_this_file = it->second;
-                int i = 0;
-                for (auto it_vec = pending_reads_this_file.begin(); it_vec != pending_reads_this_file.end(); it++) {
+				auto it_vec = pending_reads_this_file.begin();
+                while (it_vec != pending_reads_this_file.end()) {
                         auto tuple = *it_vec;
                         int pending_pid = std::get<0>(tuple);
                         int fd = std::get<1>(tuple);
                         size_t process_offset = *std::get<1>(processes_files[pending_pid][fd]);
                         size_t count = std::get<2>(tuple);
                         size_t file_size = *std::get<1>(files_metadata[path]);
+        #ifdef CAPIOLOG
+        std::cout << "pending read offset " << process_offset << " count " << count << " file_size " << file_size << std::endl;
+        #endif
                         if (process_offset + count <= file_size) {
+        #ifdef CAPIOLOG
+        std::cout << "handling this pending read"<< std::endl;
+        #endif
                                 handle_pending_read(pending_pid, fd, process_offset, count);
+                        it_vec = pending_reads_this_file.erase(it_vec);
                         }
-                        pending_reads_this_file.erase(it_vec);
-                        ++i;
+						else
+							++it_vec;
                 }
         }
+        sem_post(sems_write[pid]);
         auto it_client = clients_remote_pending_reads.find(path);
 		std::list<std::tuple<size_t, size_t, sem_t*>>::iterator it_list, prev_it_list;
         if (it_client !=  clients_remote_pending_reads.end()) {
@@ -833,8 +843,8 @@ void handle_exig(char* str) {
 	std::cout << "handle pending read file " << path << std::endl;
 	#endif	
                 auto& pending_reads_this_file = it->second;
-                int i = 0;
-                for (auto it_vec = pending_reads_this_file.begin(); it_vec != pending_reads_this_file.end(); it++) {
+				auto it_vec = pending_reads_this_file.begin();
+                while (it_vec != pending_reads_this_file.end()) {
                         auto tuple = *it_vec;
                         int pending_pid = std::get<0>(tuple);
                         int fd = std::get<1>(tuple);
@@ -845,8 +855,7 @@ void handle_exig(char* str) {
 						std::cout << "pending read pid fd offset count " << pid << " " << fd << " " << process_offset <<" "<< count << std::endl;
 						#endif	
                         handle_pending_read(pending_pid, fd, process_offset, count);
-                        pending_reads_this_file.erase(it_vec);
-                        ++i;
+                        it_vec = pending_reads_this_file.erase(it_vec);
                 }
         }
         sem_post(sems_write[pid]);
