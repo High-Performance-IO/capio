@@ -28,7 +28,7 @@ class Capio_file {
 
 		off64_t get_file_size() {
 			if (sectors.size() != 0)
-				return sectors.rbegin()->first;	
+				return sectors.rbegin()->second;	
 			else
 				return 0;
 		}

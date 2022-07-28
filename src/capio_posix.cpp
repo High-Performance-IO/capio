@@ -446,7 +446,7 @@ int capio_openat(int dirfd, const char* pathname, int flags) {
 			capio_files_descriptors[fd] = shm_name;
 			fd_copies[fd] = std::make_pair(std::vector<int>(), true);
 			capio_files_paths.insert(pathname);
-			if (flags & O_APPEND) {
+			if ((flags & O_APPEND) == O_APPEND) {
 				capio_lseek(fd, 0, SEEK_END);
 			}
 			return fd;
