@@ -325,15 +325,7 @@ void flush_file_to_disk(int pid, int fd) {
     }
 }
 
-
-//TODO: function too long
-
-void handle_open(char* str, char* p, int rank) {
-	#ifdef CAPIOLOG
-	std::cout << "handle open" << std::endl;
-	#endif
-	int pid;
-	pid = strtol(str + 5, &p, 10);
+void init_process(int pid) {
 	if (sems_response.find(pid) == sems_response.end()) {
 		sems_response[pid] = sem_open(("sem_response_read" + std::to_string(pid)).c_str(), O_RDWR);
 		if (sems_response[pid] == SEM_FAILED) {
@@ -348,6 +340,18 @@ void handle_open(char* str, char* p, int rank) {
 		caching_info[pid].first = (int*) get_shm("caching_info" + std::to_string(pid));
 		caching_info[pid].second = (int*) get_shm("caching_info_size" + std::to_string(pid));
 	}
+
+}
+
+//TODO: function too long
+
+void handle_open(char* str, char* p, int rank) {
+	#ifdef CAPIOLOG
+	std::cout << "handle open" << std::endl;
+	#endif
+	int pid;
+	pid = strtol(str + 5, &p, 10);
+	init_process(pid);
 	int fd = strtol(p + 1, &p, 10);
 	std::string path(p + 1);
 	void* p_shm;
@@ -872,6 +876,16 @@ void handle_exig(char* str) {
    }
 }
 
+void handle_stat(const char* str) {
+	char path[2048];
+	int pid;
+	sscanf(str, "stat %d %s", &pid, path);
+	Capio_file& c_file = std::get<4>(files_metadata[path]);
+	off64_t file_size = c_file.get_file_size();
+	init_process(pid);
+	response_buffers[pid]->write(&file_size);
+}
+
 void read_next_msg(int rank) {
 	char str[4096];
 	std::fill(str, str + 4096, 0);
@@ -888,17 +902,6 @@ void read_next_msg(int rank) {
 	else {
 		bool is_write = strncmp(str, "writ", 4) == 0;
 		if (is_write) {
-			/*pthread_t t;
-			struct handle_write_metadata* rr_metadata = (struct handle_write_metadata*) malloc(sizeof(struct handle_write_metadata));
-			rr_metadata->path = path_c;
-			rr_metadata->rank = rank;
-			rr_metadata->sem = ;
-			int res = pthread_create(&t, NULL, wait_for_data, (void*) rr_metadata);
-			if (res != 0) {
-				std::cerr << "error creation of capio server thread" << std::endl;
-				MPI_Finalize();
-				exit(1);
-			}*/
 			handle_write(str, rank);
 		}
 		else {
@@ -926,6 +929,8 @@ void read_next_msg(int rank) {
 						handle_seek_end(str);
 					else if (strncmp(str, "exig", 4) == 0)
 						handle_exig(str);
+					else if (strncmp(str, "stat", 4) == 0)
+						handle_stat(str);
 					else {
 						std::cerr << "error msg read" << std::endl;
 						MPI_Finalize();

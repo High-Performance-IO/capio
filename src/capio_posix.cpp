@@ -70,6 +70,7 @@ int is_directory(const char *path) {
 }
 
 static bool first_call = true;
+static bool stat_enabled = true;
 
 /*
  * This function must be called only once
@@ -80,6 +81,7 @@ void mtrace_init(void) {
 	char* val;
 	first_call = false;
 	val = getenv("CAPIO_DIR");
+	stat_enabled = false;
 	try {
 		if (val == NULL) {
 			capio_dir = std::filesystem::canonical(".");	
@@ -91,7 +93,7 @@ void mtrace_init(void) {
 	catch (const std::exception& ex){
 		exit(1);
 	}
-
+	stat_enabled = true;
 	int res = is_directory(capio_dir.c_str());
 	if (res == 0) {
 		std::cerr << "dir " << capio_dir << " is not a directory" << std::endl;
@@ -116,6 +118,35 @@ void mtrace_init(void) {
 
 
 }
+
+std::string create_absolute_path(const char* pathname) {
+	std::string path_to_check(pathname);
+	bool exists;
+	stat_enabled = false;
+	try {
+		path_to_check = std::filesystem::canonical(path_to_check);
+	}
+	catch (const std::exception& ex) {
+		exists = false;
+	}
+	stat_enabled = true;
+	if (! exists) { 
+		stat_enabled = false;
+		if (pathname[0] == '/' || pathname[0] == '.') {
+			std::string parent= std::filesystem::path(pathname).parent_path();
+			parent = std::filesystem::canonical(parent);
+			path_to_check = parent + "/" + std::string(std::filesystem::path(pathname).filename());
+		}
+		else {
+			std::string curr_dir = std::filesystem::current_path();
+			path_to_check = curr_dir + "/" + pathname;
+		}
+		stat_enabled = true;
+	}
+	return path_to_check;
+
+}
+
 
 void add_open_request(const char* pathname, size_t fd) {
 	std::string str ("open " + std::to_string(getpid()) + " " + std::to_string(fd) + " " + std::string(pathname));
@@ -385,29 +416,12 @@ int capio_openat(int dirfd, const char* pathname, int flags) {
 	std::cout << "capio_openat " << pathname << std::endl;
 	if (first_call)
 		mtrace_init();
-	std::string path_to_check(pathname);
-	bool exists;
+	std::string path_to_check;
 	try {
-		path_to_check = std::filesystem::canonical(path_to_check);
-		exists = true;
+		path_to_check = create_absolute_path(pathname);
 	}
 	catch (const std::exception& ex) {
-		exists = false;
-	}
-	if (! exists) { 
-		if (pathname[0] == '/' || pathname[0] == '.') {
-			std::string parent= std::filesystem::path(pathname).parent_path();
-			try {
-				parent = std::filesystem::canonical(parent);
-			} catch (const std::exception& ex) {
-				return -2;
-			}
-			path_to_check = parent + "/" + std::string(std::filesystem::path(pathname).filename());
-		}
-		else {
-			std::string curr_dir = std::filesystem::current_path();
-			path_to_check = curr_dir + "/" + pathname;
-		}
+		return -2; //it means that the parent dir does not exist
 	}
 	auto res = std::mismatch(capio_dir.begin(), capio_dir.end(), path_to_check.begin());
 	if (res.first == capio_dir.end()) {
@@ -707,6 +721,63 @@ void capio_exit_group(int status) {
 	return;
 }
 
+int capio_lstat(const char* path, struct stat* statbuf) {
+	std::string absolute_path;
+	std::cout << " capio lstat " << std::endl;
+	if (first_call)
+		mtrace_init();
+	try {
+		absolute_path = create_absolute_path(path);
+	}
+	catch (const std::exception& ex) {
+		return -2; //it means that the parent dir does not exist
+	}
+	auto res = std::mismatch(capio_dir.begin(), capio_dir.end(), absolute_path.begin());
+	if (res.first == capio_dir.end()) {
+		char normalized_path[2048];
+		int i = 0;
+		while (absolute_path[i] != '\0') {
+			if (absolute_path[i] == '/' && i > 0)
+				normalized_path[i] = '_';
+			else
+				normalized_path[i] = absolute_path[i];
+			++i;
+		}
+		normalized_path[i] = '\0';
+
+		std::string msg = "stat " + std::to_string(getpid()) + " " + normalized_path;
+		const char* c_str = msg.c_str();
+		buf_requests->write(c_str);
+		off64_t file_size;
+		buf_response->read(&file_size);
+		
+		std::cout << "debug 1" << std::endl;
+		statbuf->st_dev = 100;
+		statbuf->st_ino = 100;
+		statbuf->st_mode = 10;
+		statbuf->st_nlink = 1;
+		statbuf->st_uid = 10;
+		statbuf->st_gid = 10;
+		statbuf->st_rdev = 0;
+		statbuf->st_size = file_size;
+		std::cout << " file size " << file_size << std::endl;
+		statbuf->st_blksize = 512;
+		struct timespec time;
+		time.tv_sec = 1;
+		time.tv_nsec = 1;
+		std::cout << "debug 2" << std::endl;
+		statbuf->st_atim = time;
+		statbuf->st_mtim = time;
+		statbuf->st_ctim = time;
+		return 0;
+	}
+	else
+		return -2;
+
+}
+
+
+
 static int
 hook(long syscall_number,
 			long arg0, long arg1,
@@ -845,6 +916,18 @@ hook(long syscall_number,
 			int status = arg0;
 			capio_exit_group(status);
 			hook_ret_value = 0;
+			break;
+		}
+		case SYS_lstat: {
+			const char* path = reinterpret_cast<const char*>(arg0);
+			struct stat* buf = reinterpret_cast<struct stat*>(arg1);
+			if (stat_enabled) {
+				res = capio_lstat(path, buf);
+				if (res != -2) {
+					*result = res;
+					hook_ret_value = 0;
+				}
+			}
 			break;
 		}
 
