@@ -897,6 +897,7 @@ void handle_fstat(const char* str) {
 	int pid, fd;
 	sscanf(str, "fsta %d %d", &pid, &fd);
 	std::string path = processes_files_metadata[pid][fd];
+	std::cout << "path " << path << std::endl;
 	Capio_file& c_file = std::get<4>(files_metadata[path]);
 	off64_t file_size = c_file.get_file_size();
 	response_buffers[pid]->write(&file_size);
@@ -948,7 +949,7 @@ void read_next_msg(int rank) {
 					else if (strncmp(str, "stat", 4) == 0)
 						handle_stat(str);
 					else if (strncmp(str, "fsta", 4) == 0)
-						handle_stat(str);
+						handle_fstat(str);
 					else {
 						std::cerr << "error msg read" << std::endl;
 						MPI_Finalize();

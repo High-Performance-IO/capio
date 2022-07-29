@@ -788,6 +788,8 @@ int capio_lstat_wrapper(const char* path, struct stat* statbuf) {
 }
 
 int capio_fstat(int fd, struct stat* statbuf) {
+	if (first_call)
+		mtrace_init();
 	auto it = fd_copies.find(fd);
 	if (it != fd_copies.end()) {
 		if (!it->second.second) {
@@ -1048,7 +1050,6 @@ hook(long syscall_number,
 			break;
 		}
 		
-		/*
 		case SYS_fstat: {
 			int fd = arg0;
 			struct stat* buf = reinterpret_cast<struct stat*>(arg1);
@@ -1061,7 +1062,6 @@ hook(long syscall_number,
 			}
 			break;
 		}
-		*/
 
 		case SYS_newfstatat: {
 			int dirfd = arg0;
