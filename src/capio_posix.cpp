@@ -750,8 +750,10 @@ int capio_lstat(const char* path, struct stat* statbuf) {
 		buf_requests->write(c_str);
 		off64_t file_size;
 		buf_response->read(&file_size);
-		
-		std::cout << "debug 1" << std::endl;
+		if (file_size == -1) {
+			errno = ENOENT;
+			return -1;
+		}
 		statbuf->st_dev = 100;
 		statbuf->st_ino = 100;
 		statbuf->st_mode = 10;
@@ -765,7 +767,6 @@ int capio_lstat(const char* path, struct stat* statbuf) {
 		struct timespec time;
 		time.tv_sec = 1;
 		time.tv_nsec = 1;
-		std::cout << "debug 2" << std::endl;
 		statbuf->st_atim = time;
 		statbuf->st_mtim = time;
 		statbuf->st_ctim = time;

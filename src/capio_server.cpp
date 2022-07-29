@@ -880,9 +880,16 @@ void handle_stat(const char* str) {
 	char path[2048];
 	int pid;
 	sscanf(str, "stat %d %s", &pid, path);
-	Capio_file& c_file = std::get<4>(files_metadata[path]);
-	off64_t file_size = c_file.get_file_size();
+	auto it = files_metadata.find(path);
+	off64_t file_size;
 	init_process(pid);
+	if (it == files_metadata.end()) {
+		file_size = -1;	
+	}
+	else {
+		Capio_file& c_file = std::get<4>(it->second);
+		file_size = c_file.get_file_size();
+	}
 	response_buffers[pid]->write(&file_size);
 }
 
