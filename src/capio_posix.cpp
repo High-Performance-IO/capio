@@ -90,10 +90,9 @@ void mtrace_init(void) {
 			capio_dir = std::filesystem::canonical(val);
 		}
 	}
-	catch (const std::exception& ex){
+	catch (const std::exception& ex) {
 		exit(1);
 	}
-	stat_enabled = true;
 	int res = is_directory(capio_dir.c_str());
 	if (res == 0) {
 		std::cerr << "dir " << capio_dir << " is not a directory" << std::endl;
@@ -116,6 +115,7 @@ void mtrace_init(void) {
 	*caching_info_size = 0; 
 
 
+	stat_enabled = true;
 
 }
 
@@ -721,17 +721,12 @@ void capio_exit_group(int status) {
 	return;
 }
 
-int capio_lstat(const char* path, struct stat* statbuf) {
-	std::string absolute_path;
-	std::cout << " capio lstat " << std::endl;
-	if (first_call)
-		mtrace_init();
-	try {
-		absolute_path = create_absolute_path(path);
-	}
-	catch (const std::exception& ex) {
-		return -2; //it means that the parent dir does not exist
-	}
+/*
+ * Precondition: absolute_path must contain an absolute path
+ *
+ */
+
+int capio_lstat(std::string absolute_path, struct stat* statbuf) {
 	auto res = std::mismatch(capio_dir.begin(), capio_dir.end(), absolute_path.begin());
 	if (res.first == capio_dir.end()) {
 		char normalized_path[2048];
@@ -747,6 +742,7 @@ int capio_lstat(const char* path, struct stat* statbuf) {
 
 		std::string msg = "stat " + std::to_string(getpid()) + " " + normalized_path;
 		const char* c_str = msg.c_str();
+		std::cout << buf_requests << std::endl;
 		buf_requests->write(c_str);
 		off64_t file_size;
 		buf_response->read(&file_size);
@@ -774,6 +770,113 @@ int capio_lstat(const char* path, struct stat* statbuf) {
 	}
 	else
 		return -2;
+
+}
+
+int capio_lstat_wrapper(const char* path, struct stat* statbuf) {
+	std::string absolute_path;
+	std::cout << " capio lstat " << std::endl;
+	if (first_call)
+		mtrace_init();
+	try {
+		absolute_path = create_absolute_path(path);
+	}
+	catch (const std::exception& ex) {
+		return -2; //it means that the parent dir does not exist
+	}
+	return capio_lstat(absolute_path, statbuf);	
+}
+
+int capio_fstat(int fd, struct stat* statbuf) {
+	auto it = fd_copies.find(fd);
+	if (it != fd_copies.end()) {
+		if (!it->second.second) {
+			fd = it->second.first[0];
+		}
+		std::string msg = "fsta " + std::to_string(getpid()) + " " + std::to_string(fd);
+		buf_requests->write(msg.c_str());
+		off64_t file_size;
+		buf_response->read(&file_size);
+		statbuf->st_dev = 100;
+		statbuf->st_ino = 100;
+		statbuf->st_mode = 10;
+		statbuf->st_nlink = 1;
+		statbuf->st_uid = 10;
+		statbuf->st_gid = 10;
+		statbuf->st_rdev = 0;
+		statbuf->st_size = file_size;
+		std::cout << " file size " << file_size << std::endl;
+		statbuf->st_blksize = 512;
+		struct timespec time;
+		time.tv_sec = 1;
+		time.tv_nsec = 1;
+		statbuf->st_atim = time;
+		statbuf->st_mtim = time;
+		statbuf->st_ctim = time;
+		return 0;
+	}
+	else
+		return -2;
+	
+}
+
+/*
+ * Creates an absolute path considering that pathname is relative
+ * to the directory referred to by the file descriptor dirfd 
+ * (rather than relative to the current working directory of the 
+ * calling  process,  as  is  done  by  stat()  and lstat() for a 
+ * relative pathname)
+ */
+
+//std::string create_absolute_path(const char* pathname, int dirfd) {
+//}
+
+bool is_absolute(const char* pathname) {
+	bool absolute = false;
+	int i = 0;
+	while (pathname[i] != '\0' && !absolute) {
+		absolute = pathname[i] == '.';
+		++i;
+	}
+	return absolute;
+}
+
+int capio_fstatat(int dirfd, const char* pathname, struct stat* statbuf, int flags) {
+	if ((flags & AT_EMPTY_PATH) == AT_EMPTY_PATH) {
+		if(dirfd == AT_FDCWD) { // operate on currdir
+			std::string curr_dir = std::filesystem::current_path();
+			return capio_lstat(curr_dir, statbuf);
+		}
+		else { // operate on dirfd
+		// in this case dirfd can refer to any type of file
+			if (strlen(pathname) == 0)
+				return capio_fstat(dirfd, statbuf);
+			else {
+				//TODO: set errno	
+				return -1;
+			}
+		}
+
+	}
+
+	int res = -1;
+
+	if (!is_absolute(pathname)) {
+		if (dirfd == AT_FDCWD) { 
+		// pathname is interpreted relative to currdir
+			res = capio_lstat_wrapper(pathname, statbuf);		
+		}
+		else { 
+			std::cout << "CAPIO ERROR: this type of fstatat is not yet supported" << std::endl;
+			exit(1);
+			//std::string path = create_absolute_path(pathname, dirfd);
+			//res = capio_lstat(path, statbuf);
+		}
+	}
+	else { //dirfd is ignored
+		res = capio_lstat(std::string(pathname), statbuf);
+	}
+	return res;
 
 }
 
@@ -923,7 +1026,7 @@ hook(long syscall_number,
 			const char* path = reinterpret_cast<const char*>(arg0);
 			struct stat* buf = reinterpret_cast<struct stat*>(arg1);
 			if (stat_enabled) {
-				res = capio_lstat(path, buf);
+				res = capio_lstat_wrapper(path, buf);
 				if (res != -2) {
 					*result = res;
 					hook_ret_value = 0;
@@ -931,6 +1034,49 @@ hook(long syscall_number,
 			}
 			break;
 		}
+		case SYS_stat: {
+			const char* path = reinterpret_cast<const char*>(arg0);
+			struct stat* buf = reinterpret_cast<struct stat*>(arg1);
+			if (stat_enabled) {
+				std::cout << "capio stat" << std::endl;
+				res = capio_lstat_wrapper(path, buf);
+				if (res != -2) {
+					*result = res;
+					hook_ret_value = 0;
+				}
+			}
+			break;
+		}
+		
+		/*
+		case SYS_fstat: {
+			int fd = arg0;
+			struct stat* buf = reinterpret_cast<struct stat*>(arg1);
+			if (stat_enabled) {
+				res = capio_fstat(fd, buf);
+				if (res != -2) {
+					*result = res;
+					hook_ret_value = 0;
+				}
+			}
+			break;
+		}
+		*/
+
+		case SYS_newfstatat: {
+			int dirfd = arg0;
+			const char* pathname = reinterpret_cast<const char*>(arg1);
+			struct stat* statbuf = reinterpret_cast<struct stat*>(arg2);
+			int flags = arg3;
+			if (stat_enabled) {
+				res = capio_fstatat(dirfd, pathname, statbuf, flags);
+				if (res != -2) {
+					*result = res;
+					hook_ret_value = 0;
+				}
+			}
+			break;
+		} 
 
 		default:
 			hook_ret_value = 1;

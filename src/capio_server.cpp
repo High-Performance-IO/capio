@@ -893,6 +893,15 @@ void handle_stat(const char* str) {
 	response_buffers[pid]->write(&file_size);
 }
 
+void handle_fstat(const char* str) {
+	int pid, fd;
+	sscanf(str, "fsta %d %d", &pid, &fd);
+	std::string path = processes_files_metadata[pid][fd];
+	Capio_file& c_file = std::get<4>(files_metadata[path]);
+	off64_t file_size = c_file.get_file_size();
+	response_buffers[pid]->write(&file_size);
+}
+
 void read_next_msg(int rank) {
 	char str[4096];
 	std::fill(str, str + 4096, 0);
@@ -937,6 +946,8 @@ void read_next_msg(int rank) {
 					else if (strncmp(str, "exig", 4) == 0)
 						handle_exig(str);
 					else if (strncmp(str, "stat", 4) == 0)
+						handle_stat(str);
+					else if (strncmp(str, "fsta", 4) == 0)
 						handle_stat(str);
 					else {
 						std::cerr << "error msg read" << std::endl;
