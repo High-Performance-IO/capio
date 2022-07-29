@@ -905,7 +905,7 @@ hook(long syscall_number,
 			int flags = static_cast<int>(arg2);
 			int res = capio_openat(dirfd, pathname, flags);
 			if (res != -2) {
-				*result = res;
+				*result = (res<0?-errno:res);
 				hook_ret_value = 0;
 			}
 			break;
@@ -917,7 +917,7 @@ hook(long syscall_number,
 			size_t count = static_cast<size_t>(arg2);
 			ssize_t res = capio_write(fd, buf, count);
 			if (res != -2) {
-				*result = res;
+				*result = (res<0?-errno:res);
 				hook_ret_value = 0;
 			}
 			break;
@@ -929,7 +929,7 @@ hook(long syscall_number,
 			size_t count = static_cast<size_t>(arg2);
 			ssize_t res = capio_read(fd, buf, count);
 			if (res != -2) {
-				*result = res;
+				*result = (res<0?-errno:res);
 				hook_ret_value = 0;
 			}
 			break;
@@ -939,7 +939,7 @@ hook(long syscall_number,
 			int fd = static_cast<int>(arg0);
 			int res = capio_close(fd);
 			if (res != -2) {
-				*result = res;
+				*result = (res<0?-errno:res);
 				hook_ret_value = 0;
 			}
 			break;
@@ -951,7 +951,7 @@ hook(long syscall_number,
 			int whence = static_cast<int>(arg2);
 			off_t res = capio_lseek(fd, offset, whence);
 			if (res != -2) {
-				*result = res;
+				*result = (res<0?-errno:res);
 				hook_ret_value = 0;
 			}
 			break;
@@ -963,7 +963,7 @@ hook(long syscall_number,
 			int iovcnt = static_cast<int>(arg2);
 			ssize_t res = capio_writev(fd, iov, iovcnt);
 			if (res != -2) {
-				*result = res;
+				*result = (res<0?-errno:res);
 				hook_ret_value = 0;
 			}
 			break;
@@ -975,7 +975,7 @@ hook(long syscall_number,
 			int arg = arg2;
 			int res = capio_fcntl(fd, cmd, arg);
 			if (res != -2) {
-				*result = res;
+				*result = (res<0?-errno:res);
 				hook_ret_value = 0;
 			}
 
@@ -989,7 +989,7 @@ hook(long syscall_number,
 			size_t size = arg3;
 			ssize_t res = capio_fgetxattr(fd, name, value, size);
 			if (res != -2) {
-				*result = res;
+				*result = (res<0?-errno:res);
 				hook_ret_value = 0;
 			}
 			break;
@@ -1001,7 +1001,7 @@ hook(long syscall_number,
 			size_t size = arg2;
 			ssize_t res = capio_flistxattr(fd, list, size);
 			if (res != -2) {
-				*result = res;
+				*result = (res<0?-errno:res);
 				hook_ret_value = 0;
 			}
 			break;
@@ -1012,7 +1012,7 @@ hook(long syscall_number,
 			unsigned long request = arg1;
 			int res = capio_ioctl(fd, request);
 			if (res != -2) {
-				*result = res;
+				*result = (res<0?-errno:res);
 				hook_ret_value = 0;
 			}
 			break;
@@ -1030,7 +1030,7 @@ hook(long syscall_number,
 			if (stat_enabled) {
 				res = capio_lstat_wrapper(path, buf);
 				if (res != -2) {
-					*result = res;
+					*result = (res<0?-errno:res);
 					hook_ret_value = 0;
 				}
 			}
@@ -1043,7 +1043,7 @@ hook(long syscall_number,
 				std::cout << "capio stat" << std::endl;
 				res = capio_lstat_wrapper(path, buf);
 				if (res != -2) {
-					*result = res;
+					*result = (res<0?-errno:res);
 					hook_ret_value = 0;
 				}
 			}
@@ -1056,7 +1056,7 @@ hook(long syscall_number,
 			if (stat_enabled) {
 				res = capio_fstat(fd, buf);
 				if (res != -2) {
-					*result = res;
+					*result = (res<0?-errno:res);
 					hook_ret_value = 0;
 				}
 			}
@@ -1071,7 +1071,7 @@ hook(long syscall_number,
 			if (stat_enabled) {
 				res = capio_fstatat(dirfd, pathname, statbuf, flags);
 				if (res != -2) {
-					*result = res;
+					*result = (res<0?-errno:res);
 					hook_ret_value = 0;
 				}
 			}
