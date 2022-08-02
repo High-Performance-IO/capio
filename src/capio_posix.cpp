@@ -191,17 +191,19 @@ std::string create_absolute_path(const char* pathname) {
 
 
 
-/*
- * Creates an absolute path considering that pathname is relative
- * to the directory referred to by the file descriptor dirfd 
- * (rather than relative to the current working directory of the 
- * calling  process,  as  is  done  by  stat()  and lstat() for a 
- * relative pathname)
- */
 
-//std::string create_absolute_path(const char* pathname, int dirfd) {
-
-//}
+std::string get_dir_path(const char* pathname, int dirfd) {
+	char proclnk[128];
+	char dir_pathname[PATH_MAX];
+	sprintf(proclnk, "/proc/self/fd/%d", dirfd);
+    ssize_t r = readlink(proclnk, dir_pathname, PATH_MAX);
+    if (r < 0){
+    	printf("failed to readlink\n");
+		return "";
+    }
+    dir_pathname[r] = '\0';
+	return dir_pathname;
+}
 
 
 void add_open_request(const char* pathname, size_t fd) {
@@ -889,6 +891,14 @@ bool is_absolute(const char* pathname) {
 	return absolute;
 }
 
+bool is_dir(int dirfd) {
+	struct stat path_stat;
+	stat_enabled = false;
+    fstat(dirfd, &path_stat);
+	stat_enabled = true;
+    return S_ISREG(path_stat.st_mode);
+}
+
 int capio_fstatat(int dirfd, const char* pathname, struct stat* statbuf, int flags) {
 	if ((flags & AT_EMPTY_PATH) == AT_EMPTY_PATH) {
 		if(dirfd == AT_FDCWD) { // operate on currdir
@@ -916,10 +926,14 @@ int capio_fstatat(int dirfd, const char* pathname, struct stat* statbuf, int fla
 			res = capio_lstat_wrapper(pathname, statbuf);		
 		}
 		else { 
-			std::cout << "CAPIO ERROR: this type of fstatat is not yet supported" << std::endl;
-			exit(1);
-			//std::string path = create_absolute_path(pathname, dirfd);
-			//res = capio_lstat(path, statbuf);
+			if (is_dir(dirfd))
+				return -2;
+			std::string dir_path = get_dir_path(pathname, dirfd);
+			std::string path = dir_path + "/" + pathname;
+			std::cout << "fstat path " << path << std::endl;
+			if (path.length() == 0)
+				return -2;
+			res = capio_lstat(path, statbuf);
 		}
 	}
 	else { //dirfd is ignored
