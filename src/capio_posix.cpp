@@ -9,6 +9,7 @@
 #include <filesystem>
 #include <climits>
 
+#include <stdlib.h>
 #include <unistd.h>
 #include <stdio.h>
 #include <string.h>
@@ -119,33 +120,20 @@ void mtrace_init(void) {
 
 }
 
-std::string create_absolute_path(const char* pathname) {
-	std::string path_to_check(pathname);
-	bool exists;
+// TODO: does not work for subdirectory of capio dir that don't exist
+// in the filesystem
+std::string create_absolute_path(const char* pathname) {	
 	stat_enabled = false;
-	try {
-		path_to_check = std::filesystem::canonical(path_to_check);
-	}
-	catch (const std::exception& ex) {
-		exists = false;
-	}
+	char* abs_path = realpath(pathname, NULL);
 	stat_enabled = true;
-	if (! exists) { 
-		stat_enabled = false;
-		if (pathname[0] == '/' || pathname[0] == '.') {
-			std::string parent= std::filesystem::path(pathname).parent_path();
-			parent = std::filesystem::canonical(parent);
-			path_to_check = parent + "/" + std::string(std::filesystem::path(pathname).filename());
-		}
-		else {
-			std::string curr_dir = std::filesystem::current_path();
-			path_to_check = curr_dir + "/" + pathname;
-		}
-		stat_enabled = true;
-	}
-	return path_to_check;
-
+	if (abs_path == NULL)
+		return "";
+	free(abs_path);
+	std::string(res_path);
+	return res_path;
 }
+
+
 
 
 void add_open_request(const char* pathname, size_t fd) {
@@ -417,12 +405,9 @@ int capio_openat(int dirfd, const char* pathname, int flags) {
 	if (first_call)
 		mtrace_init();
 	std::string path_to_check;
-	try {
-		path_to_check = create_absolute_path(pathname);
-	}
-	catch (const std::exception& ex) {
-		return -2; //it means that the parent dir does not exist
-	}
+	path_to_check = create_absolute_path(pathname);
+	if (path_to_check.length() == 0)
+		return -2;
 	auto res = std::mismatch(capio_dir.begin(), capio_dir.end(), path_to_check.begin());
 	if (res.first == capio_dir.end()) {
 		if (capio_dir.size() == path_to_check.size()) {
@@ -778,12 +763,9 @@ int capio_lstat_wrapper(const char* path, struct stat* statbuf) {
 	std::cout << " capio lstat " << std::endl;
 	if (first_call)
 		mtrace_init();
-	try {
-		absolute_path = create_absolute_path(path);
-	}
-	catch (const std::exception& ex) {
-		return -2; //it means that the parent dir does not exist
-	}
+	absolute_path = create_absolute_path(path);
+	if (absolute_path.length() == 0)
+		return -2;
 	return capio_lstat(absolute_path, statbuf);	
 }
 
