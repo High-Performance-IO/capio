@@ -470,14 +470,51 @@ off_t capio_lseek(int fd, off64_t offset, int whence) {
 	}
 }
 
+
+bool is_absolute(const char* pathname) {
+	bool rel = false;
+	int i = 0;
+	while (pathname[i] != '\0' && !rel) {
+		rel = pathname[i] == '.';
+		++i;
+	}
+	return !rel;
+}
+
+bool is_directory(int dirfd) {
+	struct stat path_stat;
+	stat_enabled = false;
+    fstat(dirfd, &path_stat);
+	stat_enabled = true;
+    return S_ISREG(path_stat.st_mode);
+}
+
 int capio_openat(int dirfd, const char* pathname, int flags) {
 	CAPIO_DBG("capio_openat %s\n", pathname);
 	if (first_call)
 		mtrace_init();
 	std::string path_to_check;
-	path_to_check = create_absolute_path(pathname);
-	if (path_to_check.length() == 0)
-		return -2;
+	if(is_absolute(pathname)) {
+		path_to_check = pathname;
+		CAPIO_DBG("capio_openat absolute %s\n", path_to_check.c_str());
+	}
+	else {
+		if(dirfd == AT_FDCWD) {
+			path_to_check = create_absolute_path(pathname);
+			if (path_to_check.length() == 0)
+				return -2;
+			CAPIO_DBG("capio_openat AT_FDCWD %s\n", path_to_check.c_str());
+		}
+		else {
+			if (is_directory(dirfd))
+				return -2;
+			std::string dir_path = get_dir_path(pathname, dirfd);
+			if (dir_path.length() == 0)
+				return -2;
+			path_to_check = dir_path + "/" + pathname;
+			CAPIO_DBG("capio_openat with dirfd %s\n", path_to_check.c_str());
+		}
+	}
 	auto res = std::mismatch(capio_dir.begin(), capio_dir.end(), path_to_check.begin());
 	if (res.first == capio_dir.end()) {
 		if (capio_dir.size() == path_to_check.size()) {
@@ -881,23 +918,7 @@ int capio_fstat(int fd, struct stat* statbuf) {
 }
 
 
-bool is_absolute(const char* pathname) {
-	bool absolute = false;
-	int i = 0;
-	while (pathname[i] != '\0' && !absolute) {
-		absolute = pathname[i] == '.';
-		++i;
-	}
-	return absolute;
-}
 
-bool is_dir(int dirfd) {
-	struct stat path_stat;
-	stat_enabled = false;
-    fstat(dirfd, &path_stat);
-	stat_enabled = true;
-    return S_ISREG(path_stat.st_mode);
-}
 
 int capio_fstatat(int dirfd, const char* pathname, struct stat* statbuf, int flags) {
 	if ((flags & AT_EMPTY_PATH) == AT_EMPTY_PATH) {
@@ -926,13 +947,13 @@ int capio_fstatat(int dirfd, const char* pathname, struct stat* statbuf, int fla
 			res = capio_lstat_wrapper(pathname, statbuf);		
 		}
 		else { 
-			if (is_dir(dirfd))
+			if (is_directory(dirfd))
 				return -2;
 			std::string dir_path = get_dir_path(pathname, dirfd);
+			if (dir_path.length() == 0)
+				return -2;
 			std::string path = dir_path + "/" + pathname;
 			std::cout << "fstat path " << path << std::endl;
-			if (path.length() == 0)
-				return -2;
 			res = capio_lstat(path, statbuf);
 		}
 	}
