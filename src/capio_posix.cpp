@@ -31,7 +31,6 @@
 
 std::string capio_dir;
 
-static bool is_fstat = true;
 int num_writes_batch = 1;
 int actual_num_writes = 1;
 
@@ -104,6 +103,7 @@ static inline void print_prefix(const char* str, const char* prefix, ...) {
  */
 
 void mtrace_init(void) {
+	CAPIO_DBG("mtrace init\n");
 	char* val;
 	first_call = false;
 	val = getenv("CAPIO_DIR");
@@ -140,25 +140,68 @@ void mtrace_init(void) {
 	caching_info_size = (int*) create_shm("caching_info_size" + std::to_string(getpid()), sizeof(int));
 	*caching_info_size = 0; 
 
-
 	stat_enabled = true;
 
 }
 
-// TODO: does not work for subdirectory of capio dir that don't exist
-// in the filesystem
 std::string create_absolute_path(const char* pathname) {	
+	char* abs_path = (char*) malloc(sizeof(char) * PATH_MAX);
 	stat_enabled = false;
-	char* abs_path = realpath(pathname, NULL);
+	char* res_realpath = realpath(pathname, abs_path);
 	stat_enabled = true;
-	if (abs_path == NULL)
-		return "";
+	if (res_realpath == NULL) {
+		int i = strlen(pathname);
+		bool found = false;
+		bool no_slash = true;
+		char* pathname_copy = (char*) malloc(sizeof(char) * (strlen(pathname) + 1));
+		strcpy(pathname_copy, pathname);
+		while (i >= 0 && !found) {
+			if (pathname[i] == '/') {
+				no_slash = false;
+				pathname_copy[i] = '\0';
+				abs_path = realpath(pathname_copy, NULL);	
+				if (abs_path != NULL)
+					found = true;
+			}
+			--i;
+		}
+		if (no_slash) {
+			getcwd(abs_path, PATH_MAX);
+			int len = strlen(abs_path);
+			abs_path[len] = '/';
+			abs_path[len + 1] = '\0';
+			strcat(abs_path, pathname);
+			return abs_path;
+		}
+		if (found) {
+			++i;
+			strncpy(pathname_copy, pathname + i, strlen(pathname) - i + 1);
+			strcat(abs_path, pathname_copy); 
+			free(pathname_copy);
+		}
+		else {
+			free(pathname_copy);
+			return "";
+		}
+	}
+	std::string res_path(abs_path);
 	free(abs_path);
-	std::string(res_path);
 	return res_path;
 }
 
 
+
+/*
+ * Creates an absolute path considering that pathname is relative
+ * to the directory referred to by the file descriptor dirfd 
+ * (rather than relative to the current working directory of the 
+ * calling  process,  as  is  done  by  stat()  and lstat() for a 
+ * relative pathname)
+ */
+
+//std::string create_absolute_path(const char* pathname, int dirfd) {
+
+//}
 
 
 void add_open_request(const char* pathname, size_t fd) {
@@ -426,7 +469,7 @@ off_t capio_lseek(int fd, off64_t offset, int whence) {
 }
 
 int capio_openat(int dirfd, const char* pathname, int flags) {
-	CAPIO_DBG("capio_openat\n");
+	CAPIO_DBG("capio_openat %s\n", pathname);
 	if (first_call)
 		mtrace_init();
 	std::string path_to_check;
@@ -436,8 +479,10 @@ int capio_openat(int dirfd, const char* pathname, int flags) {
 	auto res = std::mismatch(capio_dir.begin(), capio_dir.end(), path_to_check.begin());
 	if (res.first == capio_dir.end()) {
 		if (capio_dir.size() == path_to_check.size()) {
+			return -2;
 			std::cerr << "ERROR: open to the capio_dir " << path_to_check << std::endl;
 			exit(1);
+
 		}
 		else  {
 		//create shm
@@ -737,8 +782,15 @@ void capio_exit_group(int status) {
 
 int capio_lstat(std::string absolute_path, struct stat* statbuf) {
 	CAPIO_DBG("capio_lstat\n");
+	if (first_call)
+		mtrace_init();
 	auto res = std::mismatch(capio_dir.begin(), capio_dir.end(), absolute_path.begin());
 	if (res.first == capio_dir.end()) {
+		if (capio_dir.size() == absolute_path.size()) {
+			//it means capio_dir is equals to absolute_path
+			return -2;
+
+		}
 		char normalized_path[2048];
 		int i = 0;
 		while (absolute_path[i] != '\0') {
@@ -785,8 +837,6 @@ int capio_lstat(std::string absolute_path, struct stat* statbuf) {
 int capio_lstat_wrapper(const char* path, struct stat* statbuf) {
 	CAPIO_DBG("capio_lstat_wrapper\n");
 	std::string absolute_path;	
-	if (first_call)
-		mtrace_init();
 	absolute_path = create_absolute_path(path);
 	if (absolute_path.length() == 0)
 		return -2;
@@ -828,16 +878,6 @@ int capio_fstat(int fd, struct stat* statbuf) {
 	
 }
 
-/*
- * Creates an absolute path considering that pathname is relative
- * to the directory referred to by the file descriptor dirfd 
- * (rather than relative to the current working directory of the 
- * calling  process,  as  is  done  by  stat()  and lstat() for a 
- * relative pathname)
- */
-
-//std::string create_absolute_path(const char* pathname, int dirfd) {
-//}
 
 bool is_absolute(const char* pathname) {
 	bool absolute = false;
@@ -852,8 +892,9 @@ bool is_absolute(const char* pathname) {
 int capio_fstatat(int dirfd, const char* pathname, struct stat* statbuf, int flags) {
 	if ((flags & AT_EMPTY_PATH) == AT_EMPTY_PATH) {
 		if(dirfd == AT_FDCWD) { // operate on currdir
-			std::string curr_dir = std::filesystem::current_path();
+			char* curr_dir = get_current_dir_name(); 
 			return capio_lstat(curr_dir, statbuf);
+			free(curr_dir);
 		}
 		else { // operate on dirfd
 		// in this case dirfd can refer to any type of file
