@@ -472,13 +472,7 @@ off_t capio_lseek(int fd, off64_t offset, int whence) {
 
 
 bool is_absolute(const char* pathname) {
-	bool rel = false;
-	int i = 0;
-	while (pathname[i] != '\0' && !rel) {
-		rel = pathname[i] == '.';
-		++i;
-	}
-	return !rel;
+	return (pathname ? (pathname[0]=='/') : false);
 }
 
 bool is_directory(int dirfd) {
@@ -1063,6 +1057,16 @@ hook(long syscall_number,
 
 			break;
 		}
+
+			// TO BE IMPLEMENTED
+	case SYS_lgetxattr:
+	case SYS_getxattr: {
+		CAPIO_DBG("capio_*xattr\n");
+		errno = ENODATA;
+		*result = -errno;
+		hook_ret_value = 0;
+		break;
+	}
 
 		case SYS_fgetxattr: {
 			int fd = arg0;
