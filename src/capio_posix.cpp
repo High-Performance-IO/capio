@@ -959,6 +959,10 @@ int capio_fstatat(int dirfd, const char* pathname, struct stat* statbuf, int fla
 }
 
 
+int capio_creat(const char* pathname, mode_t mode) {
+	CAPIO_DBG("capio_creat %s\n", pathname);
+	return capio_openat(AT_FDCWD, pathname, O_CREAT | O_WRONLY | O_TRUNC);
+}
 
 static int
 hook(long syscall_number,
@@ -1162,6 +1166,17 @@ hook(long syscall_number,
 			}
 			break;
 		} 
+
+		case SYS_creat: {
+			const char* pathname = reinterpret_cast<const char*>(arg0);
+			mode_t mode = arg1;
+			res = capio_creat(pathname, mode);
+			if (res != -2) {
+				*result = (res<0?-errno:res);
+				hook_ret_value = 0;
+			}
+			break;
+		}
 
 		default:
 			hook_ret_value = 1;
