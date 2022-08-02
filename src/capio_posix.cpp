@@ -61,17 +61,42 @@ std::unordered_set<std::string> capio_files_paths;
 
 std::unordered_map<int, std::pair<std::vector<int>, bool>> fd_copies;
 
-int is_directory(const char *path) {
+static bool first_call = true;
+static bool stat_enabled = true;
+
+
+// -------------------------  utility functions:
+static int is_directory(const char *path) {
    struct stat statbuf;
    if (stat(path, &statbuf) != 0) {
 		std::cerr << "error: stat" << " errno " <<  errno << " strerror(errno): " << strerror(errno) << std::endl;
-		exit(1);
+		return -1;
    }
    return S_ISDIR(statbuf.st_mode);
 }
+#if !defined(EXTRA_LEN_PRINT_ERROR)
+#define EXTRA_LEN_PRINT_ERROR   512
+#endif
+#define CAPIO_DBG(str, ...) \
+  print_prefix(str, "DBG:", ##__VA_ARGS__)
 
-static bool first_call = true;
-static bool stat_enabled = true;
+static inline void print_prefix(const char* str, const char* prefix, ...) {
+    va_list argp;
+    char * p=(char *)malloc(strlen(str)+strlen(prefix)+EXTRA_LEN_PRINT_ERROR);
+    if (!p) {
+		perror("malloc");
+		fprintf(stderr,"FATAL ERROR in print_prefix\n");
+        return;
+    }
+    strcpy(p,prefix);
+    strcpy(p+strlen(prefix), str);
+    va_start(argp, prefix);
+    vfprintf(stderr, p, argp);
+    va_end(argp);
+    free(p);
+}
+// utility functions  -------------------------
+
 
 /*
  * This function must be called only once
@@ -401,7 +426,7 @@ off_t capio_lseek(int fd, off64_t offset, int whence) {
 }
 
 int capio_openat(int dirfd, const char* pathname, int flags) {
-	std::cout << "capio_openat " << pathname << std::endl;
+	CAPIO_DBG("capio_openat\n");
 	if (first_call)
 		mtrace_init();
 	std::string path_to_check;
@@ -426,7 +451,6 @@ int capio_openat(int dirfd, const char* pathname, int flags) {
 				++i;
 			}
 			shm_name[i] = '\0';
-			std::cout << "creating shmm" << std::endl;
 			printf("%s\n", shm_name);
 			int fd;
 			void* p = create_shm(shm_name, 1024L * 1024 * 1024* 2, &fd);
@@ -712,6 +736,7 @@ void capio_exit_group(int status) {
  */
 
 int capio_lstat(std::string absolute_path, struct stat* statbuf) {
+	CAPIO_DBG("capio_lstat\n");
 	auto res = std::mismatch(capio_dir.begin(), capio_dir.end(), absolute_path.begin());
 	if (res.first == capio_dir.end()) {
 		char normalized_path[2048];
@@ -727,7 +752,6 @@ int capio_lstat(std::string absolute_path, struct stat* statbuf) {
 
 		std::string msg = "stat " + std::to_string(getpid()) + " " + normalized_path;
 		const char* c_str = msg.c_str();
-		std::cout << buf_requests << std::endl;
 		buf_requests->write(c_str);
 		off64_t file_size;
 		buf_response->read(&file_size);
@@ -737,13 +761,13 @@ int capio_lstat(std::string absolute_path, struct stat* statbuf) {
 		}
 		statbuf->st_dev = 100;
 		statbuf->st_ino = 100;
-		statbuf->st_mode = 10;
+		statbuf->st_mode = S_IFREG | S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH; // 0644 regular file 
 		statbuf->st_nlink = 1;
-		statbuf->st_uid = 10;
-		statbuf->st_gid = 10;
+		statbuf->st_uid = 0; // root 
+		statbuf->st_gid = 0; // root
 		statbuf->st_rdev = 0;
 		statbuf->st_size = file_size;
-		std::cout << " file size " << file_size << std::endl;
+		CAPIO_DBG("lstat file_size=%ld\n",file_size);
 		statbuf->st_blksize = 512;
 		struct timespec time;
 		time.tv_sec = 1;
@@ -759,8 +783,8 @@ int capio_lstat(std::string absolute_path, struct stat* statbuf) {
 }
 
 int capio_lstat_wrapper(const char* path, struct stat* statbuf) {
-	std::string absolute_path;
-	std::cout << " capio lstat " << std::endl;
+	CAPIO_DBG("capio_lstat_wrapper\n");
+	std::string absolute_path;	
 	if (first_call)
 		mtrace_init();
 	absolute_path = create_absolute_path(path);
@@ -783,13 +807,13 @@ int capio_fstat(int fd, struct stat* statbuf) {
 		buf_response->read(&file_size);
 		statbuf->st_dev = 100;
 		statbuf->st_ino = 100;
-		statbuf->st_mode = 10;
+		statbuf->st_mode = S_IFREG | S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH; // 0644 regular file 
 		statbuf->st_nlink = 1;
-		statbuf->st_uid = 10;
-		statbuf->st_gid = 10;
+		statbuf->st_uid = 0; // root
+		statbuf->st_gid = 0; // root
 		statbuf->st_rdev = 0;
 		statbuf->st_size = file_size;
-		std::cout << " file size " << file_size << std::endl;
+		CAPIO_DBG("capio_fstat file_size=%ld\n", file_size);
 		statbuf->st_blksize = 512;
 		struct timespec time;
 		time.tv_sec = 1;
@@ -1022,7 +1046,6 @@ hook(long syscall_number,
 			const char* path = reinterpret_cast<const char*>(arg0);
 			struct stat* buf = reinterpret_cast<struct stat*>(arg1);
 			if (stat_enabled) {
-				std::cout << "capio stat" << std::endl;
 				res = capio_lstat_wrapper(path, buf);
 				if (res != -2) {
 					*result = (res<0?-errno:res);
