@@ -558,7 +558,8 @@ void handle_local_read(int pid, int fd, off64_t count) {
 		std::cout << "count " << count << std::endl;
 		std::cout << "end of sector" << end_of_sector << std::endl;
 		c_file.print();
-		if (process_offset + count > end_of_sector) {
+		off64_t end_of_read = process_offset + count;
+		if (end_of_read > end_of_sector) {
 		#ifdef CAPIOLOG
 		std::cout << "Am I a writer? " << writer << std::endl;
 		std::cout << "Is the file completed? " << c_file.complete << std::endl;
@@ -568,11 +569,18 @@ void handle_local_read(int pid, int fd, off64_t count) {
 				std::cout << "add pending reads" << std::endl;
 				#endif
 				pending_reads[path].push_back(std::make_tuple(pid, fd, count));
-				sem_post(&handle_local_read_sem);
-				return;
 			}
+			else {
+				off64_t file_size = c_file.get_file_size();
+				if (file_size >= end_of_read)
+					response_buffers[pid]->write(&end_of_read);
+				else
+					response_buffers[pid]->write(&file_size);
+			}
+
 		}
-		response_buffers[pid]->write(&end_of_sector);
+		else
+			response_buffers[pid]->write(&end_of_sector);
 		#ifdef CAPIOLOG
 		std::cout << "process offset " << process_offset << std::endl;
 		#endif
