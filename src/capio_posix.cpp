@@ -500,7 +500,7 @@ int capio_openat(int dirfd, const char* pathname, int flags) {
 			CAPIO_DBG("capio_openat AT_FDCWD %s\n", path_to_check.c_str());
 		}
 		else {
-			if (is_directory(dirfd))
+			if (!is_directory(dirfd))
 				return -2;
 			std::string dir_path = get_dir_path(pathname, dirfd);
 			if (dir_path.length() == 0)
@@ -808,6 +808,13 @@ void capio_exit_group(int status) {
 	return;
 }
 
+blkcnt_t get_nblocks(off64_t file_size) {
+	if (file_size % 4096 == 0)
+		return file_size / 512;
+	
+	return file_size / 512 + 8;
+}
+
 /*
  * Precondition: absolute_path must contain an absolute path
  *
@@ -853,7 +860,11 @@ int capio_lstat(std::string absolute_path, struct stat* statbuf) {
 		statbuf->st_rdev = 0;
 		statbuf->st_size = file_size;
 		CAPIO_DBG("lstat file_size=%ld\n",file_size);
-		statbuf->st_blksize = 512;
+		statbuf->st_blksize = 4096;
+		if (file_size < 4096)
+			statbuf->st_blocks = 8;
+		else
+			statbuf->st_blocks = get_nblocks(file_size);
 		struct timespec time;
 		time.tv_sec = 1;
 		time.tv_nsec = 1;
@@ -897,7 +908,11 @@ int capio_fstat(int fd, struct stat* statbuf) {
 		statbuf->st_rdev = 0;
 		statbuf->st_size = file_size;
 		CAPIO_DBG("capio_fstat file_size=%ld\n", file_size);
-		statbuf->st_blksize = 512;
+		statbuf->st_blksize = 4096;
+		if (file_size < 4096)
+			statbuf->st_blocks = 8;
+		else
+			statbuf->st_blocks = get_nblocks(file_size);
 		struct timespec time;
 		time.tv_sec = 1;
 		time.tv_nsec = 1;
@@ -961,7 +976,10 @@ int capio_fstatat(int dirfd, const char* pathname, struct stat* statbuf, int fla
 
 int capio_creat(const char* pathname, mode_t mode) {
 	CAPIO_DBG("capio_creat %s\n", pathname);
-	return capio_openat(AT_FDCWD, pathname, O_CREAT | O_WRONLY | O_TRUNC);
+	int res = capio_openat(AT_FDCWD, pathname, O_CREAT | O_WRONLY | O_TRUNC);
+
+	CAPIO_DBG("capio_creat %s returning %d\n", pathname, res);
+	return res;
 }
 
 static int
