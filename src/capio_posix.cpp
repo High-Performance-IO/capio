@@ -63,16 +63,39 @@ std::unordered_map<int, std::pair<std::vector<int>, bool>> fd_copies;
 static bool first_call = true;
 static bool stat_enabled = true;
 
-
 // -------------------------  utility functions:
+static bool is_absolute(const char* pathname) {
+	return (pathname ? (pathname[0]=='/') : false);
+}
+static int is_directory(int dirfd) {
+	struct stat path_stat;
+	stat_enabled = false;
+    if (fstat(dirfd, &path_stat) != 0) {
+		std::cerr << "error: stat" << " errno " <<  errno << " strerror(errno): " << strerror(errno) << std::endl;
+		stat_enabled=true;
+		return -1;
+	}
+	stat_enabled = true;
+    return S_ISDIR(path_stat.st_mode);
+}
 static int is_directory(const char *path) {
    struct stat statbuf;
+   stat_enabled = false;
    if (stat(path, &statbuf) != 0) {
 		std::cerr << "error: stat" << " errno " <<  errno << " strerror(errno): " << strerror(errno) << std::endl;
+		stat_enabled=true;
 		return -1;
    }
+   stat_enabled=true;
    return S_ISDIR(statbuf.st_mode);
 }
+static blkcnt_t get_nblocks(off64_t file_size) {
+	if (file_size % 4096 == 0)
+		return file_size / 512;
+	
+	return file_size / 512 + 8;
+}
+
 #if !defined(EXTRA_LEN_PRINT_ERROR)
 #define EXTRA_LEN_PRINT_ERROR   512
 #endif
@@ -471,18 +494,6 @@ off_t capio_lseek(int fd, off64_t offset, int whence) {
 }
 
 
-bool is_absolute(const char* pathname) {
-	return (pathname ? (pathname[0]=='/') : false);
-}
-
-bool is_directory(int dirfd) {
-	struct stat path_stat;
-	stat_enabled = false;
-    fstat(dirfd, &path_stat);
-	stat_enabled = true;
-    return S_ISREG(path_stat.st_mode);
-}
-
 int capio_openat(int dirfd, const char* pathname, int flags) {
 	CAPIO_DBG("capio_openat %s\n", pathname);
 	if (first_call)
@@ -808,13 +819,6 @@ void capio_exit_group(int status) {
 	return;
 }
 
-blkcnt_t get_nblocks(off64_t file_size) {
-	if (file_size % 4096 == 0)
-		return file_size / 512;
-	
-	return file_size / 512 + 8;
-}
-
 /*
  * Precondition: absolute_path must contain an absolute path
  *
@@ -852,7 +856,11 @@ int capio_lstat(std::string absolute_path, struct stat* statbuf) {
 			return -1;
 		}
 		statbuf->st_dev = 100;
-		statbuf->st_ino = 100;
+
+		
+		std::hash<std::string> hash;		
+		statbuf->st_ino = hash(normalized_path);
+
 		statbuf->st_mode = S_IFREG | S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH; // 0644 regular file 
 		statbuf->st_nlink = 1;
 		statbuf->st_uid = 0; // root 
@@ -900,8 +908,11 @@ int capio_fstat(int fd, struct stat* statbuf) {
 		off64_t file_size;
 		buf_response->read(&file_size);
 		statbuf->st_dev = 100;
-		statbuf->st_ino = 100;
-		statbuf->st_mode = S_IFREG | S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH; // 0644 regular file 
+
+		std::hash<std::string> hash;		
+		statbuf->st_ino = hash(capio_files_descriptors[fd]);
+
+	    statbuf->st_mode = S_IFREG | S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH; // 0644 regular file 
 		statbuf->st_nlink = 1;
 		statbuf->st_uid = 0; // root
 		statbuf->st_gid = 0; // root
