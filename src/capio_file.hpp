@@ -25,7 +25,7 @@ class Capio_file {
 
 	public:
 		bool complete = false;
-		int n_links = 0;
+		int n_links = 1;
 		int n_opens = 0;
 
 		off64_t get_file_size() {
