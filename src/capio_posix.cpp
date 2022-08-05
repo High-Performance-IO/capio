@@ -1085,7 +1085,7 @@ int capio_unlink_abs(std::string abs_path) {
 			else
 				normalized_path[i] = abs_path[i];
 		}
-		normalized_path[i] = '\0';
+		normalized_path[abs_path.length()] = '\0';
 		std::string msg = "unlk " + std::to_string(pid) + " " + std::string(normalized_path);
 		buf_requests->write(msg.c_str());
 		off64_t res_unlink;
