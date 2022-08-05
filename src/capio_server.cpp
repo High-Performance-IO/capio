@@ -776,12 +776,7 @@ void delete_file(std::string path) {
 
 }
 
-void handle_close(char* str, char* p) {
-	int pid, fd;
-	sscanf(str, "clos %d %d", &pid, &fd);
-	#ifdef CAPIOLOG
-	std::cout << "handle close " << pid << " " << fd << std::endl;
-	#endif
+void handle_close(int pid, int fd) {
 	std::string path = processes_files_metadata[pid][fd];
 	std::cout << "path name " << path << std::endl;
 	Capio_file& c_file = std::get<4>(files_metadata[path]);
@@ -792,6 +787,15 @@ void handle_close(char* str, char* p) {
 	shm_unlink(("offset_" + std::to_string(pid) +  "_" + std::to_string(fd)).c_str());
 	processes_files[pid].erase(fd);
 	processes_files_metadata[pid].erase(fd);
+}
+
+void handle_close(char* str, char* p) {
+	int pid, fd;
+	sscanf(str, "clos %d %d", &pid, &fd);
+	#ifdef CAPIOLOG
+	std::cout << "handle close " << pid << " " << fd << std::endl;
+	#endif
+	handle_close(pid, fd);
 }
 
 void handle_remote_read(char* str, char* p, int rank) {
@@ -875,6 +879,16 @@ void handle_seek_end(char* str) {
 	response_buffers[pid]->write(&res);
 }
 
+void close_all_files(int pid) {
+	auto it_process_files = processes_files.find(pid);
+	if (it_process_files != processes_files.end()) {
+		auto process_files = it_process_files->second;
+		for (auto it : process_files) {
+			handle_close(pid, it.first);
+		}
+	}
+}
+
 void handle_exig(char* str) {
 	int pid;
 	sscanf(str, "exig %d", &pid);
@@ -912,6 +926,7 @@ void handle_exig(char* str) {
         sem_post(sems_write[pid]);
 	}
    }
+   close_all_files(pid);
 }
 
 void handle_stat(const char* str) {
