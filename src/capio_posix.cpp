@@ -236,7 +236,8 @@ void add_open_request(const char* pathname, size_t fd) {
 }
 
 int add_close_request(int fd) {
-	const char* c_str = ("clos " +std::to_string(getpid()) + " "  + std::to_string(fd)).c_str();
+	std::string msg = "clos " +std::to_string(getpid()) + " "  + std::to_string(fd);
+	const char* c_str = msg.c_str();
 	buf_requests->write(c_str);
 	return 0;
 }

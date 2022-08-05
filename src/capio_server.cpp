@@ -380,11 +380,11 @@ void handle_open(char* str, char* p, int rank) {
 			exit(1);
 		}
 	}
-	else {
-		Capio_file& c_file = std::get<4>(files_metadata[path]);
-		++c_file.n_links;
-		++c_file.n_opens;
-	}
+	Capio_file& c_file = std::get<4>(files_metadata[path]);
+	++c_file.n_links;
+	++c_file.n_opens;
+	std::cout << "capio open n links " << c_file.n_links << " n opens " << c_file.n_opens << std::endl;;
+	std::cout << "path " << path << std::endl;
 	processes_files_metadata[pid][fd] = path;
 	auto it_files = writers.find(pid);
 	if (it_files != writers.end()) {
@@ -766,6 +766,9 @@ void handle_read(char* str, int rank) {
 
 
 void delete_file(std::string path) {
+	#ifdef CAPIOLOG
+	std::cout << "deleting file " << path << std::endl;
+	#endif	
 	auto it_metadata = files_metadata.find(path);
 	shm_unlink(path.c_str());
 	shm_unlink((path + "_size").c_str());
@@ -775,13 +778,15 @@ void delete_file(std::string path) {
 
 void handle_close(char* str, char* p) {
 	int pid, fd;
+	sscanf(str, "clos %d %d", &pid, &fd);
 	#ifdef CAPIOLOG
-	std::cout << "handle close" << std::endl;
+	std::cout << "handle close " << pid << " " << fd << std::endl;
 	#endif
-	sscanf(str, "close %d %d", &pid, &fd);
 	std::string path = processes_files_metadata[pid][fd];
+	std::cout << "path name " << path << std::endl;
 	Capio_file& c_file = std::get<4>(files_metadata[path]);
 	--c_file.n_opens;
+	std::cout << "capio open n links " << c_file.n_links << " n opens " << c_file.n_opens << std::endl;;
 	if (c_file.n_opens == 0 && c_file.n_links == 0)
 		delete_file(path);
 	shm_unlink(("offset_" + std::to_string(pid) +  "_" + std::to_string(fd)).c_str());
@@ -939,6 +944,9 @@ void handle_fstat(const char* str) {
 void handle_access(const char* str) {
 	int pid;
 	char path[PATH_MAX];
+	#ifdef CAPIOLOG
+		std::cout << "handle access: " << str << std::endl;
+	#endif
 	sscanf(str, "accs %d %s", &pid, path);
 	off64_t res;
 	auto it = files_location.find(path);
@@ -954,11 +962,15 @@ void handle_unlink(const char* str) {
 	char path[PATH_MAX];
 	off64_t res;
 	int pid;
+	#ifdef CAPIOLOG
+		std::cout << "handle unlink: " << str << std::endl;
+	#endif
 	sscanf(str, "unlk %d %s\n", &pid, path);
 	auto it = files_metadata.find(path);
 	if (it != files_metadata.end()) { //TODO: it works only in the local case
 		Capio_file& c_file = std::get<4>(it->second);
 		--c_file.n_links;
+		std::cout << "capio unlink n links " << c_file.n_links << " n opens " << c_file.n_opens;
 		if (c_file.n_opens == 0 && c_file.n_links == 0) {
 			delete_file(path);
 		}
