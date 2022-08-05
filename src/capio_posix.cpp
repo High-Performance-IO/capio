@@ -1133,6 +1133,20 @@ int capio_unlinkat(int dirfd, const char* pathname, int flags) {
 	return res;
 }
 
+int capio_fchown(int fd, uid_t owner, gid_t group) {
+	if (files.find(fd) == files.end())
+		return -2;
+	else
+		return 0;
+}
+
+int capio_fchmod(int fd, mode_t mode) {
+	if (files.find(fd) == files.end())
+		return -2;
+	else
+		return 0;
+}
+
 
 static int
 hook(long syscall_number,
@@ -1387,6 +1401,29 @@ hook(long syscall_number,
 			const char* pathname = reinterpret_cast<const char*>(arg1);
 			int flag = arg2;
 			res = capio_unlinkat(dirfd, pathname, flag);
+			if (res != -2) {
+				*result = (res<0?-errno:res);
+				hook_ret_value = 0;
+			}
+			break;
+		}
+
+		case SYS_fchown: {
+			int fd = arg0;
+			uid_t owner = arg1;
+			gid_t group = arg2;
+			res = capio_fchown(fd, owner, group);
+			if (res != -2) {
+				*result = (res<0?-errno:res);
+				hook_ret_value = 0;
+			}
+			break;
+		}
+
+		case SYS_fchmod : {
+			int fd = arg0;
+			mode_t mode = arg1;
+			res = capio_fchmod(fd, mode);
 			if (res != -2) {
 				*result = (res<0?-errno:res);
 				hook_ret_value = 0;
