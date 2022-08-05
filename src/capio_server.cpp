@@ -780,7 +780,7 @@ void handle_close(int pid, int fd) {
 	std::cout << "path name " << path << std::endl;
 	Capio_file& c_file = std::get<4>(files_metadata[path]);
 	--c_file.n_opens;
-	std::cout << "capio open n links " << c_file.n_links << " n opens " << c_file.n_opens << std::endl;;
+	std::cout << "capio close n links " << c_file.n_links << " n opens " << c_file.n_opens << std::endl;;
 	if (c_file.n_opens == 0 && c_file.n_links <= 0)
 		delete_file(path);
 	shm_unlink(("offset_" + std::to_string(pid) +  "_" + std::to_string(fd)).c_str());

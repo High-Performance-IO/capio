@@ -968,7 +968,7 @@ int capio_fstatat(int dirfd, const char* pathname, struct stat* statbuf, int fla
 			res = capio_lstat_wrapper(pathname, statbuf);		
 		}
 		else { 
-			if (is_directory(dirfd))
+			if (!is_directory(dirfd))
 				return -2;
 			std::string dir_path = get_dir_path(pathname, dirfd);
 			if (dir_path.length() == 0)
@@ -995,9 +995,10 @@ int capio_creat(const char* pathname, mode_t mode) {
 }
 
 int is_capio_file(std::string abs_path) {
-	if (capio_files_paths.find(abs_path) == capio_files_paths.end())
+	auto it = std::mismatch(capio_dir.begin(), capio_dir.end(), abs_path.begin());
+	if (it.first == capio_dir.end()) 
 		return 0;
-	else
+	else 
 		return -1;
 }
 
@@ -1043,7 +1044,7 @@ int capio_faccessat(int dirfd, const char* pathname, int mode, int flags) {
 			res = capio_access(pathname, mode);		
 		}
 		else { 
-			if (is_directory(dirfd))
+			if (!is_directory(dirfd))
 				return -2;
 			std::string dir_path = get_dir_path(pathname, dirfd);
 			if (dir_path.length() == 0)
@@ -1117,13 +1118,12 @@ int capio_unlinkat(int dirfd, const char* pathname, int flags) {
 			res = capio_unlink(pathname);		
 		}
 		else { 
-			if (is_directory(dirfd))
+			if (!is_directory(dirfd))
 				return -2;
 			std::string dir_path = get_dir_path(pathname, dirfd);
 			if (dir_path.length() == 0)
 				return -2;
 			std::string path = dir_path + "/" + pathname;
-			res = is_capio_file(path);
 			res = capio_unlink_abs(pathname);
 		}
 	}
