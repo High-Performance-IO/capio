@@ -181,7 +181,7 @@ std::string create_absolute_path(const char* pathname) {
 		while (i >= 0 && !found) {
 			if (pathname[i] == '/') {
 				no_slash = false;
-				ispathname_copy[i] = '\0';
+				pathname_copy[i] = '\0';
 				abs_path = realpath(pathname_copy, NULL);	
 				if (abs_path != NULL)
 					found = true;
@@ -1383,8 +1383,8 @@ hook(long syscall_number,
 		case SYS_unlinkat: {
 			int dirfd = arg0;
 			const char* pathname = reinterpret_cast<const char*>(arg1);
-			int flags = arg2;
-			res = capio_unlinkat(dirfd, pathname, arg2);
+			int flag = arg2;
+			res = capio_unlinkat(dirfd, pathname, flag);
 			if (res != -2) {
 				*result = (res<0?-errno:res);
 				hook_ret_value = 0;
