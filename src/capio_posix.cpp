@@ -1040,6 +1040,70 @@ int capio_faccessat(int dirfd, const char* pathname, int mode, int flags) {
 	return res;
 }
 
+int capio_unlink_abs(std::string abs_path) {
+	int res;
+	auto it = std::mismatch(capio_dir.begin(), capio_dir.end(), abs_path.begin());
+	if (it.first == capio_dir.end()) {
+		if (capio_dir.size() == abs_path.size()) {
+			std::cerr << "ERROR: unlink to the capio_dir " << abs_path << std::endl;
+			exit(1);
+		}
+		int pid = getpid();
+		char normalized_path[PATH_MAX];
+		normalized_path[0] = '/';
+		for (int i = 1; i < abs_path.length(); ++i) {
+			if (abs_path[i] == '/')
+				normalized_path[i] = '_';
+			else
+				normalized_path[i] = abs_path.at(i);
+		}
+		std::string msg = "unlk " + std::to_string(pid) + " " + std::string(normalized_path);
+		buf_requests->write(msg.c_str());
+		off64_t res_unlink;
+	    buf_response->read(&res_unlink); 	
+		res = res_unlink;
+		if (res == -1)
+			errno = ENOENT;
+	}
+	else {
+		res = -2;
+	}
+	return res;
+}
+
+int capio_unlink(const char* pathname) {
+	std::string abs_path = create_absolute_path(pathname);
+	int res;
+	res = capio_unlink_abs(abs_path);
+	return res;
+
+}
+
+int capio_unlinkat(int dirfd, const char* pathname, int flags) {
+	int res;
+	if (!is_absolute(pathname)) {
+		if (dirfd == AT_FDCWD) { 
+		// pathname is interpreted relative to currdir
+			res = capio_unlink(pathname);		
+		}
+		else { 
+			if (is_directory(dirfd))
+				return -2;
+			std::string dir_path = get_dir_path(pathname, dirfd);
+			if (dir_path.length() == 0)
+				return -2;
+			std::string path = dir_path + "/" + pathname;
+			res = is_capio_file(path);
+			res = capio_unlink_abs(pathname);
+		}
+	}
+	else { //dirfd is ignored
+		res = capio_unlink_abs(pathname);
+	}
+	return res;
+}
+
+
 static int
 hook(long syscall_number,
 			long arg0, long arg1,
@@ -1271,6 +1335,28 @@ hook(long syscall_number,
 			int mode = arg2;
 			int flags = arg3;
 			res = capio_faccessat(dirfd, pathname, mode, flags);
+			if (res != -2) {
+				*result = (res<0?-errno:res);
+				hook_ret_value = 0;
+			}
+			break;
+		}
+
+		case SYS_unlink: {
+			const char* pathname = reinterpret_cast<const char*>(arg0);
+			res = capio_unlink(pathname);
+			if (res != -2) {
+				*result = (res<0?-errno:res);
+				hook_ret_value = 0;
+			}
+			break;
+		}
+
+		case SYS_unlinkat: {
+			int dirfd = arg0;
+			const char* pathname = reinterpret_cast<const char*>(arg1);
+			int flags = arg2;
+			res = capio_unlinkat(dirfd, pathname, arg2);
 			if (res != -2) {
 				*result = (res<0?-errno:res);
 				hook_ret_value = 0;

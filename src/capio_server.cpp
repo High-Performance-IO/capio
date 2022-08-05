@@ -11,6 +11,7 @@
 #include <pthread.h>
 #include <sstream>
 
+#include <linux/limits.h>
 #include <unistd.h>
 #include <stdio.h>
 #include <stddef.h>
@@ -378,6 +379,11 @@ void handle_open(char* str, char* p, int rank) {
 			std::cerr << "server " << rank << " error updating" <<std ::endl;
 			exit(1);
 		}
+	}
+	else {
+		Capio_file& c_file = std::get<4>(files_metadata[path]);
+		++c_file.n_links;
+		++c_file.n_opens;
 	}
 	processes_files_metadata[pid][fd] = path;
 	auto it_files = writers.find(pid);
@@ -758,10 +764,29 @@ void handle_read(char* str, int rank) {
 	
 }
 
+
+void delete_file(std::string path) {
+	auto it_metadata = files_metadata.find(path);
+	shm_unlink(path.c_str());
+	shm_unlink((path + "_size").c_str());
+	files_metadata.erase(path);
+
+}
+
 void handle_close(char* str, char* p) {
+	int pid, fd;
 	#ifdef CAPIOLOG
 	std::cout << "handle close" << std::endl;
 	#endif
+	sscanf(str, "close %d %d", &pid, &fd);
+	std::string path = processes_files_metadata[pid][fd];
+	Capio_file& c_file = std::get<4>(files_metadata[path]);
+	--c_file.n_opens;
+	if (c_file.n_opens == 0 && c_file.n_links == 0)
+		delete_file(path);
+	shm_unlink(("offset_" + std::to_string(pid) +  "_" + std::to_string(fd)).c_str());
+	processes_files[pid].erase(fd);
+	processes_files_metadata[pid].erase(fd);
 }
 
 void handle_remote_read(char* str, char* p, int rank) {
@@ -911,6 +936,26 @@ void handle_fstat(const char* str) {
 	response_buffers[pid]->write(&file_size);
 }
 
+
+void handle_unlink(const char* str) {
+	char path[PATH_MAX];
+	off64_t res;
+	int pid;
+	sscanf(str, "unlk %d %s\n", &pid, path);
+	auto it = files_metadata.find(path);
+	if (it != files_metadata.end()) { //TODO: it works only in the local case
+		Capio_file& c_file = std::get<4>(it->second);
+		--c_file.n_links;
+		if (c_file.n_opens == 0 && c_file.n_links == 0) {
+			delete_file(path);
+		}
+		res = 0;
+	}
+	else
+		res = -1;
+	response_buffers[pid]->write(&res);
+}
+
 void read_next_msg(int rank) {
 	char str[4096];
 	std::fill(str, str + 4096, 0);
@@ -958,6 +1003,8 @@ void read_next_msg(int rank) {
 						handle_stat(str);
 					else if (strncmp(str, "fsta", 4) == 0)
 						handle_fstat(str);
+					else if (strncmp(str, "unlk", 4) == 0)
+						handle_unlink(str);
 					else {
 						std::cerr << "error msg read" << std::endl;
 						MPI_Finalize();
