@@ -54,7 +54,7 @@ sem_t* sem_write;
 int* client_caching_info;
 int* caching_info_size;
 
-// fd -> pathname
+// fd -> (normalized) pathname
 std::unordered_map<int, std::string> capio_files_descriptors; 
 std::unordered_set<std::string> capio_files_paths;
 
@@ -549,7 +549,7 @@ int capio_openat(int dirfd, const char* pathname, int flags) {
 			files[fd] = std::make_tuple(p, p_offset, file_initial_size, 0, Capio_file(), flags, 0);
 			capio_files_descriptors[fd] = shm_name;
 			fd_copies[fd] = std::make_pair(std::vector<int>(), true);
-			capio_files_paths.insert(pathname);
+			capio_files_paths.insert(path_to_check);
 			if ((flags & O_APPEND) == O_APPEND) {
 				capio_lseek(fd, 0, SEEK_END);
 			}
@@ -993,6 +993,53 @@ int capio_creat(const char* pathname, mode_t mode) {
 	return res;
 }
 
+int is_capio_file(std::string abs_path) {
+	if (capio_files_paths.find(abs_path) == capio_files_paths.end())
+		return 0;
+	else
+		return -1;
+}
+
+int capio_access(const char* pathname, int mode) {
+	if (mode == F_OK) {
+		std::string abs_pathname = create_absolute_path(pathname);
+		abs_pathname = create_absolute_path(pathname);
+		if (abs_pathname.length() == 0) {
+			errno = ENONET;
+			return -1;
+		}
+		return is_capio_file(abs_pathname);
+	}
+	else if ((mode | X_OK) == X_OK) {
+		return -1;
+	}
+	else
+		return 0;
+}
+
+int capio_faccessat(int dirfd, const char* pathname, int mode, int flags) {
+	int res;
+	if (!is_absolute(pathname)) {
+		if (dirfd == AT_FDCWD) { 
+		// pathname is interpreted relative to currdir
+			res = capio_access(pathname, mode);		
+		}
+		else { 
+			if (is_directory(dirfd))
+				return -2;
+			std::string dir_path = get_dir_path(pathname, dirfd);
+			if (dir_path.length() == 0)
+				return -2;
+			std::string path = dir_path + "/" + pathname;
+			res = is_capio_file(path);
+		}
+	}
+	else { //dirfd is ignored
+		res = capio_access(pathname, mode);
+	}
+	return res;
+}
+
 static int
 hook(long syscall_number,
 			long arg0, long arg1,
@@ -1200,6 +1247,30 @@ hook(long syscall_number,
 			const char* pathname = reinterpret_cast<const char*>(arg0);
 			mode_t mode = arg1;
 			res = capio_creat(pathname, mode);
+			if (res != -2) {
+				*result = (res<0?-errno:res);
+				hook_ret_value = 0;
+			}
+			break;
+		}
+
+		case SYS_access: {
+			const char* pathname = reinterpret_cast<const char*>(arg0);
+			int mode = arg1;
+			res = capio_access(pathname, mode);
+			if (res != -2) {
+				*result = (res<0?-errno:res);
+				hook_ret_value = 0;
+			}
+			break;
+		}
+
+		case SYS_faccessat: {
+			int dirfd = arg0;
+			const char* pathname = reinterpret_cast<const char*>(arg1);
+			int mode = arg2;
+			int flags = arg3;
+			res = capio_faccessat(dirfd, pathname, mode, flags);
 			if (res != -2) {
 				*result = (res<0?-errno:res);
 				hook_ret_value = 0;
