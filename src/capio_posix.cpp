@@ -76,7 +76,7 @@ static int is_directory(int dirfd) {
 		return -1;
 	}
 	stat_enabled = true;
-    return S_ISDIR(path_stat.st_mode);
+    return S_ISDIR(path_stat.st_mode);  // 1 is a directory 
 }
 static int is_directory(const char *path) {
    struct stat statbuf;
@@ -95,6 +95,19 @@ static blkcnt_t get_nblocks(off64_t file_size) {
 	
 	return file_size / 512 + 8;
 }
+static std::string get_dir_path(const char* pathname, int dirfd) {
+	char proclnk[128];
+	char dir_pathname[PATH_MAX];
+	sprintf(proclnk, "/proc/self/fd/%d", dirfd);
+    ssize_t r = readlink(proclnk, dir_pathname, PATH_MAX);
+    if (r < 0){
+    	printf("failed to readlink\n");
+		return "";
+    }
+    dir_pathname[r] = '\0';
+	return dir_pathname;
+}
+
 
 #if !defined(EXTRA_LEN_PRINT_ERROR)
 #define EXTRA_LEN_PRINT_ERROR   512
@@ -212,21 +225,6 @@ std::string create_absolute_path(const char* pathname) {
 	return res_path;
 }
 
-
-
-
-std::string get_dir_path(const char* pathname, int dirfd) {
-	char proclnk[128];
-	char dir_pathname[PATH_MAX];
-	sprintf(proclnk, "/proc/self/fd/%d", dirfd);
-    ssize_t r = readlink(proclnk, dir_pathname, PATH_MAX);
-    if (r < 0){
-    	printf("failed to readlink\n");
-		return "";
-    }
-    dir_pathname[r] = '\0';
-	return dir_pathname;
-}
 
 
 void add_open_request(const char* pathname, size_t fd) {
@@ -512,7 +510,7 @@ int capio_openat(int dirfd, const char* pathname, int flags) {
 			CAPIO_DBG("capio_openat AT_FDCWD %s\n", path_to_check.c_str());
 		}
 		else {
-			if (!is_directory(dirfd))
+			if (is_directory(dirfd) != 1)
 				return -2;
 			std::string dir_path = get_dir_path(pathname, dirfd);
 			if (dir_path.length() == 0)
@@ -968,7 +966,7 @@ int capio_fstatat(int dirfd, const char* pathname, struct stat* statbuf, int fla
 			res = capio_lstat_wrapper(pathname, statbuf);		
 		}
 		else { 
-			if (!is_directory(dirfd))
+			if (is_directory(dirfd) != 1)
 				return -2;
 			std::string dir_path = get_dir_path(pathname, dirfd);
 			if (dir_path.length() == 0)
@@ -1044,7 +1042,7 @@ int capio_faccessat(int dirfd, const char* pathname, int mode, int flags) {
 			res = capio_access(pathname, mode);		
 		}
 		else { 
-			if (!is_directory(dirfd))
+			if (is_directory(dirfd) != 1) 
 				return -2;
 			std::string dir_path = get_dir_path(pathname, dirfd);
 			if (dir_path.length() == 0)
@@ -1111,6 +1109,8 @@ int capio_unlink(const char* pathname) {
 }
 
 int capio_unlinkat(int dirfd, const char* pathname, int flags) {
+	CAPIO_DBG("capio_unlinkat\n");
+	
 	int res;
 	if (!is_absolute(pathname)) {
 		if (dirfd == AT_FDCWD) { 
@@ -1118,13 +1118,15 @@ int capio_unlinkat(int dirfd, const char* pathname, int flags) {
 			res = capio_unlink(pathname);		
 		}
 		else { 
-			if (!is_directory(dirfd))
+			if (is_directory(dirfd) != 1)
 				return -2;
 			std::string dir_path = get_dir_path(pathname, dirfd);
 			if (dir_path.length() == 0)
 				return -2;
 			std::string path = dir_path + "/" + pathname;
-			res = capio_unlink_abs(pathname);
+			CAPIO_DBG("capio_unlinkat path=%s\n",path.c_str());
+			
+			res = capio_unlink_abs(path);
 		}
 	}
 	else { //dirfd is ignored
