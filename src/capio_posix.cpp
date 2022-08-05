@@ -181,7 +181,7 @@ std::string create_absolute_path(const char* pathname) {
 		while (i >= 0 && !found) {
 			if (pathname[i] == '/') {
 				no_slash = false;
-				pathname_copy[i] = '\0';
+				ispathname_copy[i] = '\0';
 				abs_path = realpath(pathname_copy, NULL);	
 				if (abs_path != NULL)
 					found = true;
@@ -1017,6 +1017,23 @@ int capio_access(const char* pathname, int mode) {
 		return 0;
 }
 
+int capio_file_exists(std::string path) {
+	char normalized_path[PATH_MAX];
+	normalized_path[0] = '/';
+	for (int i = 1; i < path.length(); ++i) {
+		if (path[i] == '/')
+			normalized_path[i] = '_';
+		else
+			normalized_path[i] = path[i];
+	}
+
+	std::string msg = "accs " + std::string(normalized_path);
+	off64_t res;
+	buf_requests->write(msg.c_str());
+	buf_response->read(&res);
+	return res;
+}
+
 int capio_faccessat(int dirfd, const char* pathname, int mode, int flags) {
 	int res;
 	if (!is_absolute(pathname)) {
@@ -1031,7 +1048,17 @@ int capio_faccessat(int dirfd, const char* pathname, int mode, int flags) {
 			if (dir_path.length() == 0)
 				return -2;
 			std::string path = dir_path + "/" + pathname;
-			res = is_capio_file(path);
+			auto it = std::mismatch(capio_dir.begin(), capio_dir.end(), path.begin());
+			if (it.first == capio_dir.end()) {
+				if (capio_dir.size() == path.size()) {
+					std::cerr << "ERROR: unlink to the capio_dir " << path << std::endl;
+					exit(1);
+				}
+				res = capio_file_exists(path);
+
+			}
+			else
+				res = -2;
 		}
 	}
 	else { //dirfd is ignored
@@ -1055,7 +1082,7 @@ int capio_unlink_abs(std::string abs_path) {
 			if (abs_path[i] == '/')
 				normalized_path[i] = '_';
 			else
-				normalized_path[i] = abs_path.at(i);
+				normalized_path[i] = abs_path[i];
 		}
 		std::string msg = "unlk " + std::to_string(pid) + " " + std::string(normalized_path);
 		buf_requests->write(msg.c_str());
@@ -1073,8 +1100,9 @@ int capio_unlink_abs(std::string abs_path) {
 
 int capio_unlink(const char* pathname) {
 	std::string abs_path = create_absolute_path(pathname);
-	int res;
-	res = capio_unlink_abs(abs_path);
+	if (abs_path.length() == 0)
+		return -2;
+	int res = capio_unlink_abs(abs_path);
 	return res;
 
 }

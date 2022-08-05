@@ -936,6 +936,19 @@ void handle_fstat(const char* str) {
 	response_buffers[pid]->write(&file_size);
 }
 
+void handle_access(const char* str) {
+	int pid;
+	char path[PATH_MAX];
+	sscanf(str, "accs %d %s", &pid, path);
+	off64_t res;
+	auto it = files_location.find(path);
+	if (it == files_location.end())
+		res = -1;
+	else 
+		res = 0;
+	response_buffers[pid]->write(&res);
+}
+
 
 void handle_unlink(const char* str) {
 	char path[PATH_MAX];
@@ -1003,6 +1016,8 @@ void read_next_msg(int rank) {
 						handle_stat(str);
 					else if (strncmp(str, "fsta", 4) == 0)
 						handle_fstat(str);
+					else if (strncmp(str, "accs", 4) == 0)
+						handle_access(str);
 					else if (strncmp(str, "unlk", 4) == 0)
 						handle_unlink(str);
 					else {
