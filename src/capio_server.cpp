@@ -942,6 +942,9 @@ void handle_stat(const char* str) {
 		Capio_file& c_file = std::get<4>(it->second);
 		file_size = c_file.get_file_size();
 	}
+	#ifdef CAPIOLOG
+		std::cout << "file size stat : " << file_size << std::endl;
+	#endif
 	response_buffers[pid]->write(&file_size);
 }
 

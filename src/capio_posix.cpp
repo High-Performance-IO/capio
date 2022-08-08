@@ -61,6 +61,7 @@ std::unordered_set<std::string> capio_files_paths;
 std::unordered_map<int, std::pair<std::vector<int>, bool>> fd_copies;
 
 static bool first_call = true;
+static int last_pid = 0;
 static bool stat_enabled = true;
 
 // -------------------------  utility functions:
@@ -142,6 +143,7 @@ void mtrace_init(void) {
 	CAPIO_DBG("mtrace init\n");
 	char* val;
 	first_call = false;
+	last_pid = getpid();
 	val = getenv("CAPIO_DIR");
 	stat_enabled = false;
 	try {
@@ -495,7 +497,7 @@ off_t capio_lseek(int fd, off64_t offset, int whence) {
 
 int capio_openat(int dirfd, const char* pathname, int flags) {
 	CAPIO_DBG("capio_openat %s\n", pathname);
-	if (first_call)
+	if (first_call || last_pid != getpid())
 		mtrace_init();
 	std::string path_to_check;
 	if(is_absolute(pathname)) {
@@ -607,7 +609,7 @@ ssize_t capio_write(int fd, const  void *buffer, size_t count) {
 }
 
 int capio_close(int fd) {
-	if (first_call)
+	if (first_call || last_pid != getpid())
 		mtrace_init();
 	auto it = fd_copies.find(fd);
 	if (it != fd_copies.end()) {
@@ -670,8 +672,9 @@ ssize_t capio_read(int fd, void *buffer, size_t count) {
 			//std:: cout << "count_off " << count_off << std::endl; 
 			//std:: cout << "offset " << *offset << std::endl; 
 			//std::cout << "before read shm " << bytes_read << std::endl;
-			read_shm(std::get<0>(*t), *offset, buffer, bytes_read);
-			//std::cout << "after read shm " << bytes_read << std::endl;
+			if (bytes_read > 0)
+				read_shm(std::get<0>(*t), *offset, buffer, bytes_read);
+			std::cout << "after read shm " << bytes_read << std::endl;
 		//}
 		//else {
 			//read_from_disk(fd, offset, buffer, count);
@@ -824,8 +827,8 @@ void capio_exit_group(int status) {
  */
 
 int capio_lstat(std::string absolute_path, struct stat* statbuf) {
-	CAPIO_DBG("capio_lstat\n");
-	if (first_call)
+	CAPIO_DBG("capio_lstat %s\n", absolute_path.c_str());
+	if (first_call || last_pid != getpid())
 		mtrace_init();
 	auto res = std::mismatch(capio_dir.begin(), capio_dir.end(), absolute_path.begin());
 	if (res.first == capio_dir.end()) {
@@ -844,7 +847,7 @@ int capio_lstat(std::string absolute_path, struct stat* statbuf) {
 			++i;
 		}
 		normalized_path[i] = '\0';
-
+		CAPIO_DBG("capio_lstat sending msg to server\n");
 		std::string msg = "stat " + std::to_string(getpid()) + " " + normalized_path;
 		const char* c_str = msg.c_str();
 		buf_requests->write(c_str);
@@ -895,7 +898,7 @@ int capio_lstat_wrapper(const char* path, struct stat* statbuf) {
 }
 
 int capio_fstat(int fd, struct stat* statbuf) {
-	if (first_call)
+	if (first_call || last_pid != getpid())
 		mtrace_init();
 	auto it = fd_copies.find(fd);
 	if (it != fd_copies.end()) {
