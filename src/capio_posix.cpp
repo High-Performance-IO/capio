@@ -672,9 +672,7 @@ ssize_t capio_read(int fd, void *buffer, size_t count) {
 			//std:: cout << "count_off " << count_off << std::endl; 
 			//std:: cout << "offset " << *offset << std::endl; 
 			//std::cout << "before read shm " << bytes_read << std::endl;
-			if (bytes_read > 0)
-				read_shm(std::get<0>(*t), *offset, buffer, bytes_read);
-			std::cout << "after read shm " << bytes_read << std::endl;
+			read_shm(std::get<0>(*t), *offset, buffer, bytes_read);
 		//}
 		//else {
 			//read_from_disk(fd, offset, buffer, count);
@@ -716,6 +714,7 @@ ssize_t capio_writev(int fd, const struct iovec* iov, int iovcnt) {
 int capio_fcntl(int fd, int cmd, int arg) {
 	auto it = fd_copies.find(fd);
 	if (it != fd_copies.end()) {
+		CAPIO_DBG("capio_fcntl\n");
 		if (! it->second.second) {
 			fd = it->second.first[0];
 		}
@@ -1152,6 +1151,28 @@ int capio_fchmod(int fd, mode_t mode) {
 		return 0;
 }
 
+int capio_dup(int fd) {
+	int res;
+	auto it = fd_copies.find(fd);
+	CAPIO_DBG("capio_dup\n");
+	if (it != fd_copies.end()) {
+		if (!it->second.second) {
+			fd = it->second.first[0];
+		}
+		CAPIO_DBG("handling capio_dup\n");
+		res = open("/dev/null", O_WRONLY);
+		if (res == -1)
+			err_exit("open in capio_dup");
+		fd_copies[fd].first.push_back(res);
+		fd_copies[res].first.push_back(fd);
+		fd_copies[res].second = false;
+		CAPIO_DBG("handling capio_dup returning res %d\n", res);
+	}
+	else
+		res = -2;
+	return res;
+}
+
 
 static int
 hook(long syscall_number,
@@ -1425,10 +1446,20 @@ hook(long syscall_number,
 			break;
 		}
 
-		case SYS_fchmod : {
+		case SYS_fchmod: {
 			int fd = arg0;
 			mode_t mode = arg1;
 			res = capio_fchmod(fd, mode);
+			if (res != -2) {
+				*result = (res<0?-errno:res);
+				hook_ret_value = 0;
+			}
+			break;
+		}
+
+		case SYS_dup: {
+			int fd = arg0;
+			res = capio_dup(fd);
 			if (res != -2) {
 				*result = (res<0?-errno:res);
 				hook_ret_value = 0;
