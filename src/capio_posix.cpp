@@ -1177,7 +1177,7 @@ int capio_dup(int fd) {
 int capio_dup2(int fd, int fd2) {
 	int res;
 	auto it = fd_copies.find(fd);
-	CAPIO_DBG("capio_dup\n");
+	CAPIO_DBG("capio_dup 2\n");
 	if (it != fd_copies.end()) {
 		if (!it->second.second) {
 			fd = it->second.first[0];
@@ -1188,8 +1188,8 @@ int capio_dup2(int fd, int fd2) {
 		dup2_enabled = true;
 		if (res == -1)
 			return -1;
-		fd_copies[fd2].first.push_back(res);
-		fd_copies[res].first.push_back(fd2);
+		fd_copies[fd].first.push_back(res);
+		fd_copies[res].first.push_back(fd);
 		fd_copies[res].second = false;
 		CAPIO_DBG("handling capio_dup returning res %d\n", res);
 	}
