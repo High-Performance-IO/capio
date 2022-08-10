@@ -232,20 +232,20 @@ std::string create_absolute_path(const char* pathname) {
 void add_open_request(const char* pathname, size_t fd) {
 	std::string str ("open " + std::to_string(getpid()) + " " + std::to_string(fd) + " " + std::string(pathname));
 	const char* c_str = str.c_str();
-	buf_requests->write(c_str); //TODO: max upperbound for pathname
+	buf_requests->write(c_str, (strlen(c_str) + 1) * sizeof(char)); //TODO: max upperbound for pathname
 }
 
 int add_close_request(int fd) {
 	std::string msg = "clos " +std::to_string(getpid()) + " "  + std::to_string(fd);
 	const char* c_str = msg.c_str();
-	buf_requests->write(c_str);
+	buf_requests->write(c_str, (strlen(c_str) + 1) * sizeof(char));
 	return 0;
 }
 
 off64_t add_read_request(int fd, off64_t count, std::tuple<void*, off64_t*, off64_t, off64_t, Capio_file, int , int>& t) {
 	std::string str = "read " + std::to_string(getpid()) + " " + std::to_string(fd) + " " + std::to_string(count);
 	const char* c_str = str.c_str();
-	buf_requests->write(c_str);
+	buf_requests->write(c_str, (strlen(c_str) + 1) * sizeof(char));
 	//read response (offest)
 	off64_t offset_upperbound;
 	buf_response->read(&offset_upperbound);
@@ -279,7 +279,7 @@ void add_write_request(int fd, off64_t count) { //da modifcare con capio_file si
 	if (actual_num_writes == num_writes_batch) {
 		sprintf(c_str, "writ %d %d %ld %ld", getpid(),fd, old_offset, count);
 		std::get<4>(files[fd]).insert_sector(old_offset, old_offset + count);
-		buf_requests->write(c_str);
+		buf_requests->write(c_str, (strlen(c_str) + 1) * sizeof(char));
 		actual_num_writes = 1;
 	}
 	else
@@ -411,7 +411,7 @@ off_t capio_lseek(int fd, off64_t offset, int whence) {
 				*file_offset = offset;
 				char c_str[64];
 				sprintf(c_str, "seek %d %d %zu", getpid(),fd, *file_offset);
-				buf_requests->write(c_str);
+				buf_requests->write(c_str, (strlen(c_str) + 1) * sizeof(char));
 				off64_t offset_upperbound;
 				buf_response->read(&offset_upperbound);
 				std::get<3>(*t) = offset_upperbound;
@@ -428,7 +428,7 @@ off_t capio_lseek(int fd, off64_t offset, int whence) {
 				*file_offset = new_offset;
 				char c_str[64];
 				sprintf(c_str, "seek %d %d %zu", getpid(),fd, *file_offset);
-				buf_requests->write(c_str);
+				buf_requests->write(c_str, (strlen(c_str) + 1) * sizeof(char));
 				off64_t offset_upperbound;
 				buf_response->read(&offset_upperbound);
 				std::get<3>(*t) = offset_upperbound;
@@ -453,7 +453,7 @@ off_t capio_lseek(int fd, off64_t offset, int whence) {
 			char c_str[64];
 			off64_t file_size;
 			sprintf(c_str, "send %d %d", getpid(),fd);
-			buf_requests->write(c_str);
+			buf_requests->write(c_str, (strlen(c_str) + 1) * sizeof(char));
 			buf_response->read(&file_size);
 			off64_t offset_upperbound;
 			offset_upperbound = file_size;
@@ -464,7 +464,7 @@ off_t capio_lseek(int fd, off64_t offset, int whence) {
 		else if (whence == SEEK_DATA) {
 				char c_str[64];
 				sprintf(c_str, "sdat %d %d %zu", getpid(),fd, *file_offset);
-				buf_requests->write(c_str);
+				buf_requests->write(c_str, (strlen(c_str) + 1) * sizeof(char));
 				off64_t offset_upperbound;
 				buf_response->read(&offset_upperbound);
 				std::get<3>(*t) = offset_upperbound;
@@ -475,7 +475,7 @@ off_t capio_lseek(int fd, off64_t offset, int whence) {
 		else if (whence == SEEK_HOLE) {
 				char c_str[64];
 				sprintf(c_str, "shol %d %d %zu", getpid(),fd, *file_offset);
-				buf_requests->write(c_str);
+				buf_requests->write(c_str, (strlen(c_str) + 1) * sizeof(char));
 				off64_t offset_upperbound;
 				buf_response->read(&offset_upperbound);
 				std::get<3>(*t) = offset_upperbound;
@@ -816,7 +816,7 @@ void capio_exit_group(int status) {
 	int pid = getpid();
 	std::string str = "exig " + std::to_string(pid);
 	const char* c_str = str.c_str();
-	buf_requests->write(c_str);
+	buf_requests->write(c_str, (strlen(c_str) + 1) * sizeof(char));
 	return;
 }
 

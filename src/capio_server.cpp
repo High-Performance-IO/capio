@@ -1354,7 +1354,7 @@ void* capio_helper(void* pthread_arg) {
 			#endif
 			std::string msg = "ream " + path + + " " + std::to_string(bytes_received) + " " + std::to_string(offset);
 			const char* c_str = msg.c_str();
-			buf_requests->write(c_str);
+			buf_requests->write(c_str, (strlen(c_str) + 1) * sizeof(char));
 		}
 		else {
 			std::cerr << "helper error receiving message" << std::endl;
