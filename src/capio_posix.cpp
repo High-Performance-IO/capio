@@ -850,7 +850,7 @@ int capio_lstat(std::string absolute_path, struct stat* statbuf) {
 		CAPIO_DBG("capio_lstat sending msg to server\n");
 		std::string msg = "stat " + std::to_string(getpid()) + " " + normalized_path;
 		const char* c_str = msg.c_str();
-		buf_requests->write(c_str);
+		buf_requests->write(c_str, (strlen(c_str) + 1) * sizeof(char));
 		off64_t file_size;
 		buf_response->read(&file_size);
 		if (file_size == -1) {
@@ -906,7 +906,7 @@ int capio_fstat(int fd, struct stat* statbuf) {
 			fd = it->second.first[0];
 		}
 		std::string msg = "fsta " + std::to_string(getpid()) + " " + std::to_string(fd);
-		buf_requests->write(msg.c_str());
+		buf_requests->write(msg.c_str(), (strlen(msg.c_str()) + 1) * sizeof(char));
 		off64_t file_size;
 		buf_response->read(&file_size);
 		statbuf->st_dev = 100;
@@ -1032,7 +1032,7 @@ int capio_file_exists(std::string path) {
 
 	std::string msg = "accs " + std::string(normalized_path);
 	off64_t res;
-	buf_requests->write(msg.c_str());
+	buf_requests->write(msg.c_str(), (strlen(msg.c_str()) + 1) * sizeof(char));
 	buf_response->read(&res);
 	return res;
 }
@@ -1089,7 +1089,7 @@ int capio_unlink_abs(std::string abs_path) {
 		}
 		normalized_path[abs_path.length()] = '\0';
 		std::string msg = "unlk " + std::to_string(pid) + " " + std::string(normalized_path);
-		buf_requests->write(msg.c_str());
+		buf_requests->write(msg.c_str(), (strlen(msg.c_str()) + 1) * sizeof(char));
 		off64_t res_unlink;
 	    buf_response->read(&res_unlink); 	
 		res = res_unlink;
