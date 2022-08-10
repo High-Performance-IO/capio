@@ -63,6 +63,7 @@ std::unordered_map<int, std::pair<std::vector<int>, bool>> fd_copies;
 static bool first_call = true;
 static int last_pid = 0;
 static bool stat_enabled = true;
+static bool dup2_enabled = true;
 
 // -------------------------  utility functions:
 static bool is_absolute(const char* pathname) {
@@ -1173,6 +1174,29 @@ int capio_dup(int fd) {
 	return res;
 }
 
+int capio_dup2(int fd, int fd2) {
+	int res;
+	auto it = fd_copies.find(fd);
+	CAPIO_DBG("capio_dup\n");
+	if (it != fd_copies.end()) {
+		if (!it->second.second) {
+			fd = it->second.first[0];
+		}
+		CAPIO_DBG("handling capio_dup2\n");
+		dup2_enabled = false;
+		res = dup2(fd, fd2);
+		dup2_enabled = true;
+		if (res == -1)
+			return -1;
+		fd_copies[fd2].first.push_back(res);
+		fd_copies[res].first.push_back(fd2);
+		fd_copies[res].second = false;
+		CAPIO_DBG("handling capio_dup returning res %d\n", res);
+	}
+	else
+		res = -2;
+	return res;
+}
 
 static int
 hook(long syscall_number,
@@ -1464,6 +1488,21 @@ hook(long syscall_number,
 				*result = (res<0?-errno:res);
 				hook_ret_value = 0;
 			}
+			break;
+		}
+
+		case SYS_dup2: {
+			int fd = arg0;
+			int fd2 = arg1;
+			if (dup2_enabled) {
+				res = capio_dup2(fd, fd2);
+				if (res != -2) {
+					*result = (res<0?-errno:res);
+					hook_ret_value = 0;
+				}
+			}
+			else
+				res = -2;
 			break;
 		}
 
