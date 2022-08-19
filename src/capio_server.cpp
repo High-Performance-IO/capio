@@ -998,6 +998,32 @@ void handle_unlink(const char* str) {
 	response_buffers[pid]->write(&res);
 }
 
+std::unordered_set<std::string> get_paths_opened_files(pid_t pid) {
+	std::unordered_set<std::string> set;
+	for (auto& it : processes_files_metadata[pid])
+		set.insert(it.second);
+	return set;
+}
+
+//TODO: caching info
+void handle_clone(const char* str) {
+	pid_t ppid, new_pid;
+	sscanf(str, "clon %d %d\n", &ppid, &new_pid);
+	init_process(new_pid);
+	processes_files[new_pid] = processes_files[ppid];
+	processes_files_metadata[new_pid] = processes_files_metadata[ppid];
+	writers[new_pid] = writers[ppid];
+	for (auto &p : writers[new_pid]) {
+		p.second = false;
+	}
+	std::unordered_set<std::string> parent_files = get_paths_opened_files(ppid);
+	for(std::string path : parent_files) {
+		Capio_file& c_file = std::get<4>(files_metadata[path]);
+		++c_file.n_opens;
+	}
+}
+
+
 void read_next_msg(int rank) {
 	char str[4096];
 	std::fill(str, str + 4096, 0);
@@ -1049,6 +1075,8 @@ void read_next_msg(int rank) {
 						handle_access(str);
 					else if (strncmp(str, "unlk", 4) == 0)
 						handle_unlink(str);
+					else if (strncmp(str, "clon", 4) == 0)
+						handle_clone(str);
 					else {
 						std::cerr << "error msg read" << std::endl;
 						MPI_Finalize();
@@ -1092,7 +1120,7 @@ void* capio_server(void* pthread_arg) {
 	MPI_Comm_size(MPI_COMM_WORLD, &size);
 	catch_sigterm();
 	handshake_servers(rank, size);
-	buf_requests = new Circular_buffer<char>("circular_buffer", 256L * 1024 * 1024, sizeof(char) * 600);
+	buf_requests = new Circular_buffer<char>("circular_buffer", 1024 * 1024, sizeof(char) * 600);
 	sem_post(&internal_server_sem);
 	while(true) {
 		read_next_msg(rank);
