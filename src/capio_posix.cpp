@@ -141,9 +141,10 @@ static inline void print_prefix(const char* str, const char* prefix, ...) {
  */
 
 void mtrace_init(void) {
+	#ifdef CAPIOLOG
 	CAPIO_DBG("mtrace init\n");
+	#endif
 	if (fd_copies == nullptr) {
-	CAPIO_DBG("mtrace init creating data structures\n");
 		fd_copies = new std::unordered_map<int, std::pair<std::vector<int>, bool>>;
 		capio_files_descriptors = new std::unordered_map<int, std::string>; 
 		capio_files_paths = new std::unordered_set<std::string>;
@@ -505,20 +506,26 @@ off_t capio_lseek(int fd, off64_t offset, int whence) {
 
 
 int capio_openat(int dirfd, const char* pathname, int flags) {
+	#ifdef CAPIOLOG
 	CAPIO_DBG("capio_openat %s\n", pathname);
+	#endif
 	if (first_call || last_pid != getpid())
 		mtrace_init();
 	std::string path_to_check;
 	if(is_absolute(pathname)) {
 		path_to_check = pathname;
+		#ifdef CAPIOLOG
 		CAPIO_DBG("capio_openat absolute %s\n", path_to_check.c_str());
+		#endif
 	}
 	else {
 		if(dirfd == AT_FDCWD) {
 			path_to_check = create_absolute_path(pathname);
 			if (path_to_check.length() == 0)
 				return -2;
+			#ifdef CAPIOLOG
 			CAPIO_DBG("capio_openat AT_FDCWD %s\n", path_to_check.c_str());
+			#endif
 		}
 		else {
 			if (is_directory(dirfd) != 1)
@@ -527,7 +534,9 @@ int capio_openat(int dirfd, const char* pathname, int flags) {
 			if (dir_path.length() == 0)
 				return -2;
 			path_to_check = dir_path + "/" + pathname;
+			#ifdef CAPIOLOG
 			CAPIO_DBG("capio_openat with dirfd %s\n", path_to_check.c_str());
+			#endif
 		}
 	}
 	auto res = std::mismatch(capio_dir.begin(), capio_dir.end(), path_to_check.begin());
@@ -563,7 +572,9 @@ int capio_openat(int dirfd, const char* pathname, int flags) {
 			if ((flags & O_APPEND) == O_APPEND) {
 				capio_lseek(fd, 0, SEEK_END);
 			}
+			#ifdef CAPIOLOG
 			CAPIO_DBG("capio_openat returning %d\n", fd);
+			#endif
 			return fd;
 		}
 	}
@@ -619,19 +630,25 @@ ssize_t capio_write(int fd, const  void *buffer, size_t count) {
 }
 
 int capio_close(int fd) {
+		#ifdef CAPIOLOG
 	CAPIO_DBG("capio_close %d %d\n", getpid(), fd);
+		#endif
 	if (first_call || last_pid != getpid())
 		mtrace_init();
 	auto it = fd_copies->find(fd);
 	if (it != fd_copies->end()) {
 		if (! it->second.second) {
 			fd = it->second.first[0];
+			#ifdef CAPIOLOG
 		CAPIO_DBG("capio_close debug 0\n");
+		#endif
 		}
 		add_close_request(fd);
 		auto& copies = (*fd_copies)[fd].first;
 		if (copies.size() > 0) {
+			#ifdef CAPIOLOG
 		CAPIO_DBG("capio_close debug 1\n");
+		#endif
 			int master_fd = copies[0];
 			(*files)[master_fd] = (*files)[fd];
 			(*capio_files_descriptors)[master_fd] = (*capio_files_descriptors)[fd];
@@ -639,7 +656,9 @@ int capio_close(int fd) {
 			auto& master_copies = (*fd_copies)[master_fd].first;
 			master_copies.erase(master_copies.begin());
 			for (size_t i = 1; i < copies.size(); ++i) {
-		CAPIO_DBG("capio_close debug 2\n");
+			#ifdef CAPIOLOG
+			CAPIO_DBG("capio_close debug 2\n");
+			#endif
 				int fd_copy = copies[i];
 				master_copies.push_back(fd_copy);
 				auto& copy_vec = (*fd_copies)[fd_copy].first;
@@ -648,17 +667,15 @@ int capio_close(int fd) {
 			}
 
 		}
-		CAPIO_DBG("capio_close debug 3\n");
 		capio_files_descriptors->erase(fd);
-		CAPIO_DBG("capio_close debug 4\n");
 		fd_copies->erase(fd);
-		CAPIO_DBG("capio_close debug 5\n");
 		files->erase(fd);
-		CAPIO_DBG("capio_close returning %d %d\n", getpid(), fd);
 		return close(fd);
 	}
 	else {
+		#ifdef CAPIOLOG
 		CAPIO_DBG("capio_close returning -2 %d %d\n", getpid(), fd);
+		#endif
 		return -2;
 	}
 }
@@ -733,7 +750,9 @@ ssize_t capio_writev(int fd, const struct iovec* iov, int iovcnt) {
 int capio_fcntl(int fd, int cmd, int arg) {
   auto it = fd_copies->find(fd);
   if (it != fd_copies->end()) {
+	#ifdef CAPIOLOG
     CAPIO_DBG("capio_fcntl\n");
+	#endif
     if (!it->second.second) {
       fd = it->second.first[0];
     }
@@ -835,8 +854,13 @@ void capio_exit_group(int status) {
 	int pid = getpid();
 	std::string str = "exig " + std::to_string(pid);
 	const char* c_str = str.c_str();
+	#ifdef CAPIOLOG
 	CAPIO_DBG("capio exit group captured%d\n", pid);
+	#endif
 	buf_requests->write(c_str, (strlen(c_str) + 1) * sizeof(char));
+	#ifdef CAPIOLOG
+	CAPIO_DBG("capio exit group terminated%d\n", pid);
+	#endif
 	return;
 }
 
@@ -846,7 +870,9 @@ void capio_exit_group(int status) {
  */
 
 int capio_lstat(std::string absolute_path, struct stat* statbuf) {
+	#ifdef CAPIOLOG
 	CAPIO_DBG("capio_lstat %s\n", absolute_path.c_str());
+	#endif
 	if (first_call || last_pid != getpid())
 		mtrace_init();
 	auto res = std::mismatch(capio_dir.begin(), capio_dir.end(), absolute_path.begin());
@@ -866,7 +892,9 @@ int capio_lstat(std::string absolute_path, struct stat* statbuf) {
 			++i;
 		}
 		normalized_path[i] = '\0';
+	#ifdef CAPIOLOG
 		CAPIO_DBG("capio_lstat sending msg to server\n");
+	#endif
 		std::string msg = "stat " + std::to_string(getpid()) + " " + normalized_path;
 		const char* c_str = msg.c_str();
 		buf_requests->write(c_str, (strlen(c_str) + 1) * sizeof(char));
@@ -888,7 +916,9 @@ int capio_lstat(std::string absolute_path, struct stat* statbuf) {
 		statbuf->st_gid = 0; // root
 		statbuf->st_rdev = 0;
 		statbuf->st_size = file_size;
+	#ifdef CAPIOLOG
 		CAPIO_DBG("lstat file_size=%ld\n",file_size);
+	#endif
 		statbuf->st_blksize = 4096;
 		if (file_size < 4096)
 			statbuf->st_blocks = 8;
@@ -908,7 +938,9 @@ int capio_lstat(std::string absolute_path, struct stat* statbuf) {
 }
 
 int capio_lstat_wrapper(const char* path, struct stat* statbuf) {
+	#ifdef CAPIOLOG
 	CAPIO_DBG("capio_lstat_wrapper\n");
+	#endif
 	std::string absolute_path;	
 	absolute_path = create_absolute_path(path);
 	if (absolute_path.length() == 0)
@@ -939,7 +971,9 @@ int capio_fstat(int fd, struct stat* statbuf) {
 		statbuf->st_gid = 0; // root
 		statbuf->st_rdev = 0;
 		statbuf->st_size = file_size;
+	#ifdef CAPIOLOG
 		CAPIO_DBG("capio_fstat file_size=%ld\n", file_size);
+	#endif
 		statbuf->st_blksize = 4096;
 		if (file_size < 4096)
 			statbuf->st_blocks = 8;
@@ -1007,10 +1041,14 @@ int capio_fstatat(int dirfd, const char* pathname, struct stat* statbuf, int fla
 
 
 int capio_creat(const char* pathname, mode_t mode) {
+	#ifdef CAPIOLOG
 	CAPIO_DBG("capio_creat %s\n", pathname);
+	#endif
 	int res = capio_openat(AT_FDCWD, pathname, O_CREAT | O_WRONLY | O_TRUNC);
 
+	#ifdef CAPIOLOG
 	CAPIO_DBG("capio_creat %s returning %d\n", pathname, res);
+	#endif
 	return res;
 }
 
@@ -1131,7 +1169,9 @@ int capio_unlink(const char* pathname) {
 }
 
 int capio_unlinkat(int dirfd, const char* pathname, int flags) {
+	#ifdef CAPIOLOG
 	CAPIO_DBG("capio_unlinkat\n");
+	#endif
 	
 	int res;
 	if (!is_absolute(pathname)) {
@@ -1146,7 +1186,9 @@ int capio_unlinkat(int dirfd, const char* pathname, int flags) {
 			if (dir_path.length() == 0)
 				return -2;
 			std::string path = dir_path + "/" + pathname;
+	#ifdef CAPIOLOG
 			CAPIO_DBG("capio_unlinkat path=%s\n",path.c_str());
+	#endif
 			
 			res = capio_unlink_abs(path);
 		}
@@ -1174,19 +1216,25 @@ int capio_fchmod(int fd, mode_t mode) {
 int capio_dup(int fd) {
 	int res;
 	auto it = fd_copies->find(fd);
+	#ifdef CAPIOLOG
 	CAPIO_DBG("capio_dup\n");
+	#endif
 	if (it != fd_copies->end()) {
 		if (!it->second.second) {
 			fd = it->second.first[0];
 		}
+	#ifdef CAPIOLOG
 		CAPIO_DBG("handling capio_dup\n");
+	#endif
 		res = open("/dev/null", O_WRONLY);
 		if (res == -1)
 			err_exit("open in capio_dup");
 		(*fd_copies)[fd].first.push_back(res);
 		(*fd_copies)[res].first.push_back(fd);
 		(*fd_copies)[res].second = false;
+	#ifdef CAPIOLOG
 		CAPIO_DBG("handling capio_dup returning res %d\n", res);
+	#endif
 	}
 	else
 		res = -2;
@@ -1196,12 +1244,16 @@ int capio_dup(int fd) {
 int capio_dup2(int fd, int fd2) {
 	int res;
 	auto it = fd_copies->find(fd);
+	#ifdef CAPIOLOG
 	CAPIO_DBG("capio_dup 2\n");
+	#endif
 	if (it != fd_copies->end()) {
 		if (!it->second.second) {
 			fd = it->second.first[0];
 		}
+	#ifdef CAPIOLOG
 		CAPIO_DBG("handling capio_dup2\n");
+	#endif
 		dup2_enabled = false;
 		res = dup2(fd, fd2);
 		dup2_enabled = true;
@@ -1210,7 +1262,9 @@ int capio_dup2(int fd, int fd2) {
 		(*fd_copies)[fd].first.push_back(res);
 		(*fd_copies)[res].first.push_back(fd);
 		(*fd_copies)[res].second = false;
+	#ifdef CAPIOLOG
 		CAPIO_DBG("handling capio_dup returning res %d\n", res);
+	#endif
 	}
 	else
 		res = -2;
@@ -1218,14 +1272,18 @@ int capio_dup2(int fd, int fd2) {
 }
 
 void copy_parent_files() {
+	#ifdef CAPIOLOG
 	CAPIO_DBG("Im process %d and my parent is %d\n", getpid(), getppid());
+	#endif
 	std::string msg = "clon " + std::to_string(getppid()) + " " + std::to_string(getpid());
 	buf_requests->write(msg.c_str(), (strlen(msg.c_str()) + 1) * sizeof(char));
 }
 
 pid_t capio_fork() {
 	fork_enabled = false;
+	#ifdef CAPIOLOG
 	CAPIO_DBG("fork captured\n");
+	#endif
 	pid_t pid = fork();
 	if (pid == 0) { //child
 		first_call = true;
@@ -1240,7 +1298,9 @@ pid_t capio_fork() {
 
 pid_t capio_clone(int (*fn)(void *), void *stack, int flags, void *arg) {
 	fork_enabled = false;
+	#ifdef CAPIOLOG
 	CAPIO_DBG("clone captured\n");
+	#endif
 	pid_t pid = fork();
 	if (pid == 0) { //child
 		for (auto& it : *fd_copies) 
@@ -1248,7 +1308,9 @@ pid_t capio_clone(int (*fn)(void *), void *stack, int flags, void *arg) {
 		first_call = true;
 		mtrace_init();
 		copy_parent_files();
+	#ifdef CAPIOLOG
 		CAPIO_DBG("returning from clone\n");
+	#endif
 		fork_enabled = true;
 		return 0;
 	}
@@ -1287,18 +1349,31 @@ static int hook(long syscall_number, long arg0, long arg1, long arg2, long arg3,
     		if (!stat_enabled)
                             return -2;
     stat_enabled = false;
+	#ifdef CAPIOLOG
     CAPIO_DBG("write captured %d %d\n", getpid(), fd);
+	#endif
 	if (first_call || last_pid != getpid())
 		mtrace_init();
+	#ifdef CAPIOLOG
     CAPIO_DBG("fd copies size %d %d\n",getpid(),fd_copies->size());
+	#endif
     //CAPIO_DBG("files size %d %d\n",getpid(),files->size());
+	#ifdef CAPIOLOG
     CAPIO_DBG("capio_files_paths size %d %d\n",getpid(),capio_files_paths->size());
+	#endif
+	#ifdef CAPIOLOG
 	for (auto& it : *fd_copies) 
 		CAPIO_DBG("child key %d %d\n",getpid(), it.first); 
+	#endif
 		
 	stat_enabled = true;
     
     ssize_t res = capio_write(fd, buf, count);
+    stat_enabled = false;
+	#ifdef CAPIOLOG
+    CAPIO_DBG("write returning %ld \n", res);
+	#endif
+	stat_enabled = true;
     if (res != -2) {
       *result = (res < 0 ? -errno : res);
       hook_ret_value = 0;
@@ -1333,7 +1408,9 @@ static int hook(long syscall_number, long arg0, long arg1, long arg2, long arg3,
     off_t offset = static_cast<off_t>(arg1);
     int whence = static_cast<int>(arg2);
     off_t res = capio_lseek(fd, offset, whence);
+	#ifdef CAPIOLOG
     CAPIO_DBG("seek %d %d\n", getpid(), fd);
+	#endif
     //			for (auto& it : fd_copies)
     //				CAPIO_DBG("child key %d\n",it.first);
     if (res != -2) {
@@ -1371,7 +1448,9 @@ static int hook(long syscall_number, long arg0, long arg1, long arg2, long arg3,
     // TO BE IMPLEMENTED
   case SYS_lgetxattr:
   case SYS_getxattr: {
+	#ifdef CAPIOLOG
     CAPIO_DBG("capio_*xattr\n");
+	#endif
     errno = ENODATA;
     *result = -errno;
     hook_ret_value = 0;
@@ -1578,7 +1657,9 @@ static int hook(long syscall_number, long arg0, long arg1, long arg2, long arg3,
   }
 
   case SYS_fork: {
+	#ifdef CAPIOLOG
     CAPIO_DBG("fork before captured\n");
+	#endif
     if (fork_enabled) {
       res = capio_fork();
       *result = (res < 0 ? -errno : res);
