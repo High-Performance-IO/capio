@@ -22,11 +22,25 @@ struct compare {
 class Capio_file {
 	private:
 		std::set<std::pair<off64_t, off64_t>, compare> sectors;
+		bool _directory;
 
 	public:
 		bool complete = false;
 		int n_links = 1;
 		int n_opens = 0;
+
+
+		Capio_file() {
+			_directory = false;
+		}
+
+		Capio_file(bool directory) {
+			_directory = directory;
+		}
+
+		bool is_dir() {
+			return _directory;
+		}
 
 		off64_t get_file_size() {
 			if (sectors.size() != 0)

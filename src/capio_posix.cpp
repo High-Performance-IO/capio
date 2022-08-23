@@ -252,6 +252,123 @@ int add_close_request(int fd) {
 	return 0;
 }
 
+int add_mkdir_request(std::string pathname) {
+	std::string msg = "mkdi " + std::to_string(getpid()) + " " + pathname;
+	const char* c_str = msg.c_str();
+	buf_requests->write(c_str, (strlen(c_str) + 1) * sizeof(char));
+	off64_t res_tmp;	
+	int res;
+	buf_response->read(&res_tmp);
+	if (res_tmp == 1)
+		res = -1;
+	else
+		res = 0;
+	return res;
+}
+
+int request_mkdir(std::string path_to_check) {
+	int res;
+auto res_mismatch = std::mismatch(capio_dir.begin(), capio_dir.end(), path_to_check.begin());
+	if (res_mismatch.first == capio_dir.end()) {
+		if (capio_dir.size() == path_to_check.size()) {
+			return -2;
+			std::cerr << "ERROR: open to the capio_dir " << path_to_check << std::endl;
+			exit(1);
+
+		}
+		else  {
+			if(capio_files_paths->find(path_to_check) != capio_files_paths->end()) {
+			errno = EEXIST;
+			return -1;
+			}
+		//create shm
+			char shm_name[512];
+			int i = 0;
+			while (i < path_to_check.length()) {
+				if (path_to_check[i] == '/' && i > 0)
+					shm_name[i] = '_';
+				else
+					shm_name[i] = path_to_check[i];
+				++i;
+			}
+			shm_name[i] = '\0';
+			printf("%s\n", shm_name);
+			res = add_mkdir_request(shm_name);
+			if (res == 0)
+				capio_files_paths->insert(path_to_check);
+			#ifdef CAPIOLOG
+			CAPIO_DBG("capio_mkdir returning %d\n", res);
+			#endif
+			return res;
+		}
+	}
+	else {
+		CAPIO_DBG("capio_mkdir returning -2\n");
+		return -2;
+	}
+}
+
+int capio_mkdir(const char* pathname, mode_t mode) {
+	int res = 0;
+	std::string path_to_check;
+	if(is_absolute(pathname)) {
+		path_to_check = pathname;
+		#ifdef CAPIOLOG
+		CAPIO_DBG("capio_mkdir absolute %s\n", path_to_check.c_str());
+		#endif
+	}
+	else {
+		path_to_check = create_absolute_path(pathname);
+		if (path_to_check.length() == 0)
+			return -2;
+		#ifdef CAPIOLOG
+		CAPIO_DBG("capio_mkdir relative path%s\n", path_to_check.c_str());
+		#endif
+	}
+	return request_mkdir(path_to_check);
+
+	return res;
+}
+
+int capio_mkdirat(int dirfd, const char* pathname, mode_t mode) {
+	int res = 0;
+	#ifdef CAPIOLOG
+	CAPIO_DBG("capio_openat %s\n", pathname);
+	#endif
+	if (first_call || last_pid != getpid())
+		mtrace_init();
+	std::string path_to_check;
+	if(is_absolute(pathname)) {
+		path_to_check = pathname;
+		#ifdef CAPIOLOG
+		CAPIO_DBG("capio_openat absolute %s\n", path_to_check.c_str());
+		#endif
+	}
+	else {
+		if(dirfd == AT_FDCWD) {
+			path_to_check = create_absolute_path(pathname);
+			if (path_to_check.length() == 0)
+				return -2;
+			#ifdef CAPIOLOG
+			CAPIO_DBG("capio_openat AT_FDCWD %s\n", path_to_check.c_str());
+			#endif
+		}
+		else {
+			if (is_directory(dirfd) != 1)
+				return -2;
+			std::string dir_path = get_dir_path(pathname, dirfd);
+			if (dir_path.length() == 0)
+				return -2;
+			path_to_check = dir_path + "/" + pathname;
+			#ifdef CAPIOLOG
+			CAPIO_DBG("capio_openat with dirfd %s\n", path_to_check.c_str());
+			#endif
+		}
+	}
+	return request_mkdir(path_to_check);
+}
+
+
 off64_t add_read_request(int fd, off64_t count, std::tuple<void*, off64_t*, off64_t, off64_t, Capio_file, int , int>& t) {
 	std::string str = "read " + std::to_string(getpid()) + " " + std::to_string(fd) + " " + std::to_string(count);
 	const char* c_str = str.c_str();
@@ -297,6 +414,7 @@ void add_write_request(int fd, off64_t count) { //da modifcare con capio_file si
 	//sem_wait(sem_response);
 	return;
 }
+
 
 void read_shm(void* shm, long int offset, void* buffer, off64_t count) {
 	memcpy(buffer, ((char*)shm) + offset, count); 
@@ -565,7 +683,7 @@ int capio_openat(int dirfd, const char* pathname, int flags) {
 			add_open_request(shm_name, fd);
 			off64_t* p_offset = create_shm_off64_t("offset_" + std::to_string(getpid()) + "_" + std::to_string(fd));
 			*p_offset = 0;
-			files->insert({fd, std::make_tuple(p, p_offset, file_initial_size, 0, Capio_file(), flags, 0)});
+			files->insert({fd, std::make_tuple(p, p_offset, file_initial_size, 0, Capio_file(false), flags, 0)});
 			(*capio_files_descriptors)[fd] = shm_name;
 			(*fd_copies)[fd] = std::make_pair(std::vector<int>(), true);
 			capio_files_paths->insert(path_to_check);
@@ -646,7 +764,7 @@ int capio_close(int fd) {
 		add_close_request(fd);
 		auto& copies = (*fd_copies)[fd].first;
 		if (copies.size() > 0) {
-			#ifdef CAPIOLOG
+		#ifdef CAPIOLOG
 		CAPIO_DBG("capio_close debug 1\n");
 		#endif
 			int master_fd = copies[0];
@@ -899,18 +1017,24 @@ int capio_lstat(std::string absolute_path, struct stat* statbuf) {
 		const char* c_str = msg.c_str();
 		buf_requests->write(c_str, (strlen(c_str) + 1) * sizeof(char));
 		off64_t file_size;
-		buf_response->read(&file_size);
+		off64_t is_dir;
+		buf_response->read(&file_size); //TODO: these two reads don't work in multithreading
 		if (file_size == -1) {
 			errno = ENOENT;
 			return -1;
 		}
+		buf_response->read(&is_dir);
 		statbuf->st_dev = 100;
 
 		
 		std::hash<std::string> hash;		
 		statbuf->st_ino = hash(normalized_path);
 
-		statbuf->st_mode = S_IFREG | S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH; // 0644 regular file 
+		if (is_dir == 0)
+		statbuf->st_mode = S_IFDIR | S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH; // 0644 directory
+																		
+		else
+			statbuf->st_mode = S_IFREG | S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH; // 0644 regular file 
 		statbuf->st_nlink = 1;
 		statbuf->st_uid = 0; // root 
 		statbuf->st_gid = 0; // root
@@ -956,16 +1080,25 @@ int capio_fstat(int fd, struct stat* statbuf) {
 		if (!it->second.second) {
 			fd = it->second.first[0];
 		}
+	#ifdef CAPIOLOG
+		CAPIO_DBG("capio_fstat captured\n");
+	#endif
 		std::string msg = "fsta " + std::to_string(getpid()) + " " + std::to_string(fd);
 		buf_requests->write(msg.c_str(), (strlen(msg.c_str()) + 1) * sizeof(char));
 		off64_t file_size;
+		off64_t is_dir;
 		buf_response->read(&file_size);
+		buf_response->read(&is_dir);
 		statbuf->st_dev = 100;
 
 		std::hash<std::string> hash;		
 		statbuf->st_ino = hash((*capio_files_descriptors)[fd]);
-
-	    statbuf->st_mode = S_IFREG | S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH; // 0644 regular file 
+		
+		if (is_dir == 0)
+	    	statbuf->st_mode = S_IFDIR | S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH; // 0644 regular file 
+																		
+		else
+	    	statbuf->st_mode = S_IFREG | S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH; // 0644 regular file 
 		statbuf->st_nlink = 1;
 		statbuf->st_uid = 0; // root
 		statbuf->st_gid = 0; // root
@@ -1314,8 +1447,10 @@ pid_t capio_clone(int (*fn)(void *), void *stack, int flags, void *arg) {
 		fork_enabled = true;
 		return 0;
 	}
+	#ifdef CAPIOLOG
 		for (auto& it : *fd_copies) 
-			std::cout << "parent key " << it.first << std::endl;
+			CAPIO_DBG("parent key %d\n", it.first);
+	#endif
 	fork_enabled = true;
 	return pid;
 }
@@ -1350,14 +1485,14 @@ static int hook(long syscall_number, long arg0, long arg1, long arg2, long arg3,
                             return -2;
     stat_enabled = false;
 	#ifdef CAPIOLOG
-    CAPIO_DBG("write captured %d %d\n", getpid(), fd);
+   	CAPIO_DBG("write captured %d %d\n", getpid(), fd);
 	#endif
 	if (first_call || last_pid != getpid())
 		mtrace_init();
 	#ifdef CAPIOLOG
     CAPIO_DBG("fd copies size %d %d\n",getpid(),fd_copies->size());
 	#endif
-    //CAPIO_DBG("files size %d %d\n",getpid(),files->size());
+    CAPIO_DBG("files size %d %d\n",getpid(),files->size());
 	#ifdef CAPIOLOG
     CAPIO_DBG("capio_files_paths size %d %d\n",getpid(),capio_files_paths->size());
 	#endif
@@ -1685,6 +1820,30 @@ static int hook(long syscall_number, long arg0, long arg1, long arg2, long arg3,
       res = -2;
     break;
   }
+
+	case SYS_mkdir: {
+		const char* pathname = reinterpret_cast<const char*>(arg0);
+		mode_t mode = arg1;
+		res = capio_mkdir(pathname, mode);
+    	if (res != -2) {
+      		*result = (res < 0 ? -errno : res);
+      		hook_ret_value = 0;
+    	}
+		break;
+	}
+
+	case SYS_mkdirat: {
+		int dirfd = arg0;
+		const char* pathname = reinterpret_cast<const char*>(arg1);
+		mode_t mode = arg2;
+		res = capio_mkdirat(dirfd, pathname, mode);
+    	if (res != -2) {
+      		*result = (res < 0 ? -errno : res);
+      		hook_ret_value = 0;
+    	}
+		break;
+	}
+	
 
   default:
     hook_ret_value = 1;

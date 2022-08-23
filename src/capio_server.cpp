@@ -343,6 +343,11 @@ void init_process(int pid) {
 	}
 
 }
+void create_file(std::string path, void* p_shm, bool is_dir) {
+		off64_t* p_shm_size = create_shm_off64_t(path + "_size");	
+		files_metadata[path] = std::make_tuple(p_shm, p_shm_size, file_initial_size, true, Capio_file(is_dir));
+
+}
 
 //TODO: function too long
 
@@ -371,14 +376,7 @@ void handle_open(char* str, char* p, int rank) {
 	processes_files[pid][fd] = std::make_tuple(p_shm, p_offset);//TODO: what happens if a process open the same file twice?
 	*caching_info[pid].second += 2;
 	if (files_metadata.find(path) == files_metadata.end()) {
-		 p_shm = std::get<0>(processes_files[pid][fd]);
-		off64_t* p_shm_size = create_shm_off64_t(path + "_size");	
-		files_metadata[path] = std::make_tuple(p_shm, p_shm_size, file_initial_size, true, Capio_file());
-
-		if (files_metadata.find(path) == files_metadata.end()) {//debug
-			std::cerr << "server " << rank << " error updating" <<std ::endl;
-			exit(1);
-		}
+		create_file(path, p_shm, false);
 	}
 	Capio_file& c_file = std::get<4>(files_metadata[path]);
 	++c_file.n_opens;
@@ -937,15 +935,22 @@ void handle_stat(const char* str) {
 	init_process(pid);
 	if (it == files_metadata.end()) {
 		file_size = -1;	
+		response_buffers[pid]->write(&file_size);
 	}
 	else {
 		Capio_file& c_file = std::get<4>(it->second);
 		file_size = c_file.get_file_size();
+		off64_t is_dir;
+		if (c_file.is_dir())
+			is_dir = 0;
+		else
+			is_dir = 1;
+		response_buffers[pid]->write(&file_size);
+		response_buffers[pid]->write(&is_dir);
 	}
 	#ifdef CAPIOLOG
 		std::cout << "file size stat : " << file_size << std::endl;
 	#endif
-	response_buffers[pid]->write(&file_size);
 }
 
 void handle_fstat(const char* str) {
@@ -956,6 +961,12 @@ void handle_fstat(const char* str) {
 	Capio_file& c_file = std::get<4>(files_metadata[path]);
 	off64_t file_size = c_file.get_file_size();
 	response_buffers[pid]->write(&file_size);
+	off64_t is_dir;
+	if (c_file.is_dir())
+		is_dir = 0;
+	else
+		is_dir = 1;
+	response_buffers[pid]->write(&is_dir);
 }
 
 void handle_access(const char* str) {
@@ -982,7 +993,7 @@ void handle_unlink(const char* str) {
 	#ifdef CAPIOLOG
 		std::cout << "handle unlink: " << str << std::endl;
 	#endif
-	sscanf(str, "unlk %d %s\n", &pid, path);
+	sscanf(str, "unlk %d %s", &pid, path);
 	auto it = files_metadata.find(path);
 	if (it != files_metadata.end()) { //TODO: it works only in the local case
 		Capio_file& c_file = std::get<4>(it->second);
@@ -1008,7 +1019,7 @@ std::unordered_set<std::string> get_paths_opened_files(pid_t pid) {
 //TODO: caching info
 void handle_clone(const char* str) {
 	pid_t ppid, new_pid;
-	sscanf(str, "clon %d %d\n", &ppid, &new_pid);
+	sscanf(str, "clon %d %d", &ppid, &new_pid);
 	init_process(new_pid);
 	processes_files[new_pid] = processes_files[ppid];
 	processes_files_metadata[new_pid] = processes_files_metadata[ppid];
@@ -1023,68 +1034,71 @@ void handle_clone(const char* str) {
 	}
 }
 
+void handle_mkdir(const char* str) {
+	pid_t pid;
+	char pathname[PATH_MAX];
+	sscanf(str, "mkdi %d %s", &pid, pathname);
+	init_process(pid);
+	off64_t res;
+	#ifdef CAPIOLOG
+	std::cout << "handle mkdir" << std::endl;
+	#endif
+	if (files_metadata.find(pathname) == files_metadata.end()) {
+		void* p_shm = create_shm(pathname, 1024L * 1024 * 1024* 2);
+		create_file(pathname, p_shm, true);	
+		res = 0;
+	}
+	else {
+		res = 1;
+	}
+	response_buffers[pid]->write(&res);
+
+}
 
 void read_next_msg(int rank) {
 	char str[4096];
 	std::fill(str, str + 4096, 0);
-	bool is_open = false;
 	buf_requests->read(str);
 	char* p = str;
-	is_open = strncmp(str, "open", 4) == 0;
 	#ifdef CAPIOLOG
 	std::cout << "next msg " << str << std::endl;
 	#endif
-	if (is_open) {
+	if (strncmp(str, "open", 4) == 0)
 		handle_open(str, p, rank);
-	}
+	else if (strncmp(str, "writ", 4) == 0)
+		handle_write(str, rank);
+	else if (strncmp(str, "read", 4) == 0)
+		handle_read(str, rank);
+	else if (strncmp(str, "clos", 4) == 0)
+		handle_close(str, p);
+	else if (strncmp(str, "ream", 4) == 0)
+		handle_remote_read(str, p, rank);
+	else if (strncmp(str, "seek", 4) == 0)
+		handle_lseek(str);
+	else if (strncmp(str, "sdat", 4) == 0)
+		handle_sdat(str);
+	else if (strncmp(str, "shol", 4) == 0)
+		handle_shol(str);
+	else if (strncmp(str, "send", 4) == 0)
+		handle_seek_end(str);
+	else if (strncmp(str, "exig", 4) == 0)
+		handle_exig(str);
+	else if (strncmp(str, "stat", 4) == 0)
+		handle_stat(str);
+	else if (strncmp(str, "fsta", 4) == 0)
+		handle_fstat(str);
+	else if (strncmp(str, "accs", 4) == 0)
+		handle_access(str);
+	else if (strncmp(str, "unlk", 4) == 0)
+		handle_unlink(str);
+	else if (strncmp(str, "clon", 4) == 0)
+		handle_clone(str);
+	else if (strncmp(str, "mkdi", 4) == 0)
+		handle_mkdir(str);
 	else {
-		bool is_write = strncmp(str, "writ", 4) == 0;
-		if (is_write) {
-			handle_write(str, rank);
-		}
-		else {
-		bool is_read = strncmp(str, "read", 4) == 0;
-			if (is_read) {
-				handle_read(str, rank);
-			}
-			else {
-				bool is_close = strncmp(str, "clos", 4) == 0;
-				if (is_close) { //TODO: more cleaning
-					handle_close(str, p);
-				}
-				else {
-					bool is_remote_read = strncmp(str, "ream", 4) == 0;
-					if (is_remote_read) {
-						handle_remote_read(str, p, rank);
-					}
-					else if (strncmp(str, "seek", 4) == 0)
-						handle_lseek(str);
-					else if (strncmp(str, "sdat", 4) == 0)
-						handle_sdat(str);
-					else if (strncmp(str, "shol", 4) == 0)
-						handle_shol(str);
-					else if (strncmp(str, "send", 4) == 0)
-						handle_seek_end(str);
-					else if (strncmp(str, "exig", 4) == 0)
-						handle_exig(str);
-					else if (strncmp(str, "stat", 4) == 0)
-						handle_stat(str);
-					else if (strncmp(str, "fsta", 4) == 0)
-						handle_fstat(str);
-					else if (strncmp(str, "accs", 4) == 0)
-						handle_access(str);
-					else if (strncmp(str, "unlk", 4) == 0)
-						handle_unlink(str);
-					else if (strncmp(str, "clon", 4) == 0)
-						handle_clone(str);
-					else {
-						std::cerr << "error msg read" << std::endl;
-						MPI_Finalize();
-						exit(1);
-					}
-				}
-			}
-		}
+		std::cerr << "error msg read" << std::endl;
+	MPI_Finalize();
+		exit(1);
 	}
 	return;
 }
