@@ -1342,6 +1342,12 @@ int capio_fchmod(int fd, mode_t mode) {
 		return 0;
 }
 
+void add_dup_request(int old_fd, int new_fd) {
+	std::string msg = "dupp " + std::to_string(getpid()) + " " + std::to_string(old_fd) + " " + std::to_string(new_fd);
+	const char* c_str = msg.c_str();
+	buf_requests->write(c_str, (strlen(c_str) + 1) * sizeof(char));
+}
+
 int capio_dup(int fd) {
 	int res;
 	auto it = fd_copies->find(fd);
@@ -1361,6 +1367,7 @@ int capio_dup(int fd) {
 		(*fd_copies)[fd].first.push_back(res);
 		(*fd_copies)[res].first.push_back(fd);
 		(*fd_copies)[res].second = false;
+		add_dup_request(fd, res);
 	#ifdef CAPIOLOG
 		CAPIO_DBG("handling capio_dup returning res %d\n", res);
 	#endif
@@ -1391,6 +1398,7 @@ int capio_dup2(int fd, int fd2) {
 		(*fd_copies)[fd].first.push_back(res);
 		(*fd_copies)[res].first.push_back(fd);
 		(*fd_copies)[res].second = false;
+		add_dup_request(fd, res);
 	#ifdef CAPIOLOG
 		CAPIO_DBG("handling capio_dup returning res %d\n", res);
 	#endif

@@ -1055,6 +1055,17 @@ void handle_mkdir(const char* str) {
 
 }
 
+void handle_dup(const char* str) {
+	pid_t pid;
+	int old_fd, new_fd;
+	sscanf(str, "dupp %d %d %d", &pid, &old_fd, &new_fd);
+	processes_files[pid][new_fd] = processes_files[pid][old_fd];
+	std:: string path = processes_files_metadata[pid][old_fd];
+	processes_files_metadata[pid][new_fd] = path;
+	Capio_file& c_file = std::get<4>(files_metadata[path]);
+	++c_file.n_opens;
+}
+
 void read_next_msg(int rank) {
 	char str[4096];
 	std::fill(str, str + 4096, 0);
@@ -1095,6 +1106,8 @@ void read_next_msg(int rank) {
 		handle_clone(str);
 	else if (strncmp(str, "mkdi", 4) == 0)
 		handle_mkdir(str);
+	else if (strncmp(str, "dupp", 4) == 0)
+		handle_dup(str);
 	else {
 		std::cerr << "error msg read" << std::endl;
 	MPI_Finalize();
