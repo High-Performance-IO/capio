@@ -37,7 +37,7 @@ int actual_num_writes = 1;
 // initial size for each file (can be overwritten by the user)
 const size_t file_initial_size = 1024L * 1024 * 1024 * 4;
 
-/* fd -> (shm*, *offset, mapped_shm_size, offset_upper_bound, Capio_file, file status flags, file_descriptor_flags)
+/* fd -> (shm*, *offset, *mapped_shm_size, *offset_upper_bound, *Capio_file, file status flags, file_descriptor_flags)
  * The mapped shm size isn't the the size of the file shm
  * but it's the mapped shm size in the virtual adress space
  * of the server process. The effective size can be greater
@@ -45,7 +45,7 @@ const size_t file_initial_size = 1024L * 1024 * 1024 * 4;
  *
  */
 
-std::unordered_map<int, std::tuple<void*, off64_t*, off64_t, off64_t, Capio_file, int, int>>* files = nullptr;
+std::unordered_map<int, std::tuple<void*, off64_t*, off64_t*, off64_t*, Capio_file*, int, int>>* files = nullptr;
 Circular_buffer<char>* buf_requests;
  
 Circular_buffer<off_t>* buf_response;
@@ -58,7 +58,6 @@ int* caching_info_size;
 std::unordered_map<int, std::string>* capio_files_descriptors = nullptr; 
 std::unordered_set<std::string>* capio_files_paths = nullptr;
 
-std::unordered_map<int, std::pair<std::vector<int>, bool>>* fd_copies = nullptr;
 static bool first_call = true;
 static int last_pid = 0;
 static bool stat_enabled = true;
@@ -144,12 +143,11 @@ void mtrace_init(void) {
 	#ifdef CAPIOLOG
 	CAPIO_DBG("mtrace init\n");
 	#endif
-	if (fd_copies == nullptr) {
-		fd_copies = new std::unordered_map<int, std::pair<std::vector<int>, bool>>;
+	if (capio_files_descriptors == nullptr) {
 		capio_files_descriptors = new std::unordered_map<int, std::string>; 
 		capio_files_paths = new std::unordered_set<std::string>;
 
-		files = new std::unordered_map<int, std::tuple<void*, off64_t*, off64_t, off64_t, Capio_file, int, int>>;
+		files = new std::unordered_map<int, std::tuple<void*, off64_t*, off64_t*, off64_t*, Capio_file*, int, int>>;
 	}
 	char* val;
 	first_call = false;
@@ -368,15 +366,15 @@ int capio_mkdirat(int dirfd, const char* pathname, mode_t mode) {
 }
 
 
-off64_t add_read_request(int fd, off64_t count, std::tuple<void*, off64_t*, off64_t, off64_t, Capio_file, int , int>& t) {
+off64_t add_read_request(int fd, off64_t count, std::tuple<void*, off64_t*, off64_t*, off64_t*, Capio_file*, int , int>& t) {
 	std::string str = "read " + std::to_string(getpid()) + " " + std::to_string(fd) + " " + std::to_string(count);
 	const char* c_str = str.c_str();
 	buf_requests->write(c_str, (strlen(c_str) + 1) * sizeof(char));
 	//read response (offest)
 	off64_t offset_upperbound;
 	buf_response->read(&offset_upperbound);
-	std::get<3>(t) = offset_upperbound;
-	size_t file_shm_size = std::get<2>(t);
+	*std::get<3>(t) = offset_upperbound;
+	size_t file_shm_size = *std::get<2>(t);
 	size_t end_of_read;
 	end_of_read = *std::get<1>(t) + count;
 	if (end_of_read > offset_upperbound)
@@ -392,7 +390,7 @@ off64_t add_read_request(int fd, off64_t count, std::tuple<void*, off64_t*, off6
 		if (p == MAP_FAILED)
 			err_exit("mremap " + std::to_string(fd));
 		std::get<0>(t) = p;
-		std::get<2>(t) = new_size;
+		*std::get<2>(t) = new_size;
 	}
 	return offset_upperbound;
 }
@@ -404,7 +402,7 @@ void add_write_request(int fd, off64_t count) { //da modifcare con capio_file si
 	*std::get<1>((*files)[fd]) += count; //works only if there is only one writer at time for each file
 	if (actual_num_writes == num_writes_batch) {
 		sprintf(c_str, "writ %d %d %ld %ld", getpid(),fd, old_offset, count);
-		std::get<4>((*files)[fd]).insert_sector(old_offset, old_offset + count);
+		std::get<4>((*files)[fd])->insert_sector(old_offset, old_offset + count);
 		buf_requests->write(c_str, (strlen(c_str) + 1) * sizeof(char));
 		actual_num_writes = 1;
 	}
@@ -526,12 +524,9 @@ void read_from_disk(int fd, int offset, void* buffer, size_t count) {
 
 //TODO: EOVERFLOW is not adressed
 off_t capio_lseek(int fd, off64_t offset, int whence) { 
-	auto it = fd_copies->find(fd);
-	if (it != fd_copies->end()) {
-		if (! it->second.second) {
-			fd = it->second.first[0];
-		}
-		std::tuple<void*, off64_t*, off64_t, off64_t, Capio_file, int, int>* t = &(*files)[fd];
+	auto it = files->find(fd);
+	if (it != files->end()) {
+		std::tuple<void*, off64_t*, off64_t*, off64_t*, Capio_file*, int, int>* t = &(*files)[fd];
 		off64_t* file_offset = std::get<1>(*t);
 		if (whence == SEEK_SET) {
 			if (offset >= 0) {
@@ -541,7 +536,7 @@ off_t capio_lseek(int fd, off64_t offset, int whence) {
 				buf_requests->write(c_str, (strlen(c_str) + 1) * sizeof(char));
 				off64_t offset_upperbound;
 				buf_response->read(&offset_upperbound);
-				std::get<3>(*t) = offset_upperbound;
+				*std::get<3>(*t) = offset_upperbound;
 				return *file_offset;
 			}
 			else {
@@ -558,7 +553,7 @@ off_t capio_lseek(int fd, off64_t offset, int whence) {
 				buf_requests->write(c_str, (strlen(c_str) + 1) * sizeof(char));
 				off64_t offset_upperbound;
 				buf_response->read(&offset_upperbound);
-				std::get<3>(*t) = offset_upperbound;
+				*std::get<3>(*t) = offset_upperbound;
 				return *file_offset;
 			}
 			else {
@@ -585,7 +580,7 @@ off_t capio_lseek(int fd, off64_t offset, int whence) {
 			off64_t offset_upperbound;
 			offset_upperbound = file_size;
 			*file_offset = file_size + offset;	
-			std::get<3>(*t) = offset_upperbound;
+			*std::get<3>(*t) = offset_upperbound;
 			return *file_offset;
 		}
 		else if (whence == SEEK_DATA) {
@@ -594,7 +589,7 @@ off_t capio_lseek(int fd, off64_t offset, int whence) {
 				buf_requests->write(c_str, (strlen(c_str) + 1) * sizeof(char));
 				off64_t offset_upperbound;
 				buf_response->read(&offset_upperbound);
-				std::get<3>(*t) = offset_upperbound;
+				*std::get<3>(*t) = offset_upperbound;
 				buf_response->read(file_offset);
 				return *file_offset;
 
@@ -605,7 +600,7 @@ off_t capio_lseek(int fd, off64_t offset, int whence) {
 				buf_requests->write(c_str, (strlen(c_str) + 1) * sizeof(char));
 				off64_t offset_upperbound;
 				buf_response->read(&offset_upperbound);
-				std::get<3>(*t) = offset_upperbound;
+				*std::get<3>(*t) = offset_upperbound;
 				buf_response->read(file_offset);
 				return *file_offset;
 
@@ -681,9 +676,13 @@ int capio_openat(int dirfd, const char* pathname, int flags) {
 			add_open_request(shm_name, fd);
 			off64_t* p_offset = create_shm_off64_t("offset_" + std::to_string(getpid()) + "_" + std::to_string(fd));
 			*p_offset = 0;
-			files->insert({fd, std::make_tuple(p, p_offset, file_initial_size, 0, Capio_file(false), flags, 0)});
+			off64_t* init_size = new off64_t;
+			*init_size = file_initial_size;
+			off64_t* offset = new off64_t;
+			*offset = 0;
+			Capio_file* c_file = new Capio_file(false);
+			files->insert({fd, std::make_tuple(p, p_offset, init_size, offset, c_file, flags, 0)});
 			(*capio_files_descriptors)[fd] = shm_name;
-			(*fd_copies)[fd] = std::make_pair(std::vector<int>(), true);
 			capio_files_paths->insert(path_to_check);
 			if ((flags & O_APPEND) == O_APPEND) {
 				capio_lseek(fd, 0, SEEK_END);
@@ -700,11 +699,8 @@ int capio_openat(int dirfd, const char* pathname, int flags) {
 }
 
 ssize_t capio_write(int fd, const  void *buffer, size_t count) {
-	auto it = fd_copies->find(fd);
-	if (it != fd_copies->end()) {
-		if (! it->second.second) {
-			fd = it->second.first[0];
-		}
+	auto it = files->find(fd);
+	if (it != files->end()) {
 		if (count > SSIZE_MAX) {
 			std::cerr << "Capio does not support writes bigger then SSIZE_MAX yet" << std::endl;
 			exit(1);
@@ -712,7 +708,7 @@ ssize_t capio_write(int fd, const  void *buffer, size_t count) {
 		off64_t count_off = count;
 		//bool in_shm = check_cache(fd);
 		//if (in_shm) {
-		off64_t file_shm_size = std::get<2>((*files)[fd]);
+		off64_t file_shm_size = *std::get<2>((*files)[fd]);
 		if (*std::get<1>((*files)[fd]) + count_off > file_shm_size) {
 			off64_t file_size = *std::get<1>((*files)[fd]);
 			off64_t new_size;
@@ -751,40 +747,10 @@ int capio_close(int fd) {
 		#endif
 	if (first_call || last_pid != getpid())
 		mtrace_init();
-	auto it = fd_copies->find(fd);
-	if (it != fd_copies->end()) {
-		if (! it->second.second) {
-			fd = it->second.first[0];
-			#ifdef CAPIOLOG
-		CAPIO_DBG("capio_close debug 0\n");
-		#endif
-		}
+	auto it = files->find(fd);
+	if (it != files->end()) {
 		add_close_request(fd);
-		auto& copies = (*fd_copies)[fd].first;
-		if (copies.size() > 0) {
-		#ifdef CAPIOLOG
-		CAPIO_DBG("capio_close debug 1\n");
-		#endif
-			int master_fd = copies[0];
-			(*files)[master_fd] = (*files)[fd];
-			(*capio_files_descriptors)[master_fd] = (*capio_files_descriptors)[fd];
-			(*fd_copies)[master_fd].second = true;
-			auto& master_copies = (*fd_copies)[master_fd].first;
-			master_copies.erase(master_copies.begin());
-			for (size_t i = 1; i < copies.size(); ++i) {
-			#ifdef CAPIOLOG
-			CAPIO_DBG("capio_close debug 2\n");
-			#endif
-				int fd_copy = copies[i];
-				master_copies.push_back(fd_copy);
-				auto& copy_vec = (*fd_copies)[fd_copy].first;
-				copy_vec.erase(copy_vec.begin());
-				copy_vec.push_back(master_fd);
-			}
-
-		}
 		capio_files_descriptors->erase(fd);
-		fd_copies->erase(fd);
 		files->erase(fd);
 		return close(fd);
 	}
@@ -797,22 +763,19 @@ int capio_close(int fd) {
 }
 
 ssize_t capio_read(int fd, void *buffer, size_t count) {
-	auto it = fd_copies->find(fd);
-	if (it != fd_copies->end()) {
-		if (! it->second.second) {
-			fd = it->second.first[0];
-		}
+	auto it = files->find(fd);
+	if (it != files->end()) {
 		if (count >= SSIZE_MAX) {
 			std::cerr << "capio does not support read bigger then SSIZE_MAX yet" << std::endl;
 			exit(1);
 		}
 		off64_t count_off = count;
-		std::tuple<void*, off64_t*, off64_t, off64_t, Capio_file, int, int>* t = &(*files)[fd];
+		std::tuple<void*, off64_t*, off64_t*, off64_t*, Capio_file*, int, int>* t = &(*files)[fd];
 		off64_t* offset = std::get<1>(*t);
 		//bool in_shm = check_cache(fd);
 		//if (in_shm) {
 		off64_t bytes_read;
-			if (*offset + count_off > std::get<3>(*t)) {
+			if (*offset + count_off > *std::get<3>(*t)) {
 				off64_t end_of_read;
 				end_of_read = add_read_request(fd, count_off, *t);
 				bytes_read = end_of_read - *offset;
@@ -837,11 +800,8 @@ ssize_t capio_read(int fd, void *buffer, size_t count) {
 
 
 ssize_t capio_writev(int fd, const struct iovec* iov, int iovcnt) {
-	auto it = fd_copies->find(fd);
-	if (it != fd_copies->end()) {
-		if (! it->second.second) {
-			fd = it->second.first[0];
-		}
+	auto it = files->find(fd);
+	if (it != files->end()) {
 		ssize_t tot_bytes = 0;
 		ssize_t res = 0;
 		int i = 0;
@@ -861,14 +821,11 @@ ssize_t capio_writev(int fd, const struct iovec* iov, int iovcnt) {
 }
 
 int capio_fcntl(int fd, int cmd, int arg) {
-  auto it = fd_copies->find(fd);
-  if (it != fd_copies->end()) {
+  auto it = files->find(fd);
+  if (it != files->end()) {
 	#ifdef CAPIOLOG
     CAPIO_DBG("capio_fcntl\n");
 	#endif
-    if (!it->second.second) {
-      fd = it->second.first[0];
-    }
     switch (cmd) {
     case F_GETFD: {
       return std::get<6>((*files)[fd]);
@@ -895,11 +852,6 @@ int capio_fcntl(int fd, int cmd, int arg) {
         err_exit("open /dev/null");
       int res = fcntl(dev_fd, F_DUPFD_CLOEXEC, arg); //
       close(dev_fd);
-      if (res != -1) {
-        (*fd_copies)[fd].first.push_back(res);
-        (*fd_copies)[res].first.push_back(fd);
-        (*fd_copies)[res].second = false;
-      }
       return res;
       break;
     }
@@ -912,11 +864,8 @@ int capio_fcntl(int fd, int cmd, int arg) {
     return -2;
 }
 ssize_t capio_fgetxattr(int fd, const char* name, void* value, size_t size) {
-	auto it = fd_copies->find(fd);
-	if (it != fd_copies->end()) {
-		if (! it->second.second) {
-			fd = it->second.first[0];
-		}
+	auto it = files->find(fd);
+	if (it != files->end()) {
 		if (strcmp(name, "system.posix_acl_access") == 0) {
 			errno = ENODATA;	
 			return -1;
@@ -932,11 +881,8 @@ ssize_t capio_fgetxattr(int fd, const char* name, void* value, size_t size) {
 }
 
 ssize_t capio_flistxattr(int fd, char* list, ssize_t size) {
-	auto it = fd_copies->find(fd);
-	if (it != fd_copies->end()) {
-		if (!it->second.second) {
-			fd = it->second.first[0];
-		}
+	auto it = files->find(fd);
+	if (it != files->end()) {
 		if (list == NULL && size == 0) {
 			return 0;
 		}
@@ -953,11 +899,8 @@ ssize_t capio_flistxattr(int fd, char* list, ssize_t size) {
 int capio_ioctl(int fd, unsigned long request) {
 	if (first_call || last_pid != getpid())
 		mtrace_init();
-	auto it = fd_copies->find(fd);
-	if (it != fd_copies->end()) {
-		if (!it->second.second) {
-			fd = it->second.first[0];
-		}
+	auto it = files->find(fd);
+	if (it != files->end()) {
 		return 0;
 	}
 	else
@@ -1072,11 +1015,8 @@ int capio_lstat_wrapper(const char* path, struct stat* statbuf) {
 int capio_fstat(int fd, struct stat* statbuf) {
 	if (first_call || last_pid != getpid())
 		mtrace_init();
-	auto it = fd_copies->find(fd);
-	if (it != fd_copies->end()) {
-		if (!it->second.second) {
-			fd = it->second.first[0];
-		}
+	auto it = files->find(fd);
+	if (it != files->end()) {
 	#ifdef CAPIOLOG
 		CAPIO_DBG("capio_fstat captured\n");
 	#endif
@@ -1350,24 +1290,19 @@ void add_dup_request(int old_fd, int new_fd) {
 
 int capio_dup(int fd) {
 	int res;
-	auto it = fd_copies->find(fd);
+	auto it = files->find(fd);
 	#ifdef CAPIOLOG
 	CAPIO_DBG("capio_dup\n");
 	#endif
-	if (it != fd_copies->end()) {
-		if (!it->second.second) {
-			fd = it->second.first[0];
-		}
+	if (it != files->end()) {
 	#ifdef CAPIOLOG
 		CAPIO_DBG("handling capio_dup\n");
 	#endif
 		res = open("/dev/null", O_WRONLY);
 		if (res == -1)
 			err_exit("open in capio_dup");
-		(*fd_copies)[fd].first.push_back(res);
-		(*fd_copies)[res].first.push_back(fd);
-		(*fd_copies)[res].second = false;
 		add_dup_request(fd, res);
+		(*files)[res] = (*files)[fd];
 	#ifdef CAPIOLOG
 		CAPIO_DBG("handling capio_dup returning res %d\n", res);
 	#endif
@@ -1379,14 +1314,11 @@ int capio_dup(int fd) {
 
 int capio_dup2(int fd, int fd2) {
 	int res;
-	auto it = fd_copies->find(fd);
+	auto it = files->find(fd);
 	#ifdef CAPIOLOG
 	CAPIO_DBG("capio_dup 2\n");
 	#endif
-	if (it != fd_copies->end()) {
-		if (!it->second.second) {
-			fd = it->second.first[0];
-		}
+	if (it != files->end()) {
 	#ifdef CAPIOLOG
 		CAPIO_DBG("handling capio_dup2\n");
 	#endif
@@ -1395,10 +1327,8 @@ int capio_dup2(int fd, int fd2) {
 		dup2_enabled = true;
 		if (res == -1)
 			return -1;
-		(*fd_copies)[fd].first.push_back(res);
-		(*fd_copies)[res].first.push_back(fd);
-		(*fd_copies)[res].second = false;
 		add_dup_request(fd, res);
+		(*files)[res] = (*files)[fd];
 	#ifdef CAPIOLOG
 		CAPIO_DBG("handling capio_dup returning res %d\n", res);
 	#endif
@@ -1449,10 +1379,6 @@ pid_t capio_clone(int (*fn)(void *), void *stack, int flags, void *arg) {
 		fork_enabled = true;
 		return 0;
 	}
-	#ifdef CAPIOLOG
-		for (auto& it : *fd_copies) 
-			CAPIO_DBG("parent key %d\n", it.first);
-	#endif
 	fork_enabled = true;
 	return pid;
 }
@@ -1491,16 +1417,9 @@ static int hook(long syscall_number, long arg0, long arg1, long arg2, long arg3,
 	#endif
 	if (first_call || last_pid != getpid())
 		mtrace_init();
-	#ifdef CAPIOLOG
-    CAPIO_DBG("fd copies size %d %d\n",getpid(),fd_copies->size());
-	#endif
     CAPIO_DBG("files size %d %d\n",getpid(),files->size());
 	#ifdef CAPIOLOG
     CAPIO_DBG("capio_files_paths size %d %d\n",getpid(),capio_files_paths->size());
-	#endif
-	#ifdef CAPIOLOG
-	for (auto& it : *fd_copies) 
-		CAPIO_DBG("child key %d %d\n",getpid(), it.first); 
 	#endif
 		
 	stat_enabled = true;
@@ -1548,8 +1467,6 @@ static int hook(long syscall_number, long arg0, long arg1, long arg2, long arg3,
 	#ifdef CAPIOLOG
     CAPIO_DBG("seek %d %d\n", getpid(), fd);
 	#endif
-    //			for (auto& it : fd_copies)
-    //				CAPIO_DBG("child key %d\n",it.first);
     if (res != -2) {
       *result = (res < 0 ? -errno : res);
       hook_ret_value = 0;
