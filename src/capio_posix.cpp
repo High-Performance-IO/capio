@@ -103,7 +103,7 @@ static std::string get_dir_path(const char* pathname, int dirfd) {
 	sprintf(proclnk, "/proc/self/fd/%d", dirfd);
     ssize_t r = readlink(proclnk, dir_pathname, PATH_MAX);
     if (r < 0){
-    	printf("failed to readlink\n");
+    	fprintf(stderr, "failed to readlink\n");
 		return "";
     }
     dir_pathname[r] = '\0';
@@ -292,7 +292,6 @@ auto res_mismatch = std::mismatch(capio_dir.begin(), capio_dir.end(), path_to_ch
 				++i;
 			}
 			shm_name[i] = '\0';
-			printf("%s\n", shm_name);
 			res = add_mkdir_request(shm_name);
 			if (res == 0)
 				capio_files_paths->insert(path_to_check);
@@ -677,7 +676,6 @@ int capio_openat(int dirfd, const char* pathname, int flags) {
 				++i;
 			}
 			shm_name[i] = '\0';
-			printf("%s\n", shm_name);
 			int fd;
 			void* p = create_shm(shm_name, 1024L * 1024 * 1024* 2, &fd);
 			add_open_request(shm_name, fd);
@@ -823,9 +821,6 @@ ssize_t capio_read(int fd, void *buffer, size_t count) {
 			}
 			else
 				bytes_read = count_off;
-			//std:: cout << "count_off " << count_off << std::endl; 
-			//std:: cout << "offset " << *offset << std::endl; 
-			//std::cout << "before read shm " << bytes_read << std::endl;
 			read_shm(std::get<0>(*t), *offset, buffer, bytes_read);
 		//}
 		//else {
@@ -1163,7 +1158,6 @@ int capio_fstatat(int dirfd, const char* pathname, struct stat* statbuf, int fla
 			if (dir_path.length() == 0)
 				return -2;
 			std::string path = dir_path + "/" + pathname;
-			std::cout << "fstat path " << path << std::endl;
 			res = capio_lstat(path, statbuf);
 		}
 	}
@@ -1438,8 +1432,6 @@ pid_t capio_clone(int (*fn)(void *), void *stack, int flags, void *arg) {
 	#endif
 	pid_t pid = fork();
 	if (pid == 0) { //child
-		for (auto& it : *fd_copies) 
-			std::cout << "child key " << it.first << std::endl;
 		first_call = true;
 		mtrace_init();
 		copy_parent_files();
