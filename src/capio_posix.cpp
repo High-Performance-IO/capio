@@ -956,6 +956,8 @@ ssize_t capio_flistxattr(int fd, char* list, ssize_t size) {
 }
 
 int capio_ioctl(int fd, unsigned long request) {
+	if (first_call || last_pid != getpid())
+		mtrace_init();
 	auto it = fd_copies->find(fd);
 	if (it != fd_copies->end()) {
 		if (!it->second.second) {
