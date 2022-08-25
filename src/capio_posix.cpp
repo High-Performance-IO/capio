@@ -133,6 +133,46 @@ static inline void print_prefix(const char* str, const char* prefix, ...) {
 }
 // utility functions  -------------------------
 
+int* get_fd_snapshot() {
+	std::string shm_name = "capio_snapshot_" + std::to_string(getpid());
+	int* fd_shm = (int*) get_shm_if_exist(shm_name);
+	return fd_shm;
+}
+
+void initialize_from_snapshot(int* fd_shm) {
+	int i = 0;
+	std::string shm_name;
+	int fd;
+	off64_t* p_shm;
+	char* path_shm;
+	#ifdef CAPIOLOG
+		CAPIO_DBG("initialize_from_snapshot \n");
+	#endif
+	std::string pid = std::to_string(getpid());
+	while ((fd = fd_shm[i]) != -1) {
+	#ifdef CAPIOLOG
+		CAPIO_DBG("snapshot fd %d\n", fd);
+	#endif
+		shm_name = "capio_snapshot_path_" + pid + "_" + std::to_string(fd);
+		path_shm = (char*) get_shm(shm_name);
+		(*capio_files_descriptors)[fd] = path_shm;
+		shm_name = "capio_snapshot_" + pid + "_" + std::to_string(fd);
+		p_shm = (off64_t*) get_shm(shm_name);
+
+		std::get<0>((*files)[fd]) = get_shm(path_shm);
+		std::string shm_name = "offset_" + pid + "_" + std::to_string(fd);
+		std::get<1>((*files)[fd]) = create_shm_off64_t("offset_" + pid + "_" + std::to_string(fd));
+		*std::get<1>((*files)[fd]) = p_shm[1];
+		std::get<2>((*files)[fd]) = new off64_t;
+		*std::get<2>((*files)[fd]) = p_shm[2];
+		std::get<3>((*files)[fd]) = new off64_t;
+		*std::get<3>((*files)[fd]) = p_shm[3];
+		std::get<4>((*files)[fd]) = p_shm[4];
+		std::get<5>((*files)[fd]) = p_shm[5];
+		capio_files_paths->insert(path_shm);
+		++i;
+	}
+}
 
 /*
  * This function must be called only once
@@ -142,21 +182,26 @@ static inline void print_prefix(const char* str, const char* prefix, ...) {
 void mtrace_init(void) {
 	first_call = false;
 	last_pid = getpid();
+	stat_enabled = false;
 	#ifdef CAPIOLOG
 	CAPIO_DBG("mtrace init\n");
 	#endif
 	if (capio_files_descriptors == nullptr) {
-	#ifdef CAPIOLOG
-	CAPIO_DBG("init data_structures\n");
-	#endif
+		#ifdef CAPIOLOG
+		CAPIO_DBG("init data_structures\n");
+		#endif
 		capio_files_descriptors = new std::unordered_map<int, std::string>; 
 		capio_files_paths = new std::unordered_set<std::string>;
 
 		files = new std::unordered_map<int, std::tuple<void*, off64_t*, off64_t*, off64_t*, int, int>>;
+
+		int* fd_shm = get_fd_snapshot();
+		if (fd_shm != nullptr) {
+			initialize_from_snapshot(fd_shm);
+		}
 	}
 	char* val;
 	val = getenv("CAPIO_DIR");
-	stat_enabled = false;
 	try {
 		if (val == NULL) {
 			capio_dir = std::filesystem::canonical(".");	
@@ -190,7 +235,55 @@ void mtrace_init(void) {
 	*caching_info_size = 0; 
 
 	stat_enabled = true;
+	#ifdef CAPIOLOG
+	CAPIO_DBG("ending mtrace init\n");
+	#endif
 
+}
+
+//* fd -> (shm*, *offset, *mapped_shm_size, *offset_upper_bound, file status flags, file_descriptor_flags)
+//std::unordered_map<int, std::tuple<void*, off64_t*, off64_t*, off64_t*, int, int>>* files = nullptr;
+//std::unordered_map<int, std::string>* capio_files_descriptors = nullptr; 
+//std::unordered_set<std::string>* capio_files_paths = nullptr;
+void crate_snapshot() {
+	int fd, status_flags, fd_flags;
+	off64_t offset, mapped_shm_size, offset_upper_bound;
+	off64_t* p_shm;
+	int* fd_shm;
+	char* path_shm;
+	std::string pid = std::to_string(getpid());
+	int n_fd = files->size();
+	if (n_fd == 0)
+		return;
+	fd_shm = (int*)create_shm("capio_snapshot_" + pid, n_fd * sizeof(int));
+	#ifdef CAPIOLOG
+		CAPIO_DBG("creating snapshots\n");
+	#endif
+	int i = 0;
+	for (auto& p : *files) {
+		fd = p.first;	
+		p_shm = create_shm_off64_t("capio_snapshot_" + pid + "_" + std::to_string(fd), 6);
+	#ifdef CAPIOLOG
+		CAPIO_DBG("creating snapshot fd%d\n", fd);
+	#endif
+		fd_shm[i] = fd;
+		offset = *std::get<1>(p.second);
+		mapped_shm_size = *std::get<2>(p.second);
+		offset_upper_bound = *std::get<3>(p.second);
+		status_flags = std::get<4>(p.second);
+		fd_flags = std::get<5>(p.second);
+		p_shm[0] = fd;
+		p_shm[1] = offset;
+		p_shm[2] = mapped_shm_size;
+		p_shm[3] = offset_upper_bound;
+		p_shm[4] = status_flags;
+		p_shm[5] = fd_flags;
+		path_shm = create_shm_path("capio_snapshot_path_" + pid + "_" + std::to_string(fd));
+		strcpy(path_shm, (*capio_files_descriptors)[fd].c_str());
+		++i;
+	}
+	fd_shm[i] = -1;
+	return;
 }
 
 std::string create_absolute_path(const char* pathname) {	
@@ -333,7 +426,7 @@ int capio_mkdir(const char* pathname, mode_t mode) {
 int capio_mkdirat(int dirfd, const char* pathname, mode_t mode) {
 	int res = 0;
 	#ifdef CAPIOLOG
-	CAPIO_DBG("capio_openat %s\n", pathname);
+	CAPIO_DBG("capio_mkdirat %s\n", pathname);
 	#endif
 	if (first_call || last_pid != getpid())
 		mtrace_init();
@@ -341,7 +434,7 @@ int capio_mkdirat(int dirfd, const char* pathname, mode_t mode) {
 	if(is_absolute(pathname)) {
 		path_to_check = pathname;
 		#ifdef CAPIOLOG
-		CAPIO_DBG("capio_openat absolute %s\n", path_to_check.c_str());
+		CAPIO_DBG("capio_mkdirat absolute %s\n", path_to_check.c_str());
 		#endif
 	}
 	else {
@@ -350,7 +443,7 @@ int capio_mkdirat(int dirfd, const char* pathname, mode_t mode) {
 			if (path_to_check.length() == 0)
 				return -2;
 			#ifdef CAPIOLOG
-			CAPIO_DBG("capio_openat AT_FDCWD %s\n", path_to_check.c_str());
+			CAPIO_DBG("capio_mkdirat AT_FDCWD %s\n", path_to_check.c_str());
 			#endif
 		}
 		else {
@@ -361,7 +454,7 @@ int capio_mkdirat(int dirfd, const char* pathname, mode_t mode) {
 				return -2;
 			path_to_check = dir_path + "/" + pathname;
 			#ifdef CAPIOLOG
-			CAPIO_DBG("capio_openat with dirfd %s\n", path_to_check.c_str());
+			CAPIO_DBG("capio_mkdirat with dirfd %s\n", path_to_check.c_str());
 			#endif
 		}
 	}
@@ -891,11 +984,15 @@ ssize_t capio_flistxattr(int fd, char* list, ssize_t size) {
 }
 
 int capio_ioctl(int fd, unsigned long request) {
+	#ifdef CAPIOLOG
+	CAPIO_DBG("capio ioctl %d %lu\n", fd, request);
+	#endif
 	if (first_call || last_pid != getpid())
 		mtrace_init();
 	auto it = files->find(fd);
 	if (it != files->end()) {
-		return 0;
+		errno = ENOTTY;
+		return -1;
 	}
 	else
 		return -2;
@@ -1297,6 +1394,7 @@ int capio_dup(int fd) {
 			err_exit("open in capio_dup");
 		add_dup_request(fd, res);
 		(*files)[res] = (*files)[fd];
+		(*capio_files_descriptors)[res] = (*capio_files_descriptors)[fd];
 	#ifdef CAPIOLOG
 		CAPIO_DBG("handling capio_dup returning res %d\n", res);
 	#endif
@@ -1323,6 +1421,7 @@ int capio_dup2(int fd, int fd2) {
 			return -1;
 		add_dup_request(fd, res);
 		(*files)[res] = (*files)[fd];
+		(*capio_files_descriptors)[res] = (*capio_files_descriptors)[fd];
 	#ifdef CAPIOLOG
 		CAPIO_DBG("handling capio_dup returning res %d\n", res);
 	#endif
@@ -1377,6 +1476,7 @@ pid_t capio_clone(int (*fn)(void *), void *stack, int flags, void *arg) {
 	return pid;
 }
 
+
 static int hook(long syscall_number, long arg0, long arg1, long arg2, long arg3,
                 long arg4, long arg5, long *result) {
   int hook_ret_value = 1;
@@ -1391,6 +1491,8 @@ static int hook(long syscall_number, long arg0, long arg1, long arg2, long arg3,
     int dirfd = static_cast<int>(arg0);
     const char *pathname = reinterpret_cast<const char *>(arg1);
     int flags = static_cast<int>(arg2);
+	if (!stat_enabled)
+		break;
     int res = capio_openat(dirfd, pathname, flags);
     if (res != -2) {
       *result = (res < 0 ? -errno : res);
@@ -1411,8 +1513,8 @@ static int hook(long syscall_number, long arg0, long arg1, long arg2, long arg3,
 	#endif
 	if (first_call || last_pid != getpid())
 		mtrace_init();
-    CAPIO_DBG("files size %d %d\n",getpid(),files->size());
 	#ifdef CAPIOLOG
+    CAPIO_DBG("files size %d %d\n",getpid(),files->size());
     CAPIO_DBG("capio_files_paths size %d %d\n",getpid(),capio_files_paths->size());
 	#endif
 		
@@ -1420,9 +1522,9 @@ static int hook(long syscall_number, long arg0, long arg1, long arg2, long arg3,
     
     ssize_t res = capio_write(fd, buf, count);
     stat_enabled = false;
-	#ifdef CAPIOLOG
-    CAPIO_DBG("write returning %ld \n", res);
-	#endif
+	//#ifdef CAPIOLOG
+    //CAPIO_DBG("write returning %ld \n", res);
+	//#endif
 	stat_enabled = true;
     if (res != -2) {
       *result = (res < 0 ? -errno : res);
@@ -1575,6 +1677,9 @@ static int hook(long syscall_number, long arg0, long arg1, long arg2, long arg3,
   case SYS_fstat: {
     int fd = arg0;
     struct stat *buf = reinterpret_cast<struct stat *>(arg1);
+#ifdef  CAPIOLOG
+	CAPIO_DBG("fstat %d %d\n", fd, getpid());
+#endif
     if (stat_enabled) {
       res = capio_fstat(fd, buf);
       if (res != -2) {
@@ -1754,6 +1859,11 @@ static int hook(long syscall_number, long arg0, long arg1, long arg2, long arg3,
       		*result = (res < 0 ? -errno : res);
       		hook_ret_value = 0;
     	}
+		break;
+	}
+	
+	case SYS_execve: {
+		crate_snapshot();
 		break;
 	}
 	
