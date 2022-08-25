@@ -37,7 +37,7 @@ int actual_num_writes = 1;
 // initial size for each file (can be overwritten by the user)
 const size_t file_initial_size = 1024L * 1024 * 1024 * 4;
 
-/* fd -> (shm*, *offset, *mapped_shm_size, *offset_upper_bound, *Capio_file, file status flags, file_descriptor_flags)
+/* fd -> (shm*, *offset, *mapped_shm_size, *offset_upper_bound, file status flags, file_descriptor_flags)
  * The mapped shm size isn't the the size of the file shm
  * but it's the mapped shm size in the virtual adress space
  * of the server process. The effective size can be greater
@@ -45,7 +45,7 @@ const size_t file_initial_size = 1024L * 1024 * 1024 * 4;
  *
  */
 
-std::unordered_map<int, std::tuple<void*, off64_t*, off64_t*, off64_t*, Capio_file*, int, int>>* files = nullptr;
+std::unordered_map<int, std::tuple<void*, off64_t*, off64_t*, off64_t*, int, int>>* files = nullptr;
 Circular_buffer<char>* buf_requests;
  
 Circular_buffer<off_t>* buf_response;
@@ -140,18 +140,21 @@ static inline void print_prefix(const char* str, const char* prefix, ...) {
  */
 
 void mtrace_init(void) {
+	first_call = false;
+	last_pid = getpid();
 	#ifdef CAPIOLOG
 	CAPIO_DBG("mtrace init\n");
 	#endif
 	if (capio_files_descriptors == nullptr) {
+	#ifdef CAPIOLOG
+	CAPIO_DBG("init data_structures\n");
+	#endif
 		capio_files_descriptors = new std::unordered_map<int, std::string>; 
 		capio_files_paths = new std::unordered_set<std::string>;
 
-		files = new std::unordered_map<int, std::tuple<void*, off64_t*, off64_t*, off64_t*, Capio_file*, int, int>>;
+		files = new std::unordered_map<int, std::tuple<void*, off64_t*, off64_t*, off64_t*, int, int>>;
 	}
 	char* val;
-	first_call = false;
-	last_pid = getpid();
 	val = getenv("CAPIO_DIR");
 	stat_enabled = false;
 	try {
@@ -366,7 +369,7 @@ int capio_mkdirat(int dirfd, const char* pathname, mode_t mode) {
 }
 
 
-off64_t add_read_request(int fd, off64_t count, std::tuple<void*, off64_t*, off64_t*, off64_t*, Capio_file*, int , int>& t) {
+off64_t add_read_request(int fd, off64_t count, std::tuple<void*, off64_t*, off64_t*, off64_t*, int , int>& t) {
 	std::string str = "read " + std::to_string(getpid()) + " " + std::to_string(fd) + " " + std::to_string(count);
 	const char* c_str = str.c_str();
 	buf_requests->write(c_str, (strlen(c_str) + 1) * sizeof(char));
@@ -402,7 +405,6 @@ void add_write_request(int fd, off64_t count) { //da modifcare con capio_file si
 	*std::get<1>((*files)[fd]) += count; //works only if there is only one writer at time for each file
 	if (actual_num_writes == num_writes_batch) {
 		sprintf(c_str, "writ %d %d %ld %ld", getpid(),fd, old_offset, count);
-		std::get<4>((*files)[fd])->insert_sector(old_offset, old_offset + count);
 		buf_requests->write(c_str, (strlen(c_str) + 1) * sizeof(char));
 		actual_num_writes = 1;
 	}
@@ -526,7 +528,7 @@ void read_from_disk(int fd, int offset, void* buffer, size_t count) {
 off_t capio_lseek(int fd, off64_t offset, int whence) { 
 	auto it = files->find(fd);
 	if (it != files->end()) {
-		std::tuple<void*, off64_t*, off64_t*, off64_t*, Capio_file*, int, int>* t = &(*files)[fd];
+		std::tuple<void*, off64_t*, off64_t*, off64_t*, int, int>* t = &(*files)[fd];
 		off64_t* file_offset = std::get<1>(*t);
 		if (whence == SEEK_SET) {
 			if (offset >= 0) {
@@ -562,16 +564,6 @@ off_t capio_lseek(int fd, off64_t offset, int whence) {
 			}
 		}
 		else if (whence == SEEK_END) {
-			//works only in batch mode or if we know tha size of the file
-			/*long int file_size = std::get<4>(*t).get_file_size();
-			off_t new_offset = file_size + offset;
-			if (new_offset >=0)
-				*file_offset = new_offset;
-			else {
-				errno = EINVAL;
-				return -1;
-			}
-			*/
 			char c_str[64];
 			off64_t file_size;
 			sprintf(c_str, "send %d %d", getpid(),fd);
@@ -680,8 +672,7 @@ int capio_openat(int dirfd, const char* pathname, int flags) {
 			*init_size = file_initial_size;
 			off64_t* offset = new off64_t;
 			*offset = 0;
-			Capio_file* c_file = new Capio_file(false);
-			files->insert({fd, std::make_tuple(p, p_offset, init_size, offset, c_file, flags, 0)});
+			files->insert({fd, std::make_tuple(p, p_offset, init_size, offset, flags, 0)});
 			(*capio_files_descriptors)[fd] = shm_name;
 			capio_files_paths->insert(path_to_check);
 			if ((flags & O_APPEND) == O_APPEND) {
@@ -763,6 +754,9 @@ int capio_close(int fd) {
 }
 
 ssize_t capio_read(int fd, void *buffer, size_t count) {
+		#ifdef CAPIOLOG
+		CAPIO_DBG("capio_read %d %d %ld\n", getpid(), fd, count);
+		#endif
 	auto it = files->find(fd);
 	if (it != files->end()) {
 		if (count >= SSIZE_MAX) {
@@ -770,7 +764,7 @@ ssize_t capio_read(int fd, void *buffer, size_t count) {
 			exit(1);
 		}
 		off64_t count_off = count;
-		std::tuple<void*, off64_t*, off64_t*, off64_t*, Capio_file*, int, int>* t = &(*files)[fd];
+		std::tuple<void*, off64_t*, off64_t*, off64_t*, int, int>* t = &(*files)[fd];
 		off64_t* offset = std::get<1>(*t);
 		//bool in_shm = check_cache(fd);
 		//if (in_shm) {
@@ -828,21 +822,21 @@ int capio_fcntl(int fd, int cmd, int arg) {
 	#endif
     switch (cmd) {
     case F_GETFD: {
-      return std::get<6>((*files)[fd]);
+      return std::get<5>((*files)[fd]);
       break;
     }
     case F_SETFD: {
-      std::get<6>((*files)[fd]) = arg;
+      std::get<5>((*files)[fd]) = arg;
       return 0;
       break;
     }
     case F_GETFL: {
-      return std::get<5>((*files)[fd]);
+      return std::get<4>((*files)[fd]);
 
       break;
     }
     case F_SETFL: {
-      std::get<5>((*files)[fd]) = arg;
+      std::get<4>((*files)[fd]) = arg;
       return 0;
       break;
     }
