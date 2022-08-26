@@ -766,7 +766,6 @@ void delete_file(std::string path) {
 	#ifdef CAPIOLOG
 	std::cout << "deleting file " << path << std::endl;
 	#endif	
-	auto it_metadata = files_metadata.find(path);
 	shm_unlink(path.c_str());
 	shm_unlink((path + "_size").c_str());
 	files_metadata.erase(path);
@@ -912,7 +911,6 @@ void handle_exig(char* str) {
                         int fd = std::get<1>(tuple);
                         size_t process_offset = *std::get<1>(processes_files[pending_pid][fd]);
                         size_t count = std::get<2>(tuple);
-                        size_t file_size = *std::get<1>(files_metadata[path]);
 						#ifdef CAPIOLOG
 						std::cout << "pending read pid fd offset count " << pid << " " << fd << " " << process_offset <<" "<< count << std::endl;
 						#endif	

@@ -386,7 +386,7 @@ auto res_mismatch = std::mismatch(capio_dir.begin(), capio_dir.end(), path_to_ch
 			}
 		//create shm
 			char shm_name[512];
-			int i = 0;
+			size_t i = 0;
 			while (i < path_to_check.length()) {
 				if (path_to_check[i] == '/' && i > 0)
 					shm_name[i] = '_';
@@ -433,7 +433,6 @@ int capio_mkdir(const char* pathname, mode_t mode) {
 }
 
 int capio_mkdirat(int dirfd, const char* pathname, mode_t mode) {
-	int res = 0;
 	#ifdef CAPIOLOG
 	CAPIO_DBG("capio_mkdirat %s\n", pathname);
 	#endif
@@ -479,9 +478,8 @@ off64_t add_read_request(int fd, off64_t count, std::tuple<void*, off64_t*, off6
 	off64_t offset_upperbound;
 	buf_response->read(&offset_upperbound);
 	*std::get<3>(t) = offset_upperbound;
-	size_t file_shm_size = *std::get<2>(t);
-	size_t end_of_read;
-	end_of_read = *std::get<1>(t) + count;
+	off64_t file_shm_size = *std::get<2>(t);
+	off64_t end_of_read = *std::get<1>(t) + count;
 	if (end_of_read > offset_upperbound)
 		end_of_read = offset_upperbound;
 	if (end_of_read > file_shm_size) {
@@ -756,7 +754,7 @@ int capio_openat(int dirfd, const char* pathname, int flags) {
 		else  {
 		//create shm
 			char shm_name[512];
-			int i = 0;
+			size_t i = 0;
 			while (i < path_to_check.length()) {
 				if (path_to_check[i] == '/' && i > 0)
 					shm_name[i] = '_';
@@ -1255,7 +1253,7 @@ int capio_access(const char* pathname, int mode) {
 int capio_file_exists(std::string path) {
 	char normalized_path[PATH_MAX];
 	normalized_path[0] = '/';
-	for (int i = 1; i < path.length(); ++i) {
+	for (size_t i = 1; i < path.length(); ++i) {
 		if (path[i] == '/')
 			normalized_path[i] = '_';
 		else
@@ -1313,7 +1311,7 @@ int capio_unlink_abs(std::string abs_path) {
 		int pid = getpid();
 		char normalized_path[PATH_MAX];
 		normalized_path[0] = '/';
-		for (int i = 1; i < abs_path.length(); ++i) {
+		for (size_t i = 1; i < abs_path.length(); ++i) {
 			if (abs_path[i] == '/')
 				normalized_path[i] = '_';
 			else
