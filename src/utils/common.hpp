@@ -60,56 +60,6 @@ void* get_shm_if_exist(std::string shm_name) {
 	return p;
 }
 
-off64_t* create_shm_off64_t(std::string shm_name, int length) {
-	void* p = nullptr;
-	// if we are not creating a new object, mode is equals to 0
-	int fd = shm_open(shm_name.c_str(), O_CREAT | O_RDWR,  S_IRUSR | S_IWUSR); //to be closed
-	const int size = sizeof(off64_t) * length;
-	if (fd == -1)
-		err_exit("create_shm_off64_t array shm_open");
-	if (ftruncate(fd, size) == -1)
-		err_exit("create_shm_off64_t array ftruncate");
-	p = mmap(NULL, size, PROT_READ|PROT_WRITE, MAP_SHARED, fd, 0);
-	if (p == MAP_FAILED)
-		err_exit("create_shm_off64_t array mmap");
-	if (close(fd) == -1)
-		err_exit("create_shm_off64_t array close");
-	return (off64_t*) p;
-}
-
-off64_t* create_shm_off64_t(std::string shm_name) { 
-	void* p = nullptr;
-	// if we are not creating a new object, mode is equals to 0
-	int fd = shm_open(shm_name.c_str(), O_CREAT | O_RDWR,  S_IRUSR | S_IWUSR); //to be closed
-	const int size = sizeof(off64_t);
-	if (fd == -1)
-		err_exit("create_shm_off64_t shm_open");
-	if (ftruncate(fd, size) == -1)
-		err_exit("ftruncate");
-	p = mmap(NULL, size, PROT_READ|PROT_WRITE, MAP_SHARED, fd, 0);
-	if (p == MAP_FAILED)
-		err_exit("mmap create_shm_size_t");
-	if (close(fd) == -1)
-		err_exit("close");
-	return (off64_t*) p;
-}
-
-char* create_shm_path(std::string shm_name) {
-	void* p = nullptr;
-	// if we are not creating a new object, mode is equals to 0
-	int fd = shm_open(shm_name.c_str(), O_CREAT | O_RDWR,  S_IRUSR | S_IWUSR); //to be closed
-	const int size = sizeof(char) * PATH_MAX;
-	if (fd == -1)
-		err_exit("create_shm_off64_t array shm_open");
-	if (ftruncate(fd, size) == -1)
-		err_exit("create_shm_off64_t array ftruncate");
-	p = mmap(NULL, size, PROT_READ|PROT_WRITE, MAP_SHARED, fd, 0);
-	if (p == MAP_FAILED)
-		err_exit("create_shm_off64_t array mmap");
-	if (close(fd) == -1)
-		err_exit("create_shm_off64_t array close");
-	return (char*) p;
-}
 
 void* create_shm(std::string shm_name, const long int size) {
 	void* p = nullptr;

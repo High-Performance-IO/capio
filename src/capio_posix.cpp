@@ -162,7 +162,7 @@ void initialize_from_snapshot(int* fd_shm) {
 		shm_name = "capio_snapshot_" + pid + "_" + std::to_string(fd);
 		p_shm = (off64_t*) get_shm(shm_name);
 		std::string shm_name_offset = "offset_" + pid + "_" + std::to_string(fd);
-		std::get<1>((*files)[fd]) = create_shm_off64_t(shm_name_offset);
+		std::get<1>((*files)[fd]) = (off64_t*) create_shm(shm_name_offset, sizeof(off64_t));
 		*std::get<1>((*files)[fd]) = p_shm[1];
 		std::get<2>((*files)[fd]) = new off64_t;
 		*std::get<2>((*files)[fd]) = p_shm[2];
@@ -271,7 +271,7 @@ void crate_snapshot() {
 	int i = 0;
 	for (auto& p : *files) {
 		fd = p.first;	
-		p_shm = create_shm_off64_t("capio_snapshot_" + pid + "_" + std::to_string(fd), 6);
+		p_shm = (off64_t*) create_shm("capio_snapshot_" + pid + "_" + std::to_string(fd), 6 * sizeof(off64_t));
 	#ifdef CAPIOLOG
 		CAPIO_DBG("creating snapshot fd%d\n", fd);
 	#endif
@@ -287,7 +287,7 @@ void crate_snapshot() {
 		p_shm[3] = offset_upper_bound;
 		p_shm[4] = status_flags;
 		p_shm[5] = fd_flags;
-		path_shm = create_shm_path("capio_snapshot_path_" + pid + "_" + std::to_string(fd));
+		path_shm = (char*) create_shm("capio_snapshot_path_" + pid + "_" + std::to_string(fd), PATH_MAX * sizeof(char));
 		strcpy(path_shm, (*capio_files_descriptors)[fd].c_str());
 		++i;
 	}
@@ -768,7 +768,7 @@ int capio_openat(int dirfd, const char* pathname, int flags) {
 			int fd;
 			void* p = create_shm(shm_name, 1024L * 1024 * 1024* 2, &fd);
 			add_open_request(shm_name, fd);
-			off64_t* p_offset = create_shm_off64_t("offset_" + std::to_string(getpid()) + "_" + std::to_string(fd));
+			off64_t* p_offset = (off64_t*) create_shm("offset_" + std::to_string(getpid()) + "_" + std::to_string(fd), sizeof(off64_t));
 			*p_offset = 0;
 			off64_t* init_size = new off64_t;
 			*init_size = file_initial_size;
@@ -1008,6 +1008,12 @@ int capio_ioctl(int fd, unsigned long request) {
 	
 }
 
+/*
+ * TODO: adding cleaning of shared memory
+ * The process can never interact with the server
+ * maybe because is a child process don't need to interact
+ * with CAPIO
+*/
 void capio_exit_group(int status) {
 	int pid = getpid();
 	std::string str = "exig " + std::to_string(pid);
@@ -1350,7 +1356,7 @@ int capio_unlinkat(int dirfd, const char* pathname, int flags) {
 	#endif
 	
 	if (capio_dir.length() == 0) {
-		//unlink can be called before initialization (see initialize_from_snapshot)
+		//unlinkat can be called before initialization (see initialize_from_snapshot)
 		return -2;
 	}
 	int res;

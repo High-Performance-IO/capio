@@ -344,7 +344,7 @@ void init_process(int pid) {
 
 }
 void create_file(std::string path, void* p_shm, bool is_dir) {
-		off64_t* p_shm_size = create_shm_off64_t(path + "_size");	
+		off64_t* p_shm_size = (off64_t*) create_shm(path + "_size", sizeof(off64_t));	
 		files_metadata[path] = std::make_tuple(p_shm, p_shm_size, file_initial_size, true, Capio_file(is_dir));
 
 }
@@ -372,7 +372,7 @@ void handle_open(char* str, char* p, int rank) {
 		caching_info[pid].first[index + 1] = 1;
 	}
 		//TODO: check the size that the user wrote in the configuration file
-	off64_t* p_offset = create_shm_off64_t("offset_" + std::to_string(pid) + "_" + std::to_string(fd));
+	off64_t* p_offset = (off64_t*) create_shm("offset_" + std::to_string(pid) + "_" + std::to_string(fd), sizeof(off64_t));
 	processes_files[pid][fd] = std::make_tuple(p_shm, p_offset);//TODO: what happens if a process open the same file twice?
 	*caching_info[pid].second += 2;
 	if (files_metadata.find(path) == files_metadata.end()) {
@@ -1238,7 +1238,8 @@ void* wait_for_data(void* pthread_arg) {
 	long int offset = rr_metadata->offset;
 	int dest = rr_metadata->dest;
 	long int nbytes = rr_metadata->nbytes;
-	const char * offset_str = std::to_string(offset).c_str();
+	std::string offset_tmp = std::to_string(offset);
+	const char * offset_str = offset_tmp.c_str();
 			#ifdef CAPIOLOG
 				std::cout << "wait for data before" << std::endl;
 			#endif
