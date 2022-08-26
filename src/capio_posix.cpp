@@ -150,18 +150,19 @@ void initialize_from_snapshot(int* fd_shm) {
 	#endif
 	std::string pid = std::to_string(getpid());
 	while ((fd = fd_shm[i]) != -1) {
-	#ifdef CAPIOLOG
-		CAPIO_DBG("snapshot fd %d\n", fd);
-	#endif
 		shm_name = "capio_snapshot_path_" + pid + "_" + std::to_string(fd);
 		path_shm = (char*) get_shm(shm_name);
 		(*capio_files_descriptors)[fd] = path_shm;
+		capio_files_paths->insert(path_shm);
+		std::get<0>((*files)[fd]) = get_shm(path_shm);
+		munmap(path_shm, PATH_MAX);
+		if (shm_unlink(shm_name.c_str()) == -1) {
+			err_exit("shm_unlink snapshot " + shm_name);
+		}
 		shm_name = "capio_snapshot_" + pid + "_" + std::to_string(fd);
 		p_shm = (off64_t*) get_shm(shm_name);
-
-		std::get<0>((*files)[fd]) = get_shm(path_shm);
-		std::string shm_name = "offset_" + pid + "_" + std::to_string(fd);
-		std::get<1>((*files)[fd]) = create_shm_off64_t("offset_" + pid + "_" + std::to_string(fd));
+		std::string shm_name_offset = "offset_" + pid + "_" + std::to_string(fd);
+		std::get<1>((*files)[fd]) = create_shm_off64_t(shm_name_offset);
 		*std::get<1>((*files)[fd]) = p_shm[1];
 		std::get<2>((*files)[fd]) = new off64_t;
 		*std::get<2>((*files)[fd]) = p_shm[2];
@@ -169,9 +170,17 @@ void initialize_from_snapshot(int* fd_shm) {
 		*std::get<3>((*files)[fd]) = p_shm[3];
 		std::get<4>((*files)[fd]) = p_shm[4];
 		std::get<5>((*files)[fd]) = p_shm[5];
-		capio_files_paths->insert(path_shm);
+		munmap(p_shm, 6 * sizeof(off64_t));
+		if (shm_unlink(shm_name.c_str()) == -1) {
+			err_exit("shm_unlink snapshot " + shm_name);
+		}
 		++i;
 	}
+	shm_name = "capio_snapshot_" + pid;
+	if (shm_unlink(shm_name.c_str()) == -1) {
+		err_exit("shm_unlink snapshot " + shm_name);
+	}
+	
 }
 
 /*
@@ -1320,6 +1329,13 @@ int capio_unlink_abs(std::string abs_path) {
 }
 
 int capio_unlink(const char* pathname) {
+	#ifdef CAPIOLOG
+	CAPIO_DBG("capio_unlink %s\n", pathname);
+	#endif
+	if (capio_dir.length() == 0) {
+		//unlink can be called before initialization (see initialize_from_snapshot)
+		return -2;
+	}
 	std::string abs_path = create_absolute_path(pathname);
 	if (abs_path.length() == 0)
 		return -2;
@@ -1333,6 +1349,10 @@ int capio_unlinkat(int dirfd, const char* pathname, int flags) {
 	CAPIO_DBG("capio_unlinkat\n");
 	#endif
 	
+	if (capio_dir.length() == 0) {
+		//unlink can be called before initialization (see initialize_from_snapshot)
+		return -2;
+	}
 	int res;
 	if (!is_absolute(pathname)) {
 		if (dirfd == AT_FDCWD) { 

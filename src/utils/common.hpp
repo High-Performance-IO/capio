@@ -89,8 +89,8 @@ off64_t* create_shm_off64_t(std::string shm_name) {
 	p = mmap(NULL, size, PROT_READ|PROT_WRITE, MAP_SHARED, fd, 0);
 	if (p == MAP_FAILED)
 		err_exit("mmap create_shm_size_t");
-//	if (close(fd) == -1)
-//		err_exit("close");
+	if (close(fd) == -1)
+		err_exit("close");
 	return (off64_t*) p;
 }
 
@@ -138,8 +138,6 @@ void* create_shm(std::string shm_name, const long int size, int* fd) {
 	p = mmap(NULL, size, PROT_READ|PROT_WRITE, MAP_SHARED, *fd, 0);
 	if (p == MAP_FAILED)
 		err_exit("mmap create_shm " + shm_name);
-//	if (close(*fd) == -1);
-//		err_exit("close");
 	return p;
 }
 
