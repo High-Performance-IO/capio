@@ -29,7 +29,7 @@
 #include "utils/common.hpp"
 #include "capio_file.hpp"
 
-std::string* capio_dir;
+std::string* capio_dir = nullptr;
 
 int num_writes_batch = 1;
 int actual_num_writes = 1;
@@ -182,6 +182,9 @@ void initialize_from_snapshot(int* fd_shm) {
 		err_exit("shm_unlink snapshot " + shm_name);
 	}
 	
+	#ifdef CAPIOLOG
+		CAPIO_DBG("initialize_from_snapshot ending\n");
+	#endif
 }
 
 /*
@@ -1331,7 +1334,7 @@ int capio_unlink(const char* pathname) {
 	#ifdef CAPIOLOG
 	CAPIO_DBG("capio_unlink %s\n", pathname);
 	#endif
-	if (capio_dir->length() == 0) {
+	if (capio_dir == nullptr) {
 		//unlink can be called before initialization (see initialize_from_snapshot)
 		return -2;
 	}
