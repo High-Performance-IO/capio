@@ -29,7 +29,7 @@
 #include "utils/common.hpp"
 #include "capio_file.hpp"
 
-std::string capio_dir;
+std::string* capio_dir;
 
 int num_writes_batch = 1;
 int actual_num_writes = 1;
@@ -60,6 +60,7 @@ std::unordered_set<std::string>* capio_files_paths = nullptr;
 
 static bool first_call = true;
 static int last_pid = 0;
+static pid_t my_pid;
 static bool stat_enabled = true;
 static bool dup2_enabled = true;
 static bool fork_enabled = true;
@@ -191,6 +192,7 @@ void initialize_from_snapshot(int* fd_shm) {
 void mtrace_init(void) {
 	first_call = false;
 	last_pid = getpid();
+	my_pid = last_pid;
 	stat_enabled = false;
 	#ifdef CAPIOLOG
 	CAPIO_DBG("mtrace init\n");
@@ -213,16 +215,16 @@ void mtrace_init(void) {
 	val = getenv("CAPIO_DIR");
 	try {
 		if (val == NULL) {
-			capio_dir = std::filesystem::canonical(".");	
+			capio_dir = new std::string(std::filesystem::canonical("."));	
 		}
 		else {
-			capio_dir = std::filesystem::canonical(val);
+			capio_dir = new std::string(std::filesystem::canonical(val));
 		}
 	}
 	catch (const std::exception& ex) {
 		exit(1);
 	}
-	int res = is_directory(capio_dir.c_str());
+	int res = is_directory(capio_dir->c_str());
 	if (res == 0) {
 		std::cerr << "dir " << capio_dir << " is not a directory" << std::endl;
 		exit(1);
@@ -246,6 +248,7 @@ void mtrace_init(void) {
 	stat_enabled = true;
 	#ifdef CAPIOLOG
 	CAPIO_DBG("ending mtrace init\n");
+	CAPIO_DBG("CAPIO directory: %s\n", capio_dir->c_str());
 	#endif
 
 }
@@ -371,9 +374,9 @@ int add_mkdir_request(std::string pathname) {
 
 int request_mkdir(std::string path_to_check) {
 	int res;
-auto res_mismatch = std::mismatch(capio_dir.begin(), capio_dir.end(), path_to_check.begin());
-	if (res_mismatch.first == capio_dir.end()) {
-		if (capio_dir.size() == path_to_check.size()) {
+auto res_mismatch = std::mismatch(capio_dir->begin(), capio_dir->end(), path_to_check.begin());
+	if (res_mismatch.first == capio_dir->end()) {
+		if (capio_dir->size() == path_to_check.size()) {
 			return -2;
 			std::cerr << "ERROR: open to the capio_dir " << path_to_check << std::endl;
 			exit(1);
@@ -436,8 +439,6 @@ int capio_mkdirat(int dirfd, const char* pathname, mode_t mode) {
 	#ifdef CAPIOLOG
 	CAPIO_DBG("capio_mkdirat %s\n", pathname);
 	#endif
-	if (first_call || last_pid != getpid())
-		mtrace_init();
 	std::string path_to_check;
 	if(is_absolute(pathname)) {
 		path_to_check = pathname;
@@ -713,8 +714,6 @@ int capio_openat(int dirfd, const char* pathname, int flags) {
 	#ifdef CAPIOLOG
 	CAPIO_DBG("capio_openat %s\n", pathname);
 	#endif
-	if (first_call || last_pid != getpid())
-		mtrace_init();
 	std::string path_to_check;
 	if(is_absolute(pathname)) {
 		path_to_check = pathname;
@@ -743,9 +742,13 @@ int capio_openat(int dirfd, const char* pathname, int flags) {
 			#endif
 		}
 	}
-	auto res = std::mismatch(capio_dir.begin(), capio_dir.end(), path_to_check.begin());
-	if (res.first == capio_dir.end()) {
-		if (capio_dir.size() == path_to_check.size()) {
+	auto res = std::mismatch(capio_dir->begin(), capio_dir->end(), path_to_check.begin());
+
+	#ifdef CAPIOLOG
+	CAPIO_DBG("CAPIO directory: %s\n", capio_dir->c_str());
+	#endif
+	if (res.first == capio_dir->end()) {
+		if (capio_dir->size() == path_to_check.size()) {
 			return -2;
 			std::cerr << "ERROR: open to the capio_dir " << path_to_check << std::endl;
 			exit(1);
@@ -836,8 +839,6 @@ int capio_close(int fd) {
 		#ifdef CAPIOLOG
 	CAPIO_DBG("capio_close %d %d\n", getpid(), fd);
 		#endif
-	if (first_call || last_pid != getpid())
-		mtrace_init();
 	auto it = files->find(fd);
 	if (it != files->end()) {
 		add_close_request(fd);
@@ -994,8 +995,6 @@ int capio_ioctl(int fd, unsigned long request) {
 	#ifdef CAPIOLOG
 	CAPIO_DBG("capio ioctl %d %lu\n", fd, request);
 	#endif
-	if (first_call || last_pid != getpid())
-		mtrace_init();
 	auto it = files->find(fd);
 	if (it != files->end()) {
 		errno = ENOTTY;
@@ -1035,11 +1034,9 @@ int capio_lstat(std::string absolute_path, struct stat* statbuf) {
 	#ifdef CAPIOLOG
 	CAPIO_DBG("capio_lstat %s\n", absolute_path.c_str());
 	#endif
-	if (first_call || last_pid != getpid())
-		mtrace_init();
-	auto res = std::mismatch(capio_dir.begin(), capio_dir.end(), absolute_path.begin());
-	if (res.first == capio_dir.end()) {
-		if (capio_dir.size() == absolute_path.size()) {
+	auto res = std::mismatch(capio_dir->begin(), capio_dir->end(), absolute_path.begin());
+	if (res.first == capio_dir->end()) {
+		if (capio_dir->size() == absolute_path.size()) {
 			//it means capio_dir is equals to absolute_path
 			return -2;
 
@@ -1117,8 +1114,6 @@ int capio_lstat_wrapper(const char* path, struct stat* statbuf) {
 }
 
 int capio_fstat(int fd, struct stat* statbuf) {
-	if (first_call || last_pid != getpid())
-		mtrace_init();
 	auto it = files->find(fd);
 	if (it != files->end()) {
 	#ifdef CAPIOLOG
@@ -1226,8 +1221,8 @@ int capio_creat(const char* pathname, mode_t mode) {
 }
 
 int is_capio_file(std::string abs_path) {
-	auto it = std::mismatch(capio_dir.begin(), capio_dir.end(), abs_path.begin());
-	if (it.first == capio_dir.end()) 
+	auto it = std::mismatch(capio_dir->begin(), capio_dir->end(), abs_path.begin());
+	if (it.first == capio_dir->end()) 
 		return 0;
 	else 
 		return -1;
@@ -1281,9 +1276,9 @@ int capio_faccessat(int dirfd, const char* pathname, int mode, int flags) {
 			if (dir_path.length() == 0)
 				return -2;
 			std::string path = dir_path + "/" + pathname;
-			auto it = std::mismatch(capio_dir.begin(), capio_dir.end(), path.begin());
-			if (it.first == capio_dir.end()) {
-				if (capio_dir.size() == path.size()) {
+			auto it = std::mismatch(capio_dir->begin(), capio_dir->end(), path.begin());
+			if (it.first == capio_dir->end()) {
+				if (capio_dir->size() == path.size()) {
 					std::cerr << "ERROR: unlink to the capio_dir " << path << std::endl;
 					exit(1);
 				}
@@ -1302,9 +1297,9 @@ int capio_faccessat(int dirfd, const char* pathname, int mode, int flags) {
 
 int capio_unlink_abs(std::string abs_path) {
 	int res;
-	auto it = std::mismatch(capio_dir.begin(), capio_dir.end(), abs_path.begin());
-	if (it.first == capio_dir.end()) {
-		if (capio_dir.size() == abs_path.size()) {
+	auto it = std::mismatch(capio_dir->begin(), capio_dir->end(), abs_path.begin());
+	if (it.first == capio_dir->end()) {
+		if (capio_dir->size() == abs_path.size()) {
 			std::cerr << "ERROR: unlink to the capio_dir " << abs_path << std::endl;
 			exit(1);
 		}
@@ -1336,7 +1331,7 @@ int capio_unlink(const char* pathname) {
 	#ifdef CAPIOLOG
 	CAPIO_DBG("capio_unlink %s\n", pathname);
 	#endif
-	if (capio_dir.length() == 0) {
+	if (capio_dir->length() == 0) {
 		//unlink can be called before initialization (see initialize_from_snapshot)
 		return -2;
 	}
@@ -1353,7 +1348,7 @@ int capio_unlinkat(int dirfd, const char* pathname, int flags) {
 	CAPIO_DBG("capio_unlinkat\n");
 	#endif
 	
-	if (capio_dir.length() == 0) {
+	if (capio_dir->length() == 0) {
 		//unlinkat can be called before initialization (see initialize_from_snapshot)
 		return -2;
 	}
@@ -1503,6 +1498,8 @@ pid_t capio_clone(int (*fn)(void *), void *stack, int flags, void *arg) {
 
 static int hook(long syscall_number, long arg0, long arg1, long arg2, long arg3,
                 long arg4, long arg5, long *result) {
+  if (first_call || last_pid != my_pid)
+	mtrace_init();
   int hook_ret_value = 1;
   int res = 0;
   switch (syscall_number) {
@@ -1535,8 +1532,6 @@ static int hook(long syscall_number, long arg0, long arg1, long arg2, long arg3,
 	#ifdef CAPIOLOG
    	CAPIO_DBG("write captured %d %d\n", getpid(), fd);
 	#endif
-	if (first_call || last_pid != getpid())
-		mtrace_init();
 	#ifdef CAPIOLOG
     CAPIO_DBG("files size %d %d\n",getpid(),files->size());
     CAPIO_DBG("capio_files_paths size %d %d\n",getpid(),capio_files_paths->size());
