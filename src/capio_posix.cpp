@@ -1151,8 +1151,10 @@ int capio_lstat(std::string absolute_path, struct stat* statbuf) {
 		std::hash<std::string> hash;		
 		statbuf->st_ino = hash(normalized_path);
 
-		if (is_dir == 0)
-		statbuf->st_mode = S_IFDIR | S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH; // 0644 directory
+		if (is_dir == 0) {
+			statbuf->st_mode = S_IFDIR | S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH; // 0644 directory
+			file_size = 4096;															
+		}
 																		
 		else
 			statbuf->st_mode = S_IFREG | S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH; // 0644 regular file 
@@ -2056,7 +2058,7 @@ static int hook(long syscall_number, long arg0, long arg1, long arg2, long arg3,
 		crate_snapshot();
 		break;
 	}
-	
+
 
   default:
     hook_ret_value = 1;
