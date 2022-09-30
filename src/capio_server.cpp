@@ -335,6 +335,10 @@ void flush_file_to_disk(int tid, int fd) {
 }
 
 void init_process(int tid) {
+	
+	#ifdef CAPIOLOG
+	std::cout << "init process tid " << std::to_string(tid) << std::endl;
+	#endif	
 	if (sems_write.find(tid) == sems_write.end()) {
 		//sems_response[tid] = sem_open(("sem_response_read" + std::to_string(tid)).c_str(), O_RDWR);
 		/*if (sems_response[tid] == SEM_FAILED) {
@@ -490,7 +494,7 @@ void handle_write(const char* str, int rank) {
         }*/
         //sem_post(sems_response[tid]);
         auto it = pending_reads.find(path);
-        sem_wait(sems_write[tid]);
+        //sem_wait(sems_write[tid]);
         if (it != pending_reads.end()) {
         #ifdef CAPIOLOG
         std::cout << "There were pending reads for" << path << std::endl;
@@ -518,7 +522,7 @@ void handle_write(const char* str, int rank) {
 							++it_vec;
                 }
         }
-        sem_post(sems_write[tid]);
+        //sem_post(sems_write[tid]);
         auto it_client = clients_remote_pending_reads.find(path);
 		std::list<std::tuple<size_t, size_t, sem_t*>>::iterator it_list, prev_it_list;
         if (it_client !=  clients_remote_pending_reads.end()) {
@@ -907,10 +911,19 @@ void handle_exig(char* str) {
    int pid = pids[tid];
    auto files = writers[pid];
    for (auto& pair : files) {
+	#ifdef CAPIOLOG
+	std::cout << "handle exit group 1" << std::endl;
+	#endif	
    	if (pair.second) {
 		std::string path = pair.first;	
 		std::get<4>(files_metadata[path]).complete = true;
-        sem_wait(sems_write[tid]);
+	#ifdef CAPIOLOG
+	std::cout << "handle exit group wait before" << std::endl;
+	#endif	
+        //sem_wait(sems_write[tid]);
+	#ifdef CAPIOLOG
+	std::cout << "handle exit group wait after" << std::endl;
+	#endif	
 		auto it = pending_reads.find(path);
         if (it != pending_reads.end()) {
 	#ifdef CAPIOLOG
@@ -931,9 +944,15 @@ void handle_exig(char* str) {
                         it_vec = pending_reads_this_file.erase(it_vec);
                 }
         }
-        sem_post(sems_write[tid]);
+        //sem_post(sems_write[tid]);
+	#ifdef CAPIOLOG
+	std::cout << "handle exit group 2" << std::endl;
+	#endif	
 	}
    }
+	#ifdef CAPIOLOG
+	std::cout << "handle exit group 3" << std::endl;
+	#endif	
    close_all_files(tid);
 }
 
