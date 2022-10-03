@@ -1093,14 +1093,7 @@ void capio_exit_group(int status) {
 	return;
 }
 
-/*
- * Removes consecutives slashes
- *
- */
 
-std::string sanitaze_path(std::string path) {
-	std::string res;
-}
 
 /*
  * Precondition: absolute_path must contain an absolute path
@@ -1111,7 +1104,6 @@ int capio_lstat(std::string absolute_path, struct stat* statbuf) {
 	#ifdef CAPIOLOG
 	CAPIO_DBG("capio_lstat %s\n", absolute_path.c_str());
 	#endif
-	absolute_path = sanitaze_path(absolute_path);
 	auto res = std::mismatch(capio_dir->begin(), capio_dir->end(), absolute_path.begin());
 	if (res.first == capio_dir->end()) {
 		if (capio_dir->size() == absolute_path.size()) {
