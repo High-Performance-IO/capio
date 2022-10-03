@@ -1,3 +1,4 @@
+
 #include "circular_buffer.hpp"
 
 #include <string>
@@ -10,6 +11,8 @@
 #include <iostream>
 #include <pthread.h>
 #include <sstream>
+#include <filesystem>
+#include <algorithm>
 
 #include <linux/limits.h>
 #include <unistd.h>
@@ -21,11 +24,31 @@
 #include <fcntl.h>
 #include <semaphore.h>
 #include <signal.h>
+#include <dirent.h> /* Defines DT_* constants */
 
 #include <mpi.h>
 
 #include "capio_file.hpp"
 #include "utils/common.hpp"
+
+/*
+ * From the man getdents:
+ * "There is no definition of struct linux_dirent  in  glibc; see NOTES."
+ *
+ * NOTES section:
+ * "[...] you will need to define the linux_dirent or linux_dirent64
+ * structure yourself."
+ *
+ */
+
+struct linux_dirent {
+	unsigned long  d_ino;
+	off_t          d_off;
+	unsigned short d_reclen;
+	char           d_name[PATH_MAX + 2];
+};
+
+std::string* capio_dir = nullptr;
 
 const long int max_shm_size = 1024L * 1024 * 1024 * 16;
 
@@ -211,7 +234,7 @@ int* create_shm_int(std::string shm_name) {
 
 void write_file_location(const std::string& file_name, int rank, std::string path_to_write) {
         #ifdef CAPIOLOG
-        std::cout << "write file location before" << std::endl;
+        std::cout << "write file location before, file_name " << file_name << std::endl;
         #endif
     struct flock lock;
     memset(&lock, 0, sizeof(lock));
@@ -245,6 +268,9 @@ void write_file_location(const std::string& file_name, int rank, std::string pat
 	file_location[len1 + len2 + len3] = '\n';
 	file_location[len1 + len2 + len3 + 1] = '\0';
 	write(fd, file_location, sizeof(char) * strlen(file_location));
+    #ifdef CAPIOLOG
+    	std::cout << "writing " << file_location << std::endl;
+    #endif
 	files_location[path_to_write] = node_name;
 	// Now release the lock explicitly.
     lock.l_type = F_UNLCK;
@@ -357,7 +383,10 @@ void init_process(int tid) {
 
 }
 void create_file(std::string path, void* p_shm, bool is_dir) {
-		off64_t* p_shm_size = (off64_t*) create_shm(path + "_size", sizeof(off64_t));	
+	std::string shm_name = path;
+	std::replace(shm_name.begin(), shm_name.end(), '/', '_');
+	shm_name = shm_name.substr(1);
+		off64_t* p_shm_size = (off64_t*) create_shm(shm_name + "_size", sizeof(off64_t));	
 		files_metadata[path] = std::make_tuple(p_shm, p_shm_size, file_initial_size, true, Capio_file(is_dir));
 
 }
@@ -377,7 +406,10 @@ void handle_open(char* str, char* p, int rank) {
 	int index = *caching_info[tid].second;
 	caching_info[tid].first[index] = fd;
 	if (on_disk.find(path) == on_disk.end()) {
-		p_shm = create_shm(path, 1024L * 1024 * 1024* 2);
+		std::string shm_name = path;
+		std::replace(shm_name.begin(), shm_name.end(), '/', '_');
+		shm_name = shm_name.substr(1);
+		p_shm = create_shm(shm_name, 1024L * 1024 * 1024* 2);
 		caching_info[tid].first[index + 1] = 0;
 	}
 	else {
@@ -425,6 +457,92 @@ struct handle_write_metadata{
 	long int rank;
 };
 
+
+std::string get_parent_dir_path(std::string file_path) {
+	std::size_t i = file_path.rfind('/');
+	if (i == std::string::npos) {
+		std::cerr << "invalid file_path in get_parent_dir_path" << std::endl;
+	}
+	return file_path.substr(0, i);
+}
+
+//  std::unordered_map<std::string, std::tuple<void*, off64_t*, off64_t, bool, Capio_file>> files_metadata;
+void write_entry_dir(std::string file_path, std::string dir) {
+	std::hash<std::string> hash;		
+	struct linux_dirent ld;
+	ld.d_ino = hash(file_path);
+	std::size_t i = file_path.rfind('/');
+	if (i == std::string::npos) {
+		std::cerr << "invalid file_path in get_parent_dir_path" << std::endl;
+	}
+	std::string file_name = file_path.substr(i + 1);
+	strcpy(ld.d_name, file_name.c_str());
+	long int ld_size = sizeof(ld);
+	ld.d_reclen =  ld_size;
+	auto it_tuple = files_metadata.find(dir);
+
+	if (it_tuple == files_metadata.end()) {
+		std::cerr << "dir " << dir << " is not present in CAPIO" << std::endl;
+		exit(1);
+	}
+	void* file_shm = std::get<0>(it_tuple->second);
+	off64_t file_size = *std::get<1>(it_tuple->second);
+	off64_t file_shm_size = std::get<2>(files_metadata[dir]);
+	off64_t data_size = file_size + ld_size;
+	ld.d_off =  data_size;
+		if (data_size > file_shm_size) {
+
+        #ifdef CAPIOLOG
+        std::cout << "handle write data_size > file_shm_size" << std::endl;
+        #endif
+			//remap
+			size_t new_size;
+			if (data_size > file_shm_size * 2)
+				new_size = data_size;
+			else
+				new_size = file_shm_size * 2;
+
+			void* p = mremap(std::get<0>(files_metadata[dir]), file_shm_size, new_size, MREMAP_MAYMOVE);
+			if (p == MAP_FAILED)
+				err_exit("mremap " + dir);
+			std::get<0>(files_metadata[dir]) = p;
+			std::get<2>(files_metadata[dir]) = new_size;
+		}
+		if (std::get<4>(files_metadata[file_path]).is_dir()) {
+			ld.d_name[PATH_MAX + 1] = DT_DIR; 
+		}
+		else {
+			ld.d_name[PATH_MAX + 1] = DT_REG; 
+		}
+		memcpy((char*) file_shm + file_size, &ld, sizeof(ld));
+		*std::get<1>(it_tuple->second) = data_size;
+		Capio_file& c_file = std::get<4>(files_metadata[dir]);
+	off64_t base_offset = file_size;
+		std::cout << "insert sector for dir" << base_offset << ", " << data_size << std::endl;
+		c_file.insert_sector(base_offset, data_size);
+		c_file.print();
+
+}
+
+void update_dir(std::string file_path, int rank) {
+	std::string dir = get_parent_dir_path(file_path);
+        #ifdef CAPIOLOG
+        std::cout << "update dir " << dir << std::endl;
+        #endif
+    if (std::get<3>(files_metadata[dir])) {
+		std::get<3>(files_metadata[dir]) = false;
+        write_file_location("files_location.txt", rank, dir);
+	}
+        #ifdef CAPIOLOG
+        std::cout << "before write entry dir" << std::endl;
+        #endif
+	write_entry_dir(file_path, dir);
+        #ifdef CAPIOLOG
+        std::cout << "update dir end" << std::endl;
+        #endif
+	return;
+}
+
 void handle_write(const char* str, int rank) {
         //check if another process is waiting for this data
         std::string request;
@@ -444,10 +562,13 @@ void handle_write(const char* str, int rank) {
 		c_file.print();
         #ifdef CAPIOLOG
         std::cout << "handle write tid fd " << tid << " " << fd << std::endl;
+		std::cout << "path " << path << std::endl;
         #endif
         if (std::get<3>(files_metadata[path])) {
 			std::get<3>(files_metadata[path]) = false;
-                write_file_location("files_location.txt", rank, path);
+            write_file_location("files_location.txt", rank, path);
+			//TODO: it works only if there is one prod per file
+			update_dir(path, rank);
         }
         *std::get<1>(files_metadata[path]) = data_size; 
 		off64_t file_shm_size = std::get<2>(files_metadata[path]);
@@ -557,12 +678,11 @@ void handle_write(const char* str, int rank) {
         }
 }
 
-
 /*
  * Multithread function
  */
 
-void handle_local_read(int tid, int fd, off64_t count) {
+void handle_local_read(int tid, int fd, off64_t count, bool dir) {
 		#ifdef CAPIOLOG
 		std::cout << "handle local read" << std::endl;
 		#endif
@@ -578,12 +698,13 @@ void handle_local_read(int tid, int fd, off64_t count) {
 		std::cout << "end of sector" << end_of_sector << std::endl;
 		c_file.print();
 		off64_t end_of_read = process_offset + count;
+		off64_t nreads;
 		if (end_of_read > end_of_sector) {
 		#ifdef CAPIOLOG
 		std::cout << "Am I a writer? " << writer << std::endl;
 		std::cout << "Is the file completed? " << c_file.complete << std::endl;
 		#endif
-			if (!writer && !c_file.complete) {
+			if (!writer && !c_file.complete && !dir) {
 				#ifdef CAPIOLOG
 				std::cout << "add pending reads" << std::endl;
 				#endif
@@ -592,14 +713,18 @@ void handle_local_read(int tid, int fd, off64_t count) {
 			else {
 				off64_t file_size = c_file.get_file_size();
 				if (file_size >= end_of_read)
-					response_buffers[tid]->write(&end_of_read);
+					nreads = end_of_read;
 				else
-					response_buffers[tid]->write(&file_size);
+					nreads = file_size;
+
+				response_buffers[tid]->write(&nreads);
+					
 			}
 
 		}
-		else
+		else {
 			response_buffers[tid]->write(&end_of_sector);
+		}
 		#ifdef CAPIOLOG
 		std::cout << "process offset " << process_offset << std::endl;
 		#endif
@@ -639,6 +764,7 @@ void handle_remote_read(int tid, int fd, off64_t count, int rank) {
 struct wait_for_file_metadata{
 	int tid;
 	int fd;
+	bool dir;
 	off64_t count;
 };
 
@@ -647,6 +773,7 @@ void* wait_for_file(void* pthread_arg) {
 	int tid = metadata->tid;
 	int fd = metadata-> fd;
 	off64_t count = metadata->count;
+	bool dir = metadata->dir;
 	//check if the data is created
 	FILE* fp;
 	bool found = false;
@@ -728,7 +855,7 @@ void* wait_for_file(void* pthread_arg) {
 	}
 	//check if the file is local or remote
 	if (strcmp(files_location[path_to_check], node_name) == 0) {
-			handle_local_read(tid, fd, count);
+			handle_local_read(tid, fd, count, dir);
 	}
 	else {
 			handle_remote_read(tid, fd, count, rank);
@@ -739,7 +866,7 @@ void* wait_for_file(void* pthread_arg) {
 }
 
 
-void handle_read(char* str, int rank) {
+void handle_read(char* str, int rank, bool dir) {
 	#ifdef CAPIOLOG
 	std::cout << "handle read str" << str << std::endl;
 	#endif
@@ -758,6 +885,7 @@ void handle_read(char* str, int rank) {
 			metadata->tid = tid;
 			metadata->fd = fd;
 			metadata->count = count;
+			metadata->dir = dir;
 			int res = pthread_create(&t, NULL, wait_for_file, (void*) metadata);
 			if (res != 0) {
 				std::cerr << "error creation of capio server thread" << std::endl;
@@ -769,7 +897,7 @@ void handle_read(char* str, int rank) {
 		}
 	}
 	if (strcmp(files_location[processes_files_metadata[tid][fd]], node_name) == 0) {
-		handle_local_read(tid, fd, count);
+		handle_local_read(tid, fd, count, dir);
 	}
 	else {
 		handle_remote_read(tid, fd, count, rank);
@@ -1068,7 +1196,7 @@ void handle_clone(const char* str) {
 	}
 }
 
-void handle_mkdir(const char* str) {
+void handle_mkdir(const char* str, int rank) {
 	pid_t tid;
 	char pathname[PATH_MAX];
 	sscanf(str, "mkdi %d %s", &tid, pathname);
@@ -1078,8 +1206,17 @@ void handle_mkdir(const char* str) {
 	std::cout << "handle mkdir" << std::endl;
 	#endif
 	if (files_metadata.find(pathname) == files_metadata.end()) {
-		void* p_shm = create_shm(pathname, 1024L * 1024 * 1024* 2);
+		std::string shm_name = pathname;
+		std::replace(shm_name.begin(), shm_name.end(), '/', '_');
+		shm_name = shm_name.substr(1);
+		void* p_shm = create_shm(shm_name, 1024L * 1024 * 1024* 2);
 		create_file(pathname, p_shm, true);	
+		if (std::get<3>(files_metadata[pathname])) {
+			std::get<3>(files_metadata[pathname]) = false;
+            write_file_location("files_location.txt", rank, pathname);
+			//TODO: it works only if there is one prod per file
+			update_dir(pathname, rank);
+        }
 		res = 0;
 	}
 	else {
@@ -1122,7 +1259,7 @@ void read_next_msg(int rank) {
 	else if (strncmp(str, "writ", 4) == 0)
 		handle_write(str, rank);
 	else if (strncmp(str, "read", 4) == 0)
-		handle_read(str, rank);
+		handle_read(str, rank, false);
 	else if (strncmp(str, "clos", 4) == 0)
 		handle_close(str, p);
 	else if (strncmp(str, "ream", 4) == 0)
@@ -1148,9 +1285,11 @@ void read_next_msg(int rank) {
 	else if (strncmp(str, "clon", 4) == 0)
 		handle_clone(str);
 	else if (strncmp(str, "mkdi", 4) == 0)
-		handle_mkdir(str);
+		handle_mkdir(str, rank);
 	else if (strncmp(str, "dupp", 4) == 0)
 		handle_dup(str);
+	else if (strncmp(str, "dent", 4) == 0)
+		handle_read(str, rank, true);
 	else {
 		std::cerr << "error msg read" << std::endl;
 	MPI_Finalize();
@@ -1190,6 +1329,37 @@ void* capio_server(void* pthread_arg) {
 	MPI_Comm_size(MPI_COMM_WORLD, &size);
 	catch_sigterm();
 	handshake_servers(rank, size);
+	char* val;
+	if (capio_dir == nullptr) {
+	val = getenv("CAPIO_DIR");
+	try {
+		if (val == NULL) {
+			capio_dir = new std::string(std::filesystem::canonical("."));	
+		}
+		else {
+			capio_dir = new std::string(std::filesystem::canonical(val));
+		}
+	}
+	catch (const std::exception& ex) {
+		exit(1);
+	}
+	int res = is_directory(capio_dir->c_str());
+	if (res == 0) {
+		std::cerr << "dir " << capio_dir << " is not a directory" << std::endl;
+		exit(1);
+	}
+	}
+	#ifdef CAPIOLOG
+	std::cout << "capio dir" << *capio_dir << std::endl;
+	#endif	
+	std::string shm_name = *capio_dir;
+	std::replace(shm_name.begin(), shm_name.end(), '/', '_');
+	shm_name = shm_name.substr(1);
+	#ifdef CAPIOLOG
+	std::cout << "capio dir" << *capio_dir << std::endl;
+	#endif	
+	void* p_shm = create_shm(shm_name.c_str(), 1024L * 1024 * 1024* 2);
+	create_file(capio_dir->c_str(), p_shm, true);	
 	buf_requests = new Circular_buffer<char>("circular_buffer", 1024 * 1024, sizeof(char) * 600);
 	sem_post(&internal_server_sem);
 	while(true) {

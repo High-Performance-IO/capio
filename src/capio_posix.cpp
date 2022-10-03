@@ -9,6 +9,7 @@
 #include <filesystem>
 #include <climits>
 #include <atomic>
+#include <algorithm>
 
 #include <stdlib.h>
 #include <unistd.h>
@@ -29,6 +30,23 @@
 
 #include "utils/common.hpp"
 #include "capio_file.hpp"
+
+/*
+ * From the man getdents:
+ * "There is no definition of struct linux_dirent  in  glibc; see NOTES."
+ *
+ * NOTES section:
+ * "[...] you will need to define the linux_dirent or linux_dirent64
+ * structure yourself."
+ *
+ */
+
+struct linux_dirent {
+	unsigned long  d_ino;
+	off_t          d_off;
+	unsigned short d_reclen;
+	char           d_name[PATH_MAX + 2];
+};
 
 struct spinlock {
   std::atomic<bool> lock_ = {0};
@@ -106,22 +124,6 @@ bool thread_created = false;
 // -------------------------  utility functions:
 static bool is_absolute(const char* pathname) {
 	return (pathname ? (pathname[0]=='/') : false);
-}
-static int is_directory(int dirfd) {
-	struct stat path_stat;
-    if (fstat(dirfd, &path_stat) != 0) {
-		std::cerr << "error: stat" << " errno " <<  errno << " strerror(errno): " << strerror(errno) << std::endl;
-		return -1;
-	}
-    return S_ISDIR(path_stat.st_mode);  // 1 is a directory 
-}
-static int is_directory(const char *path) {
-   struct stat statbuf;
-   if (stat(path, &statbuf) != 0) {
-		std::cerr << "error: stat" << " errno " <<  errno << " strerror(errno): " << strerror(errno) << std::endl;
-		return -1;
-   }
-   return S_ISDIR(statbuf.st_mode);
 }
 static blkcnt_t get_nblocks(off64_t file_size) {
 	if (file_size % 4096 == 0)
@@ -462,18 +464,7 @@ auto res_mismatch = std::mismatch(capio_dir->begin(), capio_dir->end(), path_to_
 			errno = EEXIST;
 			return -1;
 			}
-		//create shm
-			char shm_name[512];
-			size_t i = 0;
-			while (i < path_to_check.length()) {
-				if (path_to_check[i] == '/' && i > 0)
-					shm_name[i] = '_';
-				else
-					shm_name[i] = path_to_check[i];
-				++i;
-			}
-			shm_name[i] = '\0';
-			res = add_mkdir_request(shm_name);
+			res = add_mkdir_request(path_to_check);
 			if (res == 0)
 				capio_files_paths->insert(path_to_check);
 			#ifdef CAPIOLOG
@@ -509,7 +500,6 @@ int capio_mkdir(const char* pathname, mode_t mode) {
 	}
 	return request_mkdir(path_to_check);
 
-	return res;
 }
 
 int capio_mkdirat(int dirfd, const char* pathname, mode_t mode) {
@@ -845,7 +835,7 @@ int capio_openat(int dirfd, const char* pathname, int flags) {
 			shm_name[i] = '\0';
 			int fd;
 			void* p = create_shm(shm_name, 1024L * 1024 * 1024* 2, &fd);
-			add_open_request(shm_name, fd);
+			add_open_request(path_to_check.c_str(), fd);
 			off64_t* p_offset = (off64_t*) create_shm("offset_" + std::to_string(syscall(SYS_gettid)) + "_" + std::to_string(fd), sizeof(off64_t));
 			*p_offset = 0;
 			off64_t* init_size = new off64_t;
@@ -853,7 +843,7 @@ int capio_openat(int dirfd, const char* pathname, int flags) {
 			off64_t* offset = new off64_t;
 			*offset = 0;
 			files->insert({fd, std::make_tuple(p, p_offset, init_size, offset, flags, 0)});
-			(*capio_files_descriptors)[fd] = shm_name;
+			(*capio_files_descriptors)[fd] = path_to_check;
 			capio_files_paths->insert(path_to_check);
 			if ((flags & O_APPEND) == O_APPEND) {
 				capio_lseek(fd, 0, SEEK_END);
@@ -888,6 +878,7 @@ ssize_t capio_write(int fd, const  void *buffer, size_t count) {
 			else
 				new_size = file_shm_size * 2;
 			std::string shm_name = (*capio_files_descriptors)[fd];
+			std::replace(shm_name.begin(), shm_name.end(), '/', '_');
 			int fd_shm = shm_open(shm_name.c_str(), O_RDWR,  S_IRUSR | S_IWUSR); 
 			if (fd == -1)
 				err_exit(" write_shm shm_open " + shm_name);
@@ -1103,6 +1094,15 @@ void capio_exit_group(int status) {
 }
 
 /*
+ * Removes consecutives slashes
+ *
+ */
+
+std::string sanitaze_path(std::string path) {
+	std::string res;
+}
+
+/*
  * Precondition: absolute_path must contain an absolute path
  *
  */
@@ -1111,6 +1111,7 @@ int capio_lstat(std::string absolute_path, struct stat* statbuf) {
 	#ifdef CAPIOLOG
 	CAPIO_DBG("capio_lstat %s\n", absolute_path.c_str());
 	#endif
+	absolute_path = sanitaze_path(absolute_path);
 	auto res = std::mismatch(capio_dir->begin(), capio_dir->end(), absolute_path.begin());
 	if (res.first == capio_dir->end()) {
 		if (capio_dir->size() == absolute_path.size()) {
@@ -1118,20 +1119,10 @@ int capio_lstat(std::string absolute_path, struct stat* statbuf) {
 			return -2;
 
 		}
-		char normalized_path[2048];
-		int i = 0;
-		while (absolute_path[i] != '\0') {
-			if (absolute_path[i] == '/' && i > 0)
-				normalized_path[i] = '_';
-			else
-				normalized_path[i] = absolute_path[i];
-			++i;
-		}
-		normalized_path[i] = '\0';
 	#ifdef CAPIOLOG
 		CAPIO_DBG("capio_lstat sending msg to server\n");
 	#endif
-		std::string msg = "stat " + std::to_string(syscall(SYS_gettid)) + " " + normalized_path;
+		std::string msg = "stat " + std::to_string(syscall(SYS_gettid)) + " " + absolute_path;
 		const char* c_str = msg.c_str();
 		buf_requests->write(c_str, (strlen(c_str) + 1) * sizeof(char));
 	#ifdef CAPIOLOG
@@ -1149,7 +1140,7 @@ int capio_lstat(std::string absolute_path, struct stat* statbuf) {
 
 		
 		std::hash<std::string> hash;		
-		statbuf->st_ino = hash(normalized_path);
+		statbuf->st_ino = hash(absolute_path);
 
 		if (is_dir == 0) {
 			statbuf->st_mode = S_IFDIR | S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH; // 0644 directory
@@ -1187,6 +1178,7 @@ int capio_lstat(std::string absolute_path, struct stat* statbuf) {
 int capio_lstat_wrapper(const char* path, struct stat* statbuf) {
 	#ifdef CAPIOLOG
 	CAPIO_DBG("capio_lstat_wrapper\n");
+	CAPIO_DBG("lstat  pathanem %s\n", path);
 	#endif
 	std::string absolute_path;	
 	absolute_path = create_absolute_path(path);
@@ -1250,6 +1242,7 @@ int capio_fstat(int fd, struct stat* statbuf) {
 
 
 int capio_fstatat(int dirfd, const char* pathname, struct stat* statbuf, int flags) {
+	CAPIO_DBG("fstatat pathanem %s\n", pathname);
 	if ((flags & AT_EMPTY_PATH) == AT_EMPTY_PATH) {
 		if(dirfd == AT_FDCWD) { // operate on currdir
 			char* curr_dir = get_current_dir_name(); 
@@ -1331,16 +1324,7 @@ int capio_access(const char* pathname, int mode) {
 }
 
 int capio_file_exists(std::string path) {
-	char normalized_path[PATH_MAX];
-	normalized_path[0] = '/';
-	for (size_t i = 1; i < path.length(); ++i) {
-		if (path[i] == '/')
-			normalized_path[i] = '_';
-		else
-			normalized_path[i] = path[i];
-	}
-
-	std::string msg = "accs " + std::string(normalized_path);
+	std::string msg = "accs " + std::string(path);
 	off64_t res;
 	buf_requests->write(msg.c_str(), (strlen(msg.c_str()) + 1) * sizeof(char));
 	(*bufs_response)[syscall(SYS_gettid)]->read(&res);
@@ -1389,16 +1373,7 @@ int capio_unlink_abs(std::string abs_path) {
 			exit(1);
 		}
 		int pid = syscall(SYS_gettid);
-		char normalized_path[PATH_MAX];
-		normalized_path[0] = '/';
-		for (size_t i = 1; i < abs_path.length(); ++i) {
-			if (abs_path[i] == '/')
-				normalized_path[i] = '_';
-			else
-				normalized_path[i] = abs_path[i];
-		}
-		normalized_path[abs_path.length()] = '\0';
-		std::string msg = "unlk " + std::to_string(pid) + " " + std::string(normalized_path);
+		std::string msg = "unlk " + std::to_string(pid) + " " + std::string(abs_path);
 		buf_requests->write(msg.c_str(), (strlen(msg.c_str()) + 1) * sizeof(char));
 		off64_t res_unlink;
 	    (*bufs_response)[syscall(SYS_gettid)]->read(&res_unlink); 	
@@ -1642,6 +1617,83 @@ pid_t capio_clone(int flags, void* child_stack, void* parent_tidpr, void* tls, v
 
 	}
 	return pid;
+}
+
+off64_t add_getdents_request(int fd, off64_t count, std::tuple<void*, off64_t*, off64_t*, off64_t*, int , int>& t) {
+	std::string str = "dent " + std::to_string(syscall(SYS_gettid)) + " " + std::to_string(fd) + " " + std::to_string(count);
+	const char* c_str = str.c_str();
+	buf_requests->write(c_str, (strlen(c_str) + 1) * sizeof(char));
+	//read response (offest)
+	off64_t offset_upperbound;
+	(*bufs_response)[syscall(SYS_gettid)]->read(&offset_upperbound);
+	*std::get<3>(t) = offset_upperbound;
+	off64_t file_shm_size = *std::get<2>(t);
+	off64_t end_of_read = *std::get<1>(t) + count;
+	if (end_of_read > offset_upperbound)
+		end_of_read = offset_upperbound;
+	if (end_of_read > file_shm_size) {
+		size_t new_size;
+		if (end_of_read > file_shm_size * 2)
+			new_size = end_of_read;
+		else
+			new_size = file_shm_size * 2;
+
+		void* p = mremap(std::get<0>(t), file_shm_size, new_size, MREMAP_MAYMOVE);
+		if (p == MAP_FAILED)
+			err_exit("mremap " + std::to_string(fd));
+		std::get<0>(t) = p;
+		*std::get<2>(t) = new_size;
+	}
+	return offset_upperbound;
+}
+
+off64_t round(off64_t bytes) {
+	off64_t res = 0;
+	off64_t ld_size = sizeof(struct linux_dirent);
+	while (res + ld_size < bytes)
+		res += ld_size;
+	return res;
+}
+
+//TODO: too similar to capio_read, refactoring needed
+
+ssize_t capio_getdents(int fd, void *buffer, size_t count) {
+		#ifdef CAPIOLOG
+		CAPIO_DBG("capio_getdents %d %d %ld\n", syscall(SYS_gettid), fd, count);
+		#endif
+	auto it = files->find(fd);
+	if (it != files->end()) {
+		if (count >= SSIZE_MAX) {
+			std::cerr << "capio does not support read bigger then SSIZE_MAX yet" << std::endl;
+			exit(1);
+		}
+		off64_t count_off = count;
+		std::tuple<void*, off64_t*, off64_t*, off64_t*, int, int>* t = &(*files)[fd];
+		off64_t* offset = std::get<1>(*t);
+		//bool in_shm = check_cache(fd);
+		//if (in_shm) {
+		off64_t bytes_read;
+			if (*offset + count_off > *std::get<3>(*t)) {
+				off64_t end_of_read;
+				end_of_read = add_getdents_request(fd, count_off, *t);
+				bytes_read = end_of_read - *offset;
+				if (bytes_read > count_off)
+					bytes_read = count_off;
+			}
+			else
+				bytes_read = count_off;
+			bytes_read = round(bytes_read);
+			read_shm(std::get<0>(*t), *offset, buffer, bytes_read);
+		//}
+		//else {
+			//read_from_disk(fd, offset, buffer, count);
+		//}
+		*offset = *offset + bytes_read;
+		return bytes_read;
+	}
+	else { 
+		return -2;
+	}
 }
 
 
@@ -2058,6 +2110,19 @@ static int hook(long syscall_number, long arg0, long arg1, long arg2, long arg3,
 		crate_snapshot();
 		break;
 	}
+	
+	case SYS_getdents: {
+		int fd =  arg0;
+		struct linux_dirent* dirp = reinterpret_cast<struct linux_dirent*>(arg1);
+		unsigned int count = arg2;
+		ssize_t res = capio_getdents(fd, dirp, count);				
+    	if (res != -2) {
+      		*result = (res < 0 ? -errno : res);
+      		hook_ret_value = 0;
+    	}
+		break;
+	}
+	
 
 
   default:
