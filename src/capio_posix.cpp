@@ -45,7 +45,7 @@ struct linux_dirent {
 	unsigned long  d_ino;
 	off_t          d_off;
 	unsigned short d_reclen;
-	char           d_name[PATH_MAX + 2];
+	char           d_name[128];
 };
 
 struct spinlock {
@@ -1135,15 +1135,15 @@ int capio_lstat(std::string absolute_path, struct stat* statbuf) {
 		statbuf->st_ino = hash(absolute_path);
 
 		if (is_dir == 0) {
-			statbuf->st_mode = S_IFDIR | S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH; // 0644 directory
+	    	statbuf->st_mode = S_IFDIR | S_IRWXU | S_IWGRP | S_IRGRP | S_IXOTH| S_IROTH; // 0755 directory
 			file_size = 4096;															
 		}
 																		
 		else
 			statbuf->st_mode = S_IFREG | S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH; // 0644 regular file 
 		statbuf->st_nlink = 1;
-		statbuf->st_uid = 0; // root 
-		statbuf->st_gid = 0; // root
+		statbuf->st_uid = getuid(); 
+		statbuf->st_gid = getgid();
 		statbuf->st_rdev = 0;
 		statbuf->st_size = file_size;
 	#ifdef CAPIOLOG
@@ -1200,13 +1200,13 @@ int capio_fstat(int fd, struct stat* statbuf) {
 		statbuf->st_ino = hash((*capio_files_descriptors)[fd]);
 		
 		if (is_dir == 0)
-	    	statbuf->st_mode = S_IFDIR | S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH; // 0644 regular file 
+	    	statbuf->st_mode = S_IFDIR | S_IRWXU | S_IWGRP | S_IRGRP | S_IXOTH| S_IROTH; // 0755 directory
 																		
 		else
-	    	statbuf->st_mode = S_IFREG | S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH; // 0644 regular file 
+	    	statbuf->st_mode = S_IFREG | S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH; // 0666 regular file 
 		statbuf->st_nlink = 1;
-		statbuf->st_uid = 0; // root
-		statbuf->st_gid = 0; // root
+		statbuf->st_uid = getuid();
+		statbuf->st_gid = getgid();
 		statbuf->st_rdev = 0;
 		statbuf->st_size = file_size;
 	#ifdef CAPIOLOG

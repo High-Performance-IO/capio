@@ -45,7 +45,7 @@ struct linux_dirent {
 	unsigned long  d_ino;
 	off_t          d_off;
 	unsigned short d_reclen;
-	char           d_name[PATH_MAX + 2];
+	char           d_name[128];
 };
 
 std::string* capio_dir = nullptr;
