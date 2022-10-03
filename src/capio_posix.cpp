@@ -1642,7 +1642,7 @@ off64_t add_getdents_request(int fd, off64_t count, std::tuple<void*, off64_t*, 
 off64_t round(off64_t bytes) {
 	off64_t res = 0;
 	off64_t ld_size = sizeof(struct linux_dirent);
-	while (res + ld_size < bytes)
+	while (res + ld_size <= bytes)
 		res += ld_size;
 	return res;
 }
@@ -1681,6 +1681,9 @@ ssize_t capio_getdents(int fd, void *buffer, size_t count) {
 			//read_from_disk(fd, offset, buffer, count);
 		//}
 		*offset = *offset + bytes_read;
+		#ifdef CAPIOLOG
+		CAPIO_DBG("capio_getdents returning %ld\n", bytes_read);
+		#endif
 		return bytes_read;
 	}
 	else { 

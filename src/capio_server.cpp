@@ -1203,7 +1203,7 @@ void handle_mkdir(const char* str, int rank) {
 	init_process(tid);
 	off64_t res;
 	#ifdef CAPIOLOG
-	std::cout << "handle mkdir" << std::endl;
+	std::cout << "handle mkdir " << pathname << std::endl;
 	#endif
 	if (files_metadata.find(pathname) == files_metadata.end()) {
 		std::string shm_name = pathname;
