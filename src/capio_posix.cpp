@@ -558,7 +558,6 @@ off64_t add_read_request(int fd, off64_t count, std::tuple<void*, off64_t*, off6
 			new_size = end_of_read;
 		else
 			new_size = file_shm_size * 2;
-
 		void* p = mremap(std::get<0>(t), file_shm_size, new_size, MREMAP_MAYMOVE);
 		if (p == MAP_FAILED)
 			err_exit("mremap " + std::to_string(fd));
@@ -836,7 +835,7 @@ int capio_openat(int dirfd, const char* pathname, int flags) {
 			}
 			shm_name[i] = '\0';
 			int fd;
-			void* p = create_shm(shm_name, 1024L * 1024 * 1024* 2, &fd);
+			void* p = create_shm(shm_name, file_initial_size, &fd);
 			add_open_request(path_to_check.c_str(), fd);
 			off64_t* p_offset = (off64_t*) create_shm("offset_" + std::to_string(syscall(SYS_gettid)) + "_" + std::to_string(fd), sizeof(off64_t));
 			*p_offset = 0;

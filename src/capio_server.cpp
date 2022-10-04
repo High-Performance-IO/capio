@@ -1,4 +1,3 @@
-
 #include "circular_buffer.hpp"
 
 #include <string>
@@ -33,6 +32,7 @@
 
 
 #define DNAME_LENGTH 128
+
 /*
  * From the man getdents:
  * "There is no definition of struct linux_dirent  in  glibc; see NOTES."
@@ -58,7 +58,7 @@ const long int max_shm_size = 1024L * 1024 * 1024 * 16;
 const long int max_shm_size_file = 1024L * 1024 * 1024 * 8;
 
 // initial size for each file (can be overwritten by the user)
-const size_t file_initial_size = 1024L * 1024 * 1024 * 2;
+const size_t file_initial_size = 1024L * 1024 * 1024 * 4;
 
 bool shm_full = false;
 long int total_bytes_shm = 0;
@@ -411,7 +411,7 @@ void handle_open(char* str, char* p, int rank) {
 		std::string shm_name = path;
 		std::replace(shm_name.begin(), shm_name.end(), '/', '_');
 		shm_name = shm_name.substr(1);
-		p_shm = create_shm(shm_name, 1024L * 1024 * 1024* 2);
+		p_shm = create_shm(shm_name, file_initial_size);
 		caching_info[tid].first[index + 1] = 0;
 	}
 	else {
@@ -504,9 +504,13 @@ void write_entry_dir(std::string file_path, std::string dir) {
 			else
 				new_size = file_shm_size * 2;
 
-			void* p = mremap(std::get<0>(files_metadata[dir]), file_shm_size, new_size, MREMAP_MAYMOVE);
-			if (p == MAP_FAILED)
-				err_exit("mremap " + dir);
+
+			int res = munmap(std::get<0>(files_metadata[dir]), file_shm_size);
+			if (res == -1)
+				err_exit("munmap " + dir);
+			std::string shm_name = dir;
+			std::replace(shm_name.begin(), shm_name.end(), '/', '_');
+			void* p = expand_shared_mem(shm_name, new_size);
 			std::get<0>(files_metadata[dir]) = p;
 			std::get<2>(files_metadata[dir]) = new_size;
 		}
@@ -586,9 +590,12 @@ void handle_write(const char* str, int rank) {
 			else
 				new_size = file_shm_size * 2;
 
-			void* p = mremap(std::get<0>(files_metadata[path]), file_shm_size, new_size, MREMAP_MAYMOVE);
-			if (p == MAP_FAILED)
-				err_exit("mremap " + path);
+			int res = munmap(std::get<0>(files_metadata[path]), file_shm_size);
+			if (res == -1)
+				err_exit("munmap " + path);
+			std::string shm_name = path;
+			std::replace(shm_name.begin(), shm_name.end(), '/', '_');
+			void* p = expand_shared_mem(shm_name, new_size);
 			std::get<0>(files_metadata[path]) = p;
 			std::get<2>(files_metadata[path]) = new_size;
 		}
@@ -1211,7 +1218,7 @@ void handle_mkdir(const char* str, int rank) {
 		std::string shm_name = pathname;
 		std::replace(shm_name.begin(), shm_name.end(), '/', '_');
 		shm_name = shm_name.substr(1);
-		void* p_shm = create_shm(shm_name, 1024L * 1024 * 1024* 2);
+		void* p_shm = create_shm(shm_name, file_initial_size);
 		create_file(pathname, p_shm, true);	
 		if (std::get<3>(files_metadata[pathname])) {
 			std::get<3>(files_metadata[pathname]) = false;
@@ -1360,7 +1367,7 @@ void* capio_server(void* pthread_arg) {
 	#ifdef CAPIOLOG
 	std::cout << "capio dir" << *capio_dir << std::endl;
 	#endif	
-	void* p_shm = create_shm(shm_name.c_str(), 1024L * 1024 * 1024* 2);
+	void* p_shm = create_shm(shm_name.c_str(), file_initial_size);
 	create_file(capio_dir->c_str(), p_shm, true);	
 	buf_requests = new Circular_buffer<char>("circular_buffer", 1024 * 1024, sizeof(char) * 600);
 	sem_post(&internal_server_sem);

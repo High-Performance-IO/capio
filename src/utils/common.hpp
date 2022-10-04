@@ -10,6 +10,7 @@
 #include <sys/stat.h>
 #include <fcntl.h>
 #include <unistd.h>
+
 static int is_directory(int dirfd) {
 	struct stat path_stat;
     if (fstat(dirfd, &path_stat) != 0) {
@@ -91,6 +92,32 @@ void* create_shm(std::string shm_name, const long int size) {
 	if (close(fd) == -1)
 		err_exit("close");
 	return p;
+}
+
+void* expand_shared_mem(std::string shm_name, long int new_size) {
+	void* p = nullptr;
+	// if we are not creating a new object, mode is equals to 0
+	int fd = shm_open(shm_name.c_str(), O_RDWR, 0); //to be closed
+	struct stat sb;
+	if (fd == -1) {
+		if (errno == ENOENT)
+			return nullptr;
+		err_exit("get_shm shm_open " + shm_name);
+	}
+	/* Open existing object */
+	/* Use shared memory object size as length argument for mmap()
+	and as number of bytes to write() */
+	if (fstat(fd, &sb) == -1)
+		err_exit("fstat " + shm_name);
+	if (ftruncate(fd, new_size) == -1)
+		err_exit("ftruncate " + shm_name);
+	p = mmap(NULL, new_size, PROT_READ|PROT_WRITE, MAP_SHARED, fd, 0);
+	if (p == MAP_FAILED)
+		err_exit("mmap create_shm " + shm_name);
+	if (close(fd) == -1)
+		err_exit("close");
+	return p;
+
 }
 
 void* create_shm(std::string shm_name, const long int size, int* fd) {
