@@ -489,7 +489,6 @@ void write_entry_dir(std::string file_path, std::string dir) {
 	strcpy(ld.d_name, file_name.c_str());
 	long int ld_size = theoretical_size;
 	ld.d_reclen =  ld_size;
-	std::cout << "theoretical_size " << theoretical_size << "real size " << sizeof(ld);
 	auto it_tuple = files_metadata.find(dir);
 
 	if (it_tuple == files_metadata.end()) {
@@ -530,10 +529,6 @@ void write_entry_dir(std::string file_path, std::string dir) {
 			ld.d_name[DNAME_LENGTH + 1] = DT_REG; 
 		}
 			ld.d_name[DNAME_LENGTH] = '\0'; 
-			char* buf = (char*) &ld;
-		char d_type = *(buf + ld.d_reclen - 1);
-                   printf("dtype: %c %d\n", d_type, d_type);
-                   printf("dtype real: %c %d\n", ld.d_name[DNAME_LENGTH + 1], ld.d_name[DNAME_LENGTH + 1]);
 		memcpy((char*) file_shm + file_size, &ld, sizeof(ld));
 		*std::get<1>(it_tuple->second) = data_size;
 		Capio_file& c_file = std::get<4>(files_metadata[dir]);
