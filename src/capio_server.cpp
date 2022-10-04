@@ -31,6 +31,8 @@
 #include "capio_file.hpp"
 #include "utils/common.hpp"
 
+
+#define DNAME_LENGTH 128
 /*
  * From the man getdents:
  * "There is no definition of struct linux_dirent  in  glibc; see NOTES."
@@ -45,7 +47,7 @@ struct linux_dirent {
 	unsigned long  d_ino;
 	off_t          d_off;
 	unsigned short d_reclen;
-	char           d_name[128];
+	char           d_name[DNAME_LENGTH + 2];
 };
 
 std::string* capio_dir = nullptr;
@@ -509,10 +511,10 @@ void write_entry_dir(std::string file_path, std::string dir) {
 			std::get<2>(files_metadata[dir]) = new_size;
 		}
 		if (std::get<4>(files_metadata[file_path]).is_dir()) {
-			ld.d_name[PATH_MAX + 1] = DT_DIR; 
+			ld.d_name[DNAME_LENGTH + 1] = DT_DIR; 
 		}
 		else {
-			ld.d_name[PATH_MAX + 1] = DT_REG; 
+			ld.d_name[DNAME_LENGTH + 1] = DT_REG; 
 		}
 		memcpy((char*) file_shm + file_size, &ld, sizeof(ld));
 		*std::get<1>(it_tuple->second) = data_size;

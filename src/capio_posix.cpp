@@ -31,6 +31,8 @@
 #include "utils/common.hpp"
 #include "capio_file.hpp"
 
+#define DNAME_LENGTH 128
+
 /*
  * From the man getdents:
  * "There is no definition of struct linux_dirent  in  glibc; see NOTES."
@@ -45,7 +47,7 @@ struct linux_dirent {
 	unsigned long  d_ino;
 	off_t          d_off;
 	unsigned short d_reclen;
-	char           d_name[128];
+	char           d_name[DNAME_LENGTH + 2];
 };
 
 struct spinlock {
