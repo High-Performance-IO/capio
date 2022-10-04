@@ -50,6 +50,8 @@ struct linux_dirent {
 	char           d_name[DNAME_LENGTH + 2];
 };
 
+const static int theoretical_size = sizeof(unsigned long) + sizeof(off_t) + sizeof(unsigned short) + sizeof(char) * DNAME_LENGTH + 2;
+
 struct spinlock {
   std::atomic<bool> lock_ = {0};
 
@@ -1642,7 +1644,7 @@ off64_t add_getdents_request(int fd, off64_t count, std::tuple<void*, off64_t*, 
 
 off64_t round(off64_t bytes) {
 	off64_t res = 0;
-	off64_t ld_size = sizeof(struct linux_dirent);
+	off64_t ld_size = theoretical_size;
 	while (res + ld_size <= bytes)
 		res += ld_size;
 	return res;

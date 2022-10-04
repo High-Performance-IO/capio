@@ -50,6 +50,8 @@ struct linux_dirent {
 	char           d_name[DNAME_LENGTH + 2];
 };
 
+const static int theoretical_size = sizeof(unsigned long) + sizeof(off_t) + sizeof(unsigned short) + sizeof(char) * DNAME_LENGTH + 2;
+
 std::string* capio_dir = nullptr;
 
 const long int max_shm_size = 1024L * 1024 * 1024 * 16;
@@ -155,7 +157,7 @@ char node_name[MPI_MAX_PROCESSOR_NAME];
 
 Circular_buffer<char>* buf_requests; 
 //std::unordered_map<int, sem_t*> sems_response;
-std::unordered_map<int, sem_t*> sems_write;
+std::unordered_map<int, sem_t*>* sems_write;
 
 sem_t internal_server_sem;
 sem_t remote_read_sem;
@@ -367,14 +369,17 @@ void init_process(int tid) {
 	#ifdef CAPIOLOG
 	std::cout << "init process tid " << std::to_string(tid) << std::endl;
 	#endif	
-	if (sems_write.find(tid) == sems_write.end()) {
+	if (sems_write->find(tid) == sems_write->end()) {
+	#ifdef CAPIOLOG
+	std::cout << "init process tid inside if " << std::to_string(tid) << std::endl;
+	#endif	
 		//sems_response[tid] = sem_open(("sem_response_read" + std::to_string(tid)).c_str(), O_RDWR);
 		/*if (sems_response[tid] == SEM_FAILED) {
 			err_exit("error creating sem_response_read" + std::to_string(tid));  	
 		}
 		*/
-		sems_write[tid] = sem_open(("sem_write" + std::to_string(tid)).c_str(), O_RDWR);
-		if (sems_write[tid] == SEM_FAILED) {
+		(*sems_write)[tid] = sem_open(("sem_write" + std::to_string(tid)).c_str(), O_RDWR);
+		if ((*sems_write)[tid] == SEM_FAILED) {
 			err_exit("error creating sem_write" + std::to_string(tid));
 		}
 		Circular_buffer<off_t>* cb = new Circular_buffer<off_t>("buf_response" + std::to_string(tid), 256L * 1024 * 1024, sizeof(off_t));
@@ -382,6 +387,9 @@ void init_process(int tid) {
 		caching_info[tid].first = (int*) get_shm("caching_info" + std::to_string(tid));
 		caching_info[tid].second = (int*) get_shm("caching_info_size" + std::to_string(tid));
 	}
+	#ifdef CAPIOLOG
+	std::cout << "end init process tid " << std::to_string(tid) << std::endl;
+	#endif	
 
 }
 void create_file(std::string path, void* p_shm, bool is_dir) {
@@ -479,8 +487,9 @@ void write_entry_dir(std::string file_path, std::string dir) {
 	}
 	std::string file_name = file_path.substr(i + 1);
 	strcpy(ld.d_name, file_name.c_str());
-	long int ld_size = sizeof(ld);
+	long int ld_size = theoretical_size;
 	ld.d_reclen =  ld_size;
+	std::cout << "theoretical_size " << theoretical_size << "real size " << sizeof(ld);
 	auto it_tuple = files_metadata.find(dir);
 
 	if (it_tuple == files_metadata.end()) {
@@ -520,6 +529,11 @@ void write_entry_dir(std::string file_path, std::string dir) {
 		else {
 			ld.d_name[DNAME_LENGTH + 1] = DT_REG; 
 		}
+			ld.d_name[DNAME_LENGTH] = '\0'; 
+			char* buf = (char*) &ld;
+		char d_type = *(buf + ld.d_reclen - 1);
+                   printf("dtype: %c %d\n", d_type, d_type);
+                   printf("dtype real: %c %d\n", ld.d_name[DNAME_LENGTH + 1], ld.d_name[DNAME_LENGTH + 1]);
 		memcpy((char*) file_shm + file_size, &ld, sizeof(ld));
 		*std::get<1>(it_tuple->second) = data_size;
 		Capio_file& c_file = std::get<4>(files_metadata[dir]);
@@ -1646,6 +1660,7 @@ void* capio_helper(void* pthread_arg) {
 int main(int argc, char** argv) {
 	int rank, len, provided;
 	MPI_Init_thread(&argc, &argv, MPI_THREAD_MULTIPLE, &provided);
+	sems_write = new std::unordered_map<int, sem_t*>;
     if(provided != MPI_THREAD_MULTIPLE)
     {
         std::cerr << "The threading support level is lesser than that demanded" << std::endl;
