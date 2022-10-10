@@ -303,7 +303,7 @@ void mtrace_init(void) {
 	sem_t* sem_write = sem_open(("sem_write" + std::to_string(my_tid)).c_str(),  O_CREAT | O_RDWR, S_IRUSR | S_IWUSR, 0);
 	sems_write->insert(std::make_pair(my_tid, sem_write));
 	if (buf_requests == nullptr)
-		buf_requests = new Circular_buffer<char>("circular_buffer", 1024 * 1024, sizeof(char) * 600);
+		buf_requests = new Circular_buffer<char>("circular_buffer", 1024L * 1024 * 1024, sizeof(char) * 600);
 	if (bufs_response == nullptr)
 		bufs_response = new std::unordered_map<int, Circular_buffer<off_t>*>();
 	Circular_buffer<off_t>* p_buf_response = new Circular_buffer<off_t>("buf_response" + std::to_string(my_tid), 256L * 1024 * 1024, sizeof(off_t));
@@ -1029,6 +1029,7 @@ int capio_fcntl(int fd, int cmd, int arg) {
   } else
     return -2;
 }
+
 ssize_t capio_fgetxattr(int fd, const char* name, void* value, size_t size) {
 	auto it = files->find(fd);
 	if (it != files->end()) {
