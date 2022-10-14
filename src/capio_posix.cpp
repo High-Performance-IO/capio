@@ -86,6 +86,7 @@ struct spinlock {
 //struct spinlock clone_sl;
 
 std::string* capio_dir = nullptr;
+std::string* current_dir = nullptr;
 
 int num_writes_batch = 1;
 int actual_num_writes = 1;
@@ -270,6 +271,7 @@ void mtrace_init(void) {
 		else {
 			capio_dir = new std::string(std::filesystem::canonical(val));
 		}
+		current_dir = new std::string(*capio_dir);
 	}
 	catch (const std::exception& ex) {
 		exit(1);
@@ -379,8 +381,46 @@ void crate_snapshot() {
 	return;
 }
 
-std::string create_absolute_path(const char* pathname) {	
+std::string get_capio_parent_dir(std::string path) {
+	auto pos = path.rfind('/');
+	return path.substr(0, pos);
+}
+
+std::string create_absolute_path(const char* pathname) {
 	char* abs_path = (char*) malloc(sizeof(char) * PATH_MAX);
+	if (*current_dir != *capio_dir) {
+		#ifdef CAPIOLOG
+		CAPIO_DBG("current dir changed by capiodir\n");
+		#endif
+		std::string path(pathname);
+		std::string res_path = "";
+		if (path == ".") {
+			res_path = *current_dir;	
+			return res_path;
+		}
+		else if (path == ".." || path == "./..") {
+			res_path = get_capio_parent_dir(*current_dir);
+			return res_path;
+		}
+		if (path.find('/') == path.npos) {
+			return *current_dir + "/" + path;
+		}
+		if (path.substr(0, 3) == "../") {
+			res_path = get_capio_parent_dir(*current_dir);
+			return res_path + path.substr(2, path.length() - 2);
+		}
+		if (path.substr(0, 2) == "./") {
+			path = *current_dir + path.substr(1, path.length() - 1);
+			pathname = path.c_str();
+			#ifdef CAPIOLOG
+			CAPIO_DBG("path modified %s\n", pathname);
+			#endif
+			if (is_absolute(pathname)) {
+				return path;
+			}
+		}
+	}
+	
 	long int my_tid = syscall(SYS_gettid);
 	(*stat_enabled)[my_tid] = false;
 	char* res_realpath = realpath(pathname, abs_path);
@@ -424,7 +464,6 @@ std::string create_absolute_path(const char* pathname) {
 	free(abs_path);
 	return res_path;
 }
-
 
 
 void add_open_request(const char* pathname, size_t fd) {
@@ -1706,6 +1745,38 @@ ssize_t capio_getdents(int fd, void *buffer, size_t count) {
 	}
 }
 
+int capio_chdir(const char* path) { //TODO: refactor, path check similar to open_at
+	std::string path_to_check;
+		#ifdef CAPIOLOG
+		CAPIO_DBG("capio_chdir captured %s\n", path);
+		#endif
+	if(is_absolute(path)) {
+		path_to_check = path;
+		#ifdef CAPIOLOG
+		CAPIO_DBG("capio_chdir absolute %s\n", path_to_check.c_str());
+		#endif
+	}
+	else {
+		path_to_check = create_absolute_path(path);
+	}
+
+	auto res = std::mismatch(capio_dir->begin(), capio_dir->end(), path_to_check.begin());
+
+	#ifdef CAPIOLOG
+	CAPIO_DBG("CAPIO directory: %s\n", capio_dir->c_str());
+	#endif
+	if (res.first == capio_dir->end()) {
+		delete current_dir;
+	#ifdef CAPIOLOG
+	CAPIO_DBG("current dir changed: %s\n", path_to_check.c_str());
+	#endif
+		current_dir = new std::string(path_to_check);
+		return 0;
+	}
+	else {
+		return -2;
+	}
+}
 
 static int hook(long syscall_number, long arg0, long arg1, long arg2, long arg3,
                 long arg4, long arg5, long *result) {
@@ -2126,6 +2197,16 @@ static int hook(long syscall_number, long arg0, long arg1, long arg2, long arg3,
 		struct linux_dirent* dirp = reinterpret_cast<struct linux_dirent*>(arg1);
 		unsigned int count = arg2;
 		ssize_t res = capio_getdents(fd, dirp, count);				
+    	if (res != -2) {
+      		*result = (res < 0 ? -errno : res);
+      		hook_ret_value = 0;
+    	}
+		break;
+	}
+
+	case SYS_chdir: {
+		const char* path = reinterpret_cast<const char*>(arg0);
+		int res = capio_chdir(path);	
     	if (res != -2) {
       		*result = (res < 0 ? -errno : res);
       		hook_ret_value = 0;
