@@ -262,7 +262,7 @@ void mtrace_init(void) {
 	}
 	char* val;
 	if (capio_dir == nullptr) {
-	val = getenv("CAPIO_DIR");
+		val = getenv("CAPIO_DIR");
 	try {
 		if (val == NULL) {
 			capio_dir = new std::string(std::filesystem::canonical("."));	
@@ -303,29 +303,30 @@ void mtrace_init(void) {
 	sem_t* sem_write = sem_open(("sem_write" + std::to_string(my_tid)).c_str(),  O_CREAT | O_RDWR, S_IRUSR | S_IWUSR, 0);
 	sems_write->insert(std::make_pair(my_tid, sem_write));
 	if (buf_requests == nullptr)
-		buf_requests = new Circular_buffer<char>("circular_buffer", 1024L * 1024 * 1024, sizeof(char) * 600);
+		buf_requests = new Circular_buffer<char>("circular_buffer", 1024 * 1024, sizeof(char) * 256);
 	if (bufs_response == nullptr)
 		bufs_response = new std::unordered_map<int, Circular_buffer<off_t>*>();
-	Circular_buffer<off_t>* p_buf_response = new Circular_buffer<off_t>("buf_response" + std::to_string(my_tid), 256L * 1024 * 1024, sizeof(off_t));
+	Circular_buffer<off_t>* p_buf_response = new Circular_buffer<off_t>("buf_response" + std::to_string(my_tid), 8 * 1024 * 1024, sizeof(off_t));
 	bufs_response->insert(std::make_pair(my_tid, p_buf_response));
-	client_caching_info = (int*) create_shm("caching_info" + std::to_string(my_tid), 4096);
+	client_caching_info = (int*) create_shm("caching_info" + std::to_string(my_tid), 8192 * sizeof(int));
 	caching_info_size = (int*) create_shm("caching_info_size" + std::to_string(my_tid), sizeof(int));
 	*caching_info_size = 0; 
 	sem_post(sem_tmp);
+	char c_str[256];
 	if (thread_created) {
 
 	#ifdef CAPIOLOG
 	CAPIO_DBG("thread created init\n");
 	#endif
-		std::string msg = "clon " + std::to_string(parent_tid) + " " + std::to_string(my_tid);
-		buf_requests->write(msg.c_str(), (strlen(msg.c_str()) + 1) * sizeof(char));
+		sprintf(c_str, "clon %ld %d", parent_tid, my_tid);
+		buf_requests->write(c_str, 256 * sizeof(char));
 		sem_post(sem_family);
 	#ifdef CAPIOLOG
 	CAPIO_DBG("thread created init end\n");
 	#endif
 	}
-	std::string msg = "hand " + std::to_string(my_tid) + " " + std::to_string(getpid());
-	buf_requests->write(msg.c_str());
+	sprintf(c_str, "hand %d %d", my_tid, getpid());
+	buf_requests->write(c_str, 256 * sizeof(char));
 	(*stat_enabled)[my_tid] = true;
 	#ifdef CAPIOLOG
 	CAPIO_DBG("ending mtrace init\n");
@@ -427,22 +428,22 @@ std::string create_absolute_path(const char* pathname) {
 
 
 void add_open_request(const char* pathname, size_t fd) {
-	std::string str ("open " + std::to_string(syscall(SYS_gettid)) + " " + std::to_string(fd) + " " + std::string(pathname));
-	const char* c_str = str.c_str();
-	buf_requests->write(c_str, (strlen(c_str) + 1) * sizeof(char)); //TODO: max upperbound for pathname
+	char c_str[256];
+	sprintf(c_str, "open %ld %ld %s", syscall(SYS_gettid), fd, pathname);
+	buf_requests->write(c_str, 256 * sizeof(char)); //TODO: max upperbound for pathname
 }
 
 int add_close_request(int fd) {
-	std::string msg = "clos " +std::to_string(syscall(SYS_gettid)) + " "  + std::to_string(fd);
-	const char* c_str = msg.c_str();
-	buf_requests->write(c_str, (strlen(c_str) + 1) * sizeof(char));
+	char c_str[256]; 
+	sprintf(c_str, "clos %ld %d", syscall(SYS_gettid), fd);
+	buf_requests->write(c_str, 256 * sizeof(char));
 	return 0;
 }
 
 int add_mkdir_request(std::string pathname) {
-	std::string msg = "mkdi " + std::to_string(syscall(SYS_gettid)) + " " + pathname;
-	const char* c_str = msg.c_str();
-	buf_requests->write(c_str, (strlen(c_str) + 1) * sizeof(char));
+	char c_str[256]; 
+	sprintf(c_str, "mkdi %ld %s", syscall(SYS_gettid), pathname.c_str());
+	buf_requests->write(c_str, 256 * sizeof(char));
 	off64_t res_tmp;	
 	int res;
 	(*bufs_response)[syscall(SYS_gettid)]->read(&res_tmp);
@@ -543,9 +544,9 @@ int capio_mkdirat(int dirfd, const char* pathname, mode_t mode) {
 
 
 off64_t add_read_request(int fd, off64_t count, std::tuple<void*, off64_t*, off64_t*, off64_t*, int , int>& t) {
-	std::string str = "read " + std::to_string(syscall(SYS_gettid)) + " " + std::to_string(fd) + " " + std::to_string(count);
-	const char* c_str = str.c_str();
-	buf_requests->write(c_str, (strlen(c_str) + 1) * sizeof(char));
+	char c_str[256];
+	sprintf(c_str, "read %ld %d %ld", syscall(SYS_gettid), fd, count);
+	buf_requests->write(c_str, 256 * sizeof(char));
 	//read response (offest)
 	off64_t offset_upperbound;
 	(*bufs_response)[syscall(SYS_gettid)]->read(&offset_upperbound);
@@ -571,12 +572,12 @@ off64_t add_read_request(int fd, off64_t count, std::tuple<void*, off64_t*, off6
 
 
 void add_write_request(int fd, off64_t count) { //da modifcare con capio_file sia per una normale scrittura sia per quando si fa il batch
-	char c_str[64];
+	char c_str[256];
 	long int old_offset = *std::get<1>((*files)[fd]);
 	*std::get<1>((*files)[fd]) += count; //works only if there is only one writer at time for each file
 	if (actual_num_writes == num_writes_batch) {
 		sprintf(c_str, "writ %ld %d %ld %ld", syscall(SYS_gettid),fd, old_offset, count);
-		buf_requests->write(c_str, (strlen(c_str) + 1) * sizeof(char));
+		buf_requests->write(c_str, 256 * sizeof(char));
 		actual_num_writes = 1;
 	}
 	else
@@ -698,15 +699,15 @@ void read_from_disk(int fd, int offset, void* buffer, size_t count) {
 //TODO: EOVERFLOW is not adressed
 off_t capio_lseek(int fd, off64_t offset, int whence) { 
 	auto it = files->find(fd);
+	char c_str[256];
 	if (it != files->end()) {
 		std::tuple<void*, off64_t*, off64_t*, off64_t*, int, int>* t = &(*files)[fd];
 		off64_t* file_offset = std::get<1>(*t);
 		if (whence == SEEK_SET) {
 			if (offset >= 0) {
 				*file_offset = offset;
-				char c_str[64];
 				sprintf(c_str, "seek %ld %d %zu", syscall(SYS_gettid),fd, *file_offset);
-				buf_requests->write(c_str, (strlen(c_str) + 1) * sizeof(char));
+				buf_requests->write(c_str, 256 * sizeof(char));
 				off64_t offset_upperbound;
 				(*bufs_response)[syscall(SYS_gettid)]->read(&offset_upperbound);
 				*std::get<3>(*t) = offset_upperbound;
@@ -721,9 +722,8 @@ off_t capio_lseek(int fd, off64_t offset, int whence) {
 			off64_t new_offset = *file_offset + offset;
 			if (new_offset >= 0) {
 				*file_offset = new_offset;
-				char c_str[64];
 				sprintf(c_str, "seek %ld %d %zu", syscall(SYS_gettid),fd, *file_offset);
-				buf_requests->write(c_str, (strlen(c_str) + 1) * sizeof(char));
+				buf_requests->write(c_str, 256 * sizeof(char));
 				off64_t offset_upperbound;
 				(*bufs_response)[syscall(SYS_gettid)]->read(&offset_upperbound);
 				*std::get<3>(*t) = offset_upperbound;
@@ -735,10 +735,9 @@ off_t capio_lseek(int fd, off64_t offset, int whence) {
 			}
 		}
 		else if (whence == SEEK_END) {
-			char c_str[64];
 			off64_t file_size;
 			sprintf(c_str, "send %ld %d", syscall(SYS_gettid),fd);
-			buf_requests->write(c_str, (strlen(c_str) + 1) * sizeof(char));
+			buf_requests->write(c_str, 256 * sizeof(char));
 			(*bufs_response)[syscall(SYS_gettid)]->read(&file_size);
 			off64_t offset_upperbound;
 			offset_upperbound = file_size;
@@ -749,7 +748,7 @@ off_t capio_lseek(int fd, off64_t offset, int whence) {
 		else if (whence == SEEK_DATA) {
 				char c_str[64];
 				sprintf(c_str, "sdat %ld %d %zu", syscall(SYS_gettid),fd, *file_offset);
-				buf_requests->write(c_str, (strlen(c_str) + 1) * sizeof(char));
+				buf_requests->write(c_str, 256 * sizeof(char));
 				off64_t offset_upperbound;
 				(*bufs_response)[syscall(SYS_gettid)]->read(&offset_upperbound);
 				*std::get<3>(*t) = offset_upperbound;
@@ -760,7 +759,7 @@ off_t capio_lseek(int fd, off64_t offset, int whence) {
 		else if (whence == SEEK_HOLE) {
 				char c_str[64];
 				sprintf(c_str, "shol %ld %d %zu", syscall(SYS_gettid),fd, *file_offset);
-				buf_requests->write(c_str, (strlen(c_str) + 1) * sizeof(char));
+				buf_requests->write(c_str, 256 * sizeof(char));
 				off64_t offset_upperbound;
 				(*bufs_response)[syscall(SYS_gettid)]->read(&offset_upperbound);
 				*std::get<3>(*t) = offset_upperbound;
@@ -1085,12 +1084,12 @@ int capio_ioctl(int fd, unsigned long request) {
 */
 void capio_exit_group(int status) {
 	int pid = syscall(SYS_gettid);
-	std::string str = "exig " + std::to_string(pid);
-	const char* c_str = str.c_str();
+	char c_str[256];
+	sprintf(c_str, "exig %d", pid);
 	#ifdef CAPIOLOG
 	CAPIO_DBG("capio exit group captured%d\n", pid);
 	#endif
-	buf_requests->write(c_str, (strlen(c_str) + 1) * sizeof(char));
+	buf_requests->write(c_str, 256 * sizeof(char));
 	#ifdef CAPIOLOG
 	CAPIO_DBG("capio exit group terminated%d\n", pid);
 	#endif
@@ -1108,6 +1107,7 @@ int capio_lstat(std::string absolute_path, struct stat* statbuf) {
 	#ifdef CAPIOLOG
 	CAPIO_DBG("capio_lstat %s\n", absolute_path.c_str());
 	#endif
+	char c_str[256];
 	auto res = std::mismatch(capio_dir->begin(), capio_dir->end(), absolute_path.begin());
 	if (res.first == capio_dir->end()) {
 		if (capio_dir->size() == absolute_path.size()) {
@@ -1118,11 +1118,10 @@ int capio_lstat(std::string absolute_path, struct stat* statbuf) {
 	#ifdef CAPIOLOG
 		CAPIO_DBG("capio_lstat sending msg to server\n");
 	#endif
-		std::string msg = "stat " + std::to_string(syscall(SYS_gettid)) + " " + absolute_path;
-		const char* c_str = msg.c_str();
-		buf_requests->write(c_str, (strlen(c_str) + 1) * sizeof(char));
+		sprintf(c_str, "stat %ld %s", syscall(SYS_gettid), absolute_path.c_str());
+		buf_requests->write(c_str, 256 * sizeof(char));
 	#ifdef CAPIOLOG
-		CAPIO_DBG("capio_lstat after sent msg to server\n");
+		CAPIO_DBG("capio_lstat after sent msg to server: %s\n", c_str);
 	#endif
 		off64_t file_size;
 		off64_t is_dir;
@@ -1137,6 +1136,9 @@ int capio_lstat(std::string absolute_path, struct stat* statbuf) {
 		
 		std::hash<std::string> hash;		
 		statbuf->st_ino = hash(absolute_path);
+		#ifdef CAPIOLOG
+		CAPIO_DBG("lstat isdir %ld\n", is_dir);
+		#endif
 
 		if (is_dir == 0) {
 	    	statbuf->st_mode = S_IFDIR | S_IRWXU | S_IWGRP | S_IRGRP | S_IXOTH| S_IROTH; // 0755 directory
@@ -1189,8 +1191,9 @@ int capio_fstat(int fd, struct stat* statbuf) {
 	#ifdef CAPIOLOG
 		CAPIO_DBG("capio_fstat captured\n");
 	#endif
-		std::string msg = "fsta " + std::to_string(syscall(SYS_gettid)) + " " + std::to_string(fd);
-		buf_requests->write(msg.c_str(), (strlen(msg.c_str()) + 1) * sizeof(char));
+		char c_str[256];
+		sprintf(c_str, "fsta %ld %d", syscall(SYS_gettid), fd);
+		buf_requests->write(c_str, 256 * sizeof(char));
 	#ifdef CAPIOLOG
 		CAPIO_DBG("capio_fstat captured after write\n");
 	#endif
@@ -1242,8 +1245,9 @@ int capio_fstatat(int dirfd, const char* pathname, struct stat* statbuf, int fla
 	if ((flags & AT_EMPTY_PATH) == AT_EMPTY_PATH) {
 		if(dirfd == AT_FDCWD) { // operate on currdir
 			char* curr_dir = get_current_dir_name(); 
-			return capio_lstat(curr_dir, statbuf);
+			std::string path(curr_dir);
 			free(curr_dir);
+			return capio_lstat(path, statbuf);
 		}
 		else { // operate on dirfd
 		// in this case dirfd can refer to any type of file
@@ -1270,7 +1274,11 @@ int capio_fstatat(int dirfd, const char* pathname, struct stat* statbuf, int fla
 			std::string dir_path = get_dir_path(pathname, dirfd);
 			if (dir_path.length() == 0)
 				return -2;
-			std::string path = dir_path + "/" + pathname;
+			std::string path;
+			if (pathname[strlen(pathname) -1] == '.')
+				path = dir_path;
+			else 
+				path = dir_path + "/" + pathname;
 			res = capio_lstat(path, statbuf);
 		}
 	}
@@ -1320,9 +1328,10 @@ int capio_access(const char* pathname, int mode) {
 }
 
 int capio_file_exists(std::string path) {
-	std::string msg = "accs " + std::string(path);
 	off64_t res;
-	buf_requests->write(msg.c_str(), (strlen(msg.c_str()) + 1) * sizeof(char));
+	char c_str[256];
+	sprintf(c_str, "accs %s", path.c_str());
+	buf_requests->write(c_str, 256 * sizeof(char));
 	(*bufs_response)[syscall(SYS_gettid)]->read(&res);
 	return res;
 }
@@ -1369,8 +1378,9 @@ int capio_unlink_abs(std::string abs_path) {
 			exit(1);
 		}
 		int pid = syscall(SYS_gettid);
-		std::string msg = "unlk " + std::to_string(pid) + " " + std::string(abs_path);
-		buf_requests->write(msg.c_str(), (strlen(msg.c_str()) + 1) * sizeof(char));
+		char c_str[256];
+		sprintf(c_str, "unlk %d %s", pid, abs_path.c_str());
+		buf_requests->write(c_str, 256 * sizeof(char));
 		off64_t res_unlink;
 	    (*bufs_response)[syscall(SYS_gettid)]->read(&res_unlink); 	
 		res = res_unlink;
@@ -1449,9 +1459,9 @@ int capio_fchmod(int fd, mode_t mode) {
 }
 
 void add_dup_request(int old_fd, int new_fd) {
-	std::string msg = "dupp " + std::to_string(syscall(SYS_gettid)) + " " + std::to_string(old_fd) + " " + std::to_string(new_fd);
-	const char* c_str = msg.c_str();
-	buf_requests->write(c_str, (strlen(c_str) + 1) * sizeof(char));
+	char c_str[256];
+	sprintf(c_str, "dupp %ld %d %d", syscall(SYS_gettid), old_fd, new_fd);
+	buf_requests->write(c_str, 256 * sizeof(char));
 }
 
 int capio_dup(int fd) {
@@ -1510,8 +1520,9 @@ void copy_parent_files() {
 	#ifdef CAPIOLOG
 	CAPIO_DBG("Im process %d and my parent is %d\n", syscall(SYS_gettid), parent_tid);
 	#endif
-	std::string msg = "clon " + std::to_string(parent_tid) + " " + std::to_string(syscall(SYS_gettid));
-	buf_requests->write(msg.c_str(), (strlen(msg.c_str()) + 1) * sizeof(char));
+	char c_str[256];
+	sprintf(c_str, "clon %ld %ld", parent_tid, syscall(SYS_gettid));
+	buf_requests->write(c_str, 256 * sizeof(char));
 }
 
 pid_t capio_fork() {
@@ -1616,9 +1627,9 @@ pid_t capio_clone(int flags, void* child_stack, void* parent_tidpr, void* tls, v
 }
 
 off64_t add_getdents_request(int fd, off64_t count, std::tuple<void*, off64_t*, off64_t*, off64_t*, int , int>& t) {
-	std::string str = "dent " + std::to_string(syscall(SYS_gettid)) + " " + std::to_string(fd) + " " + std::to_string(count);
-	const char* c_str = str.c_str();
-	buf_requests->write(c_str, (strlen(c_str) + 1) * sizeof(char));
+	char c_str[256];
+	sprintf(c_str, "dent %ld %d %ld", syscall(SYS_gettid), fd, count);
+	buf_requests->write(c_str, 256 * sizeof(char));
 	//read response (offest)
 	off64_t offset_upperbound;
 	(*bufs_response)[syscall(SYS_gettid)]->read(&offset_upperbound);

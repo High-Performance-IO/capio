@@ -382,7 +382,7 @@ void init_process(int tid) {
 		if ((*sems_write)[tid] == SEM_FAILED) {
 			err_exit("error creating sem_write" + std::to_string(tid));
 		}
-		Circular_buffer<off_t>* cb = new Circular_buffer<off_t>("buf_response" + std::to_string(tid), 256L * 1024 * 1024, sizeof(off_t));
+		Circular_buffer<off_t>* cb = new Circular_buffer<off_t>("buf_response" + std::to_string(tid), 8 * 1024 * 1024, sizeof(off_t));
 		response_buffers.insert({tid, cb});
 		caching_info[tid].first = (int*) get_shm("caching_info" + std::to_string(tid));
 		caching_info[tid].second = (int*) get_shm("caching_info_size" + std::to_string(tid));
@@ -1391,7 +1391,7 @@ void* capio_server(void* pthread_arg) {
 	std::cout << "capio dir" << *capio_dir << std::endl;
 	#endif	
 	create_dir(capio_dir->c_str(), rank, true);
-	buf_requests = new Circular_buffer<char>("circular_buffer", 1024L * 1024 * 1024, sizeof(char) * 600);
+	buf_requests = new Circular_buffer<char>("circular_buffer", 1024 * 1024, sizeof(char) * 256);
 	sem_post(&internal_server_sem);
 	while(true) {
 		read_next_msg(rank);
