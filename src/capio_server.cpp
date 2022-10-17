@@ -1275,6 +1275,70 @@ void handle_dup(const char* str) {
 }
 
 
+// std::unordered_map<int, std::unordered_map<int, std::string>> processes_files_metadata;
+// std::unordered_map<std::string, std::tuple<void*, off64_t*, off64_t, bool, Capio_file>> files_metadata;
+// std::unordered_map<int, std::unordered_map<std::string, bool>> writers;
+
+// pathname -> node
+//std::unordered_map<std::string, char*> files_location;
+
+// node -> rank
+// std::unordered_map<std::string, int> nodes_helper_rank;
+
+
+//std::unordered_map<std::string, std::vector<std::tuple<int, int, off64_t>>>  pending_reads;
+void handle_rename(const char* str, int rank) {
+	char oldpath[PATH_MAX];
+	char newpath[PATH_MAX];
+	int tid;
+	off64_t res;
+	sscanf(str, "rnam %s %s %d", oldpath, newpath, &tid);
+	if (files_metadata.find(oldpath) == files_metadata.end())
+		res = 0;
+	else 
+		res = 1;
+
+	response_buffers[tid]->write(&res);
+
+	for (auto& pair : processes_files_metadata) {
+		for (auto& pair_2 : pair.second) {
+			if (pair_2.second == oldpath) {
+				pair_2.second = newpath;
+			}
+		}
+	}
+
+	auto node = files_metadata.extract(oldpath);
+	node.key() = newpath;
+	files_metadata.insert(std::move(node));
+
+	for (auto& pair : writers) {
+		auto node = pair.second.extract(oldpath);
+		if (!node.empty()) {
+			node.key() = newpath;
+			pair.second.insert(std::move(node));
+		}
+	}
+
+
+	auto node_2 = files_location.extract(oldpath);
+	if (!node_2.empty()) {
+		node_2.key() = newpath;
+		files_location.insert(std::move(node_2));
+	}
+
+	auto node_3 = nodes_helper_rank.extract(oldpath);
+	if (!node_3.empty()) {
+		node_3.key() = newpath;
+		nodes_helper_rank.insert(std::move(node_3));
+	}
+	//TODO: streaming + renaming?
+	
+    write_file_location("files_location.txt", rank, newpath);
+	//TODO: remove from files_location oldpath
+}
+
+
 void handle_handshake(const char* str) {
 	int tid, pid;
 	sscanf(str, "hand %d %d", &tid, &pid);
@@ -1327,6 +1391,8 @@ void read_next_msg(int rank) {
 		handle_dup(str);
 	else if (strncmp(str, "dent", 4) == 0)
 		handle_read(str, rank, true);
+	else if (strncmp(str, "rnam", 4) == 0)
+		handle_rename(str, rank);
 	else {
 		std::cerr << "error msg read" << std::endl;
 	MPI_Finalize();

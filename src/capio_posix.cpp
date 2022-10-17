@@ -1778,6 +1778,158 @@ int capio_chdir(const char* path) { //TODO: refactor, path check similar to open
 	}
 }
 
+
+bool is_capio_path(std::string path_to_check) {
+	bool res = false;
+	auto mis_res = std::mismatch(capio_dir->begin(), capio_dir->end(), path_to_check.begin());
+	#ifdef CAPIOLOG
+	CAPIO_DBG("CAPIO directory: %s\n", capio_dir->c_str());
+	#endif
+	if (mis_res.first == capio_dir->end()) {
+		if (capio_dir->size() == path_to_check.size()) {
+			return -2;
+			std::cerr << "ERROR: rename to the capio_dir " << path_to_check << std::endl;
+			exit(1);
+
+		}
+		else  {
+			res = true;	
+		}
+
+	}
+	return res;
+}
+
+int rename_capio_files(std::string oldpath_abs, std::string newpath_abs) {
+	capio_files_paths->erase(oldpath_abs); 
+	char msg[256];	
+	sprintf(msg, "rnam %s %s", oldpath_abs.c_str(), newpath_abs.c_str());
+	buf_requests->write(msg, 256 * sizeof(char));
+	off64_t res;
+	(*bufs_response)[syscall(SYS_gettid)]->read(&res);
+	return res;
+}
+
+void copy_file(std::string path_1, std::string path_2) {
+	FILE* fp_1 = fopen(path_1.c_str(), "r");
+	FILE* fp_2 = fopen(path_2.c_str(), "w");
+	char buf[1024];
+	int res;
+	while ((res = fread(buf, sizeof(char), 1024, fp_1)) == 1024) {
+			fwrite(buf, sizeof(char), 1024, fp_2);
+	}
+	if (res != 0) {
+		fwrite(buf, sizeof(char), res, fp_2);
+	}
+	fclose(fp_1);
+	fclose(fp_2);
+}
+
+void copy_outside_capio(std::string oldpath_abs, std::string newpath_abs) {
+	copy_file(oldpath_abs, newpath_abs);
+
+	int tid = syscall(SYS_gettid);
+	char c_str[256];
+	sprintf(c_str, "unlk %d %s", tid, oldpath_abs.c_str());
+	buf_requests->write(c_str, 256 * sizeof(char));
+	off64_t res_unlink;
+	(*bufs_response)[tid]->read(&res_unlink); 	
+		
+}
+
+void copy_inside_capio(std::string oldpath_abs, std::string newpath_abs) {
+	copy_file(oldpath_abs, newpath_abs);
+}
+
+bool is_prefix(std::string path_1, std::string path_2) {
+	auto res = std::mismatch(path_1.begin(), path_1.end(), path_2.begin());
+    return res.first == path_2.end();
+}
+
+/*
+ *
+ * There are four cases:
+ *
+ * 1) Both oldpath and newpath are CAPIO paths. In this case we
+ * simply change the path of the file. If newpath already exists
+ * it must be removed.
+ *
+ * 2) oldpath is a CAPIO path while newpath no. In this case we
+ * must copy the file outside CAPIO (in the filesystem) and then remove
+ * the file from CAPIO.
+ *
+ * 3) newpath is a CAPIO path while oldpath no. In this case we must copy
+ * the file pointed by oldpath inside CAPIO and then remove the file from
+ * the filesystem.
+ *
+ * 4) Both oldpath and newpath aren't CAPIO paths. In this case we leave 
+ * the control to the kernel.
+ *
+ */
+
+int capio_rename(const char* oldpath, const char* newpath) {
+	int res = 0;
+	std::string oldpath_abs, newpath_abs;	
+	if(is_absolute(oldpath)) {
+		oldpath_abs = oldpath;
+	}
+	else {
+		oldpath_abs = create_absolute_path(oldpath);
+	}
+
+	bool oldpath_capio = is_capio_path(oldpath_abs);
+
+	if(is_absolute(newpath)) { //TODO: move this control inside create_absolute_path
+		newpath_abs = newpath;
+	}
+	else {
+		newpath_abs = create_absolute_path(newpath);
+	}
+
+	bool newpath_capio = is_capio_path(newpath_abs);
+
+	if (is_prefix(oldpath_abs, newpath_abs)) {//TODO: The check is more complex
+		errno = EINVAL;
+		return -1;
+	}
+
+	if (oldpath_capio) {
+		if (newpath_capio) {
+			#ifdef CAPIOLOG
+			CAPIO_DBG("rename capio\n");
+			#endif
+			res = rename_capio_files(oldpath_abs, newpath_abs);
+			if (res == 1) {
+				res = -2;
+				errno = ENOENT;
+			}
+		}
+		else {
+			#ifdef CAPIOLOG
+			CAPIO_DBG("copy_outside_capio\n");
+			#endif
+			copy_outside_capio(oldpath_abs, newpath_abs);
+		}
+	}
+	else {
+		if (newpath_capio) {
+			#ifdef CAPIOLOG
+			CAPIO_DBG("copy_inside_capio\n");
+			#endif
+			copy_inside_capio(oldpath_abs, newpath_abs);	
+		}
+		else { //Both aren't CAPIO paths
+			#ifdef CAPIOLOG
+			CAPIO_DBG("rename not interessing to CAPIO\n");
+			#endif
+			res = -2;
+		}
+
+	}
+
+	return res;
+}
+
 static int hook(long syscall_number, long arg0, long arg1, long arg2, long arg3,
                 long arg4, long arg5, long *result) {
 	
@@ -2207,6 +2359,17 @@ static int hook(long syscall_number, long arg0, long arg1, long arg2, long arg3,
 	case SYS_chdir: {
 		const char* path = reinterpret_cast<const char*>(arg0);
 		int res = capio_chdir(path);	
+    	if (res != -2) {
+      		*result = (res < 0 ? -errno : res);
+      		hook_ret_value = 0;
+    	}
+		break;
+	}
+
+	case SYS_rename: {
+		const char* oldpath = reinterpret_cast<const char*>(arg0);
+		const char* newpath = reinterpret_cast<const char*>(arg1);
+		int res = capio_rename(oldpath, newpath);
     	if (res != -2) {
       		*result = (res < 0 ? -errno : res);
       		hook_ret_value = 0;
