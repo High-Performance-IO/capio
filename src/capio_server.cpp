@@ -97,7 +97,7 @@ std::unordered_map<int, Circular_buffer<off_t>*> response_buffers;
  */
 
 // tid -> (response shared buffer, size)
-std::unordered_map<int, std::pair<int*, int*>> caching_info;
+//std::unordered_map<int, std::pair<int*, int*>> caching_info;
 
 /* pathname -> (file_shm, file_size, mapped_shm_size, first_write, capio_file)
  * The mapped shm size isn't the the size of the file shm
@@ -181,8 +181,8 @@ void sig_term_handler(int signum, siginfo_t *info, void *ptr) {
 //		sem_unlink(("sem_response_read" + std::to_string(pair.first)).c_str());
 		sem_unlink(("sem_response_write" + std::to_string(pair.first)).c_str());
 		sem_unlink(("sem_write" + std::to_string(pair.first)).c_str());
-		shm_unlink(("caching_info" + std::to_string(pair.first)).c_str()); 
-		shm_unlink(("caching_info_size" + std::to_string(pair.first)).c_str()); 
+		//shm_unlink(("caching_info" + std::to_string(pair.first)).c_str()); 
+		//shm_unlink(("caching_info_size" + std::to_string(pair.first)).c_str()); 
 	}
 	shm_unlink("circular_buffer");
 	shm_unlink("index_buf");
@@ -384,8 +384,8 @@ void init_process(int tid) {
 		}
 		Circular_buffer<off_t>* cb = new Circular_buffer<off_t>("buf_response" + std::to_string(tid), 8 * 1024 * 1024, sizeof(off_t));
 		response_buffers.insert({tid, cb});
-		caching_info[tid].first = (int*) get_shm("caching_info" + std::to_string(tid));
-		caching_info[tid].second = (int*) get_shm("caching_info_size" + std::to_string(tid));
+		//caching_info[tid].first = (int*) get_shm("caching_info" + std::to_string(tid));
+		//caching_info[tid].second = (int*) get_shm("caching_info_size" + std::to_string(tid));
 	}
 	#ifdef CAPIOLOG
 	std::cout << "end init process tid " << std::to_string(tid) << std::endl;
@@ -400,6 +400,7 @@ void create_file(std::string path, void* p_shm, bool is_dir) {
 	//std::cout << "creating " << path << std::endl;
 	//std::cout << "pshm " << p_shm << "p_shm_size " << p_shm_size << std::endl;
 	files_metadata[path] = std::make_tuple(p_shm, p_shm_size, file_initial_size, true, Capio_file(is_dir));
+	std::cout << "created file path " << path << std::endl;
 
 }
 
@@ -415,23 +416,23 @@ void handle_open(char* str, char* p, int rank) {
 	int fd = strtol(p + 1, &p, 10);
 	std::string path(p + 1);
 	void* p_shm;
-	int index = *caching_info[tid].second;
-	caching_info[tid].first[index] = fd;
+	//int index = *caching_info[tid].second;
+	//caching_info[tid].first[index] = fd;
 	if (on_disk.find(path) == on_disk.end()) {
 		std::string shm_name = path;
 		std::replace(shm_name.begin(), shm_name.end(), '/', '_');
 		shm_name = shm_name.substr(1);
 		p_shm = create_shm(shm_name, file_initial_size);
-		caching_info[tid].first[index + 1] = 0;
+		//caching_info[tid].first[index + 1] = 0;
 	}
 	else {
 		p_shm = nullptr;
-		caching_info[tid].first[index + 1] = 1;
+		//caching_info[tid].first[index + 1] = 1;
 	}
 		//TODO: check the size that the user wrote in the configuration file
 	off64_t* p_offset = (off64_t*) create_shm("offset_" + std::to_string(tid) + "_" + std::to_string(fd), sizeof(off64_t));
 	processes_files[tid][fd] = std::make_tuple(p_shm, p_offset);//TODO: what happens if a process open the same file twice?
-	*caching_info[tid].second += 2;
+	//*caching_info[tid].second += 2;
 	if (files_metadata.find(path) == files_metadata.end()) {
 		create_file(path, p_shm, false);
 	}
@@ -478,17 +479,34 @@ std::string get_parent_dir_path(std::string file_path) {
 	return file_path.substr(0, i);
 }
 
-//  std::unordered_map<std::string, std::tuple<void*, off64_t*, off64_t, bool, Capio_file>> files_metadata;
-void write_entry_dir(std::string file_path, std::string dir) {
+/*
+ * type == 0 -> regular entry
+ * type == 1 -> "." entry
+ * type == 2 -> ".." entry
+ */
+void write_entry_dir(std::string file_path, std::string dir, int type) {
 	std::hash<std::string> hash;		
 	struct linux_dirent ld;
 	ld.d_ino = hash(file_path);
 	//std::cout << "path " << file_path << " hash " << ld.d_ino << std::endl;
-	std::size_t i = file_path.rfind('/');
-	if (i == std::string::npos) {
-		std::cerr << "invalid file_path in get_parent_dir_path" << std::endl;
+	std::string file_name;
+	if (type == 0) {
+		std::size_t i = file_path.rfind('/');
+		if (i == std::string::npos) {
+			std::cerr << "invalid file_path in get_parent_dir_path" << std::endl;
+		}
+		file_name = file_path.substr(i + 1);
 	}
-	std::string file_name = file_path.substr(i + 1);
+	else if (type == 1) {
+		file_name = ".";
+	}
+	else {
+		file_name = "..";
+	}
+	std::cout << "file_name " << file_name << std::endl;
+	std::cout << "file_path " << file_path << std::endl;
+	std::cout << "dir " << dir << std::endl;
+
 	strcpy(ld.d_name, file_name.c_str());
 	long int ld_size = theoretical_size;
 	ld.d_reclen =  ld_size;
@@ -529,8 +547,10 @@ void write_entry_dir(std::string file_path, std::string dir) {
 		}
 		if (std::get<4>(files_metadata[file_path]).is_dir()) {
 			ld.d_name[DNAME_LENGTH + 1] = DT_DIR; 
+			std::cout << " is a dir " << std::endl;
 		}
 		else {
+			std::cout << " isn't a dir " << std::endl;
 			ld.d_name[DNAME_LENGTH + 1] = DT_REG; 
 		}
 			ld.d_name[DNAME_LENGTH] = '\0'; 
@@ -561,7 +581,7 @@ void update_dir(std::string file_path, int rank) {
         #ifdef CAPIOLOG
         std::cout << "before write entry dir" << std::endl;
         #endif
-	write_entry_dir(file_path, dir);
+	write_entry_dir(file_path, dir, 0);
         #ifdef CAPIOLOG
         std::cout << "update dir end" << std::endl;
         #endif
@@ -1067,19 +1087,19 @@ void handle_exig(char* str) {
    int pid = pids[tid];
    auto files = writers[pid];
    for (auto& pair : files) {
-	#ifdef CAPIOLOG
-	std::cout << "handle exit group 1" << std::endl;
-	#endif	
+	//#ifdef CAPIOLOG
+	//std::cout << "handle exit group 1" << std::endl;
+	//#endif	
    	if (pair.second) {
 		std::string path = pair.first;	
 		std::get<4>(files_metadata[path]).complete = true;
-	#ifdef CAPIOLOG
-	std::cout << "handle exit group wait before" << std::endl;
-	#endif	
+	//#ifdef CAPIOLOG
+	//std::cout << "handle exit group wait before" << std::endl;
+	//#endif	
         //sem_wait(sems_write[tid]);
-	#ifdef CAPIOLOG
-	std::cout << "handle exit group wait after" << std::endl;
-	#endif	
+	//#ifdef CAPIOLOG
+	//std::cout << "handle exit group wait after" << std::endl;
+	//#endif	
 		auto it = pending_reads.find(path);
         if (it != pending_reads.end()) {
 	#ifdef CAPIOLOG
@@ -1101,9 +1121,9 @@ void handle_exig(char* str) {
                 }
         }
         //sem_post(sems_write[tid]);
-	#ifdef CAPIOLOG
-	std::cout << "handle exit group 2" << std::endl;
-	#endif	
+	//#ifdef CAPIOLOG
+	//std::cout << "handle exit group 2" << std::endl;
+	//#endif	
 	}
    }
 	#ifdef CAPIOLOG
@@ -1131,6 +1151,7 @@ void handle_stat(const char* str) {
 			is_dir = 0;
 		else
 			is_dir = 1;
+		std::cout << "is_dir " << is_dir << std::endl;
 		response_buffers[tid]->write(&file_size);
 		response_buffers[tid]->write(&is_dir);
 	}
@@ -1153,6 +1174,7 @@ void handle_fstat(const char* str) {
 	else
 		is_dir = 1;
 	response_buffers[tid]->write(&is_dir);
+	std::cout << "fstat size " << file_size << " is_dir " << is_dir << std::endl;
 }
 
 void handle_access(const char* str) {
@@ -1239,8 +1261,12 @@ off64_t create_dir(const char* pathname, int rank, bool root_dir) {
 			std::get<3>(files_metadata[pathname]) = false;
             write_file_location("files_location.txt", rank, pathname);
 			//TODO: it works only if there is one prod per file
-			if (!root_dir)
+			if (!root_dir) {
 				update_dir(pathname, rank);
+			}
+				write_entry_dir(pathname, pathname, 1);
+				std::string parent_dir = get_parent_dir_path(pathname);
+				write_entry_dir(parent_dir, pathname, 2);
         }
 		res = 0;
 	}
@@ -1292,14 +1318,21 @@ void handle_rename(const char* str, int rank) {
 	char newpath[PATH_MAX];
 	int tid;
 	off64_t res;
+	std::cout << "debug 0" << std::endl;
 	sscanf(str, "rnam %s %s %d", oldpath, newpath, &tid);
+	std::cout << "debug 1" << std::endl;
 	if (files_metadata.find(oldpath) == files_metadata.end())
-		res = 0;
-	else 
 		res = 1;
+	else 
+		res = 0;
 
+	std::cout << "debug 2 res " << res <<  std::endl;
 	response_buffers[tid]->write(&res);
 
+	if (res == 1)
+		return;
+
+	std::cout << "debug 3" << std::endl;
 	for (auto& pair : processes_files_metadata) {
 		for (auto& pair_2 : pair.second) {
 			if (pair_2.second == oldpath) {
@@ -1308,10 +1341,12 @@ void handle_rename(const char* str, int rank) {
 		}
 	}
 
+	std::cout << "debug 4" << std::endl;
 	auto node = files_metadata.extract(oldpath);
 	node.key() = newpath;
 	files_metadata.insert(std::move(node));
 
+	std::cout << "debug 5" << std::endl;
 	for (auto& pair : writers) {
 		auto node = pair.second.extract(oldpath);
 		if (!node.empty()) {
@@ -1321,21 +1356,25 @@ void handle_rename(const char* str, int rank) {
 	}
 
 
+	std::cout << "debug 6" << std::endl;
 	auto node_2 = files_location.extract(oldpath);
 	if (!node_2.empty()) {
 		node_2.key() = newpath;
 		files_location.insert(std::move(node_2));
 	}
 
+	std::cout << "debug 7" << std::endl;
 	auto node_3 = nodes_helper_rank.extract(oldpath);
 	if (!node_3.empty()) {
 		node_3.key() = newpath;
 		nodes_helper_rank.insert(std::move(node_3));
 	}
+	std::cout << "debug 8" << std::endl;
 	//TODO: streaming + renaming?
 	
     write_file_location("files_location.txt", rank, newpath);
 	//TODO: remove from files_location oldpath
+	std::cout << "debug 9" << std::endl;
 }
 
 
