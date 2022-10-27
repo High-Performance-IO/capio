@@ -400,7 +400,6 @@ void create_file(std::string path, void* p_shm, bool is_dir) {
 	//std::cout << "creating " << path << std::endl;
 	//std::cout << "pshm " << p_shm << "p_shm_size " << p_shm_size << std::endl;
 	files_metadata[path] = std::make_tuple(p_shm, p_shm_size, file_initial_size, true, Capio_file(is_dir));
-	std::cout << "created file path " << path << std::endl;
 
 }
 
@@ -503,9 +502,6 @@ void write_entry_dir(std::string file_path, std::string dir, int type) {
 	else {
 		file_name = "..";
 	}
-	std::cout << "file_name " << file_name << std::endl;
-	std::cout << "file_path " << file_path << std::endl;
-	std::cout << "dir " << dir << std::endl;
 
 	strcpy(ld.d_name, file_name.c_str());
 	long int ld_size = theoretical_size;
@@ -547,10 +543,8 @@ void write_entry_dir(std::string file_path, std::string dir, int type) {
 		}
 		if (std::get<4>(files_metadata[file_path]).is_dir()) {
 			ld.d_name[DNAME_LENGTH + 1] = DT_DIR; 
-			std::cout << " is a dir " << std::endl;
 		}
 		else {
-			std::cout << " isn't a dir " << std::endl;
 			ld.d_name[DNAME_LENGTH + 1] = DT_REG; 
 		}
 			ld.d_name[DNAME_LENGTH] = '\0'; 
@@ -1151,7 +1145,6 @@ void handle_stat(const char* str) {
 			is_dir = 0;
 		else
 			is_dir = 1;
-		std::cout << "is_dir " << is_dir << std::endl;
 		response_buffers[tid]->write(&file_size);
 		response_buffers[tid]->write(&is_dir);
 	}
@@ -1174,7 +1167,6 @@ void handle_fstat(const char* str) {
 	else
 		is_dir = 1;
 	response_buffers[tid]->write(&is_dir);
-	std::cout << "fstat size " << file_size << " is_dir " << is_dir << std::endl;
 }
 
 void handle_access(const char* str) {
@@ -1308,8 +1300,6 @@ void handle_dup(const char* str) {
 // pathname -> node
 //std::unordered_map<std::string, char*> files_location;
 
-// node -> rank
-// std::unordered_map<std::string, int> nodes_helper_rank;
 
 
 //std::unordered_map<std::string, std::vector<std::tuple<int, int, off64_t>>>  pending_reads;
@@ -1318,21 +1308,18 @@ void handle_rename(const char* str, int rank) {
 	char newpath[PATH_MAX];
 	int tid;
 	off64_t res;
-	std::cout << "debug 0" << std::endl;
 	sscanf(str, "rnam %s %s %d", oldpath, newpath, &tid);
-	std::cout << "debug 1" << std::endl;
 	if (files_metadata.find(oldpath) == files_metadata.end())
 		res = 1;
 	else 
 		res = 0;
 
-	std::cout << "debug 2 res " << res <<  std::endl;
 	response_buffers[tid]->write(&res);
 
-	if (res == 1)
+	if (res == 1) {
 		return;
+	}
 
-	std::cout << "debug 3" << std::endl;
 	for (auto& pair : processes_files_metadata) {
 		for (auto& pair_2 : pair.second) {
 			if (pair_2.second == oldpath) {
@@ -1341,12 +1328,10 @@ void handle_rename(const char* str, int rank) {
 		}
 	}
 
-	std::cout << "debug 4" << std::endl;
 	auto node = files_metadata.extract(oldpath);
 	node.key() = newpath;
 	files_metadata.insert(std::move(node));
 
-	std::cout << "debug 5" << std::endl;
 	for (auto& pair : writers) {
 		auto node = pair.second.extract(oldpath);
 		if (!node.empty()) {
@@ -1356,25 +1341,16 @@ void handle_rename(const char* str, int rank) {
 	}
 
 
-	std::cout << "debug 6" << std::endl;
 	auto node_2 = files_location.extract(oldpath);
 	if (!node_2.empty()) {
 		node_2.key() = newpath;
 		files_location.insert(std::move(node_2));
 	}
 
-	std::cout << "debug 7" << std::endl;
-	auto node_3 = nodes_helper_rank.extract(oldpath);
-	if (!node_3.empty()) {
-		node_3.key() = newpath;
-		nodes_helper_rank.insert(std::move(node_3));
-	}
-	std::cout << "debug 8" << std::endl;
 	//TODO: streaming + renaming?
 	
     write_file_location("files_location.txt", rank, newpath);
 	//TODO: remove from files_location oldpath
-	std::cout << "debug 9" << std::endl;
 }
 
 

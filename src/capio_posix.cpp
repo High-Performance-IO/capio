@@ -918,10 +918,13 @@ int capio_openat(int dirfd, const char* pathname, int flags) {
 			*init_size = file_initial_size;
 			off64_t* offset = new off64_t;
 			*offset = 0;
+			if ((flags & O_DIRECTORY) == O_DIRECTORY)
+				flags = flags | O_LARGEFILE;
 			if ((flags & O_CLOEXEC) == O_CLOEXEC) {
 			#ifdef CAPIOLOG
 				CAPIO_DBG("open with O_CLOEXEC\n");
 			#endif
+				flags &= ~O_CLOEXEC; 
 				files->insert({fd, std::make_tuple(p, p_offset, init_size, offset, flags, FD_CLOEXEC)});
 			}
 			else
@@ -1099,8 +1102,11 @@ int capio_fcntl(int fd, int cmd, int arg) {
       break;
     }
     case F_GETFL: {
-      return std::get<4>((*files)[fd]);
-
+      int flags = std::get<4>((*files)[fd]);
+	  #ifdef CAPIOLOG
+		CAPIO_DBG("fcntl F_GETFL returing %d instead of %d\n", flags, O_RDONLY|O_LARGEFILE|O_DIRECTORY);
+      #endif
+	  return flags;
       break;
     }
     case F_SETFL: {
@@ -1362,14 +1368,12 @@ int capio_fstatat(int dirfd, const char* pathname, struct stat* statbuf, int fla
 	CAPIO_DBG("fstatat pathanem %s\n", pathname);
 	if ((flags & AT_EMPTY_PATH) == AT_EMPTY_PATH) {
 		if(dirfd == AT_FDCWD) { // operate on currdir
-			CAPIO_DBG("debug 0\n");
 			char* curr_dir = get_current_dir_name(); 
 			std::string path(curr_dir);
 			free(curr_dir);
 			return capio_lstat(path, statbuf);
 		}
 		else { // operate on dirfd
-			CAPIO_DBG("debug 1\n");
 		// in this case dirfd can refer to any type of file
 			if (strlen(pathname) == 0)
 				return capio_fstat(dirfd, statbuf);
@@ -1386,14 +1390,11 @@ int capio_fstatat(int dirfd, const char* pathname, struct stat* statbuf, int fla
 	if (!is_absolute(pathname)) {
 		if (dirfd == AT_FDCWD) { 
 		// pathname is interpreted relative to currdir
-			CAPIO_DBG("debug 2\n");
 			res = capio_lstat_wrapper(pathname, statbuf);		
 		}
 		else { 
-			CAPIO_DBG("debug 3\n");
 			if (is_directory(dirfd) != 1)
 				return -2;
-			CAPIO_DBG("debug 4\n");
 			auto it = capio_files_descriptors->find(dirfd);
 			std::string dir_path; 
 			if (it == capio_files_descriptors->end())
@@ -1403,18 +1404,14 @@ int capio_fstatat(int dirfd, const char* pathname, struct stat* statbuf, int fla
 			if (dir_path.length() == 0)
 				return -2;
 			std::string path;
-			CAPIO_DBG("debug 5\n");
 			if (pathname[strlen(pathname) -1] == '.')
 				path = dir_path;
 			else 
 				path = dir_path + "/" + pathname;
-			CAPIO_DBG("debug 6\n");
 			res = capio_lstat(path, statbuf);
-			CAPIO_DBG("debug 7 res = %d\n", res);
 		}
 	}
 	else { //dirfd is ignored
-			CAPIO_DBG("debug 8\n");
 		res = capio_lstat(std::string(pathname), statbuf);
 	}
 	return res;
@@ -1913,7 +1910,7 @@ void copy_file(std::string path_1, std::string path_2) {
 	fclose(fp_2);
 }
 
-void copy_outside_capio(std::string oldpath_abs, std::string newpath_abs) {
+void mv_file_capio(std::string oldpath_abs, std::string newpath_abs) {
 	copy_file(oldpath_abs, newpath_abs);
 
 	int tid = syscall(SYS_gettid);
@@ -1986,17 +1983,18 @@ int capio_rename(const char* oldpath, const char* newpath) {
 			#ifdef CAPIOLOG
 			CAPIO_DBG("rename capio\n");
 			#endif
-			res = rename_capio_files(oldpath_abs, newpath_abs);
-			if (res == 1) {
-				res = -2;
-				errno = ENOENT;
-			}
+			/*res = rename_capio_files(oldpath_abs, newpath_abs);
+			*if (res == 1) {
+			*	res = -2;
+			*	errno = ENOENT;
+			}*/
+			mv_file_capio(oldpath_abs, newpath_abs);
 		}
 		else {
 			#ifdef CAPIOLOG
 			CAPIO_DBG("copy_outside_capio\n");
 			#endif
-			copy_outside_capio(oldpath_abs, newpath_abs);
+			mv_file_capio(oldpath_abs, newpath_abs);
 		}
 	}
 	else {
