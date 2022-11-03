@@ -878,7 +878,14 @@ int capio_openat(int dirfd, const char* pathname, int flags) {
 				dir_path = it->second;
 			if (dir_path.length() == 0)
 				return -2;
-			if (std::string(pathname) == ".") {
+			std::string pathstr = pathname;
+			if (pathstr.substr(0, 2) == "./") {
+				path_to_check = dir_path + pathstr.substr(1, pathstr.length() - 1);
+				#ifdef CAPIOLOG
+				CAPIO_DBG("path modified %s\n", pathname);
+				#endif
+			}
+			else if (std::string(pathname) == ".") {
 				path_to_check = dir_path;
 
 			}
@@ -1368,12 +1375,14 @@ int capio_fstatat(int dirfd, const char* pathname, struct stat* statbuf, int fla
 	CAPIO_DBG("fstatat pathanem %s\n", pathname);
 	if ((flags & AT_EMPTY_PATH) == AT_EMPTY_PATH) {
 		if(dirfd == AT_FDCWD) { // operate on currdir
+			CAPIO_DBG("debug 0\n");
 			char* curr_dir = get_current_dir_name(); 
 			std::string path(curr_dir);
 			free(curr_dir);
 			return capio_lstat(path, statbuf);
 		}
 		else { // operate on dirfd
+			CAPIO_DBG("debug 1\n");
 		// in this case dirfd can refer to any type of file
 			if (strlen(pathname) == 0)
 				return capio_fstat(dirfd, statbuf);
@@ -1389,12 +1398,15 @@ int capio_fstatat(int dirfd, const char* pathname, struct stat* statbuf, int fla
 
 	if (!is_absolute(pathname)) {
 		if (dirfd == AT_FDCWD) { 
+			CAPIO_DBG("debug 2\n");
 		// pathname is interpreted relative to currdir
 			res = capio_lstat_wrapper(pathname, statbuf);		
 		}
 		else { 
+			CAPIO_DBG("debug 3\n");
 			if (is_directory(dirfd) != 1)
 				return -2;
+			CAPIO_DBG("debug 4\n");
 			auto it = capio_files_descriptors->find(dirfd);
 			std::string dir_path; 
 			if (it == capio_files_descriptors->end())
@@ -1403,6 +1415,14 @@ int capio_fstatat(int dirfd, const char* pathname, struct stat* statbuf, int fla
 				dir_path = it->second;
 			if (dir_path.length() == 0)
 				return -2;
+			std::string pathstr = pathname;
+		if (pathstr.substr(0, 2) == "./") {
+			pathstr = pathstr.substr(2, pathstr.length() - 1);
+			pathname = pathstr.c_str();
+			#ifdef CAPIOLOG
+			CAPIO_DBG("path modified %s\n", pathname);
+			#endif
+		}
 			std::string path;
 			if (pathname[strlen(pathname) -1] == '.')
 				path = dir_path;
@@ -1412,6 +1432,7 @@ int capio_fstatat(int dirfd, const char* pathname, struct stat* statbuf, int fla
 		}
 	}
 	else { //dirfd is ignored
+			CAPIO_DBG("debug 5\n");
 		res = capio_lstat(std::string(pathname), statbuf);
 	}
 	return res;
