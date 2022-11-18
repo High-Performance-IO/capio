@@ -23,7 +23,8 @@ class Capio_file {
 	private:
 		std::set<std::pair<off64_t, off64_t>, compare> sectors;
 		bool _directory;
-
+		std::string _committed;
+		std::string _mode;
 	public:
 		bool complete = false;
 		int n_links = 1;
@@ -31,11 +32,39 @@ class Capio_file {
 
 
 		Capio_file() {
+			_committed = "on_termination";
 			_directory = false;
 		}
 
-		Capio_file(bool directory) {
+		Capio_file(std::string committed) {
+			_committed = committed;
+			_directory = false;
+		}
+
+		Capio_file(std::string committed, std::string mode) {
+			_committed = committed;
+			_mode = mode;
+			_directory = false;
+		}
+
+		Capio_file(std::string committed, std::string mode,
+				bool directory) {
+			_committed = committed;
+			_mode = mode;
 			_directory = directory;
+		}
+
+		Capio_file(bool directory) {
+			_committed = "on_termination";
+			_directory = directory;
+		}
+
+		std::string get_committed() {
+			return _committed;
+		}
+
+		std::string get_mode() {
+			return _mode;
 		}
 
 		bool is_dir() {

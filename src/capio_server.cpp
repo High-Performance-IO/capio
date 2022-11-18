@@ -28,10 +28,13 @@
 #include <mpi.h>
 
 #include "capio_file.hpp"
+#include "simdjson.h"
 #include "utils/common.hpp"
 
 
 #define DNAME_LENGTH 128
+
+using namespace simdjson;
 
 /*
  * From the man getdents:
@@ -106,6 +109,8 @@ std::unordered_map<int, Circular_buffer<off_t>*> response_buffers;
  * in a given moment.
  */
 std::unordered_map<std::string, std::tuple<void*, off64_t*, off64_t, bool, Capio_file>> files_metadata;
+
+std::unordered_map<std::string, std::tuple<std::string, std::string>> metadata_conf;
 
 /*
  * pid -> pathname -> bool
@@ -399,7 +404,22 @@ void create_file(std::string path, void* p_shm, bool is_dir) {
 	off64_t* p_shm_size = (off64_t*) create_shm(shm_name + "_size", sizeof(off64_t));	
 	//std::cout << "creating " << path << std::endl;
 	//std::cout << "pshm " << p_shm << "p_shm_size " << p_shm_size << std::endl;
-	files_metadata[path] = std::make_tuple(p_shm, p_shm_size, file_initial_size, true, Capio_file(is_dir));
+	auto it = metadata_conf.find(path);
+	if (it == metadata_conf.end()) {
+        #ifdef CAPIOLOG
+		std::cout << "creating file withtout conf file " << path << std::endl;
+		#endif
+		files_metadata[path] = std::make_tuple(p_shm, p_shm_size, file_initial_size, true, Capio_file(is_dir));
+	}
+	else {
+		std::string committed = std::get<0>(it->second);
+		std::string mode = std::get<1>(it->second);
+        #ifdef CAPIOLOG
+		std::cout << "creating file " << path << std::endl;
+		std::cout << "committed " << committed << " mode " << mode << std::endl;
+		#endif
+		files_metadata[path] = std::make_tuple(p_shm, p_shm_size, file_initial_size, true, Capio_file(committed, mode, is_dir));
+	}
 
 }
 
@@ -437,8 +457,9 @@ void handle_open(char* str, char* p, int rank) {
 	}
 	Capio_file& c_file = std::get<4>(files_metadata[path]);
 	++c_file.n_opens;
+    #ifdef CAPIOLOG
 	std::cout << "capio open n links " << c_file.n_links << " n opens " << c_file.n_opens << std::endl;;
-	std::cout << "path " << path << std::endl;
+	#endif
 	processes_files_metadata[tid][fd] = path;
 	int pid = pids[tid];
 	auto it_files = writers.find(pid);
@@ -487,7 +508,6 @@ void write_entry_dir(std::string file_path, std::string dir, int type) {
 	std::hash<std::string> hash;		
 	struct linux_dirent ld;
 	ld.d_ino = hash(file_path);
-	//std::cout << "path " << file_path << " hash " << ld.d_ino << std::endl;
 	std::string file_name;
 	if (type == 0) {
 		std::size_t i = file_path.rfind('/');
@@ -512,9 +532,7 @@ void write_entry_dir(std::string file_path, std::string dir, int type) {
 		std::cerr << "dir " << dir << " is not present in CAPIO" << std::endl;
 		exit(1);
 	}
-	//std::cout << "info dir " << dir << std::endl;
 	void* file_shm = std::get<0>(it_tuple->second);
-	//std::cout << "off64_t pointer " << std::get<1>(it_tuple->second) << std::endl;
 	off64_t file_size = *std::get<1>(it_tuple->second);
 	off64_t file_shm_size = std::get<2>(it_tuple->second);
 	off64_t data_size = file_size + ld_size;
@@ -555,11 +573,6 @@ void write_entry_dir(std::string file_path, std::string dir, int type) {
 		std::cout << "insert sector for dir" << base_offset << ", " << data_size << std::endl;
 		c_file.insert_sector(base_offset, data_size);
 		c_file.print();
-		//struct linux_dirent* ld_tmp = (struct linux_dirent*) (((char*) file_shm) + file_size);
-		//std::cout << "file size " << file_size << std::endl;
-		//std::cout << "d_ino " << ld_tmp->d_ino << std::endl;
-		//std::cout << "d_off " << ld_tmp->d_off << std::endl;
-		//std::cout << "d_reclen " << ld_tmp->d_reclen << std::endl;
 
 }
 
@@ -596,7 +609,9 @@ void handle_write(const char* str, int rank) {
 		int pid = pids[tid];
 		writers[pid][path] = true;
 		Capio_file& c_file = std::get<4>(files_metadata[path]);
+        #ifdef CAPIOLOG
 		std::cout << "insert sector " << base_offset << ", " << data_size << std::endl;
+        #endif
 		c_file.insert_sector(base_offset, data_size);
 		c_file.print();
         #ifdef CAPIOLOG
@@ -657,8 +672,12 @@ void handle_write(const char* str, int rank) {
         }*/
         //sem_post(sems_response[tid]);
         auto it = pending_reads.find(path);
+		std::string mode = std::get<4>(files_metadata[path]).get_mode();
+        #ifdef CAPIOLOG
+        std::cout << "mode is " << mode << std::endl;
+        #endif
         //sem_wait(sems_write[tid]);
-        if (it != pending_reads.end()) {
+        if (it != pending_reads.end() && mode == "append") {
         #ifdef CAPIOLOG
         std::cout << "There were pending reads for" << path << std::endl;
         #endif
@@ -735,20 +754,32 @@ void handle_local_read(int tid, int fd, off64_t count, bool dir) {
 		int pid = pids[tid];
 		bool writer = writers[pid][path];
 		off64_t end_of_sector = c_file.get_sector_end(process_offset);
+		#ifdef CAPIOLOG
 		std::cout << "process offset " << process_offset << std::endl;
 		std::cout << "count " << count << std::endl;
 		std::cout << "end of sector" << end_of_sector << std::endl;
+        #endif
 		c_file.print();
 		off64_t end_of_read = process_offset + count;
 		off64_t nreads;
-		if (end_of_read > end_of_sector) {
+		std::string committed = c_file.get_committed();
+		std::string mode = c_file.get_mode();
+		if (mode != "append" && !c_file.complete) {
+			#ifdef CAPIOLOG
+			std::cout << "add pending reads 1" << std::endl;
+			std::cout << "mode " << mode << std::endl;
+			std::cout << "file complete " << c_file.complete << std::endl;
+			#endif
+			pending_reads[path].push_back(std::make_tuple(tid, fd, count));
+		}
+		else if (end_of_read > end_of_sector) {
 		#ifdef CAPIOLOG
 		std::cout << "Am I a writer? " << writer << std::endl;
 		std::cout << "Is the file completed? " << c_file.complete << std::endl;
 		#endif
 			if (!writer && !c_file.complete && !dir) {
 				#ifdef CAPIOLOG
-				std::cout << "add pending reads" << std::endl;
+				std::cout << "add pending reads 2" << std::endl;
 				#endif
 				pending_reads[path].push_back(std::make_tuple(tid, fd, count));
 			}
@@ -762,6 +793,7 @@ void handle_local_read(int tid, int fd, off64_t count, bool dir) {
 				response_buffers[tid]->write(&nreads);
 					
 			}
+				
 
 		}
 		else {
@@ -960,10 +992,38 @@ void delete_file(std::string path) {
 
 void handle_close(int tid, int fd) {
 	std::string path = processes_files_metadata[tid][fd];
-	std::cout << "path name " << path << std::endl;
 	Capio_file& c_file = std::get<4>(files_metadata[path]);
+	if (c_file.get_committed() == "on_close") {
+		#ifdef CAPIOLOG
+		std::cout <<  "handle close, committed = on_close" << std::endl;
+		#endif
+		c_file.complete = true;
+		auto it = pending_reads.find(path);
+        if (it != pending_reads.end()) {
+	#ifdef CAPIOLOG
+	std::cout << "handle pending read file on_close " << path << std::endl;
+	#endif	
+            auto& pending_reads_this_file = it->second;
+			auto it_vec = pending_reads_this_file.begin();
+            while (it_vec != pending_reads_this_file.end()) {
+                auto tuple = *it_vec;
+                int pending_tid = std::get<0>(tuple);
+                int fd = std::get<1>(tuple);
+                size_t process_offset = *std::get<1>(processes_files[pending_tid][fd]);
+                size_t count = std::get<2>(tuple);
+				#ifdef CAPIOLOG
+				std::cout << "pending read tid fd offset count " << tid << " " << fd << " " << process_offset <<" "<< count << std::endl;
+				#endif	
+                handle_pending_read(pending_tid, fd, process_offset, count);
+                it_vec = pending_reads_this_file.erase(it_vec);
+            }
+			pending_reads.erase(it);
+        }
+	}
 	--c_file.n_opens;
+	#ifdef CAPIOLOG
 	std::cout << "capio close n links " << c_file.n_links << " n opens " << c_file.n_opens << std::endl;;
+	#endif
 	if (c_file.n_opens == 0 && c_file.n_links <= 0)
 		delete_file(path);
 	shm_unlink(("offset_" + std::to_string(tid) +  "_" + std::to_string(fd)).c_str());
@@ -1081,12 +1141,23 @@ void handle_exig(char* str) {
    int pid = pids[tid];
    auto files = writers[pid];
    for (auto& pair : files) {
-	//#ifdef CAPIOLOG
-	//std::cout << "handle exit group 1" << std::endl;
-	//#endif	
-   	if (pair.second) {
 		std::string path = pair.first;	
-		std::get<4>(files_metadata[path]).complete = true;
+   	if (pair.second) {
+		auto it_conf = metadata_conf.find(path);
+		#ifdef CAPIOLOG
+		std::cout << "path: " << path << std::endl;
+		#endif
+		if (it_conf == metadata_conf.end() || std::get<0>(it_conf->second) == "on_termination") {//  
+			#ifdef CAPIOLOG
+			std::cout << "file " << path << " completed" << std::endl;
+			std::get<4>(files_metadata[path]).complete = true;
+			#endif
+		}
+		else {
+			#ifdef CAPIOLOG
+			std::cout << "committed " << std::get<0>(it_conf->second) << " mode " << std::get<1>(it_conf->second) << std::endl;
+			#endif
+		}
 	//#ifdef CAPIOLOG
 	//std::cout << "handle exit group wait before" << std::endl;
 	//#endif	
@@ -1097,7 +1168,7 @@ void handle_exig(char* str) {
 		auto it = pending_reads.find(path);
         if (it != pending_reads.end()) {
 	#ifdef CAPIOLOG
-	std::cout << "handle pending read file " << path << std::endl;
+	std::cout << "handle pending read file on_termination " << path << std::endl;
 	#endif	
                 auto& pending_reads_this_file = it->second;
 				auto it_vec = pending_reads_this_file.begin();
@@ -1113,6 +1184,7 @@ void handle_exig(char* str) {
                         handle_pending_read(pending_tid, fd, process_offset, count);
                         it_vec = pending_reads_this_file.erase(it_vec);
                 }
+			pending_reads.erase(it);
         }
         //sem_post(sems_write[tid]);
 	//#ifdef CAPIOLOG
@@ -1157,7 +1229,9 @@ void handle_fstat(const char* str) {
 	int tid, fd;
 	sscanf(str, "fsta %d %d", &tid, &fd);
 	std::string path = processes_files_metadata[tid][fd];
+	#ifdef CAPIOLOG
 	std::cout << "path " << path << std::endl;
+	#endif
 	Capio_file& c_file = std::get<4>(files_metadata[path]);
 	off64_t file_size = c_file.get_file_size();
 	response_buffers[tid]->write(&file_size);
@@ -1198,7 +1272,9 @@ void handle_unlink(const char* str) {
 	if (it != files_metadata.end()) { //TODO: it works only in the local case
 		Capio_file& c_file = std::get<4>(it->second);
 		--c_file.n_links;
+		#ifdef CAPIOLOG
 		std::cout << "capio unlink n links " << c_file.n_links << " n opens " << c_file.n_opens;
+		#endif
 		if (c_file.n_opens == 0 && c_file.n_links <= 0) {
 			delete_file(path);
 		}
@@ -1448,32 +1524,12 @@ void* capio_server(void* pthread_arg) {
 	MPI_Comm_size(MPI_COMM_WORLD, &size);
 	catch_sigterm();
 	handshake_servers(rank, size);
-	char* val;
-	if (capio_dir == nullptr) {
-	val = getenv("CAPIO_DIR");
-	try {
-		if (val == NULL) {
-			capio_dir = new std::string(std::filesystem::canonical("."));	
-		}
-		else {
-			capio_dir = new std::string(std::filesystem::canonical(val));
-		}
-	}
-	catch (const std::exception& ex) {
-		exit(1);
-	}
-	int res = is_directory(capio_dir->c_str());
-	if (res == 0) {
-		std::cerr << "dir " << capio_dir << " is not a directory" << std::endl;
-		exit(1);
-	}
-	}
-	#ifdef CAPIOLOG
-	std::cout << "capio dir" << *capio_dir << std::endl;
-	#endif	
 	create_dir(capio_dir->c_str(), rank, true);
 	buf_requests = new Circular_buffer<char>("circular_buffer", 1024 * 1024, sizeof(char) * 256);
 	sem_post(&internal_server_sem);
+	#ifdef CAPIOLOG
+	std::cout << "capio dir 2 " << *capio_dir << std::endl;
+	#endif	
 	while(true) {
 		read_next_msg(rank);
 		#ifdef CAPIOLOG
@@ -1744,11 +1800,164 @@ void* capio_helper(void* pthread_arg) {
 	return nullptr; //pthreads always needs a return value
 }
 
+void parse_conf_file(std::string conf_file) {
+	ondemand::parser parser;
+	padded_string json;
+	try {
+		json = padded_string::load(conf_file);
+	}
+	catch (const simdjson_error& e) {
+		std::cerr << "Exception thrown while opening conf file: " << e.what() << std::endl;
+		exit(1);
+	}
+	ondemand::document entries = parser.iterate(json);
+	auto workflow_name = entries["name"];	
+	#ifdef CAPIOLOG
+	std::cout << "workflow name: " << workflow_name << std::endl;
+	#endif
+	auto io_graph = entries["IO_Graph"];
+	for (auto app : io_graph) {
+		std::string_view app_name = app["name"].get_string();
+		#ifdef CAPIOLOG
+		std::cout << "app name: " << app_name << std::endl;
+		#endif
+		ondemand::array input_stream;
+		auto error = app["input_stream"].get_array().get(input_stream);
+		if (!error) {
+			for (auto group : input_stream) {
+				std::string_view group_name;
+				error = group["group_name"].get_string().get(group_name);;
+				if (!error) {
+					#ifdef CAPIOLOG
+					std::cout << "group name " << group_name << std::endl;
+					#endif
+					auto files = group["files"];
+					for (auto file : files) {
+						#ifdef CAPIOLOG
+						std::cout << "file: " << file << std::endl; 
+						#endif
+					}
+				}
+				else {
+					#ifdef CAPIOLOG
+					std::cout << "simple file" << group << std::endl;
+					#endif
+				}
+			}
+		}
+		ondemand::array output_stream;
+		error = app["output_stream"].get_array().get(output_stream);
+		if (!error) {
+			for (auto group : output_stream) {
+				std::string_view group_name;
+				error = group["group_name"].get_string().get(group_name);;
+				if (!error) {
+					#ifdef CAPIOLOG
+					std::cout << "group name " << group_name << std::endl;
+					#endif
+					auto files = group["files"];
+					for (auto file : files) {
+						#ifdef CAPIOLOG
+						std::cout << "file: " << file << std::endl; 
+						#endif
+					}
+				}
+				else {
+					#ifdef CAPIOLOG
+					std::cout << "simple file" << group << std::endl;
+					#endif
+				}
+			}
+		}
+		ondemand::array streaming;
+		error = app["streaming"].get_array().get(streaming);
+		if (!error) {
+			for (auto file : streaming) {
+				std::string_view name;
+				error = file["name"].get_string().get(name);
+				if (!error) {
+					#ifdef CAPIOLOG
+					std::cout << " name " << name << std::endl;
+					#endif
+				}
+				std::string_view committed;
+				error = file["committed"].get_string().get(committed);
+				if (!error) {
+					#ifdef CAPIOLOG
+					std::cout << " committed " << committed << std::endl;
+					#endif
+				}
+				std::string_view mode;
+				error = file["mode"].get_string().get(mode);
+				if (!error) {
+					#ifdef CAPIOLOG
+					std::cout << " mode " << mode << std::endl;
+					#endif
+				}
+				std::string path = std::string(name);
+				if (!is_absolute(path.c_str())) {
+					if (path.substr(0, 2) == "./") 
+						path = path.substr(2, path.length() - 2);
+					path = *capio_dir + "/" + path;
+				}
+				#ifdef CAPIOLOG
+				std::cout << "conf path " << path << std::endl;
+				#endif
+				metadata_conf[path] = std::make_tuple(std::string(committed), std::string(mode));
+			}
+		}
+	}
 
+	ondemand::array permanent_files;
+	auto error = entries["permanent"].get_array().get(permanent_files);
+	if (!error) {
+		for (auto file : permanent_files) {
+			std::cout << "permament file: " << file << std::endl;
+		}
+	}
+
+}
+
+void get_capio_dir() {
+	char* val;
+	if (capio_dir == nullptr) {
+	val = getenv("CAPIO_DIR");
+	try {
+		if (val == NULL) {
+			capio_dir = new std::string(std::filesystem::canonical("."));	
+		}
+		else {
+			capio_dir = new std::string(std::filesystem::canonical(val));
+		}
+	}
+	catch (const std::exception& ex) {
+		exit(1);
+	}
+	int res = is_directory(capio_dir->c_str());
+	if (res == 0) {
+		std::cerr << "dir " << capio_dir << " is not a directory" << std::endl;
+		exit(1);
+	}
+	}
+	#ifdef CAPIOLOG
+	std::cout << "capio dir " << *capio_dir << std::endl;
+	#endif	
+
+}
 
 int main(int argc, char** argv) {
 	int rank, len, provided;
 	MPI_Init_thread(&argc, &argv, MPI_THREAD_MULTIPLE, &provided);
+	std::string conf_file;
+	if (argc > 2) {
+		std::cerr << "error: too many inputs. ./capio_server [conf_file]" << std::endl;
+		exit(1);
+	}
+	get_capio_dir();
+	if (argc == 2) {
+		conf_file = argv[1];
+		parse_conf_file(conf_file);
+	}
 	sems_write = new std::unordered_map<int, sem_t*>;
     if(provided != MPI_THREAD_MULTIPLE)
     {
@@ -1758,7 +1967,7 @@ int main(int argc, char** argv) {
 	MPI_Get_processor_name(node_name, &len);
 	pthread_t server_thread, helper_thread;
 	int res = sem_init(&internal_server_sem, 0, 0);
-	if (res !=0) {
+	if (res != 0) {
 		std::cerr << __FILE__ << ":" << __LINE__ << " - " << std::flush;
 		perror("sem_init failed"); exit(res);
 	}

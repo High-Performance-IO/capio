@@ -129,9 +129,6 @@ static bool fork_enabled = true;
 bool thread_created = false;
 
 // -------------------------  utility functions:
-static bool is_absolute(const char* pathname) {
-	return (pathname ? (pathname[0]=='/') : false);
-}
 static blkcnt_t get_nblocks(off64_t file_size) {
 	if (file_size % 4096 == 0)
 		return file_size / 512;
@@ -2131,9 +2128,9 @@ static int hook(long syscall_number, long arg0, long arg1, long arg2, long arg3,
     const void *buf = reinterpret_cast<const void *>(arg1);
     size_t count = static_cast<size_t>(arg2);
 	(*stat_enabled)[my_tid] = false;
-	#ifdef CAPIOLOG
-   	CAPIO_DBG("write captured %d %d %ld\n", syscall(SYS_gettid), fd, count);
-	#endif
+	//#ifdef CAPIOLOG
+   	//CAPIO_DBG("write captured %d %d %ld\n", syscall(SYS_gettid), fd, count);
+	//#endif
 	/*
 	#ifdef CAPIOLOG
     CAPIO_DBG("files size %d %d\n",syscall(SYS_gettid),files->size());

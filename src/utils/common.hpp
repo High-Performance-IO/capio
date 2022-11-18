@@ -11,6 +11,11 @@
 #include <fcntl.h>
 #include <unistd.h>
 
+
+static bool is_absolute(const char* pathname) {
+	return (pathname ? (pathname[0]=='/') : false);
+}
+
 static int is_directory(int dirfd) {
 	struct stat path_stat;
     if (fstat(dirfd, &path_stat) != 0) {
