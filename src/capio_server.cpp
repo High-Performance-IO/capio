@@ -504,7 +504,7 @@ std::string get_parent_dir_path(std::string file_path) {
  * type == 1 -> "." entry
  * type == 2 -> ".." entry
  */
-void write_entry_dir(std::string file_path, std::string dir, int type) {
+void write_entry_dir(int tid, std::string file_path, std::string dir, int type) {
 	std::hash<std::string> hash;		
 	struct linux_dirent ld;
 	ld.d_ino = hash(file_path);
@@ -570,13 +570,39 @@ void write_entry_dir(std::string file_path, std::string dir, int type) {
 		*std::get<1>(it_tuple->second) = data_size;
 		Capio_file& c_file = std::get<4>(files_metadata[dir]);
 	off64_t base_offset = file_size;
+		#ifdef CAPIOLOG
 		std::cout << "insert sector for dir" << base_offset << ", " << data_size << std::endl;
+		#endif
 		c_file.insert_sector(base_offset, data_size);
+		++c_file.n_files;
+		std::string committed = c_file.get_committed();
+		int pid = pids[tid];
+		writers[pid][dir] = true;
+		int n_committed;
+		try {
+			n_committed = std::stoi(committed);
+			#ifdef CAPIOLOG
+			std::cout << "nfiles in dir " << dir << " " << c_file.n_files << std::endl;
+			#endif
+			if (c_file.n_files == n_committed) {
+				#ifdef CAPIOLOG
+				std::cout << "dir completed " << std::endl;
+				#endif
+				c_file.complete = true;
+			}
+		}
+		catch (const std::exception& e) {
+			#ifdef CAPIOLOG
+			std::cout << "exception write entry: " << e.what() << std::endl;
+			std::cout << "committed " << committed << std::endl;
+			#endif
+		}
+
 		c_file.print();
 
 }
 
-void update_dir(std::string file_path, int rank) {
+void update_dir(int tid, std::string file_path, int rank) {
 	std::string dir = get_parent_dir_path(file_path);
         #ifdef CAPIOLOG
         std::cout << "update dir " << dir << std::endl;
@@ -588,7 +614,7 @@ void update_dir(std::string file_path, int rank) {
         #ifdef CAPIOLOG
         std::cout << "before write entry dir" << std::endl;
         #endif
-	write_entry_dir(file_path, dir, 0);
+	write_entry_dir(tid, file_path, dir, 0);
         #ifdef CAPIOLOG
         std::cout << "update dir end" << std::endl;
         #endif
@@ -622,7 +648,7 @@ void handle_write(const char* str, int rank) {
 			std::get<3>(files_metadata[path]) = false;
             write_file_location("files_location.txt", rank, path);
 			//TODO: it works only if there is one prod per file
-			update_dir(path, rank);
+			update_dir(tid, path, rank);
         }
         *std::get<1>(files_metadata[path]) = data_size; 
 		off64_t file_shm_size = std::get<2>(files_metadata[path]);
@@ -1147,14 +1173,45 @@ void handle_exig(char* str) {
 		#ifdef CAPIOLOG
 		std::cout << "path: " << path << std::endl;
 		#endif
-		if (it_conf == metadata_conf.end() || std::get<0>(it_conf->second) == "on_termination") {//  
+		if (it_conf == metadata_conf.end() || std::get<0>(it_conf->second) == "on_termination" || std::get<0>(it_conf->second).length() == 0) { 
+			Capio_file& c_file = std::get<4>(files_metadata[path]);
 			#ifdef CAPIOLOG
-			std::cout << "file " << path << " completed" << std::endl;
-			std::get<4>(files_metadata[path]).complete = true;
+			std::cout << "committed " << c_file.get_committed() << std::endl;
 			#endif
+			if (c_file.is_dir()) {
+				std::string committed = c_file.get_committed();
+				int n_committed;
+				try {
+					n_committed = std::stoi(committed);
+					#ifdef CAPIOLOG
+					std::cout << "nfiles in dir " << path << " " << c_file.n_files << std::endl;
+					#endif
+					if (n_committed > c_file.n_files) {
+						#ifdef CAPIOLOG
+						std::cout << "dir " << path << " completed " << std::endl;
+						#endif
+						c_file.complete = true;
+					}
+				}
+				catch (const std::exception& e) {
+					#ifdef CAPIOLOG
+					std::cout << "exception write entry: " << e.what() << std::endl;
+					std::cout << "committed " << committed << std::endl;
+					std::cout << "dir " << path << " completed " << std::endl;
+					#endif
+					c_file.complete = true;
+				}
+			}
+			else {
+				#ifdef CAPIOLOG
+				std::cout << "file " << path << " completed" << std::endl;
+				#endif
+				c_file.complete = true;
+			}
 		}
 		else {
 			#ifdef CAPIOLOG
+			std::cout << "debug 00" << std::endl;
 			std::cout << "committed " << std::get<0>(it_conf->second) << " mode " << std::get<1>(it_conf->second) << std::endl;
 			#endif
 		}
@@ -1314,7 +1371,7 @@ void handle_clone(const char* str) {
 	}
 }
 
-off64_t create_dir(const char* pathname, int rank, bool root_dir) {
+off64_t create_dir(int tid, const char* pathname, int rank, bool root_dir) {
 	off64_t res;
 	#ifdef CAPIOLOG
 	std::cout << "handle mkdir " << pathname << std::endl;
@@ -1330,11 +1387,11 @@ off64_t create_dir(const char* pathname, int rank, bool root_dir) {
             write_file_location("files_location.txt", rank, pathname);
 			//TODO: it works only if there is one prod per file
 			if (!root_dir) {
-				update_dir(pathname, rank);
+				update_dir(tid, pathname, rank);
 			}
-				write_entry_dir(pathname, pathname, 1);
+				write_entry_dir(tid, pathname, pathname, 1);
 				std::string parent_dir = get_parent_dir_path(pathname);
-				write_entry_dir(parent_dir, pathname, 2);
+				write_entry_dir(tid, parent_dir, pathname, 2);
         }
 		res = 0;
 	}
@@ -1352,7 +1409,7 @@ void handle_mkdir(const char* str, int rank) {
 	char pathname[PATH_MAX];
 	sscanf(str, "mkdi %d %s", &tid, pathname);
 	init_process(tid);
-	off64_t res = create_dir(pathname, rank, false);	
+	off64_t res = create_dir(tid, pathname, rank, false);	
 	response_buffers[tid]->write(&res);
 
 }
@@ -1524,7 +1581,8 @@ void* capio_server(void* pthread_arg) {
 	MPI_Comm_size(MPI_COMM_WORLD, &size);
 	catch_sigterm();
 	handshake_servers(rank, size);
-	create_dir(capio_dir->c_str(), rank, true);
+	int pid = getpid();
+	create_dir(pid, capio_dir->c_str(), rank, true); //TODO: can be a problem if a process execute readdir on capio_dir
 	buf_requests = new Circular_buffer<char>("circular_buffer", 1024 * 1024, sizeof(char) * 256);
 	sem_post(&internal_server_sem);
 	#ifdef CAPIOLOG
@@ -1912,7 +1970,9 @@ void parse_conf_file(std::string conf_file) {
 	auto error = entries["permanent"].get_array().get(permanent_files);
 	if (!error) {
 		for (auto file : permanent_files) {
+			#ifdef CAPIOLOG
 			std::cout << "permament file: " << file << std::endl;
+			#endif
 		}
 	}
 

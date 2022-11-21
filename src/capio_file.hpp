@@ -23,12 +23,13 @@ class Capio_file {
 	private:
 		std::set<std::pair<off64_t, off64_t>, compare> sectors;
 		bool _directory;
-		std::string _committed;
-		std::string _mode;
+		std::string _committed = "";
+		std::string _mode = "";
 	public:
 		bool complete = false;
 		int n_links = 1;
 		int n_opens = 0;
+		int n_files = 0; //useful for directories
 
 
 		Capio_file() {
