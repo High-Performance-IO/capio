@@ -389,7 +389,9 @@ void crate_snapshot() {
 		p_shm[4] = status_flags;
 		p_shm[5] = fd_flags;
 		std::string shm_name = "capio_snapshot_path_" + pid + "_" + std::to_string(fd);
+		#ifdef CAPIOLOG
 		CAPIO_DBG("snapshot path name %s\n", shm_name.c_str());
+		#endif
 		path_shm = (char*) create_shm(shm_name.c_str(), PATH_MAX * sizeof(char));
 		strcpy(path_shm, (*capio_files_descriptors)[fd].c_str());
 		++i;
@@ -1369,17 +1371,17 @@ int capio_fstat(int fd, struct stat* statbuf) {
 
 
 int capio_fstatat(int dirfd, const char* pathname, struct stat* statbuf, int flags) {
+	#ifdef CAPIOLOG
 	CAPIO_DBG("fstatat pathanem %s\n", pathname);
+	#endif
 	if ((flags & AT_EMPTY_PATH) == AT_EMPTY_PATH) {
 		if(dirfd == AT_FDCWD) { // operate on currdir
-			CAPIO_DBG("debug 0\n");
 			char* curr_dir = get_current_dir_name(); 
 			std::string path(curr_dir);
 			free(curr_dir);
 			return capio_lstat(path, statbuf);
 		}
 		else { // operate on dirfd
-			CAPIO_DBG("debug 1\n");
 		// in this case dirfd can refer to any type of file
 			if (strlen(pathname) == 0)
 				return capio_fstat(dirfd, statbuf);
@@ -1395,15 +1397,12 @@ int capio_fstatat(int dirfd, const char* pathname, struct stat* statbuf, int fla
 
 	if (!is_absolute(pathname)) {
 		if (dirfd == AT_FDCWD) { 
-			CAPIO_DBG("debug 2\n");
 		// pathname is interpreted relative to currdir
 			res = capio_lstat_wrapper(pathname, statbuf);		
 		}
 		else { 
-			CAPIO_DBG("debug 3\n");
 			if (is_directory(dirfd) != 1)
 				return -2;
-			CAPIO_DBG("debug 4\n");
 			auto it = capio_files_descriptors->find(dirfd);
 			std::string dir_path; 
 			if (it == capio_files_descriptors->end())
@@ -1429,7 +1428,6 @@ int capio_fstatat(int dirfd, const char* pathname, struct stat* statbuf, int fla
 		}
 	}
 	else { //dirfd is ignored
-			CAPIO_DBG("debug 5\n");
 		res = capio_lstat(std::string(pathname), statbuf);
 	}
 	return res;
@@ -2038,9 +2036,13 @@ int capio_rename(const char* oldpath, const char* newpath) {
 int capio_fstatfs(int fd, struct statfs* buf) {
 	int res = 0;
 	auto it = files->find(fd);
+#ifdef CAPIOLOG
 	CAPIO_DBG("fstatfs captured %d", fd);
+#endif
 	if (it != files->end()) {
+#ifdef CAPIOLOG
 		CAPIO_DBG("fstatfs of CAPIO captured %d", fd);
+#endif
 		std::string path = (*capio_files_descriptors)[fd];
 		return statfs(capio_dir->c_str(), buf);
 	}
@@ -2057,7 +2059,9 @@ char* capio_getcw(char* buf, size_t size) {
 	}
 	else {
 		strcpy(buf, c_current_dir);
+		#ifdef CAPIOLOG
 		CAPIO_DBG("getcw current_dir : %s\n", c_current_dir);
+		#endif
 		return buf;
 	}
 

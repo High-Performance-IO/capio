@@ -598,8 +598,10 @@ void write_entry_dir(int tid, std::string file_path, std::string dir, int type) 
 			#endif
 		}
 
+			#ifdef CAPIOLOG
 		c_file.print();
 
+			#endif
 }
 
 void update_dir(int tid, std::string file_path, int rank) {
@@ -639,8 +641,8 @@ void handle_write(const char* str, int rank) {
 		std::cout << "insert sector " << base_offset << ", " << data_size << std::endl;
         #endif
 		c_file.insert_sector(base_offset, data_size);
-		c_file.print();
         #ifdef CAPIOLOG
+		c_file.print();
         std::cout << "handle write tid fd " << tid << " " << fd << std::endl;
 		std::cout << "path " << path << std::endl;
         #endif
@@ -784,8 +786,8 @@ void handle_local_read(int tid, int fd, off64_t count, bool dir) {
 		std::cout << "process offset " << process_offset << std::endl;
 		std::cout << "count " << count << std::endl;
 		std::cout << "end of sector" << end_of_sector << std::endl;
-        #endif
 		c_file.print();
+        #endif
 		off64_t end_of_read = process_offset + count;
 		off64_t nreads;
 		std::string committed = c_file.get_committed();

@@ -134,8 +134,12 @@ class Circular_buffer {
 			if (sem_wait(_mutex) == -1)
 				err_exit("sem_wait _mutex in write");
 		
-			if (*_last_elem + num_bytes >= _buff_size)
+			if (*_last_elem + num_bytes > _buff_size) {
+				std::cout << "_last_elem " << *_last_elem << std::endl;
+				std::cout << "num_bytes" << num_bytes << std::endl;
+				std::cout << "buff_size" << _buff_size << std::endl;
 				std::cout << "out of bound write" << std::endl;
+			}
 
 			memcpy((char*) _shm + *_last_elem, data, num_bytes);
 			*_last_elem = (*_last_elem + num_bytes) % _buff_size;
