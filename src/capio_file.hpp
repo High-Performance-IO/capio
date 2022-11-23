@@ -5,6 +5,7 @@
 #include <set>
 #include <cstddef>
 
+
 /*
  * Only the server have all the information
  * A process that only read from a file doesn't have the info on the sectors
@@ -247,10 +248,10 @@ class Capio_file {
 			}
 		}
 
-		void print() {
-			std::cout << "sectors" << std::endl;
+		void print(std::ostream& out_stream) {
+			out_stream << "sectors" << std::endl;
 			for (auto& sector : sectors) {
-				std::cout << "<" << sector.first << ", " << sector.second << ">" << std::endl;
+				out_stream << "<" << sector.first << ", " << sector.second << ">" << std::endl;
 			}
 		}
 };

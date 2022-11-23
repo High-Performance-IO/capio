@@ -7,7 +7,7 @@
 void test1() {
 	Capio_file c_file;
 	c_file.insert_sector(1, 3);
-	c_file.print();
+	c_file.print(std::cout);
 }
 
 void test2() {
@@ -15,35 +15,35 @@ void test2() {
 	Capio_file c_file;
 	for (size_t i = 0; i < nums.size(); i+=2)
 		c_file.insert_sector(nums[i], nums[i + 1]);
-	c_file.print();
+	c_file.print(std::cout);
 }
 
 void test3() {
 	Capio_file c_file;
 	c_file.insert_sector(1, 4);
 	c_file.insert_sector(2, 3);
-	c_file.print();
+	c_file.print(std::cout);
 }
 
 void test4() {
 	Capio_file c_file;
 	c_file.insert_sector(5, 7);
 	c_file.insert_sector(1, 3);
-	c_file.print();
+	c_file.print(std::cout);
 }
 
 void test5() {
 	Capio_file c_file;
 	c_file.insert_sector(1, 4);
 	c_file.insert_sector(1, 3);
-	c_file.print();
+	c_file.print(std::cout);
 }
 
 void test6() {
 	Capio_file c_file;
 	c_file.insert_sector(1, 4);
 	c_file.insert_sector(2, 4);
-	c_file.print();
+	c_file.print(std::cout);
 }
 
 void test7() {
@@ -51,7 +51,7 @@ void test7() {
 	c_file.insert_sector(1, 3);
 	c_file.insert_sector(5, 7);
 	c_file.insert_sector(0, 10);
-	c_file.print();
+	c_file.print(std::cout);
 }
 
 void test8() {
@@ -59,7 +59,7 @@ void test8() {
 	c_file.insert_sector(1, 3);
 	c_file.insert_sector(5, 7);
 	c_file.insert_sector(2, 6);
-	c_file.print();
+	c_file.print(std::cout);
 }
 
 
@@ -68,7 +68,7 @@ void test9() {
 	c_file.insert_sector(1, 3);
 	c_file.insert_sector(5, 7);
 	c_file.insert_sector(3, 5);
-	c_file.print();
+	c_file.print(std::cout);
 }
 
 void test10() {
@@ -76,7 +76,7 @@ void test10() {
 	c_file.insert_sector(1, 3);
 	c_file.insert_sector(5, 7);
 	c_file.insert_sector(3, 4);
-	c_file.print();
+	c_file.print(std::cout);
 }
 
 void test11() {
@@ -84,14 +84,14 @@ void test11() {
 	c_file.insert_sector(1, 3);
 	c_file.insert_sector(5, 7);
 	c_file.insert_sector(4, 5);
-	c_file.print();
+	c_file.print(std::cout);
 }
 
 void test12() {
 	Capio_file c_file;
 	c_file.insert_sector(2, 3);
 	c_file.insert_sector(1, 4);
-	c_file.print();
+	c_file.print(std::cout);
 }
 
 void test13() {
