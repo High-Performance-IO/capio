@@ -263,7 +263,7 @@ void write_file_location(const std::string& file_name, int rank, std::string pat
     memset(&lock, 0, sizeof(lock));
     int fd;
     if ((fd = open(file_name.c_str(), O_WRONLY|O_APPEND, 0664)) == -1) {
-        std::cerr << "writer " << rank << " error opening file, errno = " << errno << " strerror(errno): " << strerror(errno) << std::endl;
+        logfile << "writer " << rank << " error opening file, errno = " << errno << " strerror(errno): " << strerror(errno) << std::endl;
         MPI_Finalize();
         exit(1);
     }
@@ -276,7 +276,7 @@ void write_file_location(const std::string& file_name, int rank, std::string pat
     // of file (no matter how large the file grows in future)
     lock.l_pid = getpid();
     if (fcntl(fd, F_SETLKW, &lock) == -1) { // F_SETLK doesn't block, F_SETLKW does
-        std::cerr << "write " << rank << "failed to lock the file" << std::endl;
+        logfile << "write " << rank << "failed to lock the file" << std::endl;
     }
     
 	const char* path_to_write_cstr = path_to_write.c_str();
@@ -298,7 +298,7 @@ void write_file_location(const std::string& file_name, int rank, std::string pat
 	// Now release the lock explicitly.
     lock.l_type = F_UNLCK;
     if (fcntl(fd, F_SETLKW, &lock) == - 1) {
-        std::cerr << "write " << rank << "failed to unlock the file" << std::endl;
+        logfile << "write " << rank << "failed to unlock the file" << std::endl;
     }
 	free(file_location);
     close(fd); // close the file: would unlock if needed
@@ -326,12 +326,12 @@ bool check_remote_file(const std::string& file_name, int rank, std::string path_
     //fd = open(file_name.c_str(), O_RDONLY);  /* -1 signals an error */
     fp = fopen(file_name.c_str(), "r");
 	if (fp == NULL) {
-		std::cerr << "capio server " << rank << " failed to open the location file" << std::endl;
+		logfile << "capio server " << rank << " failed to open the location file" << std::endl;
 		return false;
 	}
 	fd = fileno(fp);
     if (fcntl(fd, F_SETLKW, &lock) < 0) {
-        std::cerr << "capio server " << rank << " failed to lock the file" << std::endl;
+        logfile << "capio server " << rank << " failed to lock the file" << std::endl;
         close(fd);
         return false;
     }
@@ -365,7 +365,7 @@ bool check_remote_file(const std::string& file_name, int rank, std::string path_
     /* Release the lock explicitly. */
     lock.l_type = F_UNLCK;
     if (fcntl(fd, F_SETLK, &lock) < 0) {
-        std::cerr << "reader " << rank << " failed to unlock the file" << std::endl;
+        logfile << "reader " << rank << " failed to unlock the file" << std::endl;
         res = false;
     }
     fclose(fp);
@@ -508,7 +508,7 @@ struct handle_write_metadata{
 std::string get_parent_dir_path(std::string file_path) {
 	std::size_t i = file_path.rfind('/');
 	if (i == std::string::npos) {
-		std::cerr << "invalid file_path in get_parent_dir_path" << std::endl;
+		logfile << "invalid file_path in get_parent_dir_path" << std::endl;
 	}
 	return file_path.substr(0, i);
 }
@@ -526,7 +526,7 @@ void write_entry_dir(int tid, std::string file_path, std::string dir, int type) 
 	if (type == 0) {
 		std::size_t i = file_path.rfind('/');
 		if (i == std::string::npos) {
-			std::cerr << "invalid file_path in get_parent_dir_path" << std::endl;
+			logfile << "invalid file_path in get_parent_dir_path" << std::endl;
 		}
 		file_name = file_path.substr(i + 1);
 	}
@@ -543,7 +543,7 @@ void write_entry_dir(int tid, std::string file_path, std::string dir, int type) 
 	auto it_tuple = files_metadata.find(dir);
 
 	if (it_tuple == files_metadata.end()) {
-		std::cerr << "dir " << dir << " is not present in CAPIO" << std::endl;
+		logfile << "dir " << dir << " is not present in CAPIO" << std::endl;
 		exit(1);
 	}
 	void* file_shm = std::get<0>(it_tuple->second);
@@ -918,7 +918,7 @@ void loop_check_files_location(std::string path_to_check, int rank) {
 		int tot_chars = 0;
     		fp = fopen("files_location.txt", "r");
 		if (fp == NULL) {
-			std::cerr << "error fopen files_location.txt" << std::endl;
+			logfile << "error fopen files_location.txt" << std::endl;
 			exit(1);
 		}
 		fd_locations = fileno(fp);
@@ -957,7 +957,7 @@ void loop_check_files_location(std::string path_to_check, int rank) {
 		/* Release the lock explicitly. */
 		lock.l_type = F_UNLCK;
 		if (fcntl(fd_locations, F_SETLK, &lock) < 0) {
-			std::cerr << "reader " << rank << " failed to unlock the file" << std::endl;
+			logfile << "reader " << rank << " failed to unlock the file" << std::endl;
 		}
 		fclose(fp);
 	}
@@ -1010,7 +1010,7 @@ void handle_read(char* str, int rank, bool dir) {
 			metadata->dir = dir;
 			int res = pthread_create(&t, NULL, wait_for_file, (void*) metadata);
 			if (res != 0) {
-				std::cerr << "error creation of capio server thread" << std::endl;
+				logfile << "error creation of capio server thread" << std::endl;
 				MPI_Finalize();
 				exit(1);
 			}
@@ -1097,30 +1097,31 @@ void handle_close(char* str, char* p) {
 
 void handle_remote_read(char* str, char* p, int rank) {
 	size_t bytes_received, offset;
-	char path_c[30];
-	sscanf(str, "ream %s %zu %zu", path_c, &bytes_received, &offset);
+	char path_c[PATH_MAX];
+	int complete_tmp;
+	sscanf(str, "ream %s %zu %zu %d", path_c, &bytes_received, &offset, &complete_tmp);
 	#ifdef CAPIOLOG
 		logfile << "serving the remote read: " << str << std::endl;
 	#endif
+	bool complete = complete_tmp;
 	*std::get<1>(files_metadata[path_c]) += bytes_received;
 	std::string path(path_c);
 	int tid, fd;
 	long int count; //TODO: diff between count and bytes_received
-
 	std::list<std::tuple<int, int, long int>>& list_remote_reads = my_remote_pending_reads[path];
 	auto it = list_remote_reads.begin();
 	std::list<std::tuple<int, int, long int>>::iterator prev_it;
-	while (it != list_remote_reads.end()) {
+	if (it != list_remote_reads.end()) {
 		tid = std::get<0>(*it);
 		fd = std::get<1>(*it);
 		count = std::get<2>(*it);
 		size_t fd_offset = *std::get<1>(processes_files[tid][fd]);
-		if (fd_offset + count <= offset + bytes_received) {
+		response_buffers[tid]->write(std::get<1>(files_metadata[path]));
+		if (complete || fd_offset + count <= offset + bytes_received) {
 		#ifdef CAPIOLOG
 			logfile << "handling others remote reads fd_offset " << fd_offset << " count " << count << " offset " << offset << " bytes received " << bytes_received << std::endl;
 		#endif
 			//this part is equals to the local read (TODO: function)
-			response_buffers[tid]->write(std::get<1>(files_metadata[path]));
 			//TODO: check if there is data that can be read in the local memory file
 			if (it == list_remote_reads.begin()) {
 				list_remote_reads.erase(it);
@@ -1240,7 +1241,6 @@ void handle_exig(char* str) {
 		}
 		else {
 			#ifdef CAPIOLOG
-			logfile << "debug 00" << std::endl;
 			logfile << "committed " << std::get<0>(it_conf->second) << " mode " << std::get<1>(it_conf->second) << std::endl;
 			#endif
 		}
@@ -1373,7 +1373,7 @@ void handle_stat(const char* str, int rank) {
 				strcpy(metadata->path, path);
 				int res = pthread_create(&t, NULL, wait_for_stat, (void*) metadata);
 				if (res != 0) {
-					std::cerr << "error creation of capio server thread wiat for stat" << std::endl;
+					logfile << "error creation of capio server thread wiat for stat" << std::endl;
 					MPI_Finalize();
 					exit(1);
 				}
@@ -1400,22 +1400,31 @@ void handle_stat(const char* str, int rank) {
 
 }
 
-void handle_fstat(const char* str) {
+void handle_fstat(const char* str, int rank) {
 	int tid, fd;
 	sscanf(str, "fsta %d %d", &tid, &fd);
 	std::string path = processes_files_metadata[tid][fd];
 	#ifdef CAPIOLOG
 	logfile << "path " << path << std::endl;
 	#endif
-	Capio_file& c_file = std::get<4>(files_metadata[path]);
-	off64_t file_size = c_file.get_file_size();
-	response_buffers[tid]->write(&file_size);
-	off64_t is_dir;
-	if (c_file.is_dir())
-		is_dir = 0;
-	else
-		is_dir = 1;
-	response_buffers[tid]->write(&is_dir);
+
+	if (files_location.find(path) == files_location.end()) {
+		check_remote_file("files_location.txt", rank, path);
+		if (files_location.find(path) == files_location.end()) {
+			//TODO: fix this
+			handle_local_stat(tid, path.c_str());
+			return;
+		}
+
+	}
+
+	if (strcmp(files_location[path], node_name) == 0) {
+		handle_local_stat(tid, path.c_str());
+	}
+	else {
+		handle_remote_stat(tid, path, rank);
+	}
+
 }
 
 void handle_access(const char* str) {
@@ -1623,10 +1632,13 @@ void handle_stat_reply(const char* str) {
 	#endif
 
 	auto it = my_remote_pending_stats.find(path_c);
+	if (it == my_remote_pending_stats.end())
+		exit(1);
 	for (int tid : it->second) {
 		response_buffers[tid]->write(&size);
 		response_buffers[tid]->write(&dir);
 		#ifdef CAPIOLOG
+		logfile << "tid: " << tid << std::endl;
 		logfile << "file size stat : " << size << std::endl;
 		logfile << "file is_dir stat : " << dir << std::endl;
 		#endif
@@ -1636,8 +1648,8 @@ void handle_stat_reply(const char* str) {
 }
 
 void read_next_msg(int rank) {
-	char str[4096];
-	std::fill(str, str + 4096, 0);
+	char str[2048];
+	std::fill(str, str + 2048, 0);
 	buf_requests->read(str);
 	char* p = str;
 	#ifdef CAPIOLOG
@@ -1670,7 +1682,7 @@ void read_next_msg(int rank) {
 	else if (strncmp(str, "stam", 4) == 0)
 		handle_stat_reply(str);
 	else if (strncmp(str, "fsta", 4) == 0)
-		handle_fstat(str);
+		handle_fstat(str, rank);
 	else if (strncmp(str, "accs", 4) == 0)
 		handle_access(str);
 	else if (strncmp(str, "unlk", 4) == 0)
@@ -1686,8 +1698,8 @@ void read_next_msg(int rank) {
 	else if (strncmp(str, "rnam", 4) == 0)
 		handle_rename(str, rank);
 	else {
-		std::cerr << "error msg read" << std::endl;
-	MPI_Finalize();
+		logfile << "error msg read" << std::endl;
+		MPI_Finalize();
 		exit(1);
 	}
 	return;
@@ -1700,7 +1712,7 @@ void clean_files_location() {
 	}
 	
 	if (close(fd) == -1) {
-		std::cerr << "impossible close the file files_location" << std::endl;
+		logfile << "impossible close the file files_location" << std::endl;
 	}
 }
 
@@ -1748,6 +1760,7 @@ struct remote_read_metadata {
 	long int offset;
 	int dest;
 	long int nbytes;
+	bool complete;
 	sem_t* sem;
 };
 
@@ -1764,7 +1777,7 @@ void send_file(char* shm, long int nbytes, int dest) {
 
 //TODO: refactor offset_str and offset
 
-void serve_remote_read(const char* path_c, const char* offset_str, int dest, long int offset, long int nbytes) {
+void serve_remote_read(const char* path_c, const char* offset_str, int dest, long int offset, long int nbytes, int complete) {
 	sem_wait(&remote_read_sem);
 	char* buf_send;
 	// Send all the rest of the file not only the number of bytes requested
@@ -1776,19 +1789,22 @@ void serve_remote_read(const char* path_c, const char* offset_str, int dest, lon
 		file_size = *std::get<1>(files_metadata[path_c]);
 		}
 	else {
-		std::cerr << "error capio_helper file " << path_c << " not in shared memory" << std::endl;
+		logfile << "error capio_helper file " << path_c << " not in shared memory" << std::endl;
 		exit(1);
 	}
 	nbytes = file_size - offset;
 	std::string nbytes_str = std::to_string(nbytes);
 	const char* nbytes_cstr = nbytes_str.c_str();
+	std::string complete_str = std::to_string(complete);
+	const char* complete_cstr = complete_str.c_str();
 	const char* s1 = "sending";
 	const size_t len1 = strlen(s1);
 	const size_t len2 = strlen(path_c);
 	const size_t len3 = strlen(offset_str);
 	const size_t len4 = strlen(nbytes_cstr);
-	buf_send = (char*) malloc((len1 + len2 + len3 + len4 + 4) * sizeof(char));//TODO:add malloc check
-	sprintf(buf_send, "%s %s %s %s", s1, path_c, offset_str, nbytes_cstr);
+	const size_t len5 = strlen(complete_cstr);
+	buf_send = (char*) malloc((len1 + len2 + len3 + len4 + len5 + 4) * sizeof(char));//TODO:add malloc check
+	sprintf(buf_send, "%s %s %s %s %s", s1, path_c, offset_str, nbytes_cstr, complete_cstr);
 	#ifdef CAPIOLOG
 		logfile << "helper serve remote read msg sent: " << buf_send << " to " << dest << std::endl;
 	#endif
@@ -1821,13 +1837,14 @@ void* wait_for_data(void* pthread_arg) {
 	long int offset = rr_metadata->offset;
 	int dest = rr_metadata->dest;
 	long int nbytes = rr_metadata->nbytes;
+	bool complete = rr_metadata->complete;
 	std::string offset_tmp = std::to_string(offset);
 	const char * offset_str = offset_tmp.c_str();
 			#ifdef CAPIOLOG
 				logfile << "wait for data before" << std::endl;
 			#endif
 	sem_wait(rr_metadata->sem);
-	serve_remote_read(path, offset_str, dest, offset, nbytes);
+	serve_remote_read(path, offset_str, dest, offset, nbytes, complete);
 	free(rr_metadata->sem);
 	free(rr_metadata->path);
 	free(rr_metadata);
@@ -1838,9 +1855,8 @@ void* wait_for_data(void* pthread_arg) {
 }
 
 
-bool data_avaiable(const char* path_c, long int offset, long int nbytes_requested) {
-	long int file_size = *std::get<1>(files_metadata[path_c]);
-	return offset + nbytes_requested <= file_size;
+bool data_avaiable(const char* path_c, long int offset, long int nbytes_requested, long int file_size) {
+	return (offset + nbytes_requested <= file_size);
 }
 
 void lightweight_MPI_Recv(char* buf_recv, MPI_Status* status) {
@@ -1922,13 +1938,13 @@ void helper_stat_req(const char* buf_recv) {
 				rr_metadata->sem = (sem_t*) malloc(sizeof(sem_t));
 				int res = sem_init(rr_metadata->sem, 0, 0);
 				if (res !=0) {
-					std::cerr << __FILE__ << ":" << __LINE__ << " - " << std::flush;
+					logfile << __FILE__ << ":" << __LINE__ << " - " << std::flush;
 					perror("sem_init failed"); 
 					exit(1);
 				}
 				res = pthread_create(&t, NULL, wait_for_completion, (void*) rr_metadata);
 				if (res != 0) {
-					std::cerr << "error creation of capio server thread wait for completion" << std::endl;
+					logfile << "error creation of capio server thread wait for completion" << std::endl;
 					MPI_Finalize();
 					exit(1);
 				}
@@ -1945,9 +1961,9 @@ void helper_handle_stat_reply(char* buf_recv) {
 	int dir;
 	sscanf(buf_recv, "size %s %ld %d", path_c, &size, &dir);
 	std::string path(path_c);
-	std::string msg = "stam " + path + + " " + std::to_string(size) + " " + std::to_string(dir);
+	std::string msg = "stam " + path + " " + std::to_string(size) + " " + std::to_string(dir);
 	const char* c_str = msg.c_str();
-	buf_requests->write(c_str, (strlen(c_str) + 1) * sizeof(char));
+	buf_requests->write(c_str, 256 * sizeof(char));
 }
 
 void* capio_helper(void* pthread_arg) {
@@ -2006,11 +2022,15 @@ void* capio_helper(void* pthread_arg) {
 			nbytes_str[j] = '\0';
 			long int nbytes = std::atoi(nbytes_str);
 			//check if the data is avaiable
-			if (data_avaiable(path_c, offset, nbytes)) {
+			auto it = files_metadata.find(path_c);
+			long int file_size = *std::get<1>(it->second);
+			Capio_file& c_file = std::get<4>(it->second);
+			bool complete = c_file.complete; 
+			if (complete || data_avaiable(path_c, offset, nbytes, file_size)) {
 				#ifdef CAPIOLOG
 					logfile << "helper data avaiable" << std::endl;
 				#endif
-				serve_remote_read(path_c, offset_str, dest, offset, nbytes);
+				serve_remote_read(path_c, offset_str, dest, offset, nbytes, complete);
 			}
 			else {
 				#ifdef CAPIOLOG
@@ -2022,16 +2042,17 @@ void* capio_helper(void* pthread_arg) {
 				rr_metadata->offset = offset;
 				rr_metadata->dest = dest;
 				rr_metadata->nbytes = nbytes;
+				rr_metadata->complete = complete;
 				rr_metadata->sem = (sem_t*) malloc(sizeof(sem_t));
 				int res = sem_init(rr_metadata->sem, 0, 0);
 				if (res !=0) {
-					std::cerr << __FILE__ << ":" << __LINE__ << " - " << std::flush;
+					logfile << __FILE__ << ":" << __LINE__ << " - " << std::flush;
 					perror("sem_init failed"); 
 					exit(1);
 				}
 				res = pthread_create(&t, NULL, wait_for_data, (void*) rr_metadata);
 				if (res != 0) {
-					std::cerr << "error creation of capio server thread" << std::endl;
+					logfile << "error creation of capio server thread" << std::endl;
 					MPI_Finalize();
 					exit(1);
 				}
@@ -2046,14 +2067,16 @@ void* capio_helper(void* pthread_arg) {
 			int source = status.MPI_SOURCE;
 			off64_t offset; 
 			char path_c[1024];
-			sscanf(buf_recv, "sending %s %ld %ld", path_c, &offset, &bytes_received);
+			int complete_tmp;
+			sscanf(buf_recv, "sending %s %ld %ld %d", path_c, &offset, &bytes_received, &complete_tmp);
+			bool complete = complete_tmp;
 			std::string path(path_c);
 			void* file_shm; 
 			if (files_metadata.find(path) != files_metadata.end()) {
 				file_shm = std::get<0>(files_metadata[path]);
 			}
 			else {
-				std::cerr << "error capio_helper file " << path << " not in shared memory" << std::endl;
+				logfile << "error capio_helper file " << path << " not in shared memory" << std::endl;
 				exit(1);
 			}
 			#ifdef CAPIOLOG
@@ -2074,9 +2097,9 @@ void* capio_helper(void* pthread_arg) {
 			}	
 			free(tmp);
 			#endif
-			std::string msg = "ream " + path + + " " + std::to_string(bytes_received) + " " + std::to_string(offset);
+			std::string msg = "ream " + path + + " " + std::to_string(bytes_received) + " " + std::to_string(offset) + " " + std::to_string(complete);
 			const char* c_str = msg.c_str();
-			buf_requests->write(c_str, (strlen(c_str) + 1) * sizeof(char));
+			buf_requests->write(c_str, 256 * sizeof(char));
 		}
 		else if(strncmp(buf_recv, "stat", 4) == 0) {
 			helper_stat_req(buf_recv);
@@ -2085,8 +2108,9 @@ void* capio_helper(void* pthread_arg) {
 			helper_handle_stat_reply(buf_recv);
 		}
 		else {
-			std::cerr << "helper error receiving message" << std::endl;
+			logfile << "helper error receiving message" << std::endl;
 		}
+		logfile << "helper loop" << std::endl;
 	}
 	return nullptr; //pthreads always needs a return value
 }
@@ -2098,7 +2122,7 @@ void parse_conf_file(std::string conf_file) {
 		json = padded_string::load(conf_file);
 	}
 	catch (const simdjson_error& e) {
-		std::cerr << "Exception thrown while opening conf file: " << e.what() << std::endl;
+		logfile << "Exception thrown while opening conf file: " << e.what() << std::endl;
 		exit(1);
 	}
 	ondemand::document entries = parser.iterate(json);
@@ -2228,7 +2252,7 @@ void get_capio_dir() {
 	}
 	int res = is_directory(capio_dir->c_str());
 	if (res == 0) {
-		std::cerr << "dir " << capio_dir << " is not a directory" << std::endl;
+		logfile << "dir " << capio_dir << " is not a directory" << std::endl;
 		exit(1);
 	}
 	}
@@ -2244,7 +2268,7 @@ int main(int argc, char** argv) {
 	MPI_Comm_rank(MPI_COMM_WORLD, &rank);
 	std::string conf_file;
 	if (argc < 2 || argc > 3) {
-		std::cerr << "input error: ./capio_server server_log_path [conf_file]" << std::endl;
+		logfile << "input error: ./capio_server server_log_path [conf_file]" << std::endl;
 		exit(1);
 	}
 	std::string server_log_path = argv[1];
@@ -2259,14 +2283,14 @@ int main(int argc, char** argv) {
 	sems_write = new std::unordered_map<int, sem_t*>;
     if(provided != MPI_THREAD_MULTIPLE)
     {
-        std::cerr << "The threading support level is lesser than that demanded" << std::endl;
+        logfile << "The threading support level is lesser than that demanded" << std::endl;
         MPI_Abort(MPI_COMM_WORLD, EXIT_FAILURE);
     }
 	MPI_Get_processor_name(node_name, &len);
 	pthread_t server_thread, helper_thread;
 	int res = sem_init(&internal_server_sem, 0, 0);
 	if (res != 0) {
-		std::cerr << __FILE__ << ":" << __LINE__ << " - " << std::flush;
+		logfile << __FILE__ << ":" << __LINE__ << " - " << std::flush;
 		perror("sem_init failed"); exit(res);
 	}
 	sem_init(&remote_read_sem, 0, 1);
@@ -2274,38 +2298,38 @@ int main(int argc, char** argv) {
 	sem_init(&handle_remote_stat_sem, 0, 1);
 	sem_init(&handle_local_read_sem, 0, 1);
 	if (res !=0) {
-		std::cerr << __FILE__ << ":" << __LINE__ << " - " << std::flush;
+		logfile << __FILE__ << ":" << __LINE__ << " - " << std::flush;
 		perror("sem_init failed"); exit(res);
 	}
 	res = pthread_create(&server_thread, NULL, capio_server, &rank);
 	if (res != 0) {
-		std::cerr << "error creation of capio server thread" << std::endl;
+		logfile << "error creation of capio server thread" << std::endl;
 		MPI_Finalize();
 		return 1;
 	}
 	res = pthread_create(&helper_thread, NULL, capio_helper, &rank);
 	if (res != 0) {
-		std::cerr << "error creation of helper server thread" << std::endl;
+		logfile << "error creation of helper server thread" << std::endl;
 		MPI_Finalize();
 		return 1;
 	}
     void* status;
     int t = pthread_join(server_thread, &status);
     if (t != 0) {
-    	std::cerr << "Error in thread join: " << t << std::endl;
+    	logfile << "Error in thread join: " << t << std::endl;
     }
     t = pthread_join(helper_thread, &status);
     if (t != 0) {
-    	std::cerr << "Error in thread join: " << t << std::endl;
+    	logfile << "Error in thread join: " << t << std::endl;
     }
 	res = sem_destroy(&internal_server_sem);
 	if (res !=0) {
-		std::cerr << __FILE__ << ":" << __LINE__ << " - " << std::flush;
+		logfile << __FILE__ << ":" << __LINE__ << " - " << std::flush;
 		perror("sem_destroy failed"); exit(res);
 	}
 	res = sem_destroy(&remote_read_sem);
 	if (res !=0) {
-		std::cerr << __FILE__ << ":" << __LINE__ << " - " << std::flush;
+		logfile << __FILE__ << ":" << __LINE__ << " - " << std::flush;
 		perror("sem_destroy failed"); exit(res);
 	}
 	MPI_Finalize();

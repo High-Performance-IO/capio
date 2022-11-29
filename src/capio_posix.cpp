@@ -1048,6 +1048,9 @@ ssize_t capio_read(int fd, void *buffer, size_t count) {
 			//read_from_disk(fd, offset, buffer, count);
 		//}
 		*offset = *offset + bytes_read;
+		#ifdef CAPIOLOG
+		CAPIO_DBG("capio_read returning  %ld\n", bytes_read);
+		#endif
 		return bytes_read;
 	}
 	else { 
