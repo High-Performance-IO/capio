@@ -90,7 +90,7 @@ void* create_shm(std::string shm_name, const long int size) {
 	if (fd == -1)
 		err_exit("create_shm shm_open " + shm_name);
 	if (ftruncate(fd, size) == -1)
-		err_exit("ftruncate " + shm_name);
+		err_exit("ftruncate create_shm " + shm_name);
 	p = mmap(NULL, size, PROT_READ|PROT_WRITE, MAP_SHARED, fd, 0);
 	if (p == MAP_FAILED)
 		err_exit("mmap create_shm " + shm_name);
@@ -115,7 +115,7 @@ void* expand_shared_mem(std::string shm_name, long int new_size) {
 	if (fstat(fd, &sb) == -1)
 		err_exit("fstat " + shm_name);
 	if (ftruncate(fd, new_size) == -1)
-		err_exit("ftruncate " + shm_name);
+		err_exit("ftruncate expand_shared_mem" + shm_name);
 	p = mmap(NULL, new_size, PROT_READ|PROT_WRITE, MAP_SHARED, fd, 0);
 	if (p == MAP_FAILED)
 		err_exit("mmap create_shm " + shm_name);
@@ -132,7 +132,7 @@ void* create_shm(std::string shm_name, const long int size, int* fd) {
 	if (*fd == -1)
 		err_exit("create_shm 3 args shm_open " + shm_name);
 	if (ftruncate(*fd, size) == -1)
-		err_exit("ftruncate " + shm_name);
+		err_exit("ftruncate create shm *fd " + shm_name);
 	p = mmap(NULL, size, PROT_READ|PROT_WRITE, MAP_SHARED, *fd, 0);
 	if (p == MAP_FAILED)
 		err_exit("mmap create_shm " + shm_name);

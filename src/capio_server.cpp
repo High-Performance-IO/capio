@@ -1104,30 +1104,34 @@ void handle_remote_read(char* str, char* p, int rank) {
 		logfile << "serving the remote read: " << str << std::endl;
 	#endif
 	bool complete = complete_tmp;
-	*std::get<1>(files_metadata[path_c]) += bytes_received;
+	*std::get<1>(files_metadata[path_c]) = offset + bytes_received;
+	Capio_file& c_file = std::get<4>(files_metadata[path_c]);
+	c_file.insert_sector(offset, bytes_received);
 	std::string path(path_c);
 	int tid, fd;
 	long int count; //TODO: diff between count and bytes_received
 	std::list<std::tuple<int, int, long int>>& list_remote_reads = my_remote_pending_reads[path];
 	auto it = list_remote_reads.begin();
 	std::list<std::tuple<int, int, long int>>::iterator prev_it;
-	if (it != list_remote_reads.end()) {
+	off64_t end_of_sector;
+	while (it != list_remote_reads.end()) {
 		tid = std::get<0>(*it);
 		fd = std::get<1>(*it);
 		count = std::get<2>(*it);
 		size_t fd_offset = *std::get<1>(processes_files[tid][fd]);
-		response_buffers[tid]->write(std::get<1>(files_metadata[path]));
 		if (complete || fd_offset + count <= offset + bytes_received) {
 		#ifdef CAPIOLOG
 			logfile << "handling others remote reads fd_offset " << fd_offset << " count " << count << " offset " << offset << " bytes received " << bytes_received << std::endl;
 		#endif
 			//this part is equals to the local read (TODO: function)
-			//TODO: check if there is data that can be read in the local memory file
+		 	end_of_sector = c_file.get_sector_end(fd_offset);
+			response_buffers[tid]->write(&end_of_sector);
 			if (it == list_remote_reads.begin()) {
 				list_remote_reads.erase(it);
 				it = list_remote_reads.begin();
 			}
 			else {
+				list_remote_reads.erase(it);
 				it = std::next(prev_it);
 			}
 		}
@@ -1307,11 +1311,10 @@ void handle_remote_stat(int tid, const std::string path, int rank) {
 	logfile << "handle remote read before sem_wait" << std::endl;
 	#endif
 	sem_wait(&handle_remote_stat_sem);
-	const char* msg;
 	std::string str_msg;
 	int dest = nodes_helper_rank[files_location[path]];
 	str_msg = "stat " + std::to_string(rank) + " " + path; 
-	msg = str_msg.c_str();
+	const char* msg = str_msg.c_str();
 	#ifdef CAPIOLOG
 	logfile << "handle remote stat" << std::endl;
 	logfile << "msg sent " << msg << std::endl;
@@ -1766,6 +1769,12 @@ struct remote_read_metadata {
 
 void send_file(char* shm, long int nbytes, int dest) {
 	long int num_elements_to_send = 0;
+	if (nbytes == 0) {
+		#ifdef CAPIOLOG
+		logfile << "returning without sending file" << std::endl;
+		#endif
+		return;
+	}
 	for (long int k = 0; k < nbytes; k += num_elements_to_send) {
 			if (nbytes - num_elements_to_send > 1024L * 1024 * 1024)
 				num_elements_to_send = 1024L * 1024 * 1024;
@@ -1777,7 +1786,7 @@ void send_file(char* shm, long int nbytes, int dest) {
 
 //TODO: refactor offset_str and offset
 
-void serve_remote_read(const char* path_c, const char* offset_str, int dest, long int offset, long int nbytes, int complete) {
+void serve_remote_read(const char* path_c, int dest, long int offset, long int nbytes, int complete) {
 	sem_wait(&remote_read_sem);
 	char* buf_send;
 	// Send all the rest of the file not only the number of bytes requested
@@ -1795,16 +1804,18 @@ void serve_remote_read(const char* path_c, const char* offset_str, int dest, lon
 	nbytes = file_size - offset;
 	std::string nbytes_str = std::to_string(nbytes);
 	const char* nbytes_cstr = nbytes_str.c_str();
+	std::string offset_str = std::to_string(offset);
+	const char* offset_cstr = offset_str.c_str();
 	std::string complete_str = std::to_string(complete);
 	const char* complete_cstr = complete_str.c_str();
 	const char* s1 = "sending";
 	const size_t len1 = strlen(s1);
 	const size_t len2 = strlen(path_c);
-	const size_t len3 = strlen(offset_str);
+	const size_t len3 = strlen(offset_cstr);
 	const size_t len4 = strlen(nbytes_cstr);
 	const size_t len5 = strlen(complete_cstr);
 	buf_send = (char*) malloc((len1 + len2 + len3 + len4 + len5 + 4) * sizeof(char));//TODO:add malloc check
-	sprintf(buf_send, "%s %s %s %s %s", s1, path_c, offset_str, nbytes_cstr, complete_cstr);
+	sprintf(buf_send, "%s %s %s %s %s", s1, path_c, offset_cstr, nbytes_cstr, complete_cstr);
 	#ifdef CAPIOLOG
 		logfile << "helper serve remote read msg sent: " << buf_send << " to " << dest << std::endl;
 	#endif
@@ -1838,13 +1849,11 @@ void* wait_for_data(void* pthread_arg) {
 	int dest = rr_metadata->dest;
 	long int nbytes = rr_metadata->nbytes;
 	bool complete = rr_metadata->complete;
-	std::string offset_tmp = std::to_string(offset);
-	const char * offset_str = offset_tmp.c_str();
 			#ifdef CAPIOLOG
 				logfile << "wait for data before" << std::endl;
 			#endif
 	sem_wait(rr_metadata->sem);
-	serve_remote_read(path, offset_str, dest, offset, nbytes, complete);
+	serve_remote_read(path, dest, offset, nbytes, complete);
 	free(rr_metadata->sem);
 	free(rr_metadata->path);
 	free(rr_metadata);
@@ -1891,15 +1900,24 @@ struct remote_stat_metadata {
 };
 
 void serve_remote_stat(const char* path, int dest, Capio_file& c_file) {
-	char msg[1024];	
+	char msg[PATH_MAX + 1024];	
 	int dir;
+	#ifdef CAPIOLOG
+		logfile << "serve remote stat" << std::endl;
+	#endif
 	if (c_file.is_dir())
 		dir = 0;
 	else
 		dir = 1;
 	off64_t size = c_file.get_file_size();
 	sprintf(msg, "size %s %ld %d", path, size, dir);
+	#ifdef CAPIOLOG
+		logfile << "serve remote stat 0" << std::endl;
+	#endif
 	MPI_Send(msg, strlen(msg) + 1, MPI_CHAR, dest, 0, MPI_COMM_WORLD);
+	#ifdef CAPIOLOG
+		logfile << "serve remote stat 1" << std::endl;
+	#endif
 }
 
 void* wait_for_completion(void* pthread_arg) {
@@ -1921,15 +1939,35 @@ void* wait_for_completion(void* pthread_arg) {
 }
 
 void helper_stat_req(const char* buf_recv) {
-	char path_c[1024];
+	char* path_c = (char*) malloc(sizeof(char) * PATH_MAX);
 	int dest;
+	#ifdef CAPIOLOG
+	logfile << "helper stat req" << std::endl;
+	#endif
 	sscanf(buf_recv, "stat %d %s", &dest, path_c);
 
+	//std::string path(path_c);
+	#ifdef CAPIOLOG
+	logfile << "debug 0 path " << path_c << "len " << strlen(path_c) << " " << dest << std::endl;
+	#endif
+	logfile << "elems " << files_metadata.size() << std::endl;
+	//for (auto p : files_metadata) {
+//		logfile << "files metadata " << p.first << std::endl;
+//	}
 	Capio_file& c_file = std::get<4>(files_metadata[path_c]);	
+	#ifdef CAPIOLOG
+	logfile << "debug 000" << std::endl;
+	#endif
 	if (c_file.complete) {
+	#ifdef CAPIOLOG
+	logfile << "debug 1" << std::endl;
+	#endif
 		serve_remote_stat(path_c, dest, c_file);
 	}
 	else { //wait for completion
+	#ifdef CAPIOLOG
+	logfile << "debug 2" << std::endl;
+	#endif
 				pthread_t t;
 				struct remote_stat_metadata* rr_metadata = (struct remote_stat_metadata*) malloc(sizeof(struct remote_stat_metadata));
 				rr_metadata->path = path_c;
@@ -1950,6 +1988,8 @@ void helper_stat_req(const char* buf_recv) {
 				}
 				clients_remote_pending_stat[path_c].push_back(rr_metadata->sem);
 	}
+	logfile << "debug 3" << std::endl;
+	free(path_c);
 }
 
 void helper_handle_stat_reply(char* buf_recv) {
@@ -1967,7 +2007,7 @@ void helper_handle_stat_reply(char* buf_recv) {
 }
 
 void* capio_helper(void* pthread_arg) {
-	char buf_recv[2048];
+	char* buf_recv = (char*) malloc(sizeof(char) * (PATH_MAX + 1024));
 	MPI_Status status;
 	int rank = *(int*) pthread_arg;
 	sem_wait(&internal_server_sem);
@@ -1982,45 +2022,11 @@ void* capio_helper(void* pthread_arg) {
 		#endif
 		    // schema msg received: "read path dest offset nbytes"
 			// TODO: use sscanf
-			char* path_c = (char*) malloc(sizeof(char) * 512);
-			int i = 5;
-			int j = 0;
-			while (buf_recv[i] != ' ') {
-				path_c[j] = buf_recv[i];
-				++i;
-				++j;
-			}
-			path_c[j] = '\0';
-			char dest_str[128];
-			j = 0;
-			++i;
-			while (buf_recv[i] != ' ') {
-				dest_str[j] = buf_recv[i];
-				++i;
-				++j;
-			}
-			dest_str[j] = '\0';
-			int dest = std::atoi(dest_str);
-			char offset_str[128];
-			j = 0;
-			++i;
-			while (buf_recv[i] != ' ') {
-				offset_str[j] = buf_recv[i];
-				++i;
-				++j;
-			}
-			offset_str[j] = '\0';
-			long int offset = std::atoi(offset_str);
-			char nbytes_str[128];
-			j = 0;
-			++i;
-			while (buf_recv[i] != '\0') {
-				nbytes_str[j] = buf_recv[i];
-				++i;
-				++j;
-			}
-			nbytes_str[j] = '\0';
-			long int nbytes = std::atoi(nbytes_str);
+			char* path_c = (char*) malloc(sizeof(char) * PATH_MAX);
+			int dest;
+			long int offset, nbytes;
+			sscanf(buf_recv, "read %s %d %ld %ld", path_c, &dest, &offset, &nbytes);
+			
 			//check if the data is avaiable
 			auto it = files_metadata.find(path_c);
 			long int file_size = *std::get<1>(it->second);
@@ -2030,7 +2036,7 @@ void* capio_helper(void* pthread_arg) {
 				#ifdef CAPIOLOG
 					logfile << "helper data avaiable" << std::endl;
 				#endif
-				serve_remote_read(path_c, offset_str, dest, offset, nbytes, complete);
+				serve_remote_read(path_c, dest, offset, nbytes, complete);
 			}
 			else {
 				#ifdef CAPIOLOG
@@ -2057,6 +2063,7 @@ void* capio_helper(void* pthread_arg) {
 					exit(1);
 				}
 				clients_remote_pending_reads[path_c].push_back(std::make_tuple(offset, nbytes, rr_metadata->sem));
+				free(path_c);
 			}
 		}
 		else if(strncmp(buf_recv, "sending", 7) == 0) { //receiving a file
@@ -2084,25 +2091,20 @@ void* capio_helper(void* pthread_arg) {
 				logfile << "offset " << offset << std::endl;
 				logfile << "bytes received " << bytes_received << std::endl;
 			#endif
-			recv_file((char*)file_shm + offset, source, bytes_received);
+			if (bytes_received != 0) {
+				recv_file((char*)file_shm + offset, source, bytes_received);
 			#ifdef CAPIOLOG
 				logfile << "helper received part of the file" << std::endl;
 			#endif
 			bytes_received *= sizeof(char);
-			#ifdef MYDEBUG
-			int* tmp = (int*) malloc(bytes_received);
-			memcpy(tmp, file_shm, bytes_received); 
-			for (int i = 0; i < bytes_received / sizeof(int); ++i) {
-				logfile << "helper receiving tmp[i] " << tmp[i] << std::endl;
-			}	
-			free(tmp);
-			#endif
+			}
 			std::string msg = "ream " + path + + " " + std::to_string(bytes_received) + " " + std::to_string(offset) + " " + std::to_string(complete);
 			const char* c_str = msg.c_str();
 			buf_requests->write(c_str, 256 * sizeof(char));
 		}
 		else if(strncmp(buf_recv, "stat", 4) == 0) {
 			helper_stat_req(buf_recv);
+		logfile << "helper loop -1" << std::endl;
 		}
 		else if (strncmp(buf_recv, "size", 4) == 0) {
 			helper_handle_stat_reply(buf_recv);

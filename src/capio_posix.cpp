@@ -978,7 +978,7 @@ ssize_t capio_write(int fd, const  void *buffer, size_t count) {
 			if (fd == -1)
 				err_exit(" write_shm shm_open " + shm_name);
 			if (ftruncate(fd_shm, new_size) == -1)
-				err_exit("ftruncate " + shm_name);
+				err_exit("ftruncate capio_posix " + shm_name);
 			void* p = mremap(std::get<0>((*files)[fd]), file_size, new_size, MREMAP_MAYMOVE);
 			if (p == MAP_FAILED)
 				err_exit("mremap " + shm_name);
