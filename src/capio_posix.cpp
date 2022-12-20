@@ -618,8 +618,12 @@ off64_t add_read_request(int fd, off64_t count, std::tuple<void*, off64_t*, off6
 	*std::get<3>(t) = offset_upperbound;
 	off64_t file_shm_size = *std::get<2>(t);
 	off64_t end_of_read = *std::get<1>(t) + count;
-	if (end_of_read > offset_upperbound)
+	if (end_of_read > offset_upperbound) {
+			#ifdef CAPIOLOG
+		CAPIO_DBG("addreadreq (end_of_read > offset_upperbound) %ld %ld\n", end_of_read, offset_upperbound);
+#endif
 		end_of_read = offset_upperbound;
+	}
 	if (end_of_read > file_shm_size) {
 		size_t new_size;
 		if (end_of_read > file_shm_size * 2)

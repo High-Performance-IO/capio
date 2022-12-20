@@ -28,7 +28,7 @@ void writer(int rank, int* array, long int num_writes, long int num_elements, in
         	MPI_Send(array + num_elements * i + k, num_elements_to_send, MPI_INT, receiver, 0, MPI_COMM_WORLD);
 		}
     }
-	MPI_Barrier(MPI_COMM_WORLD);
+	//MPI_Barrier(MPI_COMM_WORLD);
 	if (rank == 0) {
 		const sec duration = cclock::now() - before;
 		file << "total mpi send time: " << duration.count() << " secs" << std::endl;
@@ -61,11 +61,15 @@ void reader(int rank, int master_rank, int* array, long int num_reads, long int 
     for (long int i = 0; i < num_reads; ++i) {
 		int num_elements_received = 0;
 		for (long int k = 0; k < num_elements; k += num_elements_received) {
-        	MPI_Recv(array + num_elements * i + k, num_elements - k, MPI_INT, sender, 0, MPI_COMM_WORLD, &status);
+			if (num_elements - k > 1024L * 1024 * 1024 / sizeof(int))
+        		MPI_Recv(array + num_elements * i + k, 1024L * 1024 * 1024, MPI_INT, sender, 0, MPI_COMM_WORLD, &status);
+			else
+        		MPI_Recv(array + num_elements * i + k, num_elements - k, MPI_INT, sender, 0, MPI_COMM_WORLD, &status);
+
 			MPI_Get_count(&status, MPI_INT, &num_elements_received);
 		}
     }
-	MPI_Barrier(MPI_COMM_WORLD);
+	//MPI_Barrier(MPI_COMM_WORLD);
 	if (rank == master_rank) {
 		const sec duration = cclock::now() - before;
 		file << "total mpi receive time: " << duration.count() << " secs" << std::endl;
