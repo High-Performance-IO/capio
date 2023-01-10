@@ -12,3 +12,5 @@ if(MPI_LINK_FLAGS)
     set_target_properties(capio_server PROPERTIES
             LINK_FLAGS "${MPI_LINK_FLAGS}")
 endif()
+
+target_link_libraries(capio_server stdc++fs)
