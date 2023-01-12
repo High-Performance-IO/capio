@@ -1796,6 +1796,7 @@ void send_file(char* shm, long int nbytes, int dest) {
 		return;
 	}
 	long int num_elements_to_send = 0;
+	MPI_Request req;
 	for (long int k = 0; k < nbytes; k += num_elements_to_send) {
 			if (nbytes - k > 1024L * 1024 * 1024)
 				num_elements_to_send = 1024L * 1024 * 1024;
@@ -1805,7 +1806,8 @@ void send_file(char* shm, long int nbytes, int dest) {
 		#ifdef CAPIOLOG
 			logfile << "before sending file " << std::endl;
 #endif
-			MPI_Send(shm + k, num_elements_to_send, MPI_CHAR, dest, 0, MPI_COMM_WORLD); 
+			//MPI_Send(shm + k, num_elements_to_send, MPI_CHAR, dest, 0, MPI_COMM_WORLD); 
+			MPI_Isend(shm + k, num_elements_to_send, MPI_CHAR, dest, 0, MPI_COMM_WORLD, &req); 
 		#ifdef CAPIOLOG
 			logfile << "after sending file" << std::endl;
 #endif
@@ -1987,8 +1989,8 @@ void helper_stat_req(const char* buf_recv) {
 	//std::string path(path_c);
 	#ifdef CAPIOLOG
 	logfile << "debug 0 path " << path_c << "len " << strlen(path_c) << " " << dest << std::endl;
-	#endif
 	logfile << "elems " << files_metadata.size() << std::endl;
+	#endif
 	//for (auto p : files_metadata) {
 //		logfile << "files metadata " << p.first << std::endl;
 //	}
@@ -2053,10 +2055,13 @@ void* capio_helper(void* pthread_arg) {
 	MPI_Status status;
 	int rank = *(int*) pthread_arg;
 	sem_wait(&internal_server_sem);
-		#ifdef CAPIOLOG
-		#endif
 	while(true) {
+		#ifdef CAPIOSYNC
+		MPI_Recv(buf_recv, buf_size, MPI_CHAR, MPI_ANY_SOURCE, 0, MPI_COMM_WORLD, &status); //receive from server
+		#else
 		lightweight_MPI_Recv(buf_recv, buf_size, &status); //receive from server
+		#endif
+
 		bool remote_request_to_read = strncmp(buf_recv, "read", 4) == 0;
 		if (remote_request_to_read) {
 		#ifdef CAPIOLOG
