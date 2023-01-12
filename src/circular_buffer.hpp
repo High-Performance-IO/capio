@@ -150,6 +150,7 @@ class Circular_buffer {
 			if (sem_post(_sem_num_elems) == -1)
 				err_exit("sem_post _sem_num_elems");
 		}
+
 		void read(T* buff_rcv) {
 			if (sem_wait(_sem_num_elems) == -1)
 				err_exit("sem_wait _sem_num_elems");
