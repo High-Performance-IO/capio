@@ -1,31 +1,45 @@
 #include "../../src/circular_buffer.hpp"
 #include "common.hpp"
 #include <limits>
+#include <chrono>
+#include <fstream>
 #include <mpi.h>
 
-void test_one_to_one(const std::string& buffer_name, long int buff_size, int* data, long int num_elems, long int num_reads, int rank) {
-	Circular_buffer<int> c_buff(buffer_name + std::to_string(rank), buff_size, num_elems * sizeof(int));
+
+using cclock = std::chrono::system_clock;
+using sec = std::chrono::duration<double>;
+
+void test_one_to_one(const std::string& buffer_name, long int max_num_elems, int* data, long int num_elems, long int num_reads, int rank) {
+	Circular_buffer<int> c_buff(buffer_name + std::to_string(rank), max_num_elems, num_elems * sizeof(int));
+
+	cclock::time_point before;
+	std::ofstream file;
+	file.open("time_consumer.txt", std::fstream::app);
+	// for milliseconds, use using ms = std::chrono::duration<double, std::milli>;
+	before = cclock::now();
 	for (long int i = 0; i < num_reads; ++i) {
-		c_buff.read(data + i * num_elems);
+		c_buff.read(data);
 	}
+
+	const sec duration = cclock::now() - before;
+	file << "total consumer receive time: " << duration.count() << " secs" << std::endl;
+	file.close();
 }
 
 int sum_all(int *data, long int num_elements, long int num_reads) {
 	int sum = 0;
-	for (long int k = 0; k < num_reads; ++k) {
 		for (long int i = 0; i < num_elements; ++i) {
-        	if (sum > std::numeric_limits<int>::max() - data[i + k * num_elements]) {
+        	if (sum > std::numeric_limits<int>::max() - data[i]) {
             	sum = 0;
         	}
-				sum += data[i + k * num_elements];
+				sum += data[i];
 		}
-	}
 	return sum;
 }
 
 int main(int argc, char** argv) {
 	int rank;
-	long unsigned int num_elems, num_reads, buff_size;
+	long unsigned int num_elems, num_reads, max_num_elems;
 	MPI_Init(&argc, &argv);
 	if (argc != 4) {
 		std::cerr << "input error: 4 parameter must be passed" << std::endl;
@@ -34,14 +48,10 @@ int main(int argc, char** argv) {
 	}
 	num_elems = std::atol(argv[1]);
 	num_reads = std::atol(argv[2]);
-	buff_size = std::atol(argv[3]);
-	if (buff_size < num_elems * sizeof(int)) {
-		std::cerr << "input error: buff_size must be >= num_elems * sizeof(int)" << std::endl;
-		return 1;
-	}
+	max_num_elems = std::atol(argv[3]);
 	MPI_Comm_rank(MPI_COMM_WORLD, &rank);
-	int* data = new int[num_elems * num_reads];
-	test_one_to_one("test_perf", buff_size, data, num_elems, num_reads, rank);
+	int* data = new int[num_elems];
+	test_one_to_one("test_perf", max_num_elems, data, num_elems, num_reads, rank);
 	int sum = sum_all(data, num_elems, num_reads);
 	std::cout << "process " << rank << ", sum = " << sum << "\n";
 	delete[] data;
