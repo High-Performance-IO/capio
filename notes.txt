@@ -1,7 +1,0 @@
-g++ -Wall -pedantic -shared -o libcapio_posix.so src/capio_posix.cpp -fPIC
-mpic++ src/capio_server.cpp -o capio_server -pthread -lrt
-mpic++ -o simple_write unit_tests/simple_write.cpp -L. -lcapio_posix
-mpic++ -o simple_read unit_tests/simple_read.cpp -L. -lcapio_posix
-LD_LIBRARY_PATH=. mpiexec -n 4 ./simple_write 128 2 > output.txt
-LD_LIBRARY_PATH=. mpiexec -n 4 ./simple_read 128 2 > output.txt
-
