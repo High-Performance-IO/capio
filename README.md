@@ -86,3 +86,11 @@ The [examples](examples) folder contains some examples that shows how easy is to
 - [on_close](examples/pipeline_on_close): A pipeline composed by a producer and a consumer with "on_close" semantics
 - [append](examples/pipeline_append): A pipeline composed by a producer and a consumer with "update" semantics
 - [mix_semantics](examples/pipeline_mix): A pipeline composed by a producer and a consumer with mix semantics
+
+## CAPIO Team
+Made with :heart: by:
+
+Alberto Riccardo Martinelli <albertoriccardo.martinelli@unito.it> (Designer and mantainer)  
+Massimo Torquati <massimo.torquati@unipi.it> (Designer)  
+Marco Aldinucci <marco.aldinucci@unito.it> (Designer)  
+Iacopo Colonnelli <iacopo.colonnelli@unito.it> (Workflows expert)
