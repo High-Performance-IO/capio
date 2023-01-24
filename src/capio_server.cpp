@@ -29,11 +29,15 @@
 #include <mpi.h>
 
 #include "capio_file.hpp"
+#include "spsc_queue.hpp"
 #include "simdjson.h"
 #include "utils/common.hpp"
 
 
 #define DNAME_LENGTH 128
+#define N_ELEMS_DATA_BUFS 10 
+//256KB
+#define WINDOW_DATA_BUFS 262144
 
 using namespace simdjson;
 
@@ -80,7 +84,7 @@ MPI_Request req;
 
 std::unordered_map<int, int> pids;
 
-// tid -> fd ->(file_shm, index)
+// tid -> fd ->(file_data, index)
 std::unordered_map<int, std::unordered_map<int, std::tuple<void*, off64_t*>>> processes_files;
 
 // tid -> fd -> pathname
@@ -88,6 +92,9 @@ std::unordered_map<int, std::unordered_map<int, std::string>> processes_files_me
 
 // tid -> (response shared buffer, index)
 std::unordered_map<int, Circular_buffer<off_t>*> response_buffers;
+
+// tid -> (client_to_server_data_buf, server_to_client_data_buf)
+std::unordered_map<int, std::pair<SPSC_queue<char>*, SPSC_queue<char>*>> data_buffers;
 
 /*
  * Regarding the map caching info.
@@ -105,7 +112,7 @@ std::unordered_map<int, Circular_buffer<off_t>*> response_buffers;
 // tid -> (response shared buffer, size)
 //std::unordered_map<int, std::pair<int*, int*>> caching_info;
 
-/* pathname -> (file_shm, file_size, mapped_shm_size, first_write, capio_file)
+/* pathname -> (file_data, file_size, mapped_shm_size, first_write, capio_file)
  * The mapped shm size isn't the the size of the file shm
  * but it's the mapped shm size in the virtual adress space
  * of the server process. The effective size can ge greater
@@ -203,6 +210,12 @@ void sig_term_handler(int signum, siginfo_t *info, void *ptr) {
 		//shm_unlink(("caching_info" + std::to_string(pair.first)).c_str()); 
 		//shm_unlink(("caching_info_size" + std::to_string(pair.first)).c_str()); 
 	}
+
+	for (auto& p : data_buffers) {
+		p.second.first->free_shm();
+		p.second.second->free_shm();
+	}
+
 	shm_unlink("circular_buffer");
 	shm_unlink("index_buf");
 	buf_requests->free_shm();
@@ -219,23 +232,6 @@ void catch_sigterm() {
 	if (res == -1) {
 		err_exit("sigaction for SIGTERM");
 	}
-}
-
-void* create_shm_circular_buffer(std::string shm_name) {
-	void* p = nullptr;
-	// if we are not creating a new object, mode is equals to 0
-	int fd = shm_open(shm_name.c_str(), O_CREAT | O_RDWR,  S_IRUSR | S_IWUSR); //to be closed
-	const long int size = 1024L * 1024 * 1024;
-	if (fd == -1)
-		err_exit("shm_open");
-	if (ftruncate(fd, size) == -1)
-		err_exit("ftruncate");
-	p = mmap(NULL, size, PROT_READ|PROT_WRITE, MAP_SHARED, fd, 0);
-	if (p == MAP_FAILED)
-		err_exit("mmap create_shm_circular_buffer");
-//	if (close(fd) == -1);
-//		err_exit("close");
-	return p;
 }
 
 int* create_shm_int(std::string shm_name) {
@@ -403,6 +399,11 @@ void init_process(int tid) {
 		}
 		Circular_buffer<off_t>* cb = new Circular_buffer<off_t>("buf_response" + std::to_string(tid), 8 * 1024 * 1024, sizeof(off_t));
 		response_buffers.insert({tid, cb});
+		std::string shm_name = "capio_write_data_buffer_tid_" + std::to_string(tid);
+		auto* write_data_cb = new SPSC_queue<char>(shm_name, N_ELEMS_DATA_BUFS, WINDOW_DATA_BUFS);
+		shm_name = "capio_read_data_buffer_tid_" + std::to_string(tid);
+		auto* read_data_cb = new SPSC_queue<char>(shm_name, N_ELEMS_DATA_BUFS, WINDOW_DATA_BUFS);
+		data_buffers.insert({tid, {write_data_cb, read_data_cb}});
 		//caching_info[tid].first = (int*) get_shm("caching_info" + std::to_string(tid));
 		//caching_info[tid].second = (int*) get_shm("caching_info_size" + std::to_string(tid));
 	}
@@ -455,7 +456,7 @@ void handle_open(char* str, char* p, int rank) {
 		std::string shm_name = path;
 		std::replace(shm_name.begin(), shm_name.end(), '/', '_');
 		shm_name = shm_name.substr(1);
-		p_shm = create_shm(shm_name, file_initial_size);
+		p_shm = new char[file_initial_size];
 		//caching_info[tid].first[index + 1] = 0;
 	}
 	else {
@@ -488,12 +489,35 @@ void handle_open(char* str, char* p, int rank) {
 	}
 }
 
+void send_data_to_client(int tid, char* buf, long int count) {
+	auto* data_buf = data_buffers[tid].second;
+	size_t n_writes = count / WINDOW_DATA_BUFS;
+	size_t r = count % WINDOW_DATA_BUFS;
+	size_t i = 0;
+	while (i < n_writes) {
+		data_buf->write(buf + i * WINDOW_DATA_BUFS);
+		++i;
+	}
+	if (r)
+		data_buf->write(buf + i * WINDOW_DATA_BUFS, r);
+}
+
 void handle_pending_read(int tid, int fd, long int process_offset, long int count) {
 	
 	std::string path = processes_files_metadata[tid][fd];
 	Capio_file & c_file = std::get<4>(files_metadata[path]);
 	off64_t end_of_sector = c_file.get_sector_end(process_offset);
+	char* p = (char*) std::get<0>(files_metadata[path]);
+	off64_t end_of_read = process_offset + count;
+	size_t bytes_read;
+	if (end_of_sector > end_of_read) {
+		end_of_sector = end_of_read;
+		bytes_read = count;
+	}
+	else
+		bytes_read = end_of_sector - process_offset;
 	response_buffers[tid]->write(&end_of_sector);
+	send_data_to_client(tid, p + process_offset, bytes_read);
 	//*processes_files[tid][fd].second += count;
 	//TODO: check if the file was moved to the disk
 
@@ -564,13 +588,11 @@ void write_entry_dir(int tid, std::string file_path, std::string dir, int type) 
 				new_size = file_shm_size * 2;
 
 
-			int res = munmap(std::get<0>(files_metadata[dir]), file_shm_size);
-			if (res == -1)
-				err_exit("munmap " + dir);
-			std::string shm_name = dir;
-			std::replace(shm_name.begin(), shm_name.end(), '/', '_');
-			void* p = expand_shared_mem(shm_name, new_size);
-			std::get<0>(files_metadata[dir]) = p;
+			char* old_p = (char*)std::get<0>(files_metadata[dir]);
+			char* new_p = new char[new_size];
+			memcpy(new_p, old_p, data_size); //TODO: slow
+			delete [] old_p;
+			std::get<0>(files_metadata[dir]) = new_p;
 			std::get<2>(files_metadata[dir]) = new_size;
 		}
 		if (std::get<4>(files_metadata[file_path]).is_dir()) {
@@ -682,6 +704,30 @@ void handle_write(const char* str, int rank) {
         stream >> request >> tid >> fd >> base_offset >> count;
 		data_size = base_offset + count;
         std::string path = processes_files_metadata[tid][fd];
+		char* p = (char *) std::get<0>(files_metadata[path]);
+		auto* data_buf = data_buffers[tid].first;
+		size_t n_reads = count / WINDOW_DATA_BUFS;  
+		size_t r = count % WINDOW_DATA_BUFS;
+		size_t i = 0;
+		p = p + base_offset;
+        #ifdef CAPIOLOG
+		logfile << "debug handle_write 0 " << std::endl;
+        #endif
+		while (i < n_reads) {
+        #ifdef CAPIOLOG
+		logfile << "debug handle_write 2 " << std::endl;
+        #endif
+			data_buf->read(p + i * WINDOW_DATA_BUFS);
+			++i;
+		}
+        #ifdef CAPIOLOG
+		logfile << "debug handle_write 3 " << std::endl;
+        #endif
+		if (r)
+			data_buf->read(p + i * WINDOW_DATA_BUFS, r);
+        #ifdef CAPIOLOG
+		logfile << "debug handle_write 4 " << std::endl;
+        #endif
 		int pid = pids[tid];
 		writers[pid][path] = true;
 		Capio_file& c_file = std::get<4>(files_metadata[path]);
@@ -714,13 +760,12 @@ void handle_write(const char* str, int rank) {
 			else
 				new_size = file_shm_size * 2;
 
-			int res = munmap(std::get<0>(files_metadata[path]), file_shm_size);
-			if (res == -1)
-				err_exit("munmap " + path);
-			std::string shm_name = path;
-			std::replace(shm_name.begin(), shm_name.end(), '/', '_');
-			void* p = expand_shared_mem(shm_name, new_size);
-			std::get<0>(files_metadata[path]) = p;
+
+			char* old_p = (char*)std::get<0>(files_metadata[path]);
+			char* new_p = new char[new_size];
+			memcpy(new_p, old_p, data_size); //TODO: slow
+			delete [] old_p;
+			std::get<0>(files_metadata[path]) = old_p;
 			std::get<2>(files_metadata[path]) = new_size;
 		}
         /*total_bytes_shm += data_size;
@@ -836,20 +881,28 @@ void handle_local_read(int tid, int fd, off64_t count, bool dir) {
 				pending_reads[path].push_back(std::make_tuple(tid, fd, count));
 			}
 			else {
-				off64_t file_size = c_file.get_file_size();
-				if (file_size >= end_of_read)
-					nreads = end_of_read;
-				else
-					nreads = file_size;
+				//off64_t file_size = c_file.get_file_size(); //TODO: why file size and not end of sector?
+					nreads = end_of_sector;
 
-				response_buffers[tid]->write(&nreads);
-					
+				char* p = (char*) std::get<0>(files_metadata[path]);
+		#ifdef CAPIOLOG
+		logfile << "debug bbb end_of_sector " << end_of_sector << " nreads " << nreads << " count " << count << " process_offset " << process_offset << std::endl;
+		#endif
+				response_buffers[tid]->write(&end_of_sector);
+				send_data_to_client(tid, p + process_offset, end_of_sector - process_offset);
 			}
 				
 
 		}
 		else {
-			response_buffers[tid]->write(&end_of_sector);
+			char* p = (char*) std::get<0>(files_metadata[path]);
+			size_t bytes_read;
+			bytes_read = count;
+		#ifdef CAPIOLOG
+		logfile << "debug aaa end_of_sector " << end_of_sector << " bytes_read " << bytes_read << " count " << count << " process_offset " << process_offset << std::endl;
+		#endif
+			response_buffers[tid]->write(&end_of_read);
+			send_data_to_client(tid, p + process_offset, bytes_read);
 		}
 		#ifdef CAPIOLOG
 		logfile << "process offset " << process_offset << std::endl;
@@ -857,6 +910,21 @@ void handle_local_read(int tid, int fd, off64_t count, bool dir) {
 		sem_post(&handle_local_read_sem);
 		//*processes_files[tid][fd].second += count;
 		//TODO: check if the file was moved to the disk
+}
+
+bool read_from_local_mem(int tid, off64_t process_offset, off64_t end_of_read,
+		off64_t end_of_sector, off64_t count, std::string path) {
+	bool res = false;
+	if (end_of_read < end_of_sector) {
+		char* p = (char*) std::get<0>(files_metadata[path]);
+		#ifdef CAPIOLOG
+		logfile << "debug ccc" << std::endl;
+		#endif
+		response_buffers[tid]->write(&end_of_read);
+		send_data_to_client(tid, p + process_offset, count);
+		res = true;
+	}
+	return res;
 }
 
 /*
@@ -868,7 +936,23 @@ void handle_remote_read(int tid, int fd, off64_t count, int rank) {
 		#ifdef CAPIOLOG
 		logfile << "handle remote read before sem_wait" << std::endl;
 		#endif
+		//before sending the request to the remote node, it checks
+		//in the local cache
+
 		sem_wait(&handle_remote_read_sem);
+
+		std::string path = processes_files_metadata[tid][fd];
+		Capio_file & c_file = std::get<4>(files_metadata[path]);
+		off64_t process_offset = *std::get<1>(processes_files[tid][fd]);
+		off64_t end_of_read = process_offset + count;
+		off64_t end_of_sector = c_file.get_sector_end(process_offset);
+		bool res = read_from_local_mem(tid, process_offset, end_of_read, end_of_sector, count, path);
+		if (res) {
+			sem_post(&handle_remote_read_sem);
+			return;
+		}
+
+		// If it is not in cache then send the request to the remote node
 		const char* msg;
 		std::string str_msg;
 		int dest = nodes_helper_rank[files_location[processes_files_metadata[tid][fd]]];
@@ -990,6 +1074,10 @@ void* wait_for_file(void* pthread_arg) {
 			handle_local_read(tid, fd, count, dir);
 	}
 	else {
+			#ifdef CAPIOLOG
+			logfile << "handle remote read in wait for file" << std::endl;	
+			logfile << "path to check " << path_to_check << std::endl;
+			#endif
 			handle_remote_read(tid, fd, count, rank);
 	}
 
@@ -1032,6 +1120,9 @@ void handle_read(char* str, int rank, bool dir) {
 		handle_local_read(tid, fd, count, dir);
 	}
 	else {
+	#ifdef CAPIOLOG
+	logfile << "before handle remote read handle read" << std::endl;
+	#endif	
 		handle_remote_read(tid, fd, count, rank);
 	}
 	
@@ -1144,7 +1235,20 @@ void handle_remote_read(char* str, char* p, int rank) {
     #ifdef CAPIOLOG
 			logfile << "end of sector " << end_of_sector << std::endl;
 #endif
+			char* p = (char*) std::get<0>(files_metadata[path]);
+
+			size_t bytes_read;
+			off64_t end_of_read = fd_offset + count;
+			if (end_of_sector > end_of_read) {
+				end_of_sector = end_of_read;
+				bytes_read = count;
+			}
+			else
+				bytes_read = end_of_sector - fd_offset;
+
 			response_buffers[tid]->write(&end_of_sector);
+			send_data_to_client(tid, p + fd_offset, bytes_read);
+
 			if (it == list_remote_reads.begin()) {
 				list_remote_reads.erase(it);
 				it = list_remote_reads.begin();
@@ -1529,7 +1633,7 @@ off64_t create_dir(int tid, const char* pathname, int rank, bool root_dir) {
 		std::string shm_name = pathname;
 		std::replace(shm_name.begin(), shm_name.end(), '/', '_');
 		shm_name = shm_name.substr(1);
-		void* p_shm = create_shm(shm_name, file_initial_size);
+		void* p_shm = new char[file_initial_size];
 		create_file(pathname, p_shm, true);	
 		if (std::get<3>(files_metadata[pathname])) {
 			std::get<3>(files_metadata[pathname]) = false;
@@ -1672,6 +1776,9 @@ void handle_stat_reply(const char* str) {
 void read_next_msg(int rank) {
 	char str[2048];
 	std::fill(str, str + 2048, 0);
+	#ifdef CAPIOLOG
+	logfile << "waiting msg" << std::endl;
+	#endif
 	buf_requests->read(str);
 	char* p = str;
 	#ifdef CAPIOLOG
