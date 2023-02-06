@@ -200,17 +200,6 @@ void initialize_from_snapshot(int* fd_shm) {
 		path_shm = (char*) get_shm(shm_name);
 		(*capio_files_descriptors)[fd] = path_shm;
 		capio_files_paths->insert(path_shm);
-			char tmp[512];
-			size_t k = 0;
-			std::string path_to_check(path_shm);
-			while (k < path_to_check.length()) {
-				if (path_to_check[k] == '/' && k > 0)
-					tmp[k] = '_';
-				else
-					tmp[k] = path_to_check[k];
-				++k;
-			}
-			tmp[k] = '\0';
 		munmap(path_shm, PATH_MAX);
 		if (shm_unlink(shm_name.c_str()) == -1) {
 			err_exit("shm_unlink snapshot " + shm_name);
@@ -560,7 +549,6 @@ auto res_mismatch = std::mismatch(capio_dir->begin(), capio_dir->end(), path_to_
 }
 
 int capio_mkdir(const char* pathname, mode_t mode) {
-	int res = 0;
 	std::string path_to_check;
 	if(is_absolute(pathname)) {
 		path_to_check = pathname;
@@ -813,8 +801,6 @@ off_t capio_lseek(int fd, off64_t offset, int whence) {
 			sprintf(c_str, "send %ld %d", syscall(SYS_gettid),fd);
 			buf_requests->write(c_str, 256 * sizeof(char));
 			(*bufs_response)[syscall(SYS_gettid)]->read(&file_size);
-			off64_t offset_upperbound;
-			offset_upperbound = file_size;
 			*file_offset = file_size + offset;	
 			return *file_offset;
 		}
@@ -909,16 +895,6 @@ int capio_openat(int dirfd, const char* pathname, int flags) {
 	CAPIO_DBG("CAPIO directory: %s\n", capio_dir->c_str());
 	#endif
 	if (res.first == capio_dir->end()) {
-			char shm_name[512];
-			size_t i = 0;
-			while (i < path_to_check.length()) {
-				if (path_to_check[i] == '/' && i > 0)
-					shm_name[i] = '_';
-				else
-					shm_name[i] = path_to_check[i];
-				++i;
-			}
-			shm_name[i] = '\0';
 			int fd = open("/dev/null", O_RDONLY);
 			if (fd == -1) {
 				err_exit("capio_open, /dev/null opening");
@@ -968,7 +944,6 @@ ssize_t capio_write(int fd, const  void *buffer, size_t count) {
 		off64_t count_off = count;
 		//bool in_shm = check_cache(fd);
 		//if (in_shm) {
-		off64_t file_shm_size = *std::get<1>((*files)[fd]);
 		int my_tid = syscall(SYS_gettid);
 		add_write_request(my_tid, fd, count_off); //bottleneck
 		write_shm((*threads_data_bufs)[my_tid].first, *std::get<0>((*files)[fd]), buffer, count_off);
@@ -1198,8 +1173,6 @@ int capio_ioctl(int fd, unsigned long request) {
 	#ifdef CAPIOLOG
 	CAPIO_DBG("capio ioctl %d %lu\n", fd, request);
 	#endif
-	errno = EINVAL;
-	return -1;
 	auto it = files->find(fd);
 	if (it != files->end()) {
 	#ifdef CAPIOLOG
@@ -1208,8 +1181,12 @@ int capio_ioctl(int fd, unsigned long request) {
 		errno = ENOTTY;
 		return -1;
 	}
-	else
+	else {
+		#ifdef CAPIOLOG
+		CAPIO_DBG("capio ioctl returning -2\n");
+		#endif
 		return -2;
+	}
 	
 }
 
@@ -1305,8 +1282,12 @@ int capio_lstat(std::string absolute_path, struct stat* statbuf) {
 		statbuf->st_ctim = time;
 		return 0;
 	}
-	else
+	else {
+	#ifdef CAPIOLOG
+	CAPIO_DBG("capio_lstat returning -2\n");
+	#endif
 		return -2;
+	}
 
 }
 
@@ -1780,7 +1761,6 @@ off64_t add_getdents_request(int fd, off64_t count, std::tuple<off64_t*, off64_t
 	//read response (offest)
 	off64_t offset_upperbound;
 	(*bufs_response)[syscall(SYS_gettid)]->read(&offset_upperbound);
-	off64_t file_shm_size = *std::get<1>(t);
 	off64_t end_of_read = *std::get<0>(t) + count;
 	if (end_of_read > offset_upperbound)
 		end_of_read = offset_upperbound;
