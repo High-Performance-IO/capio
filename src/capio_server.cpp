@@ -128,8 +128,13 @@ std::unordered_map<int, std::pair<SPSC_queue<char>*, SPSC_queue<char>*>> data_bu
  */
 std::unordered_map<std::string, std::tuple<void*, off64_t*, off64_t, bool, Capio_file, off64_t>> files_metadata;
 
+// string -> (committed, mode)
+
 std::unordered_map<std::string, std::tuple<std::string, std::string>> metadata_conf;
 
+// [(glob, committed, mode), (glob, committed, mode), ...]
+
+std::vector<std::tuple<std::string, std::string, std::string>> metadata_conf_globs;
 /*
  * pid -> pathname -> bool
  * Different thread with the same pid are threated as a single writer
@@ -420,6 +425,24 @@ void init_process(int tid) {
 	#endif	
 
 }
+
+long int match_globs(std::string path) {
+	long int res;
+	bool found = false;
+	size_t i = 0;
+	while (i < metadata_conf_globs.size() && !found) {
+		std::string prefix_str = std::get<0>(metadata_conf_globs[i]);
+		found = path.compare(0, prefix_str.length() - 1, prefix_str);
+		++i;
+	}
+	if (found)
+		res = i - 1;
+	else
+		res = -1;
+
+	return res;
+}
+
 void create_file(std::string path, void* p_shm, bool is_dir) {
 	std::string shm_name = path;
 	std::replace(shm_name.begin(), shm_name.end(), '/', '_');
@@ -427,16 +450,32 @@ void create_file(std::string path, void* p_shm, bool is_dir) {
 	off64_t* p_shm_size = (off64_t*) create_shm(shm_name + "_size", sizeof(off64_t));	
 	//logfile << "creating " << path << std::endl;
 	//logfile << "pshm " << p_shm << "p_shm_size " << p_shm_size << std::endl;
+	std::string committed;
+	std::string mode;
 	auto it = metadata_conf.find(path);
 	if (it == metadata_conf.end()) {
+		long int pos = match_globs(path);
+		if (pos == -1) {
         #ifdef CAPIOLOG
 		logfile << "creating file withtout conf file " << path << std::endl;
 		#endif
-		files_metadata[path] = std::make_tuple(p_shm, p_shm_size, file_initial_size, true, Capio_file(is_dir), 0);
+			files_metadata[path] = std::make_tuple(p_shm, p_shm_size, file_initial_size, true, Capio_file(is_dir), 0);
+		}
+		else {
+			auto& triple = metadata_conf_globs[pos];
+			committed = std::get<1>(triple);
+			mode = std::get<2>(triple);
+        	#ifdef CAPIOLOG
+			logfile << "creating file using globbing " << path << std::endl;
+			logfile << "committed " << committed << " mode " << mode << std::endl;
+			#endif
+			files_metadata[path] = std::make_tuple(p_shm, p_shm_size, file_initial_size, true, Capio_file(committed, mode, is_dir), 0);
+			metadata_conf[path] = std::make_tuple(committed, mode);
+		}
 	}
 	else {
-		std::string committed = std::get<0>(it->second);
-		std::string mode = std::get<1>(it->second);
+		committed = std::get<0>(it->second);
+		mode = std::get<1>(it->second);
         #ifdef CAPIOLOG
 		logfile << "creating file " << path << std::endl;
 		logfile << "committed " << committed << " mode " << mode << std::endl;
@@ -1512,7 +1551,7 @@ void handle_stat(const char* str, int rank) {
 			//if it is in configuration file then wait otherwise fails
 			
 //std::unordered_map<std::string, std::tuple<std::string, std::string>> metadata_conf;
-			if (metadata_conf.find(path) != metadata_conf.end()) {
+			if (metadata_conf.find(path) != metadata_conf.end() || match_globs(path) != -1) {
 				if (files_metadata.find(path) == files_metadata.end()) {
 					p_shm = new char[file_initial_size];
 					create_file(path, p_shm, false);
@@ -1578,7 +1617,7 @@ void handle_fstat(const char* str, int rank) {
 
 	Capio_file& c_file = std::get<4>(files_metadata[path]);
 
-	if (strcmp(files_location[path], node_name) == 0 || c_file.get_mode() == "append") {
+	if (strcmp(files_location[path], node_name) == 0 || c_file.get_committed() == "on_close") {
 		handle_local_stat(tid, path.c_str());
 	}
 	else {
@@ -2427,7 +2466,22 @@ void parse_conf_file(std::string conf_file) {
 				#ifdef CAPIOLOG
 				logfile << "conf path " << path << std::endl;
 				#endif
-				metadata_conf[path] = std::make_tuple(std::string(committed), std::string(mode));
+				std::size_t pos = path.find('*');		
+				if (pos == std::string::npos) {
+					metadata_conf[path] = std::make_tuple(std::string(committed), std::string(mode));
+					#ifdef CAPIOLOG
+					logfile << "path without star" << std::endl;
+					#endif
+				}
+				else {
+					std::string prefix_str = path.substr(0, pos);
+					#ifdef CAPIOLOG
+					logfile << "path with star ";
+					logfile << "sub string: " << prefix_str << std::endl;
+					#endif
+					metadata_conf_globs.push_back(std::make_tuple(prefix_str, std::string(committed), std::string(mode))); 
+				}
+
 			}
 		}
 	}
