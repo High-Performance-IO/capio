@@ -24,6 +24,7 @@ void test_one_to_one(const std::string& buffer_name, long int max_num_elems, cha
 	const sec duration = cclock::now() - before;
 	file << "total consumer receive time: " << duration.count() << " secs" << std::endl;
 	file.close();
+	c_buff.free_shm();
 }
 
 void check(char* data, long int num_bytes) {
