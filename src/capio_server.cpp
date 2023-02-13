@@ -259,8 +259,8 @@ int* create_shm_int(std::string shm_name) {
 	p = mmap(NULL, size, PROT_READ|PROT_WRITE, MAP_SHARED, fd, 0);
 	if (p == MAP_FAILED)
 		err_exit("mmap create_shm_int");
-//	if (close(fd) == -1);
-//		err_exit("close");
+	if (close(fd) == -1)
+		err_exit("close");
 	return (int*) p;
 }
 
@@ -704,8 +704,6 @@ void update_dir(int tid, std::string file_path, int rank) {
         #endif
 	return;
 }
-
-
 
 void handle_pending_remote_reads(std::string path, off64_t data_size) {
         auto it_client = clients_remote_pending_reads.find(path);
@@ -1239,7 +1237,7 @@ void handle_close(int tid, int fd) {
 	#endif
 	if (c_file.n_opens == 0 && c_file.n_links <= 0)
 		delete_file(path);
-	shm_unlink(("offset_" + std::to_string(tid) +  "_" + std::to_string(fd)).c_str());
+	//shm_unlink(("offset_" + std::to_string(tid) +  "_" + std::to_string(fd)).c_str());
 	processes_files[tid].erase(fd);
 	processes_files_metadata[tid].erase(fd);
 }
