@@ -48,7 +48,6 @@ using namespace simdjson;
  * NOTES section:
  * "[...] you will need to define the linux_dirent or linux_dirent64
  * structure yourself."
- *
  */
 
 struct linux_dirent {
@@ -58,11 +57,24 @@ struct linux_dirent {
 	char           d_name[DNAME_LENGTH + 2];
 };
 
+struct linux_dirent64 {
+	ino64_t  	   d_ino;
+	off64_t        d_off;
+	unsigned short d_reclen;
+	unsigned char d_type;
+	char           d_name[DNAME_LENGTH + 1];
+};
+
 std::ofstream logfile;
 
-const static int theoretical_size = sizeof(unsigned long) + sizeof(off_t) + sizeof(unsigned short) + sizeof(char) * DNAME_LENGTH + 2;
-
 std::string* capio_dir = nullptr;
+
+
+/* constants definition start */
+
+const static int theoretical_size_dirent64 = sizeof(ino64_t) + sizeof(off64_t) + sizeof(unsigned short) + sizeof(unsigned char) + sizeof(char) * (DNAME_LENGTH + 1);
+
+const static int theoretical_size_dirent = sizeof(unsigned long) + sizeof(off_t) + sizeof(unsigned short) + sizeof(char) * (DNAME_LENGTH + 2);
 
 const long int max_shm_size = 1024L * 1024 * 1024 * 16;
 
@@ -73,6 +85,9 @@ const long int max_shm_size_file = 1024L * 1024 * 1024 * 8;
 const size_t file_initial_size = 1024L * 1024 * 1024 * 4;
 
 const size_t dir_initial_size = 1024L * 1024 * 1024;
+
+/* constants definition ending */
+
 
 bool shm_full = false;
 long int total_bytes_shm = 0;
@@ -151,20 +166,20 @@ std::unordered_map<std::string, int> nodes_helper_rank;
 /*
  *
  * It contains all the reads requested by local processes to read files that are in the local node for which the data is not yet avaiable.
- * path -> [(tid, fd, numbytes), ...]
+ * path -> [(tid, fd, numbytes, is_getdents), ...]
  *
  */
 
-std::unordered_map<std::string, std::vector<std::tuple<int, int, off64_t>>>  pending_reads;
+std::unordered_map<std::string, std::vector<std::tuple<int, int, off64_t, bool>>>  pending_reads;
 
 /*
  *
  * It contains all the reads requested to the remote nodes that are not yet satisfied 
- * path -> [(tid, fd, numbytes), ...]
+ * path -> [(tid, fd, numbytes, is_getdents), ...]
  *
  */
 
-std::unordered_map<std::string, std::list<std::tuple<int, int, off64_t>>>  my_remote_pending_reads;
+std::unordered_map<std::string, std::list<std::tuple<int, int, off64_t, bool>>>  my_remote_pending_reads;
 
 /*
  *
@@ -209,11 +224,13 @@ void sig_term_handler(int signum, siginfo_t *info, void *ptr) {
 		shm_unlink(pair.first.c_str());
 		shm_unlink((pair.first + "_size").c_str());
 	}
+
 	for (auto& p1 : processes_files) {
 		for(auto& p2 : p1.second) {
 			shm_unlink(("offset_" + std::to_string(p1.first) +  "_" + std::to_string(p2.first)).c_str());
 		}
 	}
+
 	for (auto& pair : response_buffers) {
 		pair.second->free_shm();
 		delete pair.second;
@@ -245,23 +262,6 @@ void catch_sigterm() {
 	if (res == -1) {
 		err_exit("sigaction for SIGTERM");
 	}
-}
-
-int* create_shm_int(std::string shm_name) {
-	void* p = nullptr;
-	// if we are not creating a new object, mode is equals to 0
-	int fd = shm_open(shm_name.c_str(), O_CREAT | O_RDWR,  S_IRUSR | S_IWUSR); //to be closed
-	const int size = sizeof(int);
-	if (fd == -1)
-		err_exit("shm_open");
-	if (ftruncate(fd, size) == -1)
-		err_exit("ftruncate");
-	p = mmap(NULL, size, PROT_READ|PROT_WRITE, MAP_SHARED, fd, 0);
-	if (p == MAP_FAILED)
-		err_exit("mmap create_shm_int");
-	if (close(fd) == -1)
-		err_exit("close");
-	return (int*) p;
 }
 
 void write_file_location(const std::string& file_name, int rank, std::string path_to_write) {
@@ -549,7 +549,27 @@ void send_data_to_client(int tid, char* buf, long int count) {
 		data_buf->write(buf + i * WINDOW_DATA_BUFS, r);
 }
 
-void handle_pending_read(int tid, int fd, long int process_offset, long int count) {
+off64_t convert_dirent64_to_dirent(char* dirent64_buf, char* dirent_buf, off64_t dirent_64_buf_size) {
+	off64_t dirent_buf_size = 0;
+	off64_t i = 0;
+	struct linux_dirent ld;
+	struct linux_dirent64* p_ld64;
+	ld.d_reclen = theoretical_size_dirent;
+	while (i < dirent_64_buf_size) {
+		p_ld64 = (struct linux_dirent64*) (dirent64_buf + i);
+		ld.d_ino = p_ld64->d_ino;
+		ld.d_off = dirent_buf_size + theoretical_size_dirent;
+		ld.d_name[DNAME_LENGTH + 1] = p_ld64->d_type;
+		logfile << "dirent_buf_size " << dirent_buf_size << std::endl;
+		strcpy(ld.d_name, p_ld64->d_name);
+		i += theoretical_size_dirent64;
+		memcpy((char*) dirent_buf + dirent_buf_size, &ld, sizeof(ld));
+		dirent_buf_size += ld.d_reclen;
+	}
+	return dirent_buf_size;
+}
+
+void handle_pending_read(int tid, int fd, long int process_offset, long int count, bool is_getdents) {
 	
 	std::string path = processes_files_metadata[tid][fd];
 	Capio_file & c_file = std::get<4>(files_metadata[path]);
@@ -563,8 +583,19 @@ void handle_pending_read(int tid, int fd, long int process_offset, long int coun
 	}
 	else
 		bytes_read = end_of_sector - process_offset;
-	response_buffers[tid]->write(&end_of_sector);
-	send_data_to_client(tid, p + process_offset, bytes_read);
+	if (is_getdents) {
+		off64_t dir_size = *std::get<1>(files_metadata[path]);
+		off64_t n_entries = dir_size / theoretical_size_dirent64;
+		char* p_getdents = (char*) malloc(n_entries * sizeof(char) * dir_size); 
+		end_of_sector = convert_dirent64_to_dirent(p, p_getdents, dir_size);
+		response_buffers[tid]->write(&end_of_sector);
+		send_data_to_client(tid, p + process_offset, end_of_sector - process_offset);
+		free(p_getdents);
+	}
+	else {
+		response_buffers[tid]->write(&end_of_sector);
+		send_data_to_client(tid, p + process_offset, bytes_read);
+	}
 	//*processes_files[tid][fd].second += count;
 	//TODO: check if the file was moved to the disk
 }
@@ -588,9 +619,10 @@ std::string get_parent_dir_path(std::string file_path) {
  * type == 1 -> "." entry
  * type == 2 -> ".." entry
  */
+
 void write_entry_dir(int tid, std::string file_path, std::string dir, int type) {
 	std::hash<std::string> hash;		
-	struct linux_dirent ld;
+	struct linux_dirent64 ld;
 	ld.d_ino = hash(file_path);
 	std::string file_name;
 	if (type == 0) {
@@ -608,7 +640,7 @@ void write_entry_dir(int tid, std::string file_path, std::string dir, int type) 
 	}
 
 	strcpy(ld.d_name, file_name.c_str());
-	long int ld_size = theoretical_size;
+	long int ld_size = theoretical_size_dirent64;
 	ld.d_reclen =  ld_size;
 	auto it_tuple = files_metadata.find(dir);
 
@@ -619,8 +651,9 @@ void write_entry_dir(int tid, std::string file_path, std::string dir, int type) 
 	void* file_shm = std::get<0>(it_tuple->second);
 	off64_t file_size = *std::get<1>(it_tuple->second);
 	off64_t file_shm_size = std::get<2>(it_tuple->second);
-	off64_t data_size = file_size + ld_size;
+	off64_t data_size = file_size + ld_size; //TODO: check theoreitcal size and sizeof(ld) usage
 	ld.d_off =  data_size;
+
 		if (data_size > file_shm_size) {
 
         #ifdef CAPIOLOG
@@ -642,10 +675,10 @@ void write_entry_dir(int tid, std::string file_path, std::string dir, int type) 
 			std::get<2>(files_metadata[dir]) = new_size;
 		}
 		if (std::get<4>(files_metadata[file_path]).is_dir()) {
-			ld.d_name[DNAME_LENGTH + 1] = DT_DIR; 
+			ld.d_type = DT_DIR; 
 		}
 		else {
-			ld.d_name[DNAME_LENGTH + 1] = DT_REG; 
+			ld.d_type = DT_REG; 
 		}
 			ld.d_name[DNAME_LENGTH] = '\0'; 
 		memcpy((char*) file_shm + file_size, &ld, sizeof(ld));
@@ -742,8 +775,7 @@ void handle_write(const char* str, int rank) {
         std::string request;
         int tid, fd;
 		off_t base_offset;
-        off64_t count;
-        off64_t data_size;
+        off64_t count, data_size;
         std::istringstream stream(str);
         stream >> request >> tid >> fd >> base_offset >> count;
 		data_size = base_offset + count;
@@ -862,7 +894,7 @@ void handle_write(const char* str, int rank) {
         #ifdef CAPIOLOG
         logfile << "handling this pending read"<< std::endl;
         #endif
-                                handle_pending_read(pending_tid, fd, process_offset, count);
+                                handle_pending_read(pending_tid, fd, process_offset, count, std::get<3>(tuple));
                         it_vec = pending_reads_this_file.erase(it_vec);
                         }
 						else
@@ -881,11 +913,13 @@ void handle_write(const char* str, int rank) {
 
 }
 
+
+
 /*
  * Multithread function
  */
 
-void handle_local_read(int tid, int fd, off64_t count, bool dir) {
+void handle_local_read(int tid, int fd, off64_t count, bool dir, bool is_getdents) {
 		#ifdef CAPIOLOG
 		logfile << "handle local read" << std::endl;
 		#endif
@@ -906,13 +940,13 @@ void handle_local_read(int tid, int fd, off64_t count, bool dir) {
 		off64_t nreads;
 		std::string committed = c_file.get_committed();
 		std::string mode = c_file.get_mode();
-		if (mode != "append" && !c_file.complete) {
+		if (mode != "append" && !c_file.complete && !dir) {
 			#ifdef CAPIOLOG
 			logfile << "add pending reads 1" << std::endl;
 			logfile << "mode " << mode << std::endl;
 			logfile << "file complete " << c_file.complete << std::endl;
 			#endif
-			pending_reads[path].push_back(std::make_tuple(tid, fd, count));
+			pending_reads[path].push_back(std::make_tuple(tid, fd, count, is_getdents));
 		}
 		else if (end_of_read > end_of_sector) {
 		#ifdef CAPIOLOG
@@ -923,18 +957,29 @@ void handle_local_read(int tid, int fd, off64_t count, bool dir) {
 				#ifdef CAPIOLOG
 				logfile << "add pending reads 2" << std::endl;
 				#endif
-				pending_reads[path].push_back(std::make_tuple(tid, fd, count));
+				pending_reads[path].push_back(std::make_tuple(tid, fd, count, is_getdents));
 			}
 			else {
-				//off64_t file_size = c_file.get_file_size(); //TODO: why file size and not end of sector?
 					nreads = end_of_sector;
 
 				char* p = (char*) std::get<0>(files_metadata[path]);
+				if (is_getdents) {
+					off64_t dir_size = *std::get<1>(files_metadata[path]);
+					off64_t n_entries = dir_size / theoretical_size_dirent64;
+					char* p_getdents = (char*) malloc(n_entries * sizeof(char) * dir_size); 
+					end_of_sector = convert_dirent64_to_dirent(p, p_getdents, dir_size);
+					response_buffers[tid]->write(&end_of_sector);
+					send_data_to_client(tid, p + process_offset, end_of_sector - process_offset);
+					free(p_getdents);
+
+				}
+				else {
 		#ifdef CAPIOLOG
 		logfile << "debug bbb end_of_sector " << end_of_sector << " nreads " << nreads << " count " << count << " process_offset " << process_offset << std::endl;
 		#endif
-				response_buffers[tid]->write(&end_of_sector);
-				send_data_to_client(tid, p + process_offset, end_of_sector - process_offset);
+					response_buffers[tid]->write(&end_of_sector);
+					send_data_to_client(tid, p + process_offset, end_of_sector - process_offset);
+				}
 			}
 				
 
@@ -946,8 +991,20 @@ void handle_local_read(int tid, int fd, off64_t count, bool dir) {
 		#ifdef CAPIOLOG
 		logfile << "debug aaa end_of_sector " << end_of_sector << " bytes_read " << bytes_read << " count " << count << " process_offset " << process_offset << std::endl;
 		#endif
-			response_buffers[tid]->write(&end_of_read);
-			send_data_to_client(tid, p + process_offset, bytes_read);
+			if (is_getdents) {
+				off64_t dir_size = *std::get<1>(files_metadata[path]);
+				off64_t n_entries = dir_size / theoretical_size_dirent64;
+				char* p_getdents = (char*) malloc(n_entries * sizeof(char) * dir_size); 
+				end_of_sector = convert_dirent64_to_dirent(p, p_getdents, dir_size);
+
+				response_buffers[tid]->write(&end_of_read);
+				send_data_to_client(tid, p_getdents + process_offset, bytes_read);
+				free(p_getdents);
+			}
+			else {
+				response_buffers[tid]->write(&end_of_read);
+				send_data_to_client(tid, p + process_offset, bytes_read);
+			}
 		}
 		#ifdef CAPIOLOG
 		logfile << "process offset " << process_offset << std::endl;
@@ -956,6 +1013,7 @@ void handle_local_read(int tid, int fd, off64_t count, bool dir) {
 		//*processes_files[tid][fd].second += count;
 		//TODO: check if the file was moved to the disk
 }
+
 
 bool read_from_local_mem(int tid, off64_t process_offset, off64_t end_of_read,
 		off64_t end_of_sector, off64_t count, std::string path) {
@@ -977,7 +1035,7 @@ bool read_from_local_mem(int tid, off64_t process_offset, off64_t end_of_read,
  *
  */
 
-void handle_remote_read(int tid, int fd, off64_t count, int rank, bool dir) {
+void handle_remote_read(int tid, int fd, off64_t count, int rank, bool dir, bool is_getdents) {
 		#ifdef CAPIOLOG
 		logfile << "handle remote read before sem_wait" << std::endl;
 		#endif
@@ -994,7 +1052,7 @@ void handle_remote_read(int tid, int fd, off64_t count, int rank, bool dir) {
 		off64_t end_of_sector = c_file.get_sector_end(process_offset);
 
 		if (c_file.complete && (end_of_read <= end_of_sector || end_of_sector == real_file_size)) {
-			handle_local_read(tid, fd, count, dir);
+			handle_local_read(tid, fd, count, dir, is_getdents);
 			sem_post(&handle_remote_read_sem);
 			return;
 		}
@@ -1019,7 +1077,7 @@ void handle_remote_read(int tid, int fd, off64_t count, int rank, bool dir) {
 		logfile << "rank" << rank << std::endl;
 		#endif
 		MPI_Send(msg, strlen(msg) + 1, MPI_CHAR, dest, 0, MPI_COMM_WORLD);
-		my_remote_pending_reads[processes_files_metadata[tid][fd]].push_back(std::make_tuple(tid, fd, count));
+		my_remote_pending_reads[processes_files_metadata[tid][fd]].push_back(std::make_tuple(tid, fd, count, is_getdents));
 		sem_post(&handle_remote_read_sem);
 }
 
@@ -1027,6 +1085,7 @@ struct wait_for_file_metadata{
 	int tid;
 	int fd;
 	bool dir;
+	bool is_getdents;
 	off64_t count;
 };
 
@@ -1115,6 +1174,7 @@ void* wait_for_file(void* pthread_arg) {
 	int fd = metadata-> fd;
 	off64_t count = metadata->count;
 	bool dir = metadata->dir;
+	bool is_getdents = metadata->is_getdents;
 
 	int rank;
 	MPI_Comm_rank(MPI_COMM_WORLD, &rank);
@@ -1123,14 +1183,14 @@ void* wait_for_file(void* pthread_arg) {
 
 	//check if the file is local or remote
 	if (strcmp(files_location[path_to_check], node_name) == 0) {
-			handle_local_read(tid, fd, count, dir);
+			handle_local_read(tid, fd, count, dir, is_getdents);
 	}
 	else {
 			#ifdef CAPIOLOG
 			logfile << "handle remote read in wait for file" << std::endl;	
 			logfile << "path to check " << path_to_check << std::endl;
 			#endif
-			handle_remote_read(tid, fd, count, rank, dir);
+			handle_remote_read(tid, fd, count, rank, dir, is_getdents);
 	}
 
 	free(metadata);
@@ -1138,7 +1198,7 @@ void* wait_for_file(void* pthread_arg) {
 }
 
 
-void handle_read(char* str, int rank, bool dir) {
+void handle_read(char* str, int rank, bool dir, bool is_getdents) {
 	#ifdef CAPIOLOG
 	logfile << "handle read str" << str << std::endl;
 	#endif
@@ -1158,6 +1218,7 @@ void handle_read(char* str, int rank, bool dir) {
 			metadata->fd = fd;
 			metadata->count = count;
 			metadata->dir = dir;
+			metadata->is_getdents = is_getdents;
 			int res = pthread_create(&t, NULL, wait_for_file, (void*) metadata);
 			if (res != 0) {
 				logfile << "error creation of capio server thread" << std::endl;
@@ -1169,17 +1230,16 @@ void handle_read(char* str, int rank, bool dir) {
 		}
 	}
 	if (strcmp(files_location[processes_files_metadata[tid][fd]], node_name) == 0) {
-		handle_local_read(tid, fd, count, dir);
+		handle_local_read(tid, fd, count, dir, is_getdents);
 	}
 	else {
 	#ifdef CAPIOLOG
 	logfile << "before handle remote read handle read" << std::endl;
 	#endif	
-		handle_remote_read(tid, fd, count, rank, dir);
+		handle_remote_read(tid, fd, count, rank, dir, is_getdents);
 	}
 	
 }
-
 
 void delete_file(std::string path) {
 	#ifdef CAPIOLOG
@@ -1215,7 +1275,8 @@ void handle_close(int tid, int fd) {
 				#ifdef CAPIOLOG
 				logfile << "pending read tid fd offset count " << tid << " " << fd << " " << process_offset <<" "<< count << std::endl;
 				#endif	
-                handle_pending_read(pending_tid, fd, process_offset, count);
+				bool is_getdents = std::get<3>(tuple);
+                handle_pending_read(pending_tid, fd, process_offset, count, is_getdents);
                 it_vec = pending_reads_this_file.erase(it_vec);
             }
 			pending_reads.erase(it);
@@ -1271,14 +1332,15 @@ void handle_remote_read(char* str, char* p, int rank) {
 	std::string path(path_c);
 	int tid, fd;
 	long int count; //TODO: diff between count and bytes_received
-	std::list<std::tuple<int, int, long int>>& list_remote_reads = my_remote_pending_reads[path];
+	std::list<std::tuple<int, int, long int, bool>>& list_remote_reads = my_remote_pending_reads[path];
 	auto it = list_remote_reads.begin();
-	std::list<std::tuple<int, int, long int>>::iterator prev_it;
+	std::list<std::tuple<int, int, long int, bool>>::iterator prev_it;
 	off64_t end_of_sector;
 	while (it != list_remote_reads.end()) {
 		tid = std::get<0>(*it);
 		fd = std::get<1>(*it);
 		count = std::get<2>(*it);
+		bool is_getdent = std::get<3>(*it);
 		size_t fd_offset = *std::get<1>(processes_files[tid][fd]);
 		if (complete || fd_offset + count <= offset + bytes_received) {
 		#ifdef CAPIOLOG
@@ -1300,8 +1362,19 @@ void handle_remote_read(char* str, char* p, int rank) {
 			else
 				bytes_read = end_of_sector - fd_offset;
 
-			response_buffers[tid]->write(&end_of_sector);
-			send_data_to_client(tid, p + fd_offset, bytes_read);
+			if (is_getdent) {
+				off64_t dir_size = *std::get<1>(files_metadata[path]);
+				off64_t n_entries = dir_size / theoretical_size_dirent64;
+				char* p_getdents = (char*) malloc(n_entries * sizeof(char) * dir_size); 
+				end_of_sector = convert_dirent64_to_dirent(p, p_getdents, dir_size);
+				response_buffers[tid]->write(&end_of_sector);
+				send_data_to_client(tid, p_getdents + fd_offset, bytes_read);
+				free(p_getdents);
+			}
+			else {	
+				response_buffers[tid]->write(&end_of_sector);
+				send_data_to_client(tid, p + fd_offset, bytes_read);
+			}
 
 			if (it == list_remote_reads.begin()) {
 				list_remote_reads.erase(it);
@@ -1425,13 +1498,6 @@ void handle_exig(char* str) {
 			logfile << "committed " << std::get<0>(it_conf->second) << " mode " << std::get<1>(it_conf->second) << std::endl;
 			#endif
 		}
-	//#ifdef CAPIOLOG
-	//logfile << "handle exit group wait before" << std::endl;
-	//#endif	
-        //sem_wait(sems_write[tid]);
-	//#ifdef CAPIOLOG
-	//logfile << "handle exit group wait after" << std::endl;
-	//#endif	
 		auto it = pending_reads.find(path);
         if (it != pending_reads.end()) {
 	#ifdef CAPIOLOG
@@ -1448,15 +1514,11 @@ void handle_exig(char* str) {
 						#ifdef CAPIOLOG
 						logfile << "pending read tid fd offset count " << tid << " " << fd << " " << process_offset <<" "<< count << std::endl;
 						#endif	
-                        handle_pending_read(pending_tid, fd, process_offset, count);
+                        handle_pending_read(pending_tid, fd, process_offset, count, std::get<3>(tuple));
                         it_vec = pending_reads_this_file.erase(it_vec);
                 }
 			pending_reads.erase(it);
         }
-        //sem_post(sems_write[tid]);
-	//#ifdef CAPIOLOG
-	//logfile << "handle exit group 2" << std::endl;
-	//#endif	
 	}
    }
 	#ifdef CAPIOLOG
@@ -1834,11 +1896,6 @@ void handle_stat_reply(const char* str) {
 	for (int tid : it->second) {
 		response_buffers[tid]->write(&size);
 		response_buffers[tid]->write(&dir);
-		#ifdef CAPIOLOG
-		logfile << "tid: " << tid << std::endl;
-		logfile << "file size stat : " << size << std::endl;
-		logfile << "file is_dir stat : " << dir << std::endl;
-		#endif
 	}
 	my_remote_pending_stats.erase(it);
 	
@@ -1862,7 +1919,7 @@ void read_next_msg(int rank) {
 	else if (strncmp(str, "writ", 4) == 0)
 		handle_write(str, rank);
 	else if (strncmp(str, "read", 4) == 0)
-		handle_read(str, rank, false);
+		handle_read(str, rank, false, false);
 	else if (strncmp(str, "clos", 4) == 0)
 		handle_close(str, p);
 	else if (strncmp(str, "ream", 4) == 0)
@@ -1893,8 +1950,10 @@ void read_next_msg(int rank) {
 		handle_mkdir(str, rank);
 	else if (strncmp(str, "dupp", 4) == 0)
 		handle_dup(str);
+	else if (strncmp(str, "de64", 4) == 0)
+		handle_read(str, rank, true, false);
 	else if (strncmp(str, "dent", 4) == 0)
-		handle_read(str, rank, true);
+		handle_read(str, rank, true, true);	
 	else if (strncmp(str, "rnam", 4) == 0)
 		handle_rename(str, rank);
 	else {
@@ -1951,8 +2010,6 @@ void* capio_server(void* pthread_arg) {
 		#ifdef CAPIOLOG
 		logfile << "after next msg " << std::endl;
 		#endif
-
-		//respond();
 	}
 	return nullptr; //pthreads always needs a return value
 }
@@ -2038,15 +2095,6 @@ void serve_remote_read(const char* path_c, int dest, long int offset, long int n
 	MPI_Send(buf_send, strlen(buf_send) + 1, MPI_CHAR, dest, 0, MPI_COMM_WORLD);
 	free(buf_send);
 	//send data
-	#ifdef MYDEBUG
-	int* tmp = (int*) malloc(*size_shm);
-	logfile << "helper sending " << *size_shm << " bytes" << std::endl;
-	memcpy(tmp, file_shm, *size_shm); 
-	for (int i = 0; i < *size_shm / sizeof(int); ++i) {
-		logfile << "helper sending tmp[i] " << tmp[i] << std::endl;
-	}
-	free(tmp);
-	#endif
 	#ifdef CAPIOLOG
 		logfile << "before sending part of the file to : " << dest << " with offset " << offset << " nbytes" << nbytes << std::endl;
 	#endif
@@ -2069,7 +2117,6 @@ void* wait_for_data(void* pthread_arg) {
 	complete = c_file.complete;
 	serve_remote_read(path, dest, offset, nbytes, complete);
 	free(rr_metadata->sem);
-	//free(rr_metadata->path);
 	free(rr_metadata);
 	return nullptr;
 }
@@ -2155,7 +2202,6 @@ void* wait_for_completion(void* pthread_arg) {
 	sem_wait(rr_metadata->sem);
 	serve_remote_stat(path, rr_metadata->dest, *c_file);
 	free(rr_metadata->sem);
-//	free(rr_metadata->path);
 	free(rr_metadata);
 			#ifdef CAPIOLOG
 				logfile << "wait for completion after" << std::endl;
@@ -2172,30 +2218,16 @@ void helper_stat_req(const char* buf_recv) {
 	sscanf(buf_recv, "stat %d %s", &dest, path_c);
 
 	//std::string path(path_c);
-	#ifdef CAPIOLOG
-	logfile << "debug 0 path " << path_c << "len " << strlen(path_c) << " " << dest << std::endl;
-	logfile << "elems " << files_metadata.size() << std::endl;
-	#endif
 	//for (auto p : files_metadata) {
 //		logfile << "files metadata " << p.first << std::endl;
 //	}
 	Capio_file& c_file = std::get<4>(files_metadata[path_c]);	
-	#ifdef CAPIOLOG
-	logfile << "debug 000" << std::endl;
-	#endif
 	if (c_file.complete) {
-	#ifdef CAPIOLOG
-	logfile << "debug 1" << std::endl;
-	#endif
 		serve_remote_stat(path_c, dest, c_file);
 	}
 	else { //wait for completion
-	#ifdef CAPIOLOG
-	logfile << "debug 2" << std::endl;
-	#endif
 				pthread_t t;
 				struct remote_stat_metadata* rr_metadata = (struct remote_stat_metadata*) malloc(sizeof(struct remote_stat_metadata));
-//				rr_metadata->path = path_c;
 				strcpy(rr_metadata->path, path_c);
 				rr_metadata->c_file = &c_file;
 				rr_metadata->dest = dest;
@@ -2214,9 +2246,6 @@ void helper_stat_req(const char* buf_recv) {
 				}
 				clients_remote_pending_stat[path_c].push_back(rr_metadata->sem);
 	}
-    #ifdef CAPIOLOG
-	logfile << "debug 3" << std::endl;
-#endif
 	free(path_c);
 }
 
@@ -2373,15 +2402,9 @@ void parse_conf_file(std::string conf_file) {
 	}
 	ondemand::document entries = parser.iterate(json);
 	auto workflow_name = entries["name"];	
-	#ifdef CAPIOLOG
-	logfile << "workflow name: " << workflow_name << std::endl;
-	#endif
 	auto io_graph = entries["IO_Graph"];
 	for (auto app : io_graph) {
 		std::string_view app_name = app["name"].get_string();
-		#ifdef CAPIOLOG
-		logfile << "app name: " << app_name << std::endl;
-		#endif
 		ondemand::array input_stream;
 		auto error = app["input_stream"].get_array().get(input_stream);
 		if (!error) {
@@ -2461,22 +2484,12 @@ void parse_conf_file(std::string conf_file) {
 						path = path.substr(2, path.length() - 2);
 					path = *capio_dir + "/" + path;
 				}
-				#ifdef CAPIOLOG
-				logfile << "conf path " << path << std::endl;
-				#endif
 				std::size_t pos = path.find('*');		
 				if (pos == std::string::npos) {
 					metadata_conf[path] = std::make_tuple(std::string(committed), std::string(mode));
-					#ifdef CAPIOLOG
-					logfile << "path without star" << std::endl;
-					#endif
 				}
 				else {
 					std::string prefix_str = path.substr(0, pos);
-					#ifdef CAPIOLOG
-					logfile << "path with star ";
-					logfile << "sub string: " << prefix_str << std::endl;
-					#endif
 					metadata_conf_globs.push_back(std::make_tuple(prefix_str, std::string(committed), std::string(mode))); 
 				}
 

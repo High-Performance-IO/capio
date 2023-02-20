@@ -32,7 +32,6 @@ class Capio_file {
 		int n_opens = 0;
 		int n_files = 0; //useful for directories
 
-
 		Capio_file() {
 			_committed = "on_termination";
 			_directory = false;

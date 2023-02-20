@@ -56,7 +56,9 @@ struct linux_dirent {
 	char           d_name[DNAME_LENGTH + 2];
 };
 
-const static int theoretical_size = sizeof(unsigned long) + sizeof(off_t) + sizeof(unsigned short) + sizeof(char) * DNAME_LENGTH + 2;
+const static int theoretical_size_dirent64 = sizeof(ino64_t) + sizeof(off64_t) + sizeof(unsigned short) + sizeof(unsigned char) + sizeof(char) * (DNAME_LENGTH + 1);
+
+const static int theoretical_size_dirent = sizeof(unsigned long) + sizeof(off_t) + sizeof(unsigned short) + sizeof(char) * (DNAME_LENGTH + 2);
 
 struct spinlock {
   std::atomic<bool> lock_ = {0};
@@ -354,7 +356,7 @@ void mtrace_init(void) {
 //std::unordered_map<int, std::tuple<void*, off64_t*, off64_t*, off64_t*, int, int>>* files = nullptr;
 //std::unordered_map<int, std::string>* capio_files_descriptors = nullptr; 
 //std::unordered_set<std::string>* capio_files_paths = nullptr;
-void crate_snapshot() {
+void create_snapshot() {
 	int fd, status_flags, fd_flags;
 	off64_t offset, mapped_shm_size;
 	off64_t* p_shm;
@@ -768,6 +770,9 @@ off_t capio_lseek(int fd, off64_t offset, int whence) {
 		std::tuple<off64_t*, off64_t*, int, int>* t = &(*files)[fd];
 		off64_t* file_offset = std::get<0>(*t);
 		if (whence == SEEK_SET) {
+	#ifdef CAPIOLOG
+	CAPIO_DBG("capio seek set\n");
+	#endif
 			if (offset >= 0) {
 				*file_offset = offset;
 				sprintf(c_str, "seek %ld %d %zu", syscall(SYS_gettid),fd, *file_offset);
@@ -782,6 +787,9 @@ off_t capio_lseek(int fd, off64_t offset, int whence) {
 			}
 		}
 		else if (whence == SEEK_CUR) {
+	#ifdef CAPIOLOG
+	CAPIO_DBG("capio seek curr\n");
+	#endif
 			off64_t new_offset = *file_offset + offset;
 			if (new_offset >= 0) {
 				*file_offset = new_offset;
@@ -797,6 +805,9 @@ off_t capio_lseek(int fd, off64_t offset, int whence) {
 			}
 		}
 		else if (whence == SEEK_END) {
+	#ifdef CAPIOLOG
+	CAPIO_DBG("capio seek end\n");
+	#endif
 			off64_t file_size;
 			sprintf(c_str, "send %ld %d", syscall(SYS_gettid),fd);
 			buf_requests->write(c_str, 256 * sizeof(char));
@@ -805,22 +816,30 @@ off_t capio_lseek(int fd, off64_t offset, int whence) {
 			return *file_offset;
 		}
 		else if (whence == SEEK_DATA) {
+	#ifdef CAPIOLOG
+	CAPIO_DBG("capio seek data\n");
+	#endif
 				char c_str[64];
 				sprintf(c_str, "sdat %ld %d %zu", syscall(SYS_gettid),fd, *file_offset);
 				buf_requests->write(c_str, 256 * sizeof(char));
-				off64_t offset_upperbound;
-				(*bufs_response)[syscall(SYS_gettid)]->read(&offset_upperbound);
 				(*bufs_response)[syscall(SYS_gettid)]->read(file_offset);
 				return *file_offset;
 
 		}
 		else if (whence == SEEK_HOLE) {
+	#ifdef CAPIOLOG
+	CAPIO_DBG("capio seek hole\n");
+	#endif
 				char c_str[64];
 				sprintf(c_str, "shol %ld %d %zu", syscall(SYS_gettid),fd, *file_offset);
 				buf_requests->write(c_str, 256 * sizeof(char));
-				off64_t offset_upperbound;
-				(*bufs_response)[syscall(SYS_gettid)]->read(&offset_upperbound);
+	#ifdef CAPIOLOG
+	CAPIO_DBG("capio seek hole debug 1\n");
+	#endif
 				(*bufs_response)[syscall(SYS_gettid)]->read(file_offset);
+	#ifdef CAPIOLOG
+	CAPIO_DBG("capio seek hole debug2\n");
+	#endif
 				return *file_offset;
 
 		}
@@ -1324,9 +1343,10 @@ int capio_fstat(int fd, struct stat* statbuf) {
 		std::hash<std::string> hash;		
 		statbuf->st_ino = hash((*capio_files_descriptors)[fd]);
 		
-		if (is_dir == 0)
-	    	statbuf->st_mode = S_IFDIR | S_IRWXU | S_IWGRP | S_IRGRP | S_IXOTH| S_IROTH; // 0755 directory
-																		
+		if (is_dir == 0) {
+	    	statbuf->st_mode = S_IFDIR | S_IRWXU | S_IWGRP | S_IRGRP | S_IXOTH| S_IROTH; // 0755 directory	
+																						 file_size = 4096;
+		}												
 		else
 	    	statbuf->st_mode = S_IFREG | S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH; // 0666 regular file 
 		statbuf->st_nlink = 1;
@@ -1669,6 +1689,7 @@ pid_t capio_fork() {
 	return pid;
 
 }
+
 /*
  * From "The Linux Programming Interface: A Linux and Unix System Programming Handbook", by Micheal Kerrisk:
  * "Within the kernel, fork(), vfork(), and clone() are ultimately
@@ -1679,6 +1700,7 @@ pid_t capio_fork() {
  * describes the clone() wrapper function that glibc provides for sys_clone().
  * This wrapper function invokes func after sys_clone() returns in the child."
 */
+
 pid_t capio_clone(int flags, void* child_stack, void* parent_tidpr, void* tls, void* child_tidpr) {
 	//clone_sl.lock();
 	sem_wait(sem_clone);
@@ -1754,9 +1776,12 @@ pid_t capio_clone(int flags, void* child_stack, void* parent_tidpr, void* tls, v
 	return pid;
 }
 
-off64_t add_getdents_request(int fd, off64_t count, std::tuple<off64_t*, off64_t*, int , int>& t) {
+off64_t add_getdents_request(int fd, off64_t count, std::tuple<off64_t*, off64_t*, int , int>& t, bool is_getdents64) {
 	char c_str[256];
-	sprintf(c_str, "dent %ld %d %ld", syscall(SYS_gettid), fd, count);
+	if (is_getdents64)
+		sprintf(c_str, "de64 %ld %d %ld", syscall(SYS_gettid), fd, count);
+	else
+		sprintf(c_str, "dent %ld %d %ld", syscall(SYS_gettid), fd, count);
 	buf_requests->write(c_str, 256 * sizeof(char));
 	//read response (offest)
 	off64_t offset_upperbound;
@@ -1781,9 +1806,13 @@ off64_t add_getdents_request(int fd, off64_t count, std::tuple<off64_t*, off64_t
 	return offset_upperbound;
 }
 
-off64_t round(off64_t bytes) {
+off64_t round(off64_t bytes, bool is_getdents64) {
 	off64_t res = 0;
-	off64_t ld_size = theoretical_size;
+	off64_t ld_size;
+	if (is_getdents64)
+		ld_size = theoretical_size_dirent64;
+	else
+		ld_size = theoretical_size_dirent;
 	while (res + ld_size <= bytes)
 		res += ld_size;
 	return res;
@@ -1791,9 +1820,13 @@ off64_t round(off64_t bytes) {
 
 //TODO: too similar to capio_read, refactoring needed
 
-ssize_t capio_getdents(int fd, void *buffer, size_t count) {
+ssize_t capio_getdents(int fd, void *buffer, size_t count, bool is_getdents64) {
 		#ifdef CAPIOLOG
+	if (is_getdents64)
+		CAPIO_DBG("capio_getdents64 %d %d %ld\n", syscall(SYS_gettid), fd, count);
+	else
 		CAPIO_DBG("capio_getdents %d %d %ld\n", syscall(SYS_gettid), fd, count);
+
 		#endif
 	auto it = files->find(fd);
 	if (it != files->end()) {
@@ -1808,11 +1841,11 @@ ssize_t capio_getdents(int fd, void *buffer, size_t count) {
 		//if (in_shm) {
 		off64_t bytes_read;
 		off64_t end_of_read;
-		end_of_read = add_getdents_request(fd, count_off, *t);
+		end_of_read = add_getdents_request(fd, count_off, *t, is_getdents64);
 		bytes_read = end_of_read - *offset;
 		if (bytes_read > count_off)
 			bytes_read = count_off;
-		bytes_read = round(bytes_read);
+		bytes_read = round(bytes_read, is_getdents64);
 		int my_tid = syscall(SYS_gettid);
 		read_shm((*threads_data_bufs)[my_tid].second, *offset, buffer, bytes_read);
 		//}
@@ -2167,7 +2200,7 @@ static int hook(long syscall_number, long arg0, long arg1, long arg2, long arg3,
     int whence = static_cast<int>(arg2);
     off_t res = capio_lseek(fd, offset, whence);
 	#ifdef CAPIOLOG
-    CAPIO_DBG("seek %d %d\n", syscall(SYS_gettid), fd);
+    CAPIO_DBG("seek tid: %d fd: %d offset: %ld res: %ld\n", syscall(SYS_gettid), fd, offset, res);
 	#endif
     if (res != -2) {
       *result = (res < 0 ? -errno : res);
@@ -2463,7 +2496,7 @@ static int hook(long syscall_number, long arg0, long arg1, long arg2, long arg3,
 	}
 	
 	case SYS_execve: {
-		crate_snapshot();
+		create_snapshot();
 		break;
 	}
 	
@@ -2471,7 +2504,19 @@ static int hook(long syscall_number, long arg0, long arg1, long arg2, long arg3,
 		int fd =  arg0;
 		struct linux_dirent* dirp = reinterpret_cast<struct linux_dirent*>(arg1);
 		unsigned int count = arg2;
-		ssize_t res = capio_getdents(fd, dirp, count);				
+		ssize_t res = capio_getdents(fd, dirp, count, false);				
+    	if (res != -2) {
+      		*result = (res < 0 ? -errno : res);
+      		hook_ret_value = 0;
+    	}
+		break;
+	}
+
+	case SYS_getdents64: {
+		int fd = arg0;
+		void* dirp = reinterpret_cast<void*>(arg1);
+		size_t count = arg2;
+		ssize_t res = capio_getdents(fd, dirp, count, true);
     	if (res != -2) {
       		*result = (res < 0 ? -errno : res);
       		hook_ret_value = 0;
