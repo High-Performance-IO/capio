@@ -940,7 +940,7 @@ void handle_local_read(int tid, int fd, off64_t count, bool dir, bool is_getdent
 		off64_t nreads;
 		std::string committed = c_file.get_committed();
 		std::string mode = c_file.get_mode();
-		if (mode != "append" && !c_file.complete && !dir) {
+		if (mode != "append" && !c_file.complete && !dir && !writer) {
 			#ifdef CAPIOLOG
 			logfile << "add pending reads 1" << std::endl;
 			logfile << "mode " << mode << std::endl;
@@ -1245,8 +1245,9 @@ void delete_file(std::string path) {
 	#ifdef CAPIOLOG
 	logfile << "deleting file " << path << std::endl;
 	#endif	
-	shm_unlink(path.c_str());
-	shm_unlink((path + "_size").c_str());
+	//shm_unlink(path.c_str());
+	//shm_unlink((path + "_size").c_str());
+	free(std::get<0>(files_metadata[path]));
 	files_metadata.erase(path);
 
 }
@@ -1541,7 +1542,7 @@ void handle_local_stat(int tid, const char* path) {
 	response_buffers[tid]->write(&file_size);
 	response_buffers[tid]->write(&is_dir);
 	#ifdef CAPIOLOG
-		logfile << "file size stat : " << file_size << std::endl;
+		logfile << "file size handle local stat : " << file_size << std::endl;
 	#endif
 }
 
