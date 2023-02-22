@@ -559,9 +559,10 @@ off64_t convert_dirent64_to_dirent(char* dirent64_buf, char* dirent_buf, off64_t
 		p_ld64 = (struct linux_dirent64*) (dirent64_buf + i);
 		ld.d_ino = p_ld64->d_ino;
 		ld.d_off = dirent_buf_size + theoretical_size_dirent;
-		ld.d_name[DNAME_LENGTH + 1] = p_ld64->d_type;
 		logfile << "dirent_buf_size " << dirent_buf_size << std::endl;
 		strcpy(ld.d_name, p_ld64->d_name);
+		ld.d_name[DNAME_LENGTH + 1] = p_ld64->d_type;
+		ld.d_name[DNAME_LENGTH] = '\0'; 
 		i += theoretical_size_dirent64;
 		memcpy((char*) dirent_buf + dirent_buf_size, &ld, sizeof(ld));
 		dirent_buf_size += ld.d_reclen;
@@ -589,7 +590,7 @@ void handle_pending_read(int tid, int fd, long int process_offset, long int coun
 		char* p_getdents = (char*) malloc(n_entries * sizeof(char) * dir_size); 
 		end_of_sector = convert_dirent64_to_dirent(p, p_getdents, dir_size);
 		response_buffers[tid]->write(&end_of_sector);
-		send_data_to_client(tid, p + process_offset, end_of_sector - process_offset);
+		send_data_to_client(tid, p_getdents + process_offset, end_of_sector - process_offset);
 		free(p_getdents);
 	}
 	else {
@@ -977,7 +978,7 @@ void handle_local_read(int tid, int fd, off64_t count, bool dir, bool is_getdent
 					char* p_getdents = (char*) malloc(n_entries * sizeof(char) * dir_size); 
 					end_of_sector = convert_dirent64_to_dirent(p, p_getdents, dir_size);
 					response_buffers[tid]->write(&end_of_sector);
-					send_data_to_client(tid, p + process_offset, end_of_sector - process_offset);
+					send_data_to_client(tid, p_getdents + process_offset, end_of_sector - process_offset);
 					free(p_getdents);
 
 				}
