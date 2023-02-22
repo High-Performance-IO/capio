@@ -669,8 +669,12 @@ void write_entry_dir(int tid, std::string file_path, std::string dir, int type) 
 
 			char* old_p = (char*)std::get<0>(files_metadata[dir]);
 			char* new_p = new char[new_size];
-			memcpy(new_p, old_p, data_size); //TODO: slow
+			memcpy(new_p, old_p, file_shm_size);
 			delete [] old_p;
+
+	#ifdef CAPIOLOG
+	logfile << "expanded memory for file data_size " << data_size << " file_shm_size " << file_shm_size << " new_size " << new_size << std::endl;
+	#endif	
 			std::get<0>(files_metadata[dir]) = new_p;
 			std::get<2>(files_metadata[dir]) = new_size;
 		}
@@ -785,6 +789,31 @@ void handle_write(const char* str, int rank) {
 		size_t n_reads = count / WINDOW_DATA_BUFS;  
 		size_t r = count % WINDOW_DATA_BUFS;
 		size_t i = 0;
+		off64_t file_shm_size = std::get<2>(files_metadata[path]);
+		if (data_size > file_shm_size) {
+
+        #ifdef CAPIOLOG
+        logfile << "handle write data_size > file_shm_size" << std::endl;
+        #endif
+			//remap
+			size_t new_size;
+			if (data_size > file_shm_size * 2)
+				new_size = data_size;
+			else
+				new_size = file_shm_size * 2;
+
+
+			char* old_p = (char*)std::get<0>(files_metadata[path]);
+			char* new_p = new char[new_size];
+			memcpy(new_p, old_p, file_shm_size); //TODO: slow
+			delete [] old_p;
+	#ifdef CAPIOLOG
+	logfile << "expanded memory for file data_size " << data_size << " file_shm_size " << file_shm_size << " new_size " << new_size << std::endl;
+	#endif	
+			std::get<0>(files_metadata[path]) = new_p;
+			std::get<2>(files_metadata[path]) = new_size;
+			p = new_p;
+		}
 		p = p + base_offset;
         #ifdef CAPIOLOG
 		logfile << "debug handle_write 0 " << std::endl;
@@ -823,27 +852,6 @@ void handle_write(const char* str, int rank) {
 			update_dir(tid, path, rank);
         }
         *std::get<1>(files_metadata[path]) = data_size; 
-		off64_t file_shm_size = std::get<2>(files_metadata[path]);
-		if (data_size > file_shm_size) {
-
-        #ifdef CAPIOLOG
-        logfile << "handle write data_size > file_shm_size" << std::endl;
-        #endif
-			//remap
-			size_t new_size;
-			if (data_size > file_shm_size * 2)
-				new_size = data_size;
-			else
-				new_size = file_shm_size * 2;
-
-
-			char* old_p = (char*)std::get<0>(files_metadata[path]);
-			char* new_p = new char[new_size];
-			memcpy(new_p, old_p, data_size); //TODO: slow
-			delete [] old_p;
-			std::get<0>(files_metadata[path]) = old_p;
-			std::get<2>(files_metadata[path]) = new_size;
-		}
         /*total_bytes_shm += data_size;
         if (total_bytes_shm > max_shm_size && on_disk.find(path) == on_disk.end()) {
                 shm_full = true;
@@ -931,6 +939,7 @@ void handle_local_read(int tid, int fd, off64_t count, bool dir, bool is_getdent
 		bool writer = writers[pid][path];
 		off64_t end_of_sector = c_file.get_sector_end(process_offset);
 		#ifdef CAPIOLOG
+		logfile << "Am I a writer? " << writer << std::endl;
 		logfile << "process offset " << process_offset << std::endl;
 		logfile << "count " << count << std::endl;
 		logfile << "end of sector" << end_of_sector << std::endl;
@@ -950,7 +959,6 @@ void handle_local_read(int tid, int fd, off64_t count, bool dir, bool is_getdent
 		}
 		else if (end_of_read > end_of_sector) {
 		#ifdef CAPIOLOG
-		logfile << "Am I a writer? " << writer << std::endl;
 		logfile << "Is the file completed? " << c_file.complete << std::endl;
 		#endif
 			if (!writer && !c_file.complete && !dir) {
@@ -1548,7 +1556,7 @@ void handle_local_stat(int tid, const char* path) {
 
 void handle_remote_stat(int tid, const std::string path, int rank) {
 	#ifdef CAPIOLOG
-	logfile << "handle remote read before sem_wait" << std::endl;
+	logfile << "handle remote stat before sem_wait" << std::endl;
 	#endif
 	sem_wait(&handle_remote_stat_sem);
 	std::string str_msg;
@@ -1579,6 +1587,9 @@ void* wait_for_stat(void* pthread_arg) {
 	int rank;
 	MPI_Comm_rank(MPI_COMM_WORLD, &rank);
 	std::string path_to_check(path);
+        #ifdef CAPIOLOG
+        logfile << "wait for stat" << std::endl;
+        #endif
 	loop_check_files_location(path_to_check, rank);
 
 	//check if the file is local or remote
@@ -1641,6 +1652,7 @@ void handle_stat(const char* str, int rank) {
 			return;
 		}
 	}
+
 	if (files_metadata.find(path) == files_metadata.end()) {
 		p_shm = new char[file_initial_size];
 		create_file(path, p_shm, false);
