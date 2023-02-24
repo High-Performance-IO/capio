@@ -103,6 +103,9 @@ MPI_Request req;
 
 std::unordered_map<int, int> pids;
 
+// tid -> application name 
+std::unordered_map<int, std::string> apps;
+
 // tid -> fd ->(file_data, index)
 std::unordered_map<int, std::unordered_map<int, std::tuple<void*, off64_t*>>> processes_files;
 
@@ -143,13 +146,13 @@ std::unordered_map<int, std::pair<SPSC_queue<char>*, SPSC_queue<char>*>> data_bu
  */
 std::unordered_map<std::string, std::tuple<void*, off64_t*, off64_t, bool, Capio_file, off64_t>> files_metadata;
 
-// string -> (committed, mode)
+// path -> (committed, mode, app_name)
 
-std::unordered_map<std::string, std::tuple<std::string, std::string>> metadata_conf;
+std::unordered_map<std::string, std::tuple<std::string, std::string, std::string>> metadata_conf;
 
-// [(glob, committed, mode), (glob, committed, mode), ...]
+// [(glob, committed, mode, app_name), (glob, committed, mode, app_name), ...]
 
-std::vector<std::tuple<std::string, std::string, std::string>> metadata_conf_globs;
+std::vector<std::tuple<std::string, std::string, std::string, std::string>> metadata_conf_globs;
 /*
  * pid -> pathname -> bool
  * Different thread with the same pid are threated as a single writer
@@ -301,7 +304,7 @@ void write_file_location(const std::string& file_name, int rank, std::string pat
 	file_location[len1 + len2 + len3 + 1] = '\0';
 	write(fd, file_location, sizeof(char) * strlen(file_location));
     #ifdef CAPIOLOG
-    	logfile << "writing " << file_location << std::endl;
+    	logfile << "file_location writing " << path_to_write << " " << file_location << std::endl;
     #endif
 	files_location[path_to_write] = node_name;
 	// Now release the lock explicitly.
@@ -364,6 +367,9 @@ bool check_remote_file(const std::string& file_name, int rank, std::string path_
 		}
 		node_str[j] = '\0';
 		if (strcmp(path, path_to_check_cstr) == 0) {
+    #ifdef CAPIOLOG
+    	logfile << "check remote file writing " << path_to_check << " " << node_str << std::endl;
+    #endif
 			files_location[path_to_check] = (char*) malloc(sizeof(char) * (strlen(node_str) + 1));
 			found = true;
 			strcpy(files_location[path_to_check], node_str);
@@ -432,7 +438,8 @@ long int match_globs(std::string path) {
 	size_t i = 0;
 	while (i < metadata_conf_globs.size() && !found) {
 		std::string prefix_str = std::get<0>(metadata_conf_globs[i]);
-		found = path.compare(0, prefix_str.length() - 1, prefix_str);
+		if (path.compare(0, prefix_str.length(), prefix_str) == 0)
+			found = true;
 		++i;
 	}
 	if (found)
@@ -448,10 +455,7 @@ void create_file(std::string path, void* p_shm, bool is_dir) {
 	std::replace(shm_name.begin(), shm_name.end(), '/', '_');
 	shm_name = shm_name.substr(1);
 	off64_t* p_shm_size = (off64_t*) create_shm(shm_name + "_size", sizeof(off64_t));	
-	//logfile << "creating " << path << std::endl;
-	//logfile << "pshm " << p_shm << "p_shm_size " << p_shm_size << std::endl;
-	std::string committed;
-	std::string mode;
+	std::string committed, mode, app_name;
 	auto it = metadata_conf.find(path);
 	if (it == metadata_conf.end()) {
 		long int pos = match_globs(path);
@@ -462,15 +466,16 @@ void create_file(std::string path, void* p_shm, bool is_dir) {
 			files_metadata[path] = std::make_tuple(p_shm, p_shm_size, file_initial_size, true, Capio_file(is_dir), 0);
 		}
 		else {
-			auto& triple = metadata_conf_globs[pos];
-			committed = std::get<1>(triple);
-			mode = std::get<2>(triple);
+			auto& quadruple = metadata_conf_globs[pos];
+			committed = std::get<1>(quadruple);
+			mode = std::get<2>(quadruple);
+			app_name = std::get<3>(quadruple);
         	#ifdef CAPIOLOG
 			logfile << "creating file using globbing " << path << std::endl;
 			logfile << "committed " << committed << " mode " << mode << std::endl;
 			#endif
 			files_metadata[path] = std::make_tuple(p_shm, p_shm_size, file_initial_size, true, Capio_file(committed, mode, is_dir), 0);
-			metadata_conf[path] = std::make_tuple(committed, mode);
+			metadata_conf[path] = std::make_tuple(committed, mode, app_name);
 		}
 	}
 	else {
@@ -482,130 +487,7 @@ void create_file(std::string path, void* p_shm, bool is_dir) {
 		#endif
 		files_metadata[path] = std::make_tuple(p_shm, p_shm_size, file_initial_size, true, Capio_file(committed, mode, is_dir), 0);
 	}
-
 }
-
-//TODO: function too long
-
-void handle_open(char* str, char* p, int rank) {
-	#ifdef CAPIOLOG
-	logfile << "handle open" << std::endl;
-	#endif
-	int tid;
-	tid = strtol(str + 5, &p, 10);
-	init_process(tid);
-	int fd = strtol(p + 1, &p, 10);
-	std::string path(p + 1);
-	void* p_shm;
-	//int index = *caching_info[tid].second;
-	//caching_info[tid].first[index] = fd;
-	if (on_disk.find(path) == on_disk.end()) {
-		std::string shm_name = path;
-		std::replace(shm_name.begin(), shm_name.end(), '/', '_');
-		shm_name = shm_name.substr(1);
-		p_shm = new char[file_initial_size];
-		//caching_info[tid].first[index + 1] = 0;
-	}
-	else {
-		p_shm = nullptr;
-		//caching_info[tid].first[index + 1] = 1;
-	}
-		//TODO: check the size that the user wrote in the configuration file
-	off64_t* p_offset = (off64_t*) create_shm("offset_" + std::to_string(tid) + "_" + std::to_string(fd), sizeof(off64_t));
-	processes_files[tid][fd] = std::make_tuple(p_shm, p_offset);//TODO: what happens if a process open the same file twice?
-	//*caching_info[tid].second += 2;
-	if (files_metadata.find(path) == files_metadata.end()) {
-		create_file(path, p_shm, false);
-	}
-	Capio_file& c_file = std::get<4>(files_metadata[path]);
-	++c_file.n_opens;
-    #ifdef CAPIOLOG
-	logfile << "capio open n links " << c_file.n_links << " n opens " << c_file.n_opens << std::endl;;
-	#endif
-	processes_files_metadata[tid][fd] = path;
-	int pid = pids[tid];
-	auto it_files = writers.find(pid);
-	if (it_files != writers.end()) {
-		auto it_bools = it_files->second.find(path);
-		if (it_bools == it_files->second.end()) {
-			writers[pid][path] = false;
-		}
-	}
-	else {
-		writers[pid][path] = false;
-	}
-}
-
-void send_data_to_client(int tid, char* buf, long int count) {
-	auto* data_buf = data_buffers[tid].second;
-	size_t n_writes = count / WINDOW_DATA_BUFS;
-	size_t r = count % WINDOW_DATA_BUFS;
-	size_t i = 0;
-	while (i < n_writes) {
-		data_buf->write(buf + i * WINDOW_DATA_BUFS);
-		++i;
-	}
-	if (r)
-		data_buf->write(buf + i * WINDOW_DATA_BUFS, r);
-}
-
-off64_t convert_dirent64_to_dirent(char* dirent64_buf, char* dirent_buf, off64_t dirent_64_buf_size) {
-	off64_t dirent_buf_size = 0;
-	off64_t i = 0;
-	struct linux_dirent ld;
-	struct linux_dirent64* p_ld64;
-	ld.d_reclen = theoretical_size_dirent;
-	while (i < dirent_64_buf_size) {
-		p_ld64 = (struct linux_dirent64*) (dirent64_buf + i);
-		ld.d_ino = p_ld64->d_ino;
-		ld.d_off = dirent_buf_size + theoretical_size_dirent;
-		logfile << "dirent_buf_size " << dirent_buf_size << std::endl;
-		strcpy(ld.d_name, p_ld64->d_name);
-		ld.d_name[DNAME_LENGTH + 1] = p_ld64->d_type;
-		ld.d_name[DNAME_LENGTH] = '\0'; 
-		i += theoretical_size_dirent64;
-		memcpy((char*) dirent_buf + dirent_buf_size, &ld, sizeof(ld));
-		dirent_buf_size += ld.d_reclen;
-	}
-	return dirent_buf_size;
-}
-
-void handle_pending_read(int tid, int fd, long int process_offset, long int count, bool is_getdents) {
-	
-	std::string path = processes_files_metadata[tid][fd];
-	Capio_file & c_file = std::get<4>(files_metadata[path]);
-	off64_t end_of_sector = c_file.get_sector_end(process_offset);
-	char* p = (char*) std::get<0>(files_metadata[path]);
-	off64_t end_of_read = process_offset + count;
-	size_t bytes_read;
-	if (end_of_sector > end_of_read) {
-		end_of_sector = end_of_read;
-		bytes_read = count;
-	}
-	else
-		bytes_read = end_of_sector - process_offset;
-	if (is_getdents) {
-		off64_t dir_size = *std::get<1>(files_metadata[path]);
-		off64_t n_entries = dir_size / theoretical_size_dirent64;
-		char* p_getdents = (char*) malloc(n_entries * sizeof(char) * dir_size); 
-		end_of_sector = convert_dirent64_to_dirent(p, p_getdents, dir_size);
-		response_buffers[tid]->write(&end_of_sector);
-		send_data_to_client(tid, p_getdents + process_offset, end_of_sector - process_offset);
-		free(p_getdents);
-	}
-	else {
-		response_buffers[tid]->write(&end_of_sector);
-		send_data_to_client(tid, p + process_offset, bytes_read);
-	}
-	//*processes_files[tid][fd].second += count;
-	//TODO: check if the file was moved to the disk
-}
-
-struct handle_write_metadata{
-	char str[64];
-	long int rank;
-};
-
 
 std::string get_parent_dir_path(std::string file_path) {
 	std::size_t i = file_path.rfind('/');
@@ -742,6 +624,141 @@ void update_dir(int tid, std::string file_path, int rank) {
         #endif
 	return;
 }
+
+//TODO: function too long
+
+void handle_open(char* str, char* p, int rank, bool is_creat) {
+	#ifdef CAPIOLOG
+	logfile << "handle open" << std::endl;
+	#endif
+	int tid, fd;
+	char path_cstr[PATH_MAX];
+	void* p_shm;
+	if (is_creat)
+		sscanf(str, "crat %d %d %s", &tid, &fd, path_cstr);
+	else
+		sscanf(str, "open %d %d %s", &tid, &fd, path_cstr);
+	init_process(tid);
+	std::string path(path_cstr);
+	//int index = *caching_info[tid].second;
+	//caching_info[tid].first[index] = fd;
+	if (on_disk.find(path) == on_disk.end()) {
+		std::string shm_name = path;
+		std::replace(shm_name.begin(), shm_name.end(), '/', '_');
+		shm_name = shm_name.substr(1);
+		p_shm = new char[file_initial_size];
+		//caching_info[tid].first[index + 1] = 0;
+	}
+	else {
+		p_shm = nullptr;
+		//caching_info[tid].first[index + 1] = 1;
+	}
+		//TODO: check the size that the user wrote in the configuration file
+	off64_t* p_offset = (off64_t*) create_shm("offset_" + std::to_string(tid) + "_" + std::to_string(fd), sizeof(off64_t));
+	processes_files[tid][fd] = std::make_tuple(p_shm, p_offset);//TODO: what happens if a process open the same file twice?
+	//*caching_info[tid].second += 2;
+	if (files_metadata.find(path) == files_metadata.end()) {
+		create_file(path, p_shm, false);
+	}
+	Capio_file& c_file = std::get<4>(files_metadata[path]);
+	++c_file.n_opens;
+    #ifdef CAPIOLOG
+	logfile << "capio open n links " << c_file.n_links << " n opens " << c_file.n_opens << std::endl;;
+	#endif
+	processes_files_metadata[tid][fd] = path;
+	int pid = pids[tid];
+	auto it_files = writers.find(pid);
+	if (it_files != writers.end()) {
+		auto it_bools = it_files->second.find(path);
+		if (it_bools == it_files->second.end()) {
+			writers[pid][path] = false;
+		}
+	}
+	else {
+		writers[pid][path] = false;
+	}
+
+    if (std::get<3>(files_metadata[path]) && is_creat) {
+		std::get<3>(files_metadata[path]) = false;
+        write_file_location("files_location.txt", rank, path);
+		update_dir(tid, path, rank);
+	}
+
+}
+
+void send_data_to_client(int tid, char* buf, long int count) {
+	auto* data_buf = data_buffers[tid].second;
+	size_t n_writes = count / WINDOW_DATA_BUFS;
+	size_t r = count % WINDOW_DATA_BUFS;
+	size_t i = 0;
+	while (i < n_writes) {
+		data_buf->write(buf + i * WINDOW_DATA_BUFS);
+		++i;
+	}
+	if (r)
+		data_buf->write(buf + i * WINDOW_DATA_BUFS, r);
+}
+
+off64_t convert_dirent64_to_dirent(char* dirent64_buf, char* dirent_buf, off64_t dirent_64_buf_size) {
+	off64_t dirent_buf_size = 0;
+	off64_t i = 0;
+	struct linux_dirent ld;
+	struct linux_dirent64* p_ld64;
+	ld.d_reclen = theoretical_size_dirent;
+	while (i < dirent_64_buf_size) {
+		p_ld64 = (struct linux_dirent64*) (dirent64_buf + i);
+		ld.d_ino = p_ld64->d_ino;
+		ld.d_off = dirent_buf_size + theoretical_size_dirent;
+		logfile << "dirent_buf_size " << dirent_buf_size << std::endl;
+		strcpy(ld.d_name, p_ld64->d_name);
+		ld.d_name[DNAME_LENGTH + 1] = p_ld64->d_type;
+		ld.d_name[DNAME_LENGTH] = '\0'; 
+		i += theoretical_size_dirent64;
+		memcpy((char*) dirent_buf + dirent_buf_size, &ld, sizeof(ld));
+		dirent_buf_size += ld.d_reclen;
+	}
+	return dirent_buf_size;
+}
+
+void handle_pending_read(int tid, int fd, long int process_offset, long int count, bool is_getdents) {
+	
+	std::string path = processes_files_metadata[tid][fd];
+	Capio_file & c_file = std::get<4>(files_metadata[path]);
+	off64_t end_of_sector = c_file.get_sector_end(process_offset);
+	char* p = (char*) std::get<0>(files_metadata[path]);
+	off64_t end_of_read = process_offset + count;
+	size_t bytes_read;
+	if (end_of_sector > end_of_read) {
+		end_of_sector = end_of_read;
+		bytes_read = count;
+	}
+	else
+		bytes_read = end_of_sector - process_offset;
+	if (is_getdents) {
+		off64_t dir_size = *std::get<1>(files_metadata[path]);
+		off64_t n_entries = dir_size / theoretical_size_dirent64;
+		char* p_getdents = (char*) malloc(n_entries * sizeof(char) * dir_size); 
+		end_of_sector = convert_dirent64_to_dirent(p, p_getdents, dir_size);
+		response_buffers[tid]->write(&end_of_sector);
+		send_data_to_client(tid, p_getdents + process_offset, end_of_sector - process_offset);
+		free(p_getdents);
+	}
+	else {
+		response_buffers[tid]->write(&end_of_sector);
+		send_data_to_client(tid, p + process_offset, bytes_read);
+	}
+	//*processes_files[tid][fd].second += count;
+	//TODO: check if the file was moved to the disk
+}
+
+struct handle_write_metadata{
+	char str[64];
+	long int rank;
+};
+
+
+
+
 
 void handle_pending_remote_reads(std::string path, off64_t data_size) {
         auto it_client = clients_remote_pending_reads.find(path);
@@ -928,7 +945,7 @@ void handle_write(const char* str, int rank) {
  * Multithread function
  */
 
-void handle_local_read(int tid, int fd, off64_t count, bool dir, bool is_getdents) {
+void handle_local_read(int tid, int fd, off64_t count, bool dir, bool is_getdents, bool is_prod) {
 		#ifdef CAPIOLOG
 		logfile << "handle local read" << std::endl;
 		#endif
@@ -950,7 +967,7 @@ void handle_local_read(int tid, int fd, off64_t count, bool dir, bool is_getdent
 		off64_t nreads;
 		std::string committed = c_file.get_committed();
 		std::string mode = c_file.get_mode();
-		if (mode != "append" && !c_file.complete && !dir && !writer) {
+		if (mode != "append" && !c_file.complete && !dir && !writer && !is_prod) {
 			#ifdef CAPIOLOG
 			logfile << "add pending reads 1" << std::endl;
 			logfile << "mode " << mode << std::endl;
@@ -962,7 +979,7 @@ void handle_local_read(int tid, int fd, off64_t count, bool dir, bool is_getdent
 		#ifdef CAPIOLOG
 		logfile << "Is the file completed? " << c_file.complete << std::endl;
 		#endif
-			if (!writer && !c_file.complete && !dir) {
+			if (!is_prod && !writer && !c_file.complete && !dir) {
 				#ifdef CAPIOLOG
 				logfile << "add pending reads 2" << std::endl;
 				#endif
@@ -1061,7 +1078,7 @@ void handle_remote_read(int tid, int fd, off64_t count, int rank, bool dir, bool
 		off64_t end_of_sector = c_file.get_sector_end(process_offset);
 
 		if (c_file.complete && (end_of_read <= end_of_sector || end_of_sector == real_file_size)) {
-			handle_local_read(tid, fd, count, dir, is_getdents);
+			handle_local_read(tid, fd, count, dir, is_getdents, true);
 			sem_post(&handle_remote_read_sem);
 			return;
 		}
@@ -1161,10 +1178,15 @@ void loop_check_files_location(std::string path_to_check, int rank) {
 					++j;
 				}
 				node_str[j] = '\0';
-				files_location[path_to_check] = (char*) malloc(sizeof(node_str) + 1); //TODO:free the memory
 				if (strcmp(path, path_to_check_cstr) == 0) {
+    #ifdef CAPIOLOG
+    	logfile << "loop_check_files_location writing " << path_to_check << " " << node_str << std::endl;
+    #endif
+					if (files_location.find(path_to_check) == files_location.end()) {
+						files_location[path_to_check] = (char*) malloc(sizeof(node_str) + 1); //TODO:free the memory
+						strcpy(files_location[path_to_check], node_str);
+					}
 					found = true;
-					strcpy(files_location[path_to_check], node_str);
 				}
 			}
 		}
@@ -1192,7 +1214,7 @@ void* wait_for_file(void* pthread_arg) {
 
 	//check if the file is local or remote
 	if (strcmp(files_location[path_to_check], node_name) == 0) {
-			handle_local_read(tid, fd, count, dir, is_getdents);
+			handle_local_read(tid, fd, count, dir, is_getdents, false);
 	}
 	else {
 			#ifdef CAPIOLOG
@@ -1206,6 +1228,44 @@ void* wait_for_file(void* pthread_arg) {
 	return nullptr;
 }
 
+std::string get_producer_name(std::string path) {
+	std::string producer_name = "";
+	//we handle also prefixes
+	auto it_metadata = metadata_conf.find(path);
+	if (it_metadata == metadata_conf.end()) {
+		long int pos = match_globs(path);
+		if (pos != -1) {
+			producer_name = std::get<3>(metadata_conf_globs[pos]);
+	#ifdef CAPIOLOG
+	logfile << "pos " << pos << " producer_name " << producer_name << std::endl;
+	#endif
+		}
+	}
+	else {
+		producer_name = std::get<2>(it_metadata->second);
+	#ifdef CAPIOLOG
+	logfile << "get producer_name " << producer_name << std::endl;
+	#endif
+	}
+	return producer_name;
+}
+
+bool is_producer(int tid, std::string path) {
+	bool res = false;
+	auto it = apps.find(tid);
+	#ifdef CAPIOLOG
+	logfile << "is producer " << path << std::endl;
+	#endif
+	if (it != apps.end()) {
+		std::string app_name = apps[tid];
+		std::string prod_name = get_producer_name(path);
+		#ifdef CAPIOLOG
+		logfile << "app_name " << app_name << " prod_name " << prod_name << std::endl;
+		#endif
+		res = app_name == prod_name;
+	}
+	return res;
+}
 
 void handle_read(char* str, int rank, bool dir, bool is_getdents) {
 	#ifdef CAPIOLOG
@@ -1216,10 +1276,11 @@ void handle_read(char* str, int rank, bool dir, bool is_getdents) {
 	off64_t count;
 	std::istringstream stream(str);
 	stream >> request >> tid >> fd >> count;
-	if (files_location.find(processes_files_metadata[tid][fd]) == files_location.end()) {
+	std::string path = processes_files_metadata[tid][fd];
+	bool is_prod = is_producer(tid, path);
+	if (files_location.find(path) == files_location.end() && !is_prod) {
 		check_remote_file("files_location.txt", rank, processes_files_metadata[tid][fd]);
-		if (files_location.find(processes_files_metadata[tid][fd]) == files_location.end()) {
-			std::string path = processes_files_metadata[tid][fd];
+		if (files_location.find(path) == files_location.end()) {
 			//launch a thread that checks when the file is created
 			pthread_t t;
 			struct wait_for_file_metadata* metadata = (struct wait_for_file_metadata*)  malloc(sizeof(wait_for_file_metadata));
@@ -1238,8 +1299,8 @@ void handle_read(char* str, int rank, bool dir, bool is_getdents) {
 			return;
 		}
 	}
-	if (strcmp(files_location[processes_files_metadata[tid][fd]], node_name) == 0) {
-		handle_local_read(tid, fd, count, dir, is_getdents);
+	if (is_prod || strcmp(files_location[path], node_name) == 0) {
+		handle_local_read(tid, fd, count, dir, is_getdents, is_prod);
 	}
 	else {
 	#ifdef CAPIOLOG
@@ -1538,7 +1599,7 @@ void handle_exig(char* str) {
 }
 
 
-void handle_local_stat(int tid, const char* path) {
+void handle_local_stat(int tid, std::string path) {
 	off64_t file_size;
 	auto it = files_metadata.find(path);
 	Capio_file& c_file = std::get<4>(it->second);
@@ -1602,21 +1663,13 @@ void* wait_for_stat(void* pthread_arg) {
 	else {
 		handle_remote_stat(tid, path, rank);
 	}
-	
-
 
 	free(metadata);
 	return nullptr;
 }
 
 
-void handle_stat(const char* str, int rank) {
-	char path[2048];
-	int tid;
-	sscanf(str, "stat %d %s", &tid, path);
-
-	init_process(tid);
-
+void reply_stat(int tid, std::string path, int rank) {
 	char* p_shm;
 	if (files_location.find(path) == files_location.end()) {
 		check_remote_file("files_location.txt", rank, path);
@@ -1624,16 +1677,11 @@ void handle_stat(const char* str, int rank) {
 			//if it is in configuration file then wait otherwise fails
 			
 //std::unordered_map<std::string, std::tuple<std::string, std::string>> metadata_conf;
-			if (metadata_conf.find(path) != metadata_conf.end() || match_globs(path) != -1) {
-				if (files_metadata.find(path) == files_metadata.end()) {
-					p_shm = new char[file_initial_size];
-					create_file(path, p_shm, false);
-				}
-
+			if ((metadata_conf.find(path) != metadata_conf.end() || match_globs(path) != -1) && !is_producer(tid, path)) {
 				pthread_t t;
 				struct wait_for_stat_metadata* metadata = (struct wait_for_stat_metadata*)  malloc(sizeof(wait_for_stat_metadata));
 				metadata->tid = tid;
-				strcpy(metadata->path, path);
+				strcpy(metadata->path, path.c_str());
 				int res = pthread_create(&t, NULL, wait_for_stat, (void*) metadata);
 				if (res != 0) {
 					logfile << "error creation of capio server thread wiat for stat" << std::endl;
@@ -1649,7 +1697,6 @@ void handle_stat(const char* str, int rank) {
 		logfile << "file size stat : " << file_size << std::endl;
 	#endif
 			}
-
 			return;
 		}
 	}
@@ -1667,8 +1714,16 @@ void handle_stat(const char* str, int rank) {
 	else {
 		handle_remote_stat(tid, path, rank);
 	}
-	
 
+}
+
+void handle_stat(const char* str, int rank) {
+	char path[2048];
+	int tid;
+	sscanf(str, "stat %d %s", &tid, path);
+
+	init_process(tid);
+	reply_stat(tid, path, rank);
 }
 
 void handle_fstat(const char* str, int rank) {
@@ -1679,25 +1734,7 @@ void handle_fstat(const char* str, int rank) {
 	logfile << "path " << path << std::endl;
 	#endif
 
-	if (files_location.find(path) == files_location.end()) {
-		check_remote_file("files_location.txt", rank, path);
-		if (files_location.find(path) == files_location.end()) {
-			//TODO: fix this
-			handle_local_stat(tid, path.c_str());
-			return;
-		}
-
-	}
-
-	Capio_file& c_file = std::get<4>(files_metadata[path]);
-
-	if (strcmp(files_location[path], node_name) == 0 || c_file.get_committed() == "on_close") {
-		handle_local_stat(tid, path.c_str());
-	}
-	else {
-		handle_remote_stat(tid, path, rank);
-	}
-
+	reply_stat(tid, path, rank);
 }
 
 void handle_access(const char* str) {
@@ -1776,7 +1813,7 @@ off64_t create_dir(int tid, const char* pathname, int rank, bool root_dir) {
 	#ifdef CAPIOLOG
 	logfile << "handle mkdir " << pathname << std::endl;
 	#endif
-	if (files_metadata.find(pathname) == files_metadata.end()) {
+	if (files_location.find(pathname) == files_location.end()) {
 		std::string shm_name = pathname;
 		std::replace(shm_name.begin(), shm_name.end(), '/', '_');
 		shm_name = shm_name.substr(1);
@@ -1887,9 +1924,15 @@ void handle_rename(const char* str, int rank) {
 }
 
 
-void handle_handshake(const char* str) {
+void handle_handshake(const char* str, bool app_name_defined) {
 	int tid, pid;
-	sscanf(str, "hand %d %d", &tid, &pid);
+	char app_name[1024];
+	if (app_name_defined) {
+		sscanf(str, "hand %d %d %s", &tid, &pid, app_name);
+		apps[tid] = app_name;
+	}
+	else
+		sscanf(str, "hans %d %d", &tid, &pid);
 	pids[tid] = pid;
 }
 
@@ -1927,9 +1970,13 @@ void read_next_msg(int rank) {
 	logfile << "next msg " << str << std::endl;
 	#endif
 	if (strncmp(str, "hand", 4) == 0)
-		handle_handshake(str);
+		handle_handshake(str, true);
+	else if (strncmp(str, "hans", 4) == 0)
+		handle_handshake(str, false);
+	else if (strncmp(str, "crat", 4) == 0)
+		handle_open(str, p, rank, true);
 	else if (strncmp(str, "open", 4) == 0)
-		handle_open(str, p, rank);
+		handle_open(str, p, rank, false);
 	else if (strncmp(str, "writ", 4) == 0)
 		handle_write(str, rank);
 	else if (strncmp(str, "read", 4) == 0)
@@ -2500,11 +2547,17 @@ void parse_conf_file(std::string conf_file) {
 				}
 				std::size_t pos = path.find('*');		
 				if (pos == std::string::npos) {
-					metadata_conf[path] = std::make_tuple(std::string(committed), std::string(mode));
+					metadata_conf[path] = std::make_tuple(std::string(committed), std::string(mode), std::string(app_name));
+				#ifdef CAPIOLOG
+				logfile << "path " << path << " app name " << app_name << std::endl;
+				#endif
 				}
 				else {
 					std::string prefix_str = path.substr(0, pos);
-					metadata_conf_globs.push_back(std::make_tuple(prefix_str, std::string(committed), std::string(mode))); 
+					metadata_conf_globs.push_back(std::make_tuple(prefix_str, std::string(committed), std::string(mode), std::string(app_name))); 
+				#ifdef CAPIOLOG
+				logfile << "prefix_str " << prefix_str << " app name " << app_name << std::endl;
+				#endif
 				}
 
 			}
@@ -2522,6 +2575,7 @@ void parse_conf_file(std::string conf_file) {
 	}
 
 }
+
 
 void get_capio_dir() {
 	char* val;

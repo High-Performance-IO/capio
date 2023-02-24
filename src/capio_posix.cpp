@@ -94,6 +94,7 @@ struct spinlock {
 //struct spinlock clone_sl;
 
 std::string* capio_dir = nullptr;
+std::string* capio_app_name = nullptr;
 std::string* current_dir = nullptr;
 
 int num_writes_batch = 1;
@@ -231,6 +232,16 @@ void initialize_from_snapshot(int* fd_shm) {
 	#endif
 }
 
+
+void get_app_name() {
+	char* val;
+	if (capio_app_name == nullptr) {
+		val = getenv("CAPIO_APP_NAME");
+		if (val != NULL)
+			capio_app_name = new std::string(val);
+	}
+}
+
 /*
  * This function must be called only once
  *
@@ -292,6 +303,7 @@ void mtrace_init(void) {
 	catch (const std::exception& ex) {
 		exit(1);
 	}
+	get_app_name();
 	int res = is_directory(capio_dir->c_str());
 	if (res == 0) {
 		std::cerr << "dir " << capio_dir << " is not a directory" << std::endl;
@@ -343,7 +355,10 @@ void mtrace_init(void) {
 	CAPIO_DBG("thread created init end\n");
 	#endif
 	}
-	sprintf(c_str, "hand %d %d", my_tid, getpid());
+	if (capio_app_name == nullptr)
+		sprintf(c_str, "hans %d %d", my_tid, getpid());
+	else
+		sprintf(c_str, "hand %d %d %s", my_tid, getpid(), capio_app_name->c_str());
 	buf_requests->write(c_str, 256 * sizeof(char));
 	(*stat_enabled)[my_tid] = true;
 	#ifdef CAPIOLOG
@@ -491,9 +506,12 @@ std::string create_absolute_path(const char* pathname) {
 }
 
 
-void add_open_request(const char* pathname, size_t fd) {
+void add_open_request(const char* pathname, size_t fd, bool is_creat) {
 	char c_str[256];
-	sprintf(c_str, "open %ld %ld %s", syscall(SYS_gettid), fd, pathname);
+	if (is_creat)
+		sprintf(c_str, "crat %ld %ld %s", syscall(SYS_gettid), fd, pathname);
+	else
+		sprintf(c_str, "open %ld %ld %s", syscall(SYS_gettid), fd, pathname);
 	buf_requests->write(c_str, 256 * sizeof(char)); //TODO: max upperbound for pathname
 }
 
@@ -855,7 +873,7 @@ off_t capio_lseek(int fd, off64_t offset, int whence) {
 }
 
 
-int capio_openat(int dirfd, const char* pathname, int flags) {
+int capio_openat(int dirfd, const char* pathname, int flags, bool is_creat) {
 	#ifdef CAPIOLOG
 	CAPIO_DBG("capio_openat %s\n", pathname);
 	#endif
@@ -918,7 +936,9 @@ int capio_openat(int dirfd, const char* pathname, int flags) {
 			if (fd == -1) {
 				err_exit("capio_open, /dev/null opening");
 			}
-			add_open_request(path_to_check.c_str(), fd);
+			if (!is_creat)
+				is_creat = (flags & O_CREAT) == O_CREAT;
+			add_open_request(path_to_check.c_str(), fd, is_creat);
 			off64_t* p_offset = (off64_t*) create_shm("offset_" + std::to_string(syscall(SYS_gettid)) + "_" + std::to_string(fd), sizeof(off64_t));
 			*p_offset = 0;
 			off64_t* init_size = new off64_t;
@@ -940,14 +960,14 @@ int capio_openat(int dirfd, const char* pathname, int flags) {
 				capio_lseek(fd, 0, SEEK_END);
 			}
 			#ifdef CAPIOLOG
-			CAPIO_DBG("capio_openat returning %d\n", fd);
+			CAPIO_DBG("capio_openat returning %d %s\n", fd, pathname);
 			#endif
 			return fd;
 		//}
 	}
 	else {
 		#ifdef CAPIOLOG
-		CAPIO_DBG("capio_openat returning -2\n");
+		CAPIO_DBG("capio_openat returning -2 %s\n", pathname);
 		#endif
 		return -2;
 	}
@@ -1447,7 +1467,7 @@ int capio_creat(const char* pathname, mode_t mode) {
 	#ifdef CAPIOLOG
 	CAPIO_DBG("capio_creat %s\n", pathname);
 	#endif
-	int res = capio_openat(AT_FDCWD, pathname, O_CREAT | O_WRONLY | O_TRUNC);
+	int res = capio_openat(AT_FDCWD, pathname, O_CREAT | O_WRONLY | O_TRUNC, true);
 
 	#ifdef CAPIOLOG
 	CAPIO_DBG("capio_creat %s returning %d\n", pathname, res);
@@ -2136,7 +2156,7 @@ static int hook(long syscall_number, long arg0, long arg1, long arg2, long arg3,
     int dirfd = static_cast<int>(arg0);
     const char *pathname = reinterpret_cast<const char *>(arg1);
     int flags = static_cast<int>(arg2);
-    int res = capio_openat(dirfd, pathname, flags);
+    int res = capio_openat(dirfd, pathname, flags, false);
     if (res != -2) {
       *result = (res < 0 ? -errno : res);
       hook_ret_value = 0;
