@@ -30,7 +30,8 @@ class Capio_file {
 		bool complete = false;
 		int n_links = 1;
 		int n_opens = 0;
-		int n_files = 0; //useful for directories
+		long int n_files = 0; //useful for directories
+		long int n_files_expected = -1; //useful for directories
 
 		Capio_file() {
 			_committed = "on_termination";
@@ -49,10 +50,11 @@ class Capio_file {
 		}
 
 		Capio_file(std::string committed, std::string mode,
-				bool directory) {
+				bool directory, long int n_files_expected) {
 			_committed = committed;
 			_mode = mode;
 			_directory = directory;
+			this->n_files_expected = n_files_expected + 2; // +2 for . and ..
 		}
 
 		Capio_file(bool directory) {

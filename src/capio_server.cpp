@@ -148,11 +148,11 @@ std::unordered_map<std::string, std::tuple<void*, off64_t*, off64_t, bool, Capio
 
 // path -> (committed, mode, app_name)
 
-std::unordered_map<std::string, std::tuple<std::string, std::string, std::string>> metadata_conf;
+std::unordered_map<std::string, std::tuple<std::string, std::string, std::string, long int>> metadata_conf;
 
 // [(glob, committed, mode, app_name), (glob, committed, mode, app_name), ...]
 
-std::vector<std::tuple<std::string, std::string, std::string, std::string>> metadata_conf_globs;
+std::vector<std::tuple<std::string, std::string, std::string, std::string, long int>> metadata_conf_globs;
 /*
  * pid -> pathname -> bool
  * Different thread with the same pid are threated as a single writer
@@ -456,6 +456,7 @@ void create_file(std::string path, void* p_shm, bool is_dir) {
 	shm_name = shm_name.substr(1);
 	off64_t* p_shm_size = (off64_t*) create_shm(shm_name + "_size", sizeof(off64_t));	
 	std::string committed, mode, app_name;
+	long int n_files;
 	auto it = metadata_conf.find(path);
 	if (it == metadata_conf.end()) {
 		long int pos = match_globs(path);
@@ -466,26 +467,28 @@ void create_file(std::string path, void* p_shm, bool is_dir) {
 			files_metadata[path] = std::make_tuple(p_shm, p_shm_size, file_initial_size, true, Capio_file(is_dir), 0);
 		}
 		else {
-			auto& quadruple = metadata_conf_globs[pos];
-			committed = std::get<1>(quadruple);
-			mode = std::get<2>(quadruple);
-			app_name = std::get<3>(quadruple);
+			auto& quintuple = metadata_conf_globs[pos];
+			committed = std::get<1>(quintuple);
+			mode = std::get<2>(quintuple);
+			app_name = std::get<3>(quintuple);
+			n_files = std::get<4>(quintuple);
         	#ifdef CAPIOLOG
 			logfile << "creating file using globbing " << path << std::endl;
 			logfile << "committed " << committed << " mode " << mode << std::endl;
 			#endif
-			files_metadata[path] = std::make_tuple(p_shm, p_shm_size, file_initial_size, true, Capio_file(committed, mode, is_dir), 0);
-			metadata_conf[path] = std::make_tuple(committed, mode, app_name);
+			files_metadata[path] = std::make_tuple(p_shm, p_shm_size, file_initial_size, true, Capio_file(committed, mode, is_dir, n_files), 0);
+			metadata_conf[path] = std::make_tuple(committed, mode, app_name, n_files);
 		}
 	}
 	else {
 		committed = std::get<0>(it->second);
 		mode = std::get<1>(it->second);
+		n_files = std::get<3>(it->second);
         #ifdef CAPIOLOG
 		logfile << "creating file " << path << std::endl;
 		logfile << "committed " << committed << " mode " << mode << std::endl;
 		#endif
-		files_metadata[path] = std::make_tuple(p_shm, p_shm_size, file_initial_size, true, Capio_file(committed, mode, is_dir), 0);
+		files_metadata[path] = std::make_tuple(p_shm, p_shm_size, file_initial_size, true, Capio_file(committed, mode, is_dir, n_files), 0);
 	}
 }
 
@@ -580,30 +583,19 @@ void write_entry_dir(int tid, std::string file_path, std::string dir, int type) 
 		std::string committed = c_file.get_committed();
 		int pid = pids[tid];
 		writers[pid][dir] = true;
-		int n_committed;
-		try {
-			n_committed = std::stoi(committed);
+		#ifdef CAPIOLOG
+		logfile << "nfiles in dir " << dir << " " << c_file.n_files << std::endl;
+		#endif
+		if (c_file.n_files == c_file.n_files_expected) {
 			#ifdef CAPIOLOG
-			logfile << "nfiles in dir " << dir << " " << c_file.n_files << std::endl;
+			logfile << "dir completed " << std::endl;
 			#endif
-			if (c_file.n_files == n_committed) {
-				#ifdef CAPIOLOG
-				logfile << "dir completed " << std::endl;
-				#endif
-				c_file.complete = true;
-			}
-		}
-		catch (const std::exception& e) {
-			#ifdef CAPIOLOG
-			logfile << "exception write entry: " << e.what() << std::endl;
-			logfile << "committed " << committed << std::endl;
-			#endif
+			c_file.complete = true;
 		}
 
-			#ifdef CAPIOLOG
+		#ifdef CAPIOLOG
 		c_file.print(logfile);
-
-			#endif
+		#endif
 }
 
 void update_dir(int tid, std::string file_path, int rank) {
@@ -967,7 +959,7 @@ void handle_local_read(int tid, int fd, off64_t count, bool dir, bool is_getdent
 		off64_t nreads;
 		std::string committed = c_file.get_committed();
 		std::string mode = c_file.get_mode();
-		if (mode != "append" && !c_file.complete && !dir && !writer && !is_prod) {
+		if (mode != "append" && !c_file.complete && !writer && !is_prod) {
 			#ifdef CAPIOLOG
 			logfile << "add pending reads 1" << std::endl;
 			logfile << "mode " << mode << std::endl;
@@ -979,7 +971,7 @@ void handle_local_read(int tid, int fd, off64_t count, bool dir, bool is_getdent
 		#ifdef CAPIOLOG
 		logfile << "Is the file completed? " << c_file.complete << std::endl;
 		#endif
-			if (!is_prod && !writer && !c_file.complete && !dir) {
+			if (!is_prod && !writer && !c_file.complete) {
 				#ifdef CAPIOLOG
 				logfile << "add pending reads 2" << std::endl;
 				#endif
@@ -1534,28 +1526,16 @@ void handle_exig(char* str) {
 			logfile << "committed " << c_file.get_committed() << std::endl;
 			#endif
 			if (c_file.is_dir()) {
-				std::string committed = c_file.get_committed();
-				int n_committed;
-				try {
-					n_committed = std::stoi(committed);
+					long int n_committed = c_file.n_files_expected;
 					#ifdef CAPIOLOG
 					logfile << "nfiles in dir " << path << " " << c_file.n_files << std::endl;
 					#endif
-					if (n_committed > c_file.n_files) {
+					if (n_committed <= c_file.n_files) {
 						#ifdef CAPIOLOG
 						logfile << "dir " << path << " completed " << std::endl;
 						#endif
 						c_file.complete = true;
 					}
-				}
-				catch (const std::exception& e) {
-					#ifdef CAPIOLOG
-					logfile << "exception write entry: " << e.what() << std::endl;
-					logfile << "committed " << committed << std::endl;
-					logfile << "dir " << path << " completed " << std::endl;
-					#endif
-					c_file.complete = true;
-				}
 			}
 			else {
 				#ifdef CAPIOLOG
@@ -2539,22 +2519,31 @@ void parse_conf_file(std::string conf_file) {
 					logfile << " mode " << mode << std::endl;
 					#endif
 				}
+				long int n_files;
+				error = file["n_files"].get_int64().get(n_files);
+				if (error)
+					n_files = -1;
+				else {
+					#ifdef CAPIOLOG
+					logfile << " n_files " << n_files << std::endl;
+					#endif
+				}
 				std::string path = std::string(name);
 				if (!is_absolute(path.c_str())) {
 					if (path.substr(0, 2) == "./") 
 						path = path.substr(2, path.length() - 2);
 					path = *capio_dir + "/" + path;
 				}
-				std::size_t pos = path.find('*');		
+				std::size_t pos = path.find('*');	
 				if (pos == std::string::npos) {
-					metadata_conf[path] = std::make_tuple(std::string(committed), std::string(mode), std::string(app_name));
+					metadata_conf[path] = std::make_tuple(std::string(committed), std::string(mode), std::string(app_name), n_files);
 				#ifdef CAPIOLOG
 				logfile << "path " << path << " app name " << app_name << std::endl;
 				#endif
 				}
 				else {
 					std::string prefix_str = path.substr(0, pos);
-					metadata_conf_globs.push_back(std::make_tuple(prefix_str, std::string(committed), std::string(mode), std::string(app_name))); 
+					metadata_conf_globs.push_back(std::make_tuple(prefix_str, std::string(committed), std::string(mode), std::string(app_name), n_files)); 
 				#ifdef CAPIOLOG
 				logfile << "prefix_str " << prefix_str << " app name " << app_name << std::endl;
 				#endif
