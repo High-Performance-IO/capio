@@ -435,20 +435,18 @@ void init_process(int tid) {
 }
 
 long int match_globs(std::string path) {
-	long int res;
-	bool found = false;
+	long int res = -1;
 	size_t i = 0;
-	while (i < metadata_conf_globs.size() && !found) {
+	size_t max_length_prefix = 0;
+	while (i < metadata_conf_globs.size()) {
 		std::string prefix_str = std::get<0>(metadata_conf_globs[i]);
-		if (path.compare(0, prefix_str.length(), prefix_str) == 0)
-			found = true;
+		size_t prefix_length = prefix_str.length();
+		if (path.compare(0, prefix_length, prefix_str) == 0 && prefix_length > max_length_prefix) {
+			res = i;
+			max_length_prefix = prefix_length;
+		}
 		++i;
 	}
-	if (found)
-		res = i - 1;
-	else
-		res = -1;
-
 	return res;
 }
 
@@ -476,7 +474,7 @@ void create_file(std::string path, void* p_shm, bool is_dir) {
 			n_files = std::get<4>(quintuple);
         	#ifdef CAPIOLOG
 			logfile << "creating file using globbing " << path << std::endl;
-			logfile << "committed " << committed << " mode " << mode << std::endl;
+			logfile << "committed " << committed << " mode " << mode << "app name " << app_name << std::endl;
 			#endif
 			files_metadata[path] = std::make_tuple(p_shm, p_shm_size, file_initial_size, true, Capio_file(committed, mode, is_dir, n_files), 0);
 			metadata_conf[path] = std::make_tuple(committed, mode, app_name, n_files);
@@ -2681,7 +2679,7 @@ void parse_conf_file(std::string conf_file) {
 					path = *capio_dir + "/" + path;
 				}
 				std::size_t pos = path.find('*');	
-				if (pos == std::string::npos) {
+				if (pos == std::string::npos && n_files == -1) {
 					metadata_conf[path] = std::make_tuple(std::string(committed), std::string(mode), std::string(app_name), n_files);
 				#ifdef CAPIOLOG
 				logfile << "path " << path << " app name " << app_name << std::endl;
@@ -2689,6 +2687,7 @@ void parse_conf_file(std::string conf_file) {
 				}
 				else {
 					std::string prefix_str = path.substr(0, pos);
+					// if pos == std::string::npos it means prefix_str = path
 					metadata_conf_globs.push_back(std::make_tuple(prefix_str, std::string(committed), std::string(mode), std::string(app_name), n_files)); 
 				#ifdef CAPIOLOG
 				logfile << "prefix_str " << prefix_str << " app name " << app_name << std::endl;
