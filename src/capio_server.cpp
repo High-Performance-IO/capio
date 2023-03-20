@@ -2552,7 +2552,7 @@ void* capio_helper(void* pthread_arg) {
 			#endif
 				bytes_received *= sizeof(char);
 			}
-			std::string msg = "ream " + path + + " " + std::to_string(bytes_received) + " " + std::to_string(offset) + " " + std::to_string(complete) + std::to_string(file_size);
+			std::string msg = "ream " + path + + " " + std::to_string(bytes_received) + " " + std::to_string(offset) + " " + std::to_string(complete) + " " + std::to_string(file_size);
 			const char* c_str = msg.c_str();
 			buf_requests->write(c_str, 256 * sizeof(char));
 		}
