@@ -415,6 +415,7 @@ void create_snapshot() {
 }
 
 
+//TODO: doesn't work for general paths like ../dir/../dir/../dir/file.txt
 std::string create_absolute_path(const char* pathname) {
 	char* abs_path = (char*) malloc(sizeof(char) * PATH_MAX);
 	if (*current_dir != *capio_dir) {
@@ -448,6 +449,8 @@ std::string create_absolute_path(const char* pathname) {
 				return path;
 			}
 		}
+		if (path[0] != '.' && path[0] != '/')
+			return *current_dir + "/" + path;
 		
 	}
 	std::string path(pathname);
@@ -496,6 +499,7 @@ std::string create_absolute_path(const char* pathname) {
 			free(pathname_copy);
 		}
 		else {
+
 			free(pathname_copy);
 			return "";
 		}
@@ -1882,6 +1886,12 @@ ssize_t capio_getdents(int fd, void *buffer, size_t count, bool is_getdents64) {
 		return -2;
 	}
 }
+
+/*
+ * chdir could be done to a CAPIO dir that is not present in the filesystem.
+ * For this reason if chdir is done to a CAPIO directory we don't give control
+ * to the kernel.
+ */
 
 int capio_chdir(const char* path) { //TODO: refactor, path check similar to open_at
 	std::string path_to_check;
