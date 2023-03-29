@@ -1716,27 +1716,15 @@ void handle_exig(char* str, int rank) {
 
 void handle_local_stat(int tid, std::string path) {
 	off64_t file_size;
-        #ifdef CAPIOLOG
-        logfile << "stat debug local 1" << std::endl;
-        #endif
 	auto it = files_metadata.find(path);
 	Capio_file& c_file = std::get<4>(it->second);
-        #ifdef CAPIOLOG
-        logfile << "stat debug local 2" << std::endl;
-        #endif
 	file_size = c_file.get_file_size();
 	off64_t is_dir;
 	if (c_file.is_dir())
 		is_dir = 0;
 	else
 		is_dir = 1;
-        #ifdef CAPIOLOG
-        logfile << "stat debug local 3" << std::endl;
-        #endif
 	response_buffers[tid]->write(&file_size);
-        #ifdef CAPIOLOG
-        logfile << "stat debug local 4" << std::endl;
-        #endif
 	response_buffers[tid]->write(&is_dir);
 	#ifdef CAPIOLOG
 		logfile << "file size handle local stat : " << file_size << std::endl;
@@ -1808,22 +1796,10 @@ void* wait_for_stat(void* pthread_arg) {
 
 void reply_stat(int tid, std::string path, int rank) {
 	char* p_shm;
-        #ifdef CAPIOLOG
-        logfile << "stat debug 0" << std::endl;
-        #endif
 	if (files_location.find(path) == files_location.end()) {
-        #ifdef CAPIOLOG
-        logfile << "stat debug 1" << std::endl;
-        #endif
 		check_remote_file("files_location.txt", rank, path);
 
-        #ifdef CAPIOLOG
-        logfile << "stat debug 2" << std::endl;
-        #endif
 		if (files_location.find(path) == files_location.end()) {
-        #ifdef CAPIOLOG
-        logfile << "stat debug 3" << std::endl;
-        #endif
 			//if it is in configuration file then wait otherwise fails
 			
 //std::unordered_map<std::string, std::tuple<std::string, std::string>> metadata_conf;
@@ -1850,22 +1826,13 @@ void reply_stat(int tid, std::string path, int rank) {
 			return;
 		}
 	}
-        #ifdef CAPIOLOG
-        logfile << "stat debug 4" << std::endl;
-        #endif
 
 	if (files_metadata.find(path) == files_metadata.end()) {
 		create_file(path, nullptr, false);
 	}
 
-        #ifdef CAPIOLOG
-        logfile << "stat debug 5" << std::endl;
-        #endif
 	Capio_file& c_file = std::get<4>(files_metadata[path]);
 	std::string mode = c_file.get_mode();
-        #ifdef CAPIOLOG
-        logfile << "stat debug 6" << std::endl;
-        #endif
 	if (strcmp(files_location[path], node_name) == 0 || mode == "append") {
 		handle_local_stat(tid, path);
 	}
