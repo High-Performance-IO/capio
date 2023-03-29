@@ -1089,8 +1089,11 @@ ssize_t capio_writev(int fd, const struct iovec* iov, int iovcnt) {
 		ssize_t res = 0;
 		int i = 0;
 		while (i < iovcnt && res >= 0) {
-			res = capio_write(fd, iov[i].iov_base, iov[i].iov_len);
-			tot_bytes += res;
+			size_t iov_len = iov[i].iov_len;
+			if (iov_len != 0) {
+				res = capio_write(fd, iov[i].iov_base, iov[i].iov_len);
+				tot_bytes += res;
+			}
 			++i;
 		}
 		if (res == -1)

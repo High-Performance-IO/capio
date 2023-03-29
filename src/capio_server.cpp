@@ -146,13 +146,14 @@ std::unordered_map<int, std::pair<SPSC_queue<char>*, SPSC_queue<char>*>> data_bu
  */
 std::unordered_map<std::string, std::tuple<void*, off64_t, off64_t, bool, Capio_file, off64_t>> files_metadata;
 
-// path -> (committed, mode, app_name)
+// path -> (committed, mode, app_name, n_files)
 
 std::unordered_map<std::string, std::tuple<std::string, std::string, std::string, long int>> metadata_conf;
 
-// [(glob, committed, mode, app_name), (glob, committed, mode, app_name), ...]
+// [(glob, committed, mode, app_name, n_files), (glob, committed, mode, app_name, n_files), ...]
 
 std::vector<std::tuple<std::string, std::string, std::string, std::string, long int>> metadata_conf_globs;
+
 /*
  * pid -> pathname -> bool
  * Different thread with the same pid are threated as a single writer
@@ -450,11 +451,17 @@ long int match_globs(std::string path) {
 	return res;
 }
 
+bool in_dir(std::string path, std::string glob) {
+		size_t res = path.find("/", glob.length() - 1);
+		return res != std::string::npos;
+}
+
 void create_file(std::string path, void* p_shm, bool is_dir) {
 	std::string shm_name = path;
 	std::replace(shm_name.begin(), shm_name.end(), '/', '_');
 	shm_name = shm_name.substr(1);
 	off64_t p_shm_size = 0;
+	off64_t init_size = file_initial_size;
 	std::string committed, mode, app_name;
 	long int n_files;
 	auto it = metadata_conf.find(path);
@@ -464,19 +471,37 @@ void create_file(std::string path, void* p_shm, bool is_dir) {
         #ifdef CAPIOLOG
 		logfile << "creating file withtout conf file " << path << std::endl;
 		#endif
-			files_metadata[path] = std::make_tuple(p_shm, p_shm_size, file_initial_size, true, Capio_file(is_dir), 0);
+			if (is_dir) {
+				init_size = dir_initial_size;
+			}
+			if (p_shm == nullptr) {
+				p_shm = new char[init_size];
+			}
+			files_metadata[path] = std::make_tuple(p_shm, p_shm_size, init_size, true, Capio_file(is_dir), 0);
 		}
 		else {
 			auto& quintuple = metadata_conf_globs[pos];
+			std::string glob = std::get<0>(quintuple);
 			committed = std::get<1>(quintuple);
 			mode = std::get<2>(quintuple);
 			app_name = std::get<3>(quintuple);
 			n_files = std::get<4>(quintuple);
         	#ifdef CAPIOLOG
 			logfile << "creating file using globbing " << path << std::endl;
-			logfile << "committed " << committed << " mode " << mode << "app name " << app_name << std::endl;
+			logfile << "committed " << committed << " mode " << mode << "app name " << app_name << " nfiles " << n_files <<  std::endl;
 			#endif
-			files_metadata[path] = std::make_tuple(p_shm, p_shm_size, file_initial_size, true, Capio_file(committed, mode, is_dir, n_files), 0);
+			if (in_dir(path, glob)) {
+				n_files = 0;
+			}
+
+			if (n_files > 0) {
+				init_size = dir_initial_size;
+				is_dir = true;
+			}
+			if (p_shm == nullptr) {
+				p_shm = new char[init_size];
+			}
+			files_metadata[path] = std::make_tuple(p_shm, p_shm_size, init_size, true, Capio_file(committed, mode, is_dir, n_files), 0);
 			metadata_conf[path] = std::make_tuple(committed, mode, app_name, n_files);
 		}
 	}
@@ -488,7 +513,16 @@ void create_file(std::string path, void* p_shm, bool is_dir) {
 		logfile << "creating file " << path << std::endl;
 		logfile << "committed " << committed << " mode " << mode << std::endl;
 		#endif
-		files_metadata[path] = std::make_tuple(p_shm, p_shm_size, file_initial_size, true, Capio_file(committed, mode, is_dir, n_files), 0);
+		if (n_files > 0) {
+			is_dir = true;
+			init_size = dir_initial_size;
+		}
+
+		if (p_shm == nullptr) {
+			p_shm = new char[init_size];
+		}
+
+		files_metadata[path] = std::make_tuple(p_shm, p_shm_size, init_size, true, Capio_file(committed, mode, is_dir, n_files), 0);
 	}
 }
 
@@ -514,6 +548,38 @@ void reply_remote_stats(std::string path) {
 		}
 		clients_remote_pending_stat.erase(path);
 	}
+}
+
+void handle_pending_remote_reads(std::string path, off64_t data_size, bool complete) {
+        auto it_client = clients_remote_pending_reads.find(path);
+        if (it_client !=  clients_remote_pending_reads.end()) {
+	std::list<std::tuple<size_t, size_t, sem_t*>>::iterator it_list, prev_it_list;
+	it_list = it_client->second.begin();
+                while (it_list != it_client->second.end()) {
+                        off64_t offset = std::get<0>(*it_list);
+                        off64_t nbytes = std::get<1>(*it_list);
+                        sem_t* sem = std::get<2>(*it_list);
+        #ifdef CAPIOLOG
+        logfile << "handle serving remote pending reads inside the loop" << std::endl;
+        #endif
+                        if (complete || (offset + nbytes < data_size)) {
+                                sem_post(sem);
+                                if (it_list == it_client->second.begin()) {
+                                        it_client->second.erase(it_list);
+                                        it_list = it_client->second.begin();
+                                }
+                                else {
+                                        it_client->second.erase(it_list);
+                                        it_list = std::next(prev_it_list);
+                                }
+                        }
+                        else {
+                                prev_it_list = it_list;
+                                ++it_list;
+                        }
+                }
+	}
+		return;
 }
 
 /*
@@ -600,7 +666,7 @@ void write_entry_dir(int tid, std::string file_path, std::string dir, int type) 
 		int pid = pids[tid];
 		writers[pid][dir] = true;
 			#ifdef CAPIOLOG
-			logfile << "nfiles in dir " << dir << " " << c_file.n_files << std::endl;
+			logfile << "nfiles in dir " << dir << " " << c_file.n_files << " " << c_file.n_files_expected << std::endl;
 			#endif
 		if (c_file.n_files == c_file.n_files_expected) {
 				#ifdef CAPIOLOG
@@ -609,7 +675,13 @@ void write_entry_dir(int tid, std::string file_path, std::string dir, int type) 
 			c_file.complete = true;
 			reply_remote_stats(dir);
 		}
-
+	std::string mode = c_file.get_mode();	
+	if (mode == "append") {
+        #ifdef CAPIOLOG
+        logfile << "write entry serving remote reads" << std::endl;
+        #endif
+		handle_pending_remote_reads(dir, data_size, c_file.complete);
+	}
 			#ifdef CAPIOLOG
 		c_file.print(logfile);
 
@@ -652,17 +724,18 @@ void handle_open(char* str, char* p, int rank, bool is_creat) {
 	std::string path(path_cstr);
 	//int index = *caching_info[tid].second;
 	//caching_info[tid].first[index] = fd;
-	if (on_disk.find(path) == on_disk.end()) {
+	//if (on_disk.find(path) == on_disk.end()) {
 		std::string shm_name = path;
 		std::replace(shm_name.begin(), shm_name.end(), '/', '_');
 		shm_name = shm_name.substr(1);
 		p_shm = new char[file_initial_size];
 		//caching_info[tid].first[index + 1] = 0;
-	}
-	else {
+	//}
+	/*else {
 		p_shm = nullptr;
 		//caching_info[tid].first[index + 1] = 1;
 	}
+	*/
 		//TODO: check the size that the user wrote in the configuration file
 	off64_t* p_offset = (off64_t*) create_shm("offset_" + std::to_string(tid) + "_" + std::to_string(fd), sizeof(off64_t));
 	processes_files[tid][fd] = std::make_tuple(p_shm, p_offset);//TODO: what happens if a process open the same file twice?
@@ -693,7 +766,6 @@ void handle_open(char* str, char* p, int rank, bool is_creat) {
         write_file_location("files_location.txt", rank, path);
 		update_dir(tid, path, rank);
 	}
-
 }
 
 void send_data_to_client(int tid, char* buf, long int count) {
@@ -770,37 +842,7 @@ struct handle_write_metadata{
 
 
 
-void handle_pending_remote_reads(std::string path, off64_t data_size, bool complete) {
-        auto it_client = clients_remote_pending_reads.find(path);
-        if (it_client !=  clients_remote_pending_reads.end()) {
-	std::list<std::tuple<size_t, size_t, sem_t*>>::iterator it_list, prev_it_list;
-	it_list = it_client->second.begin();
-                while (it_list != it_client->second.end()) {
-                        off64_t offset = std::get<0>(*it_list);
-                        off64_t nbytes = std::get<1>(*it_list);
-                        sem_t* sem = std::get<2>(*it_list);
-        #ifdef CAPIOLOG
-        logfile << "handle serving remote pending reads inside the loop" << std::endl;
-        #endif
-                        if (complete || (offset + nbytes < data_size)) {
-                                sem_post(sem);
-                                if (it_list == it_client->second.begin()) {
-                                        it_client->second.erase(it_list);
-                                        it_list = it_client->second.begin();
-                                }
-                                else {
-                                        it_client->second.erase(it_list);
-                                        it_list = std::next(prev_it_list);
-                                }
-                        }
-                        else {
-                                prev_it_list = it_list;
-                                ++it_list;
-                        }
-                }
-	}
-		return;
-}
+
 
 void handle_write(const char* str, int rank) {
         //check if another process is waiting for this data
@@ -1403,7 +1445,7 @@ void delete_file(std::string path, int rank) {
 	delete_from_file_locations(path, rank);
 	//free(files_location[path]);
 	files_location.erase(path);
-	on_disk.erase(path);
+	//on_disk.erase(path);
    	for (auto& pair : writers) {
 		auto& files = pair.second;	
 		files.erase(path);
@@ -1674,15 +1716,27 @@ void handle_exig(char* str, int rank) {
 
 void handle_local_stat(int tid, std::string path) {
 	off64_t file_size;
+        #ifdef CAPIOLOG
+        logfile << "stat debug local 1" << std::endl;
+        #endif
 	auto it = files_metadata.find(path);
 	Capio_file& c_file = std::get<4>(it->second);
+        #ifdef CAPIOLOG
+        logfile << "stat debug local 2" << std::endl;
+        #endif
 	file_size = c_file.get_file_size();
 	off64_t is_dir;
 	if (c_file.is_dir())
 		is_dir = 0;
 	else
 		is_dir = 1;
+        #ifdef CAPIOLOG
+        logfile << "stat debug local 3" << std::endl;
+        #endif
 	response_buffers[tid]->write(&file_size);
+        #ifdef CAPIOLOG
+        logfile << "stat debug local 4" << std::endl;
+        #endif
 	response_buffers[tid]->write(&is_dir);
 	#ifdef CAPIOLOG
 		logfile << "file size handle local stat : " << file_size << std::endl;
@@ -1739,7 +1793,8 @@ void* wait_for_stat(void* pthread_arg) {
 	//check if the file is local or remote
 
 	Capio_file& c_file = std::get<4>(files_metadata[path]);
-	if (strcmp(files_location[path_to_check], node_name) == 0) {
+	std::string mode = c_file.get_mode();
+	if (strcmp(files_location[path_to_check], node_name) == 0 || mode == "append") {
 		handle_local_stat(tid, path);
 	}
 	else {
@@ -1753,9 +1808,22 @@ void* wait_for_stat(void* pthread_arg) {
 
 void reply_stat(int tid, std::string path, int rank) {
 	char* p_shm;
+        #ifdef CAPIOLOG
+        logfile << "stat debug 0" << std::endl;
+        #endif
 	if (files_location.find(path) == files_location.end()) {
+        #ifdef CAPIOLOG
+        logfile << "stat debug 1" << std::endl;
+        #endif
 		check_remote_file("files_location.txt", rank, path);
+
+        #ifdef CAPIOLOG
+        logfile << "stat debug 2" << std::endl;
+        #endif
 		if (files_location.find(path) == files_location.end()) {
+        #ifdef CAPIOLOG
+        logfile << "stat debug 3" << std::endl;
+        #endif
 			//if it is in configuration file then wait otherwise fails
 			
 //std::unordered_map<std::string, std::tuple<std::string, std::string>> metadata_conf;
@@ -1782,15 +1850,23 @@ void reply_stat(int tid, std::string path, int rank) {
 			return;
 		}
 	}
+        #ifdef CAPIOLOG
+        logfile << "stat debug 4" << std::endl;
+        #endif
 
 	if (files_metadata.find(path) == files_metadata.end()) {
-		p_shm = new char[file_initial_size];
-		create_file(path, p_shm, false);
+		create_file(path, nullptr, false);
 	}
 
+        #ifdef CAPIOLOG
+        logfile << "stat debug 5" << std::endl;
+        #endif
 	Capio_file& c_file = std::get<4>(files_metadata[path]);
-
-	if (strcmp(files_location[path], node_name) == 0) {
+	std::string mode = c_file.get_mode();
+        #ifdef CAPIOLOG
+        logfile << "stat debug 6" << std::endl;
+        #endif
+	if (strcmp(files_location[path], node_name) == 0 || mode == "append") {
 		handle_local_stat(tid, path);
 	}
 	else {
@@ -2376,7 +2452,6 @@ void helper_stat_req(const char* buf_recv) {
 	logfile << "helper stat req 1" << std::endl;
 	#endif
 	if (c_file.complete) {
-
 	#ifdef CAPIOLOG
 	logfile << "helper stat req 3" << std::endl;
 	#endif
@@ -2396,9 +2471,9 @@ void helper_stat_req(const char* buf_recv) {
 	#ifdef CAPIOLOG
 	logfile << "helper stat req 6" << std::endl;
 	#endif
-				rr_metadata->c_file = &c_file;
-				rr_metadata->dest = dest;
-				rr_metadata->sem = (sem_t*) malloc(sizeof(sem_t));
+	rr_metadata->c_file = &c_file;
+	rr_metadata->dest = dest;
+	rr_metadata->sem = (sem_t*) malloc(sizeof(sem_t));
 	#ifdef CAPIOLOG
 	logfile << "helper stat req 7" << std::endl;
 	#endif
