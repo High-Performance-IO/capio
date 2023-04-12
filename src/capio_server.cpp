@@ -95,6 +95,8 @@ long int total_bytes_shm = 0;
 off64_t PREFETCH_DATA_SIZE = 0;
 
 MPI_Request req;
+int n_servers;
+int fd_files_location;
 
 /*
  * For multithreading:
@@ -102,6 +104,7 @@ MPI_Request req;
  */
 
 std::unordered_map<int, int> pids;
+
 
 // tid -> application name 
 std::unordered_map<int, std::string> apps;
@@ -268,18 +271,14 @@ void catch_sigterm() {
 	}
 }
 
-void write_file_location(const std::string& file_name, int rank, std::string path_to_write) {
-        #ifdef CAPIOLOG
-        logfile << "write file location before, file_name " << file_name << std::endl;
-        #endif
+void write_file_location(int rank, std::string path_to_write, int tid) {
+    #ifdef CAPIOLOG
+    logfile << "write file location before, tid " << tid << std::endl;
+    #endif
     struct flock lock;
     memset(&lock, 0, sizeof(lock));
-    int fd;
-    if ((fd = open(file_name.c_str(), O_WRONLY|O_APPEND, 0664)) == -1) {
-        logfile << "writer " << rank << " error opening file, errno = " << errno << " strerror(errno): " << strerror(errno) << std::endl;
-        MPI_Finalize();
-        exit(1);
-    }
+
+    int fd = fd_files_location;
     // lock in exclusive mode
     lock.l_type = F_WRLCK;
     // lock entire file
@@ -291,6 +290,7 @@ void write_file_location(const std::string& file_name, int rank, std::string pat
     if (fcntl(fd, F_SETLKW, &lock) == -1) { // F_SETLK doesn't block, F_SETLKW does
         logfile << "write " << rank << "failed to lock the file" << std::endl;
     }
+
     
 	const char* path_to_write_cstr = path_to_write.c_str();
 	const char* space_str = " ";
@@ -313,20 +313,28 @@ void write_file_location(const std::string& file_name, int rank, std::string pat
     if (fcntl(fd, F_SETLKW, &lock) == - 1) {
         logfile << "write " << rank << "failed to unlock the file" << std::endl;
     }
+
 	free(file_location);
-    close(fd); // close the file: would unlock if needed
+    //close(fd); // close the file: would unlock if needed
         #ifdef CAPIOLOG
         logfile << "write file location after" << std::endl;
         #endif
 	return;
 }
 
-bool check_remote_file(const std::string& file_name, int rank, std::string path_to_check) {
+/*
+ * Returns 0 if the file "file_name" does not exists
+ * Returns 1 if the location of the file path_to_check is found
+ * Returns 2 otherwise
+ *
+*/
+
+int check_file_location(const std::string& file_name, int rank, std::string path_to_check) {
     FILE * fp;
     char * line = NULL;
     size_t len = 0;
     ssize_t read;
-    bool res = true;
+    int res = 1;
     struct flock lock;
     memset(&lock, 0, sizeof(lock));
     lock.l_type = F_RDLCK;    /* shared lock for read*/
@@ -339,14 +347,13 @@ bool check_remote_file(const std::string& file_name, int rank, std::string path_
     //fd = open(file_name.c_str(), O_RDONLY);  /* -1 signals an error */
     fp = fopen(file_name.c_str(), "r");
 	if (fp == NULL) {
-		logfile << "capio server " << rank << " failed to open the location file" << std::endl;
-		return false;
+		return 0;
 	}
 	fd = fileno(fp);
     if (fcntl(fd, F_SETLKW, &lock) < 0) {
         logfile << "capio server " << rank << " failed to lock the file" << std::endl;
         close(fd);
-        return false;
+        exit(1);
     }
 	const char* path_to_check_cstr = path_to_check.c_str();
 	bool found = false;
@@ -379,15 +386,29 @@ bool check_remote_file(const std::string& file_name, int rank, std::string path_
 		}
 		//check if the file is present
     }
-	res = found;
+	if (found)
+		res = 1;
+	else 
+		res = 2;
     /* Release the lock explicitly. */
     lock.l_type = F_UNLCK;
     if (fcntl(fd, F_SETLK, &lock) < 0) {
         logfile << "reader " << rank << " failed to unlock the file" << std::endl;
-        res = false;
+        exit(1);
     }
-    fclose(fp);
     return res;
+}
+
+bool check_file_location(int my_rank, std::string path_to_check) {
+	bool found = false;
+	int rank = 0, res = -1;
+	while (!found && rank < n_servers) {
+		std::string rank_str = std::to_string(rank);
+		res = check_file_location("files_location_" + rank_str + ".txt", my_rank, path_to_check);
+		found = res == 1;
+		++rank;
+	}
+	return found;
 }
 
 void flush_file_to_disk(int tid, int fd) {
@@ -428,6 +449,7 @@ void init_process(int tid) {
 		data_buffers.insert({tid, {write_data_cb, read_data_cb}});
 		//caching_info[tid].first = (int*) get_shm("caching_info" + std::to_string(tid));
 		//caching_info[tid].second = (int*) get_shm("caching_info_size" + std::to_string(tid));
+		
 	}
 	#ifdef CAPIOLOG
 	logfile << "end init process tid " << std::to_string(tid) << std::endl;
@@ -688,6 +710,18 @@ void write_entry_dir(int tid, std::string file_path, std::string dir, int type) 
 			#endif
 }
 
+void open_files_metadata(int rank) {
+	std::string rank_str = std::to_string(rank);
+	std::string file_name = "files_location_" + rank_str + ".txt";
+	int fd;
+    if ((fd = open(file_name.c_str(), O_WRONLY|O_APPEND|O_CREAT, 0664)) == -1) {
+        logfile << "writer error opening file, errno = " << errno << " strerror(errno): " << strerror(errno) << std::endl;
+        MPI_Finalize();
+        exit(1);
+    }
+    fd_files_location = fd;
+}
+
 void update_dir(int tid, std::string file_path, int rank) {
 	std::string dir = get_parent_dir_path(file_path);
         #ifdef CAPIOLOG
@@ -695,7 +729,7 @@ void update_dir(int tid, std::string file_path, int rank) {
         #endif
     if (std::get<3>(files_metadata[dir])) {
 		std::get<3>(files_metadata[dir]) = false;
-        write_file_location("files_location.txt", rank, dir);
+        write_file_location(rank, dir, tid);
 	}
         #ifdef CAPIOLOG
         logfile << "before write entry dir" << std::endl;
@@ -763,7 +797,7 @@ void handle_open(char* str, char* p, int rank, bool is_creat) {
 
     if (std::get<3>(files_metadata[path]) && is_creat) {
 		std::get<3>(files_metadata[path]) = false;
-        write_file_location("files_location.txt", rank, path);
+        write_file_location(rank, path, tid);
 		update_dir(tid, path, rank);
 	}
 }
@@ -839,16 +873,11 @@ struct handle_write_metadata{
 };
 
 
-
-
-
-
-
 void handle_write(const char* str, int rank) {
         //check if another process is waiting for this data
         std::string request;
         int tid, fd;
-		off_t base_offset;
+	off_t base_offset;
         off64_t count, data_size;
         std::istringstream stream(str);
         stream >> request >> tid >> fd >> base_offset >> count;
@@ -917,7 +946,7 @@ void handle_write(const char* str, int rank) {
         #endif
         if (std::get<3>(files_metadata[path])) {
 			std::get<3>(files_metadata[path]) = false;
-            write_file_location("files_location.txt", rank, path);
+            write_file_location(rank, path, tid);
 			//TODO: it works only if there is one prod per file
 			update_dir(tid, path, rank);
         }
@@ -1168,20 +1197,6 @@ struct wait_for_file_metadata{
 };
 
 void loop_check_files_location(std::string path_to_check, int rank) {
-	//check if the data is created
-	FILE* fp;
-	bool found = false;
-	char * line = NULL;
-    size_t len = 0;
-    ssize_t read;
-    struct flock lock;
-    memset(&lock, 0, sizeof(lock));
-    lock.l_type = F_RDLCK;    /* shared lock for read*/
-    lock.l_whence = SEEK_SET; /* base for seek offsets */
-    lock.l_start = 0;         /* 1st byte in file */
-    lock.l_len = 0;           /* 0 here means 'until EOF' */
-    lock.l_pid = getpid();    /* process id */
-    int fd_locations; /* file descriptor to identify a file within a process */
 	
 	#ifdef CAPIOLOG
 	logfile << "wait for file before" << std::endl;
@@ -1192,59 +1207,15 @@ void loop_check_files_location(std::string path_to_check, int rank) {
 	struct timespec sleepTime, returnTime;
     sleepTime.tv_sec = 0;
     sleepTime.tv_nsec = 200000;
+	bool found = false;
 	while (!found) {
 		nanosleep(&sleepTime, &returnTime);
-		int tot_chars = 0;
-    		fp = fopen("files_location.txt", "r");
-		if (fp == NULL) {
-			logfile << "error fopen files_location.txt" << std::endl;
-			exit(1);
-		}
-		fd_locations = fileno(fp);
-		if (fcntl(fd_locations, F_SETLKW, &lock) < 0) {
-			err_exit("error fcntl files_location.txt");
-			exit(1);
-    	}
-		fseek(fp, tot_chars, SEEK_SET);
-
-        while ((read = getline(&line, &len, fp)) != -1 && !found) {
-			if (line[0] == '0')
-				continue;
-			tot_chars += read;
-			char path[1024]; //TODO: heap memory
-			int i = 0;
-			while(line[i] != ' ') {
-					path[i] = line[i];
-					++i;
-			}
-			path[i] = '\0';
-			char node_str[1024]; //TODO: heap memory 
-			++i;
-			int j = 0;
-			while(line[i] != '\n') {
-					node_str[j] = line[i];
-					++i;
-					++j;
-			}
-			node_str[j] = '\0';
-			if (strcmp(path, path_to_check_cstr) == 0) {
-    #ifdef CAPIOLOG
-    	logfile << "loop_check_files_location writing " << path_to_check << " " << node_str << std::endl;
-    #endif
-				if (files_location.find(path_to_check) == files_location.end()) {
-					files_location[path_to_check] = (char*) malloc(sizeof(node_str) + 1); //TODO:free the memory
-					strcpy(files_location[path_to_check], node_str);
-				}
-				found = true;
-			}
-		}
-		/* Release the lock explicitly. */
-		lock.l_type = F_UNLCK;
-		if (fcntl(fd_locations, F_SETLK, &lock) < 0) {
-			logfile << "reader " << rank << " failed to unlock the file" << std::endl;
-		}
-		fclose(fp);
+		found = check_file_location(rank, path_to_check);
 	}
+
+	#ifdef CAPIOLOG
+	logfile << "wait for file after" << std::endl;
+	#endif
 }
 
 void* wait_for_file(void* pthread_arg) {
@@ -1327,7 +1298,7 @@ void handle_read(char* str, int rank, bool dir, bool is_getdents) {
 	std::string path = processes_files_metadata[tid][fd];
 	bool is_prod = is_producer(tid, path);
 	if (files_location.find(path) == files_location.end() && !is_prod) {
-		check_remote_file("files_location.txt", rank, processes_files_metadata[tid][fd]);
+		check_file_location(rank, processes_files_metadata[tid][fd]);
 		if (files_location.find(path) == files_location.end()) {
 			//launch a thread that checks when the file is created
 			pthread_t t;
@@ -1358,12 +1329,19 @@ void handle_read(char* str, int rank, bool dir, bool is_getdents) {
 	}
 }
 
-void delete_from_file_locations(std::string path_name, int rank) {
+/*
+ * Returns 0 if the file "file_name" does not exists
+ * Returns 1 if the location of the file path_to_check is found
+ * Returns 2 otherwise
+ *
+*/
+
+int delete_from_file_locations(std::string file_name, std::string path_to_remove, int rank) {
     FILE * fp;
     char * line = NULL;
     size_t len = 0;
     ssize_t read = 0;
-    bool res = true;
+    int res = 0;
     struct flock lock;
     memset(&lock, 0, sizeof(lock));
     lock.l_type = F_WRLCK;    /* shared lock for read*/
@@ -1374,18 +1352,18 @@ void delete_from_file_locations(std::string path_name, int rank) {
 
     int fd; /* file descriptor to identify a file within a process */
     //fd = open(file_name.c_str(), O_RDONLY);  /* -1 signals an error */
-    fp = fopen("files_location.txt", "r+");
+    fp = fopen(file_name.c_str(), "r+");
 	if (fp == NULL) {
 		logfile << "capio server " << rank << " failed to open the location file" << std::endl;
-		return;
+		return 0;
 	}
 	fd = fileno(fp);
     if (fcntl(fd, F_SETLKW, &lock) < 0) {
         logfile << "capio server " << rank << " failed to lock the file" << std::endl;
         close(fd);
-        return;
+        exit(1);
     }
-	const char* path_to_check_cstr = path_name.c_str();
+	const char* path_to_check_cstr = path_to_remove.c_str();
 	bool found = false;
 	long byte = 0;
     while (read != -1 && !found) {
@@ -1419,19 +1397,32 @@ void delete_from_file_locations(std::string path_name, int rank) {
 	if (found) {
 		char del_char = '0';
 		fseek(fp, byte, SEEK_SET);
-		fwrite(&del_char, sizeof(char), 1, fp); 	
+		fwrite(&del_char, sizeof(char), 1, fp); 
+		res = 1;	
     	#ifdef CAPIOLOG
-    		logfile << "deleting line" << path_name << std::endl;
+    		logfile << "deleting line" << path_to_remove << std::endl;
     	#endif
 	}
+	else
+		res = 2;
     /* Release the lock explicitly. */
     lock.l_type = F_UNLCK;
     if (fcntl(fd, F_SETLK, &lock) < 0) {
         logfile << "reader " << rank << " failed to unlock the file" << std::endl;
-        res = false;
     }
     fclose(fp);
-    return;
+    return res;
+}
+
+void delete_from_file_locations(std::string path_to_remove, int my_rank) { 
+	bool found = false;
+	int rank = 0, res = -1;
+	while (!found && rank < n_servers) {
+		std::string rank_str = std::to_string(rank);
+		res = delete_from_file_locations("files_location_" + rank_str + ".txt", path_to_remove, my_rank);
+		found = res == 1;
+		++rank;
+	}
 }
 
 void delete_file(std::string path, int rank) {
@@ -1797,8 +1788,7 @@ void* wait_for_stat(void* pthread_arg) {
 void reply_stat(int tid, std::string path, int rank) {
 	char* p_shm;
 	if (files_location.find(path) == files_location.end()) {
-		check_remote_file("files_location.txt", rank, path);
-
+		check_file_location(rank, path);
 		if (files_location.find(path) == files_location.end()) {
 			//if it is in configuration file then wait otherwise fails
 			
@@ -1946,7 +1936,7 @@ off64_t create_dir(int tid, const char* pathname, int rank, bool root_dir) {
 		create_file(pathname, p_shm, true);	
 		if (std::get<3>(files_metadata[pathname])) {
 			std::get<3>(files_metadata[pathname]) = false;
-            write_file_location("files_location.txt", rank, pathname);
+            write_file_location(rank, pathname, tid);
 			//TODO: it works only if there is one prod per file
 			if (!root_dir) {
 				update_dir(tid, pathname, rank);
@@ -2044,7 +2034,7 @@ void handle_rename(const char* str, int rank) {
 
 	//TODO: streaming + renaming?
 	
-    write_file_location("files_location.txt", rank, newpath);
+    write_file_location(rank, newpath, tid);
 	//TODO: remove from files_location oldpath
 }
 
@@ -2151,23 +2141,22 @@ void read_next_msg(int rank) {
 }
 
 void clean_files_location() {
-	int fd;
-	if ((fd = open("files_location.txt", O_CREAT|O_TRUNC, 0664)) == -1) {
-		err_exit("open files_location");
-	}
-	
-	if (close(fd) == -1) {
-		logfile << "impossible close the file files_location" << std::endl;
+	int res = 0;
+	std::string file_name;
+	for (int rank = 0; rank < n_servers; ++rank) {
+		std::string rank_str = std::to_string(rank);
+		file_name = "files_location_" + rank_str + ".txt";
+		res = remove(file_name.c_str());
 	}
 }
 
-void handshake_servers(int rank, int size) {
+void handshake_servers(int rank) {
 	char* buf;	
 	buf = (char*) malloc(MPI_MAX_PROCESSOR_NAME * sizeof(char));
 	if (rank == 0) {
 		clean_files_location();
 	}
-	for (int i = 0; i < size; i += 1) {
+	for (int i = 0; i < n_servers; i += 1) {
 		if (i != rank) {
 			MPI_Send(node_name, strlen(node_name), MPI_CHAR, i, 0, MPI_COMM_WORLD); //TODO: possible deadlock
 			std::fill(buf, buf + MPI_MAX_PROCESSOR_NAME, 0);
@@ -2179,11 +2168,12 @@ void handshake_servers(int rank, int size) {
 }
 
 void* capio_server(void* pthread_arg) {
-	int rank, size;
+	int rank;
 	rank = *(int*)pthread_arg;
-	MPI_Comm_size(MPI_COMM_WORLD, &size);
+	MPI_Comm_size(MPI_COMM_WORLD, &n_servers);
 	catch_sigterm();
-	handshake_servers(rank, size);
+	handshake_servers(rank);
+	open_files_metadata(rank);
 	int pid = getpid();
 	create_dir(pid, capio_dir->c_str(), rank, true); //TODO: can be a problem if a process execute readdir on capio_dir
 	buf_requests = new Circular_buffer<char>("circular_buffer", 1024 * 1024, sizeof(char) * 256);
@@ -2856,6 +2846,10 @@ int main(int argc, char** argv) {
 		perror("sem_destroy failed"); exit(res);
 	}
 	res = sem_destroy(&remote_read_sem);
+	if (res !=0) {
+		logfile << __FILE__ << ":" << __LINE__ << " - " << std::flush;
+		perror("sem_destroy failed"); exit(res);
+	}
 	if (res !=0) {
 		logfile << __FILE__ << ":" << __LINE__ << " - " << std::flush;
 		perror("sem_destroy failed"); exit(res);
