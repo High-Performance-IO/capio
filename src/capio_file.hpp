@@ -4,8 +4,7 @@
 #include <iostream>
 #include <set>
 #include <cstddef>
-
-
+#include <string.h>
 /*
  * Only the server have all the information
  * A process that only read from a file doesn't have the info on the sectors
@@ -246,6 +245,15 @@ class Capio_file {
 					return -1;
 				else 
 					return offset;
+			}
+		}
+
+		void memcpy_capio_file(char* new_p, char* old_p, off64_t new_size) {
+			for (auto& sector : sectors) {
+				off64_t lbound = sector.first;
+				off64_t ubound = sector.second;
+				off64_t sector_length = ubound - lbound;
+				memcpy(new_p + lbound, old_p + lbound, sector_length);
 			}
 		}
 
