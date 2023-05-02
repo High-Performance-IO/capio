@@ -171,8 +171,8 @@ std::vector<std::tuple<std::string, std::string, std::string, std::string, long 
 
 std::unordered_map<int, std::unordered_map<std::string, bool>> writers;
 
-// pathname -> node
-std::unordered_map<std::string, char*> files_location;
+// pathname -> (node, offset)
+std::unordered_map<std::string, std::pair<char*, long int>> files_location;
 
 // node -> rank
 std::unordered_map<std::string, int> nodes_helper_rank;
@@ -305,7 +305,8 @@ void write_file_location(int rank, std::string path_to_write, int tid) {
         logfile << "write " << rank << "failed to lock the file" << std::endl;
     }
 
-    
+	long offset = lseek(fd, 0, SEEK_CUR);
+
 	const char* path_to_write_cstr = path_to_write.c_str();
 	const char* space_str = " ";
 	const size_t len1 = strlen(path_to_write_cstr);
@@ -321,7 +322,7 @@ void write_file_location(int rank, std::string path_to_write, int tid) {
     #ifdef CAPIOLOG
     	logfile << "file_location writing " << path_to_write << " " << file_location << std::endl;
     #endif
-	files_location[path_to_write] = node_name;
+	files_location[path_to_write] = std::make_pair(node_name, offset);
 	// Now release the lock explicitly.
     lock.l_type = F_UNLCK;
     if (fcntl(fd, F_SETLKW, &lock) == - 1) {
@@ -377,13 +378,15 @@ int check_file_location(int index, int rank, std::string path_to_check) {
         #endif
 		std::string index_str = std::to_string(index);
 		std::string file_name = "files_location_" + index_str + ".txt";
-    	fp = fopen(file_name.c_str(), "r");
+    	fp = fopen(file_name.c_str(), "r+");
 		if (fp == NULL) {
 			return 0;
 		}
+
 		fd = fileno(fp);
 		seek_needed = false;
 		fd_files_location_reads.push_back(std::make_tuple(fd, fp, seek_needed));
+
 	}
     if (fcntl(fd, F_SETLKW, &lock) < 0) {
         logfile << "capio server " << rank << " failed to lock the file" << std::endl;
@@ -392,11 +395,14 @@ int check_file_location(int index, int rank, std::string path_to_check) {
     }
 	const char* path_to_check_cstr = path_to_check.c_str();
 	bool found = false;
+
 	if (seek_needed) {
 		long offset = ftell(fp);
 		fseek(fp, offset, SEEK_SET);
 	}
+
     while (!found && (read = getline(&line, &len, fp)) != -1) {
+
 		if (line[0] == '0')
 			continue;
 		char path[1024]; //TODO: heap memory
@@ -405,6 +411,7 @@ int check_file_location(int index, int rank, std::string path_to_check) {
 			path[i] = line[i];
 			++i;
 		}
+
 		path[i] = '\0';
 		char node_str[1024]; //TODO: heap memory 
 		++i;
@@ -415,12 +422,16 @@ int check_file_location(int index, int rank, std::string path_to_check) {
 			++j;
 		}
 
+
 		node_str[j] = '\0';
-		files_location[path] = (char*) malloc(sizeof(char) * (strlen(node_str) + 1));
-		strcpy(files_location[path], node_str);
+		char* p_node_str = (char*) malloc(sizeof(char) * (strlen(node_str) + 1));
+		strcpy(p_node_str, node_str);
+		long offset = ftell(fp);
+		files_location[path] = std::make_pair(p_node_str, offset); 
 
     #ifdef CAPIOLOG
-    	logfile << "check remote file reading " << path << " " << node_str << std::endl;
+    	logfile << "check remote file reading " << path << " " << node_str << " " << p_node_str << std::endl;
+		logfile << "path " << path << " node " << std::get<0>(files_location[path]) << " offset " << std::get<1>(files_location[path]) << std::endl;
     #endif
 		if (strcmp(path, path_to_check_cstr) == 0) {
     #ifdef CAPIOLOG
@@ -1218,7 +1229,7 @@ void handle_remote_read(int tid, int fd, off64_t count, int rank, bool dir, bool
 		// If it is not in cache then send the request to the remote node
 		const char* msg;
 		std::string str_msg;
-		int dest = nodes_helper_rank[files_location[processes_files_metadata[tid][fd]]];
+		int dest = nodes_helper_rank[std::get<0>(files_location[processes_files_metadata[tid][fd]])];
 		size_t offset = *std::get<1>(processes_files[tid][fd]);
 		str_msg = "read " + processes_files_metadata[tid][fd] + " " + std::to_string(rank) + " " + std::to_string(offset) + " " + std::to_string(count); 
 		msg = str_msg.c_str();
@@ -1277,7 +1288,7 @@ void* wait_for_file(void* pthread_arg) {
 	loop_check_files_location(path_to_check, rank);
 
 	//check if the file is local or remote
-	if (strcmp(files_location[path_to_check], node_name) == 0) {
+	if (strcmp(std::get<0>(files_location[path_to_check]), node_name) == 0) {
 			handle_local_read(tid, fd, count, dir, is_getdents, false);
 	}
 	else {
@@ -1392,7 +1403,7 @@ void handle_read(char* str, int rank, bool dir, bool is_getdents) {
 		}
 	}
 
-	if (is_prod || strcmp(files_location[path], node_name) == 0 || *capio_dir == path) {
+	if (is_prod || strcmp(std::get<0>(files_location[path]), node_name) == 0 || *capio_dir == path) {
 		handle_local_read(tid, fd, count, dir, is_getdents, is_prod);
 	}
 	else {
@@ -1402,7 +1413,7 @@ void handle_read(char* str, int rank, bool dir, bool is_getdents) {
 			bool res = false;
 			if (it != apps.end()) {
 				std::string app_name = it->second;
-				res = handle_nreads(path, app_name, nodes_helper_rank[files_location[path]]);
+				res = handle_nreads(path, app_name, nodes_helper_rank[std::get<0>(files_location[path])]);
 			}
 			if (res) {
 				sem_wait(&handle_remote_read_sem);
@@ -1504,14 +1515,102 @@ int delete_from_file_locations(std::string file_name, std::string path_to_remove
     return res;
 }
 
-void delete_from_file_locations(std::string path_to_remove, int my_rank) { 
+void delete_from_file_locations(std::string path_metadata, long int offset, int my_rank, int rank) {
+    char * line = NULL;
+    size_t len = 0;
+    ssize_t read = 0;
+    int res = 0;
+    struct flock lock;
+    memset(&lock, 0, sizeof(lock));
+    lock.l_type = F_WRLCK;    /* shared lock for read*/
+    lock.l_whence = SEEK_SET; /* base for seek offsets */
+    lock.l_start = 0;         /* 1st byte in file */
+    lock.l_len = 0;           /* 0 here means 'until EOF' */
+    lock.l_pid = getpid();    /* process id */
+	int fd;
+    //fd = open(file_name.c_str(), O_RDONLY);  /* -1 signals an error */
+	if (rank < fd_files_location_reads.size()) {
+
+	#ifdef CAPIOLOG
+	logfile << "fast remove if " << offset << std::endl;
+	#endif	
+    	fd = std::get<0>(fd_files_location_reads[rank]); 
+	}
+	else {
+
+	#ifdef CAPIOLOG
+	logfile << "fast remove else " << offset << std::endl;
+	#endif	
+		std::string index_str = std::to_string(rank);
+		std::string file_name = "files_location_" + std::to_string(rank) + ".txt";
+    	FILE* fp = fopen(file_name.c_str(), "r+");
+		if (fp == NULL) {
+			logfile << "capio server " << my_rank << " failed to open the location file" << std::endl;
+			exit(1);
+		}
+		fd = fileno(fp);
+		fd_files_location_reads.push_back(std::make_tuple(fd, fp, false));
+	}
+    if (fcntl(fd, F_SETLKW, &lock) < 0) {
+        logfile << "capio server " << my_rank << " failed to lock the file" << std::endl;
+        close(fd);
+        exit(1);
+    }
+	#ifdef CAPIOLOG
+	logfile << "fast remove offset " << offset << std::endl;
+	#endif	
+	char del_char = '0';
+	long old_offset = lseek(fd, 0, SEEK_CUR);
+	lseek(fd, offset, SEEK_SET);
+	write(fd, &del_char, sizeof(char)); 
+	lseek(fd, old_offset, SEEK_SET);
+    /* Release the lock explicitly. */
+    lock.l_type = F_UNLCK;
+    if (fcntl(fd, F_SETLK, &lock) < 0) {
+        logfile << "reader " << my_rank << " failed to unlock the file" << std::endl;
+    }
+
+}
+
+void delete_from_metadata(std::string path_to_remove, int my_rank) { 
 	bool found = false;
 	int rank = 0, res = -1;
-	while (!found && rank < n_servers) {
-		std::string rank_str = std::to_string(rank);
-		res = delete_from_file_locations("files_location_" + rank_str + ".txt", path_to_remove, my_rank);
-		found = res == 1;
-		++rank;
+	std::string node = std::get<0>(files_location[path_to_remove]);
+	long int offset = std::get<1>(files_location[path_to_remove]);
+	if (offset == -1) { //TODO: very inefficient
+	#ifdef CAPIOLOG
+	logfile << "very slow remove" << std::endl;
+	#endif	
+		while (!found && rank < n_servers) {
+			std::string rank_str = std::to_string(rank);
+			res = delete_from_file_locations("files_location_" + rank_str + ".txt", path_to_remove, my_rank);
+			found = res == 1;
+			++rank;
+		}
+	}
+	else {
+		
+	#ifdef CAPIOLOG
+	logfile << "fast remove" << std::endl;
+	#endif	
+// node -> rank
+//std::unordered_map<std::string, int> nodes_helper_rank;
+//rank -> node
+//std::unordered_map<int, std::string> rank_to_node;
+	std::string file_node_name = std::get<0>(files_location[path_to_remove]);
+	#ifdef CAPIOLOG
+	logfile << "fast remove node_name " << file_node_name << std::endl;
+	#endif	
+	int rank;
+	if (file_node_name == std::string(node_name))	
+		rank = my_rank;
+	else
+		rank = nodes_helper_rank[file_node_name];
+	#ifdef CAPIOLOG
+	logfile << "fast remove rank " << rank << std::endl;
+	#endif	
+		//fd_files_location_reads[rank]
+		delete_from_file_locations("files_location_" + std::to_string(rank) + ".txt", offset, my_rank, rank);
 	}
 }
 
@@ -1524,7 +1623,7 @@ void delete_file(std::string path, int rank) {
 	free(std::get<0>(files_metadata[path]));
 	delete (std::get<6>(files_metadata[path]));
 	files_metadata.erase(path);
-	delete_from_file_locations(path, rank);
+	delete_from_metadata(path, rank);
 	//free(files_location[path]);
 	files_location.erase(path);
 	//on_disk.erase(path);
@@ -1854,7 +1953,7 @@ void handle_remote_stat(int tid, const std::string path, int rank) {
 	#endif
 	sem_wait(&handle_remote_stat_sem);
 	std::string str_msg;
-	int dest = nodes_helper_rank[files_location[path]];
+	int dest = nodes_helper_rank[std::get<0>(files_location[path])];
 	str_msg = "stat " + std::to_string(rank) + " " + path; 
 	const char* msg = str_msg.c_str();
 	#ifdef CAPIOLOG
@@ -1899,7 +1998,7 @@ void* wait_for_stat(void* pthread_arg) {
 
 	Capio_file& c_file = std::get<4>(files_metadata[path]);
 	std::string mode = c_file.get_mode();
-	if (strcmp(files_location[path_to_check], node_name) == 0 || mode == "append") {
+	if (strcmp(std::get<0>(files_location[path_to_check]), node_name) == 0 || mode == "append") {
 		handle_local_stat(tid, path);
 	}
 	else {
@@ -1951,9 +2050,9 @@ void reply_stat(int tid, std::string path, int rank) {
 	std::string mode = c_file.get_mode();
 	#ifdef CAPIOLOG
 		logfile << "node_name : " << node_name << std::endl;
-		logfile << " files_location[path]: " << files_location[path] << std::endl;
+		logfile << " files_location[path]: " << std::get<0>(files_location[path]) << std::endl;
 	#endif
-	if (strcmp(files_location[path], node_name) == 0 || mode == "append" || *capio_dir == path) {
+	if (strcmp(std::get<0>(files_location[path]), node_name) == 0 || mode == "append" || *capio_dir == path) {
 		handle_local_stat(tid, path);
 	}
 	else {
@@ -2068,7 +2167,7 @@ off64_t create_dir(int tid, const char* pathname, int rank, bool root_dir) {
 			std::get<3>(files_metadata[pathname]) = false;
 			//TODO: it works only if there is one prod per file
 			if (root_dir) {
-				files_location[pathname] =  node_name;
+				files_location[pathname] =  std::make_pair(node_name, -1);
 			}
 			else {
             	write_file_location(rank, pathname, tid);
@@ -2785,8 +2884,9 @@ void recv_nfiles(char* buf_recv, int source) {
 			#endif
 			std::string node_name = rank_to_node[source];
 			const char* node_name_str = node_name.c_str();
-			files_location[path] = (char*) malloc(sizeof(char) * (strlen(node_name_str) + 1));	
-			strcpy(files_location[path], node_name_str);
+			char* p_node_name = (char*) malloc(sizeof(char) * (strlen(node_name_str) + 1));	
+			strcpy(p_node_name, node_name_str);
+			files_location[path] = std::make_pair(p_node_name, -1);
 			p_shm = new char[file_size];
 			create_file(path, p_shm, false, file_size);
 			it = files_metadata.find(path);
