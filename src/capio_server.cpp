@@ -1634,6 +1634,10 @@ void delete_file(std::string path, int rank) {
 }
 
 void handle_pending_remote_nfiles(std::string path, std::string app) {
+
+	#ifdef CAPIOLOG
+	logfile << "handle pending remote nfiles" << std::endl;;
+	#endif
 	for (auto& p : clients_remote_pending_nfiles) {
 		std::vector<struct remote_n_files*> app_pending_nfiles = p.second;
 		for (auto rr_metadata : app_pending_nfiles) {
@@ -1641,6 +1645,10 @@ void handle_pending_remote_nfiles(std::string path, std::string app) {
 			std::unordered_set<std::string> &files = files_sent[app];
 			if (std::find(files.begin(), files.end(), path) == files.end() && path.compare(0, prefix.length(), prefix) == 0) {
 				rr_metadata->files_path->push_back(path);
+				#ifdef CAPIOLOG
+				logfile << "added " << path << " to rr_metadata" << std::endl;;
+				logfile << "vector size " << rr_metadata->files_path->size() << " rr_metadata nfiles " << rr_metadata->n_files << std::endl;;
+				#endif
 				if (rr_metadata->files_path->size() == rr_metadata->n_files) {
 					sem_post(rr_metadata->sem);
 				}
@@ -1998,7 +2006,8 @@ void* wait_for_stat(void* pthread_arg) {
 
 	Capio_file& c_file = std::get<4>(files_metadata[path]);
 	std::string mode = c_file.get_mode();
-	if (strcmp(std::get<0>(files_location[path_to_check]), node_name) == 0 || mode == "append") {
+	bool complete = c_file.complete;
+	if (complete || strcmp(std::get<0>(files_location[path_to_check]), node_name) == 0 || mode == "append") {
 		handle_local_stat(tid, path);
 	}
 	else {
@@ -2048,11 +2057,12 @@ void reply_stat(int tid, std::string path, int rank) {
 
 	Capio_file& c_file = std::get<4>(files_metadata[path]);
 	std::string mode = c_file.get_mode();
+	bool complete = c_file.complete;
 	#ifdef CAPIOLOG
 		logfile << "node_name : " << node_name << std::endl;
 		logfile << " files_location[path]: " << std::get<0>(files_location[path]) << std::endl;
 	#endif
-	if (strcmp(std::get<0>(files_location[path]), node_name) == 0 || mode == "append" || *capio_dir == path) {
+	if (complete || strcmp(std::get<0>(files_location[path]), node_name) == 0 || mode == "append" || *capio_dir == path) {
 		handle_local_stat(tid, path);
 	}
 	else {
@@ -2108,6 +2118,8 @@ void handle_unlink(const char* str, int rank) {
 	sscanf(str, "unlk %d %s", &tid, path);
 	auto it = files_metadata.find(path);
 	if (it != files_metadata.end()) { //TODO: it works only in the local case
+		res = 0;
+		response_buffers[tid]->write(&res);
 		Capio_file& c_file = std::get<4>(it->second);
 		--c_file.n_links;
 		#ifdef CAPIOLOG
@@ -2116,11 +2128,11 @@ void handle_unlink(const char* str, int rank) {
 		if (c_file.n_opens == 0 && c_file.n_links <= 0) {
 			delete_file(path, rank);
 		}
-		res = 0;
 	}
-	else
+	else {
 		res = -1;
-	response_buffers[tid]->write(&res);
+		response_buffers[tid]->write(&res);
+	}
 }
 
 std::unordered_set<std::string> get_paths_opened_files(pid_t tid) {
@@ -3000,7 +3012,7 @@ void* capio_helper(void* pthread_arg) {
 		}
 		else if(strncmp(buf_recv, "sending", 7) == 0) { //receiving a file
 			#ifdef CAPIOLOG
-				logfile << "helper received sending msg" << std::endl;
+				logfile << "helper received sending msg " << buf_recv << std::endl;
 			#endif
 			off64_t bytes_received;
 			int source = status.MPI_SOURCE;
@@ -3040,7 +3052,7 @@ void* capio_helper(void* pthread_arg) {
 				bytes_received *= sizeof(char);
 			}
 
-			solve_remote_reads(bytes_received, offset, file_size, path.c_str(), true);
+			solve_remote_reads(bytes_received, offset, file_size, path.c_str(), complete);
 		}
 		else if(strncmp(buf_recv, "stat", 4) == 0) {
 			helper_stat_req(buf_recv);
