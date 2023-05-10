@@ -82,7 +82,7 @@ const long int max_shm_size = 1024L * 1024 * 1024 * 16;
 const long int max_shm_size_file = 1024L * 1024 * 1024 * 8;
 
 // initial size for each file (can be overwritten by the user)
-const size_t file_initial_size = 1024L * 1024 * 1024 * 4;
+size_t file_initial_size = 1024L * 1024 * 1024 * 4;
 
 const size_t dir_initial_size = 1024L * 1024 * 1024;
 
@@ -218,12 +218,11 @@ struct remote_n_files {
 	int n_files;
 	int dest;
 	std::vector<std::string>* files_path;
-	std::unordered_set<std::string>* files_sent;
 	sem_t* sem;
 
 };
 
-std::unordered_map<std::string, std::vector<struct remote_n_files*>> clients_remote_pending_nfiles;
+std::unordered_map<std::string, std::list<struct remote_n_files*>> clients_remote_pending_nfiles;
 
 // name of the node
 
@@ -238,13 +237,18 @@ sem_t remote_read_sem;
 sem_t handle_remote_read_sem;
 sem_t handle_remote_stat_sem;
 sem_t handle_local_read_sem;
+sem_t files_metadata_sem;
+sem_t files_location_sem;
+sem_t clients_remote_pending_nfiles_sem;
 
 void sig_term_handler(int signum, siginfo_t *info, void *ptr) {
 	//free all the memory used
+	sem_wait(&files_metadata_sem);
 	for (auto& pair : files_metadata) {
 		shm_unlink(pair.first.c_str());
 		shm_unlink((pair.first + "_size").c_str());
 	}
+	sem_post(&files_metadata_sem);
 
 	for (auto& p1 : processes_files) {
 		for(auto& p2 : p1.second) {
@@ -427,12 +431,10 @@ int check_file_location(int index, int rank, std::string path_to_check) {
 		char* p_node_str = (char*) malloc(sizeof(char) * (strlen(node_str) + 1));
 		strcpy(p_node_str, node_str);
 		long offset = ftell(fp);
+		sem_wait(&files_location_sem);
 		files_location[path] = std::make_pair(p_node_str, offset); 
+		sem_post(&files_location_sem);
 
-    #ifdef CAPIOLOG
-    	logfile << "check remote file reading " << path << " " << node_str << " " << p_node_str << std::endl;
-		logfile << "path " << path << " node " << std::get<0>(files_location[path]) << " offset " << std::get<1>(files_location[path]) << std::endl;
-    #endif
 		if (strcmp(path, path_to_check_cstr) == 0) {
     #ifdef CAPIOLOG
     	logfile << "check remote found" << std::endl;
@@ -471,7 +473,9 @@ bool check_file_location(int my_rank, std::string path_to_check) {
 void flush_file_to_disk(int tid, int fd) {
 	void* buf = std::get<0>(processes_files[tid][fd]);
 	std::string path = processes_files_metadata[tid][fd];
+	sem_wait(&files_metadata_sem);
 	long int file_size = std::get<1>(files_metadata[path]);	
+	sem_post(&files_metadata_sem);
 	long int num_bytes_written, k = 0;
 	while (k < file_size) {
     	num_bytes_written = write(fd, ((char*) buf) + k, (file_size - k));
@@ -555,7 +559,9 @@ void create_file(std::string path, void* p_shm, bool is_dir, off64_t init_size) 
 			if (p_shm == nullptr) {
 				p_shm = new char[init_size];
 			}
+			sem_wait(&files_metadata_sem);
 			files_metadata[path] = std::make_tuple(p_shm, p_shm_size, init_size, true, Capio_file(is_dir), 0, new std::vector<std::tuple<int, int>>);
+			sem_post(&files_metadata_sem);
 		}
 		else {
 			auto& quintuple = metadata_conf_globs[pos];
@@ -580,7 +586,9 @@ void create_file(std::string path, void* p_shm, bool is_dir, off64_t init_size) 
 				p_shm = new char[init_size];
 			}
 
+			sem_wait(&files_metadata_sem);
 			files_metadata[path] = std::make_tuple(p_shm, p_shm_size, init_size, true, Capio_file(committed, mode, is_dir, n_files), 0, new std::vector<std::tuple<int, int>>);
+			sem_post(&files_metadata_sem);
 			metadata_conf[path] = std::make_tuple(committed, mode, app_name, n_files);
 		}
 	}
@@ -600,7 +608,9 @@ void create_file(std::string path, void* p_shm, bool is_dir, off64_t init_size) 
 		if (p_shm == nullptr) {
 			p_shm = new char[init_size];
 		}
+		sem_post(&files_metadata_sem);
 		files_metadata[path] = std::make_tuple(p_shm, p_shm_size, init_size, true, Capio_file(committed, mode, is_dir, n_files), 0,  new std::vector<std::tuple<int, int>>);
+		sem_wait(&files_metadata_sem);
 	}
 }
 
@@ -677,10 +687,12 @@ char* expand_memory_for_file(std::string path, char* old_p, off64_t data_size, o
 	#ifdef CAPIOLOG
 	logfile << "expanded memory for file data_size " << data_size << " file_shm_size " << file_shm_size << " new_size " << new_size << std::endl;
 	#endif	
+	sem_wait(&files_metadata_sem);
 	std::get<0>(files_metadata[path]) = new_p;
 	std::get<2>(files_metadata[path]) = new_size;
-
 	auto* tids_fds = std::get<6>(files_metadata[path]);
+	sem_post(&files_metadata_sem);
+
 	for (auto& pair : *tids_fds) {
 		int tid = std::get<0>(pair);
 		int fd = std::get<1>(pair);
@@ -717,6 +729,7 @@ void write_entry_dir(int tid, std::string file_path, std::string dir, int type) 
 	strcpy(ld.d_name, file_name.c_str());
 	long int ld_size = theoretical_size_dirent64;
 	ld.d_reclen =  ld_size;
+	sem_wait(&files_metadata_sem);
 	auto it_tuple = files_metadata.find(dir);
 
 	if (it_tuple == files_metadata.end()) {
@@ -729,6 +742,7 @@ void write_entry_dir(int tid, std::string file_path, std::string dir, int type) 
 	off64_t data_size = file_size + ld_size; //TODO: check theoreitcal size and sizeof(ld) usage
 	ld.d_off =  data_size;
 	Capio_file& c_file = std::get<4>(it_tuple->second);
+	sem_post(&files_metadata_sem);
 		if (data_size > file_shm_size) {
 
         #ifdef CAPIOLOG
@@ -744,7 +758,7 @@ void write_entry_dir(int tid, std::string file_path, std::string dir, int type) 
 		}
 			ld.d_name[DNAME_LENGTH] = '\0'; 
 		memcpy((char*) file_shm + file_size, &ld, sizeof(ld));
-		std::get<1>(it_tuple->second) = data_size;
+		std::get<1>(it_tuple->second) = data_size; // DATA RACE ON it_tuple
 	off64_t base_offset = file_size;
 		#ifdef CAPIOLOG
 		logfile << "insert sector for dir" << base_offset << ", " << data_size << std::endl;
@@ -794,10 +808,12 @@ void update_dir(int tid, std::string file_path, int rank) {
         #ifdef CAPIOLOG
         logfile << "update dir " << dir << std::endl;
         #endif
+	sem_wait(&files_metadata_sem);
     if (std::get<3>(files_metadata[dir])) {
 		std::get<3>(files_metadata[dir]) = false;
         write_file_location(rank, dir, tid);
 	}
+	sem_post(&files_metadata_sem);
         #ifdef CAPIOLOG
         logfile << "before write entry dir" << std::endl;
         #endif
@@ -844,11 +860,17 @@ void handle_open(char* str, char* p, int rank, bool is_creat) {
 	off64_t* p_offset = (off64_t*) create_shm("offset_" + std::to_string(tid) + "_" + std::to_string(fd), sizeof(off64_t));
 	processes_files[tid][fd] = std::make_tuple(p_shm, p_offset);//TODO: what happens if a process open the same file twice?
 	//*caching_info[tid].second += 2;
+	sem_wait(&files_metadata_sem);
 	if (files_metadata.find(path) == files_metadata.end()) {
+		sem_post(&files_metadata_sem);
 		create_file(path, p_shm, false, file_initial_size);
 	}
+	else
+		sem_post(&files_metadata_sem);
+	sem_wait(&files_metadata_sem);
 	std::get<6>(files_metadata[path])->push_back(std::make_tuple(tid, fd));
 	Capio_file& c_file = std::get<4>(files_metadata[path]);
+	sem_post(&files_metadata_sem);
 	++c_file.n_opens;
     #ifdef CAPIOLOG
 	logfile << "capio open n links " << c_file.n_links << " n opens " << c_file.n_opens << std::endl;;
@@ -866,11 +888,15 @@ void handle_open(char* str, char* p, int rank, bool is_creat) {
 		writers[pid][path] = false;
 	}
 
+	sem_wait(&files_metadata_sem);
     if (std::get<3>(files_metadata[path]) && is_creat) {
 		std::get<3>(files_metadata[path]) = false;
+		sem_post(&files_metadata_sem);
         write_file_location(rank, path, tid);
 		update_dir(tid, path, rank);
 	}
+	else
+		sem_post(&files_metadata_sem);
 }
 
 void send_data_to_client(int tid, char* buf, long int count) {
@@ -910,9 +936,11 @@ off64_t convert_dirent64_to_dirent(char* dirent64_buf, char* dirent_buf, off64_t
 void handle_pending_read(int tid, int fd, long int process_offset, long int count, bool is_getdents) {
 	
 	std::string path = processes_files_metadata[tid][fd];
+	sem_wait(&files_metadata_sem);
 	Capio_file & c_file = std::get<4>(files_metadata[path]);
-	off64_t end_of_sector = c_file.get_sector_end(process_offset);
 	char* p = (char*) std::get<0>(files_metadata[path]);
+	sem_post(&files_metadata_sem);
+	off64_t end_of_sector = c_file.get_sector_end(process_offset);
 	off64_t end_of_read = process_offset + count;
 	size_t bytes_read;
 	if (end_of_sector > end_of_read) {
@@ -922,7 +950,9 @@ void handle_pending_read(int tid, int fd, long int process_offset, long int coun
 	else
 		bytes_read = end_of_sector - process_offset;
 	if (is_getdents) {
+		sem_wait(&files_metadata_sem);
 		off64_t dir_size = std::get<1>(files_metadata[path]);
+		sem_post(&files_metadata_sem);
 		off64_t n_entries = dir_size / theoretical_size_dirent64;
 		char* p_getdents = (char*) malloc(n_entries * sizeof(char) * dir_size); 
 		end_of_sector = convert_dirent64_to_dirent(p, p_getdents, dir_size);
@@ -954,13 +984,15 @@ void handle_write(const char* str, int rank) {
         stream >> request >> tid >> fd >> base_offset >> count;
 		data_size = base_offset + count;
         std::string path = processes_files_metadata[tid][fd];
+		sem_wait(&files_metadata_sem);
 		char* p = (char *) std::get<0>(files_metadata[path]);
+		off64_t file_shm_size = std::get<2>(files_metadata[path]);
+		Capio_file& c_file = std::get<4>(files_metadata[path]);
+		sem_post(&files_metadata_sem);
 		auto* data_buf = data_buffers[tid].first;
 		size_t n_reads = count / WINDOW_DATA_BUFS;  
 		size_t r = count % WINDOW_DATA_BUFS;
 		size_t i = 0;
-		off64_t file_shm_size = std::get<2>(files_metadata[path]);
-		Capio_file& c_file = std::get<4>(files_metadata[path]);
 		if (data_size > file_shm_size) {
 
         #ifdef CAPIOLOG
@@ -998,13 +1030,20 @@ void handle_write(const char* str, int rank) {
         logfile << "handle write tid fd " << tid << " " << fd << std::endl;
 		logfile << "path " << path << std::endl;
         #endif
+		sem_wait(&files_metadata_sem);
         if (std::get<3>(files_metadata[path])) {
 			std::get<3>(files_metadata[path]) = false;
             write_file_location(rank, path, tid);
+			sem_post(&files_metadata_sem);
 			//TODO: it works only if there is one prod per file
 			update_dir(tid, path, rank);
         }
+		else
+			sem_post(&files_metadata_sem);
+		sem_wait(&files_metadata_sem);
         std::get<1>(files_metadata[path]) = data_size; 
+		std::string mode = std::get<4>(files_metadata[path]).get_mode();
+		sem_post(&files_metadata_sem);
         /*total_bytes_shm += data_size;
         if (total_bytes_shm > max_shm_size && on_disk.find(path) == on_disk.end()) {
                 shm_full = true;
@@ -1030,7 +1069,6 @@ void handle_write(const char* str, int rank) {
         }*/
         //sem_post(sems_response[tid]);
         auto it = pending_reads.find(path);
-		std::string mode = std::get<4>(files_metadata[path]).get_mode();
         #ifdef CAPIOLOG
         logfile << "mode is " << mode << std::endl;
         #endif
@@ -1047,7 +1085,9 @@ void handle_write(const char* str, int rank) {
                         int fd = std::get<1>(tuple);
                         size_t process_offset = *std::get<1>(processes_files[pending_tid][fd]);
                         size_t count = std::get<2>(tuple);
+						sem_wait(&files_metadata_sem);
                         size_t file_size = std::get<1>(files_metadata[path]);
+						sem_post(&files_metadata_sem);
         #ifdef CAPIOLOG
         logfile << "pending read offset " << process_offset << " count " << count << " file_size " << file_size << std::endl;
         #endif
@@ -1086,7 +1126,9 @@ void handle_local_read(int tid, int fd, off64_t count, bool dir, bool is_getdent
 		#endif
 		sem_wait(&handle_local_read_sem);
 		std::string path = processes_files_metadata[tid][fd];
+		sem_wait(&files_metadata_sem);
 		Capio_file & c_file = std::get<4>(files_metadata[path]);
+		sem_post(&files_metadata_sem);
 		off64_t process_offset = *std::get<1>(processes_files[tid][fd]);
 		int pid = pids[tid];
 		bool writer = writers[pid][path];
@@ -1123,9 +1165,11 @@ void handle_local_read(int tid, int fd, off64_t count, bool dir, bool is_getdent
 			else {
 					nreads = end_of_sector;
 
+				sem_wait(&files_metadata_sem);
 				char* p = (char*) std::get<0>(files_metadata[path]);
 				if (is_getdents) {
 					off64_t dir_size = std::get<1>(files_metadata[path]);
+					sem_post(&files_metadata_sem);
 					off64_t n_entries = dir_size / theoretical_size_dirent64;
 					char* p_getdents = (char*) malloc(n_entries * sizeof(char) * dir_size); 
 					end_of_sector = convert_dirent64_to_dirent(p, p_getdents, dir_size);
@@ -1135,6 +1179,7 @@ void handle_local_read(int tid, int fd, off64_t count, bool dir, bool is_getdent
 
 				}
 				else {
+					sem_post(&files_metadata_sem);
 		#ifdef CAPIOLOG
 		logfile << "debug bbb end_of_sector " << end_of_sector << " nreads " << nreads << " count " << count << " process_offset " << process_offset << std::endl;
 		#endif
@@ -1146,6 +1191,7 @@ void handle_local_read(int tid, int fd, off64_t count, bool dir, bool is_getdent
 
 		}
 		else {
+		sem_wait(&files_metadata_sem);
 			char* p = (char*) std::get<0>(files_metadata[path]);
 			size_t bytes_read;
 			bytes_read = count;
@@ -1154,6 +1200,7 @@ void handle_local_read(int tid, int fd, off64_t count, bool dir, bool is_getdent
 		#endif
 			if (is_getdents) {
 				off64_t dir_size = std::get<1>(files_metadata[path]);
+				sem_post(&files_metadata_sem);
 				off64_t n_entries = dir_size / theoretical_size_dirent64;
 				char* p_getdents = (char*) malloc(n_entries * sizeof(char) * dir_size); 
 				end_of_sector = convert_dirent64_to_dirent(p, p_getdents, dir_size);
@@ -1163,6 +1210,7 @@ void handle_local_read(int tid, int fd, off64_t count, bool dir, bool is_getdent
 				free(p_getdents);
 			}
 			else {
+				sem_post(&files_metadata_sem);
 				response_buffers[tid]->write(&end_of_read);
 				send_data_to_client(tid, p + process_offset, bytes_read);
 			}
@@ -1183,7 +1231,9 @@ bool read_from_local_mem(int tid, off64_t process_offset, off64_t end_of_read,
 	#endif
 	bool res = false;
 	if (end_of_read <= end_of_sector) {
+		sem_wait(&files_metadata_sem);
 		char* p = (char*) std::get<0>(files_metadata[path]);
+		sem_post(&files_metadata_sem);
 		response_buffers[tid]->write(&end_of_read);
 		send_data_to_client(tid, p + process_offset, count);
 		res = true;
@@ -1206,8 +1256,10 @@ void handle_remote_read(int tid, int fd, off64_t count, int rank, bool dir, bool
 		sem_wait(&handle_remote_read_sem);
 
 		std::string path = processes_files_metadata[tid][fd];
+		sem_wait(&files_metadata_sem);
 		Capio_file & c_file = std::get<4>(files_metadata[path]);
 		size_t real_file_size = std::get<5>(files_metadata[path]);
+		sem_post(&files_metadata_sem);
 		off64_t process_offset = *std::get<1>(processes_files[tid][fd]);
 		off64_t end_of_read = process_offset + count;
 		off64_t end_of_sector = c_file.get_sector_end(process_offset);
@@ -1275,6 +1327,31 @@ void loop_check_files_location(std::string path_to_check, int rank) {
 	#endif
 }
 
+bool handle_nreads(std::string path, std::string app_name, int dest) {
+	bool success = false;
+
+	long int pos = match_globs(path);
+	if (pos != -1) {
+		#ifdef CAPIOLOG
+			logfile << "glob matched" << std::endl;
+		#endif
+		std::string glob = std::get<0>(metadata_conf_globs[pos]);
+		int batch_size = std::get<5>(metadata_conf_globs[pos]);
+		if (batch_size > 0) {
+			char* msg = (char*) malloc(sizeof(char) * (512 + PATH_MAX));
+			sprintf(msg, "nrea %d %s %s %s", batch_size, app_name.c_str(), glob.c_str(), path.c_str());
+			MPI_Send(msg, strlen(msg) + 1, MPI_CHAR, dest, 0, MPI_COMM_WORLD);
+			success = true;
+			#ifdef CAPIOLOG
+			logfile << "handling nreads, msg: " << msg << " msg size " << strlen(msg) + 1 << std::endl;
+			#endif
+			free(msg);
+			return success;
+		}
+	}
+	return success;
+}
+
 void* wait_for_file(void* pthread_arg) {
 	struct wait_for_file_metadata* metadata = (struct wait_for_file_metadata*) pthread_arg;
 	int tid = metadata->tid;
@@ -1292,6 +1369,23 @@ void* wait_for_file(void* pthread_arg) {
 			handle_local_read(tid, fd, count, dir, is_getdents, false);
 	}
 	else {
+		sem_wait(&files_metadata_sem);
+		Capio_file& c_file = std::get<4>(files_metadata[path_to_check]);
+		sem_post(&files_metadata_sem);
+		if (!c_file.complete) {
+			auto it = apps.find(tid);
+			bool res = false;
+			if (it != apps.end()) {
+				std::string app_name = it->second;
+				res = handle_nreads(path_to_check, app_name, nodes_helper_rank[std::get<0>(files_location[path_to_check])]);
+			}
+			if (res) {
+				sem_wait(&handle_remote_read_sem);
+				my_remote_pending_reads[path_to_check].push_back(std::make_tuple(tid, fd, count, is_getdents));
+				sem_post(&handle_remote_read_sem);
+				return nullptr;
+			}
+		}
 			#ifdef CAPIOLOG
 			logfile << "handle remote read in wait for file" << std::endl;	
 			logfile << "path to check " << path_to_check << std::endl;
@@ -1343,32 +1437,6 @@ bool is_producer(int tid, std::string path) {
 }
 
 
-bool handle_nreads(std::string path, std::string app_name, int dest) {
-	char* msg = (char*) malloc(sizeof(char) * (512 + PATH_MAX));
-	bool success = false;
-
-	long int pos = match_globs(path);
-	if (pos != -1) {
-		#ifdef CAPIOLOG
-			logfile << "glob matched" << std::endl;
-		#endif
-		std::string glob = std::get<0>(metadata_conf_globs[pos]);
-		int batch_size = std::get<5>(metadata_conf_globs[pos]);
-		if (batch_size > 0) {
-			sprintf(msg, "nrea %d %s %s %s", batch_size, app_name.c_str(), glob.c_str(), path.c_str());
-			MPI_Send(msg, strlen(msg) + 1, MPI_CHAR, dest, 0, MPI_COMM_WORLD);
-			success = true;
-			#ifdef CAPIOLOG
-			logfile << "handling nreads, msg: " << msg << " msg size " << strlen(msg) + 1 << std::endl;
-			#endif
-			free(msg);
-			return success;
-		}
-	}
-	
-	free(msg);
-	return success;
-}
 
 void handle_read(char* str, int rank, bool dir, bool is_getdents) {
 	#ifdef CAPIOLOG
@@ -1394,7 +1462,7 @@ void handle_read(char* str, int rank, bool dir, bool is_getdents) {
 			metadata->is_getdents = is_getdents;
 			int res = pthread_create(&t, NULL, wait_for_file, (void*) metadata);
 			if (res != 0) {
-				logfile << "error creation of capio server thread" << std::endl;
+				logfile << "error creation of capio server thread (handle read wait for file)" << std::endl;
 				MPI_Finalize();
 				exit(1);
 			}
@@ -1407,13 +1475,16 @@ void handle_read(char* str, int rank, bool dir, bool is_getdents) {
 		handle_local_read(tid, fd, count, dir, is_getdents, is_prod);
 	}
 	else {
+		sem_wait(&files_metadata_sem);
 		Capio_file& c_file = std::get<4>(files_metadata[path]);
+		sem_post(&files_metadata_sem);
 		if (!c_file.complete) {
 			auto it = apps.find(tid);
 			bool res = false;
 			if (it != apps.end()) {
 				std::string app_name = it->second;
-				res = handle_nreads(path, app_name, nodes_helper_rank[std::get<0>(files_location[path])]);
+				if (!dir)
+					res = handle_nreads(path, app_name, nodes_helper_rank[std::get<0>(files_location[path])]);
 			}
 			if (res) {
 				sem_wait(&handle_remote_read_sem);
@@ -1620,9 +1691,11 @@ void delete_file(std::string path, int rank) {
 	#endif	
 	//shm_unlink(path.c_str());
 	//shm_unlink((path + "_size").c_str());
+	sem_wait(&files_metadata_sem);
 	free(std::get<0>(files_metadata[path]));
 	delete (std::get<6>(files_metadata[path]));
 	files_metadata.erase(path);
+	sem_post(&files_metadata_sem);
 	delete_from_metadata(path, rank);
 	//free(files_location[path]);
 	files_location.erase(path);
@@ -1633,33 +1706,49 @@ void delete_file(std::string path, int rank) {
 	}
 }
 
-void handle_pending_remote_nfiles(std::string path, std::string app) {
-
+void handle_pending_remote_nfiles(std::string path) {
 	#ifdef CAPIOLOG
 	logfile << "handle pending remote nfiles" << std::endl;;
 	#endif
+	sem_wait(&clients_remote_pending_nfiles_sem);
 	for (auto& p : clients_remote_pending_nfiles) {
-		std::vector<struct remote_n_files*> app_pending_nfiles = p.second;
-		for (auto rr_metadata : app_pending_nfiles) {
-			std::string prefix = rr_metadata->prefix;
+		std::string app = p.first;
+		std::list<struct remote_n_files*>& app_pending_nfiles = p.second;
+		auto it = app_pending_nfiles.begin();
+		std::list<struct remote_n_files*>::iterator next_it;
+		while (it != app_pending_nfiles.end()) {
+			std::string prefix = (*it)->prefix;
 			std::unordered_set<std::string> &files = files_sent[app];
-			if (std::find(files.begin(), files.end(), path) == files.end() && path.compare(0, prefix.length(), prefix) == 0) {
-				rr_metadata->files_path->push_back(path);
-				#ifdef CAPIOLOG
-				logfile << "added " << path << " to rr_metadata" << std::endl;;
-				logfile << "vector size " << rr_metadata->files_path->size() << " rr_metadata nfiles " << rr_metadata->n_files << std::endl;;
-				#endif
-				if (rr_metadata->files_path->size() == rr_metadata->n_files) {
-					sem_post(rr_metadata->sem);
+			sem_wait(&files_location_sem);
+			auto it_fs = files_location.find(path);
+			next_it =  std::next(it);
+			if (files.find(path) == files.end() && it_fs != files_location.end() && strcmp(std::get<0>(it_fs->second), node_name) == 0 && path.compare(0, prefix.length(), prefix) == 0) {
+				sem_post(&files_location_sem);
+				(*it)->files_path->push_back(path);
+				files.insert(path);
+				if ((*it)->files_path->size() == (*it)->n_files) {
+					#ifdef CAPIOLOG
+					logfile << "waking up thread " << std::endl;;
+					#endif
+					sem_t* sem = (*it)->sem;
+					app_pending_nfiles.erase(it);
+					sem_post(sem);
 				}
 			}
+			else
+				sem_post(&files_location_sem);
+
+			it = next_it;
 		}
 	}
+	sem_post(&clients_remote_pending_nfiles_sem);
 }
 
 void handle_close(int tid, int fd, int rank) {
 	std::string path = processes_files_metadata[tid][fd];
+	sem_wait(&files_metadata_sem);
 	Capio_file& c_file = std::get<4>(files_metadata[path]);
+	sem_post(&files_metadata_sem);
 	if (c_file.get_committed() == "on_close") {
 		#ifdef CAPIOLOG
 		logfile <<  "handle close, committed = on_close" << std::endl;
@@ -1667,9 +1756,9 @@ void handle_close(int tid, int fd, int rank) {
 		c_file.complete = true;
 		auto it = pending_reads.find(path);
         if (it != pending_reads.end()) {
-	#ifdef CAPIOLOG
-	logfile << "handle pending read file on_close " << path << std::endl;
-	#endif	
+			#ifdef CAPIOLOG
+			logfile << "handle pending read file on_close " << path << std::endl;
+			#endif	
             auto& pending_reads_this_file = it->second;
 			auto it_vec = pending_reads_this_file.begin();
             while (it_vec != pending_reads_this_file.end()) {
@@ -1691,11 +1780,7 @@ void handle_close(int tid, int fd, int rank) {
 			reply_remote_stats(path);	
 	//TODO: error if seek are done and also do this on exit
 		handle_pending_remote_reads(path, c_file.get_sector_end(0), true);
-		auto iter = apps.find(tid);
-		if (iter != apps.end()) {
-			std::string app_name = iter->second;
-			handle_pending_remote_nfiles(path, app_name);
-		}
+		handle_pending_remote_nfiles(path);
 	}
 
 	--c_file.n_opens;
@@ -1707,7 +1792,9 @@ void handle_close(int tid, int fd, int rank) {
 	//shm_unlink(("offset_" + std::to_string(tid) +  "_" + std::to_string(fd)).c_str());
 	processes_files[tid].erase(fd);
 	processes_files_metadata[tid].erase(fd);
+	sem_wait(&files_metadata_sem);
 	auto* tids_fds = std::get<6>(files_metadata[path]);
+	sem_post(&files_metadata_sem);
 	auto it = std::find(tids_fds->begin(), tids_fds->end(), std::make_tuple(tid, fd));
 	if (it != tids_fds->end()) {
 		tids_fds->erase(it);
@@ -1728,9 +1815,14 @@ void handle_close(char* str, char* p, int rank) {
  */
 
 void solve_remote_reads(size_t bytes_received, size_t offset, size_t file_size, const char* path_c, bool complete) {
+    #ifdef CAPIOLOG
+	logfile << " solve remote reads before semwait " << std::endl;
+	#endif
+	sem_wait(&files_metadata_sem);
 	std::get<1>(files_metadata[path_c]) = offset + bytes_received;
 	std::get<5>(files_metadata[path_c]) = file_size;
 	Capio_file& c_file = std::get<4>(files_metadata[path_c]);
+	sem_post(&files_metadata_sem);
     #ifdef CAPIOLOG
 	logfile << "insert offset " << offset << " bytes_received " << bytes_received << std::endl;
 #endif
@@ -1759,7 +1851,9 @@ void solve_remote_reads(size_t bytes_received, size_t offset, size_t file_size, 
     #ifdef CAPIOLOG
 			logfile << "end of sector " << end_of_sector << std::endl;
 #endif
+		sem_wait(&files_metadata_sem);
 			char* p = (char*) std::get<0>(files_metadata[path]);
+		sem_post(&files_metadata_sem);
 
 			size_t bytes_read;
 			off64_t end_of_read = fd_offset + count;
@@ -1771,7 +1865,9 @@ void solve_remote_reads(size_t bytes_received, size_t offset, size_t file_size, 
 				bytes_read = end_of_sector - fd_offset;
 
 			if (is_getdent) {
+				sem_wait(&files_metadata_sem);
 				off64_t dir_size = std::get<1>(files_metadata[path]);
+				sem_post(&files_metadata_sem);
 				off64_t n_entries = dir_size / theoretical_size_dirent64;
 				char* p_getdents = (char*) malloc(n_entries * sizeof(char) * dir_size); 
 				end_of_sector = convert_dirent64_to_dirent(p, p_getdents, dir_size);
@@ -1818,7 +1914,9 @@ void handle_lseek(char* str) {
 	size_t offset;
 	sscanf(str, "seek %d %d %zu", &tid, &fd, &offset);
 	std::string path = processes_files_metadata[tid][fd];
+	sem_wait(&files_metadata_sem);
 	Capio_file& c_file = std::get<4>(files_metadata[path]);
+	sem_post(&files_metadata_sem);
 	off64_t sector_end = c_file.get_sector_end(offset);
 	response_buffers[tid]->write(&sector_end);
 }
@@ -1828,7 +1926,9 @@ void handle_sdat(char* str) {
 	size_t offset;
 	sscanf(str, "sdat %d %d %zu", &tid, &fd, &offset);
 	std::string path = processes_files_metadata[tid][fd];
+	sem_wait(&files_metadata_sem);
 	Capio_file& c_file = std::get<4>(files_metadata[path]);
+	sem_post(&files_metadata_sem);
 	off64_t res = c_file.seek_data(offset);
 	response_buffers[tid]->write(&res);
 }
@@ -1838,7 +1938,9 @@ void handle_shol(char* str) {
 	size_t offset;
 	sscanf(str, "shol %d %d %zu", &tid, &fd, &offset);
 	std::string path = processes_files_metadata[tid][fd];
+	sem_wait(&files_metadata_sem);
 	Capio_file& c_file = std::get<4>(files_metadata[path]);
+	sem_post(&files_metadata_sem);
 	off64_t res = c_file.seek_hole(offset);
 	response_buffers[tid]->write(&res);
 }
@@ -1847,7 +1949,9 @@ void handle_seek_end(char* str) {
 	int tid, fd;	
 	sscanf(str, "send %d %d", &tid, &fd);
 	std::string path = processes_files_metadata[tid][fd];
+	sem_wait(&files_metadata_sem);
 	Capio_file& c_file = std::get<4>(files_metadata[path]);
+	sem_post(&files_metadata_sem);
 	off64_t res = c_file.get_file_size();
 	response_buffers[tid]->write(&res);
 }
@@ -1879,7 +1983,9 @@ void handle_exig(char* str, int rank) {
 		logfile << "path: " << path << std::endl;
 		#endif
 		if (it_conf == metadata_conf.end() || std::get<0>(it_conf->second) == "on_termination" || std::get<0>(it_conf->second).length() == 0) { 
+		sem_wait(&files_metadata_sem);
 			Capio_file& c_file = std::get<4>(files_metadata[path]);
+		sem_post(&files_metadata_sem);
 			#ifdef CAPIOLOG
 			logfile << "committed " << c_file.get_committed() << std::endl;
 			#endif
@@ -1940,8 +2046,10 @@ void handle_exig(char* str, int rank) {
 
 void handle_local_stat(int tid, std::string path) {
 	off64_t file_size;
+	sem_wait(&files_metadata_sem);
 	auto it = files_metadata.find(path);
 	Capio_file& c_file = std::get<4>(it->second);
+	sem_post(&files_metadata_sem);
 	file_size = c_file.get_file_size();
 	off64_t is_dir;
 	if (c_file.is_dir())
@@ -2004,7 +2112,9 @@ void* wait_for_stat(void* pthread_arg) {
 
 	//check if the file is local or remote
 
+	sem_wait(&files_metadata_sem);
 	Capio_file& c_file = std::get<4>(files_metadata[path]);
+	sem_post(&files_metadata_sem);
 	std::string mode = c_file.get_mode();
 	bool complete = c_file.complete;
 	if (complete || strcmp(std::get<0>(files_location[path_to_check]), node_name) == 0 || mode == "append") {
@@ -2034,7 +2144,7 @@ void reply_stat(int tid, std::string path, int rank) {
 				strcpy(metadata->path, path.c_str());
 				int res = pthread_create(&t, NULL, wait_for_stat, (void*) metadata);
 				if (res != 0) {
-					logfile << "error creation of capio server thread wiat for stat" << std::endl;
+					logfile << "error creation of capio server thread wait for stat" << std::endl;
 					MPI_Finalize();
 					exit(1);
 				}
@@ -2051,11 +2161,17 @@ void reply_stat(int tid, std::string path, int rank) {
 		}
 	}
 
+	sem_wait(&files_metadata_sem);
 	if (files_metadata.find(path) == files_metadata.end()) {
+		sem_post(&files_metadata_sem);
 		create_file(path, nullptr, false, file_initial_size);
 	}
+	else
+		sem_post(&files_metadata_sem);
 
+	sem_wait(&files_metadata_sem);
 	Capio_file& c_file = std::get<4>(files_metadata[path]);
+	sem_post(&files_metadata_sem);
 	std::string mode = c_file.get_mode();
 	bool complete = c_file.complete;
 	#ifdef CAPIOLOG
@@ -2116,8 +2232,10 @@ void handle_unlink(const char* str, int rank) {
 		logfile << "handle unlink: " << str << std::endl;
 	#endif
 	sscanf(str, "unlk %d %s", &tid, path);
+	sem_wait(&files_metadata_sem);
 	auto it = files_metadata.find(path);
 	if (it != files_metadata.end()) { //TODO: it works only in the local case
+		sem_post(&files_metadata_sem);
 		res = 0;
 		response_buffers[tid]->write(&res);
 		Capio_file& c_file = std::get<4>(it->second);
@@ -2130,6 +2248,7 @@ void handle_unlink(const char* str, int rank) {
 		}
 	}
 	else {
+		sem_post(&files_metadata_sem);
 		res = -1;
 		response_buffers[tid]->write(&res);
 	}
@@ -2159,7 +2278,9 @@ void handle_clone(const char* str) {
 	}
 	std::unordered_set<std::string> parent_files = get_paths_opened_files(ptid);
 	for(std::string path : parent_files) {
+		sem_wait(&files_metadata_sem);
 		Capio_file& c_file = std::get<4>(files_metadata[path]);
+		sem_post(&files_metadata_sem);
 		++c_file.n_opens;
 	}
 }
@@ -2175,8 +2296,10 @@ off64_t create_dir(int tid, const char* pathname, int rank, bool root_dir) {
 		shm_name = shm_name.substr(1);
 		void* p_shm = new char[dir_initial_size];
 		create_file(pathname, p_shm, true, file_initial_size);	
+		sem_wait(&files_metadata_sem);
 		if (std::get<3>(files_metadata[pathname])) {
 			std::get<3>(files_metadata[pathname]) = false;
+			sem_post(&files_metadata_sem);
 			//TODO: it works only if there is one prod per file
 			if (root_dir) {
 				files_location[pathname] =  std::make_pair(node_name, -1);
@@ -2189,6 +2312,8 @@ off64_t create_dir(int tid, const char* pathname, int rank, bool root_dir) {
 				std::string parent_dir = get_parent_dir_path(pathname);
 				write_entry_dir(tid, parent_dir, pathname, 2);
         }
+		else
+			sem_post(&files_metadata_sem);
 		res = 0;
 	}
 	else {
@@ -2217,7 +2342,9 @@ void handle_dup(const char* str) {
 	processes_files[tid][new_fd] = processes_files[tid][old_fd];
 	std:: string path = processes_files_metadata[tid][old_fd];
 	processes_files_metadata[tid][new_fd] = path;
+	sem_wait(&files_metadata_sem);
 	Capio_file& c_file = std::get<4>(files_metadata[path]);
+	sem_post(&files_metadata_sem);
 	++c_file.n_opens;
 }
 
@@ -2238,11 +2365,13 @@ void handle_rename(const char* str, int rank) {
 	int tid;
 	off64_t res;
 	sscanf(str, "rnam %s %s %d", oldpath, newpath, &tid);
+	sem_wait(&files_metadata_sem);
 	if (files_metadata.find(oldpath) == files_metadata.end())
 		res = 1;
 	else 
 		res = 0;
 
+	sem_post(&files_metadata_sem);
 	response_buffers[tid]->write(&res);
 
 	if (res == 1) {
@@ -2257,10 +2386,12 @@ void handle_rename(const char* str, int rank) {
 		}
 	}
 
+	sem_wait(&files_metadata_sem);
 	auto node = files_metadata.extract(oldpath);
 	node.key() = newpath;
 	files_metadata.insert(std::move(node));
 
+	sem_post(&files_metadata_sem);
 	for (auto& pair : writers) {
 		auto node = pair.second.extract(oldpath);
 		if (!node.empty()) {
@@ -2478,11 +2609,14 @@ void serve_remote_read(const char* path_c, int dest, long int offset, long int n
 	// Useful for caching
 	void* file_shm;
 	size_t file_size;
+	sem_wait(&files_metadata_sem);
 	if (files_metadata.find(path_c) != files_metadata.end()) {
 		file_shm = std::get<0>(files_metadata[path_c]);
 		file_size = std::get<1>(files_metadata[path_c]);
-		}
+		sem_post(&files_metadata_sem);
+	}
 	else {
+		sem_post(&files_metadata_sem);
 		logfile << "error capio_helper file " << path_c << " not in shared memory" << std::endl;
 		exit(1);
 	}
@@ -2533,7 +2667,9 @@ void* wait_for_data(void* pthread_arg) {
 	long int nbytes = rr_metadata->nbytes;
 	sem_wait(rr_metadata->sem);
 	bool complete = *rr_metadata->complete; //warning: possible data races
+	sem_wait(&files_metadata_sem);
 	Capio_file& c_file = std::get<4>(files_metadata[path]);
+	sem_post(&files_metadata_sem);
 	complete = c_file.complete;
 	serve_remote_read(path, dest, offset, nbytes, complete);
 	free(rr_metadata->sem);
@@ -2563,7 +2699,7 @@ int find_batch_size(std::string glob) {
 		return n_files;
 }
 
-void send_n_files(std::string prefix, std::vector<std::string>* files_to_send, std::unordered_set<std::string>& app_files_sent, int n_files, int dest) {
+void send_n_files(std::string prefix, std::vector<std::string>* files_to_send, int n_files, int dest) {
 		std::string msg = "nsend " + prefix;
 		#ifdef CAPIOLOG
 		logfile << "send_n_files " << std::endl;
@@ -2571,10 +2707,11 @@ void send_n_files(std::string prefix, std::vector<std::string>* files_to_send, s
 		size_t prefix_length = prefix.length();
 		for (std::string path : *files_to_send) {
 			msg += " " + path.substr(prefix_length);
+			sem_wait(&files_metadata_sem);
 			auto it = files_metadata.find(path);
 			long int file_size = std::get<1>(it->second);
+			sem_post(&files_metadata_sem);
 			msg += " " + std::to_string(file_size);
-			app_files_sent.insert(path);
 		}
 		const char* msg_cstr = msg.c_str();
 		#ifdef CAPIOLOG
@@ -2583,9 +2720,17 @@ void send_n_files(std::string prefix, std::vector<std::string>* files_to_send, s
 		MPI_Send(msg_cstr, strlen(msg_cstr) + 1, MPI_CHAR, dest, 0, MPI_COMM_WORLD);
 		void* file_shm;
 		for (std::string path : *files_to_send) {
+			sem_wait(&files_metadata_sem);
 			auto it = files_metadata.find(path);
+			if (it == files_metadata.end()) {
+				#ifdef CAPIOLOG
+				logfile << "error send_n_files " << path << " not in files metadata" << std::endl;
+				#endif
+				exit(1);
+			}
 			file_shm = std::get<0>(it->second);
 			long int file_size = std::get<1>(it->second);
+			sem_post(&files_metadata_sem);
 			#ifdef CAPIOLOG
 			logfile << "sending file " << path << " " << file_size << std::endl;
 			#endif
@@ -2600,8 +2745,13 @@ void* wait_for_n_files(void* arg) {
 	logfile << "wait_for_n_files" << std::endl;
 	#endif
 	sem_wait(rr_metadata->sem);
-	send_n_files(rr_metadata->prefix, rr_metadata->files_path, *(rr_metadata->files_sent), rr_metadata->n_files, rr_metadata->dest);
+	send_n_files(rr_metadata->prefix, rr_metadata->files_path, rr_metadata->n_files, rr_metadata->dest);
 	delete rr_metadata->files_path;
+	free(rr_metadata->sem);
+	free(rr_metadata);
+	#ifdef CAPIOLOG
+	logfile << "wait_for_n_files terminating" << std::endl;
+	#endif
 	return nullptr;
 }
 
@@ -2611,8 +2761,10 @@ std::vector<std::string>* files_avaiable(std::string prefix, std::string app, st
 	std::vector<std::string>* files_to_send = new std::vector<std::string>;	
 	std::unordered_set<std::string> &files = files_sent[app];
 
+	sem_wait(&files_metadata_sem);
 	auto it_path_file = files_metadata.find(path_file);
 	if (it_path_file == files_metadata.end()) {
+		sem_post(&files_metadata_sem);
 		return files_to_send;
 	}
 	else {
@@ -2623,27 +2775,36 @@ std::vector<std::string>* files_avaiable(std::string prefix, std::string app, st
 			files.insert(path_file);
 		}
 	}
-
 	auto it = files_metadata.begin();	
-	while (it != files_metadata.end() && n_files_completed < n_files) {
+	sem_post(&files_metadata_sem);
+	while (it != files_metadata.end() && n_files_completed < n_files) { // DATA RACE on files_metadata
 		std::string path = it->first;
-		if (files.find(path) == files.end() && path.compare(0, prefix_length, prefix) == 0) {
+		sem_wait(&files_location_sem);
+		auto it_fs = files_location.find(path);
+		if (files.find(path) == files.end() && it_fs != files_location.end() && strcmp(std::get<0>(it_fs->second), node_name) == 0 && path.compare(0, prefix_length, prefix) == 0) {
+			sem_post(&files_location_sem);
 			Capio_file &c_file = std::get<4>(it->second);
-
-	#ifdef CAPIOLOG
-	logfile << "path " << path << " to send?" << std::endl;
-	#endif
-			if (c_file.complete && !c_file.is_dir()) {
-	#ifdef CAPIOLOG
-	logfile << "yes" << std::endl;
-	#endif
+			#ifdef CAPIOLOG
+			logfile << "path " << path << " to send?" << std::endl;
+			#endif
+			if (c_file.complete && !c_file.is_dir() ) {
+				#ifdef CAPIOLOG
+				logfile << "yes path " << path << std::endl;
+				#endif
 				files_to_send->push_back(path);
 				++n_files_completed;
 				files.insert(path);
 			}
 		}
+		else
+			sem_post(&files_location_sem);
+
 		++it;
 	}
+
+	#ifdef CAPIOLOG
+	logfile << "files avaiable files sent app " << app << files.size() << std::endl;;
+	#endif
 	return files_to_send;
 }
 
@@ -2658,13 +2819,14 @@ void helper_nreads_req(char* buf_recv, int dest) {
 	logfile << " app_name " << app_name << " prefix " << prefix << " path_file " << path_file << std::endl;
 	#endif
     n_files = find_batch_size(prefix);
+	sem_wait(&clients_remote_pending_nfiles_sem); // important even if not using the data structure
 	std::vector<std::string>* files = files_avaiable(prefix, app_name, path_file, n_files);
-	std::unordered_set<std::string>& app_files_sent = files_sent[app_name];
+	sem_post(&clients_remote_pending_nfiles_sem);
 	if (files->size() == n_files) {
 		#ifdef CAPIOLOG
 		logfile << "sending n files" << std::endl;
 		#endif
-		send_n_files(prefix, files, app_files_sent, n_files, dest);
+		send_n_files(prefix, files, n_files, dest);
 		delete files;
 	}
 	else {
@@ -2682,7 +2844,7 @@ void helper_nreads_req(char* buf_recv, int dest) {
 		rr_metadata->dest = dest;
 		rr_metadata->sem = (sem_t*) malloc(sizeof(sem_t));
 		rr_metadata->files_path = files;
-		rr_metadata->files_sent = &app_files_sent;
+		rr_metadata->n_files = n_files;
 		int res = sem_init(rr_metadata->sem, 0, 0);
 
 		if (res !=0) {
@@ -2698,8 +2860,9 @@ void helper_nreads_req(char* buf_recv, int dest) {
 			MPI_Finalize();
 			exit(1);
 		}
-
+		sem_wait(&clients_remote_pending_nfiles_sem);
 		clients_remote_pending_nfiles[app_name].push_back(rr_metadata);
+		sem_post(&clients_remote_pending_nfiles_sem);
 	}
 	free(prefix);
 	free(path_file);
@@ -2812,8 +2975,10 @@ void helper_stat_req(const char* buf_recv) {
 	//for (auto p : files_metadata) {
 //		logfile << "files metadata " << p.first << std::endl;
 //	}
+	sem_wait(&files_metadata_sem);
 	Capio_file& c_file = std::get<4>(files_metadata[path_c]);	
 
+	sem_post(&files_metadata_sem);
 	if (c_file.complete) {
 		serve_remote_stat(path_c, dest, c_file);
 	}
@@ -2888,9 +3053,11 @@ void recv_nfiles(char* buf_recv, int source) {
 		files.push_back(std::make_pair(path, bytes_received));
 		void* p_shm;
 		Capio_file* c_file;
+		sem_wait(&files_metadata_sem);
 		auto it = files_metadata.find(path);
 		long int file_size = std::stoi(bytes_received);
 		if (it == files_metadata.end()) {			
+		sem_post(&files_metadata_sem);
 			#ifdef CAPIOLOG
 			logfile << "creating new file " << path <<  std::endl;
 			#endif
@@ -2901,6 +3068,7 @@ void recv_nfiles(char* buf_recv, int source) {
 			files_location[path] = std::make_pair(p_node_name, -1);
 			p_shm = new char[file_size];
 			create_file(path, p_shm, false, file_size);
+			sem_wait(&files_metadata_sem);
 			it = files_metadata.find(path);
 			if (it == files_metadata.end()) {
 				std::cerr << "error recv nfiles" << std::endl;
@@ -2910,8 +3078,10 @@ void recv_nfiles(char* buf_recv, int source) {
 			c_file->insert_sector(0, file_size);
 			c_file->complete = true;
 			std::get<5>(it->second) = file_size;
+			sem_post(&files_metadata_sem);
 		}
 		else {
+			sem_post(&files_metadata_sem);
 			p_shm = std::get<0>(it->second);
 			#ifdef CAPIOLOG
 			logfile << "file was already created " << path <<  std::endl;
@@ -2937,7 +3107,13 @@ void recv_nfiles(char* buf_recv, int source) {
 	for (const auto& pair : files) {
 		std::string file_path = pair.first;
 		std::string bytes_received = pair.second;
+		#ifdef CAPIOLOG
+			logfile << " checking remote pending reads for file " << file_path << std::endl;
+		#endif
 		if (my_remote_pending_reads.find(file_path) != my_remote_pending_reads.end()) {		
+		#ifdef CAPIOLOG
+			logfile << " solving remote pending reads for file " << file_path << std::endl;
+		#endif
 			//std::string msg = "ream " + file_path + " " + bytes_received + " " + std::to_string(0) + " " + std::to_string(complete) + " " + bytes_received;
 			solve_remote_reads(std::stol(bytes_received), 0, std::stol(bytes_received), file_path.c_str(), true);
 		}
@@ -2972,9 +3148,11 @@ void* capio_helper(void* pthread_arg) {
 			sscanf(buf_recv, "read %s %d %ld %ld", path_c, &dest, &offset, &nbytes);
 			
 			//check if the data is avaiable
+			sem_wait(&files_metadata_sem);
 			auto it = files_metadata.find(path_c);
 			long int file_size = std::get<1>(it->second);
 			Capio_file& c_file = std::get<4>(it->second);
+			sem_post(&files_metadata_sem);
 			bool complete = c_file.complete; 
 			if (complete || (c_file.get_mode() == "append" && data_avaiable(path_c, offset, nbytes, file_size))) {
 				#ifdef CAPIOLOG
@@ -3002,7 +3180,7 @@ void* capio_helper(void* pthread_arg) {
 				}
 				res = pthread_create(&t, NULL, wait_for_data, (void*) rr_metadata);
 				if (res != 0) {
-					logfile << "error creation of capio server thread" << std::endl;
+					logfile << "error creation of capio server thread helper loop wait for data" << std::endl;
 					MPI_Finalize();
 					exit(1);
 				}
@@ -3024,9 +3202,11 @@ void* capio_helper(void* pthread_arg) {
 			bool complete = complete_tmp;
 			std::string path(path_c);
 			void* file_shm; 
+			sem_wait(&files_metadata_sem);
 			auto it = files_metadata.find(path);
 			if (it != files_metadata.end()) {
 				file_shm = std::get<0>(files_metadata[path]);
+				sem_post(&files_metadata_sem);
 			}
 			else {
 				logfile << "error capio_helper file " << path << " not in shared memory" << std::endl;
@@ -3256,6 +3436,17 @@ void get_prefetch_data_size() {
 	#endif	
 }
 
+void get_file_initial_size() {
+	char* val;
+	val = getenv("CAPIO_FILE_INIT_SIZE");
+	if (val != NULL) {
+		file_initial_size = strtol(val, NULL, 10);
+	}
+	#ifdef CAPIOLOG
+	logfile << "FILE_INITIAL_SIZE " << file_initial_size << std::endl;
+	#endif	
+}
+
 int main(int argc, char** argv) {
 	int rank, len, provided;
 	MPI_Init_thread(&argc, &argv, MPI_THREAD_MULTIPLE, &provided);
@@ -3269,6 +3460,7 @@ int main(int argc, char** argv) {
   	logfile.open (server_log_path + "_" + std::to_string(rank), std::ofstream::out);
 	get_capio_dir();
 	get_prefetch_data_size();
+	get_file_initial_size();
 	if (argc == 3) {
 		conf_file = argv[2];
 		parse_conf_file(conf_file);
@@ -3290,13 +3482,16 @@ int main(int argc, char** argv) {
 	sem_init(&handle_remote_read_sem, 0, 1);
 	sem_init(&handle_remote_stat_sem, 0, 1);
 	sem_init(&handle_local_read_sem, 0, 1);
+	sem_init(&files_metadata_sem, 0, 1);
+	sem_init(&files_location_sem, 0, 1);
+	sem_init(&clients_remote_pending_nfiles_sem, 0, 1);
 	if (res !=0) {
 		logfile << __FILE__ << ":" << __LINE__ << " - " << std::flush;
 		perror("sem_init failed"); exit(res);
 	}
 	res = pthread_create(&server_thread, NULL, capio_server, &rank);
 	if (res != 0) {
-		logfile << "error creation of capio server thread" << std::endl;
+		logfile << "error creation of capio server main thread" << std::endl;
 		MPI_Finalize();
 		return 1;
 	}
