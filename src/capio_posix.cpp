@@ -242,6 +242,14 @@ void get_app_name() {
 	}
 }
 
+void create_buf_thread(int tid) {
+	std::string shm_name = "capio_write_data_buffer_tid_" + std::to_string(tid);
+	auto* write_queue = new SPSC_queue<char>(shm_name, N_ELEMS_DATA_BUFS, WINDOW_DATA_BUFS);
+	shm_name = "capio_read_data_buffer_tid_" + std::to_string(tid);
+	auto* read_queue = new SPSC_queue<char>(shm_name, N_ELEMS_DATA_BUFS, WINDOW_DATA_BUFS);
+	threads_data_bufs->insert({tid, {write_queue, read_queue}});	
+}
+
 /*
  * This function must be called only once
  *
@@ -282,11 +290,7 @@ void mtrace_init(void) {
 			initialize_from_snapshot(fd_shm);
 		}
 		threads_data_bufs = new std::unordered_map<int, std::pair<SPSC_queue<char>*, SPSC_queue<char>*>>;
-		std::string shm_name = "capio_write_data_buffer_tid_" + std::to_string(my_tid);
-		auto* write_queue = new SPSC_queue<char>(shm_name, N_ELEMS_DATA_BUFS, WINDOW_DATA_BUFS);
-		shm_name = "capio_read_data_buffer_tid_" + std::to_string(my_tid);
-		auto* read_queue = new SPSC_queue<char>(shm_name, N_ELEMS_DATA_BUFS, WINDOW_DATA_BUFS);
-		threads_data_bufs->insert({my_tid, {write_queue, read_queue}});
+		create_buf_thread(my_tid);
 	}
 	char* val;
 	if (capio_dir == nullptr) {
@@ -349,8 +353,10 @@ void mtrace_init(void) {
 	CAPIO_DBG("thread created init\n");
 	#endif
 		sprintf(c_str, "clon %ld %d", parent_tid, my_tid);
+		create_buf_thread(my_tid);
 		buf_requests->write(c_str, 256 * sizeof(char));
 		sem_post(sem_family);
+		
 	#ifdef CAPIOLOG
 	CAPIO_DBG("thread created init end\n");
 	#endif
@@ -510,13 +516,29 @@ std::string create_absolute_path(const char* pathname) {
 }
 
 
-void add_open_request(const char* pathname, size_t fd, bool is_creat) {
+/*
+	Return 0 on success and 1 on error
+*/
+
+int add_open_request(const char* pathname, size_t fd, int mode) {
 	char c_str[256];
-	if (is_creat)
+	if (mode == 0) {
+		sprintf(c_str, "crax %ld %ld %s", syscall(SYS_gettid), fd, pathname);
+		buf_requests->write(c_str, 256 * sizeof(char));
+		off64_t res;
+		(*bufs_response)[syscall(SYS_gettid)]->read(&res);
+		return res;
+	}
+	else if (mode == 1) 
 		sprintf(c_str, "crat %ld %ld %s", syscall(SYS_gettid), fd, pathname);
-	else
+	else if (mode == 2)
 		sprintf(c_str, "open %ld %ld %s", syscall(SYS_gettid), fd, pathname);
+	else {
+		std::cerr << "error add_open_request mode " << mode << std::endl;
+		exit(1);
+	}
 	buf_requests->write(c_str, 256 * sizeof(char)); //TODO: max upperbound for pathname
+	return 0;
 }
 
 int add_close_request(int fd) {
@@ -687,8 +709,15 @@ void write_shm(SPSC_queue<char>* data_buf, size_t offset, const void* buffer, of
 		data_buf->write((char*) buffer + i * WINDOW_DATA_BUFS);
 		++i;
 	}
-	if (r)
+	if (r) {
+		#ifdef CAPIOLOG
+		CAPIO_DBG("write shm debug before\n");
+		#endif
 		data_buf->write((char*) buffer + i * WINDOW_DATA_BUFS, r);
+		#ifdef CAPIOLOG
+		CAPIO_DBG("write shm debug after\n");
+		#endif
+	}
 	//sem_post((*sems_write)[syscall(SYS_gettid)]);
 }
 
@@ -942,7 +971,19 @@ int capio_openat(int dirfd, const char* pathname, int flags, bool is_creat) {
 			}
 			if (!is_creat)
 				is_creat = (flags & O_CREAT) == O_CREAT;
-			add_open_request(path_to_check.c_str(), fd, is_creat);
+			bool excl = (flags & O_EXCL) == O_EXCL;
+			int mode;
+			if (excl)
+				mode = 0;
+			else if (is_creat)
+				mode = 1;
+			else
+				mode = 2;
+			int res = add_open_request(path_to_check.c_str(), fd, mode);
+			if (res == 1) {
+				errno = EEXIST;
+				return -1;
+			}
 			off64_t* p_offset = (off64_t*) create_shm("offset_" + std::to_string(syscall(SYS_gettid)) + "_" + std::to_string(fd), sizeof(off64_t));
 			*p_offset = 0;
 			off64_t* init_size = new off64_t;

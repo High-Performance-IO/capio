@@ -551,7 +551,7 @@ void create_file(std::string path, void* p_shm, bool is_dir, off64_t init_size) 
 		long int pos = match_globs(path);
 		if (pos == -1) {
         #ifdef CAPIOLOG
-		logfile << "creating file withtout conf file " << path << std::endl;
+		logfile << "creating file without conf file " << path << std::endl;
 		#endif
 			if (is_dir) {
 				init_size = dir_initial_size;
@@ -559,6 +559,9 @@ void create_file(std::string path, void* p_shm, bool is_dir, off64_t init_size) 
 			if (p_shm == nullptr) {
 				p_shm = new char[init_size];
 			}
+			#ifdef CAPIOLOG
+		logfile << "init size " << init_size << std::endl;
+		#endif
 			sem_wait(&files_metadata_sem);
 			files_metadata[path] = std::make_tuple(p_shm, p_shm_size, init_size, true, Capio_file(is_dir), 0, new std::vector<std::tuple<int, int>>);
 			sem_post(&files_metadata_sem);
@@ -805,9 +808,9 @@ void open_files_metadata(int rank) {
 
 void update_dir(int tid, std::string file_path, int rank) {
 	std::string dir = get_parent_dir_path(file_path);
-        #ifdef CAPIOLOG
+    #ifdef CAPIOLOG
         logfile << "update dir " << dir << std::endl;
-        #endif
+    #endif
 	sem_wait(&files_metadata_sem);
     if (std::get<3>(files_metadata[dir])) {
 		std::get<3>(files_metadata[dir]) = false;
@@ -824,21 +827,8 @@ void update_dir(int tid, std::string file_path, int rank) {
 	return;
 }
 
-//TODO: function too long
-
-void handle_open(char* str, char* p, int rank, bool is_creat) {
-	#ifdef CAPIOLOG
-	logfile << "handle open" << std::endl;
-	#endif
-	int tid, fd;
-	char path_cstr[PATH_MAX];
+void update_file_metadata(std::string path, int tid, int fd, int rank, bool is_creat) {
 	void* p_shm;
-	if (is_creat)
-		sscanf(str, "crat %d %d %s", &tid, &fd, path_cstr);
-	else
-		sscanf(str, "open %d %d %s", &tid, &fd, path_cstr);
-	init_process(tid);
-	std::string path(path_cstr);
 	//int index = *caching_info[tid].second;
 	//caching_info[tid].first[index] = fd;
 	//if (on_disk.find(path) == on_disk.end()) {
@@ -897,6 +887,38 @@ void handle_open(char* str, char* p, int rank, bool is_creat) {
 	}
 	else
 		sem_post(&files_metadata_sem);
+}
+
+void handle_crax(const char* str, int rank) {
+	int tid, fd;
+	char path_cstr[PATH_MAX];
+	off64_t res = 1;
+	sscanf(str, "crax %d %d %s", &tid, &fd, path_cstr);
+	std::string path(path_cstr);
+	init_process(tid);
+	if (files_metadata.find(path) == files_metadata.end()) {
+		res = 0;
+		response_buffers[tid]->write(&res);
+		update_file_metadata(path, tid, fd, rank, true);
+	}
+	else
+		response_buffers[tid]->write(&res);
+}
+
+//TODO: function too long
+
+void handle_open(char* str, int rank, bool is_creat) {
+	#ifdef CAPIOLOG
+	logfile << "handle open" << std::endl;
+	#endif
+	int tid, fd;
+	char path_cstr[PATH_MAX];
+	if (is_creat)
+		sscanf(str, "crat %d %d %s", &tid, &fd, path_cstr);
+	else
+		sscanf(str, "open %d %d %s", &tid, &fd, path_cstr);
+	init_process(tid);
+	update_file_metadata(path_cstr, tid, fd, rank, is_creat);
 }
 
 void send_data_to_client(int tid, char* buf, long int count) {
@@ -972,6 +994,7 @@ struct handle_write_metadata{
 	char str[64];
 	long int rank;
 };
+
 
 
 void handle_write(const char* str, int rank) {
@@ -2464,9 +2487,11 @@ void read_next_msg(int rank) {
 	else if (strncmp(str, "hans", 4) == 0)
 		handle_handshake(str, false);
 	else if (strncmp(str, "crat", 4) == 0)
-		handle_open(str, p, rank, true);
+		handle_open(str, rank, true);
 	else if (strncmp(str, "open", 4) == 0)
-		handle_open(str, p, rank, false);
+		handle_open(str, rank, false);
+	else if (strncmp(str, "crax", 4) == 0)
+		handle_crax(str, rank);
 	else if (strncmp(str, "writ", 4) == 0)
 		handle_write(str, rank);
 	else if (strncmp(str, "read", 4) == 0)
@@ -3453,7 +3478,7 @@ int main(int argc, char** argv) {
 	MPI_Comm_rank(MPI_COMM_WORLD, &rank);
 	std::string conf_file;
 	if (argc < 2 || argc > 3) {
-		logfile << "input error: ./capio_server server_log_path [conf_file]" << std::endl;
+		std::cerr << "input error: ./capio_server server_log_path [conf_file]" << std::endl;
 		exit(1);
 	}
 	std::string server_log_path = argv[1];
