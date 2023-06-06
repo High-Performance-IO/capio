@@ -266,7 +266,7 @@ void mtrace_init(void) {
 			CAPIO_DBG("sem wait parent before %ld %ld\n", parent_tid, my_tid);
 			CAPIO_DBG("sem_family %ld\n", sem_family);
 		#endif
-		sem_wait(sem_family);
+		//sem_wait(sem_family);
 		#ifdef CAPIOLOG
 			CAPIO_DBG("sem wait parent after\n");
 		#endif
@@ -355,7 +355,7 @@ void mtrace_init(void) {
 		sprintf(c_str, "clon %ld %d", parent_tid, my_tid);
 		create_buf_thread(my_tid);
 		buf_requests->write(c_str, 256 * sizeof(char));
-		sem_post(sem_family);
+		//sem_post(sem_family);
 		
 	#ifdef CAPIOLOG
 	CAPIO_DBG("thread created init end\n");
@@ -1531,31 +1531,34 @@ int is_capio_file(std::string abs_path) {
 		return -1;
 }
 
+int capio_file_exists(std::string path) {
+	off64_t res;
+	char c_str[256];
+	int tid = syscall(SYS_gettid);
+	sprintf(c_str, "accs %d %s", tid, path.c_str());
+	buf_requests->write(c_str, 256 * sizeof(char));
+	(*bufs_response)[tid]->read(&res);
+	return res;
+}
+
 int capio_access(const char* pathname, int mode) {
-	if (mode == F_OK) {
+	//if (mode == F_OK) {
 		std::string abs_pathname = create_absolute_path(pathname);
 		abs_pathname = create_absolute_path(pathname);
 		if (abs_pathname.length() == 0) {
 			errno = ENONET;
 			return -1;
 		}
-		return is_capio_file(abs_pathname);
-	}
-	else if ((mode | X_OK) == X_OK) {
+			return capio_file_exists(abs_pathname);
+//	}
+	/*else if ((mode | X_OK) == X_OK) {
 		return -1;
 	}
 	else
-		return 0;
+		return -2;
+		*/
 }
 
-int capio_file_exists(std::string path) {
-	off64_t res;
-	char c_str[256];
-	sprintf(c_str, "accs %s", path.c_str());
-	buf_requests->write(c_str, 256 * sizeof(char));
-	(*bufs_response)[syscall(SYS_gettid)]->read(&res);
-	return res;
-}
 
 int capio_faccessat(int dirfd, const char* pathname, int mode, int flags) {
 	int res;
@@ -1585,7 +1588,7 @@ int capio_faccessat(int dirfd, const char* pathname, int mode, int flags) {
 		}
 	}
 	else { //dirfd is ignored
-		res = capio_access(pathname, mode);
+		res = capio_file_exists(pathname);
 	}
 	return res;
 }
@@ -2062,6 +2065,9 @@ bool is_prefix(std::string path_1, std::string path_2) {
 int capio_rename(const char* oldpath, const char* newpath) {
 	int res = 0;
 	std::string oldpath_abs, newpath_abs;	
+	#ifdef CAPIOLOG
+		CAPIO_DBG("rename captured, checking if are CAPIO files...\n");
+	#endif
 	if(is_absolute(oldpath)) {
 		oldpath_abs = oldpath;
 	}

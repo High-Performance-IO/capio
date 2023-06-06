@@ -2243,6 +2243,9 @@ void handle_access(const char* str) {
 		res = -1;
 	else 
 		res = 0;
+	#ifdef CAPIOLOG
+		logfile << "handle access result: " << res << std::endl;
+	#endif
 	response_buffers[tid]->write(&res);
 }
 
@@ -2388,6 +2391,10 @@ void handle_rename(const char* str, int rank) {
 	int tid;
 	off64_t res;
 	sscanf(str, "rnam %s %s %d", oldpath, newpath, &tid);
+
+	#ifdef CAPIOLOG
+		logfile << "handling rename " << std::endl;
+	#endif
 	sem_wait(&files_metadata_sem);
 	if (files_metadata.find(oldpath) == files_metadata.end())
 		res = 1;
