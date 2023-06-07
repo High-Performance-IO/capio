@@ -10,7 +10,7 @@ using sec = std::chrono::duration<double>;
 
 void writer(int rank, int* array, long int num_writes, int receiver) {
 	std::ofstream file;
-	long int num_elements;
+	std::size_t num_elements;
 	cclock::time_point before;
 	if (rank == 0) {
 		file.open("time_mpi_sender.txt", std::fstream::app);
@@ -22,7 +22,7 @@ void writer(int rank, int* array, long int num_writes, int receiver) {
 		long int num_elements_to_send = 0;
 		MPI_Recv(&num_elements, 1, MPI_LONG_INT, receiver, 1, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
 		std::cout << "num elements received " << num_elements << std::endl;
-		for (long int k = 0; k < num_elements; k += num_elements_to_send) {
+		for (std::size_t k = 0; k < num_elements; k += num_elements_to_send) {
 			if (num_elements - k > 1024L * 1024 * 1024 / sizeof(int))
 				num_elements_to_send = 1024L * 1024 * 1024 / sizeof(int);
 			else

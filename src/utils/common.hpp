@@ -12,11 +12,12 @@
 #include <unistd.h>
 
 
-static bool is_absolute(const char* pathname) {
+static inline bool is_absolute(const char* pathname) {
 	return (pathname ? (pathname[0]=='/') : false);
 }
 
-static int is_directory(int dirfd) {
+
+static inline int is_directory(int dirfd) {
 	struct stat path_stat;
     if (fstat(dirfd, &path_stat) != 0) {
 		std::cerr << "error: stat" << " errno " <<  errno << " strerror(errno): " << strerror(errno) << std::endl;
@@ -24,7 +25,8 @@ static int is_directory(int dirfd) {
 	}
     return S_ISDIR(path_stat.st_mode);  // 1 is a directory 
 }
-static int is_directory(const char *path) {
+
+static inline int is_directory(const char *path) {
    struct stat statbuf;
    if (stat(path, &statbuf) != 0) {
 		std::cerr << "error: stat" << " errno " <<  errno << " strerror(errno): " << strerror(errno) << std::endl;
