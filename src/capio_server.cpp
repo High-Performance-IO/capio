@@ -215,7 +215,7 @@ std::unordered_set<std::string> on_disk;
 
 struct remote_n_files {
 	char* prefix;
-	int n_files;
+	std::size_t n_files;
 	int dest;
 	std::vector<std::string>* files_path;
 	sem_t* sem;
@@ -348,7 +348,7 @@ void write_file_location(int rank, std::string path_to_write, int tid) {
  *
 */
 
-int check_file_location(int index, int rank, std::string path_to_check) {
+int check_file_location(std::size_t index, int rank, std::string path_to_check) {
     FILE * fp;
 	bool seek_needed;
     char * line = NULL;
@@ -1290,7 +1290,12 @@ void handle_remote_read(int tid, int fd, off64_t count, int rank, bool dir, bool
 		logfile << "complete " << c_file.complete << " end_of_read " << end_of_read << std::endl;
 		logfile << " end_of_sector " << end_of_sector << " real_file_size " << real_file_size << std::endl;
 		#endif
-		if (c_file.complete && (end_of_read <= end_of_sector || end_of_sector == real_file_size)) {
+		std::size_t eos;
+		if (end_of_sector == -1)
+			eos = 0;
+		else 
+			eos = end_of_sector;
+		if (c_file.complete && (end_of_read <= end_of_sector || eos == real_file_size)) {
 			handle_local_read(tid, fd, count, dir, is_getdents, true);
 			sem_post(&handle_remote_read_sem);
 			return;
@@ -1333,9 +1338,6 @@ void loop_check_files_location(std::string path_to_check, int rank) {
 	#ifdef CAPIOLOG
 	logfile << "wait for file before" << std::endl;
 	#endif
-	
-	const char* path_to_check_cstr = path_to_check.c_str();
-
 	struct timespec sleepTime, returnTime;
     sleepTime.tv_sec = 0;
     sleepTime.tv_nsec = 200000;
@@ -1359,10 +1361,10 @@ bool handle_nreads(std::string path, std::string app_name, int dest) {
 			logfile << "glob matched" << std::endl;
 		#endif
 		std::string glob = std::get<0>(metadata_conf_globs[pos]);
-		int batch_size = std::get<5>(metadata_conf_globs[pos]);
+		std::size_t batch_size = std::get<5>(metadata_conf_globs[pos]);
 		if (batch_size > 0) {
 			char* msg = (char*) malloc(sizeof(char) * (512 + PATH_MAX));
-			sprintf(msg, "nrea %d %s %s %s", batch_size, app_name.c_str(), glob.c_str(), path.c_str());
+			sprintf(msg, "nrea %zu %s %s %s", batch_size, app_name.c_str(), glob.c_str(), path.c_str());
 			MPI_Send(msg, strlen(msg) + 1, MPI_CHAR, dest, 0, MPI_COMM_WORLD);
 			success = true;
 			#ifdef CAPIOLOG
@@ -1575,15 +1577,6 @@ int delete_from_file_locations(std::string file_name, std::string path_to_remove
 			++i;
 		}
 		path[i] = '\0';
-		char node_str[1024]; //TODO: heap memory 
-		++i;
-		int j = 0;
-		while(line[i] != '\n') {
-			node_str[j] = line[i];
-			++i;
-			++j;
-		}
-		node_str[j] = '\0';
 		if (strcmp(path, path_to_check_cstr) == 0) {
 			found = true;
 		}
@@ -1609,11 +1602,7 @@ int delete_from_file_locations(std::string file_name, std::string path_to_remove
     return res;
 }
 
-void delete_from_file_locations(std::string path_metadata, long int offset, int my_rank, int rank) {
-    char * line = NULL;
-    size_t len = 0;
-    ssize_t read = 0;
-    int res = 0;
+void delete_from_file_locations(std::string path_metadata, long int offset, int my_rank, std::size_t rank) {
     struct flock lock;
     memset(&lock, 0, sizeof(lock));
     lock.l_type = F_WRLCK;    /* shared lock for read*/
@@ -2153,7 +2142,6 @@ void* wait_for_stat(void* pthread_arg) {
 
 
 void reply_stat(int tid, std::string path, int rank) {
-	char* p_shm;
 	if (files_location.find(path) == files_location.end()) {
 		check_file_location(rank, path);
 		if (files_location.find(path) == files_location.end()) {
@@ -2269,8 +2257,9 @@ void handle_unlink(const char* str, int rank) {
 		#ifdef CAPIOLOG
 		logfile << "capio unlink n links " << c_file.n_links << " n opens " << c_file.n_opens;
 		#endif
-		if (c_file.n_opens == 0 && c_file.n_links <= 0) {
+			if (c_file.n_opens == 0 && c_file.n_links <= 0) {
 			delete_file(path, rank);
+			
 		}
 	}
 	else {
@@ -2548,12 +2537,11 @@ void read_next_msg(int rank) {
 }
 
 void clean_files_location() {
-	int res = 0;
 	std::string file_name;
 	for (int rank = 0; rank < n_servers; ++rank) {
 		std::string rank_str = std::to_string(rank);
 		file_name = "files_location_" + rank_str + ".txt";
-		res = remove(file_name.c_str());
+		remove(file_name.c_str());
 	}
 }
 
@@ -2716,7 +2704,8 @@ bool data_avaiable(const char* path_c, long int offset, long int nbytes_requeste
 
 int find_batch_size(std::string glob) {
 		bool found = false;
-		int n_files, i = 0;
+		int n_files; 
+		std::size_t i = 0;
 
 		while (!found && i < metadata_conf_globs.size()) {
 			found = glob == std::get<0>(metadata_conf_globs[i]);
@@ -2844,8 +2833,8 @@ void helper_nreads_req(char* buf_recv, int dest) {
 	char* prefix = (char*) malloc(sizeof(char) * PATH_MAX);
 	char* path_file = (char*) malloc(sizeof(char) * PATH_MAX);
 	char* app_name = (char*) malloc(sizeof(char) * 512);
-	int n_files;
-	sscanf(buf_recv, "nrea %d %s %s %s", &n_files, app_name, prefix, path_file);
+	std::size_t n_files;
+	sscanf(buf_recv, "nrea %zu %s %s %s", &n_files, app_name, prefix, path_file);
 	#ifdef CAPIOLOG
 	logfile << "helper_nreads_req n_files " << n_files;
 	logfile << " app_name " << app_name << " prefix " << prefix << " path_file " << path_file << std::endl;
@@ -3075,7 +3064,6 @@ void recv_nfiles(char* buf_recv, int source) {
 	#ifdef CAPIOLOG
 	logfile << "recv_nfiles prefix " << prefix << std::endl;
 	#endif
-	MPI_Status status;
 	while (getline(input_stringstream, path, ' ')) {
 		#ifdef CAPIOLOG
 		logfile << "recv_nfiles path " << path << std::endl;
@@ -3135,7 +3123,6 @@ void recv_nfiles(char* buf_recv, int source) {
 		
 
 	}
-	int complete = true;
 	for (const auto& pair : files) {
 		std::string file_path = pair.first;
 		std::string bytes_received = pair.second;
@@ -3156,7 +3143,6 @@ void* capio_helper(void* pthread_arg) {
 	size_t buf_size = sizeof(char) * (PATH_MAX + 81920);
 	char* buf_recv = (char*) malloc(buf_size);
 	MPI_Status status;
-	int rank = *(int*) pthread_arg;
 	sem_wait(&internal_server_sem);
 	while(true) {
 		#ifdef CAPIOLOG
@@ -3302,7 +3288,7 @@ void parse_conf_file(std::string conf_file) {
 		exit(1);
 	}
 	ondemand::document entries = parser.iterate(json);
-	auto workflow_name = entries["name"];	
+	entries["name"];	
 	auto io_graph = entries["IO_Graph"];
 	for (auto app : io_graph) {
 		std::string_view app_name = app["name"].get_string();
@@ -3527,7 +3513,7 @@ int main(int argc, char** argv) {
 		MPI_Finalize();
 		return 1;
 	}
-	res = pthread_create(&helper_thread, NULL, capio_helper, &rank);
+	res = pthread_create(&helper_thread, NULL, capio_helper, nullptr);
 	if (res != 0) {
 		logfile << "error creation of helper server thread" << std::endl;
 		MPI_Finalize();

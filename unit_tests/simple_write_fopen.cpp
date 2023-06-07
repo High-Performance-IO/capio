@@ -25,7 +25,6 @@ void write_to_file(int* data, long int num_elements, long int num_writes, int ra
 		exit(1);
 	}
 	for (long int i = 0; i < num_writes; ++i) {
-		int res = 0;
 		long int k = 0;
     	long int num_elements_written;
     	while (k < num_elements) {

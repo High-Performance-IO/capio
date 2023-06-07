@@ -8,7 +8,7 @@
 using cclock = std::chrono::system_clock;
 using sec = std::chrono::duration<double>;
 
-void writer(int rank, int* array, long int num_writes, long int num_elements, int receiver) {
+void writer(int rank, int* array, long int num_writes, std::size_t num_elements, int receiver) {
 	std::ofstream file;
 	cclock::time_point before;
 	if (rank == 0) {
@@ -19,7 +19,7 @@ void writer(int rank, int* array, long int num_writes, long int num_elements, in
 
     for (long int i = 0; i < num_writes; ++i) {
 		long int num_elements_to_send = 0;
-		for (long int k = 0; k < num_elements; k += num_elements_to_send) {
+		for (std::size_t k = 0; k < num_elements; k += num_elements_to_send) {
 			if (num_elements - k > 1024L * 1024 * 1024 / sizeof(int))
 				num_elements_to_send = 1024L * 1024 * 1024 / sizeof(int);
 			else
@@ -49,7 +49,7 @@ int sum_all(int *data, long int num_elements, long int num_reads) {
 	return sum;
 }
 
-void reader(int rank, int master_rank, int* array, long int num_reads, long int num_elements, int sender) {
+void reader(int rank, int master_rank, int* array, long int num_reads, std::size_t num_elements, int sender) {
 	MPI_Status status;
 	std::ofstream file;
 	cclock::time_point before;
@@ -60,7 +60,7 @@ void reader(int rank, int master_rank, int* array, long int num_reads, long int 
 	}
     for (long int i = 0; i < num_reads; ++i) {
 		int num_elements_received = 0;
-		for (long int k = 0; k < num_elements; k += num_elements_received) {
+		for (std::size_t k = 0; k < num_elements; k += num_elements_received) {
 			if (num_elements - k > 1024L * 1024 * 1024 / sizeof(int))
         		MPI_Recv(array + num_elements * i + k, 1024L * 1024 * 1024, MPI_INT, sender, 0, MPI_COMM_WORLD, &status);
 			else

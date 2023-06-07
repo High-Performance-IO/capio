@@ -139,6 +139,8 @@ bool thread_created = false;
 std::unordered_map<int, std::pair<SPSC_queue<char>*, SPSC_queue<char>*>>* threads_data_bufs = nullptr;
 
 // -------------------------  utility functions:
+
+
 static blkcnt_t get_nblocks(off64_t file_size) {
 	if (file_size % 4096 == 0)
 		return file_size / 512;
