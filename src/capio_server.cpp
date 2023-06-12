@@ -3419,28 +3419,31 @@ void parse_conf_file(std::string conf_file) {
 void get_capio_dir() {
 	char* val;
 	if (capio_dir == nullptr) {
-	val = getenv("CAPIO_DIR");
-	try {
-		if (val == NULL) {
-			capio_dir = new std::string(std::filesystem::canonical("."));	
+		val = getenv("CAPIO_DIR");
+		try {
+			if (val == NULL) {
+				capio_dir = new std::string(std::filesystem::canonical("."));	
+			}
+			else {
+				capio_dir = new std::string(std::filesystem::canonical(val));
+			}
 		}
-		else {
-			capio_dir = new std::string(std::filesystem::canonical(val));
+		catch (const std::exception& ex) {
+			if (val == NULL)
+				logfile << "error CAPIO_DIR: current directory not valid" << std::endl;
+			else
+				logfile << "error CAPIO_DIR: directory " << val << " does not exist" << std::endl; 
+			exit(1);
 		}
-	}
-	catch (const std::exception& ex) {
-		exit(1);
-	}
-	int res = is_directory(capio_dir->c_str());
-	if (res == 0) {
-		logfile << "dir " << capio_dir << " is not a directory" << std::endl;
-		exit(1);
-	}
+		int res = is_directory(capio_dir->c_str());
+		if (res == 0) {
+			logfile << "dir " << capio_dir << " is not a directory" << std::endl;
+			exit(1);
+		}
 	}
 	#ifdef CAPIOLOG
 	logfile << "capio dir " << *capio_dir << std::endl;
 	#endif	
-
 }
 
 void get_prefetch_data_size() {
