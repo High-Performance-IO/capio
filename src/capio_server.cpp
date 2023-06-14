@@ -260,20 +260,13 @@ void sig_term_handler(int signum, siginfo_t *info, void *ptr) {
 		}
 	}
 
-	std::string sem_response_write_shm_name;
 	std::string sem_write_shm_name;
 	for (auto& pair : response_buffers) {
 		pair.second->free_shm();
 		delete pair.second;
-//		sem_unlink(("sem_response_read" + std::to_string(pair.first)).c_str());
-		sem_response_write_shm_name = "sem_response_write" + std::to_string(pair.first);
-		//if (sem_unlink(sem_response_write_shm_name.c_str()) == -1)
-			//err_exit("sem_unlink " + sem_response_write_shm_name + " in sig_term_handler", logfile);
 		sem_write_shm_name = "sem_write" + std::to_string(pair.first);
 		if (sem_unlink(sem_write_shm_name.c_str()) == -1)
 			err_exit("sem_unlink " + sem_write_shm_name + "in sig_term_handler", logfile);
-		//shm_unlink(("caching_info" + std::to_string(pair.first)).c_str()); 
-		//shm_unlink(("caching_info_size" + std::to_string(pair.first)).c_str()); 
 	}
 
 	for (auto& p : data_buffers) {
@@ -2045,6 +2038,34 @@ void close_all_files(int tid, int rank) {
 	}
 }
 
+void free_resources(int tid) {
+	std::string sem_write_shm_name;
+	auto it_resp = response_buffers.find(tid);
+	if (it_resp == response_buffers.end()) {
+		std::cerr << "error tid in response_buffers not found" << std::endl;
+		MPI_Finalize();
+		exit(1);
+	}
+	it_resp->second->free_shm();
+	delete it_resp->second;
+	sem_write_shm_name = "sem_write" + std::to_string(it_resp->first);
+	if (sem_unlink(sem_write_shm_name.c_str()) == -1)
+		err_exit("sem_unlink " + sem_write_shm_name + "in sig_term_handler", logfile);
+	response_buffers.erase(it_resp);
+
+	auto it = data_buffers.find(tid);
+	if (it == data_buffers.end()) {
+		std::cerr << "error tid in data_buffers not found" << std::endl;
+		MPI_Finalize();
+		exit(1);
+	}
+	else {
+		it->second.first->free_shm();
+		it->second.second->free_shm();
+	}
+	data_buffers.erase(it);
+}
+
 void handle_exig(char* str, int rank) {
 	int tid;
 	sscanf(str, "exig %d", &tid);
@@ -2120,6 +2141,7 @@ void handle_exig(char* str, int rank) {
 	logfile << "handle exit group 3" << std::endl;
 	#endif	
    close_all_files(tid, rank);
+   free_resources(tid);
 }
 
 
