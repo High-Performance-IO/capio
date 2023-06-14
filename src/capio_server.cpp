@@ -242,15 +242,12 @@ sem_t files_location_sem;
 sem_t clients_remote_pending_nfiles_sem;
 
 void sig_term_handler(int signum, siginfo_t *info, void *ptr) {
+    #ifdef CAPIOLOG
+    logfile << "sigterm captured, freeing resources..." << std::endl;
+    #endif
 	//free all the memory used
 	if (sem_wait(&files_metadata_sem) == -1)
 		err_exit("sem_wait files_metadata_sem in sig_term_handler", logfile);
-	for (auto& pair : files_metadata) {
-		if (shm_unlink(pair.first.c_str()) == -1)
-			err_exit("shm_unlink " + pair.first + " in sig_term_handler", logfile);
-		if (shm_unlink((pair.first + "_size").c_str()) == -1)
-			err_exit("shm_unlink " + pair.first + "_size in sig_term_handler", logfile);
-	}
 	if (sem_post(&files_metadata_sem) == -1)
 		err_exit("sem_post files_metadata_sem in sig_term_handler", logfile);
 
@@ -270,8 +267,8 @@ void sig_term_handler(int signum, siginfo_t *info, void *ptr) {
 		delete pair.second;
 //		sem_unlink(("sem_response_read" + std::to_string(pair.first)).c_str());
 		sem_response_write_shm_name = "sem_response_write" + std::to_string(pair.first);
-		if (sem_unlink(sem_response_write_shm_name.c_str()) == -1)
-			err_exit("sem_unlink " + sem_response_write_shm_name + "in sig_term_handler", logfile);
+		//if (sem_unlink(sem_response_write_shm_name.c_str()) == -1)
+			//err_exit("sem_unlink " + sem_response_write_shm_name + " in sig_term_handler", logfile);
 		sem_write_shm_name = "sem_write" + std::to_string(pair.first);
 		if (sem_unlink(sem_write_shm_name.c_str()) == -1)
 			err_exit("sem_unlink " + sem_write_shm_name + "in sig_term_handler", logfile);
@@ -284,11 +281,11 @@ void sig_term_handler(int signum, siginfo_t *info, void *ptr) {
 		p.second.second->free_shm();
 	}
 
-	if (shm_unlink("circular_buffer") == -1)
-		err_exit("shm_unlink circular_buffer in sig_term_handler", logfile);
-	if (shm_unlink("index_buf") == -1)
-		err_exit("shm_unlink index_buf in sig_term_handler", logfile);
-	buf_requests->free_shm();
+	buf_requests->free_shm(logfile);
+
+    #ifdef CAPIOLOG
+    logfile << "server terminated" << std::endl;
+    #endif
 	MPI_Finalize();
 	exit(0);
 }
@@ -1867,7 +1864,9 @@ void handle_close(int tid, int fd, int rank) {
 	#endif
 	if (c_file.n_opens == 0 && c_file.n_links <= 0)
 		delete_file(path, rank);
-	//shm_unlink(("offset_" + std::to_string(tid) +  "_" + std::to_string(fd)).c_str());
+	std::string offset_name = "offset_" + std::to_string(tid) +  "_" + std::to_string(fd);
+	if (shm_unlink(offset_name.c_str()) == -1)
+		err_exit("shm_unlink " + offset_name + " in handle_close");
 	processes_files[tid].erase(fd);
 	processes_files_metadata[tid].erase(fd);
 	sem_wait(&files_metadata_sem);
@@ -2063,9 +2062,9 @@ void handle_exig(char* str, int rank) {
 		logfile << "path: " << path << std::endl;
 		#endif
 		if (it_conf == metadata_conf.end() || std::get<0>(it_conf->second) == "on_termination" || std::get<0>(it_conf->second).length() == 0) { 
-		sem_wait(&files_metadata_sem);
+			sem_wait(&files_metadata_sem);
 			Capio_file& c_file = std::get<4>(files_metadata[path]);
-		sem_post(&files_metadata_sem);
+			sem_post(&files_metadata_sem);
 			#ifdef CAPIOLOG
 			logfile << "committed " << c_file.get_committed() << std::endl;
 			#endif
