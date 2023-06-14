@@ -335,8 +335,11 @@ void mtrace_init(void) {
 		}
 	}
 //	sem_response = sem_open(("sem_response_read" + std::to_string(my_tid)).c_str(),  O_CREAT | O_RDWR, S_IRUSR | S_IWUSR, 0);
-		if (sem_tmp == nullptr)
-			sem_tmp = sem_open(("capio_sem_tmp_" + std::to_string(syscall(SYS_gettid))).c_str(),  O_CREAT | O_RDWR, S_IRUSR | S_IWUSR, 1);
+		if (sem_tmp == nullptr) {
+			sem_tmp = new sem_t;
+			if (sem_init(sem_tmp, 0, 1) == -1)
+				err_exit("sem_init sem_tmp mtrace_init");
+		}
 	#ifdef CAPIOLOG
 	CAPIO_DBG("before second lock\n");
 	#endif
@@ -359,7 +362,7 @@ void mtrace_init(void) {
 	//caching_info_size = (int*) create_shm("caching_info_size" + std::to_string(my_tid), sizeof(int));
 	//*caching_info_size = 0; 
 	if (sem_post(sem_tmp) == -1)
-		err_exit("sem_post sem_tmp");
+		err_exit("sem_post sem_tmp mtrace_init");
 	char c_str[256];
 	if (thread_created) {
 

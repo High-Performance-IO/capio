@@ -102,13 +102,24 @@ class Circular_buffer {
 			sem_close(_sem_num_empty);
 		}
 
-		void free_shm() {
-			shm_unlink(_shm_name.c_str());
-			shm_unlink(("_first_elem" + _shm_name).c_str());
-			shm_unlink(("_last_elem" + _shm_name).c_str());
-			sem_unlink(("_mutex" + _shm_name).c_str());
-			sem_unlink(("_sem_num_elems" + _shm_name).c_str());
-			sem_unlink(("_sem_num_empty" + _shm_name).c_str());
+		void free_shm(std::ostream& outstream = std::cerr) {
+			if (shm_unlink(_shm_name.c_str()) == -1)
+				err_exit("shm_unlink " + _shm_name + " in circular_buffer free_shm");
+			std::string resource = "_first_elem" + _shm_name;
+			if (shm_unlink(resource.c_str()) == -1)
+				err_exit("shm_unlink " + resource + " in circular_buffer free_shm");
+			resource = "_last_elem" + _shm_name;
+			if (shm_unlink(resource.c_str()) == -1)
+				err_exit("shm_unlink " + resource + " in circular_buffer free_shm");
+			resource = "_mutex" + _shm_name;
+			if (sem_unlink(resource.c_str()) == -1)
+				err_exit("sem_unlink " + resource + " in circular_buffer free_shm");
+			resource = "_sem_num_elems" + _shm_name;
+			if (sem_unlink(resource.c_str()) == -1)
+				err_exit("sem_unlink " + resource + " in circular_buffer free_shm");
+			resource = "_sem_num_empty" + _shm_name;
+			if (sem_unlink(resource.c_str()) == -1)
+				err_exit("sem_unlink " + resource + " in circular_buffer free_shm");
 		}
 	
 		void write(const T* data) {
