@@ -205,7 +205,9 @@ void initialize_from_snapshot(int* fd_shm) {
 		path_shm = (char*) get_shm(shm_name);
 		(*capio_files_descriptors)[fd] = path_shm;
 		capio_files_paths->insert(path_shm);
-		munmap(path_shm, PATH_MAX);
+		if (munmap(path_shm, PATH_MAX) == -1) {
+			err_exit("munmap initialize_from_snapshot");
+		}
 		if (shm_unlink(shm_name.c_str()) == -1) {
 			err_exit("shm_unlink snapshot " + shm_name);
 		}
@@ -218,7 +220,9 @@ void initialize_from_snapshot(int* fd_shm) {
 		*std::get<1>((*files)[fd]) = p_shm[2];
 		std::get<2>((*files)[fd]) = p_shm[3];
 		std::get<3>((*files)[fd]) = p_shm[4];
-		munmap(p_shm, 6 * sizeof(off64_t));
+		if (munmap(p_shm, 6 * sizeof(off64_t)) == -1) {
+			err_exit("munmap 2 initialize_from_snapshot");
+		}
 		if (shm_unlink(shm_name.c_str()) == -1) {
 			err_exit("shm_unlink snapshot " + shm_name);
 		}
@@ -262,7 +266,8 @@ void mtrace_init(void) {
 	if (first_call == nullptr)
 		first_call = new std::set<int>();
 	first_call->insert(my_tid);
-	sem_post(sem_first_call);
+	if (sem_post(sem_first_call) == -1)
+		err_exit("sem_post sem_first_call mtrace_init");
 	if (parent_tid == my_tid) {
 		#ifdef CAPIOLOG
 			CAPIO_DBG("sem wait parent before %ld %ld\n", parent_tid, my_tid);
@@ -272,7 +277,8 @@ void mtrace_init(void) {
 		#ifdef CAPIOLOG
 			CAPIO_DBG("sem wait parent after\n");
 		#endif
-		sem_post(sem_clone);
+		if (sem_post(sem_clone) == -1)
+			err_exit("sem_post sem_clone mtrace_init");
 		//clone_sl.unlock();
 		return;
 	}
@@ -307,6 +313,10 @@ void mtrace_init(void) {
 		current_dir = new std::string(*capio_dir);
 	}
 	catch (const std::exception& ex) {
+		if (val == NULL)
+			std::cerr << "error CAPIO_DIR: current directory not valid" << std::endl;
+		else
+			std::cerr << "error CAPIO_DIR: directory " << val << " does not exist" << std::endl; 
 		exit(1);
 	}
 	get_app_name();
@@ -330,7 +340,8 @@ void mtrace_init(void) {
 	#ifdef CAPIOLOG
 	CAPIO_DBG("before second lock\n");
 	#endif
-	sem_wait(sem_tmp);
+	if (sem_wait(sem_tmp) == -1)
+		err_exit("sem_wait sem_tmp mtrace_init");
 	#ifdef CAPIOLOG
 	CAPIO_DBG("after second lock\n");
 	#endif
@@ -347,7 +358,8 @@ void mtrace_init(void) {
 	//client_caching_info = (int*) create_shm("caching_info" + std::to_string(my_tid), 8192 * sizeof(int));
 	//caching_info_size = (int*) create_shm("caching_info_size" + std::to_string(my_tid), sizeof(int));
 	//*caching_info_size = 0; 
-	sem_post(sem_tmp);
+	if (sem_post(sem_tmp) == -1)
+		err_exit("sem_post sem_tmp");
 	char c_str[256];
 	if (thread_created) {
 
@@ -426,6 +438,8 @@ void create_snapshot() {
 //TODO: doesn't work for general paths like ../dir/../dir/../dir/file.txt
 std::string create_absolute_path(const char* pathname) {
 	char* abs_path = (char*) malloc(sizeof(char) * PATH_MAX);
+	if (abs_path == NULL)
+		err_exit("abs_path create_absolute_path");
 	if (*current_dir != *capio_dir) {
 		#ifdef CAPIOLOG
 		CAPIO_DBG("current dir changed by capiodir\n");
@@ -498,7 +512,9 @@ std::string create_absolute_path(const char* pathname) {
 			abs_path[len] = '/';
 			abs_path[len + 1] = '\0';
 			strcat(abs_path, pathname);
-			return abs_path;
+			std::string res_path(abs_path);
+			free(abs_path);
+			return res_path;
 		}
 		if (found) {
 			++i;
@@ -507,8 +523,8 @@ std::string create_absolute_path(const char* pathname) {
 			free(pathname_copy);
 		}
 		else {
-
 			free(pathname_copy);
+			free(abs_path);
 			return "";
 		}
 	}
@@ -759,7 +775,8 @@ void write_to_disk(const int fd, const int offset, const void* buffer, const siz
 		std::cerr << "capio client error: impossible write to disk capio file " << fd << std::endl;
 		exit(1);
 	}
-	lseek(filesystem_fd, offset, SEEK_SET);
+	if (lseek(filesystem_fd, offset, SEEK_SET) == -1)
+		err_exit("lseek write_to_disk");
 	ssize_t res = write(filesystem_fd, buffer, count);
 	if (res == -1) {
 		err_exit("capio error writing to disk capio file ");
@@ -883,18 +900,17 @@ off_t capio_lseek(int fd, off64_t offset, int whence) {
 	#ifdef CAPIOLOG
 	CAPIO_DBG("capio seek hole\n");
 	#endif
-				char c_str[64];
-				sprintf(c_str, "shol %ld %d %zu", syscall(SYS_gettid),fd, *file_offset);
-				buf_requests->write(c_str, 256 * sizeof(char));
+			char c_str[64];
+			sprintf(c_str, "shol %ld %d %zu", syscall(SYS_gettid),fd, *file_offset);
+			buf_requests->write(c_str, 256 * sizeof(char));
 	#ifdef CAPIOLOG
 	CAPIO_DBG("capio seek hole debug 1\n");
 	#endif
-				(*bufs_response)[syscall(SYS_gettid)]->read(file_offset);
+			(*bufs_response)[syscall(SYS_gettid)]->read(file_offset);
 	#ifdef CAPIOLOG
 	CAPIO_DBG("capio seek hole debug2\n");
 	#endif
-				return *file_offset;
-
+			return *file_offset;
 		}
 		else {
 			errno = EINVAL;
@@ -1042,13 +1058,12 @@ ssize_t capio_write(int fd, const  void *buffer, size_t count) {
 	else {
 		return -2;	
 	}
-
 }
 
 int capio_close(int fd) {
-		#ifdef CAPIOLOG
+	#ifdef CAPIOLOG
 	CAPIO_DBG("capio_close %d %d\n", syscall(SYS_gettid), fd);
-		#endif
+	#endif
 	auto it = files->find(fd);
 	if (it != files->end()) {
 		add_close_request(fd);
@@ -1355,9 +1370,9 @@ int capio_lstat(std::string absolute_path, struct stat* statbuf) {
 		statbuf->st_gid = getgid();
 		statbuf->st_rdev = 0;
 		statbuf->st_size = file_size;
-	#ifdef CAPIOLOG
+		#ifdef CAPIOLOG
 		CAPIO_DBG("lstat file_size=%ld\n",file_size);
-	#endif
+		#endif
 		statbuf->st_blksize = 4096;
 		if (file_size < 4096)
 			statbuf->st_blocks = 8;
@@ -1372,9 +1387,9 @@ int capio_lstat(std::string absolute_path, struct stat* statbuf) {
 		return 0;
 	}
 	else {
-	#ifdef CAPIOLOG
-	CAPIO_DBG("capio_lstat returning -2\n");
-	#endif
+		#ifdef CAPIOLOG
+		CAPIO_DBG("capio_lstat returning -2\n");
+		#endif
 		return -2;
 	}
 
@@ -1518,7 +1533,6 @@ int capio_creat(const char* pathname, mode_t mode) {
 	CAPIO_DBG("capio_creat %s\n", pathname);
 	#endif
 	int res = capio_openat(AT_FDCWD, pathname, O_CREAT | O_WRONLY | O_TRUNC, true);
-
 	#ifdef CAPIOLOG
 	CAPIO_DBG("capio_creat %s returning %d\n", pathname, res);
 	#endif
@@ -1551,7 +1565,7 @@ int capio_access(const char* pathname, int mode) {
 			errno = ENONET;
 			return -1;
 		}
-			return capio_file_exists(abs_pathname);
+		return capio_file_exists(abs_pathname);
 //	}
 	/*else if ((mode | X_OK) == X_OK) {
 		return -1;
@@ -1647,7 +1661,7 @@ int capio_unlinkat(int dirfd, const char* pathname, int flags) {
 	int res;
 	if (!is_absolute(pathname)) {
 		if (dirfd == AT_FDCWD) { 
-		// pathname is interpreted relative to currdir
+			//pathname is interpreted relative to currdir
 			res = capio_unlink(pathname);		
 		}
 		else { 
@@ -1657,9 +1671,9 @@ int capio_unlinkat(int dirfd, const char* pathname, int flags) {
 			if (dir_path.length() == 0)
 				return -2;
 			std::string path = dir_path + "/" + pathname;
-	#ifdef CAPIOLOG
+			#ifdef CAPIOLOG
 			CAPIO_DBG("capio_unlinkat path=%s\n",path.c_str());
-	#endif
+			#endif
 			
 			res = capio_unlink_abs(path);
 		}
@@ -1717,9 +1731,9 @@ int capio_dup2(int fd, int fd2) {
 	CAPIO_DBG("capio_dup 2\n");
 	#endif
 	if (it != files->end()) {
-	#ifdef CAPIOLOG
+		#ifdef CAPIOLOG
 		CAPIO_DBG("handling capio_dup2\n");
-	#endif
+		#endif
 		dup2_enabled = false;
 		res = dup2(fd, fd2);
 		dup2_enabled = true;
@@ -1728,9 +1742,9 @@ int capio_dup2(int fd, int fd2) {
 		add_dup_request(fd, res);
 		(*files)[res] = (*files)[fd];
 		(*capio_files_descriptors)[res] = (*capio_files_descriptors)[fd];
-	#ifdef CAPIOLOG
+		#ifdef CAPIOLOG
 		CAPIO_DBG("handling capio_dup returning res %d\n", res);
-	#endif
+		#endif
 	}
 	else
 		res = -2;
@@ -1776,7 +1790,8 @@ pid_t capio_fork() {
 
 pid_t capio_clone(int flags, void* child_stack, void* parent_tidpr, void* tls, void* child_tidpr) {
 	//clone_sl.lock();
-	sem_wait(sem_clone);
+	if (sem_wait(sem_clone) == -1)
+		err_exit("sem_wait sem_clone in capio_clone");
 	#ifdef CAPIOLOG
 	CAPIO_DBG("clone captured flags %d\n", flags);
 	#endif
@@ -1791,8 +1806,11 @@ pid_t capio_clone(int flags, void* child_stack, void* parent_tidpr, void* tls, v
 		//*p = syscall(SYS_gettid);
 		parent_tid = syscall(SYS_gettid);
 		thread_created = true;
-		if (sem_family == nullptr)
+		if (sem_family == nullptr) {
 			sem_family = sem_open(("capio_sem_family_" + std::to_string(syscall(SYS_gettid))).c_str(),  O_CREAT | O_RDWR, S_IRUSR | S_IWUSR, 0);
+			if (sem_family == SEM_FAILED)
+				err_exit("sem_open 1 sem_family in capio_clone");
+		}
 	#ifdef CAPIOLOG
 			CAPIO_DBG("sem_family %ld\n", sem_family);
 	CAPIO_DBG("thread creation ending\n");
@@ -1802,9 +1820,12 @@ pid_t capio_clone(int flags, void* child_stack, void* parent_tidpr, void* tls, v
 	#ifdef CAPIOLOG
 		CAPIO_DBG("first call size %ld\n", first_call->size());
 #endif
-		sem_wait(sem_first_call);
+		if (sem_wait(sem_first_call) == -1)
+			err_exit("sem_wait in sem_first_call in capio_clone");
+
 		first_call->erase(syscall(SYS_gettid));
-		sem_post(sem_first_call);
+		if (sem_post(sem_first_call) == -1)
+			err_exit("sem_post in sem_first_call in capio_clone");
 	#ifdef CAPIOLOG
 		CAPIO_DBG("first call after size %ld\n", first_call->size());
 #endif
@@ -1824,10 +1845,15 @@ pid_t capio_clone(int flags, void* child_stack, void* parent_tidpr, void* tls, v
 	if (pid == 0) { //child
 		mtrace_init();
 		copy_parent_files();
-		if (sem_family == nullptr)
+		if (sem_family == nullptr) {
 			sem_family = sem_open(("capio_sem_family_" + std::to_string(parent_tid)).c_str(),  O_CREAT | O_RDWR, S_IRUSR | S_IWUSR, 0);
+			if (sem_family == SEM_FAILED) 
+				err_exit("sem_open 2 sem_family in capio_clone");
+		}
 
-		sem_post(sem_family);
+		if (sem_post(sem_family) == -1) {
+			err_exit("sem_post sem_family in capio_clone");
+		}
 	#ifdef CAPIOLOG
 		CAPIO_DBG("returning from clone\n");
 	#endif
@@ -1837,14 +1863,17 @@ pid_t capio_clone(int flags, void* child_stack, void* parent_tidpr, void* tls, v
 	#ifdef CAPIOLOG
 		CAPIO_DBG("father before wait\n");
 	#endif
-		if (sem_family == nullptr)
+		if (sem_family == nullptr) {
 			sem_family = sem_open(("capio_sem_family_" + std::to_string(syscall(SYS_gettid))).c_str(),  O_CREAT | O_RDWR, S_IRUSR | S_IWUSR, 0);
-		sem_wait(sem_family);
+			if (sem_family == SEM_FAILED)
+				err_exit("sem_open 3 sem_family in capio_clone");
+		}
+		if (sem_wait(sem_family) == -1)
+			err_exit("sem_wait sem_family in capio_clone");
 	#ifdef CAPIOLOG
 		CAPIO_DBG("father returning from clone\n");
 	#endif
 		fork_enabled = true;
-
 	}
 	return pid;
 }
@@ -2009,7 +2038,11 @@ int rename_capio_files(std::string oldpath_abs, std::string newpath_abs) {
 
 void copy_file(std::string path_1, std::string path_2) {
 	FILE* fp_1 = fopen(path_1.c_str(), "r");
+	if (fp_1 == NULL)
+		err_exit("fopen fp_1 in copy_file");
 	FILE* fp_2 = fopen(path_2.c_str(), "w");
+	if (fp_2 == NULL)
+		err_exit("fopen fp_2 in copy_file");
 	char buf[1024];
 	int res;
 	while ((res = fread(buf, sizeof(char), 1024, fp_1)) == 1024) {
@@ -2018,8 +2051,11 @@ void copy_file(std::string path_1, std::string path_2) {
 	if (res != 0) {
 		fwrite(buf, sizeof(char), res, fp_2);
 	}
-	fclose(fp_1);
-	fclose(fp_2);
+	if (fclose(fp_1) == EOF)
+		err_exit("fclose fp_1");
+	
+	if (fclose(fp_2) == EOF)
+		err_exit("fclose fp_2");
 }
 
 void mv_file_capio(std::string oldpath_abs, std::string newpath_abs) {
@@ -2031,7 +2067,6 @@ void mv_file_capio(std::string oldpath_abs, std::string newpath_abs) {
 	buf_requests->write(c_str, 256 * sizeof(char));
 	off64_t res_unlink;
 	(*bufs_response)[tid]->read(&res_unlink); 	
-		
 }
 
 void copy_inside_capio(std::string oldpath_abs, std::string newpath_abs) {
@@ -2192,20 +2227,24 @@ static int hook(long syscall_number, long arg0, long arg1, long arg2, long arg3,
 
 	if (sem_first_call == nullptr) {
 		sem_first_call = new sem_t;
-		sem_init(sem_first_call, 0, 1);
+		if (sem_init(sem_first_call, 0, 1) == -1)
+			err_exit("sem_init sem_first_call in hook");
 		sem_clone = new sem_t;
-		sem_init(sem_clone, 0, 1);
+		if (sem_init(sem_clone, 0, 1) == -1)
+			err_exit("sem_init sem_clone in hook");
 	}
 	
-	sem_wait(sem_first_call);
+	if (sem_wait(sem_first_call) == -1)
+		err_exit("sem_wait sem_first_call in hook");
 	
 
-	  if (first_call == nullptr || first_call->find(syscall(SYS_gettid)) == first_call->end()) {
+	if (first_call == nullptr || first_call->find(syscall(SYS_gettid)) == first_call->end()) {
 		mtrace_init();
-	  }
+	}
 	else {
-	    sem_post(sem_first_call);
-	  }
+	    if (sem_post(sem_first_call) == -1)
+			err_exit("sem_post sem_first_call in hook");
+	}
   int hook_ret_value = 1;
   int res = 0;
   switch (syscall_number) {

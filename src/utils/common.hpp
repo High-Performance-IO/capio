@@ -35,8 +35,8 @@ static inline int is_directory(const char *path) {
    return S_ISDIR(statbuf.st_mode);
 }
 
-void err_exit(std::string error_msg) {
-	std::cerr << "error: " << error_msg << " errno " <<  errno << " strerror(errno): " << strerror(errno) << std::endl;
+static inline void err_exit(std::string error_msg, std::ostream& outstream = std::cerr) {
+	outstream << "error: " << error_msg << " errno " <<  errno << " strerror(errno): " << strerror(errno) << std::endl;
 	exit(1);
 }
 
