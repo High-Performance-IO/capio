@@ -2038,32 +2038,35 @@ void close_all_files(int tid, int rank) {
 	}
 }
 
+/*
+ * Unlink resources in shared memory of the thread with thread id = tid
+ * To be called only when the client thread terminates
+ */
+
 void free_resources(int tid) {
 	std::string sem_write_shm_name;
 	auto it_resp = response_buffers.find(tid);
-	if (it_resp == response_buffers.end()) {
-		std::cerr << "error tid in response_buffers not found" << std::endl;
-		MPI_Finalize();
-		exit(1);
+	if (it_resp != response_buffers.end()) {
+		logfile << "cleaning response buffer " << tid << std::endl;
+		it_resp->second->free_shm();
+		delete it_resp->second;
+		response_buffers.erase(it_resp);
 	}
-	it_resp->second->free_shm();
-	delete it_resp->second;
-	sem_write_shm_name = "sem_write" + std::to_string(it_resp->first);
-	if (sem_unlink(sem_write_shm_name.c_str()) == -1)
-		err_exit("sem_unlink " + sem_write_shm_name + "in sig_term_handler", logfile);
-	response_buffers.erase(it_resp);
+
+	if (sems_write->find(tid) != sems_write->end()) {
+		logfile << "cleaning sem_write" << tid << std::endl;
+		sem_write_shm_name = "sem_write" + std::to_string(tid);
+		if (sem_unlink(sem_write_shm_name.c_str()) == -1)
+			err_exit("sem_unlink " + sem_write_shm_name + "in sig_term_handler", logfile);
+	}
 
 	auto it = data_buffers.find(tid);
-	if (it == data_buffers.end()) {
-		std::cerr << "error tid in data_buffers not found" << std::endl;
-		MPI_Finalize();
-		exit(1);
-	}
-	else {
+	if (it != data_buffers.end()) {
+		logfile << "cleaning data buffer " << tid << std::endl;
 		it->second.first->free_shm();
 		it->second.second->free_shm();
+		data_buffers.erase(it);
 	}
-	data_buffers.erase(it);
 }
 
 void handle_exig(char* str, int rank) {
@@ -2072,7 +2075,6 @@ void handle_exig(char* str, int rank) {
 	#ifdef CAPIOLOG
 	logfile << "handle exit group " << std::endl;
 	#endif	
-   // std::unordered_map<int, std::unordered_map<std::string, bool>> writers;
    int pid = pids[tid];
    auto files = writers[pid];
    for (auto& pair : files) {
@@ -2526,6 +2528,7 @@ void handle_rename(const char* str, int rank) {
 void handle_handshake(const char* str, bool app_name_defined) {
 	int tid, pid;
 	char app_name[1024];
+
 	if (app_name_defined) {
 		sscanf(str, "hand %d %d %s", &tid, &pid, app_name);
 		apps[tid] = app_name;
@@ -2533,6 +2536,7 @@ void handle_handshake(const char* str, bool app_name_defined) {
 	else
 		sscanf(str, "hans %d %d", &tid, &pid);
 	pids[tid] = pid;
+	init_process(tid);
 }
 
 
