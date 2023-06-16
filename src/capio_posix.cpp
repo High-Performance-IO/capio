@@ -1403,6 +1403,8 @@ int capio_lstat_wrapper(const char* path, struct stat* statbuf) {
 	CAPIO_DBG("capio_lstat_wrapper\n");
 	CAPIO_DBG("lstat  pathanem %s\n", path);
 	#endif
+	if (path == NULL)
+		return -2;
 	std::string absolute_path;	
 	absolute_path = create_absolute_path(path);
 	if (absolute_path.length() == 0)
@@ -1809,11 +1811,11 @@ pid_t capio_clone(int flags, void* child_stack, void* parent_tidpr, void* tls, v
 		//*p = syscall(SYS_gettid);
 		parent_tid = syscall(SYS_gettid);
 		thread_created = true;
-		if (sem_family == nullptr) {
+		/*if (sem_family == nullptr) {
 			sem_family = sem_open(("capio_sem_family_" + std::to_string(syscall(SYS_gettid))).c_str(),  O_CREAT | O_RDWR, S_IRUSR | S_IWUSR, 0);
 			if (sem_family == SEM_FAILED)
 				err_exit("sem_open 1 sem_family in capio_clone");
-		}
+		}*/
 	#ifdef CAPIOLOG
 			CAPIO_DBG("sem_family %ld\n", sem_family);
 	CAPIO_DBG("thread creation ending\n");
@@ -2412,6 +2414,13 @@ static int hook(long syscall_number, long arg0, long arg1, long arg2, long arg3,
     hook_ret_value = 1;
     break;
   }
+
+  case SYS_exit: {
+	int status = arg0;
+	capio_exit_group(status);
+	hook_ret_value = 1;
+  }
+
   case SYS_lstat: {
     const char *path = reinterpret_cast<const char *>(arg0);
     struct stat *buf = reinterpret_cast<struct stat *>(arg1);
