@@ -3,8 +3,17 @@
 
 #include <iostream>
 #include <set>
+#include <vector>
+#include <algorithm>
 #include <cstddef>
 #include <string.h>
+#include <fcntl.h>
+#include <sys/mman.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <unistd.h>
+#include "utils/common.hpp"
+
 /*
  * Only the server have all the information
  * A process that only read from a file doesn't have the info on the sectors
@@ -21,44 +30,73 @@ struct compare {
 
 class Capio_file {
 	private:
-		std::set<std::pair<off64_t, off64_t>, compare> sectors;
 		bool _directory;
+		bool _permanent;
+		// _fd is useful only when the file is memory-mapped
+		int _fd = -1; 
+		bool _home_node = false;
 		std::string _committed = "";
 		std::string _mode = "";
+		char* _buf = nullptr; //buffer containing the data
+		// sectors stored in memory of the files (only the home node is forced to be up to date)
+		std::set<std::pair<off64_t, off64_t>, compare> sectors;
+		//vector of (tid, fd)
+		std::vector<std::pair<int, int>>* threads_fd = nullptr;
+		std::ostream& logfile;
 	public:
 		bool complete = false;
+		bool first_write = true;
 		int n_links = 1;
 		int n_opens = 0;
 		long int n_files = 0; //useful for directories
 		long int n_files_expected = -1; //useful for directories
+		std::size_t _buf_size;
+		/* 
+		 * file size in the home node. In a given moment could not be up to date.
+		 * This member is useful because a node different from the home node
+		 * could need to known the size of the file but not its content
+		 */
+		std::size_t real_file_size = 0;
 
-		Capio_file() {
-			_committed = "on_termination";
-			_directory = false;
-		}
-
-		Capio_file(std::string committed) {
-			_committed = committed;
-			_directory = false;
-		}
-
-		Capio_file(std::string committed, std::string mode) {
-			_committed = committed;
-			_mode = mode;
-			_directory = false;
-		}
+	    Capio_file() : logfile(std::cerr) {
+            _committed = "on_termination";
+            _directory = false;
+            _permanent = false;
+            _buf_size = 0;
+			threads_fd = new std::vector<std::pair<int, int>>;
+        }
 
 		Capio_file(std::string committed, std::string mode,
-				bool directory, long int n_files_expected) {
+				bool directory, long int n_files_expected, bool permanent, std::size_t init_size, std::ostream& logstream) : logfile(logstream) {
 			_committed = committed;
 			_mode = mode;
 			_directory = directory;
+			_permanent = permanent;
 			this->n_files_expected = n_files_expected + 2; // +2 for . and ..
+			_buf_size = init_size;
+			threads_fd = new std::vector<std::pair<int, int>>;
 		}
 
-		Capio_file(bool directory) {
+		Capio_file(bool directory, bool permanent, std::size_t init_size, std::ostream& logstream) : logfile(logstream) {
 			_committed = "on_termination";
 			_directory = directory;
+			_permanent = permanent;
+			_buf_size = init_size;
+			threads_fd = new std::vector<std::pair<int, int>>;
+		}
+
+		~Capio_file() {
+			#ifdef CAPIOLOG
+			logfile << "calling capio_file destructor" << std::endl;
+			#endif
+			free_buf();
+			delete threads_fd;
+		}
+
+		void remove_fd(int tid, int fd) {
+			auto it = std::find(threads_fd->begin(), threads_fd->end(), std::make_pair(tid, fd));
+			if (it != threads_fd->end())
+				threads_fd->erase(it);
 		}
 
 		std::string get_committed() {
@@ -73,11 +111,104 @@ class Capio_file {
 			return _directory;
 		}
 
+		bool buf_to_allocate() {
+			return _buf == nullptr;
+		}
+
 		off64_t get_file_size() {
 			if (sectors.size() != 0)
 				return sectors.rbegin()->second;	
 			else
 				return 0;
+		}
+
+		/*
+		 * To be called when a process
+		 * execute a read or a write syscall
+		 */
+
+		void create_buffer(std::string path, bool home_node) {
+			#ifdef CAPIOLOG
+			logfile << "creating buf for file " << path << " home node " << home_node << " permanent " << _permanent << " dir " <<  _directory << std::endl;
+			#endif
+			_home_node = home_node;
+			if (_permanent && home_node) {
+				if (_directory) {
+					if (mkdir(path.c_str(), 0700) == -1)
+						err_exit("mkdir capio_file create_buffer");
+					#ifdef CAPIOLOG
+					logfile<< "creating buf dir" << std::endl;
+					#endif
+				_buf = new char[_buf_size];
+				}
+				else {
+					#ifdef CAPIOLOG
+					logfile<< "creating mem mapped file" << std::endl;
+					#endif
+					_fd = open(path.c_str(), O_RDWR | O_CREAT, S_IRWXU | S_IRGRP | S_IROTH);
+					if (_fd == -1)
+						err_exit("open " + path + " " + "Capio_file constructor");
+				
+					
+					if (ftruncate(_fd, _buf_size) == -1)
+						err_exit("ftruncate Capio_file constructor");
+
+					_buf = (char*) mmap(NULL, _buf_size, PROT_READ | PROT_WRITE, MAP_SHARED, _fd, 0);
+					if (_buf == MAP_FAILED)
+						err_exit("mmap Capio_file constructor");
+
+				}
+			}
+			else
+				_buf = new char[_buf_size];
+		}
+
+		char* expand_buffer(std::size_t data_size) {
+			size_t new_size, double_size = _buf_size * 2;
+			new_size = data_size > double_size ? data_size : double_size;
+			char* new_buf = new char[new_size];
+			//	memcpy(new_p, old_p, file_shm_size); //TODO memcpy only the sector stored in Capio_file
+			memcpy_capio_file(new_buf, _buf, new_size);
+			delete [] _buf;
+			_buf = new_buf;
+			_buf_size = new_size;
+			return new_buf;
+		}
+
+		char* get_buffer() {
+			return _buf;
+		}
+
+		void free_buf() {
+			if (_permanent && _home_node) {
+				if (_directory)
+					delete [] _buf;
+				else {
+					int res = munmap(_buf, _buf_size);	
+					if (res == -1)
+						err_exit("munmap Capio_file");
+				}
+			}
+			else 
+				delete [] _buf;
+		}
+
+		std::size_t get_buf_size() {
+			return _buf_size;
+		}
+
+		/*
+		 * get the size of the data stored in this node
+		 * If the node is the home node then this is equals to
+		 * the real size of the file
+		 */
+
+		off64_t get_stored_size() {
+			auto it = sectors.rbegin();
+			if (it == sectors.rend())
+				return 0;
+			else
+				return it->second;
 		}
 
 		/*
@@ -262,6 +393,21 @@ class Capio_file {
 			for (auto& sector : sectors) {
 				out_stream << "<" << sector.first << ", " << sector.second << ">" << std::endl;
 			}
+		}
+
+		void commit() {
+			if (_permanent && !_directory && _home_node) {
+				off64_t size = get_file_size();
+				if (ftruncate(_fd, size) == -1)
+					err_exit("ftruncate commit capio_file");
+            	_buf_size = size;
+				if (close(_fd) == -1)
+					err_exit("close commit capio_file");
+			}
+		}
+		
+		void add_fd(int tid, int fd) {
+			threads_fd->push_back({tid, fd});
 		}
 };
 
