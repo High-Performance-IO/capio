@@ -34,31 +34,9 @@
 #include "capio_file.hpp"
 #include "spsc_queue.hpp"
 
-#define DNAME_LENGTH 128
 #define N_ELEMS_DATA_BUFS 10 
 //256KB
 #define WINDOW_DATA_BUFS 262144
-
-/*
- * From the man getdents:
- * "There is no definition of struct linux_dirent  in  glibc; see NOTES."
- *
- * NOTES section:
- * "[...] you will need to define the linux_dirent or linux_dirent64
- * structure yourself."
- *
- */
-
-struct linux_dirent {
-	unsigned long  d_ino;
-	off_t          d_off;
-	unsigned short d_reclen;
-	char           d_name[DNAME_LENGTH + 2];
-};
-
-const static int theoretical_size_dirent64 = sizeof(ino64_t) + sizeof(off64_t) + sizeof(unsigned short) + sizeof(unsigned char) + sizeof(char) * (DNAME_LENGTH + 1);
-
-const static int theoretical_size_dirent = sizeof(unsigned long) + sizeof(off_t) + sizeof(unsigned short) + sizeof(char) * (DNAME_LENGTH + 2);
 
 struct spinlock {
   std::atomic<bool> lock_ = {0};
