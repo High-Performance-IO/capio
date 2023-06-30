@@ -50,6 +50,8 @@ class Capio_file {
 		int n_opens = 0;
 		long int n_files = 0; //useful for directories
 		long int n_files_expected = -1; //useful for directories
+		long int _n_close = 0;
+		long int _n_close_expected = -1;
 		std::size_t _buf_size;
 		/* 
 		 * file size in the home node. In a given moment could not be up to date.
@@ -67,7 +69,7 @@ class Capio_file {
         }
 
 		Capio_file(std::string committed, std::string mode,
-				bool directory, long int n_files_expected, bool permanent, std::size_t init_size, std::ostream& logstream) : logfile(logstream) {
+				bool directory, long int n_files_expected, bool permanent, std::size_t init_size, std::ostream& logstream, long int n_close_expected) : logfile(logstream) {
 			_committed = committed;
 			_mode = mode;
 			_directory = directory;
@@ -75,14 +77,16 @@ class Capio_file {
 			this->n_files_expected = n_files_expected + 2; // +2 for . and ..
 			_buf_size = init_size;
 			threads_fd = new std::vector<std::pair<int, int>>;
+			_n_close_expected = n_close_expected;
 		}
 
-		Capio_file(bool directory, bool permanent, std::size_t init_size, std::ostream& logstream) : logfile(logstream) {
+		Capio_file(bool directory, bool permanent, std::size_t init_size, std::ostream& logstream, long int n_close_expected = -1) : logfile(logstream) {
 			_committed = "on_termination";
 			_directory = directory;
 			_permanent = permanent;
 			_buf_size = init_size;
 			threads_fd = new std::vector<std::pair<int, int>>;
+			_n_close_expected = n_close_expected;
 		}
 
 		~Capio_file() {

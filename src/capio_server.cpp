@@ -100,13 +100,13 @@ std::unordered_map<int, std::pair<SPSC_queue<char>*, SPSC_queue<char>*>> data_bu
 
 std::unordered_map<std::string, Capio_file*> files_metadata;
 
-// path -> (committed, mode, app_name, n_files, bool)
+// path -> (committed, mode, app_name, n_files, bool, n_close)
 
-std::unordered_map<std::string, std::tuple<std::string, std::string, std::string, long int, bool>> metadata_conf;
+std::unordered_map<std::string, std::tuple<std::string, std::string, std::string, long int, bool, long int>> metadata_conf;
 
-// [(glob, committed, mode, app_name, n_files, batch_size, permanent), (glob, committed, mode, app_name, n_files, batch_size, permanent), ...]
+// [(glob, committed, mode, app_name, n_files, batch_size, permanent, n_close), (glob, committed, mode, app_name, n_files, batch_size, permanent, n_close), ...]
 
-std::vector<std::tuple<std::string, std::string, std::string, std::string, long int, long int, bool>> metadata_conf_globs;
+std::vector<std::tuple<std::string, std::string, std::string, std::string, long int, long int, bool, long int>> metadata_conf_globs;
 
 /*
  * pid -> pathname -> bool
@@ -533,14 +533,15 @@ void create_file(std::string path, bool is_dir, off64_t init_size) {
 			if (sem_wait(&files_metadata_sem) == -1)
 				err_exit("sem_wait 2 files_metadata_sem in create_file", logfile);
 			bool permanent = std::get<6>(metadata_conf_globs[pos]);
+			long int n_close = std::get<7>(metadata_conf_globs[pos]);
         	#ifdef CAPIOLOG
 			logfile << "creating file " << path << " permanent " << permanent << " dir " << is_dir << std::endl;
 			#endif
-			p_capio_file = new Capio_file(committed, mode, is_dir, n_files, permanent, init_size, logfile);
+			p_capio_file = new Capio_file(committed, mode, is_dir, n_files, permanent, init_size, logfile, n_close);
 			files_metadata[path] = p_capio_file;
 			if (sem_post(&files_metadata_sem) == -1)
 				err_exit("sem_post 2 files_metadata_sem in create_file", logfile);
-			metadata_conf[path] = std::make_tuple(committed, mode, app_name, n_files, permanent);
+			metadata_conf[path] = std::make_tuple(committed, mode, app_name, n_files, permanent, n_close);
 		}
 	}
 	else {
@@ -559,10 +560,11 @@ void create_file(std::string path, bool is_dir, off64_t init_size) {
 		if (sem_wait(&files_metadata_sem) == -1)
 			err_exit("sem_wait 3 files_metadata_sem in create_file", logfile);
 		bool permanent =  std::get<4>(it->second);
+		long int n_close = std::get<5>(it->second);
         	#ifdef CAPIOLOG
 			logfile << "creating file " << path << " permanent " << permanent << " dir " << is_dir << std::endl;
 			#endif
-		p_capio_file = new Capio_file(committed, mode, is_dir, n_files, permanent, init_size, logfile);
+		p_capio_file = new Capio_file(committed, mode, is_dir, n_files, permanent, init_size, logfile, n_close);
 		files_metadata[path] = p_capio_file;
 		if (sem_post(&files_metadata_sem) == -1)
 			err_exit("sem_post 3 files_metadata_sem in create_file", logfile);
@@ -1727,9 +1729,10 @@ void handle_close(int tid, int fd, int rank) {
 	sem_wait(&files_metadata_sem);
 	Capio_file& c_file = *files_metadata[path];
 	sem_post(&files_metadata_sem);
-	if (c_file.get_committed() == "on_close") {
+	++c_file._n_close;
+	if (c_file.get_committed() == "on_close" && (c_file._n_close_expected == -1 || c_file._n_close == c_file._n_close_expected)) {
 		#ifdef CAPIOLOG
-		logfile <<  "handle close, committed = on_close" << std::endl;
+		logfile <<  "handle close, committed = on_close. n_close " << c_file._n_close << " n_close_expected " << c_file._n_close_expected << std::endl;
 		#endif
 		c_file.complete = true;
 		auto it = pending_reads.find(path);
@@ -3317,9 +3320,9 @@ void* capio_helper(void* pthread_arg) {
 }
 
 void update_metadata_conf(std::string& path, size_t pos, long int n_files, size_t batch_size, const std::string& committed,
-const std::string& mode, const std::string& app_name, bool permanent) {
+const std::string& mode, const std::string& app_name, bool permanent, long int n_close) {
 	if (pos == std::string::npos && n_files == -1) {
-		metadata_conf[path] = std::make_tuple(committed, mode, app_name, n_files, permanent);
+		metadata_conf[path] = std::make_tuple(committed, mode, app_name, n_files, permanent, n_close);
 		#ifdef CAPIOLOG
 		logfile << "path " << path << " app name " << app_name << std::endl;
 		#endif
@@ -3327,11 +3330,21 @@ const std::string& mode, const std::string& app_name, bool permanent) {
 	else {
 		std::string prefix_str = path.substr(0, pos);
 		// if pos == std::string::npos it means prefix_str = path
-		metadata_conf_globs.push_back(std::make_tuple(prefix_str, committed, mode, app_name, n_files, batch_size, permanent)); 
+		metadata_conf_globs.push_back(std::make_tuple(prefix_str, committed, mode, app_name, n_files, batch_size, permanent, n_close)); 
 		#ifdef CAPIOLOG
 		logfile << "prefix_str " << prefix_str << " app name " << app_name << " batch size " << batch_size << std::endl;
 		#endif
 	}
+}
+
+bool is_int(std::string s) {
+	bool res = false;
+	if (!s.empty()) {
+		char* p;
+		strtol(s.c_str(), &p, 10);
+		res = *p == 0;
+	}
+	return res;
 }
 
 void parse_conf_file(std::string conf_file) {
@@ -3412,12 +3425,43 @@ void parse_conf_file(std::string conf_file) {
 					#endif
 				}
 				std::string_view committed;
+				std::string committed_str;
 				error = file["committed"].get_string().get(committed);
+				std::string commit_rule = "";
+				long int n_close = -1;
 				if (!error) {
 					#ifdef CAPIOLOG
 					logfile << " committed " << committed << std::endl;
 					#endif
+					committed_str = std::string(committed);
+					int pos = committed_str.find(':'); 
+					if (pos != -1) {
+						commit_rule = committed_str.substr(0, pos);
+						if (commit_rule != "on_close") {
+							logfile << "error conf file: commit rule " << commit_rule << std::endl;
+							exit(1);
+						}
+						std::string n_close_str = committed_str.substr(pos + 1, committed_str.length());
+			#ifdef CAPIOLOG
+			logfile << "conf on_close_n_str " << n_close_str << std::endl;
+			#endif	
+   						if (!is_int(n_close_str)) {
+							logfile << "error conf file:  commit rule on_close invalid number" << std::endl;
+							exit(1);
+						}
+						n_close = std::stol(n_close_str);
+					}
+					else
+						commit_rule = std::string(committed);
 				}
+				else {
+					logfile << "error conf file: commit rule is mandatory in streaming section" << std::endl;
+					exit(1);
+				}
+
+			#ifdef CAPIOLOG
+			logfile << "conf on_close_n " << n_close << std::endl;
+			#endif	
 				std::string_view mode;
 				error = file["mode"].get_string().get(mode);
 				if (!error) {
@@ -3445,7 +3489,7 @@ void parse_conf_file(std::string conf_file) {
 					path = *capio_dir + "/" + path;
 				}
 				std::size_t pos = path.find('*');
-				update_metadata_conf(path, pos, n_files, batch_size, std::string(committed), std::string(mode), std::string(app_name), false);
+				update_metadata_conf(path, pos, n_files, batch_size, std::string(commit_rule), std::string(mode), std::string(app_name), false, n_close);
 			}
 		}
 	}
@@ -3465,11 +3509,16 @@ void parse_conf_file(std::string conf_file) {
 					path = path.substr(2, path.length() - 2);
 				path = *capio_dir + "/" + path;
 			}
+			if (!is_absolute(path.c_str())) {
+				if (path.substr(0, 2) == "./") 
+					path = path.substr(2, path.length() - 2);
+				path = *capio_dir + "/" + path;
+			}
 			std::size_t pos = path.find('*');	
 			if (pos == std::string::npos) {
 				auto it = metadata_conf.find(path);
 				if (it == metadata_conf.end())
-					update_metadata_conf(path, pos, -1, batch_size, "on_termination", "", "", true);
+					update_metadata_conf(path, pos, -1, batch_size, "on_termination", "", "", true, -1);
 				else
 					std::get<4>(it->second) = true;
 			}
@@ -3477,7 +3526,7 @@ void parse_conf_file(std::string conf_file) {
 				std::string prefix_str = path.substr(0, pos);
 				long int i = match_globs(prefix_str);
 				if (i == -1)
-					update_metadata_conf(path, pos, -1, batch_size, "on_termination", "", "", true);
+					update_metadata_conf(path, pos, -1, batch_size, "on_termination", "", "", true, -1);
 				else {
 					auto& tuple = metadata_conf_globs[i];
 					std::get<6>(tuple) = true;
