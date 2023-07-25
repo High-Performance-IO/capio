@@ -1541,21 +1541,17 @@ int capio_file_exists(std::string path) {
 }
 
 int capio_access(const char* pathname, int mode) {
-	//if (mode == F_OK) {
-		std::string abs_pathname = create_absolute_path(pathname);
-		abs_pathname = create_absolute_path(pathname);
-		if (abs_pathname.length() == 0) {
-			errno = ENONET;
-			return -1;
-		}
-		return capio_file_exists(abs_pathname);
-//	}
-	/*else if ((mode | X_OK) == X_OK) {
+	std::string abs_pathname = create_absolute_path(pathname);
+	abs_pathname = create_absolute_path(pathname);
+	if (abs_pathname.length() == 0) {
+		errno = ENONET;
 		return -1;
 	}
+	auto res = std::mismatch(capio_dir->begin(), capio_dir->end(), abs_pathname.begin());
+	if (res.first == capio_dir->end())
+		return capio_file_exists(abs_pathname);
 	else
 		return -2;
-		*/
 }
 
 
