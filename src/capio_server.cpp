@@ -32,7 +32,7 @@
 #include "spsc_queue.hpp"
 #include "simdjson.h"
 #include "utils/common.hpp"
-
+#define CAPIOLOG
 #define N_ELEMS_DATA_BUFS 10
 //256KB
 #define WINDOW_DATA_BUFS 262144
@@ -199,8 +199,7 @@ void sig_term_handler(int signum, siginfo_t *info, void *ptr) {
 	for (auto& p1 : processes_files) {
 		for(auto& p2 : p1.second) {
 			offset_shm_name = "offset_" + std::to_string(p1.first) +  "_" + std::to_string(p2.first);
-			if (shm_unlink(offset_shm_name.c_str()) == -1)
-				err_exit("shm_unlink " + offset_shm_name + " in sig_term_handler", logfile);
+			shm_unlink(offset_shm_name.c_str()); // no check because offset could not exist for dup
 		}
 	}
 
@@ -774,29 +773,15 @@ void update_dir(int tid, std::string file_path, int rank) {
 
 void update_file_metadata(std::string path, int tid, int fd, int rank, bool is_creat) {
 	void* p_shm;
-	//int index = *caching_info[tid].second;
-	//caching_info[tid].first[index] = fd;
-	//if (on_disk.find(path) == on_disk.end()) {
-		std::string shm_name = path;
-		std::replace(shm_name.begin(), shm_name.end(), '/', '_');
-		shm_name = shm_name.substr(1);
-		p_shm = new char[file_initial_size];
-				#ifdef CAPIOLOG
-		logfile << " address p_shm " << p_shm << std::endl;
-		#endif
-		//caching_info[tid].first[index + 1] = 0;
-	//}
-	/*else {
-		p_shm = nullptr;
-		//caching_info[tid].first[index + 1] = 1;
-	}
-	*/
-		//TODO: check the size that the user wrote in the configuration file
+	std::string shm_name = path;
+	std::replace(shm_name.begin(), shm_name.end(), '/', '_');
+	shm_name = shm_name.substr(1);
+	p_shm = new char[file_initial_size];
+	#ifdef CAPIOLOG
+	logfile << " address p_shm " << p_shm << std::endl;
+	#endif
+	//TODO: check the size that the user wrote in the configuration file
 	off64_t* p_offset = (off64_t*) create_shm("offset_" + std::to_string(tid) + "_" + std::to_string(fd), sizeof(off64_t));
-	sem_wait(&files_metadata_sem);
-	
-	sem_post(&files_metadata_sem);
-	//*caching_info[tid].second += 2;
 	sem_wait(&files_metadata_sem);
 	auto it = files_metadata.find(path);
 	if (it == files_metadata.end()) {
@@ -853,20 +838,27 @@ void handle_crax(const char* str, int rank) {
 		response_buffers[tid]->write(&res);
 }
 
-//TODO: function too long
-
 void handle_open(char* str, int rank, bool is_creat) {
 	#ifdef CAPIOLOG
 	logfile << "handle open" << std::endl;
 	#endif
 	int tid, fd;
 	char path_cstr[PATH_MAX];
-	if (is_creat)
+	if (is_creat) {
 		sscanf(str, "crat %d %d %s", &tid, &fd, path_cstr);
-	else
+		init_process(tid);
+		update_file_metadata(path_cstr, tid, fd, rank, is_creat);
+	}
+	else {
 		sscanf(str, "open %d %d %s", &tid, &fd, path_cstr);
-	init_process(tid);
-	update_file_metadata(path_cstr, tid, fd, rank, is_creat);
+		init_process(tid);
+		off64_t res = 1;
+		if (files_location.find(path_cstr) != files_location.end() || metadata_conf.find(path_cstr) != metadata_conf.end() || match_globs(path_cstr) != -1) {
+			update_file_metadata(path_cstr, tid, fd, rank, is_creat);
+			res = 0;
+		}
+		response_buffers[tid]->write(&res);
+	}
 }
 
 void send_data_to_client(int tid, char* buf, long int count) {
@@ -1126,6 +1118,13 @@ void handle_local_read(int tid, int fd, off64_t count, bool dir, bool is_getdent
 				pending_reads[path].push_back(std::make_tuple(tid, fd, count, is_getdents));
 			}
 			else {
+			  if (end_of_sector == -1) {
+			    end_of_sector = 0;
+			    response_buffers[tid]->write(&end_of_sector);
+			    if (sem_post(&handle_local_read_sem) == -1)
+			      err_exit("sem_post handle_local_read_sem in handle_local_read", logfile);
+			    return;
+			  }
 				nreads = end_of_sector;
 				sem_wait(&files_metadata_sem);
 				if (c_file.buf_to_allocate()) {
@@ -1191,6 +1190,8 @@ void handle_local_read(int tid, int fd, off64_t count, bool dir, bool is_getdent
 		#endif
 		if (sem_post(&handle_local_read_sem) == -1)
 			err_exit("sem_post handle_local_read_sem in handle_local_read", logfile);
+	    
+	       
 }
 
 
@@ -1772,8 +1773,9 @@ void handle_close(int tid, int fd, int rank) {
 	if (c_file.n_opens == 0 && c_file.n_links <= 0)
 		delete_file(path, rank);
 	std::string offset_name = "offset_" + std::to_string(tid) +  "_" + std::to_string(fd);
-	if (shm_unlink(offset_name.c_str()) == -1)
-		err_exit("shm_unlink " + offset_name + " in handle_close");
+	shm_unlink(offset_name.c_str()); // no check because could be a dup fd
+	/*if (shm_unlink(offset_name.c_str()) == -1)
+		err_exit("shm_unlink " + offset_name + " in handle_close");*/
 	processes_files[tid].erase(fd);
 	processes_files_metadata[tid].erase(fd);
 	c_file.remove_fd(tid, fd);
@@ -2231,10 +2233,10 @@ void handle_access(const char* str) {
 	sscanf(str, "accs %d %s", &tid, path);
 	off64_t res;
 	auto it = files_location.find(path);
-	if (it == files_location.end())
-		res = -1;
-	else 
+	if (it != files_location.end() || metadata_conf.find(path) != metadata_conf.end() || match_globs(path) != -1)
 		res = 0;
+	else 
+		res = -1;
 	#ifdef CAPIOLOG
 		logfile << "handle access result: " << res << std::endl;
 	#endif
