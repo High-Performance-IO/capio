@@ -1,19 +1,6 @@
 #ifndef CAPIO_FILE_HPP_
 #define CAPIO_FILE_HPP_
 
-#include <iostream>
-#include <set>
-#include <vector>
-#include <algorithm>
-#include <cstddef>
-#include <string.h>
-#include <fcntl.h>
-#include <sys/mman.h>
-#include <sys/types.h>
-#include <sys/stat.h>
-#include <unistd.h>
-#include "utils/common.hpp"
-
 /*
  * Only the server have all the information
  * A process that only read from a file doesn't have the info on the sectors
@@ -139,7 +126,7 @@ class Capio_file {
 			if (_permanent && home_node) {
 				if (_directory) {
 					if (mkdir(path.c_str(), 0700) == -1)
-						err_exit("mkdir capio_file create_buffer");
+						err_exit("mkdir capio_file create_buffer", "create_buffer");
 					#ifdef CAPIOLOG
 					logfile<< "creating buf dir" << std::endl;
 					#endif
@@ -151,15 +138,15 @@ class Capio_file {
 					#endif
 					_fd = open(path.c_str(), O_RDWR | O_CREAT, S_IRWXU | S_IRGRP | S_IROTH);
 					if (_fd == -1)
-						err_exit("open " + path + " " + "Capio_file constructor");
+						err_exit("open " + path + " " + "Capio_file constructor", "create_buffer");
 				
 					
 					if (ftruncate(_fd, _buf_size) == -1)
-						err_exit("ftruncate Capio_file constructor");
+						err_exit("ftruncate Capio_file constructor", "create_buffer");
 
 					_buf = (char*) mmap(NULL, _buf_size, PROT_READ | PROT_WRITE, MAP_SHARED, _fd, 0);
 					if (_buf == MAP_FAILED)
-						err_exit("mmap Capio_file constructor");
+						err_exit("mmap Capio_file constructor", "create_buffer");
 
 				}
 			}
@@ -190,7 +177,7 @@ class Capio_file {
 				else {
 					int res = munmap(_buf, _buf_size);	
 					if (res == -1)
-						err_exit("munmap Capio_file");
+						err_exit("munmap Capio_file", "free_buf");
 				}
 			}
 			else 

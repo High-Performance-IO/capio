@@ -2,7 +2,7 @@
 #include <fcntl.h>
 #include <unistd.h>
 
-#include "../src/utils/common.hpp"
+#include "circular_buffer/common.hpp"
 
 void read_file() {
 	int fd = open("file.txt", O_RDONLY);

@@ -1,7 +1,12 @@
-#include "../../src/circular_buffer.hpp"
+#include <sys/mman.h>
+#include <sys/stat.h>        /* For mode constants */
+#include <fcntl.h>
+#include <iostream>
+#include <string>
 #include "common.hpp"
 #include <mpi.h>
 #include <semaphore.h>
+#include "../../src/data_structure/circular_buffer.hpp"
 
 void sync_with_cons(sem_t* sem_prod, sem_t* sem_cons) {
 	if (sem_wait(sem_prod) == -1)
