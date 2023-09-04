@@ -1,8 +1,14 @@
-#include "../src/capio_file.hpp"
-
+#include <sys/mman.h>
+#include <sys/stat.h>        /* For mode constants */
+#include <fcntl.h>
 #include <iostream>
+#include <string>
+#include <utility>
 #include <set>
 #include <vector>
+#include <algorithm>
+#include "circular_buffer/common.hpp"
+#include "../src/data_structure/capio_file.hpp"
 
 void test1() {
 	Capio_file c_file;

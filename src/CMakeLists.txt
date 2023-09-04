@@ -1,4 +1,4 @@
-add_executable(capio_server capio_server.cpp simdjson.cpp)
+add_executable(capio_server capio_server.cpp simdjson/simdjson.cpp)
 
 target_link_libraries(capio_server ${MPI_LIBRARIES} rt)
 # includes MPI

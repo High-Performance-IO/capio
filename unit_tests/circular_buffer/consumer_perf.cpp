@@ -1,5 +1,10 @@
-#include "../../src/circular_buffer.hpp"
+#include <sys/mman.h>
+#include <sys/stat.h>        /* For mode constants */
+#include <fcntl.h>
+#include <iostream>
+#include <string>
 #include "common.hpp"
+#include "../../src/data_structure/circular_buffer.hpp"
 #include <limits>
 #include <chrono>
 #include <fstream>

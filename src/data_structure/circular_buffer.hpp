@@ -1,16 +1,6 @@
-#ifndef CAPIO_SPSC_CIRCULAR_BUFFER_HPP_
-#define CAPIO_SPSC_CIRCULAR_BUFFER_HPP_
+#ifndef CAPIO_CIRCULAR_BUFFER_HPP_
+#define CAPIO_CIRCULAR_BUFFER_HPP_
 
-#include <string>
-#include <iostream>
-
-#include <string.h>
-#include <sys/stat.h>
-#include <sys/mman.h>
-#include <unistd.h>
-#include <fcntl.h>
-#include <semaphore.h>
-#include <limits.h>
 
 /*
  * Multi-producer and multi-consumer circular buffer.
@@ -18,7 +8,7 @@
  */
 
 template <class T>
-class SPSC_queue {
+class Circular_buffer {
 	private:
 		void* _shm;
 		const long int _max_num_elems;
@@ -27,6 +17,7 @@ class SPSC_queue {
 		long int* _first_elem;
 		long int* _last_elem;
 		const std::string _shm_name;
+		sem_t* _mutex;
 		sem_t* _sem_num_elems;
 		sem_t* _sem_num_empty;
 
@@ -66,13 +57,12 @@ class SPSC_queue {
 		_shm = mmap(NULL, sb.st_size, PROT_READ|PROT_WRITE, MAP_SHARED, fd, 0);
 		if (_shm == MAP_FAILED)
 			err_exit("mmap " + _shm_name);
-		if (close(fd) == -1)
-			err_exit("close");
-
-		return 0;
-	}
+		//	if (close(fd) == -1);
+		//		err_exit("close");
+	return fd;
+}
 	public:
-		SPSC_queue(const std::string shm_name, const long int _max_num_elems, const long int elem_size) : _max_num_elems(_max_num_elems), _elem_size(elem_size), _shm_name(shm_name) {
+		Circular_buffer(const std::string shm_name, const long int _max_num_elems, const long int elem_size) : _max_num_elems(_max_num_elems), _elem_size(elem_size), _shm_name(shm_name) {
 			_buff_size = _max_num_elems * _elem_size;
 			_first_elem = (long int*) create_shm("_first_elem" + shm_name, sizeof(long int));
 			_last_elem = (long int*) create_shm("_last_elem" + shm_name, sizeof(long int));
@@ -82,6 +72,10 @@ class SPSC_queue {
 				_shm = create_shm(shm_name, _buff_size);	
 			}
 			
+			_mutex = sem_open(("_mutex" + _shm_name).c_str(), O_CREAT | O_RDWR, S_IRUSR | S_IWUSR, 1); //check the flags
+			if (_mutex == SEM_FAILED) {
+				err_exit("sem_open _mutex" + _shm_name);
+			}
 			_sem_num_elems = sem_open(("_sem_num_elems" + _shm_name).c_str(), O_CREAT | O_RDWR, S_IRUSR | S_IWUSR, 0); //check the flags
 			if (_sem_num_elems == SEM_FAILED) {
 				err_exit("sem_open _sem_num_elems" + _shm_name);
@@ -92,42 +86,69 @@ class SPSC_queue {
 			}
 		}
 
-		~SPSC_queue() {
+		~Circular_buffer() {
+			sem_close(_mutex);
 			sem_close(_sem_num_elems);
 			sem_close(_sem_num_empty);
 		}
 
-		void free_shm() {
-			shm_unlink(_shm_name.c_str());
-			shm_unlink(("_first_elem" + _shm_name).c_str());
-			shm_unlink(("_last_elem" + _shm_name).c_str());
-			sem_unlink(("_sem_num_elems" + _shm_name).c_str());
-			sem_unlink(("_sem_num_empty" + _shm_name).c_str());
+		void free_shm(std::ostream& outstream = std::cerr) {
+			if (shm_unlink(_shm_name.c_str()) == -1)
+				err_exit("shm_unlink " + _shm_name + " in circular_buffer free_shm");
+			std::string resource = "_first_elem" + _shm_name;
+			if (shm_unlink(resource.c_str()) == -1)
+				err_exit("shm_unlink " + resource + " in circular_buffer free_shm");
+			resource = "_last_elem" + _shm_name;
+			if (shm_unlink(resource.c_str()) == -1)
+				err_exit("shm_unlink " + resource + " in circular_buffer free_shm");
+			resource = "_mutex" + _shm_name;
+			if (sem_unlink(resource.c_str()) == -1)
+				err_exit("sem_unlink " + resource + " in circular_buffer free_shm");
+			resource = "_sem_num_elems" + _shm_name;
+			if (sem_unlink(resource.c_str()) == -1)
+				err_exit("sem_unlink " + resource + " in circular_buffer free_shm");
+			resource = "_sem_num_empty" + _shm_name;
+			if (sem_unlink(resource.c_str()) == -1)
+				err_exit("sem_unlink " + resource + " in circular_buffer free_shm");
 		}
 	
 		void write(const T* data) {
 			if (sem_wait(_sem_num_empty) == -1)
 				err_exit("sem_wait _sem_num_empty");
 			
+			if (sem_wait(_mutex) == -1)
+				err_exit("sem_wait _mutex in write");
+			
 			memcpy((char*) _shm + *_last_elem, data, _elem_size);
 			*_last_elem = (*_last_elem + _elem_size) % _buff_size;
+
+			if (sem_post(_mutex) == -1)
+				err_exit("sem_post _mutex in write");
 
 			if (sem_post(_sem_num_elems) == -1)
 				err_exit("sem_post _sem_num_elems");
 		}
 			
 		void write(const T* data, long int num_bytes) {
-
-			if (num_bytes > _elem_size) {
-				std::cerr << "circular buffer " + _shm_name + "write error: num_bytes > _elem_size"  << std::endl;
-				exit(1);
-			}
-
 			if (sem_wait(_sem_num_empty) == -1)
 				err_exit("sem_wait _sem_num_empty");
-				
+			
+			if (sem_wait(_mutex) == -1)
+				err_exit("sem_wait _mutex in write");
+		
+			if (*_last_elem + num_bytes > _buff_size) {
+				std::cout << "_last_elem " << *_last_elem << std::endl;
+				std::cout << "num_bytes" << num_bytes << std::endl;
+				std::cout << "buff_size" << _buff_size << std::endl;
+				std::cout << "out of bound write" << std::endl;
+			}
+
 			memcpy((char*) _shm + *_last_elem, data, num_bytes);
+			//TODO: dangerous consider remove this function
 			*_last_elem = (*_last_elem + _elem_size) % _buff_size;
+
+			if (sem_post(_mutex) == -1)
+				err_exit("sem_post _mutex in write");
 
 			if (sem_post(_sem_num_elems) == -1)
 				err_exit("sem_post _sem_num_elems");
@@ -137,19 +158,17 @@ class SPSC_queue {
 			if (sem_wait(_sem_num_elems) == -1)
 				err_exit("sem_wait _sem_num_elems");
 
-
+			if (sem_wait(_mutex) == -1)
+				err_exit("sem_wait _mutex in write");
 			memcpy((char*) buff_rcv, ((char*) _shm) + *_first_elem, _elem_size);
 			*_first_elem = (*_first_elem + _elem_size) % _buff_size;
 
+			if (sem_post(_mutex) == -1)
+				err_exit("sem_wait _mutex in write");
 
 			if (sem_post(_sem_num_empty) == -1)
 				err_exit("sem_post _sem_num_empty");
 		}
-
-		/* 
-		 * It reads only the firsts num_bytes bytes of the buffer element 
-		 */
-
 		void read(T* buff_rcv, long int num_bytes) {
 			if (num_bytes > _elem_size) {
 				std::cerr << "circular buffer " + _shm_name + "read error: num_bytes > _elem_size"  << std::endl;
@@ -162,6 +181,8 @@ class SPSC_queue {
 
 			memcpy((char*) buff_rcv, ((char*) _shm) + *_first_elem, num_bytes);
 			*_first_elem = (*_first_elem + _elem_size) % _buff_size;
+			if (sem_post(_mutex) == -1)
+				err_exit("sem_post _mutex in write");
 
 			if (sem_post(_sem_num_empty) == -1)
 				err_exit("sem_post _sem_num_empty");
