@@ -32,7 +32,6 @@
 #include "spsc_queue.hpp"
 #include "simdjson.h"
 #include "utils/common.hpp"
-#define CAPIOLOG
 #define N_ELEMS_DATA_BUFS 10
 //256KB
 #define WINDOW_DATA_BUFS 262144
@@ -1960,14 +1959,18 @@ void free_resources(int tid) {
 	std::string sem_write_shm_name;
 	auto it_resp = response_buffers.find(tid);
 	if (it_resp != response_buffers.end()) {
+		#ifdef CAPIOLOG
 		logfile << "cleaning response buffer " << tid << std::endl;
+		#endif
 		it_resp->second->free_shm();
 		delete it_resp->second;
 		response_buffers.erase(it_resp);
 	}
 
 	if (sems_write->find(tid) != sems_write->end()) {
+		#ifdef CAPIOLOG
 		logfile << "cleaning sem_write" << tid << std::endl;
+		#endif
 		sem_write_shm_name = "sem_write" + std::to_string(tid);
 		if (sem_unlink(sem_write_shm_name.c_str()) == -1)
 			err_exit("sem_unlink " + sem_write_shm_name + "in sig_term_handler", logfile);
@@ -1975,7 +1978,9 @@ void free_resources(int tid) {
 
 	auto it = data_buffers.find(tid);
 	if (it != data_buffers.end()) {
+		#ifdef CAPIOLOG
 		logfile << "cleaning data buffer " << tid << std::endl;
+		#endif
 		it->second.first->free_shm();
 		it->second.second->free_shm();
 		data_buffers.erase(it);

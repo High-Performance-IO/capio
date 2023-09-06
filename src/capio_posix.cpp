@@ -893,7 +893,6 @@ off_t capio_lseek(int fd, off64_t offset, int whence) {
 
 
 int capio_openat(int dirfd, const char* pathname, int flags, bool is_creat) {
-	CAPIO_DBG("capio_openat %s\n", pathname);
 	std::string path_to_check;
 	if(is_absolute(pathname)) {
 		path_to_check = pathname;
