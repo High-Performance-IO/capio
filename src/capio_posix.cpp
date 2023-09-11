@@ -963,8 +963,8 @@ int capio_openat(int dirfd, const char* pathname, int flags, bool is_creat) {
 			else
 				mode = 2;
 			int res = add_open_request(path_to_check.c_str(), fd, mode);
-			if (res == 1) {
-				errno = EEXIST;
+			if (res == 1) { // if mode==2 res is always 0
+				errno = (mode == 0) ? EEXIST : ENOENT;
 				return -1;
 			}
 			off64_t* p_offset = (off64_t*) create_shm("offset_" + std::to_string(syscall(SYS_gettid)) + "_" + std::to_string(fd), sizeof(off64_t));

@@ -291,7 +291,7 @@ void write_file_location(int rank, std::string path_to_write, int tid) {
 }
 
 /*
- * Returns 0 if the file "file_name" does not exists
+ * Returns 0 if the file "file_location" does not exists
  * Returns 1 if the location of the file path_to_check is found
  * Returns 2 otherwise
  *
@@ -852,9 +852,13 @@ void handle_open(char* str, int rank, bool is_creat) {
 		sscanf(str, "open %d %d %s", &tid, &fd, path_cstr);
 		init_process(tid);
 		off64_t res = 1;
-		if (files_location.find(path_cstr) != files_location.end() || metadata_conf.find(path_cstr) != metadata_conf.end() || match_globs(path_cstr) != -1) {
+		//it is important that check_files_location is the last beacuse is the slowest (short circuit evalutation)
+		if (files_location.find(path_cstr) != files_location.end() || metadata_conf.find(path_cstr) != metadata_conf.end() || match_globs(path_cstr) != -1 || check_file_location(rank, path_cstr)) {
 			update_file_metadata(path_cstr, tid, fd, rank, is_creat);
 			res = 0;
+			#ifdef CAPIOLOG
+			logfile << "file found" << std::endl;
+			#endif
 		}
 		response_buffers[tid]->write(&res);
 	}
