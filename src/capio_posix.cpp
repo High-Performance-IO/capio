@@ -506,6 +506,8 @@ int add_open_request(const char* pathname, size_t fd, int mode) {
 	else if (mode == 1) {
 		sprintf(c_str, "crat %ld %ld %s", syscall(SYS_gettid), fd, pathname);
 		buf_requests->write(c_str, 256 * sizeof(char)); //TODO: max upperbound for pathname
+		off64_t res;
+		(*bufs_response)[syscall(SYS_gettid)]->read(&res);
 	}
 	else if (mode == 2) {
 		sprintf(c_str, "open %ld %ld %s", syscall(SYS_gettid), fd, pathname);
@@ -846,10 +848,16 @@ off_t capio_lseek(int fd, off64_t offset, int whence) {
 	#ifdef CAPIOLOG
 	CAPIO_DBG("capio seek end\n");
 	#endif
-			off64_t file_size;
+			off64_t file_size, is_dir;
 			sprintf(c_str, "send %ld %d", syscall(SYS_gettid),fd);
 			buf_requests->write(c_str, 256 * sizeof(char));
 			(*bufs_response)[syscall(SYS_gettid)]->read(&file_size);
+			/* 
+			 * we don't use is_dir here but we have to remove it from the queue.
+			 * A better option wuold be that the server doesnt write is_dir during
+			 * the seek end, but for the moment this is the easiest thing to do
+			 */
+			(*bufs_response)[syscall(SYS_gettid)]->read(&is_dir);
 			*file_offset = file_size + offset;	
 			return *file_offset;
 		}
@@ -963,7 +971,7 @@ int capio_openat(int dirfd, const char* pathname, int flags, bool is_creat) {
 			else
 				mode = 2;
 			int res = add_open_request(path_to_check.c_str(), fd, mode);
-			if (res == 1) { // if mode==2 res is always 0
+			if (res == 1) { // if mode==1 res is always 0
 				errno = (mode == 0) ? EEXIST : ENOENT;
 				return -1;
 			}

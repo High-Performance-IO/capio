@@ -843,25 +843,29 @@ void handle_open(char* str, int rank, bool is_creat) {
 	#endif
 	int tid, fd;
 	char path_cstr[PATH_MAX];
+	off64_t res = 0;
 	if (is_creat) {
 		sscanf(str, "crat %d %d %s", &tid, &fd, path_cstr);
 		init_process(tid);
+		if (files_location.find(path_cstr) != files_location.end() || check_file_location(rank, path_cstr))
+			is_creat = false;
 		update_file_metadata(path_cstr, tid, fd, rank, is_creat);
 	}
 	else {
 		sscanf(str, "open %d %d %s", &tid, &fd, path_cstr);
 		init_process(tid);
-		off64_t res = 1;
 		//it is important that check_files_location is the last beacuse is the slowest (short circuit evalutation)
 		if (files_location.find(path_cstr) != files_location.end() || metadata_conf.find(path_cstr) != metadata_conf.end() || match_globs(path_cstr) != -1 || check_file_location(rank, path_cstr)) {
 			update_file_metadata(path_cstr, tid, fd, rank, is_creat);
-			res = 0;
 			#ifdef CAPIOLOG
 			logfile << "file found" << std::endl;
 			#endif
 		}
-		response_buffers[tid]->write(&res);
+		else
+			res = 1;
+		
 	}
+	response_buffers[tid]->write(&res);
 }
 
 void send_data_to_client(int tid, char* buf, long int count) {
@@ -1266,7 +1270,9 @@ void handle_remote_read(int tid, int fd, off64_t count, int rank, bool dir, bool
 				err_exit("sem_post handle_remote_read_sem in handle_remote_read", logfile);
 			return;
 		}
-
+		#ifdef CAPIOLOG
+		logfile << "handle remote read after sem_wait" << std::endl;
+		#endif
 		// If it is not in cache then send the request to the remote node
 		const char* msg;
 		std::string str_msg;
@@ -1933,15 +1939,159 @@ void handle_shol(char* str) {
 	response_buffers[tid]->write(&res);
 }
 
-void handle_seek_end(char* str) {
+
+void handle_local_stat(int tid, std::string path) {
+	off64_t file_size;
+	sem_wait(&files_metadata_sem);
+	auto it = files_metadata.find(path);
+	Capio_file& c_file = *(it->second);
+	sem_post(&files_metadata_sem);
+	file_size = c_file.get_file_size();
+	off64_t is_dir;
+	if (c_file.is_dir())
+		is_dir = 0;
+	else
+		is_dir = 1;
+	response_buffers[tid]->write(&file_size);
+	response_buffers[tid]->write(&is_dir);
+	#ifdef CAPIOLOG
+		logfile << "file size handle local stat : " << file_size << std::endl;
+	#endif
+}
+
+void handle_remote_stat(int tid, const std::string path, int rank) {
+	#ifdef CAPIOLOG
+	logfile << "handle remote stat before sem_wait" << std::endl;
+	#endif
+	if (sem_wait(&handle_remote_stat_sem) == -1)
+		err_exit("sem_wait handle_remote_stat_sem in handle_remote_stat", logfile);
+	std::string str_msg;
+	int dest = nodes_helper_rank[std::get<0>(files_location[path])];
+	str_msg = "stat " + std::to_string(rank) + " " + path; 
+	const char* msg = str_msg.c_str();
+	#ifdef CAPIOLOG
+	logfile << "handle remote stat" << std::endl;
+	logfile << "msg sent " << msg << std::endl;
+	logfile << "dest " << dest << std::endl;
+	logfile << "rank" << rank << std::endl;
+	#endif
+	MPI_Send(msg, strlen(msg) + 1, MPI_CHAR, dest, 0, MPI_COMM_WORLD);
+	#ifdef CAPIOLOG
+	logfile << "remote stat 0" << std::endl;
+	#endif
+	my_remote_pending_stats[path].push_back(tid);
+	#ifdef CAPIOLOG
+	logfile << "remote stat 1" << std::endl;
+	#endif
+	if (sem_post(&handle_remote_stat_sem) == -1)
+		err_exit("sem_post handle_remote_stat_sem in handle_remote_stat", logfile);
+	#ifdef CAPIOLOG
+	logfile << "remote stat 2" << std::endl;
+	#endif
+
+}
+
+
+struct wait_for_stat_metadata{
+	int tid;
+	char path[PATH_MAX];
+};
+
+void* wait_for_stat(void* pthread_arg) {
+	struct wait_for_stat_metadata* metadata = (struct wait_for_stat_metadata*) pthread_arg;
+	int tid = metadata->tid;
+	const char* path = metadata->path;
+	int rank;
+	MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+	std::string path_to_check(path);
+        #ifdef CAPIOLOG
+        logfile << "wait for stat" << std::endl;
+        #endif
+	loop_check_files_location(path_to_check, rank);
+
+	//check if the file is local or remote
+
+	sem_wait(&files_metadata_sem);
+	Capio_file& c_file = *files_metadata[path];
+	sem_post(&files_metadata_sem);
+	std::string mode = c_file.get_mode();
+	bool complete = c_file.complete;
+	if (complete || strcmp(std::get<0>(files_location[path_to_check]), node_name) == 0 || mode == "append") {
+		handle_local_stat(tid, path);
+	}
+	else {
+		handle_remote_stat(tid, path, rank);
+	}
+
+	free(metadata);
+	return nullptr;
+}
+
+void reply_stat(int tid, std::string path, int rank) {
+	if (files_location.find(path) == files_location.end()) {
+		check_file_location(rank, path);
+		if (files_location.find(path) == files_location.end()) {
+			//if it is in configuration file then wait otherwise fails
+			
+			if ((metadata_conf.find(path) != metadata_conf.end() || match_globs(path) != -1) && !is_producer(tid, path)) {
+				pthread_t t;
+				struct wait_for_stat_metadata* metadata = (struct wait_for_stat_metadata*)  malloc(sizeof(wait_for_stat_metadata));
+				metadata->tid = tid;
+				strcpy(metadata->path, path.c_str());
+				int res = pthread_create(&t, NULL, wait_for_stat, (void*) metadata);
+				if (res != 0) {
+					logfile << "error creation of capio server thread wait for stat" << std::endl;
+					MPI_Finalize();
+					exit(1);
+				}
+			} 
+			else {
+				off64_t file_size;
+				file_size = -1;	
+				response_buffers[tid]->write(&file_size);
+	#ifdef CAPIOLOG
+		logfile << "file size stat : " << file_size << std::endl;
+	#endif
+			}
+			return;
+		}
+	}
+
+	sem_wait(&files_metadata_sem);
+	if (files_metadata.find(path) == files_metadata.end()) {
+		sem_post(&files_metadata_sem);
+		create_file(path, false, file_initial_size);
+	}
+	else
+		sem_post(&files_metadata_sem);
+
+	sem_wait(&files_metadata_sem);
+	Capio_file& c_file = *files_metadata[path];
+	sem_post(&files_metadata_sem);
+	std::string mode = c_file.get_mode();
+	bool complete = c_file.complete;
+	#ifdef CAPIOLOG
+		logfile << "node_name : " << node_name << std::endl;
+		logfile << " files_location[path]: " << std::get<0>(files_location[path]) << std::endl;
+	#endif
+	if (complete || strcmp(std::get<0>(files_location[path]), node_name) == 0 || mode == "append" || *capio_dir == path) {
+		handle_local_stat(tid, path);
+	}
+	else {
+		handle_remote_stat(tid, path, rank);
+	}
+
+}
+
+void handle_seek_end(char* str, int rank) {
 	int tid, fd;	
 	sscanf(str, "send %d %d", &tid, &fd);
 	std::string path = processes_files_metadata[tid][fd];
 	sem_wait(&files_metadata_sem);
 	Capio_file& c_file = *files_metadata[path];
 	sem_post(&files_metadata_sem);
-	off64_t res = c_file.get_file_size();
-	response_buffers[tid]->write(&res);
+	// seek_end here behaves as stat because we want the file size
+	reply_stat(tid, path, rank);
 }
 
 void close_all_files(int tid, int rank) {
@@ -2067,150 +2217,6 @@ void handle_exig(char* str, int rank) {
 	#endif	
    close_all_files(tid, rank);
    free_resources(tid);
-}
-
-
-void handle_local_stat(int tid, std::string path) {
-	off64_t file_size;
-	sem_wait(&files_metadata_sem);
-	auto it = files_metadata.find(path);
-	Capio_file& c_file = *(it->second);
-	sem_post(&files_metadata_sem);
-	file_size = c_file.get_file_size();
-	off64_t is_dir;
-	if (c_file.is_dir())
-		is_dir = 0;
-	else
-		is_dir = 1;
-	response_buffers[tid]->write(&file_size);
-	response_buffers[tid]->write(&is_dir);
-	#ifdef CAPIOLOG
-		logfile << "file size handle local stat : " << file_size << std::endl;
-	#endif
-}
-
-void handle_remote_stat(int tid, const std::string path, int rank) {
-	#ifdef CAPIOLOG
-	logfile << "handle remote stat before sem_wait" << std::endl;
-	#endif
-	if (sem_wait(&handle_remote_stat_sem) == -1)
-		err_exit("sem_wait handle_remote_stat_sem in handle_remote_stat", logfile);
-	std::string str_msg;
-	int dest = nodes_helper_rank[std::get<0>(files_location[path])];
-	str_msg = "stat " + std::to_string(rank) + " " + path; 
-	const char* msg = str_msg.c_str();
-	#ifdef CAPIOLOG
-	logfile << "handle remote stat" << std::endl;
-	logfile << "msg sent " << msg << std::endl;
-	logfile << "dest " << dest << std::endl;
-	logfile << "rank" << rank << std::endl;
-	#endif
-	MPI_Send(msg, strlen(msg) + 1, MPI_CHAR, dest, 0, MPI_COMM_WORLD);
-	#ifdef CAPIOLOG
-	logfile << "remote stat 0" << std::endl;
-	#endif
-	my_remote_pending_stats[path].push_back(tid);
-	#ifdef CAPIOLOG
-	logfile << "remote stat 1" << std::endl;
-	#endif
-	if (sem_post(&handle_remote_stat_sem) == -1)
-		err_exit("sem_post handle_remote_stat_sem in handle_remote_stat", logfile);
-	#ifdef CAPIOLOG
-	logfile << "remote stat 2" << std::endl;
-	#endif
-
-}
-
-struct wait_for_stat_metadata{
-	int tid;
-	char path[PATH_MAX];
-};
-
-void* wait_for_stat(void* pthread_arg) {
-	struct wait_for_stat_metadata* metadata = (struct wait_for_stat_metadata*) pthread_arg;
-	int tid = metadata->tid;
-	const char* path = metadata->path;
-	int rank;
-	MPI_Comm_rank(MPI_COMM_WORLD, &rank);
-	std::string path_to_check(path);
-        #ifdef CAPIOLOG
-        logfile << "wait for stat" << std::endl;
-        #endif
-	loop_check_files_location(path_to_check, rank);
-
-	//check if the file is local or remote
-
-	sem_wait(&files_metadata_sem);
-	Capio_file& c_file = *files_metadata[path];
-	sem_post(&files_metadata_sem);
-	std::string mode = c_file.get_mode();
-	bool complete = c_file.complete;
-	if (complete || strcmp(std::get<0>(files_location[path_to_check]), node_name) == 0 || mode == "append") {
-		handle_local_stat(tid, path);
-	}
-	else {
-		handle_remote_stat(tid, path, rank);
-	}
-
-	free(metadata);
-	return nullptr;
-}
-
-
-void reply_stat(int tid, std::string path, int rank) {
-	if (files_location.find(path) == files_location.end()) {
-		check_file_location(rank, path);
-		if (files_location.find(path) == files_location.end()) {
-			//if it is in configuration file then wait otherwise fails
-			
-			if ((metadata_conf.find(path) != metadata_conf.end() || match_globs(path) != -1) && !is_producer(tid, path)) {
-				pthread_t t;
-				struct wait_for_stat_metadata* metadata = (struct wait_for_stat_metadata*)  malloc(sizeof(wait_for_stat_metadata));
-				metadata->tid = tid;
-				strcpy(metadata->path, path.c_str());
-				int res = pthread_create(&t, NULL, wait_for_stat, (void*) metadata);
-				if (res != 0) {
-					logfile << "error creation of capio server thread wait for stat" << std::endl;
-					MPI_Finalize();
-					exit(1);
-				}
-			} 
-			else {
-				off64_t file_size;
-				file_size = -1;	
-				response_buffers[tid]->write(&file_size);
-	#ifdef CAPIOLOG
-		logfile << "file size stat : " << file_size << std::endl;
-	#endif
-			}
-			return;
-		}
-	}
-
-	sem_wait(&files_metadata_sem);
-	if (files_metadata.find(path) == files_metadata.end()) {
-		sem_post(&files_metadata_sem);
-		create_file(path, false, file_initial_size);
-	}
-	else
-		sem_post(&files_metadata_sem);
-
-	sem_wait(&files_metadata_sem);
-	Capio_file& c_file = *files_metadata[path];
-	sem_post(&files_metadata_sem);
-	std::string mode = c_file.get_mode();
-	bool complete = c_file.complete;
-	#ifdef CAPIOLOG
-		logfile << "node_name : " << node_name << std::endl;
-		logfile << " files_location[path]: " << std::get<0>(files_location[path]) << std::endl;
-	#endif
-	if (complete || strcmp(std::get<0>(files_location[path]), node_name) == 0 || mode == "append" || *capio_dir == path) {
-		handle_local_stat(tid, path);
-	}
-	else {
-		handle_remote_stat(tid, path, rank);
-	}
-
 }
 
 void handle_stat(const char* str, int rank) {
@@ -2471,15 +2477,21 @@ void handle_stat_reply(const char* str) {
 	#ifdef CAPIOLOG
 		logfile << "serving the remote stat: " << str << std::endl;
 	#endif
-
+	if (sem_wait(&handle_remote_stat_sem) == -1)
+		err_exit("sem_wait handle_remote_stat_sem in handle_remote_stat", logfile);
 	auto it = my_remote_pending_stats.find(path_c);
-	if (it == my_remote_pending_stats.end())
-		exit(1);
-	for (int tid : it->second) {
-		response_buffers[tid]->write(&size);
-		response_buffers[tid]->write(&dir);
+	if (it == my_remote_pending_stats.end()) {
+		logfile << "handle_stat_reply " << path_c << " not found, stat already answered for optimization" << std::endl;	
 	}
-	my_remote_pending_stats.erase(it);
+	else {
+		for (int tid : it->second) {
+			response_buffers[tid]->write(&size);
+			response_buffers[tid]->write(&dir);
+		}
+		my_remote_pending_stats.erase(it);
+	}
+	if (sem_post(&handle_remote_stat_sem) == -1)
+		err_exit("sem_post handle_remote_stat_sem in handle_remote_stat", logfile);
 }
 
 void read_next_msg(int rank) {
@@ -2518,7 +2530,7 @@ void read_next_msg(int rank) {
 	else if (strncmp(str, "shol", 4) == 0)
 		handle_shol(str);
 	else if (strncmp(str, "send", 4) == 0)
-		handle_seek_end(str);
+		handle_seek_end(str, rank);
 	else if (strncmp(str, "exig", 4) == 0)
 		handle_exig(str, rank);
 	else if (strncmp(str, "stat", 4) == 0)
