@@ -5,7 +5,7 @@
 #include <string>
 #include "common.hpp"
 #include <mpi.h>
-#include "../../src/data_structure/circular_buffer.hpp"
+#include "capio/circular_buffer.hpp"
 
 void test_one_to_one(const std::string& buffer_name, long int max_num_elems, char* data, long int num_bytes, long int num_writes, int rank) {
 	Circular_buffer<char> c_buff(buffer_name + std::to_string(rank), max_num_elems, num_bytes);

@@ -4,7 +4,7 @@
 #include <iostream>
 #include <string>
 #include "common.hpp"
-#include "../../src/data_structure/circular_buffer.hpp"
+#include "capio/circular_buffer.hpp"
 #include <limits>
 #include <chrono>
 #include <fstream>

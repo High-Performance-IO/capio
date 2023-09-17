@@ -4,7 +4,6 @@ project(capio)
 set(CMAKE_VERBOSE_MAKEFILE ON)
 set(CMAKE_CXX_STANDARD 17)
 find_package(Threads REQUIRED)
-find_package(MPI REQUIRED)
 
 OPTION(DEFINE_MACRO "Option description" OFF) # Disabled by default
 IF(DEFINE_MACRO)
@@ -19,10 +18,9 @@ ENDIF(CAPIO_SYNC)
 
 set(CMAKE_CXX_FLAGS_DEBUG "-g -Wall -pedantic -O0")
 set(CMAKE_CXX_FLAGS_RELEASE "-O3")
-add_library(capio_posix SHARED
-    src/capio_posix.cpp
-)
-target_link_libraries(capio_posix rt syscall_intercept)
-add_subdirectory(src)
-add_subdirectory(mpi_io_examples)
-add_subdirectory(unit_tests)
+
+file(GLOB_RECURSE CAPIO_COMMON_HEADERS "src/common/capio/*.hpp")
+include_directories(src/common)
+
+add_subdirectory(src/posix)
+add_subdirectory(src/server)

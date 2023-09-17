@@ -1,0 +1,5 @@
+add_library(capio_posix SHARED capio_posix.cpp)
+file(GLOB_RECURSE CAPIO_POSIX_HEADERS "*.hpp")
+target_sources(capio_posix PRIVATE "${CAPIO_COMMON_HEADERS}" "${CAPIO_POSIX_HEADERS}")
+target_include_directories(capio_posix PRIVATE .)
+target_link_libraries(capio_posix PRIVATE rt syscall_intercept)

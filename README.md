@@ -22,7 +22,7 @@ Then follow the instructions in their README file to install it.
 
 Build it: 
 ```bash
-cd capio 
+cd src 
 mkdir build && cd build
 cmake -DCMAKE_BUILD_TYPE=Release ..
 ```
@@ -33,12 +33,12 @@ Good news! You don't need to modify your code to benefit from the features of CA
 1) Write a configuration file for injecting streaming capabilities to your workflow
 
 2) Launch the CAPIO deamons with MPI passing the (eventual) configuration file as argument on the machines in which you want to execute your program (one deamon for each node).
-```bash
-mpiexec -N 1 --hostfile your_hostfile src/capio_server conf.json 
-```
+    ```bash
+    mpiexec -N 1 --hostfile your_hostfile src/capio_server conf.json 
+    ```
 3) Launch your programs preloading the CAPIO shared library like this:
 ```bash
-LD_PRELOAD=path/to/capio/src/libcapio_posix.so ./your_app args
+LD_PRELOAD=path/to/src/src/libcapio_posix.so ./your_app args
 ```
 
 ## How to injects streaming capabilities into your workflow
@@ -48,35 +48,41 @@ The streaming semantic on_termination tells CAPIO to not allowing streaming on t
 The following is an example of a simple configuration:
 ```json
 {
-"name" : "my_workflow",
-"IO_Graph" :
-[
-	{
-		"name" : "writer",
-		"output_stream" : ["file0.dat", "file1.dat", "file2.dat"],
-		"streaming" : [
-			{
-				"name" : "file0.dat",
-				"committed" : "on_close"
-			},
-			{
-				"name" : "file1.dat",
-				"committed" : "on_close",
-				"mode" : "append"
-			},
-			{
-				"name" : "file2.dat",
-				"committed" : "on_termination"
-			}
-		]
-	},
-
-	{
-		"name" : "reader",
-		"input_stream" : ["file0.dat", "file1.dat", "file2.dat"]
-	}
-
-]
+  "name": "my_workflow",
+  "IO_Graph": [
+    {
+      "name": "writer",
+      "output_stream": [
+        "file0.dat",
+        "file1.dat",
+        "file2.dat"
+      ],
+      "streaming": [
+        {
+          "name": "file0.dat",
+          "committed": "on_close"
+        },
+        {
+          "name": "file1.dat",
+          "committed": "on_close",
+          "mode": "append"
+        },
+        {
+          "name": "file2.dat",
+          "committed": "on_termination"
+        }
+      ]
+    },
+    {
+      "name": "reader",
+      "input_stream": [
+        "file0.dat",
+        "file1.dat",
+        "file2.dat"
+      ]
+    }
+  ]
+}
 ```
 
 :rescue_worker_helmet: We are working in an extension of the possible streaming semantics and in a detailed documentation about the configuration file!

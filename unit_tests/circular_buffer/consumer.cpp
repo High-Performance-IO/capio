@@ -8,7 +8,7 @@
 #include <cassert>
 #include <mpi.h>
 #include <string.h>
-#include "../../src/data_structure/circular_buffer.hpp"
+#include "capio/circular_buffer.hpp"
 
 
 void sync_with_cons(sem_t* sem_prod, sem_t* sem_cons) {
