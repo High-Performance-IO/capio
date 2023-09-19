@@ -3,41 +3,68 @@
 
 #include "globals.hpp"
 
-inline off64_t capio_unlink(const char *pathname,long tid) {
+inline off64_t capio_unlinkat(int dirfd,const std::string& pathname,int flags,long tid) {
+    START_LOG(tid, "call(dirfd=%d, pathname=%s, flags=%X)", dirfd, pathname.c_str(), flags);
 
-    CAPIO_DBG("capio_unlink TID[%ld] PATHNAME[%s]: enter\n", tid, pathname);
-
-    if (capio_dir == nullptr) {
-        //unlink can be called before initialization (see initialize_from_snapshot)
-
-        CAPIO_DBG("capio_unlink TID[%ld] PATHNAME[%s]: invalid CAPIO_DIR, return -2\n", tid, pathname);
-
+    const std::string* capio_dir = get_capio_dir();
+    if (capio_dir->length() == 0) {
         return -2;
     }
-    std::string abs_path = create_absolute_path(pathname, capio_dir, current_dir, stat_enabled);
-    if (abs_path.length() == 0) {
+    off64_t res;
+    if (!is_absolute(&pathname)) {
+        if (dirfd == AT_FDCWD) {
+            const std::string* abs_path = capio_posix_realpath(tid, &pathname, capio_dir, current_dir);
+            if (abs_path->length() == 0) {
+                return -2;
+            }
+            res = capio_unlink_abs(*abs_path, tid);
+        } else {
+            if (!is_directory(dirfd)) {
+                return -2;
+            }
+            std::string dir_path = get_dir_path(dirfd);
+            if (dir_path.length() == 0) {
+                return -2;
+            }
+            std::string path = dir_path + "/" + pathname;
 
-        CAPIO_DBG("capio_unlink TID[%ld] PATHNAME[%s]: invalid abs_path, return -2\n", tid, pathname);
-
-        return -2;
+            res = capio_unlink_abs(path, tid);
+        }
+    } else {
+        res = capio_unlink_abs(pathname, tid);
     }
-
-    off64_t res = capio_unlink_abs(abs_path, tid);
-
-    CAPIO_DBG("capio_unlink TID[%ld] PATHNAME[%s]: return %ld\n", tid, pathname, res);
 
     return res;
 }
 
-int unlink_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg5, long* result,  long tid){
+int unlink_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg5, long* result){
+    std::string pathname(reinterpret_cast<const char *>(arg0));
+    long tid = syscall_no_intercept(SYS_gettid);
+    START_LOG(tid, "call(pathname=%s)", pathname.c_str());
 
-    const char *pathname = reinterpret_cast<const char *>(arg0);
-    off64_t res = capio_unlink(pathname, tid);
+    off64_t res = capio_unlinkat(AT_FDCWD, pathname, 0, tid);
 
     if (res != -2) {
         *result = (res < 0 ? -errno : res);
         return 0;
     }
+    return 1;
+}
+
+int unlinkat_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg5, long* result){
+    int dirfd = static_cast<int>(arg0);
+    std::string pathname(reinterpret_cast<const char *>(arg1));
+    int flags = static_cast<int>(arg2);
+    long tid = syscall_no_intercept(SYS_gettid);
+    START_LOG(tid, "call(dirfd=%d, pathname=%s, flags=%X)", dirfd, pathname.c_str(), flags);
+
+    off64_t res = capio_unlinkat(dirfd, pathname, flags, tid);
+
+    if (res != -2) {
+        *result = (res < 0 ? -errno : res);
+        return 0;
+    }
+
     return 1;
 }
 

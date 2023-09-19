@@ -15,55 +15,12 @@
  * This wrapper function invokes func after sys_clone() returns in the child."
 */
 
-inline pid_t capio_clone(int flags, long parent_tid) {
+static void hook_clone_parent(long child_pid) {
+    auto parent_pid = static_cast<pid_t>(syscall_no_intercept(SYS_gettid));
+    START_LOG(parent_pid, "call(parent_tid=%ld)", parent_pid);
+    mtrace_init(child_pid);
+    clone_request(parent_pid, child_pid);
 
-    CAPIO_DBG("capio_clone: PARENT_TID[%d] FLAGS[%d]: enter\n", parent_tid, flags);
-
-    if ((flags & CLONE_THREAD) != CLONE_THREAD) {
-
-        CAPIO_DBG("capio_clone: PARENT_TID[%d] FLAGS[%d]: process creation\n", parent_tid, flags);
-
-        auto pid = static_cast<pid_t>(syscall_no_intercept(SYS_fork));
-        if (pid == 0) { //child
-            auto child_tid = static_cast<pid_t>(syscall_no_intercept(SYS_gettid));
-
-            CAPIO_DBG("capio_clone: PARENT_TID[%d] FLAGS[%d]: created child process %d\n", parent_tid, flags, child_tid);
-
-            mtrace_init(child_tid);
-
-            CAPIO_DBG("capio_clone: PARENT_TID[%d] FLAGS[%d]: initialized child process %d\n", parent_tid, flags, child_tid);
-
-            clone_request(parent_tid, child_tid);
-
-            CAPIO_DBG("capio_clone: PARENT_TID[%d] FLAGS[%d]: process creation ending, child process %ld returns 0\n", parent_tid, flags, child_tid);
-
-            return 0;
-        } else {
-
-            CAPIO_DBG("capio_clone: PARENT_TID[%d] FLAGS[%d]: process creation ending, parent process returns %d\n", parent_tid, flags, pid);
-
-            return pid;
-        }
-    } else {
-
-        CAPIO_DBG("capio_clone: PARENT_TID[%d] FLAGS[%d]: thread creation, return 1\n", parent_tid, flags);
-
-        return 1;
-    }
 }
-
-int clone_handler(long arg0, long arg1, long arg2,long arg3, long arg4, long arg5, long* result,long tid){
-
-    int res;
-    res = capio_clone(static_cast<int>(arg0), tid);
-    if (res == 1)
-        return 1;
-    if (res != -2) {
-        *result = (res < 0 ? -errno : res);
-        return 0;
-    }
-    return 1;
-}
-
 
 #endif // CAPIO_POSIX_HANDLERS_CLONE_HPP

@@ -1,36 +1,27 @@
 #ifndef CAPIO_SERVER_HANDLERS_UNLINK_HPP
 #define CAPIO_SERVER_HANDLERS_UNLINK_HPP
 
-void handle_unlink(const char* str, int rank) {
-    char path[PATH_MAX];
-    off64_t res;
-    int tid;
-#ifdef CAPIOLOG
-    logfile << "handle unlink: " << str << std::endl;
-#endif
-    sscanf(str, "unlk %d %s", &tid, path);
-    sem_wait(&files_metadata_sem);
-    auto it = files_metadata.find(path);
-    if (it != files_metadata.end()) { //TODO: it works only in the local case
-        sem_post(&files_metadata_sem);
-        res = 0;
-        response_buffers[tid]->write(&res);
-        Capio_file& c_file = *(it->second);
-        --c_file.n_links;
-#ifdef CAPIOLOG
-        logfile << "capio unlink n links " << c_file.n_links << " n opens " << c_file.n_opens;
-#endif
-        if (c_file.n_opens == 0 && c_file.n_links <= 0) {
-            delete_file(path, rank);
+inline void handle_unlink(int tid, const char *path, int rank) {
+    START_LOG(gettid(), "call(tid=%d, path=%s, rank=%d)", tid, path, rank);
 
+    auto c_file_opt = get_capio_file_opt(path);
+    if (c_file_opt) { //TODO: it works only in the local case
+        Capio_file &c_file = c_file_opt->get();
+        c_file.unlink();
+        if (c_file.is_deletable()) {
+            delete_file(path, rank);
         }
-    }
-    else {
-        sem_post(&files_metadata_sem);
-        res = -1;
-        response_buffers[tid]->write(&res);
+        write_response(tid, 0);
+    } else {
+        write_response(tid, -1);
     }
 }
 
+void unlink_handler(const char * const str, int rank) {
+    char path[PATH_MAX];
+    int tid;
+    sscanf(str, "%d %s", &tid, path);
+    handle_unlink(tid, path, rank);
+}
 
 #endif // CAPIO_SERVER_HANDLERS_UNLINK_HPP

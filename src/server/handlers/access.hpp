@@ -1,23 +1,21 @@
 #ifndef CAPIO_SERVER_HANDLERS_ACCESS_HPP
 #define CAPIO_SERVER_HANDLERS_ACCESS_HPP
 
-void handle_access(const char* str) {
-    int tid;
-    char path[PATH_MAX];
-#ifdef CAPIOLOG
-    logfile << "handle access: " << str << std::endl;
-#endif
-    sscanf(str, "accs %d %s", &tid, path);
-    off64_t res;
+inline void handle_access(long tid, char *path) {
+    START_LOG(gettid(), "call(tid=%ld, path=%s)", tid, path);
+
     auto it = files_location.find(path);
     if (it == files_location.end())
-        res = -1;
+        write_response(tid, -1);
     else
-        res = 0;
-#ifdef CAPIOLOG
-    logfile << "handle access result: " << res << std::endl;
-#endif
-    response_buffers[tid]->write(&res);
+        write_response(tid, 0);
+}
+
+void access_handler(const char * const str, int rank) {
+    long tid;
+    char path[PATH_MAX];
+    sscanf(str, "%ld %s", &tid, path);
+    handle_access(tid, path);
 }
 
 #endif // CAPIO_SERVER_HANDLERS_ACCESS_HPP

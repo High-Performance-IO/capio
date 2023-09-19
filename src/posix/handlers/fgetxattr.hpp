@@ -3,32 +3,30 @@
 
 #include "globals.hpp"
 
-inline int capio_fgetxattr(int fd, const char *name, void *value, size_t size, long tid) {
-
-    CAPIO_DBG("capio_fgetxattr TID[%ld] FD[%d] NAME[%s] VALUE[0x%08x] SIZE[%ld]: enter\n", tid, fd, name, value, size);
+inline int capio_fgetxattr(int fd, const  std::string& name, void *value, size_t size, long tid) {
+    START_LOG(tid, "call(name=%s, value=0x%08x, size=%ld)", name, value, size);
 
     auto it = files->find(fd);
     if (it != files->end()) {
-        if (strcmp(name, "system.posix_acl_access") == 0) {
+        if(std::equal(name.begin(), name.end(),"system.posix_acl_access")){
             errno = ENODATA;
-            CAPIO_DBG("capio_fgetxattr TID[%ld] FD[%d] NAME[%s] VALUE[0x%08x] SIZE[%ld]: return -1\n", tid, fd, name, value, size);
             return -1;
         } else {
-            std::cerr << "fgetxattr with name " << name << " is not yet supporte in CAPIO" << std::endl;
-            exit(1);
+            ERR_EXIT("fgetxattr with name %s is not yet supported in CAPIO", name);
         }
     } else {
-        CAPIO_DBG("capio_fgetxattr TID[%ld] FD[%d] NAME[%s] VALUE[0x%08x] SIZE[%ld]: external file, return -2\n", tid, fd, name, value, size);
         return -2;
     }
 }
 
 
-int fgetxattr_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg5, long* result, long tid){
+int fgetxattr_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg5, long* result){
+    std::string name(reinterpret_cast<const char *>(arg1));
+    auto* value = reinterpret_cast<void *>(arg2);
+    auto size = static_cast<size_t>(arg3);
+    long tid = syscall_no_intercept(SYS_gettid);
+    START_LOG(tid, "call(name=%s, value=0x%08x, size=%ld)", name.c_str(), value, size);
 
-    const char *name = reinterpret_cast<const char *>(arg1);
-    void *value = reinterpret_cast<void *>(arg2);
-    size_t size = arg3;
     int res = capio_fgetxattr(static_cast<int>(arg0), name, value, size, tid);
 
     if (res != -2) {

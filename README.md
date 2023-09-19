@@ -2,25 +2,18 @@
 Cross-Application Programmable I/O. High-performance support for direct multi-rail, programmable and portable streaming across different distributed  applications (e.g. MPI-app1 -> MPI-app2).
 
 ## Report bugs + get help
-https://github.com/alpha-unito/capio/issues/new
-
+https://github.com/High-Performance-IO/capio/issues/new
 ## Build and run tests
 The following steps require `cmake >=3.1` as build system.
 
 Get CAPIO:
 ```bash
-git clone https://github.com/alpha-unito/capio.git
+git clone https://github.com/High-Performance-IO/capio/capio.git
 ```
-The current implementation is based on [syscall_intercept](https://github.com/pmem/syscall_intercept) as system calls interceptor.
-Get it:
-```bash
-git clone https://github.com/pmem/syscall_intercept.git
-```
-Then follow the instructions in their README file to install it.
+The current implementation is based on [syscall_intercept](https://github.com/pmem/syscall_intercept) as system calls interceptor. When compiling CAPIO, 
+syscall_intercpet is automatically cloned from the repository, and compiled as dependency.
 
-:rescue_worker_helmet: A better solution for including syscall_intercept as dependency is under development!
-
-Build it: 
+Build CAPIO: 
 ```bash
 cd src 
 mkdir build && cd build
@@ -33,13 +26,13 @@ Good news! You don't need to modify your code to benefit from the features of CA
 1) Write a configuration file for injecting streaming capabilities to your workflow
 
 2) Launch the CAPIO deamons with MPI passing the (eventual) configuration file as argument on the machines in which you want to execute your program (one deamon for each node).
-    ```bash
-    mpiexec -N 1 --hostfile your_hostfile src/capio_server conf.json 
-    ```
+   ```bash
+   mpiexec -N 1 --hostfile your_hostfile src/capio_server conf.json 
+   ```
 3) Launch your programs preloading the CAPIO shared library like this:
-```bash
-LD_PRELOAD=path/to/src/src/libcapio_posix.so ./your_app args
-```
+   ```bash
+   LD_PRELOAD=path/to/src/src/libcapio_posix.so ./your_app args
+   ```
 
 ## How to injects streaming capabilities into your workflow
 With CAPIO is possible to run the applications of your workflow that communicates through files concurrently. CAPIO will synchronize transparently the concurrent reads and writes on those files. If a file is never modified after it is closed you can set the streaming semantics equals to "on_close" on the configuration file. In this way, all the reads done on this file will hung until the writer closes the file, allowing the consumer application to read the file even if the producer is still running.
@@ -96,7 +89,8 @@ The [examples](examples) folder contains some examples that shows how easy is to
 ## CAPIO Team
 Made with :heart: by:
 
-Alberto Riccardo Martinelli <albertoriccardo.martinelli@unito.it> (Designer and mantainer)  
-Massimo Torquati <massimo.torquati@unipi.it> (Designer)  
-Marco Aldinucci <marco.aldinucci@unito.it> (Designer)  
-Iacopo Colonnelli <iacopo.colonnelli@unito.it> (Workflows expert)
+Alberto Riccardo Martinelli <albertoriccardo.martinelli@unito.it> (Designer and mantainer)\  
+Massimo Torquati <massimo.torquati@unipi.it> (Designer)\
+Marco Aldinucci <marco.aldinucci@unito.it> (Designer)\
+Iacopo Colonnelli <iacopo.colonnelli@unito.it> (Workflows expert)\
+Marco Edoardo Santimaria <marcoedoardo.santimaria@unito.it> (Designer)

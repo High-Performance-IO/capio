@@ -1,13 +1,17 @@
 #ifndef CAPIO_SERVER_HANDLERS_MKDIR_HPP
 #define CAPIO_SERVER_HANDLERS_MKDIR_HPP
 
-void handle_mkdir(const char* str, int rank) {
+inline void handle_mkdir(int tid, const char *pathname, int rank) {
+    START_LOG(gettid(), "call(tid=%d, pathname=%s, rank=%d)", tid, pathname, rank);
+    init_process(tid);
+    write_response(tid, create_dir(tid, pathname, rank, false));
+}
+
+void mkdir_handler(const char * const str, int rank) {
     pid_t tid;
     char pathname[PATH_MAX];
-    sscanf(str, "mkdi %d %s", &tid, pathname);
-    init_process(tid);
-    off64_t res = create_dir(tid, pathname, rank, false);
-    response_buffers[tid]->write(&res);
+    sscanf(str, "%d %s", &tid, pathname);
+    handle_mkdir(tid, pathname, rank);
 }
 
 #endif // CAPIO_SERVER_HANDLERS_MKDIR_HPP

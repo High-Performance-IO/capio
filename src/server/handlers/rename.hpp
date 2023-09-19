@@ -1,43 +1,19 @@
 #ifndef CAPIO_SERVER_HANDLERS_RENAME_HPP
 #define CAPIO_SERVER_HANDLERS_RENAME_HPP
 
-void handle_rename(const char* str, int rank) {
-    char oldpath[PATH_MAX];
-    char newpath[PATH_MAX];
-    int tid;
-    off64_t res;
-    sscanf(str, "rnam %s %s %d", oldpath, newpath, &tid);
+void handle_rename(int tid, const char* oldpath, const char* newpath, int rank) {
+    START_LOG(gettid(), "call(tid=%d, oldpath=%s, newpath=%s, rank=%d)",
+              tid, oldpath, newpath, rank);
 
-#ifdef CAPIOLOG
-    logfile << "handling rename " << std::endl;
-#endif
-    sem_wait(&files_metadata_sem);
-    if (files_metadata.find(oldpath) == files_metadata.end())
-        res = 1;
-    else
-        res = 0;
-
-    sem_post(&files_metadata_sem);
-    response_buffers[tid]->write(&res);
-
-    if (res == 1) {
+    /*
+    if(is_absolute(oldpath))
+        exit(EXIT_FAILURE);
+*/ //TODO: add support for absolutes path
+    if (!get_capio_file_opt(oldpath)) {
+        write_response(tid, 1);
         return;
     }
-
-    for (auto& pair : processes_files_metadata) {
-        for (auto& pair_2 : pair.second) {
-            if (pair_2.second == oldpath) {
-                pair_2.second = newpath;
-            }
-        }
-    }
-
-    sem_wait(&files_metadata_sem);
-    auto node = files_metadata.extract(oldpath);
-    node.key() = newpath;
-    files_metadata.insert(std::move(node));
-
-    sem_post(&files_metadata_sem);
+    rename_capio_file(oldpath, newpath);
     for (auto& pair : writers) {
         auto node = pair.second.extract(oldpath);
         if (!node.empty()) {
@@ -45,18 +21,24 @@ void handle_rename(const char* str, int rank) {
             pair.second.insert(std::move(node));
         }
     }
-
-
     auto node_2 = files_location.extract(oldpath);
     if (!node_2.empty()) {
         node_2.key() = newpath;
         files_location.insert(std::move(node_2));
     }
-
     //TODO: streaming + renaming?
-
+    delete_from_file_locations("files_location_" + std::to_string(rank) + ".txt", oldpath, rank);
     write_file_location(rank, newpath, tid);
-    //TODO: remove from files_location oldpath
+    //respond to client, as rename() should return 0 on success
+    write_response(tid, 0);
+}
+
+void rename_handler(const char * const str, int rank) {
+    char oldpath[PATH_MAX];
+    char newpath[PATH_MAX];
+    int tid;
+    sscanf(str, "%s %s %d", oldpath, newpath, &tid);
+    handle_rename(tid, oldpath, newpath, rank);
 }
 
 #endif // CAPIO_SERVER_HANDLERS_RENAME_HPP

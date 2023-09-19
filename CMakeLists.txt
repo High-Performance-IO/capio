@@ -1,26 +1,68 @@
+#####################################
+# Project-wide settings
+#####################################
 cmake_minimum_required(VERSION 3.15)
-project(capio)
 
-set(CMAKE_VERBOSE_MAKEFILE ON)
+# Define project name and description
+project(capio LANGUAGES CXX DESCRIPTION "Cross-Application Programmable I/O")
+
+# Set project version
+set(CMAKE_PROJECT_VERSION_MAJOR 0)
+set(CMAKE_PROJECT_VERSION_MINOR 0)
+set(CMAKE_PROJECT_VERSION_PATCH 1)
+set(CMAKE_PROJECT_VERSION ${CMAKE_PROJECT_VERSION_MAJOR}.${CMAKE_PROJECT_VERSION_MINOR}.${CMAKE_PROJECT_VERSION_PATCH})
+
+# Set required C++ standard
 set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED TRUE)
+
+# Generate the compile_commands.json file
+set(CMAKE_EXPORT_COMPILE_COMMANDS TRUE)
+
+# Set compiler flags
+set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -g -Wall -pedantic -O0")
+set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -O3")
+
+#####################################
+# Options
+#####################################
+option(CAPIO_BUILD_TESTS "Build CAPIO test suite" FALSE)
+option(CAPIO_LOG "Enable capio debug logging" FALSE)
+option(CAPIO_SYNC "Use sync MPI primitives" FALSE)
+
+#####################################
+# Dependencies
+#####################################
+find_package(MPI REQUIRED)
 find_package(Threads REQUIRED)
 
-OPTION(DEFINE_MACRO "Option description" OFF) # Disabled by default
-IF(DEFINE_MACRO)
-    ADD_DEFINITIONS(-DCAPIOLOG)
-ENDIF(DEFINE_MACRO)
+IF(CAPIO_BUILD_TESTS)
+    find_package(Catch2 3 REQUIRED)
+ENDIF(CAPIO_BUILD_TESTS)
 
+#####################################
+# Definitions
+#####################################
+IF(CAPIO_LOG)
+    add_compile_definitions(CAPIOLOG)
+ENDIF(CAPIO_LOG)
 
-OPTION(CAPIO_SYNC "Use sync MPI primitives" OFF) # Disabled by default
 IF(CAPIO_SYNC)
-	ADD_DEFINITIONS(-DCAPIOSYNC)
+    add_compile_definitions(CAPIOSYNC)
 ENDIF(CAPIO_SYNC)
 
-set(CMAKE_CXX_FLAGS_DEBUG "-g -Wall -pedantic -O0")
-set(CMAKE_CXX_FLAGS_RELEASE "-O3")
-
+#####################################
+# Include files and directories
+#####################################
 file(GLOB_RECURSE CAPIO_COMMON_HEADERS "src/common/capio/*.hpp")
 include_directories(src/common)
 
+#####################################
+# Targets
+#####################################
 add_subdirectory(src/posix)
 add_subdirectory(src/server)
+
+IF(CAPIO_BUILD_TESTS)
+    add_subdirectory(tests)
+ENDIF(CAPIO_BUILD_TESTS)

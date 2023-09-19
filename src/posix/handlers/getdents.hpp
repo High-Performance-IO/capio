@@ -26,13 +26,11 @@ inline off64_t add_getdents_request(int fd,off64_t count,std::tuple<off64_t *,of
 
 //TODO: too similar to capio_read, refactoring needed
 inline ssize_t capio_getdents(int fd, void *buffer, size_t count, bool is_getdents64,long tid) {
-
-    CAPIO_DBG("capio_getdents%s TID[%d] FD[%d] BUFFER[0x%08x] COUNT[%ld]: enter\n", (is_getdents64? std::to_string(64).c_str() : ""), tid, fd, buffer, count);
+    START_LOG(tid, "call(fd=%d, dirp=0x%08x, count=%ld, is64bit=%s", fd, buffer, count, is_getdents64? "true" : "false");
 
     if (files->find(fd) != files->end()) {
         if (count >= SSIZE_MAX) {
-            std::cerr << "src does not support read bigger then SSIZE_MAX yet" << std::endl;
-            exit(1);
+            ERR_EXIT("src does not support read bigger than SSIZE_MAX yet");
         }
         off64_t count_off = count;
         std::tuple<off64_t *, off64_t *, int, int> *t = &(*files)[fd];
@@ -44,11 +42,9 @@ inline ssize_t capio_getdents(int fd, void *buffer, size_t count, bool is_getden
         if (bytes_read > count_off)
             bytes_read = count_off;
         bytes_read = round(bytes_read, is_getdents64);
-        read_shm((*threads_data_bufs)[tid].second, *offset, buffer, bytes_read);
+        read_shm(tid, (*threads_data_bufs)[tid].second, *offset, buffer, bytes_read);
 
         *offset = *offset + bytes_read;
-
-        CAPIO_DBG("capio_getdents%s TID[%d] FD[%d] BUFFER[0x%08x] COUNT[%ld]: return %ld\n", (is_getdents64? std::to_string(64).c_str() : ""), tid, fd, buffer, count, bytes_read);
 
         return bytes_read;
     } else {
@@ -56,9 +52,15 @@ inline ssize_t capio_getdents(int fd, void *buffer, size_t count, bool is_getden
     }
 }
 
-static inline int getdents_handler_impl(long arg0, long arg1, long arg2, long* result, long tid, bool is64bit){
-    struct linux_dirent *dirp = reinterpret_cast<struct linux_dirent *>(arg1);
-    int res = capio_getdents(static_cast<int>(arg0), dirp, static_cast<unsigned int>(arg2), is64bit, tid);
+inline int getdents_handler_impl(long arg0, long arg1, long arg2, long* result, bool is64bit){
+    auto fd = static_cast<int>(arg0);
+    auto* dirp = reinterpret_cast<struct linux_dirent *>(arg1);
+    auto count = static_cast<size_t>(arg2);
+    long tid = syscall_no_intercept(SYS_gettid);
+    START_LOG(tid, "call(fd=%d, dirp=0x%08x, count=%ld, is64bit=%s", fd, dirp, count, is64bit? "true" : "false");
+
+    auto res = capio_getdents(fd, dirp, count, is64bit, tid);
+
     if (res != -2) {
         *result = (res < 0 ? -errno : res);
         return  0;
@@ -66,13 +68,12 @@ static inline int getdents_handler_impl(long arg0, long arg1, long arg2, long* r
     return 1;
 }
 
-int getdents_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg5, long* result, long tid){
-    return getdents_handler_impl(arg0, arg1, arg2, result, tid, false);
+inline int getdents_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg5, long* result){
+    return getdents_handler_impl(arg0, arg1, arg2, result, false);
 }
 
-int getdents64_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg5, long* result, long tid){
-
-    return getdents_handler_impl(arg0, arg1, arg2, result, tid, true);
+inline int getdents64_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg5, long* result){
+    return getdents_handler_impl(arg0, arg1, arg2, result, true);
 }
 
 #endif // CAPIO_POSIX_HANDLERS_GETDENTS_HPP

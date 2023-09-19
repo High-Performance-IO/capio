@@ -3,23 +3,20 @@
 
 #include "read.hpp"
 
-void handle_close(int tid, int fd, int rank) {
-    std::string path = processes_files_metadata[tid][fd];
-    sem_wait(&files_metadata_sem);
-    Capio_file& c_file = *files_metadata[path];
-    sem_post(&files_metadata_sem);
-    ++c_file._n_close;
-    if (c_file.get_committed() == "on_close" && (c_file._n_close_expected == -1 || c_file._n_close == c_file._n_close_expected)) {
-#ifdef CAPIOLOG
-        logfile <<  "handle close, committed = on_close. n_close " << c_file._n_close << " n_close_expected " << c_file._n_close_expected << std::endl;
-#endif
+inline void handle_close(int tid, int fd, int rank) {
+    START_LOG(gettid(), "call(tid=%d, fd=%d, rank=%d)", tid, fd, rank);
+
+    std::string_view path = get_capio_file_path(tid, fd);
+    if(path.empty()) //avoid to try to close a file that does not exists (example: try to close() on a dir
+        return;
+
+    Capio_file& c_file = get_capio_file(path.data());
+    c_file.close();
+    if (c_file.get_committed() == "on_close" && c_file.is_closed()) {
         c_file.complete = true;
-        auto it = pending_reads.find(path);
+        auto it = pending_reads.find(path.data());
         if (it != pending_reads.end()) {
-#ifdef CAPIOLOG
-            logfile << "handle pending read file on_close " << path << std::endl;
-#endif
-            auto& pending_reads_this_file = it->second;
+            auto &pending_reads_this_file = it->second;
             auto it_vec = pending_reads_this_file.begin();
             while (it_vec != pending_reads_this_file.end()) {
                 auto tuple = *it_vec;
@@ -27,9 +24,7 @@ void handle_close(int tid, int fd, int rank) {
                 int fd = std::get<1>(tuple);
                 size_t process_offset = *std::get<1>(processes_files[pending_tid][fd]);
                 size_t count = std::get<2>(tuple);
-#ifdef CAPIOLOG
-                logfile << "pending read tid fd offset count " << tid << " " << fd << " " << process_offset <<" "<< count << std::endl;
-#endif
+
                 bool is_getdents = std::get<3>(tuple);
                 handle_pending_read(pending_tid, fd, process_offset, count, is_getdents);
                 it_vec = pending_reads_this_file.erase(it_vec);
@@ -37,34 +32,27 @@ void handle_close(int tid, int fd, int rank) {
             pending_reads.erase(it);
         }
         if (c_file.is_dir())
-            reply_remote_stats(path);
+            reply_remote_stats(path.data());
         //TODO: error if seek are done and also do this on exit
-        handle_pending_remote_reads(path, c_file.get_sector_end(0), true);
-        handle_pending_remote_nfiles(path);
+        handle_pending_remote_reads(path.data(), c_file.get_sector_end(0), true);
+        handle_pending_remote_nfiles(path.data());
         c_file.commit();
     }
 
-    --c_file.n_opens;
-#ifdef CAPIOLOG
-    logfile << "capio close n links " << c_file.n_links << " n opens " << c_file.n_opens << std::endl;;
-#endif
-    if (c_file.n_opens == 0 && c_file.n_links <= 0)
-        delete_file(path, rank);
-    std::string offset_name = "offset_" + std::to_string(tid) +  "_" + std::to_string(fd);
-    if (shm_unlink(offset_name.c_str()) == -1)
-        err_exit("shm_unlink " + offset_name + " in handle_close");
+    if (c_file.is_deletable()) {
+        delete_file(path.data(), rank);
+    }
+    std::string offset_name = "offset_" + std::to_string(tid) + "_" + std::to_string(fd);
+    if (shm_unlink(offset_name.c_str()) == -1) {
+        ERR_EXIT("shm_unlink %s in handle_close", offset_name.c_str());
+    }
     processes_files[tid].erase(fd);
-    processes_files_metadata[tid].erase(fd);
-    c_file.remove_fd(tid, fd);
+    delete_capio_file_from_tid(tid, fd);
 }
 
-
-void handle_close(char* str, char* p, int rank) {
+void close_handler(const char *str, int rank) {
     int tid, fd;
-    sscanf(str, "clos %d %d", &tid, &fd);
-#ifdef CAPIOLOG
-    logfile << "handle close " << tid << " " << fd << std::endl;
-#endif
+    sscanf(str, "%d %d", &tid, &fd);
     handle_close(tid, fd, rank);
 }
 
