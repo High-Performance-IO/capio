@@ -1,17 +1,18 @@
 /**
- * todo: in the future this should not be required. this constant is used to tell some of the shared posix_utils hot to behave.
- * mainly it is used to distinguish wheter to use libsyscall_intercept or not
+ * Capio log level.
+ * if -1, and capio logging is enable everything is logged, otherwise, only logs up to CAPIO_MAX_LOG_LEVEL function calls
  */
-#define _COMPILE_CAPIO_POSIX
+#define CAPIO_MAX_LOG_LEVEL -1
 
 #include <array>
+#include <string>
 #include <unordered_map>
 
 #include <asm-generic/unistd.h>
 #include <libsyscall_intercept_hook_point.h>
 #include <syscall.h>
 
-#include "capio/errors.hpp"
+#include "capio/env.hpp"
 
 #include "globals.hpp"
 #include "handlers.hpp"
@@ -19,20 +20,20 @@
 /**
  * Handler for syscall not handled and interrupt syscall_intercept
  */
-static int not_handled_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg5, long *result, long tid) {
-  return 1;
+static int not_handled_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg5, long *result) {
+    return 1;
 }
 
 /**
  * Handler for syscall handled, but not yet implemented and interrupt syscall_intercept
  */
-static int not_implemented_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg5, long *result, long tid) {
-  errno = ENOTSUP;
-  *result = -errno;
-  return 0;
+static int not_implemented_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg5, long *result) {
+    errno = ENOTSUP;
+    *result = -errno;
+    return 0;
 }
 
-static constexpr std::array<CPHandler_t, __NR_syscalls> buildSyscallTable() {
+static constexpr std::array<CPHandler_t, __NR_syscalls> build_syscall_table() {
     std::array<CPHandler_t, __NR_syscalls> _syscallTable{0};
 
     for (int i = 0; i < __NR_syscalls; i++)
@@ -42,7 +43,6 @@ static constexpr std::array<CPHandler_t, __NR_syscalls> buildSyscallTable() {
     _syscallTable[SYS_chdir] = chdir_handler;
     _syscallTable[SYS_chmod] = fchmod_handler;
     _syscallTable[SYS_chown] = fchown_handler;
-    _syscallTable[SYS_clone] = clone_handler;
     _syscallTable[SYS_close] = close_handler;
     _syscallTable[SYS_creat] = creat_handler;
     _syscallTable[SYS_dup] = dup_handler;
@@ -51,6 +51,7 @@ static constexpr std::array<CPHandler_t, __NR_syscalls> buildSyscallTable() {
     _syscallTable[SYS_exit] = exit_handler;
     _syscallTable[SYS_exit_group] = exit_handler;
     _syscallTable[SYS_faccessat] = faccessat_handler;
+    _syscallTable[SYS_faccessat2] = faccessat_handler;
     _syscallTable[SYS_fcntl] = fcntl_handler;
     _syscallTable[SYS_fgetxattr] = fgetxattr_handler;
     _syscallTable[SYS_flistxattr] = not_implemented_handler;
@@ -76,60 +77,39 @@ static constexpr std::array<CPHandler_t, __NR_syscalls> buildSyscallTable() {
     _syscallTable[SYS_unlinkat] = unlinkat_handler;
     _syscallTable[SYS_write] = write_handler;
     _syscallTable[SYS_writev] = writev_handler;
+    _syscallTable[SYS_rmdir] = rmdir_handler;
 
     return _syscallTable;
 }
 
 static int hook(long syscall_number, long arg0, long arg1, long arg2, long arg3, long arg4, long arg5, long *result) {
+    static const std::array<CPHandler_t, __NR_syscalls> syscallTable = build_syscall_table();
+    static const char* capio_dir = std::getenv("CAPIO_DIR");
 
-    static const std::array<CPHandler_t, __NR_syscalls> syscallTable = buildSyscallTable();
+    // If the flag is set to true, CAPIO will not
+    // intercept the system calls
+    if (syscall_no_intercept_flag) {
+        return 1;
+    }
 
-    long int tid = syscall_no_intercept(SYS_gettid);
+    START_LOG(syscall_no_intercept(SYS_gettid), "call(syscall_number=%ld)", syscall_number);
 
-    if (stat_enabled == nullptr)
-        stat_enabled = new std::unordered_map<long int, bool>;
+    //NB: if capio dir is not set as enviroment variable,
+    //then capio will not intercept the system calls
+    if(capio_dir == nullptr){
+        LOG("CAPIO_DIR env var not set. returning control to kernel");
+        return 1;
+    }
 
-
-    auto it = stat_enabled->find(tid);
-    if (it != stat_enabled->end())
-        if (!(it->second))
-            return 1;
-
-#ifdef CAPIOLOG
-      CPHandler_t callback = syscallTable[syscall_number];
-
-      if(callback == not_implemented_handler) {
-            CAPIO_DBG("capio_posix TID[%ld]: syscall number %ld is not implemented\n",
-                      tid, syscall_number);
-      }
-      if(callback == not_handled_handler) {
-            CAPIO_DBG("capio_posix TID[%ld]: syscall number %ld is not handled\n", tid, syscall_number);
-      }
-      return callback(arg0, arg1, arg2, arg3, arg4, arg5, result, tid);
-#else
-    return syscallTable[syscall_number](arg0, arg1, arg2, arg3, arg4, arg5, result, tid);
-#endif
-}
-
-static void hook_clone_parent(long parent_tid) {
-    auto child_tid = static_cast<pid_t>(syscall_no_intercept(SYS_gettid));
-
-    CAPIO_DBG("hook_clone_parent PARENT_TID[%ld] CHILD_TID[%ld]: delegate to mtrace_init\n", parent_tid, child_tid);
-
-    mtrace_init(child_tid);
-
-    CAPIO_DBG("hook_clone_parent PARENT_TID[%ld] CHILD_TID[%ld]: add clone_request\n", parent_tid, child_tid);
-
-    clone_request(parent_tid, child_tid);
-
-    CAPIO_DBG("hook_clone_parent PARENT_TID[%ld] CHILD_TID[%ld]: clone_request added, return\n", parent_tid, child_tid);
+    return syscallTable[syscall_number](arg0, arg1, arg2, arg3, arg4, arg5, result);
 }
 
 static __attribute__((constructor)) void
 init() {
     init_client();
-    mtrace_init(gettid());
+    current_dir = new std::string(*get_capio_dir());
+    mtrace_init(syscall_no_intercept(SYS_gettid));
 
-    intercept_hook_point = hook;
     intercept_hook_point_clone_parent = hook_clone_parent;
+    intercept_hook_point = hook;
 }

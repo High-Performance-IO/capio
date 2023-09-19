@@ -1,7 +1,8 @@
 #ifndef CAPIO_POSIX_HANDLERS_EXIT_GROUP_HPP
 #define CAPIO_POSIX_HANDLERS_EXIT_GROUP_HPP
 
-#include "utils/logger.hpp"
+#include "capio/logger.hpp"
+
 #include "utils/requests.hpp"
 
 /*
@@ -11,13 +12,11 @@
  * with CAPIO
 */
 
-int exit_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg5, long* result, long tid){
-
-    CAPIO_DBG("exit_handler TID[%ld]: add exit_group_request\n", tid);
+int exit_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg5, long* result){
+    long tid = syscall_no_intercept(SYS_gettid);
+    START_LOG(tid, "call()");
 
     exit_group_request(tid);
-
-    CAPIO_DBG("exit_handler TID[%ld]: exit_group_request added\n", tid);
 
     return 1;
 }

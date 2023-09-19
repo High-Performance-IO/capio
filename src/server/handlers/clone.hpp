@@ -2,27 +2,25 @@
 #define CAPIO_SERVER_HANDLERS_CLONE_HPP
 
 //TODO: caching info
-void handle_clone(const char* str) {
-    pid_t ptid, new_tid;
-    sscanf(str, "clon %d %d", &ptid, &new_tid);
-    init_process(new_tid);
-    processes_files[new_tid] = processes_files[ptid];
-    processes_files_metadata[new_tid] = processes_files_metadata[ptid];
-    int ppid = pids[ptid];
-    int new_pid = pids[new_tid];
+inline void handle_clone(pid_t parent_tid, pid_t child_tid) {
+    START_LOG(gettid(), "call(parent_tid=%d, child_tid=%d)", parent_tid, child_tid);
+    init_process(child_tid);
+    clone_capio_file(parent_tid, child_tid);
+    processes_files[child_tid] = processes_files[parent_tid];
+    int ppid = pids[parent_tid];
+    int new_pid = pids[child_tid];
     if (ppid != new_pid) {
-        writers[new_tid] = writers[ptid];
-        for (auto &p : writers[new_tid]) {
+        writers[child_tid] = writers[parent_tid];
+        for (auto &p : writers[child_tid]) {
             p.second = false;
         }
     }
-    std::unordered_set<std::string> parent_files = get_paths_opened_files(ptid);
-    for(std::string path : parent_files) {
-        sem_wait(&files_metadata_sem);
-        Capio_file& c_file = *files_metadata[path];
-        sem_post(&files_metadata_sem);
-        ++c_file.n_opens;
-    }
+}
+
+void clone_handler(const char * const str, int rank) {
+    pid_t parent_tid, child_tid;
+    sscanf(str, "%d %d", &parent_tid, &child_tid);
+    handle_clone(parent_tid, child_tid);
 }
 
 #endif // CAPIO_SERVER_HANDLERS_CLONE_HPP

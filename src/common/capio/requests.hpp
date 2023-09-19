@@ -1,28 +1,32 @@
 #ifndef CAPIO_COMMON_REQUESTS_HPP
 #define CAPIO_COMMON_REQUESTS_HPP
 
-constexpr const char* CAPIO_REQUEST_ACCESS = "accs";
-constexpr const char* CAPIO_REQUEST_CLONE = "clon";
-constexpr const char* CAPIO_REQUEST_CLOSE = "clos";
-constexpr const char* CAPIO_REQUEST_CREATE = "crat";
-constexpr const char* CAPIO_REQUEST_CREATE_EXCLUSIVE = "crax";
-constexpr const char* CAPIO_REQUEST_DUP = "dupp";
-constexpr const char* CAPIO_REQUEST_EXIT_GROUP = "exig";
-constexpr const char* CAPIO_REQUEST_FSTAT = "fsta";
-constexpr const char* CAPIO_REQUEST_GETDENTS = "dent";
-constexpr const char* CAPIO_REQUEST_GETDENTS64 = "de64";
-constexpr const char* CAPIO_REQUEST_HANDSHAKE_NAMED = "hand";
-constexpr const char* CAPIO_REQUEST_HANDSHAKE_ANONYMOUS = "hans";
-constexpr const char* CAPIO_REQUEST_MKDIR = "mkdi";
-constexpr const char* CAPIO_REQUEST_OPEN = "open";
-constexpr const char* CAPIO_REQUEST_READ = "read";
-constexpr const char* CAPIO_REQUEST_RENAME = "rnam";
-constexpr const char* CAPIO_REQUEST_SEEK = "seek";
-constexpr const char* CAPIO_REQUEST_SEEK_DATA = "sdat";
-constexpr const char* CAPIO_REQUEST_SEEK_END = "send";
-constexpr const char* CAPIO_REQUEST_SEEK_HOLE = "shol";
-constexpr const char* CAPIO_REQUEST_STAT = "stat";
-constexpr const char* CAPIO_REQUEST_UNLINK = "unlk";
-constexpr const char* CAPIO_REQUEST_WRITE = "writ";
+constexpr const int CAPIO_REQUEST_ACCESS = 0;
+constexpr const int CAPIO_REQUEST_CLONE = 1;
+constexpr const int CAPIO_REQUEST_CLOSE = 2;
+constexpr const int CAPIO_REQUEST_CREATE = 3;
+constexpr const int CAPIO_REQUEST_CREATE_EXCLUSIVE = 4;
+constexpr const int CAPIO_REQUEST_DUP = 5;
+constexpr const int CAPIO_REQUEST_EXIT_GROUP = 6;
+constexpr const int CAPIO_REQUEST_FSTAT = 7;
+constexpr const int CAPIO_REQUEST_GETDENTS = 8;
+constexpr const int CAPIO_REQUEST_GETDENTS64 = 9;
+constexpr const int CAPIO_REQUEST_HANDSHAKE_NAMED = 10;
+constexpr const int CAPIO_REQUEST_HANDSHAKE_ANONYMOUS = 11;
+constexpr const int CAPIO_REQUEST_MKDIR = 12;
+constexpr const int CAPIO_REQUEST_OPEN = 13;
+constexpr const int CAPIO_REQUEST_READ = 14;
+constexpr const int CAPIO_REQUEST_RENAME = 15;
+constexpr const int CAPIO_REQUEST_SEEK = 16;
+constexpr const int CAPIO_REQUEST_SEEK_DATA = 17;
+constexpr const int CAPIO_REQUEST_SEEK_END = 18;
+constexpr const int CAPIO_REQUEST_SEEK_HOLE = 19;
+constexpr const int CAPIO_REQUEST_STAT = 20;
+constexpr const int CAPIO_REQUEST_STAT_REPLY = 21;
+constexpr const int CAPIO_REQUEST_UNLINK = 22;
+constexpr const int CAPIO_REQUEST_WRITE = 23;
+constexpr const int CAPIO_REQUEST_RMDIR = 24;
+
+constexpr const int CAPIO_NR_REQUESTS = 25;
 
 #endif // CAPIO_COMMON_REQUESTS_HPP

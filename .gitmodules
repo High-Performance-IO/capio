@@ -1,3 +1,0 @@
-[submodule "syscall_intercept"]
-	path = syscall_intercept
-	url = https://github.com/pmem/syscall_intercept
