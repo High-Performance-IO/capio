@@ -1767,9 +1767,8 @@ void handle_close(int tid, int fd, int rank) {
             }
 			pending_reads.erase(it);
         }
-		if (c_file.is_dir())
-			reply_remote_stats(path);	
-	//TODO: error if seek are done and also do this on exit
+		reply_remote_stats(path);	
+		//TODO: error if seek are done and also do this on exit
 		handle_pending_remote_reads(path, c_file.get_sector_end(0), true);
 		handle_pending_remote_nfiles(path);
 		c_file.commit();
@@ -2383,17 +2382,6 @@ void handle_dup(const char* str) {
 	++c_file.n_opens;
 }
 
-
-// std::unordered_map<int, std::unordered_map<int, std::string>> processes_files_metadata;
-// std::unordered_map<std::string, std::tuple<void*, off64_t*, off64_t, bool, Capio_file>> files_metadata;
-// std::unordered_map<int, std::unordered_map<std::string, bool>> writers;
-
-// pathname -> node
-//std::unordered_map<std::string, char*> files_location;
-
-
-
-//std::unordered_map<std::string, std::vector<std::tuple<int, int, off64_t>>>  pending_reads;
 void handle_rename(const char* str, int rank) {
 	char oldpath[PATH_MAX];
 	char newpath[PATH_MAX];
