@@ -32,9 +32,6 @@
 #include "spsc_queue.hpp"
 #include "simdjson.h"
 #include "utils/common.hpp"
-#define N_ELEMS_DATA_BUFS 10
-//256KB
-#define WINDOW_DATA_BUFS 262144
 
 using namespace simdjson;
 
@@ -446,9 +443,9 @@ void init_process(int tid) {
 		Circular_buffer<off_t>* cb = new Circular_buffer<off_t>("buf_response" + std::to_string(tid), 8 * 1024 * 1024, sizeof(off_t));
 		response_buffers.insert({tid, cb});
 		std::string shm_name = "capio_write_data_buffer_tid_" + std::to_string(tid);
-		auto* write_data_cb = new SPSC_queue<char>(shm_name, N_ELEMS_DATA_BUFS, WINDOW_DATA_BUFS);
+		auto* write_data_cb = new SPSC_queue<char>(shm_name, *N_ELEMS_DATA_BUFS, *WINDOW_DATA_BUFS);
 		shm_name = "capio_read_data_buffer_tid_" + std::to_string(tid);
-		auto* read_data_cb = new SPSC_queue<char>(shm_name, N_ELEMS_DATA_BUFS, WINDOW_DATA_BUFS);
+		auto* read_data_cb = new SPSC_queue<char>(shm_name, *N_ELEMS_DATA_BUFS, *WINDOW_DATA_BUFS);
 		data_buffers.insert({tid, {write_data_cb, read_data_cb}});
 		//caching_info[tid].first = (int*) get_shm("caching_info" + std::to_string(tid));
 		//caching_info[tid].second = (int*) get_shm("caching_info_size" + std::to_string(tid));
@@ -870,15 +867,15 @@ void handle_open(char* str, int rank, bool is_creat) {
 
 void send_data_to_client(int tid, char* buf, long int count) {
 	auto* data_buf = data_buffers[tid].second;
-	size_t n_writes = count / WINDOW_DATA_BUFS;
-	size_t r = count % WINDOW_DATA_BUFS;
+	size_t n_writes = count / *WINDOW_DATA_BUFS;
+	size_t r = count % *WINDOW_DATA_BUFS;
 	size_t i = 0;
 	while (i < n_writes) {
-		data_buf->write(buf + i * WINDOW_DATA_BUFS);
+		data_buf->write(buf + i * *WINDOW_DATA_BUFS);
 		++i;
 	}
 	if (r)
-		data_buf->write(buf + i * WINDOW_DATA_BUFS, r);
+		data_buf->write(buf + i * *WINDOW_DATA_BUFS, r);
 }
 
 off64_t convert_dirent64_to_dirent(char* dirent64_buf, char* dirent_buf, off64_t dirent_64_buf_size) {
@@ -972,8 +969,8 @@ void handle_write(const char* str, int rank) {
 		}
 		off64_t file_shm_size = c_file.get_buf_size();
 		auto* data_buf = data_buffers[tid].first;
-		size_t n_reads = count / WINDOW_DATA_BUFS;  
-		size_t r = count % WINDOW_DATA_BUFS;
+		size_t n_reads = count / *WINDOW_DATA_BUFS;  
+		size_t r = count % *WINDOW_DATA_BUFS;
 		size_t i = 0;
 		char* p;
 		if (data_size > file_shm_size) {
@@ -992,14 +989,14 @@ void handle_write(const char* str, int rank) {
         #ifdef CAPIOLOG
 		logfile << "debug handle_write 2 " << std::endl;
         #endif
-			data_buf->read(p + i * WINDOW_DATA_BUFS);
+			data_buf->read(p + i * *WINDOW_DATA_BUFS);
 			++i;
 		}
         #ifdef CAPIOLOG
 		logfile << "debug handle_write 3 " << std::endl;
         #endif
 		if (r)
-			data_buf->read(p + i * WINDOW_DATA_BUFS, r);
+			data_buf->read(p + i * *WINDOW_DATA_BUFS, r);
 
         #ifdef CAPIOLOG
 		logfile << "debug handle_write 4 " << std::endl;
@@ -3612,6 +3609,10 @@ int main(int argc, char** argv) {
 	std::string server_log_path = argv[1];
   	logfile.open (server_log_path + "_" + std::to_string(rank), std::ofstream::out);
 	get_capio_dir();
+	get_circular_buffers_info();
+	#ifdef CAPIOLOG
+	logfile << "WINDOW_DATA_BUFS " << *WINDOW_DATA_BUFS << " N_ELEMS_DATA_BUFS " << * N_ELEMS_DATA_BUFS << std::endl;
+	#endif	
 	get_prefetch_data_size();
 	get_file_initial_size();
 	if (argc == 3) {

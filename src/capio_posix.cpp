@@ -30,24 +30,22 @@
 
 #include <libsyscall_intercept_hook_point.h>
 
-#include "utils/common.hpp"
+#include "utils/client_utils.hpp"
 #include "capio_file.hpp"
 #include "spsc_queue.hpp"
+#include "writer_cache.hpp"
+#include "reader_cache.hpp"
 
-#define N_ELEMS_DATA_BUFS 10 
-//256KB
-#define WINDOW_DATA_BUFS 262144
+
 
 std::string* capio_dir = nullptr;
 std::string* capio_app_name = nullptr;
 std::string* current_dir = nullptr;
-FILE* logfile = nullptr;
-
-int num_writes_batch = 1;
-int actual_num_writes = 1;
 
 // initial size for each file (can be overwritten by the user)
 const size_t file_initial_size = 1024L * 1024 * 1024 * 4;
+const size_t* writer_cache_size = nullptr;
+const size_t* reader_cache_size = nullptr;
 
 /* fd -> (*offset, *mapped_shm_size, file status flags, file_descriptor_flags)
  * The mapped shm size isn't the the size of the file shm
@@ -57,9 +55,8 @@ const size_t file_initial_size = 1024L * 1024 * 1024 * 4;
  *
  */
 
-std::unordered_map<int, std::tuple<off64_t*, off64_t*, int, int>>* files = nullptr;
+std::unordered_map<int, std::tuple<off64_t*, off64_t*, int, int, Writer_cache*, Reader_cache*>>* files = nullptr;
 Circular_buffer<char>* buf_requests = nullptr;
- 
 std::unordered_map<int, Circular_buffer<off_t>*>* bufs_response = nullptr;
 //sem_t* sem_response;
 sem_t* sem_family = nullptr;
@@ -112,22 +109,6 @@ std::string get_capio_parent_dir(std::string path) {
 	return path.substr(0, pos);
 }
 
-#if !defined(EXTRA_LEN_PRINT_ERROR)
-#define EXTRA_LEN_PRINT_ERROR   512
-#endif
-#define CAPIO_DBG(str, ...) \
-  print_prefix(str, "DBG:", ##__VA_ARGS__)
-
-static inline void print_prefix(const char* str, const char* prefix, ...) {
-    va_list argp;
-    char p[256];
-    strcpy(p,prefix);
-    strcpy(p+strlen(prefix), str);
-    va_start(argp, prefix);
-    vfprintf(logfile, p, argp);
-    va_end(argp);
-    fflush(logfile);
-}
 // utility functions  -------------------------
 
 int* get_fd_snapshot() {
@@ -194,11 +175,30 @@ void get_app_name() {
 	}
 }
 
+void get_caches_size() {
+	char* val;
+	if (!writer_cache_size) {
+		val = getenv("CAPIO_WRITER_CACHE_SIZE");
+		if (val)
+			writer_cache_size = new size_t(strtol(val, NULL, 10));
+		else
+			writer_cache_size = new size_t(0);
+		val = getenv("CAPIO_READER_CACHE_SIZE"); 
+		if (val)
+			reader_cache_size = new size_t(strtol(val, NULL, 10));
+		else
+			reader_cache_size = new size_t(0);
+		#ifdef CAPIOLOG
+			CAPIO_DBG("writer_cache %ld reader_cache %ld\n", *writer_cache_size, *reader_cache_size);
+		#endif
+	}
+}
+
 void create_buf_thread(int tid) {
 	std::string shm_name = "capio_write_data_buffer_tid_" + std::to_string(tid);
-	auto* write_queue = new SPSC_queue<char>(shm_name, N_ELEMS_DATA_BUFS, WINDOW_DATA_BUFS);
+	auto* write_queue = new SPSC_queue<char>(shm_name, *N_ELEMS_DATA_BUFS, *WINDOW_DATA_BUFS);
 	shm_name = "capio_read_data_buffer_tid_" + std::to_string(tid);
-	auto* read_queue = new SPSC_queue<char>(shm_name, N_ELEMS_DATA_BUFS, WINDOW_DATA_BUFS);
+	auto* read_queue = new SPSC_queue<char>(shm_name, *N_ELEMS_DATA_BUFS, *WINDOW_DATA_BUFS);
 	threads_data_bufs->insert({tid, {write_queue, read_queue}});	
 }
 
@@ -236,14 +236,19 @@ void mtrace_init(void) {
 	    err_exit("fopen capio.log");
 	  #endif
 	}
-	if (capio_files_descriptors == nullptr) {
+	if (!capio_files_descriptors) {
 		#ifdef CAPIOLOG
 		CAPIO_DBG("init data_structures\n");
+		#endif
+		get_caches_size();
+		get_circular_buffers_info();
+		#ifdef CAPIOLOG
+			CAPIO_DBG("WINDOW_DATA_BUFS %ld N_ELEMS_DATA_BUFS %ld\n", *WINDOW_DATA_BUFS, *N_ELEMS_DATA_BUFS);
 		#endif
 		capio_files_descriptors = new std::unordered_map<int, std::string>; 
 		capio_files_paths = new std::unordered_set<std::string>;
 
-		files = new std::unordered_map<int, std::tuple<off64_t*, off64_t*, int, int>>;
+		files = new std::unordered_map<int, std::tuple<off64_t*, off64_t*, int, int, Writer_cache*, Reader_cache*>>;
 
 		int* fd_shm = get_fd_snapshot();
 		if (fd_shm != nullptr) {
@@ -279,14 +284,6 @@ void mtrace_init(void) {
 	}
 	}
 
-	val = getenv("GW_BATCH");
-	if (val != NULL) {
-		num_writes_batch = std::stoi(val);
-		if (num_writes_batch <= 0) {
-			std::cerr << "error: GW_BATCH variable must be >= 0";
-			exit(1);
-		}
-	}
 //	sem_response = sem_open(("sem_response_read" + std::to_string(my_tid)).c_str(),  O_CREAT | O_RDWR, S_IRUSR | S_IWUSR, 0);
 		if (sem_tmp == nullptr) {
 			sem_tmp = new sem_t;
@@ -633,107 +630,6 @@ int capio_mkdirat(int dirfd, const char* pathname, mode_t mode) {
 	return request_mkdir(path_to_check);
 }
 
-
-off64_t add_read_request(int fd, off64_t count, std::tuple<off64_t*, off64_t*, int , int>& t) {
-	char c_str[256];
-	sprintf(c_str, "read %ld %d %ld", syscall(SYS_gettid), fd, count);
-	buf_requests->write(c_str, 256 * sizeof(char));
-	//read response (offest)
-	off64_t offset_upperbound;
-	(*bufs_response)[syscall(SYS_gettid)]->read(&offset_upperbound);
-	return offset_upperbound;
-}
-
-
-void add_write_request(long int my_tid, int fd, off64_t count) { //da modifcare con capio_file sia per una normale scrittura sia per quando si fa il batch
-	char c_str[256];
-	long int old_offset = *std::get<0>((*files)[fd]);
-	*std::get<0>((*files)[fd]) += count; //works only if there is only one writer at time for each file
-	if (actual_num_writes == num_writes_batch) {
-		sprintf(c_str, "writ %ld %d %ld %ld", my_tid,fd, old_offset, count);
-		buf_requests->write(c_str, 256 * sizeof(char));
-		actual_num_writes = 1;
-	}
-	else
-		++actual_num_writes;
-	//sem_wait(sem_response);
-	return;
-}
-
-
-/*
- * Prerequisites : count > 0
- */
-
-void read_shm(SPSC_queue<char>* data_buf, long int offset, void* buffer, off64_t count) {
-	size_t n_reads = count / WINDOW_DATA_BUFS;
-	size_t r = count % WINDOW_DATA_BUFS;
-	#ifdef CAPIOLOG
-	CAPIO_DBG("read shm %ld %ld\n", n_reads, r);
-	if (r)
-		CAPIO_DBG("lol shm %ld %ld\n", n_reads, r);
-	#endif
-	size_t i = 0;
-	while (i < n_reads) {
-		data_buf->read((char*) buffer + i * WINDOW_DATA_BUFS);
-		++i;
-	}
-	if (r)
-		data_buf->read((char*) buffer + i * WINDOW_DATA_BUFS, r);
-
-}
-
-void write_shm(SPSC_queue<char>* data_buf, size_t offset, const void* buffer, off64_t count) {	
-	//memcpy(((char*)shm) + offset, buffer, count); 
-	size_t n_writes = count / WINDOW_DATA_BUFS;
-	size_t r = count % WINDOW_DATA_BUFS;
-	#ifdef CAPIOLOG
-	CAPIO_DBG("write shm %ld %ld\n", n_writes, r);
-	if (r)
-		CAPIO_DBG("lol shm %ld %ld\n", n_writes, r);
-	#endif
-	size_t i = 0;
-	while (i < n_writes) {
-		data_buf->write((char*) buffer + i * WINDOW_DATA_BUFS);
-		++i;
-	}
-	if (r) {
-		#ifdef CAPIOLOG
-		CAPIO_DBG("write shm debug before\n");
-		#endif
-		data_buf->write((char*) buffer + i * WINDOW_DATA_BUFS, r);
-		#ifdef CAPIOLOG
-		CAPIO_DBG("write shm debug after\n");
-		#endif
-	}
-	//sem_post((*sems_write)[syscall(SYS_gettid)]);
-}
-
-/*
- * Returns true if the file with file descriptor fd is in shared memory, false
- * if the file is in the disk
- */
-/*
-bool check_cache(int fd) {
-	int i = 0;
-	bool found = false;
-	while (!found && i < *caching_info_size) {
-		if (fd == client_caching_info[i]) {
-			found = true;
-		}
-		else {
-			i += 2;
-		}
-	}
-	if (!found) {
-		std::cerr << "error check cache: file not found" << std::endl;
-		exit(1);
-	}
-	return client_caching_info[i + 1] == 0;
-}
-
-*/
-
 void write_to_disk(const int fd, const int offset, const void* buffer, const size_t count) {
 	auto it = capio_files_descriptors->find(fd);
 	if (it == capio_files_descriptors->end()) {
@@ -807,7 +703,7 @@ off_t capio_lseek(int fd, off64_t offset, int whence) {
 	auto it = files->find(fd);
 	char c_str[256];
 	if (it != files->end()) {
-		std::tuple<off64_t*, off64_t*, int, int>* t = &(*files)[fd];
+		std::tuple<off64_t*, off64_t*, int, int, Writer_cache*, Reader_cache*>* t = &(*files)[fd];
 		off64_t* file_offset = std::get<0>(*t);
 		if (whence == SEEK_SET) {
 	#ifdef CAPIOLOG
@@ -859,7 +755,7 @@ off_t capio_lseek(int fd, off64_t offset, int whence) {
 			 */
 			(*bufs_response)[syscall(SYS_gettid)]->read(&is_dir);
 			*file_offset = file_size + offset;	
-			return *file_offset;
+			return *file_offset; 
 		}
 		else if (whence == SEEK_DATA) {
 	#ifdef CAPIOLOG
@@ -975,10 +871,16 @@ int capio_openat(int dirfd, const char* pathname, int flags, bool is_creat) {
 				errno = (mode == 0) ? EEXIST : ENOENT;
 				return -1;
 			}
-			off64_t* p_offset = (off64_t*) create_shm("offset_" + std::to_string(syscall(SYS_gettid)) + "_" + std::to_string(fd), sizeof(off64_t));
+			int tid = syscall_no_intercept(SYS_gettid);
+			off64_t* p_offset = (off64_t*) create_shm("offset_" + std::to_string(tid) + "_" + std::to_string(fd), sizeof(off64_t));
 			*p_offset = 0;
 			off64_t* init_size = new off64_t;
 			*init_size = file_initial_size;
+			SPSC_queue<char>* writes_data_queue = (*threads_data_bufs)[tid].first;
+			SPSC_queue<char>* reads_data_queue = (*threads_data_bufs)[tid].second;
+			Circular_buffer<off_t>* buf_response = (*bufs_response)[tid];
+			Writer_cache* w_cache = new Writer_cache(*writer_cache_size, writes_data_queue, buf_requests);
+			Reader_cache* r_cache = new Reader_cache(tid, *reader_cache_size, reads_data_queue, buf_requests, buf_response);
 			if ((flags & O_DIRECTORY) == O_DIRECTORY)
 				flags = flags | O_LARGEFILE;
 			if ((flags & O_CLOEXEC) == O_CLOEXEC) {
@@ -986,10 +888,10 @@ int capio_openat(int dirfd, const char* pathname, int flags, bool is_creat) {
 				CAPIO_DBG("open with O_CLOEXEC\n");
 			#endif
 				flags &= ~O_CLOEXEC; 
-				files->insert({fd, std::make_tuple(p_offset, init_size, flags, FD_CLOEXEC)});
+				files->insert({fd, std::make_tuple(p_offset, init_size, flags, FD_CLOEXEC, w_cache, r_cache)});
 			}
 			else
-				files->insert({fd, std::make_tuple(p_offset, init_size, flags, 0)});
+				files->insert({fd, std::make_tuple(p_offset, init_size, flags, 0, w_cache, r_cache)});
 			(*capio_files_descriptors)[fd] = path_to_check;
 			capio_files_paths->insert(path_to_check);
 			if ((flags & O_APPEND) == O_APPEND) {
@@ -1009,27 +911,16 @@ int capio_openat(int dirfd, const char* pathname, int flags, bool is_creat) {
 	}
 }
 
-ssize_t capio_write(int fd, const  void *buffer, size_t count) {
+ssize_t capio_write(int fd, const void *buffer, size_t count) {
 	auto it = files->find(fd);
 	if (it != files->end()) {
 		if (count > SSIZE_MAX) {
 			std::cerr << "Capio does not support writes bigger then SSIZE_MAX yet" << std::endl;
 			exit(1);
 		}
-		off64_t count_off = count;
-		//bool in_shm = check_cache(fd);
-		//if (in_shm) {
-		int my_tid = syscall(SYS_gettid);
-		add_write_request(my_tid, fd, count_off); //bottleneck
-		if (threads_data_bufs->find(my_tid) == threads_data_bufs->end()) {
-			CAPIO_DBG("capio threads_data_bufs not found %d\n", syscall(SYS_gettid));
-			exit(1);
-		}
-		write_shm((*threads_data_bufs)[my_tid].first, *std::get<0>((*files)[fd]), buffer, count_off);
-		//}
-		//else {
-			//write_to_disk(fd, (*files)[fd].second, buffer, count);
-		//}
+		Writer_cache* w_cache = std::get<4>(it->second);
+		off64_t* offset = std::get<0>((*files)[fd]);
+		w_cache->write_to_server(fd, offset, buffer, count);
 		return count;
 	}
 	else {
@@ -1043,6 +934,9 @@ int capio_close(int fd) {
 	#endif
 	auto it = files->find(fd);
 	if (it != files->end()) {
+		Writer_cache* w_cache = std::get<4>(it->second);
+		off64_t* offset = std::get<0>((*files)[fd]);
+		w_cache->flush(fd, offset);
 		add_close_request(fd);
 		capio_files_descriptors->erase(fd);
 		files->erase(fd);
@@ -1057,58 +951,20 @@ int capio_close(int fd) {
 }
 
 ssize_t capio_read(int fd, void *buffer, size_t count) {
-		#ifdef CAPIOLOG
-		CAPIO_DBG("capio_read %d %d %ld\n", syscall(SYS_gettid), fd, count);
-		#endif
+	#ifdef CAPIOLOG
+	CAPIO_DBG("capio_read %d %d %ld\n", syscall_no_intercept(SYS_gettid), fd, count);
+	#endif
 	auto it = files->find(fd);
 	if (it != files->end()) {
 		if (count >= SSIZE_MAX) {
 			std::cerr << "capio does not support read bigger then SSIZE_MAX yet" << std::endl;
 			exit(1);
 		}
-		off64_t count_off = count;
-		std::tuple<off64_t*, off64_t*, int, int>* t = &(*files)[fd];
+		auto* t = &(*files)[fd];
 		off64_t* offset = std::get<0>(*t);
-		//bool in_shm = check_cache(fd);
-		//if (in_shm) {
-		/*off64_t bytes_read;
-			if (*offset + count_off > *std::get<2>(*t)) {
-				off64_t end_of_read;
-				end_of_read = add_read_request(fd, count_off, *t);
-				bytes_read = end_of_read - *offset;
-				if (bytes_read > count_off)
-					bytes_read = count_off;
-			}
-			else
-				bytes_read = count_off;
-				*/
 		off64_t bytes_read;
-		off64_t end_of_read;
-		#ifdef CAPIOLOG
-		CAPIO_DBG("debug 0\n");
-		#endif
-		end_of_read = add_read_request(fd, count_off, *t);
-		if (end_of_read == 0)
-		  return 0;
-		bytes_read = end_of_read - *offset;
-		#ifdef CAPIOLOG
-		CAPIO_DBG("before read shm bytes_read %ld end_of_read %ld\n", bytes_read, end_of_read);
-		#endif
-	
-		  int my_tid = syscall(SYS_gettid);
-		  read_shm((*threads_data_bufs)[my_tid].second, *offset, buffer, bytes_read);
-	
-		#ifdef CAPIOLOG
-		CAPIO_DBG("after read shm\n");
-		#endif
-		//}
-		//else {
-			//read_from_disk(fd, offset, buffer, count);
-		//}
-		*offset = *offset + bytes_read;
-		#ifdef CAPIOLOG
-		CAPIO_DBG("capio_read returning  %ld\n", bytes_read);
-		#endif
+		Reader_cache* r_cache = std::get<5>(it->second);
+		bytes_read = r_cache->read_from_server(fd, buffer, offset, count);
 		return bytes_read;
 	}
 	else { 
@@ -1118,8 +974,6 @@ ssize_t capio_read(int fd, void *buffer, size_t count) {
 		return -2;
 	}
 }
-
-
 
 ssize_t capio_writev(int fd, const struct iovec* iov, int iovcnt) {
 	auto it = files->find(fd);
@@ -1853,7 +1707,7 @@ pid_t capio_clone(int flags, void* child_stack, void* parent_tidpr, void* tls, v
 	return pid;
 }
 
-off64_t add_getdents_request(int fd, off64_t count, std::tuple<off64_t*, off64_t*, int , int>& t, bool is_getdents64) {
+off64_t add_getdents_request(int fd, off64_t count, std::tuple<off64_t*, off64_t*, int , int, Writer_cache*, Reader_cache*>& t, bool is_getdents64) {
 	char c_str[256];
 	if (is_getdents64)
 		sprintf(c_str, "de64 %ld %d %ld", syscall(SYS_gettid), fd, count);
@@ -1912,10 +1766,8 @@ ssize_t capio_getdents(int fd, void *buffer, size_t count, bool is_getdents64) {
 			exit(1);
 		}
 		off64_t count_off = count;
-		std::tuple<off64_t*, off64_t*, int, int>* t = &(*files)[fd];
+		auto* t = &(*files)[fd];
 		off64_t* offset = std::get<0>(*t);
-		//bool in_shm = check_cache(fd);
-		//if (in_shm) {
 		off64_t bytes_read;
 		off64_t end_of_read;
 		end_of_read = add_getdents_request(fd, count_off, *t, is_getdents64);
@@ -1927,11 +1779,7 @@ ssize_t capio_getdents(int fd, void *buffer, size_t count, bool is_getdents64) {
 		bytes_read = round(bytes_read, is_getdents64);
 		int my_tid = syscall(SYS_gettid);
 		if (bytes_read != 0)
-		  read_shm((*threads_data_bufs)[my_tid].second, *offset, buffer, bytes_read);
-		//}
-		//else {
-			//read_from_disk(fd, offset, buffer, count);
-		//}
+		  read_shm((*threads_data_bufs)[my_tid].second, buffer, bytes_read);
 		*offset = *offset + bytes_read;
 		#ifdef CAPIOLOG
 		CAPIO_DBG("capio_getdents returning %ld\n", bytes_read);

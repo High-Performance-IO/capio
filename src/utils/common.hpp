@@ -12,6 +12,8 @@
 #include <unistd.h>
 
 
+const size_t* N_ELEMS_DATA_BUFS = nullptr;
+const size_t* WINDOW_DATA_BUFS = nullptr;
 #define DNAME_LENGTH 128
 
 /*
@@ -45,6 +47,23 @@ const static int theoretical_size_dirent = sizeof(unsigned long) + sizeof(off_t)
 
 static inline bool is_absolute(const char* pathname) {
 	return (pathname ? (pathname[0]=='/') : false);
+}
+
+void get_circular_buffers_info() {
+	char* val;
+	if (!WINDOW_DATA_BUFS) {
+		val = getenv("CAPIO_WINDOW_DATA_BUFS_SIZE");
+		if (val)
+			WINDOW_DATA_BUFS = new size_t(strtol(val, NULL, 10));
+		else
+			WINDOW_DATA_BUFS = new size_t(256 * 1024);
+		val = getenv("CAPIO_N_ELEMS_DATA_BUFS");
+		if (val)
+			N_ELEMS_DATA_BUFS = new size_t(strtol(val, NULL, 10));
+		else
+			N_ELEMS_DATA_BUFS = new size_t(1024);
+
+	}
 }
 
 
