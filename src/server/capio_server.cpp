@@ -27,6 +27,7 @@
 #include <unistd.h>
 
 #include <args.hxx>
+#include <singleheader/simdjson.h>
 
 #include "capio/env.hpp"
 #include "capio/logger.hpp"

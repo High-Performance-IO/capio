@@ -4,7 +4,7 @@
 #include "globals.hpp"
 
 inline int capio_fgetxattr(int fd, const  std::string& name, void *value, size_t size, long tid) {
-    START_LOG(tid, "call(name=%s, value=0x%08x, size=%ld)", name, value, size);
+    START_LOG(tid, "call(name=%s, value=0x%08x, size=%ld)", name.c_str(), value, size);
 
     auto it = files->find(fd);
     if (it != files->end()) {
@@ -12,7 +12,7 @@ inline int capio_fgetxattr(int fd, const  std::string& name, void *value, size_t
             errno = ENODATA;
             return -1;
         } else {
-            ERR_EXIT("fgetxattr with name %s is not yet supported in CAPIO", name);
+            ERR_EXIT("fgetxattr with name %s is not yet supported in CAPIO", name.c_str());
         }
     } else {
         return -2;

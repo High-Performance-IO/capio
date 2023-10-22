@@ -31,14 +31,15 @@ option(CAPIO_LOG "Enable capio debug logging" FALSE)
 option(CAPIO_SYNC "Use sync MPI primitives" FALSE)
 
 #####################################
+# CMake module imports
+#####################################
+include(FetchContent)
+
+#####################################
 # Dependencies
 #####################################
 find_package(MPI REQUIRED)
 find_package(Threads REQUIRED)
-
-IF(CAPIO_BUILD_TESTS)
-    find_package(Catch2 3 REQUIRED)
-ENDIF(CAPIO_BUILD_TESTS)
 
 #####################################
 # Definitions

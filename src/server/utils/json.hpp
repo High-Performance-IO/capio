@@ -1,7 +1,7 @@
 #ifndef CAPIO_SERVER_UTILS_JSON_HPP
 #define CAPIO_SERVER_UTILS_JSON_HPP
 
-#include "simdjson/simdjson.h"
+#include <singleheader/simdjson.h>
 
 #include "utils/types.hpp"
 
