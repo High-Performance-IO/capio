@@ -8,7 +8,7 @@
 #include <vector>
 #include <algorithm>
 #include "circular_buffer/common.hpp"
-#include "../src/server/utils/capio_file.hpp"
+#include "utils/capio_file.hpp"
 
 void test1() {
 	Capio_file c_file;

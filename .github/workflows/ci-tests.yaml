@@ -1,0 +1,68 @@
+name: "CI Tests"
+on:
+  push:
+    branches:
+      - master
+      - code-refactor
+  pull_request:
+    branches:
+      - master
+concurrency:
+  group: build-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+jobs:
+  build:
+    name: "Build ${{ matrix.build_type }} with ${{ matrix.cxx }}"
+    runs-on: ubuntu-22.04
+    strategy:
+      matrix:
+        build_type:
+          - Debug
+          - Release
+        cxx:
+          - g++-9
+          - g++-10
+          - g++-11
+          - g++-12
+          - clang-11
+          - clang-12
+          - clang-13
+          - clang-14
+          - clang-15
+    steps:
+      - uses: actions/checkout@v4
+      - name: "Install packages"
+        run: |
+          sudo apt install -y \
+            libcapstone-dev \
+            libopenmpi-dev \
+            ninja-build \
+            openmpi-bin \
+            pkg-config \
+            ${{ matrix.cxx }}
+      - name: "Get compiler version"
+        run: |
+          IFS='-' read -r -a COMPILER <<< "${{ matrix.cxx }}"
+          echo "CXX_VERSION=${COMPILER[1]}" >> $GITHUB_ENV
+      - name: "Run CMake"
+        env:
+          CXX: ${{ startsWith(matrix.cxx, 'clang-') && 'clang++' || 'g++' }}-${{ env.CXX_VERSION }}
+        run: |
+          cmake -DCMAKE_BUILD_TYPE=${{ matrix.build_type }} \
+                -DCAPIO_LOG=${{ matrix.build_type == 'Debug' && 'ON' || 'OFF' }} \
+                -DCAPIO_BUILD_TESTS=ON \
+                -G Ninja \
+                -B build \
+                -S ${GITHUB_WORKSPACE}
+      - name: "Build with Ninja"
+        run: cmake --build build --target all -j $(nproc)
+      - name: "Run CAPIO server"
+        run: mpirun -n 1 build/src/server/capio_server &
+      - name: "Run tests"
+        env:
+          LDPRELOAD: build/src/posix/libcapio_posix.so
+        run: |
+          ctest \
+            --build-config ${{ matrix.build_type }} \
+            --output-on-failure \
+            --test-dir build/tests
