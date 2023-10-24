@@ -8,6 +8,10 @@ void sig_term_handler(int signum, siginfo_t *info, void *ptr) {
 
     std::cout << std::endl << CAPIO_SERVER_CLI_LOG_SERVER_WARNING << "shutting down server"<<std::endl;
 
+    if(signum == SIGSEGV){
+        std::cout << CAPIO_SERVER_CLI_LOG_SERVER_ERROR << "Segfault detected!" << std::endl;
+    }
+
     //free all the memory used
     std::string offset_shm_name;
     for (auto &p1: processes_files) {
@@ -45,6 +49,7 @@ void setup_signal_handlers() {
     res = res | sigaction(SIGSEGV, &sigact, nullptr);
     res = res | sigaction(SIGQUIT, &sigact, nullptr);
     res = res | sigaction(SIGPIPE, &sigact, nullptr);
+    res = res | sigaction(SIGINT, &sigact, nullptr);
     if (res == -1) {
         ERR_EXIT("sigaction for SIGTERM");
     }

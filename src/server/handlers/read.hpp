@@ -4,8 +4,7 @@
 #include <mutex>
 #include <thread>
 
-#include "capio/semaphore.hpp"
-
+#include "utils/location.hpp"
 #include "utils/metadata.hpp"
 
 CSMyRemotePendingReads_t pending_remote_reads;
@@ -58,12 +57,16 @@ inline void handle_local_read(int tid, int fd, off64_t count, bool dir, bool is_
     off64_t end_of_sector = c_file.get_sector_end(process_offset);
     off64_t end_of_read = process_offset + count;
     std::string_view mode = c_file.get_mode();
-    if (mode != "append" && !c_file.complete && !writer && !is_prod) {
+    if (mode != CAPIO_FILE_MODE_NOUPDATE && !c_file.complete && !writer && !is_prod) {
         pending_reads[path.data()].emplace_back(tid, fd, count, is_getdents);
     } else if (end_of_read > end_of_sector) {
         if (!is_prod && !writer && !c_file.complete) {
             pending_reads[path.data()].emplace_back(tid, fd, count, is_getdents);
         } else {
+            if (end_of_sector == -1) {
+                write_response(tid, 0);
+                return;
+            }
             c_file = init_capio_file(path.data(), false);
             char *p = c_file.get_buffer();
             if (is_getdents) {
@@ -89,11 +92,11 @@ inline void handle_local_read(int tid, int fd, off64_t count, bool dir, bool is_
             off64_t n_entries = dir_size / THEORETICAL_SIZE_DIRENT64;
             char *p_getdents = (char *) malloc(n_entries * sizeof(char) * dir_size);
             end_of_sector = convert_dirent64_to_dirent(p, p_getdents, dir_size);
-            write_response(tid, end_of_sector);
+            write_response(tid, end_of_read);
             send_data_to_client(tid, p_getdents + process_offset, bytes_read);
             free(p_getdents);
         } else {
-            write_response(tid, end_of_sector);
+            write_response(tid, end_of_read);
             send_data_to_client(tid, p + process_offset, bytes_read);
         }
     }
@@ -153,7 +156,7 @@ inline void handle_remote_read(int tid, int fd, off64_t count, int rank, bool di
     // If it is not in cache then send the request to the remote node
     const char *msg;
     std::string str_msg;
-    int dest = nodes_helper_rank[std::get<0>(files_location[path.data()])];
+    int dest = nodes_helper_rank[std::get<0>(get_file_location(path.data()))];
     size_t offset = *std::get<1>(processes_files[tid][fd]);
     str_msg = "read " + std::string(path) + " " + std::to_string(rank) + " " + std::to_string(offset) +
               " " + std::to_string(count);
@@ -168,7 +171,7 @@ inline bool handle_nreads(const std::string& path, const std::string& app_name, 
     START_LOG(gettid(), "call(path=%s, app_name=%s, dest=%d)", path.c_str(), app_name.c_str(), dest);
 
     bool success = false;
-    long int pos = match_globs(path, &metadata_conf_globs);
+    long int pos = match_globs(path);
     if (pos != -1) {
         std::string glob = std::get<0>(metadata_conf_globs[pos]);
         std::size_t batch_size = std::get<5>(metadata_conf_globs[pos]);
@@ -195,7 +198,7 @@ inline void wait_for_file(int tid, int fd, off64_t count, bool dir, bool is_getd
     loop_check_files_location(path_to_check.data(), rank);
 
     //check if the file is local or remote
-    if (strcmp(std::get<0>(files_location[path_to_check.data()]), node_name) == 0) {
+    if (strcmp(std::get<0>(get_file_location(path_to_check.data())), node_name) == 0) {
         handle_local_read(tid, fd, count, dir, is_getdents, false);
     } else {
         Capio_file &c_file = get_capio_file(path_to_check.data());
@@ -205,7 +208,7 @@ inline void wait_for_file(int tid, int fd, off64_t count, bool dir, bool is_getd
             if (it != apps.end()) {
                 std::string app_name = it->second;
                 res = handle_nreads(path_to_check.data(), app_name,
-                                    nodes_helper_rank[std::get<0>(files_location[path_to_check.data()])]);
+                                    nodes_helper_rank[std::get<0>(get_file_location(path_to_check.data()))]);
             }
             if (res) {
                 const std::lock_guard<std::mutex> lg(pending_remote_reads_mutex);
@@ -224,7 +227,8 @@ inline void handle_read(int tid, int fd, off64_t count, bool dir, bool is_getden
     std::string_view path = get_capio_file_path(tid, fd);
     const std::string *capio_dir = get_capio_dir();
     bool is_prod = is_producer(tid, path.data());
-    if (files_location.find(path.data()) == files_location.end() && !is_prod) {
+
+    if (!get_file_location_opt(path.data()) && !is_prod) {
         bool found = check_file_location(rank, path.data());
         if (!found) {
             //launch a thread that checks when the file is created
@@ -232,7 +236,7 @@ inline void handle_read(int tid, int fd, off64_t count, bool dir, bool is_getden
             t.detach();
         }
     }
-    if (is_prod || strcmp(std::get<0>(files_location[path.data()]), node_name) == 0 || *capio_dir == path) {
+    if (is_prod || strcmp(std::get<0>(get_file_location(path.data())), node_name) == 0 || *capio_dir == path) {
         handle_local_read(tid, fd, count, dir, is_getdents, is_prod);
     } else {
         Capio_file &c_file = get_capio_file(path.data());
@@ -242,7 +246,7 @@ inline void handle_read(int tid, int fd, off64_t count, bool dir, bool is_getden
             if (it != apps.end()) {
                 std::string app_name = it->second;
                 if (!dir)
-                    res = handle_nreads(path.data(), app_name, nodes_helper_rank[std::get<0>(files_location[path.data()])]);
+                    res = handle_nreads(path.data(), app_name, nodes_helper_rank[std::get<0>(get_file_location(path.data()))]);
             }
             if (res) {
                 const std::lock_guard<std::mutex> lg(pending_remote_reads_mutex);

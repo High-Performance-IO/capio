@@ -1,17 +1,16 @@
-#ifndef SRC_CAPIO_POSIX_GLOBALS_H
-#define SRC_CAPIO_POSIX_GLOBALS_H
+#ifndef CAPIO_POSIX_GLOBALS_HPP
+#define CAPIO_POSIX_GLOBALS_HPP
 
 #include <filesystem>
 #include <set>
 #include <string>
 
-#include <libsyscall_intercept_hook_point.h>
 #include <semaphore.h>
-#include <syscall.h>
 
 #include "capio/logger.hpp"
 #include "capio/constants.hpp"
 #include "capio/filesystem.hpp"
+#include "capio/syscall.hpp"
 
 #include "utils/env.hpp"
 #include "utils/requests.hpp"
@@ -25,10 +24,6 @@ CPFilesPaths_t *capio_files_paths = nullptr;
 CPFiles_t *files = nullptr;
 
 CPThreadDataBufs_t *threads_data_bufs = nullptr;
-
-/* Allows CAPIO to deactivate syscalls hooking. */
-thread_local bool syscall_no_intercept_flag = false;
-
 
 void mtrace_init(long tid) {
 
@@ -73,4 +68,4 @@ void mtrace_init(long tid) {
     syscall_no_intercept_flag = false;
 }
 
-#endif // SRC_CAPIO_POSIX_GLOBALS_H
+#endif // CAPIO_POSIX_GLOBALS_HPP

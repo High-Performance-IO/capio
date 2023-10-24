@@ -40,11 +40,13 @@ inline off64_t capio_mkdirat(int dirfd, std::string* pathname, mode_t mode, long
             if (res == 1) {
                 return -1;
             } else {
+                LOG("Adding %s to capio_files_path", path_to_check.c_str());
                 capio_files_paths->insert(path_to_check);
                 return res;
             }
         }
     } else {
+        LOG("File %s already present in capio_files_path", path_to_check.c_str());
         return -2;
     }
 }
@@ -57,20 +59,24 @@ inline off64_t capio_rmdir(std::string* pathname, long tid) {
     if (!is_absolute(pathname)) {
         path_to_check = *capio_posix_realpath(tid, pathname, capio_dir, current_dir);
         if (path_to_check.length() == 0) {
+            LOG("path_to_check.len = 0!");
             return -2;
         }
     }
     auto res_mismatch = std::mismatch(capio_dir->begin(), capio_dir->end(), path_to_check.begin());
     if (res_mismatch.first == capio_dir->end()) {
         if (capio_dir->size() == path_to_check.size()) {
+            LOG("capio_dir.size == path_to_check.size");
             return -2;
         } else {
             if (capio_files_paths->find(path_to_check) == capio_files_paths->end()) {
+                LOG("capio_files_path.find == end. errno = ENOENT");
                 errno = ENOENT;
                 return -1;
             }
-            off64_t res = rmdir_request(*pathname, tid);
+            off64_t res = rmdir_request(path_to_check.c_str(), tid);
             if (res == 2) {
+                LOG("res == 2. errno = ENOENT");
                 errno = ENOENT;
                 return -1;
             } else {
@@ -79,6 +85,7 @@ inline off64_t capio_rmdir(std::string* pathname, long tid) {
             }
         }
     } else {
+        LOG("generic return -2");
         return -2;
     }
 }

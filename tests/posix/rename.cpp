@@ -45,7 +45,7 @@ TEST_CASE("Test directory rename when the new path does not exist", "[posix]") {
     REQUIRE(rename(OLDNAME, NEWNAME) == 0);
     REQUIRE(access(OLDNAME, F_OK) != 0);
     REQUIRE(access(NEWNAME, F_OK) == 0);
-    REQUIRE(unlink(NEWNAME) != -1);
+    REQUIRE(rmdir(NEWNAME) != -1);
     REQUIRE(access(NEWNAME, F_OK) != 0);
 }
 
@@ -59,6 +59,6 @@ TEST_CASE("Test directory rename when the new path already exists", "[posix]") {
     REQUIRE(rename(OLDNAME, NEWNAME) == 0);
     REQUIRE(access(OLDNAME, F_OK) != 0);
     REQUIRE(access(NEWNAME, F_OK) == 0);
-    REQUIRE(unlink(NEWNAME) != -1);
+    REQUIRE(rmdir(NEWNAME) != -1);
     REQUIRE(access(NEWNAME, F_OK) != 0);
 }

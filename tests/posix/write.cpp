@@ -1,10 +1,13 @@
 #include <catch2/catch_test_macros.hpp>
 
 #include <array>
+#include <memory>
+#include <string_view>
 
 #include <fcntl.h>
 #include <sys/uio.h>
 #include <unistd.h>
+
 
 TEST_CASE("Test file creation, write and close", "[posix]") {
     constexpr const char* PATHNAME = "test_file.txt";
@@ -14,14 +17,21 @@ TEST_CASE("Test file creation, write and close", "[posix]") {
     REQUIRE(access(PATHNAME, F_OK) == 0);
     REQUIRE(write(fd, BUFFER, strlen(BUFFER)) == strlen(BUFFER));
     REQUIRE(close(fd) != -1);
+    fd = open(PATHNAME, O_RDONLY, S_IRUSR | S_IWUSR);
+    REQUIRE(fd != -1);
+    std::unique_ptr<char[]> buf(new char[strlen(BUFFER)]);
+    REQUIRE(read(fd, buf.get(), strlen(BUFFER)) == strlen(BUFFER));
+    buf[strlen(BUFFER)] = '\0';
+    REQUIRE(std::string_view(BUFFER) == std::string_view(buf.get()));
+    REQUIRE(close(fd) != -1);
     REQUIRE(unlink(PATHNAME) != -1);
     REQUIRE(access(PATHNAME, F_OK) != 0);
 }
 
 TEST_CASE("Test file creation, write with lseek and close") {
     constexpr const char* PATHNAME = "test_file.txt";
-    constexpr std::array<int, 12> BUFFER = {1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12};
-    int fd = open(PATHNAME, O_CREAT | O_WRONLY | O_TRUNC, S_IRUSR | S_IWUSR);
+    constexpr std::array<int, 12> BUFFER = {1, 2, 3, 4, 5, 6, 7, 8, 9};
+    int fd = open(PATHNAME, O_CREAT | O_RDWR | O_TRUNC, S_IRUSR | S_IWUSR);
     REQUIRE(fd != -1);
     REQUIRE(access(PATHNAME, F_OK) == 0);
     REQUIRE(write(fd, BUFFER.data(), 3 * sizeof(int)) == 3 * sizeof(int));
@@ -30,6 +40,13 @@ TEST_CASE("Test file creation, write with lseek and close") {
     REQUIRE(lseek(fd, 3 * sizeof(int), SEEK_SET) == 3 * sizeof(int));
     REQUIRE(write(fd, BUFFER.data() + 3, 3 * sizeof(int)) == 3 * sizeof(int));
     REQUIRE(lseek(fd, 0, SEEK_SET) == 0);
+    std::array<int, 12> buf{};
+    REQUIRE(read(fd, buf.data(), 3 * sizeof(int)) == 3 * sizeof(int));
+    REQUIRE(lseek(fd, 3 * sizeof(int), SEEK_CUR) == 2 * 3 * sizeof(int));
+    REQUIRE(read(fd, buf.data() + 6, 3 * sizeof(int)) == 3 * sizeof(int));
+    REQUIRE(lseek(fd, 3 * sizeof(int), SEEK_SET) == 3 * sizeof(int));
+    REQUIRE(read(fd, buf.data() + 3, 3 * sizeof(int)) == 3 * sizeof(int));
+    REQUIRE(BUFFER == buf);
     REQUIRE(close(fd) != -1);
     REQUIRE(unlink(PATHNAME) != -1);
     REQUIRE(access(PATHNAME, F_OK) != 0);
@@ -49,7 +66,7 @@ TEST_CASE("Test file creation, buffered write and close", "[posix]") {
     iov[2].iov_base = const_cast<int *>(BUFFER3.data());
     iov[2].iov_len = BUFFER3.size() * sizeof(int);
 
-    int fd = open(PATHNAME, O_CREAT | O_WRONLY | O_TRUNC, S_IRUSR | S_IWUSR);
+    int fd = open(PATHNAME, O_CREAT | O_RDWR | O_TRUNC, S_IRUSR | S_IWUSR);
     REQUIRE(fd != -1);
     REQUIRE(access(PATHNAME, F_OK) == 0);
     REQUIRE(writev(fd, iov, 3));

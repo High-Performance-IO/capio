@@ -1,6 +1,8 @@
 #ifndef CAPIO_UTIL_FILESYS_HPP
 #define CAPIO_UTIL_FILESYS_HPP
 
+#include "utils/location.hpp"
+
 void reply_remote_stats(const std::string& path) {
     START_LOG(gettid(), "call(%s)", path.c_str());
 
@@ -39,7 +41,6 @@ void handle_pending_remote_reads(const std::string& path, off64_t data_size, boo
             }
         }
     }
-
 }
 
 /*
@@ -101,54 +102,9 @@ void write_entry_dir(int tid, const std::string& file_path, const std::string& d
     }
 
     std::string_view mode = c_file.get_mode();
-    if (mode == "append") {
+    if (mode == CAPIO_FILE_MODE_NOUPDATE) {
         handle_pending_remote_reads(dir, data_size, c_file.complete);
     }
-}
-
-void write_file_location(int rank, const std::string& path_to_write, int tid) {
-    START_LOG(tid, "call(rank=%d, path_to_write=%s)", rank, path_to_write.c_str());
-    struct flock lock{};
-    memset(&lock, 0, sizeof(lock));
-
-    int fd = fd_files_location;
-    // lock in exclusive mode
-    lock.l_type = F_WRLCK;
-    // lock entire file
-    lock.l_whence = SEEK_SET; // offset base is start of the file
-    lock.l_start = 0;         // starting offset is zero
-    lock.l_len = 0;           // len is zero, which is a special value representing end
-    // of file (no matter how large the file grows in future)
-    lock.l_pid = getpid();
-    if (fcntl(fd, F_SETLKW, &lock) == -1) { // F_SETLK doesn't block, F_SETLKW does
-        logfile << "write " << rank << "failed to lock the file" << std::endl;
-    }
-
-    long offset = lseek(fd, 0, SEEK_CUR);
-    if (offset == -1)
-        ERR_EXIT("lseek in write_file_location");
-
-    const char *path_to_write_cstr = path_to_write.c_str();
-    const char *space_str = " ";
-    const size_t len1 = strlen(path_to_write_cstr);
-    const size_t len2 = strlen(space_str);
-    const size_t len3 = strlen(node_name);
-    char *file_location = (char *) malloc(len1 + len2 + len3 + 2); // +2 for  \n and for the null-terminator
-    memcpy(file_location, path_to_write_cstr, len1);
-    memcpy(file_location + len1, space_str, len2);
-    memcpy(file_location + len1 + len2, node_name, len3);
-    file_location[len1 + len2 + len3] = '\n';
-    file_location[len1 + len2 + len3 + 1] = '\0';
-    write(fd, file_location, sizeof(char) * strlen(file_location));
-
-    files_location[path_to_write] = std::make_pair(node_name, offset);
-    // Now release the lock explicitly.
-    lock.l_type = F_UNLCK;
-    if (fcntl(fd, F_SETLKW, &lock) == -1) {
-        logfile << "write " << rank << "failed to unlock the file" << std::endl;
-    }
-
-    free(file_location);
 }
 
 void update_dir(int tid, const std::string& file_path, int rank) {
@@ -162,45 +118,16 @@ void update_dir(int tid, const std::string& file_path, int rank) {
     write_entry_dir(tid, file_path, dir, 0);
 }
 
-void update_file_metadata(const std::string& path, int tid, int fd, int rank, bool is_creat) {
-    START_LOG(tid, "call(path=%s, fd=%d, rank=%d, is_creat=%s)", path.c_str(), fd, rank, is_creat? "true" : "false");
-
-    //TODO: check the size that the user wrote in the configuration file
-    off64_t *p_offset = (off64_t *) create_shm("offset_" + std::to_string(tid) + "_" + std::to_string(fd),
-                                               sizeof(off64_t));
-    //*caching_info[tid].second += 2;
-    auto c_file_opt = get_capio_file_opt(path.c_str());
-    Capio_file &c_file = (c_file_opt)? c_file_opt->get() : create_capio_file(path, false, get_file_initial_size());
-    c_file.open();
-    add_capio_file_to_tid(tid, fd, path);
-    processes_files[tid][fd] = std::make_tuple(&c_file, p_offset);//TODO: what happens if a process open the same file twice?
-    int pid = pids[tid];
-    auto it_files = writers.find(pid);
-    if (it_files != writers.end()) {
-        auto it_bools = it_files->second.find(path);
-        if (it_bools == it_files->second.end()) {
-            writers[pid][path] = false;
-        }
-    } else {
-        writers[pid][path] = false;
-    }
-    if (c_file.first_write && is_creat) {
-        c_file.first_write = false;
-        write_file_location(rank, path, tid);
-        update_dir(tid, path, rank);
-    }
-}
-
 off64_t create_dir(int tid, const char *pathname, int rank, bool root_dir) {
     START_LOG(tid, "call(pathname=%s, rank=%d, root_dir=%s)", pathname, rank, root_dir? "true" : "false");
 
-    if (files_location.find(pathname) == files_location.end()) {
+    if (!get_file_location_opt(pathname)) {
         Capio_file &c_file = create_capio_file(pathname, true, DIR_INITIAL_SIZE);
         if (c_file.first_write) {
             c_file.first_write = false;
             //TODO: it works only if there is one prod per file
             if (root_dir) {
-                files_location[pathname] = std::make_pair(node_name, -1);
+                add_file_location(pathname, node_name, -1);
             } else {
                 write_file_location(rank, pathname, tid);
                 update_dir(tid, pathname, rank);

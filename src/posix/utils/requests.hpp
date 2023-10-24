@@ -239,20 +239,12 @@ inline off64_t unlink_request(const  std::string&  path, const long tid) {
 }
 
 
-inline off64_t rmdir_request(const  std::string&  dir_path, long tid) {
+inline off64_t rmdir_request(const std::string&  dir_path, long tid) {
     char req[CAPIO_REQUEST_MAX_SIZE];
-
-    if(!is_absolute(&dir_path)){
-        char path_abs[CAPIO_REQUEST_MAX_SIZE];
-        sprintf(path_abs, "%04d %s/%s %ld", CAPIO_REQUEST_RMDIR,  get_capio_dir()->c_str(), dir_path.c_str() , tid);
-        buf_requests->write(path_abs, CAPIO_REQUEST_MAX_SIZE);
-    }else{
-        sprintf(req, "%04d %s %ld", CAPIO_REQUEST_RMDIR, dir_path.c_str(), tid);
-        buf_requests->write(req, CAPIO_REQUEST_MAX_SIZE);
-    }
+    sprintf(req, "%04d %s %ld", CAPIO_REQUEST_RMDIR, dir_path.c_str(), tid);
+    buf_requests->write(req, CAPIO_REQUEST_MAX_SIZE);
     off64_t res;
     bufs_response->at(tid)->read(&res);
-
     return res;
 }
 
@@ -260,10 +252,10 @@ inline off64_t rmdir_request(const  std::string&  dir_path, long tid) {
 inline void write_request(CPFiles_t *const files, const int fd, const off64_t count, const long tid) {
     char req[CAPIO_REQUEST_MAX_SIZE];
     int num_writes_batch = get_num_writes_batch(tid);
+    long int old_offset = *std::get<0>((*files)[fd]);
     *std::get<0>((*files)[fd]) += count;
     // FIXME: works only if there is only one writer at time for each file
     if (actual_num_writes == num_writes_batch) {
-        long int old_offset = *std::get<0>((*files)[fd]);
         sprintf(req, "%04d %ld %d %ld %ld", CAPIO_REQUEST_WRITE, tid, fd, old_offset, count);
         buf_requests->write(req, CAPIO_REQUEST_MAX_SIZE);
         actual_num_writes = 1;

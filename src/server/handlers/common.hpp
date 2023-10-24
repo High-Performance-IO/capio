@@ -69,14 +69,11 @@ void handle_pending_remote_nfiles(const std::string& path) {
         while (it != app_pending_nfiles.end()) {
             auto& [prefix, n_files, dest, files_path, sem] = *it;
             std::unordered_set<std::string> &files = files_sent[app];
-            if (sem_wait(&files_location_sem) == -1)
-                ERR_EXIT("sem_wait files_location_sem in handle_pending_remote_nfiles");
-            auto it_fs = files_location.find(path);
+            auto file_location_opt = get_file_location_opt(path.c_str());
             auto next_it = std::next(it);
-            if (files.find(path) == files.end() && it_fs != files_location.end() &&
-                strcmp(std::get<0>(it_fs->second), node_name) == 0 && path.compare(0, strlen(prefix), prefix) == 0) {
-                if (sem_post(&files_location_sem) == -1)
-                    ERR_EXIT("sem_post files_location_sem in handle_pending_remote_nfiles");
+            if (files.find(path) == files.end() && file_location_opt &&
+                strcmp(std::get<0>(file_location_opt->get()), node_name) == 0 &&
+                path.compare(0, strlen(prefix), prefix) == 0) {
                 files_path->push_back(path);
                 files.insert(path);
                 if (files_path->size() == n_files) {
@@ -84,28 +81,12 @@ void handle_pending_remote_nfiles(const std::string& path) {
                     if (sem_post(sem) == -1)
                         ERR_EXIT("sem_post sem in handle_pending_remote_nfiles");
                 }
-            } else {
-                if (sem_post(&files_location_sem) == -1)
-                    ERR_EXIT("sem_post files_location_sem in handle_pending_remote_nfiles");
             }
             it = next_it;
         }
     }
     if (sem_post(&clients_remote_pending_nfiles_sem) == -1)
         ERR_EXIT("sem_post clients_remote_pending_nfiles_sem in handle_pending_remote_nfiles");
-}
-
-
-void open_files_metadata(int rank, int *fd_files_location) {
-    START_LOG(gettid(), "call(%d)", rank);
-    std::string rank_str = std::to_string(rank);
-    std::string file_name = "files_location_" + rank_str + ".txt";
-    int fd;
-    if ((fd = open(file_name.c_str(), O_WRONLY | O_APPEND | O_CREAT, 0664)) == -1) {
-        MPI_Finalize();
-        ERR_EXIT("writer error opening file");
-    }
-    *fd_files_location = fd;
 }
 
 #endif // CAPIO_SERVER_HANDLERS_COMMON_HPP

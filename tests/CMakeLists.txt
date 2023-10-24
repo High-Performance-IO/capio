@@ -6,7 +6,6 @@ set(TARGET_SOURCES
         ${CMAKE_CURRENT_SOURCE_DIR}/posix/clone.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/posix/directory.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/posix/file.cpp
-        ${CMAKE_CURRENT_SOURCE_DIR}/posix/realpath.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/posix/rename.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/posix/write.cpp
 )
@@ -40,4 +39,7 @@ include(Catch)
 #####################################
 # Configure tests
 #####################################
-catch_discover_tests(${TARGET_NAME})
+catch_discover_tests(${TARGET_NAME}
+    PROPERTIES
+        ENVIRONMENT LD_PRELOAD=${CMAKE_BINARY_DIR}/src/posix/libcapio_posix.so
+)

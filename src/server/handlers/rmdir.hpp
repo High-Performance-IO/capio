@@ -1,14 +1,16 @@
 #ifndef CAPIO_SERVER_HANDLERS_RMDIR_HPP
 #define CAPIO_SERVER_HANDLERS_RMDIR_HPP
 
+#include "utils/location.hpp"
+
 inline void handle_rmdir(int tid, const char *dir_to_remove, int rank) {
     START_LOG(gettid(), "call(tid=%d, dir_to_remove=%s, rank=%d)", tid, dir_to_remove, rank);
 
-    files_location.erase(dir_to_remove);
     long res = delete_from_file_locations(
             "files_location_" + std::to_string(rank) + ".txt",
             dir_to_remove,
             rank);
+    erase_from_files_location(dir_to_remove);
     write_response(tid, res);
 }
 

@@ -15,12 +15,12 @@
  * This wrapper function invokes func after sys_clone() returns in the child."
 */
 
-static void hook_clone_parent(long child_pid) {
-    auto parent_pid = static_cast<pid_t>(syscall_no_intercept(SYS_gettid));
-    START_LOG(parent_pid, "call(parent_tid=%ld)", parent_pid);
-    mtrace_init(child_pid);
-    clone_request(parent_pid, child_pid);
-
+static void hook_clone_child() {
+    auto parent_tid = static_cast<pid_t>(syscall_no_intercept(SYS_getppid));
+    auto child_tid = static_cast<pid_t>(syscall_no_intercept(SYS_gettid));
+    START_LOG(parent_tid, "call(parent_tid=%ld, child_tid=%d)", parent_tid, child_tid);
+    mtrace_init(child_tid);
+    clone_request(parent_tid, child_tid);
 }
 
 #endif // CAPIO_POSIX_HANDLERS_CLONE_HPP

@@ -3,13 +3,12 @@
 
 #include <singleheader/simdjson.h>
 
+#include "utils/metadata.hpp"
 #include "utils/types.hpp"
 
 using namespace simdjson;
 
-void parse_conf_file(std::string conf_file, CSMetadataConfGlobs_t *metadata_conf_globs,
-                     CSMetadataConfMap_t *metadata_conf, const std::string *capio_dir) {
-
+void parse_conf_file(const std::string& conf_file, const std::string *capio_dir) {
     ondemand::parser parser;
     padded_string json;
     try {
@@ -101,26 +100,26 @@ void parse_conf_file(std::string conf_file, CSMetadataConfGlobs_t *metadata_conf
                 std::string_view mode;
                 error = file["mode"].get_string().get(mode);
 
-                long int n_files;
+                long n_files;
                 error = file["n_files"].get_int64().get(n_files);
-                if (error)
+                if (error) {
                     n_files = -1;
-
-
-                long int batch_size;
+                }
+                long batch_size;
                 error = file["batch_size"].get_int64().get(batch_size);
-                if (error)
+                if (error) {
                     batch_size = 0;
+                }
                 std::string path = std::string(name);
                 if (!is_absolute(&path)) {
-                    if (path.substr(0, 2) == "./")
+                    if (path.substr(0, 2) == "./") {
                         path = path.substr(2, path.length() - 2);
+                    }
                     path = *capio_dir + "/" + path;
                 }
                 std::size_t pos = path.find('*');
-                update_metadata_conf(path, pos, n_files, batch_size, std::string(commit_rule), std::string(mode),
-                                     std::string(app_name),
-                                     false, n_close, metadata_conf_globs, metadata_conf);
+                update_metadata_conf(path, pos, n_files, batch_size, std::string(commit_rule),
+                                     std::string(mode),std::string(app_name), false, n_close);
             }
         }
     }
@@ -145,20 +144,18 @@ void parse_conf_file(std::string conf_file, CSMetadataConfGlobs_t *metadata_conf
             }
             std::size_t pos = path.find('*');
             if (pos == std::string::npos) {
-                auto it = metadata_conf->find(path);
-                if (it == metadata_conf->end())
-                    update_metadata_conf(path, pos, -1, batch_size, "on_termination", "", "", true,
-                                         -1, metadata_conf_globs, metadata_conf);
+                auto it = metadata_conf.find(path);
+                if (it == metadata_conf.end())
+                    update_metadata_conf(path, pos, -1, batch_size, "on_termination", "", "", true, -1);
                 else
                     std::get<4>(it->second) = true;
             } else {
                 std::string prefix_str = path.substr(0, pos);
-                long int i = match_globs(prefix_str, metadata_conf_globs);
+                long int i = match_globs(prefix_str);
                 if (i == -1)
-                    update_metadata_conf(path, pos, -1, batch_size, "on_termination", "", "", true,
-                                         -1, metadata_conf_globs, metadata_conf);
+                    update_metadata_conf(path, pos, -1, batch_size, "on_termination", "", "", true, -1);
                 else {
-                    auto &tuple = (*metadata_conf_globs)[i];
+                    auto &tuple = metadata_conf_globs[i];
                     std::get<6>(tuple) = true;
                 }
             }

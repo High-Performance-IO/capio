@@ -13,7 +13,7 @@
 			{
 				"name" : "file1.dat",
 				"committed" : "on_close",
-				"mode" : "append"
+				"mode" : "noupdate"
 			},
 			{
 				"name" : "file3.dat",
@@ -22,12 +22,12 @@
 			{
 				"name" : "file4.dat",
 				"committed" : "on_close",
-				"mode" : "append"
+				"mode" : "noupdate"
 			},
 			{
 				"name" : "file5.dat",
 				"committed" : "on_close",
-				"mode" : "append"
+				"mode" : "noupdate"
 			}
 		]
 	},

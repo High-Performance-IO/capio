@@ -45,6 +45,7 @@ find_package(Threads REQUIRED)
 # Definitions
 #####################################
 IF(CAPIO_LOG)
+    message(STATUS "Enabling CAPIO logger")
     add_compile_definitions(CAPIOLOG)
 ENDIF(CAPIO_LOG)
 
@@ -65,5 +66,6 @@ add_subdirectory(src/posix)
 add_subdirectory(src/server)
 
 IF(CAPIO_BUILD_TESTS)
+    message(STATUS "Building CAPIO test suite")
     add_subdirectory(tests)
 ENDIF(CAPIO_BUILD_TESTS)

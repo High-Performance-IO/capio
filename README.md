@@ -101,7 +101,7 @@ The following is an example of a simple configuration:
         {
           "name": "file1.dat",
           "committed": "on_close",
-          "mode": "append"
+          "mode": "noupdate"
         },
         {
           "name": "file2.dat",

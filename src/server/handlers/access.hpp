@@ -1,14 +1,16 @@
 #ifndef CAPIO_SERVER_HANDLERS_ACCESS_HPP
 #define CAPIO_SERVER_HANDLERS_ACCESS_HPP
 
+#include "utils/location.hpp"
+
 inline void handle_access(long tid, char *path) {
     START_LOG(gettid(), "call(tid=%ld, path=%s)", tid, path);
 
-    auto it = files_location.find(path);
-    if (it == files_location.end())
+    if (!get_file_location_opt(path)) {
         write_response(tid, -1);
-    else
+    } else {
         write_response(tid, 0);
+    }
 }
 
 void access_handler(const char * const str, int rank) {
