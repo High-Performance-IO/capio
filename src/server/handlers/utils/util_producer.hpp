@@ -6,7 +6,7 @@ std::string get_producer_name(std::string path) {
     //we handle also prefixes
     auto it_metadata = metadata_conf.find(path);
     if (it_metadata == metadata_conf.end()) {
-        long int pos = match_globs(path, &metadata_conf_globs);
+        long int pos = match_globs(path);
         if (pos != -1) {
             producer_name = std::get<3>(metadata_conf_globs[pos]);
         }

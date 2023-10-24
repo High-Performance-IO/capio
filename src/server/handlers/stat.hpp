@@ -4,6 +4,7 @@
 #include <mutex>
 #include <thread>
 
+#include "utils/location.hpp"
 #include "utils/types.hpp"
 
 CSMyRemotePendingStats_t pending_remote_stats;
@@ -22,7 +23,7 @@ inline void handle_remote_stat(int tid, const std::string& path, int rank) {
 
     const std::lock_guard<std::mutex> lg(pending_remote_stats_mutex);
     std::string str_msg;
-    int dest = nodes_helper_rank[std::get<0>(files_location[path])];
+    int dest = nodes_helper_rank[std::get<0>(get_file_location(path.c_str()))];
     str_msg = "stat " + std::to_string(rank) + " " + path;
     const char *msg = str_msg.c_str();
     MPI_Send(msg, strlen(msg) + 1, MPI_CHAR, dest, 0, MPI_COMM_WORLD);
@@ -40,7 +41,7 @@ void wait_for_stat(int tid, const std::string& path) {
     Capio_file &c_file = get_capio_file(path.c_str());
     std::string_view mode = c_file.get_mode();
     bool complete = c_file.complete;
-    if (complete || strcmp(std::get<0>(files_location[path_to_check]), node_name) == 0 || mode == "append") {
+    if (complete || strcmp(std::get<0>(get_file_location(path_to_check.c_str())), node_name) == 0 || mode == CAPIO_FILE_MODE_NOUPDATE) {
         handle_local_stat(tid, path);
     } else {
         handle_remote_stat(tid, path, rank);
@@ -51,26 +52,25 @@ void wait_for_stat(int tid, const std::string& path) {
 inline void reply_stat(int tid, const std::string &path, int rank) {
     START_LOG(gettid(), "call(tid=%d, path=%s, rank=%d)", tid, path.c_str(), rank);
 
-    if (files_location.find(path) == files_location.end()) {
+    auto file_location_opt = get_file_location_opt(path.c_str());
+    if (!file_location_opt) {
         check_file_location(rank, path);
-        if (files_location.find(path) == files_location.end()) {
-            //if it is in configuration file then wait otherwise fails
-            if ((metadata_conf.find(path) != metadata_conf.end() || match_globs(path, &metadata_conf_globs) != -1) &&
-                !is_producer(tid, path)) {
-                std::thread t(wait_for_stat, tid, std::string(path));
-                t.detach();
-            } else {
-                write_response(tid, -1);
-            }
-            return;
+        //if it is in configuration file then wait otherwise fails
+        if ((metadata_conf.find(path) != metadata_conf.end() || match_globs(path) != -1) &&
+            !is_producer(tid, path)) {
+            std::thread t(wait_for_stat, tid, std::string(path));
+            t.detach();
+        } else {
+            write_response(tid, -1);
         }
+        return;
     }
     auto c_file_opt = get_capio_file_opt(path.c_str());
     Capio_file &c_file = (c_file_opt)? c_file_opt->get() : create_capio_file(path, false, get_file_initial_size());
     std::string_view mode = c_file.get_mode();
     bool complete = c_file.complete;
     const std::string *capio_dir = get_capio_dir();
-    if (complete || strcmp(std::get<0>(files_location[path]), node_name) == 0 || mode == "append" ||
+    if (complete || strcmp(std::get<0>(file_location_opt->get()), node_name) == 0 || mode == CAPIO_FILE_MODE_NOUPDATE ||
         *capio_dir == path) {
         handle_local_stat(tid, path);
     } else {
@@ -104,7 +104,6 @@ void stat_handler(const char * const str, int rank) {
     char path[2048];
     int tid;
     sscanf(str, "%d %s", &tid, path);
-    init_process(tid);
     reply_stat(tid, path, rank);
 }
 

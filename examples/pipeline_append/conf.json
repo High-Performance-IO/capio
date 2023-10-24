@@ -9,32 +9,32 @@
 			{
 				"name" : "file0.dat",
 				"committed" : "on_close",
-				"mode" : "append"
+				"mode" : "noupdate"
 			},
 			{
 				"name" : "file1.dat",
 				"committed" : "on_close",
-				"mode" : "append"
+				"mode" : "noupdate"
 			},
 			{
 				"name" : "file2.dat",
 				"committed" : "on_close",
-				"mode" : "append"
+				"mode" : "noupdate"
 			},
 			{
 				"name" : "file3.dat",
 				"committed" : "on_close",
-				"mode" : "append"
+				"mode" : "noupdate"
 			},
 			{
 				"name" : "file4.dat",
 				"committed" : "on_close",
-				"mode" : "append"
+				"mode" : "noupdate"
 			},
 			{
 				"name" : "file5.dat",
 				"committed" : "on_close",
-				"mode" : "append"
+				"mode" : "noupdate"
 			}
 		]
 	},

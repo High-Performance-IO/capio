@@ -2,15 +2,12 @@
  * Capio log level.
  * if -1, and capio logging is enable everything is logged, otherwise, only logs up to CAPIO_MAX_LOG_LEVEL function calls
  */
-#define CAPIO_MAX_LOG_LEVEL -1
 
 #include <array>
 #include <string>
 #include <unordered_map>
 
 #include <asm-generic/unistd.h>
-#include <libsyscall_intercept_hook_point.h>
-#include <syscall.h>
 
 #include "capio/env.hpp"
 
@@ -86,6 +83,10 @@ static int hook(long syscall_number, long arg0, long arg1, long arg2, long arg3,
     static const std::array<CPHandler_t, __NR_syscalls> syscallTable = build_syscall_table();
     static const char* capio_dir = std::getenv("CAPIO_DIR");
 
+#ifdef CAPIOLOG
+    CAPIO_LOG_LEVEL = get_capio_log_level();
+#endif
+
     // If the flag is set to true, CAPIO will not
     // intercept the system calls
     if (syscall_no_intercept_flag) {
@@ -107,9 +108,11 @@ static int hook(long syscall_number, long arg0, long arg1, long arg2, long arg3,
 static __attribute__((constructor)) void
 init() {
     init_client();
-    current_dir = new std::string(*get_capio_dir());
+    char *buf = (char *) malloc(PATH_MAX * sizeof(char));
+    syscall_no_intercept(SYS_getcwd, buf, PATH_MAX);
+    current_dir = new std::string(buf);
     mtrace_init(syscall_no_intercept(SYS_gettid));
 
-    intercept_hook_point_clone_parent = hook_clone_parent;
+    intercept_hook_point_clone_child = hook_clone_child;
     intercept_hook_point = hook;
 }

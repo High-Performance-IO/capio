@@ -20,7 +20,7 @@ typedef std::unordered_map<std::string, Capio_file*> CSFilesMetadata_t;
 typedef std::unordered_map<std::string, std::tuple<std::string, std::string, std::string, long int, bool, long int>> CSMetadataConfMap_t;
 typedef std::vector<std::tuple<std::string, std::string, std::string, std::string, long int, long int, bool, long int>> CSMetadataConfGlobs_t;
 typedef std::unordered_map<int, std::unordered_map<std::string, bool>> CSWritersMap_t;
-typedef std::unordered_map<std::string, std::pair<char*, long int>> CSFilesLocationMap_t;
+typedef std::unordered_map<std::string, std::pair<const char * const, long int>> CSFilesLocationMap_t;
 typedef std::unordered_map<std::string, int> CSNodesHelperRankMap_t;
 typedef std::unordered_map<int, std::string> CSRankToNodeMap_t;
 typedef std::unordered_map<std::string, std::vector<std::tuple<int, int, off64_t, bool>>> CSPendingReadsMap_t;

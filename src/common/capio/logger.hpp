@@ -1,5 +1,5 @@
-#ifndef CAPIO_POSIX_UTILS_LOGGER_HPP
-#define CAPIO_POSIX_UTILS_LOGGER_HPP
+#ifndef CAPIO_COMMON_LOGGER_HPP
+#define CAPIO_COMMON_LOGGER_HPP
 
 #include <cstdarg>
 #include <cstdio>
@@ -29,6 +29,8 @@ thread_local int current_log_level = 0;
 #endif
 
 #define LOG_PRE_MSG "tid[%ld]-at[%s]: "
+
+int CAPIO_LOG_LEVEL = -1;
 
 class Logger {
 private:
@@ -72,7 +74,7 @@ public:
             fflush(stderr);
         }
 #else
-        if(current_log_level < CAPIO_MAX_LOG_LEVEL || CAPIO_MAX_LOG_LEVEL < 0){
+        if(current_log_level < CAPIO_LOG_LEVEL || CAPIO_LOG_LEVEL < 0){
             logfile << buf << "\n";
             logfile.flush();
         }
@@ -106,7 +108,7 @@ public:
             fflush(stderr);
         }
 #else
-        if(current_log_level < CAPIO_MAX_LOG_LEVEL || CAPIO_MAX_LOG_LEVEL < 0) {
+        if(current_log_level < CAPIO_LOG_LEVEL || CAPIO_LOG_LEVEL < 0) {
             logfile << buf << "\n";
             logfile.flush();
         }
@@ -129,7 +131,7 @@ public:
             fflush(stderr);
         }
 #else
-        if(current_log_level < CAPIO_MAX_LOG_LEVEL || CAPIO_MAX_LOG_LEVEL < 0) {
+        if(current_log_level < CAPIO_LOG_LEVEL || CAPIO_LOG_LEVEL < 0) {
             logfile << format << "\n";
             logfile.flush();
         }
@@ -147,6 +149,4 @@ public:
 #define START_LOG(tid, message, ...)
 #endif
 
-#endif
-
-
+#endif // CAPIO_COMMON_LOGGER_HPP

@@ -8,8 +8,6 @@ add_executable(request_reply_mpi request_reply_mpi.cpp)
 add_executable(simple_fopen simple_fopen.cpp)
 
 add_executable(capio_file_tests capio_file_tests.cpp)
-add_executable(test_lseek_write test_lseek_write.cpp)
-add_executable(test_lseek_read test_lseek_read.cpp)
 
 
 add_executable(writev_test writev_test.cpp)
@@ -20,9 +18,8 @@ target_link_libraries(simple_read ${MPI_LIBRARIES} rt)
 target_link_libraries(simple_read_fopen ${MPI_LIBRARIES} rt)
 target_link_libraries(read_write_mpi ${MPI_LIBRARIES} rt)
 target_link_libraries(request_reply_mpi ${MPI_LIBRARIES} rt)
-target_link_libraries(test_lseek_write rt)
 target_link_libraries(writev_test)
-target_link_libraries(test_lseek_read rt)
+
 
 target_link_libraries(simple_fopen  rt)
 

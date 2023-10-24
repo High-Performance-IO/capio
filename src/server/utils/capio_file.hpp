@@ -147,7 +147,7 @@ public:
             _buf = new char[_buf_size];
     }
 
-    char *expand_buffer(std::size_t data_size) {
+    char *expand_buffer(std::size_t data_size) { //TODO: use realloc
         size_t double_size = _buf_size * 2;
         size_t new_size = data_size > double_size ? data_size : double_size;
         char *new_buf = new char[new_size];

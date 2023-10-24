@@ -40,7 +40,8 @@ inline void handle_close(int tid, int fd, int rank) {
     }
 
     if (c_file.is_deletable()) {
-        delete_file(path.data(), rank);
+        delete_capio_file(path.data());
+        delete_from_file_locations(path.data(), rank);
     }
     std::string offset_name = "offset_" + std::to_string(tid) + "_" + std::to_string(fd);
     if (shm_unlink(offset_name.c_str()) == -1) {

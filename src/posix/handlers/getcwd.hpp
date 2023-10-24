@@ -11,7 +11,6 @@ inline std::string* capio_getcwd(std::string* buf, size_t size, long tid) {
         return nullptr;
     } else {
         std::strcpy(buf->data(), current_dir->data());
-
         return buf;
     }
 }

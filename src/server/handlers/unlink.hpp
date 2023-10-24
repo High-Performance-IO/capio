@@ -9,7 +9,8 @@ inline void handle_unlink(int tid, const char *path, int rank) {
         Capio_file &c_file = c_file_opt->get();
         c_file.unlink();
         if (c_file.is_deletable()) {
-            delete_file(path, rank);
+            delete_capio_file(path);
+            delete_from_file_locations(path, rank);
         }
         write_response(tid, 0);
     } else {

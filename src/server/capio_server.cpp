@@ -1,9 +1,3 @@
-/**
- * Capio log level.
- * if -1, and capio logging is enable everything is logged, otherwise, only logs up to CAPIO_MAX_LOG_LEVEL function calls
- */
-#define CAPIO_MAX_LOG_LEVEL -1
-
 #include <algorithm>
 #include <array>
 #include <cstdio>
@@ -21,7 +15,6 @@
 
 #include <dirent.h>
 #include <fcntl.h>
-#include <linux/limits.h>
 #include <mpi.h>
 #include <semaphore.h>
 #include <unistd.h>
@@ -46,9 +39,6 @@ MPI_Request req;
 int n_servers;
 
 
-// [(fd, fp, bool), ....] the third argument is true if the last time getline returned -1, false otherwise
-CSFDFileLocationReadsVector_t fd_files_location_reads;
-
 /*
  * For multithreading:
  * tid -> pid*/
@@ -71,9 +61,6 @@ CSDataBufferMap_t data_buffers;
  * Different threads with the same pid are treated as a single writer
  */
 CSWritersMap_t writers;
-
-// pathname -> (node, offset)
-CSFilesLocationMap_t files_location;
 
 // node -> rank
 CSNodesHelperRankMap_t nodes_helper_rank;
@@ -107,10 +94,10 @@ char node_name[MPI_MAX_PROCESSOR_NAME];
 sem_t internal_server_sem;
 sem_t remote_read_sem;
 sem_t clients_remote_pending_nfiles_sem;
-sem_t files_location_sem;
 
 
 #include "handlers.hpp"
+#include "utils/location.hpp"
 #include "utils/signals.hpp"
 
 static constexpr std::array<CSHandler_t, CAPIO_NR_REQUESTS> build_request_handlers_table() {
@@ -175,7 +162,7 @@ void capio_server(int rank) {
     MPI_Comm_size(MPI_COMM_WORLD, &n_servers);
     setup_signal_handlers();
     handshake_servers(rank);
-    open_files_metadata(rank, &fd_files_location);
+    open_files_location(rank);
     int pid = getpid();
     const std::string *capio_dir = get_capio_dir();
     create_dir(pid, capio_dir->c_str(), rank, true); //TODO: can be a problem if a process execute readdir on capio_dir
@@ -185,7 +172,7 @@ void capio_server(int rank) {
     if (sem_post(&internal_server_sem) == -1)
         ERR_EXIT("sem_post internal_server_sem in capio_server");
 
-    auto str = std::unique_ptr<char>(new char[CAPIO_REQUEST_MAX_SIZE]);
+    auto str = std::unique_ptr<char[]>(new char[CAPIO_REQUEST_MAX_SIZE]);
     while (true) {
         int code = read_next_request(str.get());
         if (code < 0 || code > CAPIO_NR_REQUESTS) {
@@ -343,26 +330,19 @@ std::vector<std::string> *files_avaiable(const std::string& prefix, const std::s
     } else {
         return files_to_send;
     }
-
     for (auto path : get_capio_file_paths()) { // DATA RACE on files_metadata
-        sem_wait(&files_location_sem); //TODO: slipt sems
-        auto it_fs = files_location.find(path.data());
+        auto file_location_opt = get_file_location_opt(path.data());
         if (files.find(path.data()) == files.end() &&
-            it_fs != files_location.end() &&
-            strcmp(std::get<0>(it_fs->second), node_name) == 0 &&
+            file_location_opt &&
+            strcmp(std::get<0>(file_location_opt->get()), node_name) == 0 &&
             path.compare(0, prefix_length, prefix) == 0
         ) {
-            if (sem_post(&files_location_sem) == -1)
-                ERR_EXIT("sem_post files_location_sem in files_avaiable");
             Capio_file &c_file = get_capio_file(path.data());
             if (c_file.complete && !c_file.is_dir()) {
                 files_to_send->emplace_back(path.data());
                 ++n_files_completed;
                 files.insert(path.data());
             }
-        } else {
-            if (sem_post(&files_location_sem) == -1)
-                ERR_EXIT("sem_post files_location_sem in files_avaiable");
         }
     }
     return files_to_send;
@@ -443,7 +423,6 @@ void recv_file(char *shm, int source, long int bytes_expected) {
         MPI_Get_count(&status, MPI_BYTE, &bytes_received);
     }
 }
-
 
 void serve_remote_stat(const char *path, int dest, const Capio_file &c_file) {
     START_LOG(gettid(), "call(%s, %d, %ld)", path, dest, c_file.get_buf_size());
@@ -538,7 +517,7 @@ void recv_nfiles(char *buf_recv, int source) {
             const char *node_name_str = node_name.c_str();
             char *p_node_name = (char *) malloc(sizeof(char) * (strlen(node_name_str) + 1));
             strcpy(p_node_name, node_name_str);
-            files_location[path] = std::make_pair(p_node_name, -1);
+            add_file_location(path, p_node_name, -1);
             p_shm = new char[file_size];
             Capio_file &c_file = create_capio_file(path, false, file_size);
             c_file.insert_sector(0, file_size);
@@ -590,7 +569,7 @@ void capio_helper() {
             size_t file_size = c_file.get_stored_size();
             bool complete = c_file.complete;
             bool data_available = (offset + nbytes <= file_size);
-            if (complete || (c_file.get_mode() == "append" && data_available)) {
+            if (complete || (c_file.get_mode() == CAPIO_FILE_MODE_NOUPDATE && data_available)) {
                 serve_remote_read(path_c, dest, offset, nbytes, complete);
             } else {
                 auto *sem = (sem_t *) malloc(sizeof(sem_t));
@@ -679,8 +658,6 @@ int parseCLI(int argc, char **argv, int rank){
         MPI_Finalize();
         exit(EXIT_FAILURE);
     }
-
-
     if (logfile_src) {
         //log file was given
         std::string token = args::get(logfile_src);
@@ -691,7 +668,7 @@ int parseCLI(int argc, char **argv, int rank){
         logfile.open(filename, std::ofstream::out);
         log = new Logger(__func__, __FILE__, __LINE__, gettid(), "Created new log file");
         std::cout << CAPIO_SERVER_CLI_LOG_SERVER << "started logging to: " << filename << std::endl;
-    }else{
+    } else{
         //log file not given. starting with default name
         const std::string logname(CAPIO_SERVER_DEFAULT_LOG_FILE_NAME + std::to_string(rank) + ".log");
         logfile.open(logname, std::ofstream::out);
@@ -699,20 +676,26 @@ int parseCLI(int argc, char **argv, int rank){
         std::cout << CAPIO_SERVER_CLI_LOG_SERVER << "started logging to default logfile " << logname << std::endl;
     }
 
-
     if (config) {
         std::string token = args::get(config);
         const std::string *capio_dir = get_capio_dir();
         std::cout << CAPIO_SERVER_CLI_LOG_SERVER << "parsing config file: " << token << std::endl;
-        parse_conf_file(token, &metadata_conf_globs, &metadata_conf, capio_dir);
+        parse_conf_file(token, capio_dir);
     }else{
         std::cout << CAPIO_SERVER_CLI_LOG_SERVER << "started server with default configuration" << std::endl;
     }
 
     std::cout << CAPIO_SERVER_CLI_LOG_SERVER << "CAPIO_DIR=" << get_capio_dir()->c_str() << std::endl;
-    std::cout << CAPIO_SERVER_CLI_LOG_SERVER << "server initialization completed!" << std::flush;
 
     delete log;
+
+#ifdef CAPIOLOG
+    CAPIO_LOG_LEVEL = get_capio_log_level();
+    std::cout << CAPIO_SERVER_CLI_LOG_SERVER << "LOG_LEVEL set to: " << CAPIO_LOG_LEVEL << std::endl;
+    std::cout << CAPIO_LOG_CLI_WARNING;
+#endif
+
+    std::cout << CAPIO_SERVER_CLI_LOG_SERVER << "server initialization completed!" << std::flush;
     return 0;
 }
 
@@ -742,8 +725,6 @@ int main(int argc, char **argv) {
     }
     if (sem_init(&remote_read_sem, 0, 1) == -1)
         ERR_EXIT("sem_init remote_read_sem in main");
-    if (sem_init(&files_location_sem, 0, 1) == -1)
-        ERR_EXIT("sem_init files_location_sem in main");
     if (sem_init(&clients_remote_pending_nfiles_sem, 0, 1) == -1)
         ERR_EXIT("sem_init clients_remote_pending_nfiles_sem in main");
     std::thread server_thread(capio_server, rank);

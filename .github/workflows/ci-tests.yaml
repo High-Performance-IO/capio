@@ -3,7 +3,6 @@ on:
   push:
     branches:
       - master
-      - code-refactor
   pull_request:
     branches:
       - master
@@ -57,10 +56,12 @@ jobs:
       - name: "Build with Ninja"
         run: cmake --build build --target all -j $(nproc)
       - name: "Run CAPIO server"
+        env:
+          CAPIO_DIR: ${{ github.workspace }}
         run: mpirun -n 1 build/src/server/capio_server &
       - name: "Run tests"
         env:
-          LDPRELOAD: build/src/posix/libcapio_posix.so
+          CAPIO_DIR: ${{ github.workspace }}
         run: |
           ctest \
             --build-config ${{ matrix.build_type }} \

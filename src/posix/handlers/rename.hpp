@@ -32,6 +32,8 @@ inline off64_t capio_rename(const std::string& oldpath,const std::string& newpat
     }
 
     if (oldpath_capio) {
+        capio_files_paths->erase(oldpath_abs);
+        capio_files_paths->insert(newpath_abs);
         return rename_request(tid, oldpath_abs, newpath_abs);
     } else {
         if (newpath_capio) {

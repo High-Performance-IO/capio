@@ -1,7 +1,10 @@
 #ifndef CAPIO_SERVER_HANDLERS_WRITE_HPP
 #define CAPIO_SERVER_HANDLERS_WRITE_HPP
 
+#include "utils/location.hpp"
 #include "utils/metadata.hpp"
+
+
 
 inline void handle_write(int tid, int fd, off64_t base_offset, off64_t count, int rank) {
     START_LOG(gettid(), "call(tid=%d, fd=%d, base_offset=%ld, count=%ld, rank=%d)", tid, fd, base_offset, count, rank);
@@ -36,7 +39,7 @@ inline void handle_write(int tid, int fd, off64_t base_offset, off64_t count, in
     }
     std::string_view mode = c_file.get_mode();
     auto it = pending_reads.find(path.data());
-    if (it != pending_reads.end() && mode == "append") {
+    if (it != pending_reads.end() && mode == CAPIO_FILE_MODE_NOUPDATE) {
         auto &pending_reads_this_file = it->second;
         auto it_vec = pending_reads_this_file.begin();
         while (it_vec != pending_reads_this_file.end()) {
@@ -53,7 +56,7 @@ inline void handle_write(int tid, int fd, off64_t base_offset, off64_t count, in
                 ++it_vec;
         }
     }
-    if (mode == "append")
+    if (mode == CAPIO_FILE_MODE_NOUPDATE)
         handle_pending_remote_reads(path.data(), data_size, false);
 }
 

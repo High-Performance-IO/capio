@@ -5,9 +5,10 @@
 #include <cstring>
 #include <fstream>
 #include <iostream>
-#include "syscall.hpp"
 #include <sys/stat.h>
+
 #include "logger.hpp"
+#include "syscall.hpp"
 
 std::string get_parent_dir_path(const std::string &file_path) {
     START_LOG(capio_syscall(SYS_gettid), "call(file-Path=%s)", file_path.c_str());
@@ -53,152 +54,6 @@ inline bool is_directory(const std::string &path) {
 bool is_prefix(std::string path_1, std::string path_2) {
     auto res = std::mismatch(path_1.begin(), path_1.end(), path_2.begin());
     return res.first == path_2.end();
-}
-
-
-#ifndef PATH_MAX
-#ifdef _POSIX_VERSION
-#define PATH_MAX 1024
-#else
-#ifdef MAXPATHLEN
-#define PATH_MAX MAXPATHLEN
-#else
-#define PATH_MAX 1024
-#endif
-#endif
-#endif
-
-#define MAX_READLINKS 32
-
-char *capio_realpath(const char *path, char *resolved) {
-    START_LOG(capio_syscall(SYS_gettid), "call(path=%s, resolved=%s)", path, resolved);
-    char copy_path[PATH_MAX];
-    char *max_path, *new_path, *allocated_path;
-    size_t path_len;
-    int readlinks = 0;
-#ifdef S_IFLNK
-    int link_len;
-#endif
-
-    if (path == nullptr) {
-        errno = EINVAL;
-        LOG("path==nullptr");
-        return nullptr;
-    }
-    if (*path == '\0') {
-        errno = ENOENT;
-        LOG("path==\\0");
-        return nullptr;
-    }
-    /* Make a copy of the source path since we may need to modify it. */
-    path_len = strlen(path);
-    if (path_len >= PATH_MAX - 2) {
-        errno = ENAMETOOLONG;
-        LOG("path_len>=PATH_MAX");
-        return nullptr;
-    }
-    /* Copy so that path is at the end of copy_path[] */
-    strcpy(copy_path + (PATH_MAX - 1) - path_len, path);
-    path = copy_path + (PATH_MAX - 1) - path_len;
-    allocated_path = resolved ? nullptr : (resolved = new char[PATH_MAX]);
-    max_path = resolved + PATH_MAX - 2; /* points to last non-NUL char */
-    new_path = resolved;
-    if (*path != '/') {
-        /* If it's a relative pathname use getcwd for starters. */
-        capio_syscall(SYS_getcwd, new_path, PATH_MAX);
-        new_path += strlen(new_path);
-        if (new_path[-1] != '/')
-            *new_path++ = '/';
-    } else {
-        *new_path++ = '/';
-        path++;
-    }
-    /* Expand each slash-separated pathname component. */
-    while (*path != '\0') {
-        /* Ignore stray "/". */
-        if (*path == '/') {
-            path++;
-            continue;
-        }
-        if (*path == '.') {
-            /* Ignore ".". */
-            if (path[1] == '\0' || path[1] == '/') {
-                path++;
-                continue;
-            }
-            if (path[1] == '.') {
-                if (path[2] == '\0' || path[2] == '/') {
-                    path += 2;
-                    /* Ignore ".." at root. */
-                    if (new_path == resolved + 1)
-                        continue;
-                    /* Handle ".." by backing up. */
-                    while ((--new_path)[-1] != '/');
-                    continue;
-                }
-            }
-        }
-        /* Safely copy the next pathname component. */
-        while (*path != '\0' && *path != '/') {
-            if (new_path > max_path) {
-                errno = ENAMETOOLONG;
-                err:
-                free(allocated_path);
-                LOG("returned at label err");
-                return nullptr;
-            }
-            *new_path++ = *path++;
-        }
-#ifdef S_IFLNK
-        /* Protect against infinite loops. */
-        if (readlinks++ > MAX_READLINKS) {
-            errno = ELOOP;
-            LOG("error readlinks++ > MAX_READLINKS");
-            goto err;
-        }
-        path_len = strlen(path);
-        /* See if last (so far) pathname component is a symlink. */
-        *new_path = '\0';
-        {
-            int sv_errno = errno;
-
-            link_len = capio_syscall(SYS_readlink, resolved, copy_path, PATH_MAX - 1);
-            if (link_len < 0) {
-                /* EINVAL means the file exists but isn't a symlink. */
-                if (errno != EINVAL) {
-                    LOG("link_len<0 && errno!=EINVAL");
-                    goto err;
-                }
-            } else {
-                /* Safe sex check. */
-                if (path_len + link_len >= PATH_MAX - 2) {
-                    errno = ENAMETOOLONG;
-                    LOG("error ENAMETOOLONG");
-                    goto err;
-                }
-                /* Note: readlink doesn't add the null byte. */
-                /* copy_path[link_len] = '\0'; - we don't need it too */
-                if (*copy_path == '/')
-                    /* Start over for an absolute symlink. */
-                    new_path = resolved;
-                else
-                    /* Otherwise back up over this component. */
-                    while (*(--new_path) != '/');
-                /* Prepend symlink contents to path. */
-                memmove(copy_path + (PATH_MAX - 1) - link_len - path_len, copy_path, link_len);
-                path = copy_path + (PATH_MAX - 1) - link_len - path_len;
-            }
-            errno = sv_errno;
-        }
-#endif                            /* S_IFLNK */
-        *new_path++ = '/';
-    }
-    /* Delete trailing slash but don't whomp a lone slash. */
-    if (new_path != resolved + 1 && new_path[-1] == '/')
-        new_path--;
-    /* Make sure it's null terminated. */
-    *new_path = '\0';
-    return resolved;
 }
 
 static inline bool is_capio_path(long tid, const std::string &path_to_check, const std::string &capio_dir) {

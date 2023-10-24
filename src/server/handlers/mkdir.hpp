@@ -3,7 +3,7 @@
 
 inline void handle_mkdir(int tid, const char *pathname, int rank) {
     START_LOG(gettid(), "call(tid=%d, pathname=%s, rank=%d)", tid, pathname, rank);
-    init_process(tid);
+
     write_response(tid, create_dir(tid, pathname, rank, false));
 }
 

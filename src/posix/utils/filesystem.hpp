@@ -16,26 +16,6 @@
 #include "requests.hpp"
 #include "types.hpp"
 
-off64_t capio_unlink_abs(const std::string &abs_path, long pid) {
-    START_LOG(pid, "call(abs_path=%s)", abs_path.c_str());
-    off64_t res;
-    const std::string *capio_dir = get_capio_dir();
-    auto it = std::mismatch(capio_dir->begin(), capio_dir->end(), abs_path.begin());
-    if (it.first == capio_dir->end()) {
-        if (capio_dir->size() == abs_path.size()) {
-            ERR_EXIT("ERROR: unlink to the capio_dir %s", abs_path.c_str());
-        }
-
-        res = unlink_request(abs_path.c_str(), pid);
-        if (res == -1)
-            errno = ENOENT;
-    } else {
-        res = -2;
-    }
-
-    return res;
-}
-
 void copy_file(long tid, const std::string &path_1, const std::string &path_2) {
     START_LOG(tid, "call(%s, %s)", path_1.c_str(), path_2.c_str());
 
@@ -53,13 +33,12 @@ void copy_file(long tid, const std::string &path_1, const std::string &path_2) {
     if (res != 0) {
         fwrite(buf, sizeof(char), res, fp_2);
     }
-    if (fclose(fp_1) == EOF)
+    if (fclose(fp_1) == EOF) {
         ERR_EXIT("fclose fp_1");
-
-    if (fclose(fp_2) == EOF)
+    }
+    if (fclose(fp_2) == EOF) {
         ERR_EXIT("fclose fp_2");
-
-
+    }
 }
 
 std::string get_capio_parent_dir(const std::string &path) {
