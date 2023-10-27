@@ -32,8 +32,8 @@ inline ssize_t capio_writev(int fd, const struct iovec *iov, int iovcnt, long ti
     auto it = files->find(fd);
     if (it != files->end()) {
         ssize_t tot_bytes = 0;
-        ssize_t res = 0;
-        int i = 0;
+        ssize_t res       = 0;
+        int i             = 0;
         while (i < iovcnt && res >= 0) {
             size_t iov_len = iov[i].iov_len;
             if (iov_len != 0) {
@@ -53,10 +53,10 @@ inline ssize_t capio_writev(int fd, const struct iovec *iov, int iovcnt, long ti
 }
 
 int write_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg5, long *result) {
-    auto fd = static_cast<int>(arg0);
+    auto fd         = static_cast<int>(arg0);
     const auto *buf = reinterpret_cast<const void *>(arg1);
-    auto count = static_cast<off64_t>(arg2);
-    long tid = syscall_no_intercept(SYS_gettid);
+    auto count      = static_cast<off64_t>(arg2);
+    long tid        = syscall_no_intercept(SYS_gettid);
     START_LOG(tid, "call(fd=%d, buf=0x%08x, count=%ld)", fd, buf, count);
 
     ssize_t res = capio_write(fd, buf, count, tid);
@@ -70,10 +70,10 @@ int write_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long ar
 }
 
 int writev_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg5, long *result) {
-    auto fd = static_cast<int>(arg0);
+    auto fd         = static_cast<int>(arg0);
     const auto *iov = reinterpret_cast<const struct iovec *>(arg1);
-    auto iovcnt = static_cast<int>(arg2);
-    long tid = syscall_no_intercept(SYS_gettid);
+    auto iovcnt     = static_cast<int>(arg2);
+    long tid        = syscall_no_intercept(SYS_gettid);
     START_LOG(tid, "call(fd=%d, iov.iov_base=0x%08x, iov.iov_len=%ld, iovcnt=%d)", fd,
               iov->iov_base, iov->iov_len, iovcnt);
 

@@ -23,8 +23,8 @@ inline void handle_remote_stat(int tid, const std::string &path, int rank) {
 
     const std::lock_guard<std::mutex> lg(pending_remote_stats_mutex);
     std::string str_msg;
-    int dest = nodes_helper_rank[std::get<0>(get_file_location(path.c_str()))];
-    str_msg = "stat " + std::to_string(rank) + " " + path;
+    int dest        = nodes_helper_rank[std::get<0>(get_file_location(path.c_str()))];
+    str_msg         = "stat " + std::to_string(rank) + " " + path;
     const char *msg = str_msg.c_str();
     MPI_Send(msg, strlen(msg) + 1, MPI_CHAR, dest, 0, MPI_COMM_WORLD);
     pending_remote_stats[path].emplace_back(tid);
@@ -38,9 +38,9 @@ void wait_for_stat(int tid, const std::string &path) {
     const std::string &path_to_check(path);
     loop_check_files_location(path_to_check, rank);
     // check if the file is local or remote
-    Capio_file &c_file = get_capio_file(path.c_str());
+    Capio_file &c_file    = get_capio_file(path.c_str());
     std::string_view mode = c_file.get_mode();
-    bool complete = c_file.complete;
+    bool complete         = c_file.complete;
     if (complete || strcmp(std::get<0>(get_file_location(path_to_check.c_str())), node_name) == 0 ||
         mode == CAPIO_FILE_MODE_NOUPDATE) {
         handle_local_stat(tid, path);
@@ -68,8 +68,8 @@ inline void reply_stat(int tid, const std::string &path, int rank) {
     auto c_file_opt = get_capio_file_opt(path.c_str());
     Capio_file &c_file =
         (c_file_opt) ? c_file_opt->get() : create_capio_file(path, false, get_file_initial_size());
-    std::string_view mode = c_file.get_mode();
-    bool complete = c_file.complete;
+    std::string_view mode        = c_file.get_mode();
+    bool complete                = c_file.complete;
     const std::string *capio_dir = get_capio_dir();
     if (complete || strcmp(std::get<0>(file_location_opt->get()), node_name) == 0 ||
         mode == CAPIO_FILE_MODE_NOUPDATE || *capio_dir == path) {

@@ -18,7 +18,7 @@
 
 static void hook_clone_child() {
     auto parent_tid = static_cast<pid_t>(syscall_no_intercept(SYS_getppid));
-    auto child_tid = static_cast<pid_t>(syscall_no_intercept(SYS_gettid));
+    auto child_tid  = static_cast<pid_t>(syscall_no_intercept(SYS_gettid));
     START_LOG(parent_tid, "call(parent_tid=%ld, child_tid=%d)", parent_tid, child_tid);
     mtrace_init(child_tid);
     clone_request(parent_tid, child_tid);

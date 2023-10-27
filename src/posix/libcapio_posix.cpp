@@ -28,7 +28,7 @@ static int not_handled_handler(long arg0, long arg1, long arg2, long arg3, long 
  */
 static int not_implemented_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg5,
                                    long *result) {
-    errno = ENOTSUP;
+    errno   = ENOTSUP;
     *result = -errno;
     return 0;
 }
@@ -40,45 +40,45 @@ static constexpr std::array<CPHandler_t, __NR_syscalls> build_syscall_table() {
         _syscallTable[i] = not_handled_handler;
     }
 
-    _syscallTable[SYS_access] = access_handler;
-    _syscallTable[SYS_chdir] = chdir_handler;
-    _syscallTable[SYS_chmod] = fchmod_handler;
-    _syscallTable[SYS_chown] = fchown_handler;
-    _syscallTable[SYS_close] = close_handler;
-    _syscallTable[SYS_creat] = creat_handler;
-    _syscallTable[SYS_dup] = dup_handler;
-    _syscallTable[SYS_dup2] = dup2_handler;
-    _syscallTable[SYS_execve] = execve_handler;
-    _syscallTable[SYS_exit] = exit_handler;
+    _syscallTable[SYS_access]     = access_handler;
+    _syscallTable[SYS_chdir]      = chdir_handler;
+    _syscallTable[SYS_chmod]      = fchmod_handler;
+    _syscallTable[SYS_chown]      = fchown_handler;
+    _syscallTable[SYS_close]      = close_handler;
+    _syscallTable[SYS_creat]      = creat_handler;
+    _syscallTable[SYS_dup]        = dup_handler;
+    _syscallTable[SYS_dup2]       = dup2_handler;
+    _syscallTable[SYS_execve]     = execve_handler;
+    _syscallTable[SYS_exit]       = exit_handler;
     _syscallTable[SYS_exit_group] = exit_handler;
-    _syscallTable[SYS_faccessat] = faccessat_handler;
+    _syscallTable[SYS_faccessat]  = faccessat_handler;
     _syscallTable[SYS_faccessat2] = faccessat_handler;
-    _syscallTable[SYS_fcntl] = fcntl_handler;
-    _syscallTable[SYS_fgetxattr] = fgetxattr_handler;
+    _syscallTable[SYS_fcntl]      = fcntl_handler;
+    _syscallTable[SYS_fgetxattr]  = fgetxattr_handler;
     _syscallTable[SYS_flistxattr] = not_implemented_handler;
-    _syscallTable[SYS_fork] = fork_handler;
-    _syscallTable[SYS_fstat] = fstat_handler;
-    _syscallTable[SYS_fstatfs] = fstatfs_handler;
-    _syscallTable[SYS_getcwd] = getcwd_handler;
-    _syscallTable[SYS_getdents] = getdents_handler;
+    _syscallTable[SYS_fork]       = fork_handler;
+    _syscallTable[SYS_fstat]      = fstat_handler;
+    _syscallTable[SYS_fstatfs]    = fstatfs_handler;
+    _syscallTable[SYS_getcwd]     = getcwd_handler;
+    _syscallTable[SYS_getdents]   = getdents_handler;
     _syscallTable[SYS_getdents64] = getdents64_handler;
-    _syscallTable[SYS_getxattr] = not_implemented_handler;
-    _syscallTable[SYS_ioctl] = ioctl_handler;
-    _syscallTable[SYS_lgetxattr] = not_implemented_handler;
-    _syscallTable[SYS_lseek] = lseek_handler;
-    _syscallTable[SYS_lstat] = lstat_handler;
-    _syscallTable[SYS_mkdir] = mkdir_handler;
-    _syscallTable[SYS_mkdirat] = mkdirat_handler;
+    _syscallTable[SYS_getxattr]   = not_implemented_handler;
+    _syscallTable[SYS_ioctl]      = ioctl_handler;
+    _syscallTable[SYS_lgetxattr]  = not_implemented_handler;
+    _syscallTable[SYS_lseek]      = lseek_handler;
+    _syscallTable[SYS_lstat]      = lstat_handler;
+    _syscallTable[SYS_mkdir]      = mkdir_handler;
+    _syscallTable[SYS_mkdirat]    = mkdirat_handler;
     _syscallTable[SYS_newfstatat] = fstatat_handler;
-    _syscallTable[SYS_openat] = openat_handler;
-    _syscallTable[SYS_read] = read_handler;
-    _syscallTable[SYS_rename] = rename_handler;
-    _syscallTable[SYS_stat] = lstat_handler;
-    _syscallTable[SYS_unlink] = unlink_handler;
-    _syscallTable[SYS_unlinkat] = unlinkat_handler;
-    _syscallTable[SYS_write] = write_handler;
-    _syscallTable[SYS_writev] = writev_handler;
-    _syscallTable[SYS_rmdir] = rmdir_handler;
+    _syscallTable[SYS_openat]     = openat_handler;
+    _syscallTable[SYS_read]       = read_handler;
+    _syscallTable[SYS_rename]     = rename_handler;
+    _syscallTable[SYS_stat]       = lstat_handler;
+    _syscallTable[SYS_unlink]     = unlink_handler;
+    _syscallTable[SYS_unlinkat]   = unlinkat_handler;
+    _syscallTable[SYS_write]      = write_handler;
+    _syscallTable[SYS_writev]     = writev_handler;
+    _syscallTable[SYS_rmdir]      = rmdir_handler;
 
     return _syscallTable;
 }
@@ -86,7 +86,7 @@ static constexpr std::array<CPHandler_t, __NR_syscalls> build_syscall_table() {
 static int hook(long syscall_number, long arg0, long arg1, long arg2, long arg3, long arg4,
                 long arg5, long *result) {
     static const std::array<CPHandler_t, __NR_syscalls> syscallTable = build_syscall_table();
-    static const char *capio_dir = std::getenv("CAPIO_DIR");
+    static const char *capio_dir                                     = std::getenv("CAPIO_DIR");
 
 #ifdef CAPIOLOG
     CAPIO_LOG_LEVEL = get_capio_log_level();
@@ -118,5 +118,5 @@ static __attribute__((constructor)) void init() {
     mtrace_init(syscall_no_intercept(SYS_gettid));
 
     intercept_hook_point_clone_child = hook_clone_child;
-    intercept_hook_point = hook;
+    intercept_hook_point             = hook;
 }

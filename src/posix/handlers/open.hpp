@@ -46,7 +46,7 @@ inline int capio_openat(int dirfd, std::string *pathname, int flags, long tid) {
             ERR_EXIT("capio_open, /dev/null opening");
         }
         bool create = (flags & O_CREAT) == O_CREAT;
-        bool excl = (flags & O_EXCL) == O_EXCL;
+        bool excl   = (flags & O_EXCL) == O_EXCL;
         if (excl) {
             off64_t return_code = create_exclusive_request(fd, path_to_check, tid);
             if (return_code == 1) {
@@ -67,12 +67,12 @@ inline int capio_openat(int dirfd, std::string *pathname, int flags, long tid) {
             }
         }
         syscall_no_intercept_flag = true;
-        off64_t *p_offset = (off64_t *)create_shm(
+        off64_t *p_offset         = (off64_t *)create_shm(
             "offset_" + std::to_string(tid) + "_" + std::to_string(fd), sizeof(off64_t));
         syscall_no_intercept_flag = false;
-        *p_offset = 0;
-        off64_t init_size = DEFAULT_FILE_INITIAL_SIZE;
-        int actual_flags = flags;
+        *p_offset                 = 0;
+        off64_t init_size         = DEFAULT_FILE_INITIAL_SIZE;
+        int actual_flags          = flags;
         if ((flags & O_DIRECTORY) == O_DIRECTORY) {
             actual_flags = actual_flags | O_LARGEFILE;
         }
@@ -111,7 +111,7 @@ int openat_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long a
     int dirfd = static_cast<int>(arg0);
     std::string pathname(reinterpret_cast<const char *>(arg1));
     int flags = static_cast<int>(arg2);
-    long tid = syscall_no_intercept(SYS_gettid);
+    long tid  = syscall_no_intercept(SYS_gettid);
 
     START_LOG(tid, "call(dirfd=%d, pathname=%s, flags=%X)", dirfd, pathname.c_str(), flags);
 

@@ -7,8 +7,8 @@ inline void handle_clone(pid_t parent_tid, pid_t child_tid) {
     init_process(child_tid);
     clone_capio_file(parent_tid, child_tid);
     processes_files[child_tid] = processes_files[parent_tid];
-    int ppid = pids[parent_tid];
-    int new_pid = pids[child_tid];
+    int ppid                   = pids[parent_tid];
+    int new_pid                = pids[child_tid];
     if (ppid != new_pid) {
         writers[child_tid] = writers[parent_tid];
         for (auto &p : writers[child_tid]) {

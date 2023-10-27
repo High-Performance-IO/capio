@@ -11,7 +11,7 @@
 #include <sys/stat.h> /* For mode constants */
 
 using cclock = std::chrono::system_clock;
-using sec = std::chrono::duration<double>;
+using sec    = std::chrono::duration<double>;
 
 void test_one_to_one(const std::string &buffer_name, long int max_num_elems, char *data,
                      long int num_bytes, long int num_reads, int rank) {
@@ -50,8 +50,8 @@ int main(int argc, char **argv) {
         MPI_Finalize();
         return 1;
     }
-    num_bytes = std::atol(argv[1]);
-    num_reads = std::atol(argv[2]);
+    num_bytes     = std::atol(argv[1]);
+    num_reads     = std::atol(argv[2]);
     max_num_elems = std::atol(argv[3]);
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
     char *data = new char[num_bytes];

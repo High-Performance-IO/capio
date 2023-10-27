@@ -39,12 +39,12 @@ inline ssize_t capio_getdents(int fd, void *buffer, size_t count, bool is_getden
         if (count >= SSIZE_MAX) {
             ERR_EXIT("src does not support read bigger than SSIZE_MAX yet");
         }
-        off64_t count_off = count;
+        off64_t count_off                             = count;
         std::tuple<off64_t *, off64_t *, int, int> *t = &(*files)[fd];
-        off64_t *offset = std::get<0>(*t);
+        off64_t *offset                               = std::get<0>(*t);
 
         off64_t end_of_read = add_getdents_request(fd, count_off, *t, is_getdents64, tid);
-        off64_t bytes_read = end_of_read - *offset;
+        off64_t bytes_read  = end_of_read - *offset;
 
         if (bytes_read > count_off) {
             bytes_read = count_off;
@@ -61,10 +61,10 @@ inline ssize_t capio_getdents(int fd, void *buffer, size_t count, bool is_getden
 }
 
 inline int getdents_handler_impl(long arg0, long arg1, long arg2, long *result, bool is64bit) {
-    auto fd = static_cast<int>(arg0);
+    auto fd    = static_cast<int>(arg0);
     auto *dirp = reinterpret_cast<struct linux_dirent *>(arg1);
     auto count = static_cast<size_t>(arg2);
-    long tid = syscall_no_intercept(SYS_gettid);
+    long tid   = syscall_no_intercept(SYS_gettid);
     START_LOG(tid, "call(fd=%d, dirp=0x%08x, count=%ld, is64bit=%s", fd, dirp, count,
               is64bit ? "true" : "false");
 

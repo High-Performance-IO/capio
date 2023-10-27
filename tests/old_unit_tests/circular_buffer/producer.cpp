@@ -36,8 +36,8 @@ void test_one_to_one_str(const std::string &buffer_name, long int buff_size, lon
     int val;
     std::string str;
     for (long int i = 0; i < num_elems; ++i) {
-        val = i % 10;
-        str = "ciao" + std::to_string(val);
+        val               = i % 10;
+        str               = "ciao" + std::to_string(val);
         const char *c_str = str.c_str();
         c_buff.write(c_str);
     }

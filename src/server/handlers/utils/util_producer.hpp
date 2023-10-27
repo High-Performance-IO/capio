@@ -1,5 +1,6 @@
 #ifndef CAPIO_UTIL_PRODUCER_HPP
 #define CAPIO_UTIL_PRODUCER_HPP
+
 std::string get_producer_name(std::string path) {
     START_LOG(gettid(), "call( %s)", path.c_str());
     std::string producer_name = "";
@@ -20,14 +21,15 @@ std::string get_producer_name(std::string path) {
 bool is_producer(int tid, std::string path) {
     START_LOG(tid, "call(%d, %s)", tid, path.c_str());
     bool res = false;
-    auto it = apps.find(tid);
+    auto it  = apps.find(tid);
 
     if (it != apps.end()) {
-        std::string app_name = apps[tid];
+        std::string app_name  = apps[tid];
         std::string prod_name = get_producer_name(path);
-        res = app_name == prod_name;
+        res                   = app_name == prod_name;
     }
 
     return res;
 }
+
 #endif // CAPIO_UTIL_PRODUCER_HPP

@@ -21,7 +21,7 @@ inline void update_file_metadata(const std::string &path, int tid, int fd, int r
     processes_files[tid][fd] =
         std::make_tuple(&c_file,
                         p_offset); // TODO: what happens if a process open the same file twice?
-    int pid = pids[tid];
+    int pid       = pids[tid];
     auto it_files = writers.find(pid);
     if (it_files != writers.end()) {
         if (it_files->second.find(path) == it_files->second.end()) {

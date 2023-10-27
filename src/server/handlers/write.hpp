@@ -8,14 +8,14 @@ inline void handle_write(int tid, int fd, off64_t base_offset, off64_t count, in
     START_LOG(gettid(), "call(tid=%d, fd=%d, base_offset=%ld, count=%ld, rank=%d)", tid, fd,
               base_offset, count, rank);
     // check if another process is waiting for this data
-    off64_t data_size = base_offset + count;
+    off64_t data_size     = base_offset + count;
     std::string_view path = get_capio_file_path(tid, fd);
-    Capio_file &c_file = init_capio_file(path.data(), true);
-    size_t file_shm_size = c_file.get_buf_size();
-    auto *data_buf = data_buffers[tid].first;
-    size_t n_reads = count / WINDOW_DATA_BUFS;
-    size_t r = count % WINDOW_DATA_BUFS;
-    size_t i = 0;
+    Capio_file &c_file    = init_capio_file(path.data(), true);
+    size_t file_shm_size  = c_file.get_buf_size();
+    auto *data_buf        = data_buffers[tid].first;
+    size_t n_reads        = count / WINDOW_DATA_BUFS;
+    size_t r              = count % WINDOW_DATA_BUFS;
+    size_t i              = 0;
     char *p;
     if (data_size > file_shm_size) {
         p = expand_memory_for_file(path.data(), data_size, c_file);
@@ -29,7 +29,7 @@ inline void handle_write(int tid, int fd, off64_t base_offset, off64_t count, in
     if (r) {
         data_buf->read(p + i * WINDOW_DATA_BUFS, r);
     }
-    int pid = pids[tid];
+    int pid                   = pids[tid];
     writers[pid][path.data()] = true;
     c_file.insert_sector(base_offset, data_size);
     if (c_file.first_write) {
@@ -39,17 +39,17 @@ inline void handle_write(int tid, int fd, off64_t base_offset, off64_t count, in
         update_dir(tid, path.data(), rank);
     }
     std::string_view mode = c_file.get_mode();
-    auto it = pending_reads.find(path.data());
+    auto it               = pending_reads.find(path.data());
     if (it != pending_reads.end() && mode == CAPIO_FILE_MODE_NOUPDATE) {
         auto &pending_reads_this_file = it->second;
-        auto it_vec = pending_reads_this_file.begin();
+        auto it_vec                   = pending_reads_this_file.begin();
         while (it_vec != pending_reads_this_file.end()) {
-            auto tuple = *it_vec;
-            int pending_tid = std::get<0>(tuple);
-            int fd = std::get<1>(tuple);
+            auto tuple            = *it_vec;
+            int pending_tid       = std::get<0>(tuple);
+            int fd                = std::get<1>(tuple);
             size_t process_offset = *std::get<1>(processes_files[pending_tid][fd]);
-            size_t count = std::get<2>(tuple);
-            size_t file_size = c_file.get_stored_size();
+            size_t count          = std::get<2>(tuple);
+            size_t file_size      = c_file.get_stored_size();
             if (process_offset + count <= file_size) {
                 handle_pending_read(pending_tid, fd, process_offset, count, std::get<3>(tuple));
                 it_vec = pending_reads_this_file.erase(it_vec);

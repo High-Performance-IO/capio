@@ -78,12 +78,12 @@ void parse_conf_file(const std::string &conf_file, const std::string *capio_dir)
 
                 std::string_view committed;
                 std::string committed_str;
-                error = file["committed"].get_string().get(committed);
+                error                   = file["committed"].get_string().get(committed);
                 std::string commit_rule = "";
-                long int n_close = -1;
+                long int n_close        = -1;
                 if (!error) {
                     committed_str = std::string(committed);
-                    int pos = committed_str.find(':');
+                    int pos       = committed_str.find(':');
                     if (pos != -1) {
                         commit_rule = committed_str.substr(0, pos);
                         if (commit_rule != "on_close") {
@@ -145,12 +145,12 @@ void parse_conf_file(const std::string &conf_file, const std::string *capio_dir)
         }
     }
     ondemand::array permanent_files;
-    auto error = entries["permanent"].get_array().get(permanent_files);
+    auto error          = entries["permanent"].get_array().get(permanent_files);
     long int batch_size = 0;
     if (!error) {
         for (auto file : permanent_files) {
             std::string_view name;
-            error = file.get_string().get(name);
+            error            = file.get_string().get(name);
             std::string path = std::string(name);
 
             if (!is_absolute(&path)) {
@@ -176,12 +176,12 @@ void parse_conf_file(const std::string &conf_file, const std::string *capio_dir)
                 }
             } else {
                 std::string prefix_str = path.substr(0, pos);
-                long int i = match_globs(prefix_str);
+                long int i             = match_globs(prefix_str);
                 if (i == -1) {
                     update_metadata_conf(path, pos, -1, batch_size, "on_termination", "", "", true,
                                          -1);
                 } else {
-                    auto &tuple = metadata_conf_globs[i];
+                    auto &tuple        = metadata_conf_globs[i];
                     std::get<6>(tuple) = true;
                 }
             }

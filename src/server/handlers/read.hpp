@@ -17,22 +17,22 @@ inline void handle_pending_read(int tid, int fd, long int process_offset, long i
               process_offset, count, is_getdents ? "true" : "false");
 
     std::string_view path = get_capio_file_path(tid, fd);
-    Capio_file &c_file = init_capio_file(path.data(), false);
-    char *p = c_file.get_buffer();
+    Capio_file &c_file    = init_capio_file(path.data(), false);
+    char *p               = c_file.get_buffer();
     off64_t end_of_sector = c_file.get_sector_end(process_offset);
-    off64_t end_of_read = process_offset + count;
+    off64_t end_of_read   = process_offset + count;
     size_t bytes_read;
     if (end_of_sector > end_of_read) {
         end_of_sector = end_of_read;
-        bytes_read = count;
+        bytes_read    = count;
     } else {
         bytes_read = end_of_sector - process_offset;
     }
     if (is_getdents) {
-        off64_t dir_size = c_file.get_stored_size();
+        off64_t dir_size  = c_file.get_stored_size();
         off64_t n_entries = dir_size / THEORETICAL_SIZE_DIRENT64;
-        char *p_getdents = (char *)malloc(n_entries * sizeof(char) * dir_size);
-        end_of_sector = convert_dirent64_to_dirent(p, p_getdents, dir_size);
+        char *p_getdents  = (char *)malloc(n_entries * sizeof(char) * dir_size);
+        end_of_sector     = convert_dirent64_to_dirent(p, p_getdents, dir_size);
         write_response(tid, end_of_sector);
         send_data_to_client(tid, p_getdents + process_offset, end_of_sector - process_offset);
         free(p_getdents);
@@ -51,14 +51,14 @@ inline void handle_local_read(int tid, int fd, off64_t count, bool dir, bool is_
               is_prod ? "true" : "false");
 
     const std::lock_guard<std::mutex> lg(local_read_mutex);
-    std::string_view path = get_capio_file_path(tid, fd);
-    Capio_file &c_file = get_capio_file(path.data());
+    std::string_view path  = get_capio_file_path(tid, fd);
+    Capio_file &c_file     = get_capio_file(path.data());
     off64_t process_offset = *std::get<1>(processes_files[tid][fd]);
-    int pid = pids[tid];
-    bool writer = writers[pid][path.data()];
-    off64_t end_of_sector = c_file.get_sector_end(process_offset);
-    off64_t end_of_read = process_offset + count;
-    std::string_view mode = c_file.get_mode();
+    int pid                = pids[tid];
+    bool writer            = writers[pid][path.data()];
+    off64_t end_of_sector  = c_file.get_sector_end(process_offset);
+    off64_t end_of_read    = process_offset + count;
+    std::string_view mode  = c_file.get_mode();
     if (mode != CAPIO_FILE_MODE_NOUPDATE && !c_file.complete && !writer && !is_prod) {
         pending_reads[path.data()].emplace_back(tid, fd, count, is_getdents);
     } else if (end_of_read > end_of_sector) {
@@ -69,13 +69,13 @@ inline void handle_local_read(int tid, int fd, off64_t count, bool dir, bool is_
                 write_response(tid, 0);
                 return;
             }
-            c_file = init_capio_file(path.data(), false);
+            c_file  = init_capio_file(path.data(), false);
             char *p = c_file.get_buffer();
             if (is_getdents) {
-                off64_t dir_size = c_file.get_stored_size();
+                off64_t dir_size  = c_file.get_stored_size();
                 off64_t n_entries = dir_size / THEORETICAL_SIZE_DIRENT64;
-                char *p_getdents = (char *)malloc(n_entries * sizeof(char) * dir_size);
-                end_of_sector = convert_dirent64_to_dirent(p, p_getdents, dir_size);
+                char *p_getdents  = (char *)malloc(n_entries * sizeof(char) * dir_size);
+                end_of_sector     = convert_dirent64_to_dirent(p, p_getdents, dir_size);
                 write_response(tid, end_of_sector);
                 send_data_to_client(tid, p_getdents + process_offset,
                                     end_of_sector - process_offset);
@@ -86,15 +86,15 @@ inline void handle_local_read(int tid, int fd, off64_t count, bool dir, bool is_
             }
         }
     } else {
-        c_file = init_capio_file(path.data(), false);
+        c_file  = init_capio_file(path.data(), false);
         char *p = c_file.get_buffer();
         size_t bytes_read;
         bytes_read = count;
         if (is_getdents) {
-            off64_t dir_size = c_file.get_stored_size();
+            off64_t dir_size  = c_file.get_stored_size();
             off64_t n_entries = dir_size / THEORETICAL_SIZE_DIRENT64;
-            char *p_getdents = (char *)malloc(n_entries * sizeof(char) * dir_size);
-            end_of_sector = convert_dirent64_to_dirent(p, p_getdents, dir_size);
+            char *p_getdents  = (char *)malloc(n_entries * sizeof(char) * dir_size);
+            end_of_sector     = convert_dirent64_to_dirent(p, p_getdents, dir_size);
             write_response(tid, end_of_read);
             send_data_to_client(tid, p_getdents + process_offset, bytes_read);
             free(p_getdents);
@@ -114,7 +114,7 @@ inline bool read_from_local_mem(int tid, off64_t process_offset, off64_t end_of_
     bool res = false;
     if (end_of_read <= end_of_sector) {
         Capio_file &c_file = init_capio_file(path.c_str(), false);
-        char *p = c_file.get_buffer();
+        char *p            = c_file.get_buffer();
         write_response(tid, end_of_sector);
         send_data_to_client(tid, p + process_offset, count);
         res = true;
@@ -134,12 +134,12 @@ inline void handle_remote_read(int tid, int fd, off64_t count, int rank, bool di
     // before sending the request to the remote node, it checks
     // in the local cache
     const std::lock_guard<std::mutex> lg(pending_remote_reads_mutex);
-    std::string_view path = get_capio_file_path(tid, fd);
-    Capio_file &c_file = get_capio_file(path.data());
-    size_t real_file_size = c_file.real_file_size;
+    std::string_view path  = get_capio_file_path(tid, fd);
+    Capio_file &c_file     = get_capio_file(path.data());
+    size_t real_file_size  = c_file.real_file_size;
     off64_t process_offset = *std::get<1>(processes_files[tid][fd]);
-    off64_t end_of_read = process_offset + count;
-    off64_t end_of_sector = c_file.get_sector_end(process_offset);
+    off64_t end_of_read    = process_offset + count;
+    off64_t end_of_sector  = c_file.get_sector_end(process_offset);
     std::size_t eos;
     if (end_of_sector == -1) {
         eos = 0;
@@ -159,9 +159,9 @@ inline void handle_remote_read(int tid, int fd, off64_t count, int rank, bool di
     // If it is not in cache then send the request to the remote node
     const char *msg;
     std::string str_msg;
-    int dest = nodes_helper_rank[std::get<0>(get_file_location(path.data()))];
+    int dest      = nodes_helper_rank[std::get<0>(get_file_location(path.data()))];
     size_t offset = *std::get<1>(processes_files[tid][fd]);
-    str_msg = "read " + std::string(path) + " " + std::to_string(rank) + " " +
+    str_msg       = "read " + std::string(path) + " " + std::to_string(rank) + " " +
               std::to_string(offset) + " " + std::to_string(count);
     msg = str_msg.c_str();
 
@@ -176,7 +176,7 @@ inline bool handle_nreads(const std::string &path, const std::string &app_name, 
     bool success = false;
     long int pos = match_globs(path);
     if (pos != -1) {
-        std::string glob = std::get<0>(metadata_conf_globs[pos]);
+        std::string glob       = std::get<0>(metadata_conf_globs[pos]);
         std::size_t batch_size = std::get<5>(metadata_conf_globs[pos]);
         if (batch_size > 0) {
             char *msg = (char *)malloc(sizeof(char) * (512 + PATH_MAX));
@@ -206,11 +206,11 @@ inline void wait_for_file(int tid, int fd, off64_t count, bool dir, bool is_getd
     } else {
         Capio_file &c_file = get_capio_file(path_to_check.data());
         if (!c_file.complete) {
-            auto it = apps.find(tid);
+            auto it  = apps.find(tid);
             bool res = false;
             if (it != apps.end()) {
                 std::string app_name = it->second;
-                res = handle_nreads(
+                res                  = handle_nreads(
                     path_to_check.data(), app_name,
                     nodes_helper_rank[std::get<0>(get_file_location(path_to_check.data()))]);
             }
@@ -229,9 +229,9 @@ inline void handle_read(int tid, int fd, off64_t count, bool dir, bool is_getden
     START_LOG(gettid(), "call(tid=%d, fd=%d, count=%ld, dir=%s, is_getdents=%s, rank=%d)", tid, fd,
               count, dir ? "true" : "false", is_getdents ? "true" : "false", rank);
 
-    std::string_view path = get_capio_file_path(tid, fd);
+    std::string_view path        = get_capio_file_path(tid, fd);
     const std::string *capio_dir = get_capio_dir();
-    bool is_prod = is_producer(tid, path.data());
+    bool is_prod                 = is_producer(tid, path.data());
 
     if (!get_file_location_opt(path.data()) && !is_prod) {
         bool found = check_file_location(rank, path.data());
@@ -247,7 +247,7 @@ inline void handle_read(int tid, int fd, off64_t count, bool dir, bool is_getden
     } else {
         Capio_file &c_file = get_capio_file(path.data());
         if (!c_file.complete) {
-            auto it = apps.find(tid);
+            auto it  = apps.find(tid);
             bool res = false;
             if (it != apps.end()) {
                 std::string app_name = it->second;
@@ -282,7 +282,7 @@ inline void solve_remote_reads(size_t bytes_received, size_t offset, size_t file
               "complete=%s)",
               bytes_received, offset, file_size, path_c, complete ? "true" : "false");
 
-    Capio_file &c_file = get_capio_file(path_c);
+    Capio_file &c_file    = get_capio_file(path_c);
     c_file.real_file_size = file_size;
     c_file.insert_sector(offset, offset + bytes_received);
     c_file.complete = complete;
@@ -291,33 +291,33 @@ inline void solve_remote_reads(size_t bytes_received, size_t offset, size_t file
     long int count; // TODO: diff between count and bytes_received
     const std::lock_guard<std::mutex> lg(pending_remote_reads_mutex);
     std::list<std::tuple<int, int, long int, bool>> &list_remote_reads = pending_remote_reads[path];
-    auto it = list_remote_reads.begin();
+    auto it                                                            = list_remote_reads.begin();
     std::list<std::tuple<int, int, long int, bool>>::iterator prev_it;
     off64_t end_of_sector;
     while (it != list_remote_reads.end()) {
-        tid = std::get<0>(*it);
-        fd = std::get<1>(*it);
-        count = std::get<2>(*it);
-        bool is_getdent = std::get<3>(*it);
+        tid              = std::get<0>(*it);
+        fd               = std::get<1>(*it);
+        count            = std::get<2>(*it);
+        bool is_getdent  = std::get<3>(*it);
         size_t fd_offset = *std::get<1>(processes_files[tid][fd]);
         if (complete || fd_offset + count <= offset + bytes_received) {
             // this part is equals to the local read (TODO: function)
             end_of_sector = c_file.get_sector_end(fd_offset);
-            c_file = init_capio_file(path_c, false);
-            char *p = c_file.get_buffer();
+            c_file        = init_capio_file(path_c, false);
+            char *p       = c_file.get_buffer();
             size_t bytes_read;
             off64_t end_of_read = fd_offset + count;
             if (end_of_sector > end_of_read) {
                 end_of_sector = end_of_read;
-                bytes_read = count;
+                bytes_read    = count;
             } else {
                 bytes_read = end_of_sector - fd_offset;
             }
             if (is_getdent) {
-                off64_t dir_size = c_file.get_stored_size();
+                off64_t dir_size  = c_file.get_stored_size();
                 off64_t n_entries = dir_size / THEORETICAL_SIZE_DIRENT64;
-                char *p_getdents = (char *)malloc(n_entries * sizeof(char) * dir_size);
-                end_of_sector = convert_dirent64_to_dirent(p, p_getdents, dir_size);
+                char *p_getdents  = (char *)malloc(n_entries * sizeof(char) * dir_size);
+                end_of_sector     = convert_dirent64_to_dirent(p, p_getdents, dir_size);
                 write_response(tid, end_of_sector);
                 send_data_to_client(tid, p_getdents + fd_offset, bytes_read);
                 free(p_getdents);

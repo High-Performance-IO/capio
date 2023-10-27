@@ -19,10 +19,10 @@ inline void init_process(int tid) {
 
 void send_data_to_client(int tid, char *buf, long int count) {
     START_LOG(tid, "call(%d,%s, %ld)", tid, buf, count);
-    auto *data_buf = data_buffers[tid].second;
+    auto *data_buf  = data_buffers[tid].second;
     size_t n_writes = count / WINDOW_DATA_BUFS;
-    size_t r = count % WINDOW_DATA_BUFS;
-    size_t i = 0;
+    size_t r        = count % WINDOW_DATA_BUFS;
+    size_t i        = 0;
     while (i < n_writes) {
         data_buf->write(buf + i * WINDOW_DATA_BUFS);
         ++i;
@@ -58,14 +58,14 @@ void handle_pending_remote_nfiles(const std::string &path) {
                  "handle_pending_remote_nfiles");
     }
     for (auto &p : clients_remote_pending_nfiles) {
-        std::string app = p.first;
+        std::string app          = p.first;
         auto &app_pending_nfiles = p.second;
-        auto it = app_pending_nfiles.begin();
+        auto it                  = app_pending_nfiles.begin();
         while (it != app_pending_nfiles.end()) {
             auto &[prefix, n_files, dest, files_path, sem] = *it;
-            std::unordered_set<std::string> &files = files_sent[app];
-            auto file_location_opt = get_file_location_opt(path.c_str());
-            auto next_it = std::next(it);
+            std::unordered_set<std::string> &files         = files_sent[app];
+            auto file_location_opt                         = get_file_location_opt(path.c_str());
+            auto next_it                                   = std::next(it);
             if (files.find(path) == files.end() && file_location_opt &&
                 strcmp(std::get<0>(file_location_opt->get()), node_name) == 0 &&
                 path.compare(0, strlen(prefix), prefix) == 0) {

@@ -27,16 +27,17 @@ class flock_guard {
                   close_file ? "true" : "false");
 
         memset(&_lock, 0, sizeof(_lock));
-        _lock.l_type = l_type;
+        _lock.l_type   = l_type;
         _lock.l_whence = SEEK_SET;
-        _lock.l_start = 0;
-        _lock.l_len = 0;
-        _lock.l_pid = getpid();
+        _lock.l_start  = 0;
+        _lock.l_len    = 0;
+        _lock.l_pid    = getpid();
         if (fcntl(_fd, F_SETLKW, &_lock) < 0) {
             close(_fd);
             ERR_EXIT("CAPIO server failed to lock the file");
         }
     }
+
     inline ~flock_guard() {
         START_LOG(gettid(), "call(fd=%d)", _fd);
 
@@ -112,12 +113,12 @@ int check_file_location(std::size_t index, int rank, const std::string &path_to_
     int fd; /* file descriptor to identify a file within a process */
 
     if (index < fd_files_location_reads.size()) {
-        fd = std::get<0>(fd_files_location_reads[index]);
-        fp = std::get<1>(fd_files_location_reads[index]);
+        fd          = std::get<0>(fd_files_location_reads[index]);
+        fp          = std::get<1>(fd_files_location_reads[index]);
         seek_needed = std::get<2>(fd_files_location_reads[index]);
     } else {
         std::string file_name = "files_location_" + std::to_string(index) + ".txt";
-        fp = fopen(file_name.c_str(), "r+");
+        fp                    = fopen(file_name.c_str(), "r+");
         if (fp == nullptr) {
             return 0;
         }
@@ -156,7 +157,7 @@ int check_file_location(std::size_t index, int rank, const std::string &path_to_
             ++i;
             ++j;
         }
-        node_str[j] = '\0';
+        node_str[j]      = '\0';
         char *p_node_str = (char *)malloc(sizeof(char) * (strlen(node_str) + 1));
         strcpy(p_node_str, node_str);
         long offset = ftell(fp);
@@ -183,8 +184,8 @@ bool check_file_location(int my_rank, const std::string &path_to_check) {
     int rank = 0, res = -1;
     while (!found && rank < n_servers) {
         std::string rank_str = std::to_string(rank);
-        res = check_file_location(rank, my_rank, path_to_check);
-        found = res == 1;
+        res                  = check_file_location(rank, my_rank, path_to_check);
+        found                = res == 1;
         ++rank;
     }
     return found;
@@ -212,9 +213,9 @@ int delete_from_file_locations(const std::string &file_name, const std::string &
 
     std::unique_ptr<char[]> line(new char[PATH_MAX]);
 
-    size_t len = PATH_MAX;
+    size_t len   = PATH_MAX;
     ssize_t read = 0;
-    FILE *fp = fopen(file_name.c_str(), "r+");
+    FILE *fp     = fopen(file_name.c_str(), "r+");
     if (fp == nullptr) {
         LOG("capio server %d failed to open the location file", rank);
         return 0;
@@ -232,7 +233,7 @@ int delete_from_file_locations(const std::string &file_name, const std::string &
             ERR_EXIT("ftell delete_from_file_location");
         }
         char *line_addr = static_cast<char *>(line.get());
-        read = getline(&line_addr, &len, fp);
+        read            = getline(&line_addr, &len, fp);
         if (read == -1) {
             break;
         }
@@ -278,7 +279,7 @@ void delete_from_file_locations(const std::string &path_metadata, long int offse
         fd = std::get<0>(fd_files_location_reads[rank]);
     } else {
         std::string file_name = "files_location_" + std::to_string(rank) + ".txt";
-        FILE *fp = fopen(file_name.c_str(), "r+");
+        FILE *fp              = fopen(file_name.c_str(), "r+");
         if (fp == nullptr) {
             ERR_EXIT("fopen %s delete_from_file_locations", file_name.c_str());
         }
@@ -307,14 +308,14 @@ void delete_from_file_locations(const std::string &path_metadata, long int offse
 void delete_from_file_locations(const std::string &path, int rank) {
     START_LOG(gettid(), "call(%s, %d)", path.c_str(), rank);
 
-    bool found = false;
-    int res = -1;
+    bool found           = false;
+    int res              = -1;
     auto &[node, offset] = get_file_location(path.c_str());
     if (offset == -1) { // TODO: very inefficient
         int r = 0;
         while (!found && r < n_servers) {
-            res = delete_from_file_locations("files_location_" + std::to_string(r) + ".txt", path,
-                                             rank);
+            res   = delete_from_file_locations("files_location_" + std::to_string(r) + ".txt", path,
+                                               rank);
             found = res == 1;
             ++r;
         }
@@ -358,15 +359,15 @@ void write_file_location(int rank, const std::string &path_to_write, int tid) {
         ERR_EXIT("lseek in write_file_location");
     }
     const char *path_to_write_cstr = path_to_write.c_str();
-    const char *space_str = " ";
-    const size_t len1 = strlen(path_to_write_cstr);
-    const size_t len2 = strlen(space_str);
-    const size_t len3 = strlen(node_name);
+    const char *space_str          = " ";
+    const size_t len1              = strlen(path_to_write_cstr);
+    const size_t len2              = strlen(space_str);
+    const size_t len3              = strlen(node_name);
     std::unique_ptr<char[]> file_location(new char[len1 + len2 + len3 + 2]);
     memcpy(file_location.get(), path_to_write_cstr, len1);
     memcpy(file_location.get() + len1, space_str, len2);
     memcpy(file_location.get() + len1 + len2, node_name, len3);
-    file_location[len1 + len2 + len3] = '\n';
+    file_location[len1 + len2 + len3]     = '\n';
     file_location[len1 + len2 + len3 + 1] = '\0';
     write(fd_files_location, file_location.get(), sizeof(char) * strlen(file_location.get()));
     add_file_location(path_to_write, node_name, offset);

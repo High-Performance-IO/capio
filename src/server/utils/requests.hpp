@@ -15,8 +15,8 @@ CSBufResponse_t *bufs_response;
  */
 inline void init_server() {
     // TODO: replace number with constexpr
-    buf_requests = new CSBufRequest_t("circular_buffer", 1024 * 1024, CAPIO_REQUEST_MAX_SIZE,
-                                      CAPIO_SEM_TIMEOUT_NANOSEC, CAPIO_SEM_RETRIES);
+    buf_requests  = new CSBufRequest_t("circular_buffer", 1024 * 1024, CAPIO_REQUEST_MAX_SIZE,
+                                       CAPIO_SEM_TIMEOUT_NANOSEC, CAPIO_SEM_RETRIES);
     bufs_response = new CSBufResponse_t();
 }
 

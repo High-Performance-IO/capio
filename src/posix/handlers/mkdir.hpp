@@ -93,7 +93,7 @@ inline off64_t capio_rmdir(std::string *pathname, long tid) {
 int mkdir_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg5, long *result) {
     std::string pathname(reinterpret_cast<const char *>(arg0));
     auto mode = static_cast<mode_t>(arg1);
-    long tid = syscall_no_intercept(SYS_gettid);
+    long tid  = syscall_no_intercept(SYS_gettid);
     START_LOG(tid, "call(pathname=%s, mode=%o)", pathname.c_str(), mode);
 
     off64_t res = capio_mkdirat(AT_FDCWD, &pathname, mode, tid);
@@ -110,7 +110,7 @@ int mkdirat_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long 
     int dirfd = static_cast<int>(arg0);
     std::string pathname(reinterpret_cast<const char *>(arg1));
     auto mode = static_cast<mode_t>(arg2);
-    long tid = syscall_no_intercept(SYS_gettid);
+    long tid  = syscall_no_intercept(SYS_gettid);
     START_LOG(tid, "call(dirfd=%d, pathname=%s, mode=%o)", dirfd, pathname.c_str(), mode);
 
     off64_t res = capio_mkdirat(dirfd, &pathname, mode, tid);

@@ -12,7 +12,7 @@ TEST_CASE("Test directory creation, reopening and close", "[posix]") {
     constexpr const char *PATHNAME = "test";
     REQUIRE(mkdir(PATHNAME, S_IRWXU) != -1);
     int flags = O_RDONLY | O_DIRECTORY;
-    int fd = open(PATHNAME, flags, S_IRUSR | S_IWUSR);
+    int fd    = open(PATHNAME, flags, S_IRUSR | S_IWUSR);
     REQUIRE(fd != -1);
     REQUIRE(close(fd) != -1);
     fd = open(PATHNAME, flags, S_IRUSR | S_IWUSR);
@@ -25,7 +25,7 @@ TEST_CASE("Test directory creation, reopening, and close using mkdirat with AT_F
     constexpr const char *PATHNAME = "test";
     REQUIRE(mkdirat(AT_FDCWD, PATHNAME, S_IRWXU) != -1);
     int flags = O_RDONLY | O_DIRECTORY;
-    int fd = openat(AT_FDCWD, PATHNAME, flags, S_IRUSR | S_IWUSR);
+    int fd    = openat(AT_FDCWD, PATHNAME, flags, S_IRUSR | S_IWUSR);
     REQUIRE(fd != -1);
     REQUIRE(close(fd) != -1);
     fd = openat(AT_FDCWD, PATHNAME, flags, S_IRUSR | S_IWUSR);
@@ -38,7 +38,7 @@ TEST_CASE("Test that mkdir fails if directory already exists", "[posix]") {
     constexpr const char *PATHNAME = "test";
     REQUIRE(mkdir(PATHNAME, S_IRWXU) != -1);
     int flags = O_RDONLY | O_DIRECTORY;
-    int fd = open(PATHNAME, flags, S_IRUSR | S_IWUSR);
+    int fd    = open(PATHNAME, flags, S_IRUSR | S_IWUSR);
     REQUIRE(fd != -1);
     REQUIRE(close(fd) != -1);
     REQUIRE(mkdir(PATHNAME, S_IRWXU) == -1);
@@ -53,7 +53,7 @@ TEST_CASE("Test directory creation, reopening, and close in a different director
     const char *PATHNAME = path_fs.c_str();
     REQUIRE(mkdirat(0, PATHNAME, S_IRWXU) != -1);
     int flags = O_RDONLY | O_DIRECTORY;
-    int fd = openat(0, PATHNAME, flags, S_IRUSR | S_IWUSR);
+    int fd    = openat(0, PATHNAME, flags, S_IRUSR | S_IWUSR);
     REQUIRE(fd != -1);
     REQUIRE(close(fd) != -1);
     fd = openat(0, PATHNAME, flags, S_IRUSR | S_IWUSR);
@@ -66,9 +66,9 @@ TEST_CASE("Test directory creation, reopening, and close in a different director
           "with dirfd",
           "[posix]") {
     constexpr const char *PATHNAME = "test";
-    const char *DIRPATH = std::getenv("PWD");
-    int flags = O_RDONLY | O_DIRECTORY;
-    int dirfd = open(DIRPATH, flags);
+    const char *DIRPATH            = std::getenv("PWD");
+    int flags                      = O_RDONLY | O_DIRECTORY;
+    int dirfd                      = open(DIRPATH, flags);
     REQUIRE(dirfd != -1);
     REQUIRE(mkdirat(dirfd, PATHNAME, S_IRWXU) != -1);
     int fd = openat(dirfd, PATHNAME, flags, S_IRUSR | S_IWUSR);

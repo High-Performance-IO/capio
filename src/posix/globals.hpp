@@ -19,8 +19,8 @@
 const std::string *current_dir = nullptr;
 
 CPFileDescriptors_t *capio_files_descriptors = nullptr;
-CPFilesPaths_t *capio_files_paths = nullptr;
-CPFiles_t *files = nullptr;
+CPFilesPaths_t *capio_files_paths            = nullptr;
+CPFiles_t *files                             = nullptr;
 
 CPThreadDataBufs_t *threads_data_bufs = nullptr;
 
@@ -31,8 +31,8 @@ void mtrace_init(long tid) {
 
     if (capio_files_descriptors == nullptr) {
         capio_files_descriptors = new CPFileDescriptors_t();
-        capio_files_paths = new CPFilesPaths_t();
-        files = new CPFiles_t();
+        capio_files_paths       = new CPFilesPaths_t();
+        files                   = new CPFiles_t();
 
         int *fd_shm = get_fd_snapshot(tid);
         if (fd_shm != nullptr) {
@@ -52,7 +52,7 @@ void mtrace_init(long tid) {
     register_listener(tid);
 
     const char *capio_app_name = get_capio_app_name();
-    long pid = syscall_no_intercept(SYS_getpid);
+    long pid                   = syscall_no_intercept(SYS_getpid);
     if (capio_app_name == nullptr) {
         handshake_anonymous_request(tid, pid);
     } else {

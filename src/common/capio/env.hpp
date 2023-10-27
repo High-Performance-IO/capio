@@ -17,7 +17,7 @@ const std::string *get_capio_dir() {
 
     if (capio_dir == nullptr) {
         const char *val = std::getenv("CAPIO_DIR");
-        auto buf = std::unique_ptr<char[]>(new char[PATH_MAX]);
+        auto buf        = std::unique_ptr<char[]>(new char[PATH_MAX]);
         if (val == nullptr) {
             int res = capio_syscall(SYS_getcwd, buf.get(), PATH_MAX);
             if (res == -1) {

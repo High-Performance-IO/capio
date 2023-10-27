@@ -39,8 +39,8 @@ inline int capio_fcntl(int fd, int cmd, int arg, long tid) {
             int res = fcntl(dev_fd, F_DUPFD_CLOEXEC, arg); //
             close(dev_fd);
 
-            (*files)[res] = (*files)[fd];
-            std::get<3>((*files)[res]) = FD_CLOEXEC;
+            (*files)[res]                   = (*files)[fd];
+            std::get<3>((*files)[res])      = FD_CLOEXEC;
             (*capio_files_descriptors)[res] = (*capio_files_descriptors)[fd];
             dup_request(fd, res, tid);
 
@@ -56,7 +56,7 @@ inline int capio_fcntl(int fd, int cmd, int arg, long tid) {
 }
 
 int fcntl_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg5, long *result) {
-    auto fd = static_cast<int>(arg0);
+    auto fd  = static_cast<int>(arg0);
     auto cmd = static_cast<int>(arg1);
     auto arg = static_cast<int>(arg2);
     long tid = syscall_no_intercept(SYS_gettid);

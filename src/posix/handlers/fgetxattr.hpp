@@ -23,8 +23,8 @@ int fgetxattr_handler(long arg0, long arg1, long arg2, long arg3, long arg4, lon
                       long *result) {
     std::string name(reinterpret_cast<const char *>(arg1));
     auto *value = reinterpret_cast<void *>(arg2);
-    auto size = static_cast<size_t>(arg3);
-    long tid = syscall_no_intercept(SYS_gettid);
+    auto size   = static_cast<size_t>(arg3);
+    long tid    = syscall_no_intercept(SYS_gettid);
     START_LOG(tid, "call(name=%s, value=0x%08x, size=%ld)", name.c_str(), value, size);
 
     int res = capio_fgetxattr(static_cast<int>(arg0), name, value, size, tid);
