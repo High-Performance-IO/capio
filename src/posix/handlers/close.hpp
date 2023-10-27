@@ -19,7 +19,7 @@ inline int capio_close(int fd, long tid) {
 }
 
 int close_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg5, long *result) {
-    int fd = static_cast<int>(arg0);
+    int fd   = static_cast<int>(arg0);
     long tid = syscall_no_intercept(SYS_gettid);
     START_LOG(tid, "call(fd=%d)", fd);
 

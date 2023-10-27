@@ -15,7 +15,7 @@ void close_all_files(int tid, int rank) {
 inline void handle_exit_group(int tid, int rank) {
     START_LOG(gettid(), "call(tid=%d, rank=%d)", tid, rank);
 
-    int pid = pids[tid];
+    int pid    = pids[tid];
     auto files = writers[pid];
     for (auto &pair : files) {
         std::string path = pair.first;
@@ -40,13 +40,13 @@ inline void handle_exit_group(int tid, int rank) {
             auto it = pending_reads.find(path);
             if (it != pending_reads.end()) {
                 auto &pending_reads_this_file = it->second;
-                auto it_vec = pending_reads_this_file.begin();
+                auto it_vec                   = pending_reads_this_file.begin();
                 while (it_vec != pending_reads_this_file.end()) {
-                    auto tuple = *it_vec;
-                    int pending_tid = std::get<0>(tuple);
-                    int fd = std::get<1>(tuple);
+                    auto tuple            = *it_vec;
+                    int pending_tid       = std::get<0>(tuple);
+                    int fd                = std::get<1>(tuple);
                     size_t process_offset = *std::get<1>(processes_files[pending_tid][fd]);
-                    size_t count = std::get<2>(tuple);
+                    size_t count          = std::get<2>(tuple);
 
                     handle_pending_read(pending_tid, fd, process_offset, count, std::get<3>(tuple));
                     it_vec = pending_reads_this_file.erase(it_vec);

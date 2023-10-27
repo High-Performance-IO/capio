@@ -52,17 +52,17 @@ template <class T> class Circular_buffer {
                   "sem_timeout=%d, sem_retries=%d)",
                   shm_name.c_str(), _max_num_elems, elem_size, sem_timeout, sem_retries);
 
-        _sem_retries = sem_retries;
+        _sem_retries               = sem_retries;
         sem_timeout_struct.tv_nsec = sem_timeout;
-        sem_timeout_struct.tv_sec = 1;
-        _buff_size = _max_num_elems * _elem_size;
+        sem_timeout_struct.tv_sec  = 1;
+        _buff_size                 = _max_num_elems * _elem_size;
         _first_elem = (long int *)create_shm("_first_elem" + shm_name, sizeof(long int));
-        _last_elem = (long int *)create_shm("_last_elem" + shm_name, sizeof(long int));
-        _shm = get_shm_if_exist(_shm_name);
+        _last_elem  = (long int *)create_shm("_last_elem" + shm_name, sizeof(long int));
+        _shm        = get_shm_if_exist(_shm_name);
         if (_shm == nullptr) {
             *_first_elem = 0;
-            *_last_elem = 0;
-            _shm = create_shm(shm_name, _buff_size);
+            *_last_elem  = 0;
+            _shm         = create_shm(shm_name, _buff_size);
         }
 
         _mutex = sem_open(("_mutex" + _shm_name).c_str(), O_CREAT | O_RDWR, S_IRUSR | S_IWUSR,

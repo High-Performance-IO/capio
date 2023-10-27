@@ -16,8 +16,8 @@ CPBufResponse_t *bufs_response;
  */
 inline void init_client() {
     // TODO: replace number with constexpr
-    buf_requests = new CPBufRequest_t("circular_buffer", 1024 * 1024, CAPIO_REQUEST_MAX_SIZE,
-                                      CAPIO_SEM_TIMEOUT_NANOSEC, CAPIO_SEM_RETRIES);
+    buf_requests  = new CPBufRequest_t("circular_buffer", 1024 * 1024, CAPIO_REQUEST_MAX_SIZE,
+                                       CAPIO_SEM_TIMEOUT_NANOSEC, CAPIO_SEM_RETRIES);
     bufs_response = new CPBufResponse_t();
 }
 
@@ -244,7 +244,7 @@ inline void write_request(CPFiles_t *const files, const int fd, const off64_t co
                           const long tid) {
     char req[CAPIO_REQUEST_MAX_SIZE];
     int num_writes_batch = get_num_writes_batch(tid);
-    long int old_offset = *std::get<0>((*files)[fd]);
+    long int old_offset  = *std::get<0>((*files)[fd]);
     *std::get<0>((*files)[fd]) += count;
     // FIXME: works only if there is only one writer at time for each file
     if (actual_num_writes == num_writes_batch) {

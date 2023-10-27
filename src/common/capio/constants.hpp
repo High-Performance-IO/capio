@@ -36,14 +36,14 @@ constexpr int CAPIO_REQUEST_MAX_SIZE = 256 * sizeof(char);
 
 constexpr int CAPIO_LOG_MAX_MSG_LEN = 2048;
 
-constexpr int CAPIO_SEM_RETRIES = 100;
+constexpr int CAPIO_SEM_RETRIES              = 100;
 constexpr long int CAPIO_SEM_TIMEOUT_NANOSEC = 10e5;
 
 constexpr char CAPIO_SERVER_DEFAULT_LOG_FILE_NAME[] = "server_rank_\0";
 
-constexpr char CAPIO_SERVER_CLI_LOG_SERVER[] = "[ \033[1;32m SERVER \033[0m ] ";
+constexpr char CAPIO_SERVER_CLI_LOG_SERVER[]         = "[ \033[1;32m SERVER \033[0m ] ";
 constexpr char CAPIO_SERVER_CLI_LOG_SERVER_WARNING[] = "[ \033[1;33m SERVER \033[0m ] ";
-constexpr char CAPIO_SERVER_CLI_LOG_SERVER_ERROR[] = "[ \033[1;31m SERVER \033[0m ] ";
+constexpr char CAPIO_SERVER_CLI_LOG_SERVER_ERROR[]   = "[ \033[1;31m SERVER \033[0m ] ";
 
 constexpr char CAPIO_BANNER[] =
     "\n\n "

@@ -27,13 +27,13 @@ class Capio_file {
     std::string_view _committed;
     bool _directory;
     // _fd is useful only when the file is memory-mapped
-    int _fd = -1;
+    int _fd         = -1;
     bool _home_node = false;
     std::string_view _mode;
-    int _n_links = 1;
-    long int _n_close = 0;
+    int _n_links               = 1;
+    long int _n_close          = 0;
     long int _n_close_expected = -1;
-    int _n_opens = 0;
+    int _n_opens               = 0;
     bool _permanent;
     // _sectors stored in memory of the files (only the home node is forced to
     // be up to date)
@@ -42,9 +42,9 @@ class Capio_file {
     std::vector<std::pair<int, int>> _threads_fd;
 
   public:
-    bool complete = false;
-    bool first_write = true;
-    long int n_files = 0;           // useful for directories
+    bool complete             = false;
+    bool first_write          = true;
+    long int n_files          = 0;  // useful for directories
     long int n_files_expected = -1; // useful for directories
     /*
      * file size in the home node. In a given moment could not be up to date.
@@ -145,14 +145,14 @@ class Capio_file {
 
     char *expand_buffer(std::size_t data_size) { // TODO: use realloc
         size_t double_size = _buf_size * 2;
-        size_t new_size = data_size > double_size ? data_size : double_size;
-        char *new_buf = new char[new_size];
+        size_t new_size    = data_size > double_size ? data_size : double_size;
+        char *new_buf      = new char[new_size];
         //	memcpy(new_p, old_p, file_shm_size); //TODO memcpy only the
         // sector
         // stored in Capio_file
         memcpy_capio_file(new_buf, _buf);
         delete[] _buf;
-        _buf = new_buf;
+        _buf      = new_buf;
         _buf_size = new_size;
         return new_buf;
     }
@@ -181,7 +181,7 @@ class Capio_file {
      */
     [[nodiscard]] off64_t get_sector_end(off64_t offset) const {
         off64_t sector_end = -1;
-        auto it = _sectors.upper_bound(std::make_pair(offset, 0));
+        auto it            = _sectors.upper_bound(std::make_pair(offset, 0));
 
         if (!_sectors.empty() && it != _sectors.begin()) {
             --it;
@@ -227,7 +227,7 @@ class Capio_file {
             if (new_end < it_lbound->first) {
                 _sectors.insert(p);
             } else {
-                auto it = it_lbound;
+                auto it         = it_lbound;
                 bool end_before = false;
                 bool end_inside = false;
                 while (it != _sectors.end() && !end_before && !end_inside) {
@@ -287,8 +287,8 @@ class Capio_file {
 
     void memcpy_capio_file(char *new_p, char *old_p) const {
         for (auto &sector : _sectors) {
-            off64_t lbound = sector.first;
-            off64_t ubound = sector.second;
+            off64_t lbound        = sector.first;
+            off64_t ubound        = sector.second;
             off64_t sector_length = ubound - lbound;
             memcpy(new_p + lbound, old_p + lbound, sector_length);
         }

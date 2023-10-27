@@ -21,12 +21,12 @@ int sum_all(int *data, long int num_elements, long int num_reads, long int num_f
 }
 
 using cclock = std::chrono::system_clock;
-using sec = std::chrono::duration<double>;
+using sec    = std::chrono::duration<double>;
 
 void read_from_file(int *data, long int num_elements, long int num_reads, int rank,
                     long int index) {
     std::string file_name = "file_" + std::to_string(rank) + "_" + std::to_string(index) + ".txt";
-    FILE *fp = fopen(file_name.c_str(), "r");
+    FILE *fp              = fopen(file_name.c_str(), "r");
     if (fp == NULL) {
         std::cerr << "error impossible open file " << file_name << std::endl;
         MPI_Finalize();
@@ -85,9 +85,9 @@ int main(int argc, char **argv) {
         return 0;
     }
     num_elements = std::atol(argv[1]);
-    num_reads = std::atol(argv[2]);
-    num_files = std::atol(argv[3]);
-    time_file = argv[4];
+    num_reads    = std::atol(argv[2]);
+    num_files    = std::atol(argv[3]);
+    time_file    = argv[4];
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
     int *data = new int[num_elements * num_reads * num_files];
     read_from_files(data, num_elements, num_reads, num_files, rank, time_file);

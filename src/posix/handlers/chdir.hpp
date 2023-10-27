@@ -11,7 +11,7 @@
  */
 
 inline int capio_chdir(const std::string *path, long tid) {
-    const std::string *capio_dir = get_capio_dir();
+    const std::string *capio_dir     = get_capio_dir();
     const std::string *path_to_check = path;
     START_LOG(tid, "call(path=%s)", path);
 

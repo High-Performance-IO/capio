@@ -87,7 +87,7 @@ void read_from_disk(int fd, int offset, void *buffer, size_t count,
     if (it == capio_files_descriptors->end()) {
         std::cerr << "src error in write to disk: file descriptor does not exist" << std::endl;
     }
-    std::string path = it->second;
+    std::string path  = it->second;
     int filesystem_fd = open(path.c_str(),
                              O_RDONLY); // TODO: maybe not efficient open in each read
     if (filesystem_fd == -1) {
@@ -124,10 +124,10 @@ void write_to_disk(const int fd, const int offset, const void *buffer, const siz
     if (it == capio_files_descriptors->end()) {
         std::cerr << "src error in write to disk: file descriptor does not exist" << std::endl;
     }
-    std::string path = it->second;
+    std::string path  = it->second;
     int filesystem_fd = open(path.c_str(),
                              O_WRONLY); // TODO: maybe not efficient open in each write and
-                                        // why O_APPEND (without lseek) does not work?
+    // why O_APPEND (without lseek) does not work?
     if (filesystem_fd == -1) {
         ERR_EXIT("src client error: impossible write to disk src file %d", fd);
     }

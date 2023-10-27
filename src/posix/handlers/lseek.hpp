@@ -10,7 +10,7 @@ inline off64_t capio_lseek(int fd, off64_t offset, int whence, long tid) {
     auto it = files->find(fd);
     if (it != files->end()) {
         std::tuple<off64_t *, off64_t *, int, int> *t = &(*files)[fd];
-        off64_t *file_offset = std::get<0>(*t);
+        off64_t *file_offset                          = std::get<0>(*t);
         if (whence == SEEK_SET) {
             if (offset >= 0) {
                 *file_offset = offset;
@@ -34,7 +34,7 @@ inline off64_t capio_lseek(int fd, off64_t offset, int whence, long tid) {
             }
         } else if (whence == SEEK_END) {
             off64_t file_size = seek_end_request(fd, tid);
-            *file_offset = file_size + offset;
+            *file_offset      = file_size + offset;
 
             return *file_offset;
         } else if (whence == SEEK_DATA) {
@@ -55,10 +55,10 @@ inline off64_t capio_lseek(int fd, off64_t offset, int whence, long tid) {
 }
 
 int lseek_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg5, long *result) {
-    int fd = static_cast<int>(arg0);
+    int fd      = static_cast<int>(arg0);
     auto offset = static_cast<off64_t>(arg1);
-    int whence = static_cast<int>(arg2);
-    long tid = syscall_no_intercept(SYS_gettid);
+    int whence  = static_cast<int>(arg2);
+    long tid    = syscall_no_intercept(SYS_gettid);
     START_LOG(tid, "call(fd=%d, offset=%ld, whence=%d)", fd, offset, whence);
 
     off64_t res = capio_lseek(fd, offset, whence, tid);

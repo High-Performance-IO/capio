@@ -73,14 +73,14 @@ void write_entry_dir(int tid, const std::string &file_path, const std::string &d
 
     strcpy(ld.d_name, file_name.c_str());
     long int ld_size = THEORETICAL_SIZE_DIRENT64;
-    ld.d_reclen = ld_size;
+    ld.d_reclen      = ld_size;
 
-    Capio_file &c_file = init_capio_file(dir.c_str(), true);
-    void *file_shm = c_file.get_buffer();
-    off64_t file_size = c_file.get_stored_size();
-    off64_t data_size = file_size + ld_size; // TODO: check theoreitcal size and sizeof(ld) usage
+    Capio_file &c_file   = init_capio_file(dir.c_str(), true);
+    void *file_shm       = c_file.get_buffer();
+    off64_t file_size    = c_file.get_stored_size();
+    off64_t data_size    = file_size + ld_size; // TODO: check theoreitcal size and sizeof(ld) usage
     size_t file_shm_size = c_file.get_buf_size();
-    ld.d_off = data_size;
+    ld.d_off             = data_size;
 
     if (data_size > file_shm_size) {
         file_shm = expand_memory_for_file(dir, data_size, c_file);
@@ -96,7 +96,7 @@ void write_entry_dir(int tid, const std::string &file_path, const std::string &d
 
     c_file.insert_sector(base_offset, data_size);
     ++c_file.n_files;
-    int pid = pids[tid];
+    int pid           = pids[tid];
     writers[pid][dir] = true;
 
     if (c_file.n_files == c_file.n_files_expected) {
@@ -112,7 +112,7 @@ void write_entry_dir(int tid, const std::string &file_path, const std::string &d
 
 void update_dir(int tid, const std::string &file_path, int rank) {
     START_LOG(tid, "call(file_path=%s, rank=%d)", file_path.c_str(), rank);
-    std::string dir = get_parent_dir_path(file_path);
+    std::string dir    = get_parent_dir_path(file_path);
     Capio_file &c_file = get_capio_file(dir.c_str());
     if (c_file.first_write) {
         c_file.first_write = false;

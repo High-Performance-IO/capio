@@ -8,7 +8,7 @@ inline void handle_close(int tid, int fd, int rank) {
 
     std::string_view path = get_capio_file_path(tid, fd);
     if (path.empty()) { // avoid to try to close a file that does not exists
-                        // (example: try to close() on a dir
+        // (example: try to close() on a dir
         return;
     }
 
@@ -16,16 +16,16 @@ inline void handle_close(int tid, int fd, int rank) {
     c_file.close();
     if (c_file.get_committed() == "on_close" && c_file.is_closed()) {
         c_file.complete = true;
-        auto it = pending_reads.find(path.data());
+        auto it         = pending_reads.find(path.data());
         if (it != pending_reads.end()) {
             auto &pending_reads_this_file = it->second;
-            auto it_vec = pending_reads_this_file.begin();
+            auto it_vec                   = pending_reads_this_file.begin();
             while (it_vec != pending_reads_this_file.end()) {
-                auto tuple = *it_vec;
-                int pending_tid = std::get<0>(tuple);
-                int fd = std::get<1>(tuple);
+                auto tuple            = *it_vec;
+                int pending_tid       = std::get<0>(tuple);
+                int fd                = std::get<1>(tuple);
                 size_t process_offset = *std::get<1>(processes_files[pending_tid][fd]);
-                size_t count = std::get<2>(tuple);
+                size_t count          = std::get<2>(tuple);
 
                 bool is_getdents = std::get<3>(tuple);
                 handle_pending_read(pending_tid, fd, process_offset, count, is_getdents);

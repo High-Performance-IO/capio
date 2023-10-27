@@ -54,7 +54,7 @@ void test_one_to_one_str(const std::string &buff_name, long int buff_size, long 
     char c_str[6];
     std::string str;
     for (long int i = 0; i < num_elems; ++i) {
-        str = "ciao" + std::to_string(i % 10);
+        str                      = "ciao" + std::to_string(i % 10);
         const char *expected_str = str.c_str();
         c_buff.read(c_str);
         assert(strcmp(c_str, expected_str) == 0);

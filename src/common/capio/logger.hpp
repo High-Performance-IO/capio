@@ -13,7 +13,7 @@
 #include "syscall.hpp"
 
 #ifndef __CAPIO_POSIX // fix for older version of gcc found on galileo100 and
-                      // leonardo
+// leonardo
 #if __GLIBC__ == 2 && __GLIBC_MINOR__ < 30
 #include <sys/syscall.h>
 #define gettid() syscall(SYS_gettid)
@@ -26,7 +26,7 @@ std::ofstream logfile; // if building for server, self contained logfile
 thread_local int current_log_level = 0;
 
 #ifndef CAPIO_MAX_LOG_LEVEL // capio max log level. defaults to -1, where
-                            // everythong is logged
+// everythong is logged
 #define CAPIO_MAX_LOG_LEVEL -1
 #endif
 

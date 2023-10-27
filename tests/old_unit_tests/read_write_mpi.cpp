@@ -6,7 +6,7 @@
 #include <mpi.h>
 
 using cclock = std::chrono::system_clock;
-using sec = std::chrono::duration<double>;
+using sec    = std::chrono::duration<double>;
 
 void writer(int rank, int *array, long int num_writes, std::size_t num_elements, int receiver) {
     std::ofstream file;
@@ -113,8 +113,8 @@ int main(int argc, char **argv) {
         return 0;
     }
     num_elements = std::atol(argv[1]);
-    num_io_ops = std::atol(argv[2]);
-    int *data = new int[num_elements * num_io_ops];
+    num_io_ops   = std::atol(argv[2]);
+    int *data    = new int[num_elements * num_io_ops];
     if (rank < size / 2) {
         initialize_data(data, num_elements, num_io_ops, rank);
         writer(rank, data, num_io_ops, num_elements, size / 2 + rank);

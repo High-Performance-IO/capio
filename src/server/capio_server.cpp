@@ -99,31 +99,31 @@ sem_t clients_remote_pending_nfiles_sem;
 static constexpr std::array<CSHandler_t, CAPIO_NR_REQUESTS> build_request_handlers_table() {
     std::array<CSHandler_t, CAPIO_NR_REQUESTS> _request_handlers{0};
 
-    _request_handlers[CAPIO_REQUEST_ACCESS] = access_handler;
-    _request_handlers[CAPIO_REQUEST_CLONE] = clone_handler;
-    _request_handlers[CAPIO_REQUEST_CLOSE] = close_handler;
-    _request_handlers[CAPIO_REQUEST_CREATE] = create_handler;
-    _request_handlers[CAPIO_REQUEST_CREATE_EXCLUSIVE] = create_exclusive_handler;
-    _request_handlers[CAPIO_REQUEST_DUP] = dup_handler;
-    _request_handlers[CAPIO_REQUEST_EXIT_GROUP] = exit_group_handler;
-    _request_handlers[CAPIO_REQUEST_FSTAT] = fstat_handler;
-    _request_handlers[CAPIO_REQUEST_GETDENTS] = getdents_handler;
-    _request_handlers[CAPIO_REQUEST_GETDENTS64] = getdents64_handler;
-    _request_handlers[CAPIO_REQUEST_HANDSHAKE_NAMED] = handshake_named_handler;
+    _request_handlers[CAPIO_REQUEST_ACCESS]              = access_handler;
+    _request_handlers[CAPIO_REQUEST_CLONE]               = clone_handler;
+    _request_handlers[CAPIO_REQUEST_CLOSE]               = close_handler;
+    _request_handlers[CAPIO_REQUEST_CREATE]              = create_handler;
+    _request_handlers[CAPIO_REQUEST_CREATE_EXCLUSIVE]    = create_exclusive_handler;
+    _request_handlers[CAPIO_REQUEST_DUP]                 = dup_handler;
+    _request_handlers[CAPIO_REQUEST_EXIT_GROUP]          = exit_group_handler;
+    _request_handlers[CAPIO_REQUEST_FSTAT]               = fstat_handler;
+    _request_handlers[CAPIO_REQUEST_GETDENTS]            = getdents_handler;
+    _request_handlers[CAPIO_REQUEST_GETDENTS64]          = getdents64_handler;
+    _request_handlers[CAPIO_REQUEST_HANDSHAKE_NAMED]     = handshake_named_handler;
     _request_handlers[CAPIO_REQUEST_HANDSHAKE_ANONYMOUS] = handshake_anonymous_handler;
-    _request_handlers[CAPIO_REQUEST_MKDIR] = mkdir_handler;
-    _request_handlers[CAPIO_REQUEST_OPEN] = open_handler;
-    _request_handlers[CAPIO_REQUEST_READ] = read_handler;
-    _request_handlers[CAPIO_REQUEST_RENAME] = rename_handler;
-    _request_handlers[CAPIO_REQUEST_RMDIR] = rmdir_handler;
-    _request_handlers[CAPIO_REQUEST_SEEK] = lseek_handler;
-    _request_handlers[CAPIO_REQUEST_SEEK_DATA] = seek_data_handler;
-    _request_handlers[CAPIO_REQUEST_SEEK_END] = seek_end_handler;
-    _request_handlers[CAPIO_REQUEST_SEEK_HOLE] = seek_hole_handler;
-    _request_handlers[CAPIO_REQUEST_STAT] = stat_handler;
-    _request_handlers[CAPIO_REQUEST_STAT_REPLY] = stat_reply_handler;
-    _request_handlers[CAPIO_REQUEST_UNLINK] = unlink_handler;
-    _request_handlers[CAPIO_REQUEST_WRITE] = write_handler;
+    _request_handlers[CAPIO_REQUEST_MKDIR]               = mkdir_handler;
+    _request_handlers[CAPIO_REQUEST_OPEN]                = open_handler;
+    _request_handlers[CAPIO_REQUEST_READ]                = read_handler;
+    _request_handlers[CAPIO_REQUEST_RENAME]              = rename_handler;
+    _request_handlers[CAPIO_REQUEST_RMDIR]               = rmdir_handler;
+    _request_handlers[CAPIO_REQUEST_SEEK]                = lseek_handler;
+    _request_handlers[CAPIO_REQUEST_SEEK_DATA]           = seek_data_handler;
+    _request_handlers[CAPIO_REQUEST_SEEK_END]            = seek_end_handler;
+    _request_handlers[CAPIO_REQUEST_SEEK_HOLE]           = seek_hole_handler;
+    _request_handlers[CAPIO_REQUEST_STAT]                = stat_handler;
+    _request_handlers[CAPIO_REQUEST_STAT_REPLY]          = stat_reply_handler;
+    _request_handlers[CAPIO_REQUEST_UNLINK]              = unlink_handler;
+    _request_handlers[CAPIO_REQUEST_WRITE]               = write_handler;
 
     return _request_handlers;
 }
@@ -147,7 +147,7 @@ void handshake_servers(int rank) {
             MPI_Recv(buf, MPI_MAX_PROCESSOR_NAME, MPI_CHAR, i, 0, MPI_COMM_WORLD,
                      MPI_STATUS_IGNORE);
             nodes_helper_rank[buf] = i;
-            rank_to_node[i] = buf;
+            rank_to_node[i]        = buf;
         }
     }
     free(buf);
@@ -163,11 +163,11 @@ void capio_server(int rank) {
     setup_signal_handlers();
     handshake_servers(rank);
     open_files_location(rank);
-    int pid = getpid();
+    int pid                      = getpid();
     const std::string *capio_dir = get_capio_dir();
     create_dir(pid, capio_dir->c_str(), rank,
                true); // TODO: can be a problem if a process execute readdir
-                      // on capio_dir
+    // on capio_dir
 
     init_server();
 
@@ -215,8 +215,8 @@ inline void serve_remote_read(const char *path_c, int dest, long int offset, lon
     // Send all the rest of the file not only the number of bytes requested
     // Useful for caching
     Capio_file &c_file = get_capio_file(path_c);
-    size_t file_size = c_file.get_stored_size();
-    nbytes = file_size - offset;
+    size_t file_size   = c_file.get_stored_size();
+    nbytes             = file_size - offset;
 
     off64_t prefetch_data_size = get_prefetch_data_size();
 
@@ -224,23 +224,23 @@ inline void serve_remote_read(const char *path_c, int dest, long int offset, lon
         nbytes = prefetch_data_size;
     }
 
-    std::string nbytes_str = std::to_string(nbytes);
-    const char *nbytes_cstr = nbytes_str.c_str();
-    std::string offset_str = std::to_string(offset);
-    const char *offset_cstr = offset_str.c_str();
-    std::string complete_str = std::to_string(complete);
-    const char *complete_cstr = complete_str.c_str();
-    std::string file_size_str = std::to_string(file_size);
+    std::string nbytes_str     = std::to_string(nbytes);
+    const char *nbytes_cstr    = nbytes_str.c_str();
+    std::string offset_str     = std::to_string(offset);
+    const char *offset_cstr    = offset_str.c_str();
+    std::string complete_str   = std::to_string(complete);
+    const char *complete_cstr  = complete_str.c_str();
+    std::string file_size_str  = std::to_string(file_size);
     const char *file_size_cstr = file_size_str.c_str();
-    const char *s1 = "sending";
-    const size_t len1 = strlen(s1);
-    const size_t len2 = strlen(path_c);
-    const size_t len3 = strlen(offset_cstr);
-    const size_t len4 = strlen(nbytes_cstr);
-    const size_t len5 = strlen(complete_cstr);
-    const size_t len6 = strlen(file_size_cstr);
-    buf_send = (char *)malloc((len1 + len2 + len3 + len4 + len5 + len6 + 6) *
-                              sizeof(char)); // TODO:add malloc check
+    const char *s1             = "sending";
+    const size_t len1          = strlen(s1);
+    const size_t len2          = strlen(path_c);
+    const size_t len3          = strlen(offset_cstr);
+    const size_t len4          = strlen(nbytes_cstr);
+    const size_t len5          = strlen(complete_cstr);
+    const size_t len6          = strlen(file_size_cstr);
+    buf_send                   = (char *)malloc((len1 + len2 + len3 + len4 + len5 + len6 + 6) *
+                                                sizeof(char)); // TODO:add malloc check
     sprintf(buf_send, "%s %s %s %s %s %s", s1, path_c, offset_cstr, nbytes_cstr, complete_cstr,
             file_size_cstr);
 
@@ -263,7 +263,7 @@ void wait_for_data(char *const path, off64_t offset, int dest, off64_t nbytes, s
     }
 
     Capio_file &c_file = get_capio_file(path);
-    bool complete = c_file.complete;
+    bool complete      = c_file.complete;
     serve_remote_read(path, dest, offset, nbytes, complete);
     free(path);
     free(sem);
@@ -294,7 +294,7 @@ void send_n_files(const std::string &prefix, std::vector<std::string> *files_to_
     START_LOG(gettid(), "call(prefix=%s, files_to_send=%ld, n_files=%d, dest=%d)", prefix.c_str(),
               files_to_send, n_files, dest);
 
-    std::string msg = "nsend " + prefix;
+    std::string msg      = "nsend " + prefix;
     size_t prefix_length = prefix.length();
     for (const std::string &path : *files_to_send) {
         Capio_file &c_file = get_capio_file(path.c_str());
@@ -330,9 +330,9 @@ std::vector<std::string> *files_avaiable(const std::string &prefix, const std::s
     START_LOG(gettid(), "call(prefix=%s, app=%s, path_file=%s, n_files=%d)", prefix.c_str(),
               app.c_str(), path_file.c_str(), n_files);
 
-    int n_files_completed = 0;
-    size_t prefix_length = prefix.length();
-    auto *files_to_send = new std::vector<std::string>;
+    int n_files_completed                  = 0;
+    size_t prefix_length                   = prefix.length();
+    auto *files_to_send                    = new std::vector<std::string>;
     std::unordered_set<std::string> &files = files_sent[app];
 
     auto capio_file_opt = get_capio_file_opt(path_file.c_str());
@@ -364,9 +364,9 @@ std::vector<std::string> *files_avaiable(const std::string &prefix, const std::s
 
 void helper_nreads_req(char *buf_recv, int dest) {
     START_LOG(gettid(), "call(%ld, %d)", buf_recv, dest);
-    char *prefix = (char *)malloc(sizeof(char) * PATH_MAX);
+    char *prefix    = (char *)malloc(sizeof(char) * PATH_MAX);
     char *path_file = (char *)malloc(sizeof(char) * PATH_MAX);
-    char *app_name = (char *)malloc(sizeof(char) * 512);
+    char *app_name  = (char *)malloc(sizeof(char) * 512);
     std::size_t n_files;
     sscanf(buf_recv, "nrea %zu %s %s %s", &n_files, app_name, prefix, path_file);
     n_files = find_batch_size(prefix);
@@ -419,7 +419,7 @@ void lightweight_MPI_Recv(char *buf_recv, int buf_size, MPI_Status *status) {
               &request); // receive from server
     struct timespec sleepTime;
     struct timespec returnTime;
-    sleepTime.tv_sec = 0;
+    sleepTime.tv_sec  = 0;
     sleepTime.tv_nsec = 200000;
 
     while (!received) {
@@ -528,31 +528,31 @@ void recv_nfiles(char *buf_recv, int source) {
         void *p_shm;
         auto c_file_opt = get_capio_file_opt(path.c_str());
         if (c_file_opt) {
-            Capio_file &c_file = init_capio_file(path.c_str(), false);
-            p_shm = c_file.get_buffer();
+            Capio_file &c_file   = init_capio_file(path.c_str(), false);
+            p_shm                = c_file.get_buffer();
             size_t file_shm_size = c_file.get_buf_size();
             if (file_size > file_shm_size) {
                 p_shm = expand_memory_for_file(path, file_size, c_file);
             }
             c_file.first_write = false;
         } else {
-            std::string node_name = rank_to_node[source];
+            std::string node_name     = rank_to_node[source];
             const char *node_name_str = node_name.c_str();
-            char *p_node_name = (char *)malloc(sizeof(char) * (strlen(node_name_str) + 1));
+            char *p_node_name         = (char *)malloc(sizeof(char) * (strlen(node_name_str) + 1));
             strcpy(p_node_name, node_name_str);
             add_file_location(path, p_node_name, -1);
-            p_shm = new char[file_size];
+            p_shm              = new char[file_size];
             Capio_file &c_file = create_capio_file(path, false, file_size);
             c_file.insert_sector(0, file_size);
-            c_file.complete = true;
+            c_file.complete       = true;
             c_file.real_file_size = file_size;
-            c_file.first_write = false;
+            c_file.first_write    = false;
         }
         recv_file((char *)p_shm, source, file_size);
     }
 
     for (const auto &pair : files) {
-        std::string file_path = pair.first;
+        std::string file_path      = pair.first;
         std::string bytes_received = pair.second;
         solve_remote_reads(std::stol(bytes_received), 0, std::stol(bytes_received),
                            file_path.c_str(), true);
@@ -563,7 +563,7 @@ void capio_helper() {
     START_LOG(gettid(), "call()");
 
     size_t buf_size = sizeof(char) * (PATH_MAX + 81920);
-    char *buf_recv = (char *)malloc(buf_size);
+    char *buf_recv  = (char *)malloc(buf_size);
     if (buf_recv == nullptr) {
         ERR_EXIT("malloc 1 in capio_helper");
     }
@@ -578,7 +578,7 @@ void capio_helper() {
                              &status); // receive from server
 #endif
 
-        int source = status.MPI_SOURCE;
+        int source                  = status.MPI_SOURCE;
         bool remote_request_to_read = strncmp(buf_recv, "read", 4) == 0;
         if (remote_request_to_read) {
             // schema msg received: "read path dest offset nbytes"
@@ -591,9 +591,9 @@ void capio_helper() {
             sscanf(buf_recv, "read %s %d %ld %ld", path_c, &dest, &offset, &nbytes);
 
             // check if the data is avaiable
-            Capio_file &c_file = get_capio_file(path_c);
-            size_t file_size = c_file.get_stored_size();
-            bool complete = c_file.complete;
+            Capio_file &c_file  = get_capio_file(path_c);
+            size_t file_size    = c_file.get_stored_size();
+            bool complete       = c_file.complete;
             bool data_available = (offset + nbytes <= file_size);
             if (complete || (c_file.get_mode() == CAPIO_FILE_MODE_NOUPDATE && data_available)) {
                 serve_remote_read(path_c, dest, offset, nbytes, complete);
@@ -625,7 +625,7 @@ void capio_helper() {
             Capio_file &c_file = init_capio_file(path.c_str(), file_shm);
             if (bytes_received != 0) {
                 off64_t file_shm_size = c_file.get_buf_size();
-                off64_t file_size = offset + bytes_received;
+                off64_t file_size     = offset + bytes_received;
                 if (file_size > file_shm_size) {
                     file_shm = expand_memory_for_file(path, file_size, c_file);
                 }
@@ -684,7 +684,7 @@ int parseCLI(int argc, char **argv, int rank) {
         std::string token = args::get(logfile_src);
         if (token.find(".log") != std::string::npos) {
             token.erase(token.length() - 4); // delete .log if for some reason
-                                             // is given as parameter
+            // is given as parameter
         }
 
         std::string filename = token + "_" + std::to_string(rank) + ".log";
@@ -702,7 +702,7 @@ int parseCLI(int argc, char **argv, int rank) {
     }
 
     if (config) {
-        std::string token = args::get(config);
+        std::string token            = args::get(config);
         const std::string *capio_dir = get_capio_dir();
         std::cout << CAPIO_SERVER_CLI_LOG_SERVER << "parsing config file: " << token << std::endl;
         parse_conf_file(token, capio_dir);

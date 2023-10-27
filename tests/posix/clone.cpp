@@ -23,7 +23,7 @@ int write_file(FILE *fp) {
 
 TEST_CASE("Test thread clone", "[posix]") {
     int *num = static_cast<int *>(malloc(sizeof(int)));
-    *num = 12345;
+    *num     = 12345;
     std::thread t(func, num);
     t.join();
     free(num);

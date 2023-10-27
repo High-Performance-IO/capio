@@ -15,14 +15,14 @@ CSMetadataConfGlobs_t metadata_conf_globs;
 long int match_globs(const std::string &path) {
     START_LOG(gettid(), "call(path=%s)", path.c_str());
 
-    long int res = -1;
-    size_t i = 0;
+    long int res             = -1;
+    size_t i                 = 0;
     size_t max_length_prefix = 0;
     while (i < metadata_conf_globs.size()) {
         std::string prefix_str = std::get<0>(metadata_conf_globs[i]);
-        size_t prefix_length = prefix_str.length();
+        size_t prefix_length   = prefix_str.length();
         if (path.compare(0, prefix_length, prefix_str) == 0 && prefix_length > max_length_prefix) {
-            res = i;
+            res               = i;
             max_length_prefix = prefix_length;
         }
         ++i;
@@ -65,7 +65,7 @@ inline void add_capio_file(const std::string &path, Capio_file *c_file) {
 
 inline void add_capio_file_to_tid(int tid, int fd, const std::string &path) {
     processes_files_metadata[tid][fd] = path;
-    Capio_file &c_file = get_capio_file(path.data());
+    Capio_file &c_file                = get_capio_file(path.data());
     c_file.add_fd(tid, fd);
 }
 
@@ -102,7 +102,7 @@ Capio_file &create_capio_file(const std::string &path, bool is_dir, size_t init_
             }
             if (n_files > 0) {
                 init_size = DIR_INITIAL_SIZE;
-                is_dir = true;
+                is_dir    = true;
             }
             metadata_conf[path] =
                 std::make_tuple(committed, mode, app_name, n_files, permanent, n_close);
@@ -114,7 +114,7 @@ Capio_file &create_capio_file(const std::string &path, bool is_dir, size_t init_
     } else {
         auto &[committed, mode, app_name, n_files, permanent, n_close] = it->second;
         if (n_files > 0) {
-            is_dir = true;
+            is_dir    = true;
             init_size = DIR_INITIAL_SIZE;
         }
         c_file = new Capio_file(committed, mode, is_dir, n_files, permanent, init_size, n_close);
@@ -134,7 +134,7 @@ inline void delete_capio_file_from_tid(int tid, int fd) {
     START_LOG(gettid(), "tid=%d, fd=%d", tid, fd);
 
     std::string_view path = get_capio_file_path(tid, fd);
-    Capio_file &c_file = get_capio_file(path.data());
+    Capio_file &c_file    = get_capio_file(path.data());
     c_file.remove_fd(tid, fd);
     processes_files_metadata[tid].erase(fd);
 }
@@ -149,9 +149,9 @@ inline std::vector<std::string_view> get_capio_file_paths() {
 }
 
 inline void dup_capio_file(int tid, int old_fd, int new_fd) {
-    const std::string_view &path = processes_files_metadata[tid][old_fd];
+    const std::string_view &path          = processes_files_metadata[tid][old_fd];
     processes_files_metadata[tid][new_fd] = path;
-    Capio_file &c_file = get_capio_file(path.data());
+    Capio_file &c_file                    = get_capio_file(path.data());
     c_file.open();
 }
 
@@ -176,7 +176,7 @@ inline void rename_capio_file(const char *const oldpath, const char *const newpa
         }
     }
     const std::lock_guard<std::mutex> lg(files_metadata_mutex);
-    auto node = files_metadata.extract(oldpath);
+    auto node  = files_metadata.extract(oldpath);
     node.key() = newpath;
     files_metadata.insert(std::move(node));
 }

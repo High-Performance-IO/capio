@@ -1,5 +1,6 @@
 Language: Cpp
 IndentWidth: 4
+AlignConsecutiveAssignments: true
 ColumnLimit: 100
 BasedOnStyle: LLVM
 InsertBraces: true
