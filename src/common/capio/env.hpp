@@ -45,13 +45,13 @@ const std::string *get_capio_dir() {
 inline int get_capio_log_level() {
     static int level = -2;
     if (level == -2) {
-        char *log_level = std::getenv("LOG_LEVEL");
+        char *log_level = std::getenv("CAPIO_LOG_LEVEL");
         if (log_level == nullptr) {
             level = 0;
         } else {
             auto [ptr, ec] = std::from_chars(log_level, log_level + strlen(log_level), level);
             if (ec != std::errc()) {
-                std::cout << CAPIO_SERVER_CLI_LOG_SERVER_WARNING << "invalid LOG_LEVEL value"
+                std::cout << CAPIO_SERVER_CLI_LOG_SERVER_WARNING << "invalid CAPIO_LOG_LEVEL value"
                           << std::endl;
                 level = 0;
             }

@@ -6,6 +6,7 @@
 
 #include "utils/location.hpp"
 #include "utils/types.hpp"
+#include "utils/util_producer.hpp"
 
 CSMyRemotePendingStats_t pending_remote_stats;
 std::mutex pending_remote_stats_mutex;

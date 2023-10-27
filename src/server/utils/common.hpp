@@ -22,7 +22,7 @@ off64_t convert_dirent64_to_dirent(char *dirent64_buf, char *dirent_buf,
     struct linux_dirent64 *p_ld64;
     ld.d_reclen = THEORETICAL_SIZE_DIRENT;
     while (i < dirent_64_buf_size) {
-        p_ld64   = (struct linux_dirent64 *)(dirent64_buf + i);
+        p_ld64   = (struct linux_dirent64 *) (dirent64_buf + i);
         ld.d_ino = p_ld64->d_ino;
         ld.d_off = dirent_buf_size + THEORETICAL_SIZE_DIRENT;
         logfile << "dirent_buf_size " << dirent_buf_size << std::endl;
@@ -30,7 +30,7 @@ off64_t convert_dirent64_to_dirent(char *dirent64_buf, char *dirent_buf,
         ld.d_name[DNAME_LENGTH + 1] = p_ld64->d_type;
         ld.d_name[DNAME_LENGTH]     = '\0';
         i += THEORETICAL_SIZE_DIRENT64;
-        memcpy((char *)dirent_buf + dirent_buf_size, &ld, sizeof(ld));
+        memcpy((char *) dirent_buf + dirent_buf_size, &ld, sizeof(ld));
         dirent_buf_size += ld.d_reclen;
     }
 

@@ -13,7 +13,7 @@ typedef std::vector<std::tuple<int, FILE *, bool>> CSFDFileLocationReadsVector_t
 typedef std::unordered_map<int, int> CSPidsMap_T;
 typedef std::unordered_map<int, std::string> CSAppsMap_t;
 typedef std::unordered_map<std::string, std::unordered_set<std::string>> CSFilesSentMap_t;
-typedef std::unordered_map<int, std::unordered_map<int, std::tuple<Capio_file *, off64_t *>>>
+typedef std::unordered_map<int, std::unordered_map<int, std::pair<Capio_file *, off64_t *>>>
     CSProcessFileMap_t;
 typedef std::unordered_map<int, std::unordered_map<int, std::string>> CSProcessFileMetadataMap_t;
 typedef std::unordered_map<int, std::pair<SPSC_queue<char> *, SPSC_queue<char> *>>

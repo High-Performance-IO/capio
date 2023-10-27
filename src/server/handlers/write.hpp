@@ -44,14 +44,11 @@ inline void handle_write(int tid, int fd, off64_t base_offset, off64_t count, in
         auto &pending_reads_this_file = it->second;
         auto it_vec                   = pending_reads_this_file.begin();
         while (it_vec != pending_reads_this_file.end()) {
-            auto tuple            = *it_vec;
-            int pending_tid       = std::get<0>(tuple);
-            int fd                = std::get<1>(tuple);
-            size_t process_offset = *std::get<1>(processes_files[pending_tid][fd]);
-            size_t count          = std::get<2>(tuple);
-            size_t file_size      = c_file.get_stored_size();
+            auto &[pending_tid, fd, count, is_getdents] = *it_vec;
+            size_t process_offset                       = get_capio_file_offset(tid, fd);
+            size_t file_size                            = c_file.get_stored_size();
             if (process_offset + count <= file_size) {
-                handle_pending_read(pending_tid, fd, process_offset, count, std::get<3>(tuple));
+                handle_pending_read(pending_tid, fd, process_offset, count, is_getdents);
                 it_vec = pending_reads_this_file.erase(it_vec);
             } else {
                 ++it_vec;

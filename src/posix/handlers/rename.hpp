@@ -1,6 +1,8 @@
 #ifndef CAPIO_POSIX_HANDLERS_RENAME_HPP
 #define CAPIO_POSIX_HANDLERS_RENAME_HPP
 
+#include <filesystem>
+
 #include "globals.hpp"
 #include "utils/filesystem.hpp"
 
@@ -37,7 +39,7 @@ inline off64_t capio_rename(const std::string &oldpath, const std::string &newpa
         return rename_request(tid, oldpath_abs, newpath_abs);
     } else {
         if (newpath_capio) {
-            copy_file(tid, oldpath_abs, newpath_abs);
+            std::filesystem::copy(oldpath_abs, newpath_abs);
             return -1;
         } else { // Both aren't CAPIO paths
             return -2;

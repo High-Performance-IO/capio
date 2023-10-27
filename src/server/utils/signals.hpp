@@ -14,13 +14,9 @@ void sig_term_handler(int signum, siginfo_t *info, void *ptr) {
     }
 
     // free all the memory used
-    std::string offset_shm_name;
-    for (auto &p1 : processes_files) {
-        for (auto &p2 : p1.second) {
-            offset_shm_name = "offset_" + std::to_string(p1.first) + "_" + std::to_string(p2.first);
-            if (shm_unlink(offset_shm_name.c_str()) == -1) {
-                ERR_EXIT("shm_unlink %s in sig_term_handler", offset_shm_name.c_str());
-            }
+    for (auto &it : get_capio_fds()) {
+        for (auto &fd : it.second) {
+            delete_capio_file_from_tid(it.first, fd);
         }
     }
     std::cout << CAPIO_SERVER_CLI_LOG_SERVER_WARNING << "shm cleanup completed" << std::endl;

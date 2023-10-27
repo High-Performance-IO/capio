@@ -7,7 +7,9 @@
 CSFilesMetadata_t files_metadata;
 std::mutex files_metadata_mutex;
 
+CSProcessFileMap_t processes_files;
 CSProcessFileMetadataMap_t processes_files_metadata;
+std::mutex processes_files_mutex;
 
 CSMetadataConfMap_t metadata_conf;
 CSMetadataConfGlobs_t metadata_conf_globs;
@@ -28,6 +30,29 @@ long int match_globs(const std::string &path) {
         ++i;
     }
     return res;
+}
+
+inline std::unordered_map<int, std::vector<int>> get_capio_fds() {
+    const std::lock_guard<std::mutex> lg(processes_files_mutex);
+    std::unordered_map<int, std::vector<int>> tid_fd_pairs;
+    for (auto &process : processes_files) {
+        for (auto &file : process.second) {
+            tid_fd_pairs[process.first].push_back(file.first);
+        }
+    }
+    return tid_fd_pairs;
+}
+
+inline std::vector<int> get_capio_fds_for_tid(int tid) {
+    const std::lock_guard<std::mutex> lg(processes_files_mutex);
+    std::vector<int> fds;
+    auto it = processes_files.find(tid);
+    if (it != processes_files.end()) {
+        for (auto &file : it->second) {
+            fds.push_back(file.first);
+        }
+    }
+    return fds;
 }
 
 inline std::optional<std::reference_wrapper<Capio_file>>
@@ -55,7 +80,13 @@ inline Capio_file &get_capio_file(const char *const path) {
 }
 
 inline std::string_view get_capio_file_path(int tid, int fd) {
+    const std::lock_guard<std::mutex> lg(processes_files_mutex);
     return processes_files_metadata[tid][fd];
+}
+
+inline off64_t get_capio_file_offset(int tid, int fd) {
+    const std::lock_guard<std::mutex> lg(processes_files_mutex);
+    return *std::get<1>(processes_files[tid][fd]);
 }
 
 inline void add_capio_file(const std::string &path, Capio_file *c_file) {
@@ -64,17 +95,26 @@ inline void add_capio_file(const std::string &path, Capio_file *c_file) {
 }
 
 inline void add_capio_file_to_tid(int tid, int fd, const std::string &path) {
-    processes_files_metadata[tid][fd] = path;
-    Capio_file &c_file                = get_capio_file(path.data());
+    Capio_file &c_file = get_capio_file(path.data());
     c_file.add_fd(tid, fd);
+
+    const std::lock_guard<std::mutex> lg(processes_files_mutex);
+    off64_t *p_offset = (off64_t *) create_shm(
+        "offset_" + std::to_string(tid) + "_" + std::to_string(fd), sizeof(off64_t));
+    // TODO: what happens if a process open the same file twice?
+    processes_files_metadata[tid][fd] = path;
+    processes_files[tid][fd]          = std::make_pair(&c_file, p_offset);
 }
 
 inline void clone_capio_file(pid_t parent_tid, pid_t child_tid) {
-    processes_files_metadata[child_tid] = processes_files_metadata[parent_tid];
     for (auto &it : processes_files_metadata[parent_tid]) {
         Capio_file &c_file = get_capio_file(it.second.c_str());
         c_file.open();
     }
+
+    const std::lock_guard<std::mutex> lg(processes_files_mutex);
+    processes_files_metadata[child_tid] = processes_files_metadata[parent_tid];
+    processes_files[child_tid]          = processes_files[parent_tid];
 }
 
 Capio_file &create_capio_file(const std::string &path, bool is_dir, size_t init_size) {
@@ -133,10 +173,15 @@ inline void delete_capio_file(const char *const path) {
 inline void delete_capio_file_from_tid(int tid, int fd) {
     START_LOG(gettid(), "tid=%d, fd=%d", tid, fd);
 
-    std::string_view path = get_capio_file_path(tid, fd);
-    Capio_file &c_file    = get_capio_file(path.data());
+    const std::lock_guard<std::mutex> lg(processes_files_mutex);
+    Capio_file &c_file = get_capio_file(processes_files_metadata[tid][fd].data());
     c_file.remove_fd(tid, fd);
     processes_files_metadata[tid].erase(fd);
+    std::string offset_shm_name = "offset_" + std::to_string(tid) + "_" + std::to_string(fd);
+    if (shm_unlink(offset_shm_name.c_str()) == -1) {
+        ERR_EXIT("shm_unlink %s in sig_term_handler", offset_shm_name.c_str());
+    }
+    processes_files[tid].erase(fd);
 }
 
 inline std::vector<std::string_view> get_capio_file_paths() {
@@ -149,8 +194,11 @@ inline std::vector<std::string_view> get_capio_file_paths() {
 }
 
 inline void dup_capio_file(int tid, int old_fd, int new_fd) {
+
+    const std::lock_guard<std::mutex> lg(processes_files_mutex);
     const std::string_view &path          = processes_files_metadata[tid][old_fd];
     processes_files_metadata[tid][new_fd] = path;
+    processes_files[tid][new_fd]          = processes_files[tid][old_fd];
     Capio_file &c_file                    = get_capio_file(path.data());
     c_file.open();
 }
@@ -168,17 +216,22 @@ inline Capio_file &init_capio_file(const char *const path, bool home_node) {
 inline void rename_capio_file(const char *const oldpath, const char *const newpath) {
     START_LOG(gettid(), "oldpath=%s, newpath=%s", oldpath, newpath);
 
-    for (auto &pair : processes_files_metadata) {
-        for (auto &pair_2 : pair.second) {
-            if (pair_2.second == oldpath) {
-                pair_2.second = newpath;
+    {
+        const std::lock_guard<std::mutex> lg(processes_files_mutex);
+        for (auto &pair : processes_files_metadata) {
+            for (auto &pair_2 : pair.second) {
+                if (pair_2.second == oldpath) {
+                    pair_2.second = newpath;
+                }
             }
         }
     }
-    const std::lock_guard<std::mutex> lg(files_metadata_mutex);
-    auto node  = files_metadata.extract(oldpath);
-    node.key() = newpath;
-    files_metadata.insert(std::move(node));
+    {
+        const std::lock_guard<std::mutex> lg(files_metadata_mutex);
+        auto node  = files_metadata.extract(oldpath);
+        node.key() = newpath;
+        files_metadata.insert(std::move(node));
+    }
 }
 
 void update_metadata_conf(std::string &path, size_t pos, long int n_files, size_t batch_size,

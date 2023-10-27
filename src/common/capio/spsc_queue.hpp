@@ -52,8 +52,8 @@ template <class T> class SPSC_queue {
         sem_timeout_struct.tv_nsec = sem_timeout;
         sem_timeout_struct.tv_sec  = 1;
         _buff_size                 = _max_num_elems * _elem_size;
-        _first_elem = (long int *)create_shm("_first_elem" + shm_name, sizeof(long int));
-        _last_elem  = (long int *)create_shm("_last_elem" + shm_name, sizeof(long int));
+        _first_elem = (long int *) create_shm("_first_elem" + shm_name, sizeof(long int));
+        _last_elem  = (long int *) create_shm("_last_elem" + shm_name, sizeof(long int));
         _shm        = get_shm_if_exist(_shm_name);
         if (_shm == nullptr) {
             *_first_elem = 0;
@@ -95,7 +95,7 @@ template <class T> class SPSC_queue {
             ERR_EXIT("sem_wait _sem_num_empty");
         }
 
-        memcpy((char *)_shm + *_last_elem, data, _elem_size);
+        memcpy((char *) _shm + *_last_elem, data, _elem_size);
         *_last_elem = (*_last_elem + _elem_size) % _buff_size;
 
         if (sem_post(_sem_num_elems) == -1) {
@@ -114,7 +114,7 @@ template <class T> class SPSC_queue {
             ERR_EXIT("sem_wait _sem_num_empty");
         }
 
-        memcpy((char *)_shm + *_last_elem, data, num_bytes);
+        memcpy((char *) _shm + *_last_elem, data, num_bytes);
         *_last_elem = (*_last_elem + _elem_size) % _buff_size;
 
         if (sem_post(_sem_num_elems) == -1) {
@@ -129,7 +129,7 @@ template <class T> class SPSC_queue {
             ERR_EXIT("sem_wait _sem_num_elems");
         }
 
-        memcpy((char *)buff_rcv, ((char *)_shm) + *_first_elem, _elem_size);
+        memcpy((char *) buff_rcv, ((char *) _shm) + *_first_elem, _elem_size);
         *_first_elem = (*_first_elem + _elem_size) % _buff_size;
 
         if (sem_post(_sem_num_empty) == -1) {
@@ -153,7 +153,7 @@ template <class T> class SPSC_queue {
             ERR_EXIT("sem_wait _sem_num_elems");
         }
 
-        memcpy((char *)buff_rcv, ((char *)_shm) + *_first_elem, num_bytes);
+        memcpy((char *) buff_rcv, ((char *) _shm) + *_first_elem, num_bytes);
         *_first_elem = (*_first_elem + _elem_size) % _buff_size;
 
         if (sem_post(_sem_num_empty) == -1) {

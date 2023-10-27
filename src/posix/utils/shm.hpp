@@ -12,11 +12,11 @@ void read_shm(long tid, SPSC_queue<char> *data_buf, long int offset, void *buffe
     size_t r       = count % WINDOW_DATA_BUFS;
     size_t i       = 0;
     while (i < n_reads) {
-        data_buf->read((char *)buffer + i * WINDOW_DATA_BUFS);
+        data_buf->read((char *) buffer + i * WINDOW_DATA_BUFS);
         ++i;
     }
     if (r) {
-        data_buf->read((char *)buffer + i * WINDOW_DATA_BUFS, r);
+        data_buf->read((char *) buffer + i * WINDOW_DATA_BUFS, r);
     }
 }
 
@@ -28,11 +28,11 @@ void write_shm(long tid, SPSC_queue<char> *data_buf, size_t offset, const void *
 
     size_t i = 0;
     while (i < n_writes) {
-        data_buf->write((char *)buffer + i * WINDOW_DATA_BUFS);
+        data_buf->write((char *) buffer + i * WINDOW_DATA_BUFS);
         ++i;
     }
     if (r) {
-        data_buf->write((char *)buffer + i * WINDOW_DATA_BUFS, r);
+        data_buf->write((char *) buffer + i * WINDOW_DATA_BUFS, r);
     }
 }
 

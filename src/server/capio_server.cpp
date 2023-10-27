@@ -46,9 +46,6 @@ CSAppsMap_t apps;
 // application name -> set of files already sent
 CSFilesSentMap_t files_sent;
 
-// tid -> fd ->(capio_file, index)
-CSProcessFileMap_t processes_files;
-
 // tid -> (client_to_server_data_buf, server_to_client_data_buf)
 CSDataBufferMap_t data_buffers;
 
@@ -132,7 +129,7 @@ void handshake_servers(int rank) {
     START_LOG(gettid(), "call(%d)", rank);
 
     char *buf;
-    buf = (char *)malloc(MPI_MAX_PROCESSOR_NAME * sizeof(char));
+    buf = (char *) malloc(MPI_MAX_PROCESSOR_NAME * sizeof(char));
     if (buf == nullptr) {
         ERR_EXIT("malloc handshake_servers");
     }
@@ -239,8 +236,8 @@ inline void serve_remote_read(const char *path_c, int dest, long int offset, lon
     const size_t len4          = strlen(nbytes_cstr);
     const size_t len5          = strlen(complete_cstr);
     const size_t len6          = strlen(file_size_cstr);
-    buf_send                   = (char *)malloc((len1 + len2 + len3 + len4 + len5 + len6 + 6) *
-                                                sizeof(char)); // TODO:add malloc check
+    buf_send                   = (char *) malloc((len1 + len2 + len3 + len4 + len5 + len6 + 6) *
+                                                 sizeof(char)); // TODO:add malloc check
     sprintf(buf_send, "%s %s %s %s %s %s", s1, path_c, offset_cstr, nbytes_cstr, complete_cstr,
             file_size_cstr);
 
@@ -364,9 +361,9 @@ std::vector<std::string> *files_avaiable(const std::string &prefix, const std::s
 
 void helper_nreads_req(char *buf_recv, int dest) {
     START_LOG(gettid(), "call(%ld, %d)", buf_recv, dest);
-    char *prefix    = (char *)malloc(sizeof(char) * PATH_MAX);
-    char *path_file = (char *)malloc(sizeof(char) * PATH_MAX);
-    char *app_name  = (char *)malloc(sizeof(char) * 512);
+    char *prefix    = (char *) malloc(sizeof(char) * PATH_MAX);
+    char *path_file = (char *) malloc(sizeof(char) * PATH_MAX);
+    char *app_name  = (char *) malloc(sizeof(char) * 512);
     std::size_t n_files;
     sscanf(buf_recv, "nrea %zu %s %s %s", &n_files, app_name, prefix, path_file);
     n_files = find_batch_size(prefix);
@@ -386,12 +383,12 @@ void helper_nreads_req(char *buf_recv, int dest) {
          * create a thread that waits for the completion of such
          * files and then send those files
          */
-        char *prefix_c = (char *)malloc(sizeof(char) * strlen(prefix));
+        char *prefix_c = (char *) malloc(sizeof(char) * strlen(prefix));
         if (prefix_c == nullptr) {
             ERR_EXIT("malloc 2 in capio_helper");
         }
         strcpy(prefix_c, prefix);
-        sem_t *sem = (sem_t *)malloc(sizeof(sem_t));
+        sem_t *sem = (sem_t *) malloc(sizeof(sem_t));
         if (sem_init(sem, 0, 0) == -1) {
             ERR_EXIT("sem_init in helper_nreads_req");
         }
@@ -476,7 +473,7 @@ void wait_for_completion(char *const path, const Capio_file &c_file, int dest, s
 
 void helper_stat_req(const char *buf_recv) {
     START_LOG(gettid(), "call(%s)", buf_recv);
-    char *path_c = (char *)malloc(sizeof(char) * PATH_MAX);
+    char *path_c = (char *) malloc(sizeof(char) * PATH_MAX);
     if (path_c == nullptr) {
         ERR_EXIT("malloc 1 in helper_stat_req");
     }
@@ -487,7 +484,7 @@ void helper_stat_req(const char *buf_recv) {
     if (c_file.complete) {
         serve_remote_stat(path_c, dest, c_file);
     } else { // wait for completion
-        sem_t *sem = (sem_t *)malloc(sizeof(sem_t));
+        sem_t *sem = (sem_t *) malloc(sizeof(sem_t));
         if (sem == nullptr) {
             ERR_EXIT("malloc 2 in helper_stat_req");
         }
@@ -538,7 +535,7 @@ void recv_nfiles(char *buf_recv, int source) {
         } else {
             std::string node_name     = rank_to_node[source];
             const char *node_name_str = node_name.c_str();
-            char *p_node_name         = (char *)malloc(sizeof(char) * (strlen(node_name_str) + 1));
+            char *p_node_name         = (char *) malloc(sizeof(char) * (strlen(node_name_str) + 1));
             strcpy(p_node_name, node_name_str);
             add_file_location(path, p_node_name, -1);
             p_shm              = new char[file_size];
@@ -548,7 +545,7 @@ void recv_nfiles(char *buf_recv, int source) {
             c_file.real_file_size = file_size;
             c_file.first_write    = false;
         }
-        recv_file((char *)p_shm, source, file_size);
+        recv_file((char *) p_shm, source, file_size);
     }
 
     for (const auto &pair : files) {
@@ -563,7 +560,7 @@ void capio_helper() {
     START_LOG(gettid(), "call()");
 
     size_t buf_size = sizeof(char) * (PATH_MAX + 81920);
-    char *buf_recv  = (char *)malloc(buf_size);
+    char *buf_recv  = (char *) malloc(buf_size);
     if (buf_recv == nullptr) {
         ERR_EXIT("malloc 1 in capio_helper");
     }
@@ -582,7 +579,7 @@ void capio_helper() {
         bool remote_request_to_read = strncmp(buf_recv, "read", 4) == 0;
         if (remote_request_to_read) {
             // schema msg received: "read path dest offset nbytes"
-            char *path_c = (char *)malloc(sizeof(char) * PATH_MAX);
+            char *path_c = (char *) malloc(sizeof(char) * PATH_MAX);
             if (path_c == nullptr) {
                 ERR_EXIT("malloc 2 in capio_helper");
             }
@@ -598,7 +595,7 @@ void capio_helper() {
             if (complete || (c_file.get_mode() == CAPIO_FILE_MODE_NOUPDATE && data_available)) {
                 serve_remote_read(path_c, dest, offset, nbytes, complete);
             } else {
-                auto *sem = (sem_t *)malloc(sizeof(sem_t));
+                auto *sem = (sem_t *) malloc(sizeof(sem_t));
                 if (sem == nullptr) {
                     ERR_EXIT("malloc 4 in capio_helper");
                 }
@@ -629,7 +626,7 @@ void capio_helper() {
                 if (file_size > file_shm_size) {
                     file_shm = expand_memory_for_file(path, file_size, c_file);
                 }
-                recv_file((char *)file_shm + offset, source, bytes_received);
+                recv_file((char *) file_shm + offset, source, bytes_received);
                 bytes_received *= sizeof(char);
             }
             solve_remote_reads(bytes_received, offset, file_size, path.c_str(), complete);

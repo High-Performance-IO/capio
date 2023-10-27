@@ -42,10 +42,10 @@ class Capio_file {
     std::vector<std::pair<int, int>> _threads_fd;
 
   public:
-    bool complete             = false;
-    bool first_write          = true;
-    long int n_files          = 0;  // useful for directories
-    long int n_files_expected = -1; // useful for directories
+    bool complete              = false;
+    bool first_write           = true;
+    long int n_files           = 0;  // useful for directories
+    long int n_files_expected  = -1; // useful for directories
     /*
      * file size in the home node. In a given moment could not be up to date.
      * This member is useful because a node different from the home node
@@ -133,7 +133,8 @@ class Capio_file {
                 if (ftruncate(_fd, _buf_size) == -1) {
                     ERR_EXIT("ftruncate Capio_file constructor");
                 }
-                _buf = (char *)mmap(nullptr, _buf_size, PROT_READ | PROT_WRITE, MAP_SHARED, _fd, 0);
+                _buf =
+                    (char *) mmap(nullptr, _buf_size, PROT_READ | PROT_WRITE, MAP_SHARED, _fd, 0);
                 if (_buf == MAP_FAILED) {
                     ERR_EXIT("mmap Capio_file constructor");
                 }
