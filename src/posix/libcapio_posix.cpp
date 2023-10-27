@@ -112,7 +112,7 @@ static int hook(long syscall_number, long arg0, long arg1, long arg2, long arg3,
 
 static __attribute__((constructor)) void init() {
     init_client();
-    char *buf = (char *)malloc(PATH_MAX * sizeof(char));
+    char *buf = (char *) malloc(PATH_MAX * sizeof(char));
     syscall_no_intercept(SYS_getcwd, buf, PATH_MAX);
     current_dir = new std::string(buf);
     mtrace_init(syscall_no_intercept(SYS_gettid));

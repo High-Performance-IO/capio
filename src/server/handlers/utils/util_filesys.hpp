@@ -91,7 +91,7 @@ void write_entry_dir(int tid, const std::string &file_path, const std::string &d
         ld.d_type = DT_REG;
     }
     ld.d_name[DNAME_LENGTH] = '\0';
-    memcpy((char *)file_shm + file_size, &ld, sizeof(ld));
+    memcpy((char *) file_shm + file_size, &ld, sizeof(ld));
     off64_t base_offset = file_size;
 
     c_file.insert_sector(base_offset, data_size);

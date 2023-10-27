@@ -56,8 +56,8 @@ template <class T> class Circular_buffer {
         sem_timeout_struct.tv_nsec = sem_timeout;
         sem_timeout_struct.tv_sec  = 1;
         _buff_size                 = _max_num_elems * _elem_size;
-        _first_elem = (long int *)create_shm("_first_elem" + shm_name, sizeof(long int));
-        _last_elem  = (long int *)create_shm("_last_elem" + shm_name, sizeof(long int));
+        _first_elem = (long int *) create_shm("_first_elem" + shm_name, sizeof(long int));
+        _last_elem  = (long int *) create_shm("_last_elem" + shm_name, sizeof(long int));
         _shm        = get_shm_if_exist(_shm_name);
         if (_shm == nullptr) {
             *_first_elem = 0;
@@ -129,7 +129,7 @@ template <class T> class Circular_buffer {
             ERR_EXIT("sem_wait _mutex in write");
         }
 
-        memcpy((char *)_shm + *_last_elem, data, _elem_size);
+        memcpy((char *) _shm + *_last_elem, data, _elem_size);
         *_last_elem = (*_last_elem + _elem_size) % _buff_size;
 
         if (sem_post(_mutex) == -1) {
@@ -159,7 +159,7 @@ template <class T> class Circular_buffer {
             std::cout << "out of bound write" << std::endl;
         }
 
-        memcpy((char *)_shm + *_last_elem, data, num_bytes);
+        memcpy((char *) _shm + *_last_elem, data, num_bytes);
         // TODO: dangerous consider remove this function
         *_last_elem = (*_last_elem + _elem_size) % _buff_size;
 
@@ -184,7 +184,7 @@ template <class T> class Circular_buffer {
             ERR_EXIT("sem_wait _mutex in read");
         }
 
-        memcpy((char *)buff_rcv, ((char *)_shm) + *_first_elem, _elem_size);
+        memcpy((char *) buff_rcv, ((char *) _shm) + *_first_elem, _elem_size);
         LOG("Received %d on %s", *buff_rcv, this->_shm_name.c_str());
         *_first_elem = (*_first_elem + _elem_size) % _buff_size;
 
@@ -210,7 +210,7 @@ template <class T> class Circular_buffer {
             ERR_EXIT("sem_wait _sem_num_elems in read");
         }
 
-        memcpy((char *)buff_rcv, ((char *)_shm) + *_first_elem, num_bytes);
+        memcpy((char *) buff_rcv, ((char *) _shm) + *_first_elem, num_bytes);
         LOG("Received %d on %s", *buff_rcv, this->_shm_name.c_str());
         *_first_elem = (*_first_elem + _elem_size) % _buff_size;
 

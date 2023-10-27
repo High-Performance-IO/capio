@@ -67,7 +67,7 @@ inline int capio_openat(int dirfd, std::string *pathname, int flags, long tid) {
             }
         }
         syscall_no_intercept_flag = true;
-        off64_t *p_offset         = (off64_t *)create_shm(
+        off64_t *p_offset         = (off64_t *) create_shm(
             "offset_" + std::to_string(tid) + "_" + std::to_string(fd), sizeof(off64_t));
         syscall_no_intercept_flag = false;
         *p_offset                 = 0;

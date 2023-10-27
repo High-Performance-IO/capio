@@ -6,6 +6,7 @@
 
 #include "utils/location.hpp"
 #include "utils/metadata.hpp"
+#include "utils/util_producer.hpp"
 
 CSMyRemotePendingReads_t pending_remote_reads;
 std::mutex pending_remote_reads_mutex;
@@ -31,7 +32,7 @@ inline void handle_pending_read(int tid, int fd, long int process_offset, long i
     if (is_getdents) {
         off64_t dir_size  = c_file.get_stored_size();
         off64_t n_entries = dir_size / THEORETICAL_SIZE_DIRENT64;
-        char *p_getdents  = (char *)malloc(n_entries * sizeof(char) * dir_size);
+        char *p_getdents  = (char *) malloc(n_entries * sizeof(char) * dir_size);
         end_of_sector     = convert_dirent64_to_dirent(p, p_getdents, dir_size);
         write_response(tid, end_of_sector);
         send_data_to_client(tid, p_getdents + process_offset, end_of_sector - process_offset);
@@ -40,7 +41,6 @@ inline void handle_pending_read(int tid, int fd, long int process_offset, long i
         write_response(tid, end_of_sector);
         send_data_to_client(tid, p + process_offset, bytes_read);
     }
-    //*processes_files[tid][fd].second += count;
     // TODO: check if the file was moved to the disk
 }
 
@@ -53,7 +53,7 @@ inline void handle_local_read(int tid, int fd, off64_t count, bool dir, bool is_
     const std::lock_guard<std::mutex> lg(local_read_mutex);
     std::string_view path  = get_capio_file_path(tid, fd);
     Capio_file &c_file     = get_capio_file(path.data());
-    off64_t process_offset = *std::get<1>(processes_files[tid][fd]);
+    off64_t process_offset = get_capio_file_offset(tid, fd);
     int pid                = pids[tid];
     bool writer            = writers[pid][path.data()];
     off64_t end_of_sector  = c_file.get_sector_end(process_offset);
@@ -74,7 +74,7 @@ inline void handle_local_read(int tid, int fd, off64_t count, bool dir, bool is_
             if (is_getdents) {
                 off64_t dir_size  = c_file.get_stored_size();
                 off64_t n_entries = dir_size / THEORETICAL_SIZE_DIRENT64;
-                char *p_getdents  = (char *)malloc(n_entries * sizeof(char) * dir_size);
+                char *p_getdents  = (char *) malloc(n_entries * sizeof(char) * dir_size);
                 end_of_sector     = convert_dirent64_to_dirent(p, p_getdents, dir_size);
                 write_response(tid, end_of_sector);
                 send_data_to_client(tid, p_getdents + process_offset,
@@ -93,7 +93,7 @@ inline void handle_local_read(int tid, int fd, off64_t count, bool dir, bool is_
         if (is_getdents) {
             off64_t dir_size  = c_file.get_stored_size();
             off64_t n_entries = dir_size / THEORETICAL_SIZE_DIRENT64;
-            char *p_getdents  = (char *)malloc(n_entries * sizeof(char) * dir_size);
+            char *p_getdents  = (char *) malloc(n_entries * sizeof(char) * dir_size);
             end_of_sector     = convert_dirent64_to_dirent(p, p_getdents, dir_size);
             write_response(tid, end_of_read);
             send_data_to_client(tid, p_getdents + process_offset, bytes_read);
@@ -137,7 +137,7 @@ inline void handle_remote_read(int tid, int fd, off64_t count, int rank, bool di
     std::string_view path  = get_capio_file_path(tid, fd);
     Capio_file &c_file     = get_capio_file(path.data());
     size_t real_file_size  = c_file.real_file_size;
-    off64_t process_offset = *std::get<1>(processes_files[tid][fd]);
+    off64_t process_offset = get_capio_file_offset(tid, fd);
     off64_t end_of_read    = process_offset + count;
     off64_t end_of_sector  = c_file.get_sector_end(process_offset);
     std::size_t eos;
@@ -160,7 +160,7 @@ inline void handle_remote_read(int tid, int fd, off64_t count, int rank, bool di
     const char *msg;
     std::string str_msg;
     int dest      = nodes_helper_rank[std::get<0>(get_file_location(path.data()))];
-    size_t offset = *std::get<1>(processes_files[tid][fd]);
+    size_t offset = get_capio_file_offset(tid, fd);
     str_msg       = "read " + std::string(path) + " " + std::to_string(rank) + " " +
               std::to_string(offset) + " " + std::to_string(count);
     msg = str_msg.c_str();
@@ -179,7 +179,7 @@ inline bool handle_nreads(const std::string &path, const std::string &app_name, 
         std::string glob       = std::get<0>(metadata_conf_globs[pos]);
         std::size_t batch_size = std::get<5>(metadata_conf_globs[pos]);
         if (batch_size > 0) {
-            char *msg = (char *)malloc(sizeof(char) * (512 + PATH_MAX));
+            char *msg = (char *) malloc(sizeof(char) * (512 + PATH_MAX));
             sprintf(msg, "nrea %zu %s %s %s", batch_size, app_name.c_str(), glob.c_str(),
                     path.c_str());
             MPI_Send(msg, strlen(msg) + 1, MPI_CHAR, dest, 0, MPI_COMM_WORLD);
@@ -287,19 +287,15 @@ inline void solve_remote_reads(size_t bytes_received, size_t offset, size_t file
     c_file.insert_sector(offset, offset + bytes_received);
     c_file.complete = complete;
     std::string path(path_c);
-    int tid, fd;
-    long int count; // TODO: diff between count and bytes_received
     const std::lock_guard<std::mutex> lg(pending_remote_reads_mutex);
     std::list<std::tuple<int, int, long int, bool>> &list_remote_reads = pending_remote_reads[path];
     auto it                                                            = list_remote_reads.begin();
     std::list<std::tuple<int, int, long int, bool>>::iterator prev_it;
     off64_t end_of_sector;
     while (it != list_remote_reads.end()) {
-        tid              = std::get<0>(*it);
-        fd               = std::get<1>(*it);
-        count            = std::get<2>(*it);
-        bool is_getdent  = std::get<3>(*it);
-        size_t fd_offset = *std::get<1>(processes_files[tid][fd]);
+        // TODO: diff between count and bytes_received
+        auto &[tid, fd, count, is_getdent] = *it;
+        size_t fd_offset                   = get_capio_file_offset(tid, fd);
         if (complete || fd_offset + count <= offset + bytes_received) {
             // this part is equals to the local read (TODO: function)
             end_of_sector = c_file.get_sector_end(fd_offset);
@@ -316,7 +312,7 @@ inline void solve_remote_reads(size_t bytes_received, size_t offset, size_t file
             if (is_getdent) {
                 off64_t dir_size  = c_file.get_stored_size();
                 off64_t n_entries = dir_size / THEORETICAL_SIZE_DIRENT64;
-                char *p_getdents  = (char *)malloc(n_entries * sizeof(char) * dir_size);
+                char *p_getdents  = (char *) malloc(n_entries * sizeof(char) * dir_size);
                 end_of_sector     = convert_dirent64_to_dirent(p, p_getdents, dir_size);
                 write_response(tid, end_of_sector);
                 send_data_to_client(tid, p_getdents + fd_offset, bytes_read);

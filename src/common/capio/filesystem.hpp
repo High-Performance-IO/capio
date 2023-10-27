@@ -73,7 +73,7 @@ const std::string *capio_posix_realpath(long tid, const std::string *pathname,
                                         const std::string *current_dir) {
     START_LOG(tid, "call(path=%s, capio_dir=%s, current_dir=%s)", pathname->c_str(),
               capio_dir->c_str(), current_dir->c_str());
-    char *posix_real_path = capio_realpath((char *)pathname->c_str(), nullptr);
+    char *posix_real_path = capio_realpath((char *) pathname->c_str(), nullptr);
 
     // if capio_realpath fails, then it should be a capio_file
     if (posix_real_path == nullptr) {

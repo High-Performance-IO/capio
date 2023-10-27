@@ -158,7 +158,7 @@ int check_file_location(std::size_t index, int rank, const std::string &path_to_
             ++j;
         }
         node_str[j]      = '\0';
-        char *p_node_str = (char *)malloc(sizeof(char) * (strlen(node_str) + 1));
+        char *p_node_str = (char *) malloc(sizeof(char) * (strlen(node_str) + 1));
         strcpy(p_node_str, node_str);
         long offset = ftell(fp);
         if (offset == -1) {

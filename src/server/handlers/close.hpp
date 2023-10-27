@@ -2,6 +2,7 @@
 #define CAPIO_SERVER_HANDLERS_CLOSE_HPP
 
 #include "read.hpp"
+#include "utils/util_filesys.hpp"
 
 inline void handle_close(int tid, int fd, int rank) {
     START_LOG(gettid(), "call(tid=%d, fd=%d, rank=%d)", tid, fd, rank);
@@ -21,13 +22,8 @@ inline void handle_close(int tid, int fd, int rank) {
             auto &pending_reads_this_file = it->second;
             auto it_vec                   = pending_reads_this_file.begin();
             while (it_vec != pending_reads_this_file.end()) {
-                auto tuple            = *it_vec;
-                int pending_tid       = std::get<0>(tuple);
-                int fd                = std::get<1>(tuple);
-                size_t process_offset = *std::get<1>(processes_files[pending_tid][fd]);
-                size_t count          = std::get<2>(tuple);
-
-                bool is_getdents = std::get<3>(tuple);
+                auto &[pending_tid, fd, count, is_getdents] = *it_vec;
+                size_t process_offset                       = get_capio_file_offset(tid, fd);
                 handle_pending_read(pending_tid, fd, process_offset, count, is_getdents);
                 it_vec = pending_reads_this_file.erase(it_vec);
             }
@@ -46,11 +42,6 @@ inline void handle_close(int tid, int fd, int rank) {
         delete_capio_file(path.data());
         delete_from_file_locations(path.data(), rank);
     }
-    std::string offset_name = "offset_" + std::to_string(tid) + "_" + std::to_string(fd);
-    if (shm_unlink(offset_name.c_str()) == -1) {
-        ERR_EXIT("shm_unlink %s in handle_close", offset_name.c_str());
-    }
-    processes_files[tid].erase(fd);
     delete_capio_file_from_tid(tid, fd);
 }
 

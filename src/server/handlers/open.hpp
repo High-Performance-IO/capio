@@ -3,6 +3,7 @@
 
 #include "utils/location.hpp"
 #include "utils/metadata.hpp"
+#include "utils/util_filesys.hpp"
 
 inline void update_file_metadata(const std::string &path, int tid, int fd, int rank,
                                  bool is_creat) {
@@ -10,17 +11,12 @@ inline void update_file_metadata(const std::string &path, int tid, int fd, int r
               is_creat ? "true" : "false");
 
     // TODO: check the size that the user wrote in the configuration file
-    off64_t *p_offset = (off64_t *)create_shm(
-        "offset_" + std::to_string(tid) + "_" + std::to_string(fd), sizeof(off64_t));
     //*caching_info[tid].second += 2;
     auto c_file_opt = get_capio_file_opt(path.c_str());
     Capio_file &c_file =
         (c_file_opt) ? c_file_opt->get() : create_capio_file(path, false, get_file_initial_size());
     c_file.open();
     add_capio_file_to_tid(tid, fd, path);
-    processes_files[tid][fd] =
-        std::make_tuple(&c_file,
-                        p_offset); // TODO: what happens if a process open the same file twice?
     int pid       = pids[tid];
     auto it_files = writers.find(pid);
     if (it_files != writers.end()) {

@@ -5,7 +5,7 @@ std::string get_producer_name(std::string path) {
     START_LOG(gettid(), "call( %s)", path.c_str());
     std::string producer_name = "";
     // we handle also prefixes
-    auto it_metadata = metadata_conf.find(path);
+    auto it_metadata          = metadata_conf.find(path);
     if (it_metadata == metadata_conf.end()) {
         long int pos = match_globs(path);
         if (pos != -1) {
