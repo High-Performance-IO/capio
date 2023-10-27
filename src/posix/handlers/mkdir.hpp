@@ -4,8 +4,7 @@
 #include "globals.hpp"
 #include "utils/filesystem.hpp"
 
-
-inline off64_t capio_mkdirat(int dirfd, std::string* pathname, mode_t mode, long tid) {
+inline off64_t capio_mkdirat(int dirfd, std::string *pathname, mode_t mode, long tid) {
     START_LOG(tid, "call(dirfd=%d, pathname=%s, mode=%o)", dirfd, pathname->c_str(), mode);
 
     const std::string *capio_dir = get_capio_dir();
@@ -51,7 +50,7 @@ inline off64_t capio_mkdirat(int dirfd, std::string* pathname, mode_t mode, long
     }
 }
 
-inline off64_t capio_rmdir(std::string* pathname, long tid) {
+inline off64_t capio_rmdir(std::string *pathname, long tid) {
     START_LOG(tid, "call(pathname=%s)", pathname->c_str());
 
     const std::string *capio_dir = get_capio_dir();
@@ -70,7 +69,8 @@ inline off64_t capio_rmdir(std::string* pathname, long tid) {
             return -2;
         } else {
             if (capio_files_paths->find(path_to_check) == capio_files_paths->end()) {
-                LOG("capio_files_path.find == end. errno = ENOENT");
+                LOG("capio_files_path.find == end. errno = "
+                    "ENOENT");
                 errno = ENOENT;
                 return -1;
             }
@@ -105,7 +105,8 @@ int mkdir_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long ar
     return 1;
 }
 
-int mkdirat_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg5, long *result) {
+int mkdirat_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg5,
+                    long *result) {
     int dirfd = static_cast<int>(arg0);
     std::string pathname(reinterpret_cast<const char *>(arg1));
     auto mode = static_cast<mode_t>(arg2);
@@ -120,7 +121,6 @@ int mkdirat_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long 
     }
     return 1;
 }
-
 
 int rmdir_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg5, long *result) {
     std::string pathname(reinterpret_cast<const char *>(arg0));

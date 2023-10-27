@@ -7,10 +7,12 @@ inline void handle_close(int tid, int fd, int rank) {
     START_LOG(gettid(), "call(tid=%d, fd=%d, rank=%d)", tid, fd, rank);
 
     std::string_view path = get_capio_file_path(tid, fd);
-    if(path.empty()) //avoid to try to close a file that does not exists (example: try to close() on a dir
+    if (path.empty()) { // avoid to try to close a file that does not exists
+                        // (example: try to close() on a dir
         return;
+    }
 
-    Capio_file& c_file = get_capio_file(path.data());
+    Capio_file &c_file = get_capio_file(path.data());
     c_file.close();
     if (c_file.get_committed() == "on_close" && c_file.is_closed()) {
         c_file.complete = true;
@@ -31,9 +33,10 @@ inline void handle_close(int tid, int fd, int rank) {
             }
             pending_reads.erase(it);
         }
-        if (c_file.is_dir())
+        if (c_file.is_dir()) {
             reply_remote_stats(path.data());
-        //TODO: error if seek are done and also do this on exit
+        }
+        // TODO: error if seek are done and also do this on exit
         handle_pending_remote_reads(path.data(), c_file.get_sector_end(0), true);
         handle_pending_remote_nfiles(path.data());
         c_file.commit();

@@ -10,7 +10,6 @@ void close_all_files(int tid, int rank) {
             handle_close(tid, it.first, rank);
         }
     }
-
 }
 
 inline void handle_exit_group(int tid, int rank) {
@@ -18,20 +17,21 @@ inline void handle_exit_group(int tid, int rank) {
 
     int pid = pids[tid];
     auto files = writers[pid];
-    for (auto& pair : files) {
+    for (auto &pair : files) {
         std::string path = pair.first;
         if (pair.second) {
             auto it_conf = metadata_conf.find(path);
-            if (it_conf == metadata_conf.end() || std::get<0>(it_conf->second) == "on_termination" || std::get<0>(it_conf->second).length() == 0) {
-                Capio_file& c_file = get_capio_file(path.c_str());
+            if (it_conf == metadata_conf.end() ||
+                std::get<0>(it_conf->second) == "on_termination" ||
+                std::get<0>(it_conf->second).length() == 0) {
+                Capio_file &c_file = get_capio_file(path.c_str());
                 if (c_file.is_dir()) {
                     long int n_committed = c_file.n_files_expected;
                     if (n_committed <= c_file.n_files) {
                         reply_remote_stats(path);
                         c_file.complete = true;
                     }
-                }
-                else {
+                } else {
                     c_file.complete = true;
                     c_file.commit();
                 }
@@ -39,9 +39,7 @@ inline void handle_exit_group(int tid, int rank) {
 
             auto it = pending_reads.find(path);
             if (it != pending_reads.end()) {
-
-
-                auto& pending_reads_this_file = it->second;
+                auto &pending_reads_this_file = it->second;
                 auto it_vec = pending_reads_this_file.begin();
                 while (it_vec != pending_reads_this_file.end()) {
                     auto tuple = *it_vec;
@@ -62,7 +60,7 @@ inline void handle_exit_group(int tid, int rank) {
     free_resources(tid);
 }
 
-void exit_group_handler(const char * const str, int rank) {
+void exit_group_handler(const char *const str, int rank) {
     int tid;
     sscanf(str, "%d", &tid);
     handle_exit_group(tid, rank);

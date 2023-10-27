@@ -2,7 +2,6 @@
 #define CAPIO_POSIX_UTILS_REQUESTS_HPP
 
 #include "capio/requests.hpp"
-
 #include "env.hpp"
 #include "types.hpp"
 
@@ -12,37 +11,30 @@ CPBufRequest_t *buf_requests;
 CPBufResponse_t *bufs_response;
 
 /**
-* Initialize request and response buffers
-* @return
-*/
+ * Initialize request and response buffers
+ * @return
+ */
 inline void init_client() {
-    //TODO: replace number with constexpr
-    buf_requests = new CPBufRequest_t(
-            "circular_buffer",
-            1024 * 1024,
-            CAPIO_REQUEST_MAX_SIZE,
-            CAPIO_SEM_TIMEOUT_NANOSEC,
-            CAPIO_SEM_RETRIES);
+    // TODO: replace number with constexpr
+    buf_requests = new CPBufRequest_t("circular_buffer", 1024 * 1024, CAPIO_REQUEST_MAX_SIZE,
+                                      CAPIO_SEM_TIMEOUT_NANOSEC, CAPIO_SEM_RETRIES);
     bufs_response = new CPBufResponse_t();
 }
 
 /**
-* Add a new response buffer for thread @param tid
-* @param tid
-* @return
-*/
+ * Add a new response buffer for thread @param tid
+ * @param tid
+ * @return
+ */
 inline void register_listener(long tid) {
-    //TODO: replace numbers with constexpr
-    auto *p_buf_response = new Circular_buffer<off_t>(
-            "buf_response_" + std::to_string(tid),
-            8 * 1024 * 1024,
-            sizeof(off_t),
-            CAPIO_SEM_TIMEOUT_NANOSEC,
-            CAPIO_SEM_RETRIES);
+    // TODO: replace numbers with constexpr
+    auto *p_buf_response =
+        new Circular_buffer<off_t>("buf_response_" + std::to_string(tid), 8 * 1024 * 1024,
+                                   sizeof(off_t), CAPIO_SEM_TIMEOUT_NANOSEC, CAPIO_SEM_RETRIES);
     bufs_response->insert(std::make_pair(tid, p_buf_response));
 }
 
-inline off64_t access_request(const  std::string& path, const long tid) {
+inline off64_t access_request(const std::string &path, const long tid) {
     char req[CAPIO_REQUEST_MAX_SIZE];
     sprintf(req, "%04d %ld %s", CAPIO_REQUEST_ACCESS, tid, path.c_str());
     buf_requests->write(req, CAPIO_REQUEST_MAX_SIZE);
@@ -50,7 +42,6 @@ inline off64_t access_request(const  std::string& path, const long tid) {
     bufs_response->at(tid)->read(&res);
     return res;
 }
-
 
 inline void clone_request(const long parent_tid, const long child_tid) {
     char req[CAPIO_REQUEST_MAX_SIZE];
@@ -64,7 +55,8 @@ inline void close_request(const int fd, const long tid) {
     buf_requests->write(req, CAPIO_REQUEST_MAX_SIZE);
 }
 
-inline off64_t rename_request(const long tid, const  std::string& old_path, const  std::string& newpath) {
+inline off64_t rename_request(const long tid, const std::string &old_path,
+                              const std::string &newpath) {
     char req[CAPIO_REQUEST_MAX_SIZE];
     sprintf(req, "%04d %s %s %ld", CAPIO_REQUEST_RENAME, old_path.c_str(), newpath.c_str(), tid);
     buf_requests->write(req, CAPIO_REQUEST_MAX_SIZE);
@@ -73,7 +65,7 @@ inline off64_t rename_request(const long tid, const  std::string& old_path, cons
     return res;
 }
 
-inline off64_t create_request(const int fd,const  std::string& path, const long tid) {
+inline off64_t create_request(const int fd, const std::string &path, const long tid) {
     char req[CAPIO_REQUEST_MAX_SIZE];
     sprintf(req, "%04d %ld %d %s", CAPIO_REQUEST_CREATE, tid, fd, path.c_str());
     buf_requests->write(req, CAPIO_REQUEST_MAX_SIZE);
@@ -82,7 +74,7 @@ inline off64_t create_request(const int fd,const  std::string& path, const long 
     return res;
 }
 
-inline off64_t create_exclusive_request(const int fd, const  std::string& path, const long tid) {
+inline off64_t create_exclusive_request(const int fd, const std::string &path, const long tid) {
     char req[CAPIO_REQUEST_MAX_SIZE];
     sprintf(req, "%04d %ld %d %s", CAPIO_REQUEST_CREATE_EXCLUSIVE, tid, fd, path.c_str());
     buf_requests->write(req, CAPIO_REQUEST_MAX_SIZE);
@@ -127,7 +119,7 @@ inline void handshake_anonymous_request(const long tid, const long pid) {
     buf_requests->write(req, CAPIO_REQUEST_MAX_SIZE);
 }
 
-inline void handshake_named_request(const long tid, const long pid, const  std::string&  app_name) {
+inline void handshake_named_request(const long tid, const long pid, const std::string &app_name) {
     char req[CAPIO_REQUEST_MAX_SIZE];
     sprintf(req, "%04d %ld %ld %s", CAPIO_REQUEST_HANDSHAKE_NAMED, tid, pid, app_name.c_str());
     buf_requests->write(req, CAPIO_REQUEST_MAX_SIZE);
@@ -137,7 +129,7 @@ inline CPStatResponse_t fstat_request(const int fd, const long tid) {
     char req[CAPIO_REQUEST_MAX_SIZE];
     sprintf(req, "%04d %ld %d", CAPIO_REQUEST_FSTAT, tid, fd);
     buf_requests->write(req, CAPIO_REQUEST_MAX_SIZE);
-    //FIXME: these two reads don't work in multithreading
+    // FIXME: these two reads don't work in multithreading
     off64_t file_size;
     bufs_response->at(tid)->read(&file_size);
     off64_t is_dir;
@@ -145,7 +137,7 @@ inline CPStatResponse_t fstat_request(const int fd, const long tid) {
     return {file_size, is_dir};
 }
 
-inline off64_t mkdir_request(const  std::string&  path, const long tid) {
+inline off64_t mkdir_request(const std::string &path, const long tid) {
     char req[CAPIO_REQUEST_MAX_SIZE];
     sprintf(req, "%04d %ld %s", CAPIO_REQUEST_MKDIR, tid, path.c_str());
     buf_requests->write(req, CAPIO_REQUEST_MAX_SIZE);
@@ -154,7 +146,7 @@ inline off64_t mkdir_request(const  std::string&  path, const long tid) {
     return res;
 }
 
-inline off64_t open_request(const int fd, const  std::string&  path, const long tid) {
+inline off64_t open_request(const int fd, const std::string &path, const long tid) {
     char req[CAPIO_REQUEST_MAX_SIZE];
     sprintf(req, "%04d %ld %d %s", CAPIO_REQUEST_OPEN, tid, fd, path.c_str());
     buf_requests->write(req, CAPIO_REQUEST_MAX_SIZE);
@@ -172,7 +164,8 @@ inline off64_t read_request(const int fd, const off64_t count, const long tid) {
     return res;
 }
 
-inline off64_t rename_request(const  std::string&  oldpath,const  std::string&  newpath, const long tid) {
+inline off64_t rename_request(const std::string &oldpath, const std::string &newpath,
+                              const long tid) {
     char req[CAPIO_REQUEST_MAX_SIZE];
     sprintf(req, "%04d %s %s %ld", CAPIO_REQUEST_RENAME, oldpath.c_str(), newpath.c_str(), tid);
     buf_requests->write(req, CAPIO_REQUEST_MAX_SIZE);
@@ -217,11 +210,11 @@ inline off64_t seek_request(const int fd, const off64_t offset, const long tid) 
     return res;
 }
 
-inline CPStatResponse_t stat_request(const  std::string&  path, const long tid) {
+inline CPStatResponse_t stat_request(const std::string &path, const long tid) {
     char req[CAPIO_REQUEST_MAX_SIZE];
     sprintf(req, "%04d %ld %s", CAPIO_REQUEST_STAT, tid, path.c_str());
     buf_requests->write(req, CAPIO_REQUEST_MAX_SIZE);
-    //FIXME: these two reads don't work in multithreading
+    // FIXME: these two reads don't work in multithreading
     off64_t file_size;
     bufs_response->at(tid)->read(&file_size);
     off64_t is_dir;
@@ -229,7 +222,7 @@ inline CPStatResponse_t stat_request(const  std::string&  path, const long tid) 
     return {file_size, is_dir};
 }
 
-inline off64_t unlink_request(const  std::string&  path, const long tid) {
+inline off64_t unlink_request(const std::string &path, const long tid) {
     char req[CAPIO_REQUEST_MAX_SIZE];
     sprintf(req, "%04d %ld %s", CAPIO_REQUEST_UNLINK, tid, path.c_str());
     buf_requests->write(req, CAPIO_REQUEST_MAX_SIZE);
@@ -238,8 +231,7 @@ inline off64_t unlink_request(const  std::string&  path, const long tid) {
     return res;
 }
 
-
-inline off64_t rmdir_request(const std::string&  dir_path, long tid) {
+inline off64_t rmdir_request(const std::string &dir_path, long tid) {
     char req[CAPIO_REQUEST_MAX_SIZE];
     sprintf(req, "%04d %s %ld", CAPIO_REQUEST_RMDIR, dir_path.c_str(), tid);
     buf_requests->write(req, CAPIO_REQUEST_MAX_SIZE);
@@ -248,8 +240,8 @@ inline off64_t rmdir_request(const std::string&  dir_path, long tid) {
     return res;
 }
 
-
-inline void write_request(CPFiles_t *const files, const int fd, const off64_t count, const long tid) {
+inline void write_request(CPFiles_t *const files, const int fd, const off64_t count,
+                          const long tid) {
     char req[CAPIO_REQUEST_MAX_SIZE];
     int num_writes_batch = get_num_writes_batch(tid);
     long int old_offset = *std::get<0>((*files)[fd]);

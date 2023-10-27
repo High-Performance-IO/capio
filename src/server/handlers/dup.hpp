@@ -10,7 +10,7 @@ inline void handle_dup(int tid, int old_fd, int new_fd) {
     dup_capio_file(tid, old_fd, new_fd);
 }
 
-void dup_handler(const char * const str, int rank) {
+void dup_handler(const char *const str, int rank) {
     int tid;
     int old_fd, new_fd;
     sscanf(str, "%d %d %d", &tid, &old_fd, &new_fd);

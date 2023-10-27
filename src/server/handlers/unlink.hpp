@@ -5,7 +5,7 @@ inline void handle_unlink(int tid, const char *path, int rank) {
     START_LOG(gettid(), "call(tid=%d, path=%s, rank=%d)", tid, path, rank);
 
     auto c_file_opt = get_capio_file_opt(path);
-    if (c_file_opt) { //TODO: it works only in the local case
+    if (c_file_opt) { // TODO: it works only in the local case
         Capio_file &c_file = c_file_opt->get();
         c_file.unlink();
         if (c_file.is_deletable()) {
@@ -18,7 +18,7 @@ inline void handle_unlink(int tid, const char *path, int rank) {
     }
 }
 
-void unlink_handler(const char * const str, int rank) {
+void unlink_handler(const char *const str, int rank) {
     char path[PATH_MAX];
     int tid;
     sscanf(str, "%d %s", &tid, path);

@@ -9,54 +9,51 @@ inline int capio_fcntl(int fd, int cmd, int arg, long tid) {
 
     if (files->find(fd) != files->end()) {
         switch (cmd) {
-            case F_GETFD: {
-                int res = std::get<3>((*files)[fd]);
-                return res;
+        case F_GETFD: {
+            int res = std::get<3>((*files)[fd]);
+            return res;
+        }
+
+        case F_SETFD: {
+            std::get<3>((*files)[fd]) = arg;
+            return 0;
+        }
+
+        case F_GETFL: {
+            int flags = std::get<2>((*files)[fd]);
+            return flags;
+        }
+
+        case F_SETFL: {
+            std::get<2>((*files)[fd]) = arg;
+            return 0;
+        }
+
+        case F_DUPFD_CLOEXEC: {
+            int dev_fd = open("/dev/null", O_RDONLY);
+
+            if (dev_fd == -1) {
+                ERR_EXIT("open /dev/null");
             }
 
-            case F_SETFD: {
-                std::get<3>((*files)[fd]) = arg;
-                return 0;
-            }
+            int res = fcntl(dev_fd, F_DUPFD_CLOEXEC, arg); //
+            close(dev_fd);
 
-            case F_GETFL: {
-                int flags = std::get<2>((*files)[fd]);
-                return flags;
-            }
+            (*files)[res] = (*files)[fd];
+            std::get<3>((*files)[res]) = FD_CLOEXEC;
+            (*capio_files_descriptors)[res] = (*capio_files_descriptors)[fd];
+            dup_request(fd, res, tid);
 
-            case F_SETFL: {
-                std::get<2>((*files)[fd]) = arg;
-                return 0;
-            }
+            return res;
+        }
 
-
-            case F_DUPFD_CLOEXEC: {
-                int dev_fd = open("/dev/null", O_RDONLY);
-
-                if (dev_fd == -1) {
-                    ERR_EXIT("open /dev/null");
-                }
-
-                int res = fcntl(dev_fd, F_DUPFD_CLOEXEC, arg); //
-                close(dev_fd);
-
-
-                (*files)[res] = (*files)[fd];
-                std::get<3>((*files)[res]) = FD_CLOEXEC;
-                (*capio_files_descriptors)[res] = (*capio_files_descriptors)[fd];
-                dup_request(fd, res, tid);
-
-                return res;
-            }
-
-            default:
-                ERR_EXIT("fcntl with cmd %d is not yet supported", cmd);
+        default:
+            ERR_EXIT("fcntl with cmd %d is not yet supported", cmd);
         }
     } else {
         return -2;
     }
 }
-
 
 int fcntl_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg5, long *result) {
     auto fd = static_cast<int>(arg0);

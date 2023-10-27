@@ -3,14 +3,14 @@
 
 #include <catch2/catch_test_macros.hpp>
 #include <thread>
-sem_t* sem;
+sem_t *sem;
 
-int func(int* num) {
+int func(int *num) {
     REQUIRE(*num == 12345);
     return 0;
 }
 
-int write_file(FILE* fp) {
+int write_file(FILE *fp) {
     constexpr int ARRAY_SIZE = 100;
     int array[ARRAY_SIZE];
     for (int i = 0; i < ARRAY_SIZE; i++) {
@@ -22,7 +22,7 @@ int write_file(FILE* fp) {
 }
 
 TEST_CASE("Test thread clone", "[posix]") {
-    int* num = static_cast<int*>(malloc(sizeof(int)));
+    int *num = static_cast<int *>(malloc(sizeof(int)));
     *num = 12345;
     std::thread t(func, num);
     t.join();

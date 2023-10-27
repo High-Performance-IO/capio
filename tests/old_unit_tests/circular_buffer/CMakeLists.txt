@@ -9,7 +9,7 @@ target_link_libraries(producer_perf ${MPI_LIBRARIES} rt)
 target_link_libraries(consumer_perf ${MPI_LIBRARIES} rt)
 # includes MPI
 include_directories(${MPI_INCLUDE_PATH})
-if(MPI_COMPILE_FLAGS)
+if (MPI_COMPILE_FLAGS)
     set_target_properties(producer PROPERTIES
             COMPILE_FLAGS "${MPI_COMPILE_FLAGS}")
     set_target_properties(consumer PROPERTIES
@@ -18,9 +18,9 @@ if(MPI_COMPILE_FLAGS)
             COMPILE_FLAGS "${MPI_COMPILE_FLAGS}")
     set_target_properties(consumer_perf PROPERTIES
             COMPILE_FLAGS "${MPI_COMPILE_FLAGS}")
-endif()
+endif ()
 
-if(MPI_LINK_FLAGS)
+if (MPI_LINK_FLAGS)
     set_target_properties(producer PROPERTIES
             LINK_FLAGS "${MPI_LINK_FLAGS}")
     set_target_properties(consumer PROPERTIES
@@ -29,4 +29,4 @@ if(MPI_LINK_FLAGS)
             LINK_FLAGS "${MPI_LINK_FLAGS}")
     set_target_properties(consumer_perf PROPERTIES
             LINK_FLAGS "${MPI_LINK_FLAGS}")
-endif()
+endif ()

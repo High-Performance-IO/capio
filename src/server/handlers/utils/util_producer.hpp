@@ -3,15 +3,14 @@
 std::string get_producer_name(std::string path) {
     START_LOG(gettid(), "call( %s)", path.c_str());
     std::string producer_name = "";
-    //we handle also prefixes
+    // we handle also prefixes
     auto it_metadata = metadata_conf.find(path);
     if (it_metadata == metadata_conf.end()) {
         long int pos = match_globs(path);
         if (pos != -1) {
             producer_name = std::get<3>(metadata_conf_globs[pos]);
         }
-    }
-    else {
+    } else {
         producer_name = std::get<2>(it_metadata->second);
     }
 
@@ -31,4 +30,4 @@ bool is_producer(int tid, std::string path) {
 
     return res;
 }
-#endif //CAPIO_UTIL_PRODUCER_HPP
+#endif // CAPIO_UTIL_PRODUCER_HPP

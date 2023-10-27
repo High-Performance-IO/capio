@@ -1,30 +1,33 @@
 /**
  * Capio log level.
- * if -1, and capio logging is enable everything is logged, otherwise, only logs up to CAPIO_MAX_LOG_LEVEL function calls
+ * if -1, and capio logging is enable everything is logged, otherwise, only
+ * logs up to CAPIO_MAX_LOG_LEVEL function calls
  */
+
+#include <asm-generic/unistd.h>
 
 #include <array>
 #include <string>
 #include <unordered_map>
 
-#include <asm-generic/unistd.h>
-
 #include "capio/env.hpp"
-
 #include "globals.hpp"
 #include "handlers.hpp"
 
 /**
  * Handler for syscall not handled and interrupt syscall_intercept
  */
-static int not_handled_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg5, long *result) {
+static int not_handled_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg5,
+                               long *result) {
     return 1;
 }
 
 /**
- * Handler for syscall handled, but not yet implemented and interrupt syscall_intercept
+ * Handler for syscall handled, but not yet implemented and interrupt
+ * syscall_intercept
  */
-static int not_implemented_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg5, long *result) {
+static int not_implemented_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg5,
+                                   long *result) {
     errno = ENOTSUP;
     *result = -errno;
     return 0;
@@ -33,8 +36,9 @@ static int not_implemented_handler(long arg0, long arg1, long arg2, long arg3, l
 static constexpr std::array<CPHandler_t, __NR_syscalls> build_syscall_table() {
     std::array<CPHandler_t, __NR_syscalls> _syscallTable{0};
 
-    for (int i = 0; i < __NR_syscalls; i++)
+    for (int i = 0; i < __NR_syscalls; i++) {
         _syscallTable[i] = not_handled_handler;
+    }
 
     _syscallTable[SYS_access] = access_handler;
     _syscallTable[SYS_chdir] = chdir_handler;
@@ -79,9 +83,10 @@ static constexpr std::array<CPHandler_t, __NR_syscalls> build_syscall_table() {
     return _syscallTable;
 }
 
-static int hook(long syscall_number, long arg0, long arg1, long arg2, long arg3, long arg4, long arg5, long *result) {
+static int hook(long syscall_number, long arg0, long arg1, long arg2, long arg3, long arg4,
+                long arg5, long *result) {
     static const std::array<CPHandler_t, __NR_syscalls> syscallTable = build_syscall_table();
-    static const char* capio_dir = std::getenv("CAPIO_DIR");
+    static const char *capio_dir = std::getenv("CAPIO_DIR");
 
 #ifdef CAPIOLOG
     CAPIO_LOG_LEVEL = get_capio_log_level();
@@ -95,9 +100,9 @@ static int hook(long syscall_number, long arg0, long arg1, long arg2, long arg3,
 
     START_LOG(syscall_no_intercept(SYS_gettid), "call(syscall_number=%ld)", syscall_number);
 
-    //NB: if capio dir is not set as enviroment variable,
-    //then capio will not intercept the system calls
-    if(capio_dir == nullptr){
+    // NB: if capio dir is not set as enviroment variable,
+    // then capio will not intercept the system calls
+    if (capio_dir == nullptr) {
         LOG("CAPIO_DIR env var not set. returning control to kernel");
         return 1;
     }
@@ -105,10 +110,9 @@ static int hook(long syscall_number, long arg0, long arg1, long arg2, long arg3,
     return syscallTable[syscall_number](arg0, arg1, arg2, arg3, arg4, arg5, result);
 }
 
-static __attribute__((constructor)) void
-init() {
+static __attribute__((constructor)) void init() {
     init_client();
-    char *buf = (char *) malloc(PATH_MAX * sizeof(char));
+    char *buf = (char *)malloc(PATH_MAX * sizeof(char));
     syscall_no_intercept(SYS_getcwd, buf, PATH_MAX);
     current_dir = new std::string(buf);
     mtrace_init(syscall_no_intercept(SYS_gettid));

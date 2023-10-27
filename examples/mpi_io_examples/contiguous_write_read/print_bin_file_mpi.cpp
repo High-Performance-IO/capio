@@ -1,5 +1,5 @@
-#include <mpi.h>
 #include <iostream>
+#include <mpi.h>
 void print_buf(char buf[], int size) {
     std::cout << "print buffer" << std::endl;
     for (int i = 0; i < size; ++i) {
@@ -7,22 +7,21 @@ void print_buf(char buf[], int size) {
     }
 }
 
-bool get_input(int argc, char** argv, char** path) {
+bool get_input(int argc, char **argv, char **path) {
     int my_rank, comm_world_size;
-    bool result = false; ;
+    bool result = false;
+    ;
     MPI_Comm_rank(MPI_COMM_WORLD, &my_rank);
     MPI_Comm_size(MPI_COMM_WORLD, &comm_world_size);
     if (comm_world_size > 1) {
         if (my_rank == 0) {
             std::cout << "error: this program must be launched with only one process" << std::endl;
         }
-    }
-    else if (argc != 2) {
+    } else if (argc != 2) {
         std::cout << "input error: miss some inputs" << std::endl;
         std::cout << "inputs needed: path of the file to read" << std::endl;
 
-    }
-    else {
+    } else {
         *path = argv[1];
         result = true;
     }
@@ -31,12 +30,12 @@ bool get_input(int argc, char** argv, char** path) {
 
 // reads a binary file created using MPI I/O end prints the result on terminal
 
-int main(int argc, char** argv) {
+int main(int argc, char **argv) {
     char buf[1024];
     int open_result, num_read;
     MPI_Status status;
     MPI_File fh;
-    char* path;
+    char *path;
     MPI_Init(&argc, &argv);
     num_read = 1024;
     for (int i = 0; i < 1024; ++i) {
@@ -52,12 +51,10 @@ int main(int argc, char** argv) {
             }
             std::cout << "num_read " << num_read << std::endl;
             MPI_File_close(&fh);
-        }
-        else {
+        } else {
             std::cout << "error path " + std::string(path) + " not valid " << std::endl;
         }
     }
 
     MPI_Finalize();
 }
-
