@@ -127,12 +127,11 @@ documentation about the configuration file!
 
 ## Examples
 
-The [examples](examples) folder contains some examples that shows how easy is to write the CAPIO configuration file for
-a workflow:
-
-- [on_close](examples/pipeline_on_close): A pipeline composed by a producer and a consumer with "on_close" semantics
-- [noupdate](examples/pipeline_append): A pipeline composed by a producer and a consumer with "update" semantics
-- [mix_semantics](examples/pipeline_mix): A pipeline composed by a producer and a consumer with mix semantics
+The [examples](examples) folder contains some examples that shows how to use mpi_io whith CAPIO. 
+There are also examples on how to write JSON configuration files:
+- [on_close](https://github.com/High-Performance-IO/capio/wiki/Examples#noupdate-semantic): A pipeline composed by a producer and a consumer with "on_close" semantics
+- [noupdate](https://github.com/High-Performance-IO/capio/wiki/Examples#on_close-semantics): A pipeline composed by a producer and a consumer with "update" semantics
+- [mix_semantics](https://github.com/High-Performance-IO/capio/wiki/Examples#mixed-semantics): A pipeline composed by a producer and a consumer with mix semantics
 
 ## CAPIO Team
 
