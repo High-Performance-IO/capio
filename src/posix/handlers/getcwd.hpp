@@ -3,7 +3,7 @@
 
 #include "globals.hpp"
 
-inline std::string* capio_getcwd(std::string* buf, size_t size, long tid) {
+inline std::string *capio_getcwd(std::string *buf, size_t size, long tid) {
     START_LOG(tid, "call(buf=0x%08x, size=%ld)", buf, size);
 
     if ((current_dir->length() + 1) * sizeof(char) > size) {
@@ -15,7 +15,7 @@ inline std::string* capio_getcwd(std::string* buf, size_t size, long tid) {
     }
 }
 
-int getcwd_handler(long arg0, long arg1, long arg2,  long arg3, long arg4, long arg5, long* result){
+int getcwd_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg5, long *result) {
     std::string buf(reinterpret_cast<char *>(arg0));
     auto size = static_cast<size_t>(arg1);
     long tid = syscall_no_intercept(SYS_gettid);
@@ -25,7 +25,7 @@ int getcwd_handler(long arg0, long arg1, long arg2,  long arg3, long arg4, long 
     if (rescw == nullptr) {
         *result = -errno;
     }
-   return 0;
+    return 0;
 }
 
 #endif // CAPIO_POSIX_HANDLERS_GETCWD_HPP

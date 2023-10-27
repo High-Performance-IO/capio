@@ -7,7 +7,7 @@ inline void handle_mkdir(int tid, const char *pathname, int rank) {
     write_response(tid, create_dir(tid, pathname, rank, false));
 }
 
-void mkdir_handler(const char * const str, int rank) {
+void mkdir_handler(const char *const str, int rank) {
     pid_t tid;
     char pathname[PATH_MAX];
     sscanf(str, "%d %s", &tid, pathname);

@@ -131,7 +131,7 @@ The [examples](examples) folder contains some examples that shows how easy is to
 a workflow:
 
 - [on_close](examples/pipeline_on_close): A pipeline composed by a producer and a consumer with "on_close" semantics
-- [append](examples/pipeline_append): A pipeline composed by a producer and a consumer with "update" semantics
+- [noupdate](examples/pipeline_append): A pipeline composed by a producer and a consumer with "update" semantics
 - [mix_semantics](examples/pipeline_mix): A pipeline composed by a producer and a consumer with mix semantics
 
 ## CAPIO Team

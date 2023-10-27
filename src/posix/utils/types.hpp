@@ -15,9 +15,11 @@ typedef std::unordered_map<long, Circular_buffer<off_t> *> CPBufResponse_t;
 typedef std::unordered_map<int, std::string> CPFileDescriptors_t;
 typedef std::unordered_set<std::string> CPFilesPaths_t;
 typedef std::unordered_map<long int, bool> CPStatEnabled_t;
-typedef std::unordered_map<int, std::pair<SPSC_queue<char> *, SPSC_queue<char> *>> CPThreadDataBufs_t;
+typedef std::unordered_map<int, std::pair<SPSC_queue<char> *, SPSC_queue<char> *>>
+    CPThreadDataBufs_t;
 
-// Pointer to how a function handler should be made... TODO: document this thing
-typedef int(*CPHandler_t)(long, long, long, long, long, long, long*);
+// Pointer to how a function handler should be made... TODO: document this
+// thing
+typedef int (*CPHandler_t)(long, long, long, long, long, long, long *);
 
 #endif // CAPIO_POSIX_UTILS_TYPES_HPP

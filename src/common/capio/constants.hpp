@@ -5,7 +5,6 @@
 
 #define CAPIO_VERSION "0.0.1"
 
-
 constexpr size_t DIR_INITIAL_SIZE = 1024L * 1024 * 1024;
 
 constexpr int DNAME_LENGTH = 128;
@@ -19,19 +18,17 @@ constexpr long MAX_SHM_SIZE = 1024L * 1024 * 1024 * 16;
 // maximum size of shm for each file
 constexpr long MAX_SHM_SIZE_FILE = 1024L * 1024 * 1024 * 16;
 
-
-//capio file mode
+// capio file mode
 constexpr char CAPIO_FILE_MODE_NOUPDATE[] = "noupdate";
-
 
 constexpr int N_ELEMS_DATA_BUFS = 10;
 
-constexpr int THEORETICAL_SIZE_DIRENT64 =
-        sizeof(ino64_t) + sizeof(off64_t) + sizeof(unsigned short) + sizeof(unsigned char) +
-        sizeof(char) * (DNAME_LENGTH + 1);
+constexpr int THEORETICAL_SIZE_DIRENT64 = sizeof(ino64_t) + sizeof(off64_t) +
+                                          sizeof(unsigned short) + sizeof(unsigned char) +
+                                          sizeof(char) * (DNAME_LENGTH + 1);
 
-constexpr int THEORETICAL_SIZE_DIRENT =
-        sizeof(unsigned long) + sizeof(off_t) + sizeof(unsigned short) + sizeof(char) * (DNAME_LENGTH + 2);
+constexpr int THEORETICAL_SIZE_DIRENT = sizeof(unsigned long) + sizeof(off_t) +
+                                        sizeof(unsigned short) + sizeof(char) * (DNAME_LENGTH + 2);
 
 constexpr int WINDOW_DATA_BUFS = 256 * 1024;
 
@@ -48,35 +45,51 @@ constexpr char CAPIO_SERVER_CLI_LOG_SERVER[] = "[ \033[1;32m SERVER \033[0m ] ";
 constexpr char CAPIO_SERVER_CLI_LOG_SERVER_WARNING[] = "[ \033[1;33m SERVER \033[0m ] ";
 constexpr char CAPIO_SERVER_CLI_LOG_SERVER_ERROR[] = "[ \033[1;31m SERVER \033[0m ] ";
 
+constexpr char CAPIO_BANNER[] =
+    "\n\n "
+    "\033[1;34m /$$$$$$   /$$$$$$  /$$$$$$$\033[0;96m  /$$$$$$  /$$$$$$ \n"
+    "\033[1;34m /$$__  $$ /$$__  $$| $$__  $$\033[0;96m|_  $$_/ /$$__  $$\n"
+    "\033[1;34m| $$  \\__/| $$  \\ $$| $$  \\ $$ \033[0;96m | $$  | $$  \\ "
+    "$$\n"
+    "\033[1;34m| $$      | $$$$$$$$| $$$$$$$/  \033[0;96m| $$  | $$  | $$\n"
+    "\033[1;34m| $$      | $$__  $$| $$____/   \033[0;96m| $$  | $$  | $$\n"
+    "\033[1;34m| $$    $$| $$  | $$| $$        \033[0;96m| $$  | $$  | $$\n"
+    "\033[1;34m|  $$$$$$/| $$  | $$| $$       \033[0;96m/$$$$$$|  $$$$$$/\n"
+    "\033[1;34m \\______/ |__/  |__/|__/      \033[0;96m|______/ "
+    "\\______/\n\n"
+    "\033[0m   CAPIO - Cross Application Programmable IO         \n"
+    "                    V. " CAPIO_VERSION "\n\n";
 
-constexpr char CAPIO_BANNER[] = "\n\n "
-                                "\033[1;34m /$$$$$$   /$$$$$$  /$$$$$$$\033[0;96m  /$$$$$$  /$$$$$$ \n"
-                                "\033[1;34m /$$__  $$ /$$__  $$| $$__  $$\033[0;96m|_  $$_/ /$$__  $$\n"
-                                "\033[1;34m| $$  \\__/| $$  \\ $$| $$  \\ $$ \033[0;96m | $$  | $$  \\ $$\n"
-                                "\033[1;34m| $$      | $$$$$$$$| $$$$$$$/  \033[0;96m| $$  | $$  | $$\n"
-                                "\033[1;34m| $$      | $$__  $$| $$____/   \033[0;96m| $$  | $$  | $$\n"
-                                "\033[1;34m| $$    $$| $$  | $$| $$        \033[0;96m| $$  | $$  | $$\n"
-                                "\033[1;34m|  $$$$$$/| $$  | $$| $$       \033[0;96m/$$$$$$|  $$$$$$/\n"
-                                "\033[1;34m \\______/ |__/  |__/|__/      \033[0;96m|______/ \\______/\n\n"
-                                "\033[0m   CAPIO - Cross Application Programmable IO         \n"
-                                "                    V. " CAPIO_VERSION  "\n\n";
+constexpr char CAPIO_LOG_CLI_WARNING[] =
+    "[ \033[1;33m SERVER \033[0m ] "
+    "|==================================================================|\n"
+    "[ \033[1;33m SERVER \033[0m ] | you are running a build of CAPIO with "
+    "logging enabled.           |\n"
+    "[ \033[1;33m SERVER \033[0m ] | this will have impact on performance. "
+    "you "
+    "should recompile CAPIO |\n"
+    "[ \033[1;33m SERVER \033[0m ] | with -DCAPIOLOG=FALSE                  "
+    "   "
+    "                       |\n"
+    "[ \033[1;33m SERVER \033[0m ] "
+    "|==================================================================|\n";
 
-
-constexpr char CAPIO_LOG_CLI_WARNING[] ="[ \033[1;33m SERVER \033[0m ] |==================================================================|\n"
-                                        "[ \033[1;33m SERVER \033[0m ] | you are running a build of CAPIO with logging enabled.           |\n"
-                                        "[ \033[1;33m SERVER \033[0m ] | this will have impact on performance. you should recompile CAPIO |\n"
-                                        "[ \033[1;33m SERVER \033[0m ] | with -DCAPIOLOG=FALSE                                            |\n"
-                                        "[ \033[1;33m SERVER \033[0m ] |==================================================================|\n";
-
-//constant strings for argument parser and capio server help
-constexpr char CAPIO_SERVER_ARG_PARSER_PRE[] = "Cross Application Programmable IO application. developed by Alberto Riccardo Martinelli (UniTO), "
-                                               "Massimo Torquati(UniPI), Marco Aldinucci (UniTO), Iacopo Colonneli(UniTO) and"
-                                               " Marco Edoardo Santimaria (UniTO).";
-constexpr char CAPIO_SERVER_ARG_PARSER_EPILOGUE[] = "For further help, a full list of the available ENVIROMENT VARIABLES,"
-                                                    " and a guide on config JSON file structure, please visit "
-                                                    "https://github.com/High-Performance-IO/capio";
+// constant strings for argument parser and capio server help
+constexpr char CAPIO_SERVER_ARG_PARSER_PRE[] =
+    "Cross Application Programmable IO application. developed by Alberto "
+    "Riccardo Martinelli (UniTO), "
+    "Massimo Torquati(UniPI), Marco Aldinucci (UniTO), Iacopo "
+    "Colonneli(UniTO) "
+    "and"
+    " Marco Edoardo Santimaria (UniTO).";
+constexpr char CAPIO_SERVER_ARG_PARSER_EPILOGUE[] =
+    "For further help, a full list of the available ENVIROMENT VARIABLES,"
+    " and a guide on config JSON file structure, please visit "
+    "https://github.com/High-Performance-IO/capio";
 constexpr char CAPIO_SERVER_ARG_PARSER_PRE_COMMAND[] = "{ENVIRONMENT_VARS}  mpirun -n 1";
-constexpr char CAPIO_SERVER_ARG_PARSER_LOGILE_OPT_HELP[] = "Filename to which capio_server will log to, without extension";
-constexpr char CAPIO_SERVER_ARG_PARSER_CONFIG_OPT_HELP[] = "JSON Configuration file for capio_server";
+constexpr char CAPIO_SERVER_ARG_PARSER_LOGILE_OPT_HELP[] =
+    "Filename to which capio_server will log to, without extension";
+constexpr char CAPIO_SERVER_ARG_PARSER_CONFIG_OPT_HELP[] =
+    "JSON Configuration file for capio_server";
 
 #endif // CAPIO_COMMON_CONSTANTS_HPP

@@ -19,7 +19,7 @@ inline pid_t capio_fork(long parent_tid) {
     }
 }
 
-int fork_handler(long arg0, long arg1, long arg2,long arg3, long arg4, long arg5, long* result){
+int fork_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg5, long *result) {
     long tid = syscall_no_intercept(SYS_gettid);
     START_LOG(tid, "call()");
 

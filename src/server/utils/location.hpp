@@ -15,14 +15,16 @@ int fd_files_location;
 CSFDFileLocationReadsVector_t fd_files_location_reads;
 
 class flock_guard {
-private:
+  private:
     int _fd;
     struct flock _lock;
     bool _close_file;
-public:
-    inline explicit flock_guard(const int fd, const short l_type, bool close_file) : _fd(fd), _close_file(close_file) {
-        START_LOG(gettid(), "call(fd=%d, l_type=%d, close_file=%s)",
-                  _fd, l_type, close_file? "true" : "false");
+
+  public:
+    inline explicit flock_guard(const int fd, const short l_type, bool close_file)
+        : _fd(fd), _close_file(close_file) {
+        START_LOG(gettid(), "call(fd=%d, l_type=%d, close_file=%s)", _fd, l_type,
+                  close_file ? "true" : "false");
 
         memset(&_lock, 0, sizeof(_lock));
         _lock.l_type = l_type;
@@ -49,7 +51,8 @@ public:
     }
 };
 
-inline std::optional<std::reference_wrapper<std::pair<const char * const, long int>>> get_file_location_opt(const char * const path) {
+inline std::optional<std::reference_wrapper<std::pair<const char *const, long int>>>
+get_file_location_opt(const char *const path) {
     START_LOG(gettid(), "path=%s", path);
 
     const std::lock_guard<std::mutex> lg(files_metadata_mutex);
@@ -61,7 +64,7 @@ inline std::optional<std::reference_wrapper<std::pair<const char * const, long i
     }
 }
 
-inline std::pair<const char * const, long int>& get_file_location(const char * const path) {
+inline std::pair<const char *const, long int> &get_file_location(const char *const path) {
     START_LOG(gettid(), "path=%s", path);
 
     auto file_location_opt = get_file_location_opt(path);
@@ -72,17 +75,17 @@ inline std::pair<const char * const, long int>& get_file_location(const char * c
     }
 }
 
-inline void add_file_location(const std::string& path, const char * const p_node_str, long offset) {
+inline void add_file_location(const std::string &path, const char *const p_node_str, long offset) {
     const std::lock_guard<std::mutex> lg(files_location_mutex);
     files_location.emplace(path, std::make_pair(p_node_str, offset));
 }
 
-void erase_from_files_location(const char * const path) {
+void erase_from_files_location(const char *const path) {
     const std::lock_guard<std::mutex> lg(files_location_mutex);
     files_location.erase(path);
 }
 
-void rename_file_location(const char * const oldpath, const char * const newpath) {
+void rename_file_location(const char *const oldpath, const char *const newpath) {
     const std::lock_guard<std::mutex> lg(files_location_mutex);
     auto node_2 = files_location.extract(oldpath);
     if (!node_2.empty()) {
@@ -96,9 +99,10 @@ void rename_file_location(const char * const oldpath, const char * const newpath
  * Returns 1 if the location of the file path_to_check is found
  * Returns 2 otherwise
  *
-*/
-int check_file_location(std::size_t index, int rank, const std::string& path_to_check) {
-    START_LOG(gettid(), "call(index=%ld, rank=%d, path_to_check=%s)", index, rank, path_to_check.c_str());
+ */
+int check_file_location(std::size_t index, int rank, const std::string &path_to_check) {
+    START_LOG(gettid(), "call(index=%ld, rank=%d, path_to_check=%s)", index, rank,
+              path_to_check.c_str());
 
     FILE *fp;
     bool seek_needed;
@@ -137,14 +141,14 @@ int check_file_location(std::size_t index, int rank, const std::string& path_to_
         if (line[0] == '0') {
             continue;
         }
-        char path[1024]; //TODO: heap memory
+        char path[1024]; // TODO: heap memory
         int i = 0;
         while (line[i] != ' ') {
             path[i] = line[i];
             ++i;
         }
         path[i] = '\0';
-        char node_str[1024]; //TODO: heap memory
+        char node_str[1024]; // TODO: heap memory
         ++i;
         int j = 0;
         while (line[i] != '\n') {
@@ -153,7 +157,7 @@ int check_file_location(std::size_t index, int rank, const std::string& path_to_
             ++j;
         }
         node_str[j] = '\0';
-        char *p_node_str = (char *) malloc(sizeof(char) * (strlen(node_str) + 1));
+        char *p_node_str = (char *)malloc(sizeof(char) * (strlen(node_str) + 1));
         strcpy(p_node_str, node_str);
         long offset = ftell(fp);
         if (offset == -1) {
@@ -172,7 +176,7 @@ int check_file_location(std::size_t index, int rank, const std::string& path_to_
     }
 }
 
-bool check_file_location(int my_rank, const std::string& path_to_check) {
+bool check_file_location(int my_rank, const std::string &path_to_check) {
     START_LOG(gettid(), "call(my_rank=%d, path_to_check=%s)", my_rank, path_to_check.c_str());
 
     bool found = false;
@@ -201,15 +205,16 @@ void clean_files_location(int n_servers) {
  * Returns 1 if the location of the file path_to_check is found
  * Returns 2 otherwise
  *
-*/
-int delete_from_file_locations(const std::string& file_name, const std::string& path_to_remove, int rank) {
+ */
+int delete_from_file_locations(const std::string &file_name, const std::string &path_to_remove,
+                               int rank) {
     START_LOG(gettid(), "call(%s, %s, %d)", file_name.c_str(), path_to_remove.c_str(), rank);
 
-    std::unique_ptr<char[]> line(new char[PATH_MAX] );
+    std::unique_ptr<char[]> line(new char[PATH_MAX]);
 
     size_t len = PATH_MAX;
     ssize_t read = 0;
-    FILE * fp = fopen(file_name.c_str(), "r+");
+    FILE *fp = fopen(file_name.c_str(), "r+");
     if (fp == nullptr) {
         LOG("capio server %d failed to open the location file", rank);
         return 0;
@@ -226,7 +231,7 @@ int delete_from_file_locations(const std::string& file_name, const std::string& 
         if (byte == -1) {
             ERR_EXIT("ftell delete_from_file_location");
         }
-        char *line_addr = static_cast<char*>(line.get());
+        char *line_addr = static_cast<char *>(line.get());
         read = getline(&line_addr, &len, fp);
         if (read == -1) {
             break;
@@ -236,7 +241,7 @@ int delete_from_file_locations(const std::string& file_name, const std::string& 
         }
         char path[PATH_MAX];
         int i = 0;
-        while(line[i] != ' ') {
+        while (line[i] != ' ') {
             path[i] = line[i];
             ++i;
         }
@@ -247,31 +252,33 @@ int delete_from_file_locations(const std::string& file_name, const std::string& 
             if (lseek(fd, byte, SEEK_SET) == -1) {
                 ERR_EXIT("fseek delete_from_file_location");
             }
-            if(write(fd, &CAPIO_SERVER_INVALIDATE_FILE_PATH_CHAR, sizeof(char)) != 1){
-                ERR_EXIT("fwrite unable to invalidate file %s in files_location_%d.txt",path_to_remove.c_str(),  rank);
+            if (write(fd, &CAPIO_SERVER_INVALIDATE_FILE_PATH_CHAR, sizeof(char)) != 1) {
+                ERR_EXIT("fwrite unable to invalidate file %s in "
+                         "files_location_%d.txt",
+                         path_to_remove.c_str(), rank);
             }
         }
     }
 
     LOG("%d files have been invalidated!", found);
 
-
-    if (found>0)
+    if (found > 0) {
         return 1;
-    else
+    } else {
         return 2;
-
+    }
 }
 
-void delete_from_file_locations(const std::string& path_metadata, long int offset, int my_rank, std::size_t rank) {
+void delete_from_file_locations(const std::string &path_metadata, long int offset, int my_rank,
+                                std::size_t rank) {
     START_LOG(gettid(), "call(%s, %ld, %d, %ld)", path_metadata.c_str(), offset, my_rank, rank);
-    
+
     int fd;
     if (rank < fd_files_location_reads.size()) {
         fd = std::get<0>(fd_files_location_reads[rank]);
     } else {
         std::string file_name = "files_location_" + std::to_string(rank) + ".txt";
-        FILE* fp = fopen(file_name.c_str(), "r+");
+        FILE *fp = fopen(file_name.c_str(), "r+");
         if (fp == nullptr) {
             ERR_EXIT("fopen %s delete_from_file_locations", file_name.c_str());
         }
@@ -297,30 +304,31 @@ void delete_from_file_locations(const std::string& path_metadata, long int offse
     }
 }
 
-void delete_from_file_locations(const std::string& path, int rank) {
+void delete_from_file_locations(const std::string &path, int rank) {
     START_LOG(gettid(), "call(%s, %d)", path.c_str(), rank);
 
     bool found = false;
     int res = -1;
-    auto& [node, offset] = get_file_location(path.c_str());
-    if (offset == -1) { //TODO: very inefficient
+    auto &[node, offset] = get_file_location(path.c_str());
+    if (offset == -1) { // TODO: very inefficient
         int r = 0;
         while (!found && r < n_servers) {
-            res = delete_from_file_locations("files_location_" + std::to_string(r) + ".txt", path, rank);
+            res = delete_from_file_locations("files_location_" + std::to_string(r) + ".txt", path,
+                                             rank);
             found = res == 1;
             ++r;
         }
     } else {
-        int r = (node == std::string(node_name))? rank : nodes_helper_rank[node];
+        int r = (node == std::string(node_name)) ? rank : nodes_helper_rank[node];
         delete_from_file_locations("files_location_" + std::to_string(r) + ".txt", offset, rank, r);
     }
     erase_from_files_location(path.c_str());
-    for (auto& pair : writers) {
+    for (auto &pair : writers) {
         pair.second.erase(path);
     }
 }
 
-void loop_check_files_location(const std::string& path_to_check, int rank) {
+void loop_check_files_location(const std::string &path_to_check, int rank) {
     START_LOG(gettid(), "call(path_to_check=%s, rank=%d)", path_to_check.c_str(), rank);
 
     while (!check_file_location(rank, path_to_check)) {
@@ -340,7 +348,7 @@ void open_files_location(int rank) {
     fd_files_location = fd;
 }
 
-void write_file_location(int rank, const std::string& path_to_write, int tid) {
+void write_file_location(int rank, const std::string &path_to_write, int tid) {
     START_LOG(tid, "call(rank=%d, path_to_write=%s)", rank, path_to_write.c_str());
 
     const flock_guard fg(fd_files_location, F_WRLCK, false);

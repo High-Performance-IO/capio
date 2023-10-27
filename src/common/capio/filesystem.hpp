@@ -1,11 +1,12 @@
 #ifndef CAPIO_COMMON_FILESYSTEM_HPP
 #define CAPIO_COMMON_FILESYSTEM_HPP
 
+#include <sys/stat.h>
+
 #include <cerrno>
 #include <cstring>
 #include <fstream>
 #include <iostream>
-#include <sys/stat.h>
 
 #include "logger.hpp"
 #include "syscall.hpp"
@@ -31,10 +32,11 @@ inline bool is_absolute(const std::string *pathname) {
 inline bool is_directory(int dirfd) {
     START_LOG(capio_syscall(SYS_gettid), "call(dirfd=%d)", dirfd);
 
-    struct stat path_stat{};
+    struct stat path_stat {};
     int tmp = fstat(dirfd, &path_stat);
     if (tmp != 0) {
-        LOG("Error at is_directory(dirfd=%d) -> %d: %d (%s)", dirfd, tmp, errno, std::strerror(errno));
+        LOG("Error at is_directory(dirfd=%d) -> %d: %d (%s)", dirfd, tmp, errno,
+            std::strerror(errno));
         return -1;
     }
     return S_ISDIR(path_stat.st_mode) == 1;
@@ -43,9 +45,10 @@ inline bool is_directory(int dirfd) {
 inline bool is_directory(const std::string &path) {
     START_LOG(capio_syscall(SYS_gettid), "call(path=%s)", path.c_str());
 
-    struct stat statbuf{};
+    struct stat statbuf {};
     if (stat(path.c_str(), &statbuf) != 0) {
-        LOG("Error at is_directory(path=%d) -> %d: %d (%s)", path.c_str(), errno, std::strerror(errno));
+        LOG("Error at is_directory(path=%d) -> %d: %d (%s)", path.c_str(), errno,
+            std::strerror(errno));
         return -1;
     }
     return S_ISDIR(statbuf.st_mode) == 1;
@@ -56,23 +59,23 @@ bool is_prefix(std::string path_1, std::string path_2) {
     return res.first == path_2.end();
 }
 
-static inline bool is_capio_path(long tid, const std::string &path_to_check, const std::string &capio_dir) {
+static inline bool is_capio_path(long tid, const std::string &path_to_check,
+                                 const std::string &capio_dir) {
     START_LOG(tid, "call(%s, %s)", path_to_check.c_str(), capio_dir.c_str());
 
-    return (std::mismatch(capio_dir.begin(), capio_dir.end(), path_to_check.begin()).first == capio_dir.end() &&
+    return (std::mismatch(capio_dir.begin(), capio_dir.end(), path_to_check.begin()).first ==
+                capio_dir.end() &&
             capio_dir.size() != path_to_check.size());
 }
 
-const std::string *capio_posix_realpath(long tid,
-                                        const std::string *pathname,
+const std::string *capio_posix_realpath(long tid, const std::string *pathname,
                                         const std::string *capio_dir,
                                         const std::string *current_dir) {
+    START_LOG(tid, "call(path=%s, capio_dir=%s, current_dir=%s)", pathname->c_str(),
+              capio_dir->c_str(), current_dir->c_str());
+    char *posix_real_path = capio_realpath((char *)pathname->c_str(), nullptr);
 
-    START_LOG(tid, "call(path=%s, capio_dir=%s, current_dir=%s)", pathname->c_str(), capio_dir->c_str(),
-              current_dir->c_str());
-    char *posix_real_path = capio_realpath((char *) pathname->c_str(), nullptr);
-
-    //if capio_realpath fails, then it should be a capio_file
+    // if capio_realpath fails, then it should be a capio_file
     if (posix_real_path == nullptr) {
         LOG("path is null due to errno='%s'", strerror(errno));
 
@@ -80,7 +83,7 @@ const std::string *capio_posix_realpath(long tid,
             if (pathname[0] != "/") {
                 auto newPath = new std::string(*capio_dir + "/" + *pathname);
 
-                //remove /./ from path
+                // remove /./ from path
                 std::size_t pos = 0;
                 while ((pos = newPath->find("/./", pos)) != std::string::npos) {
                     newPath->replace(newPath->find("/./"), 3, "/");
@@ -94,13 +97,15 @@ const std::string *capio_posix_realpath(long tid,
             }
             return pathname;
         } else {
-            //if file not found, then error is returned
-            LOG("Fatal: file %s is not a posix file, nor a capio file!", pathname->c_str());
+            // if file not found, then error is returned
+            LOG("Fatal: file %s is not a posix file, nor a capio "
+                "file!",
+                pathname->c_str());
             exit(EXIT_FAILURE);
         }
     }
 
-    //if not, then check for realpath trough libc implementation
+    // if not, then check for realpath trough libc implementation
     LOG("Computed realpath = %s", posix_real_path);
     return new std::string(posix_real_path);
 }

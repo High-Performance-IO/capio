@@ -10,7 +10,7 @@
 /* Allows CAPIO to deactivate syscalls hooking. */
 thread_local bool syscall_no_intercept_flag = false;
 
-inline char *syscall_no_intercept_realpath(const char * path, char * resolved) {
+inline char *syscall_no_intercept_realpath(const char *path, char *resolved) {
     syscall_no_intercept_flag = true;
     char *res = realpath(path, resolved);
     syscall_no_intercept_flag = false;

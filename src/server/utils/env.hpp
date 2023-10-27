@@ -27,10 +27,11 @@ off64_t get_prefetch_data_size() {
     if (prefetch_data_size == -1) {
         char *val;
         val = std::getenv("CAPIO_PREFETCH_DATA_SIZE");
-        if (val != nullptr)
+        if (val != nullptr) {
             prefetch_data_size = std::strtol(val, nullptr, 10);
-        else
+        } else {
             prefetch_data_size = 0;
+        }
     }
 
     return prefetch_data_size;

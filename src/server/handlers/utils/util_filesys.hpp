@@ -3,20 +3,21 @@
 
 #include "utils/location.hpp"
 
-void reply_remote_stats(const std::string& path) {
+void reply_remote_stats(const std::string &path) {
     START_LOG(gettid(), "call(%s)", path.c_str());
 
     auto it_client = clients_remote_pending_stat.find(path);
     if (it_client != clients_remote_pending_stat.end()) {
-        for (sem_t *sem: it_client->second) {
-            if (sem_post(sem) == -1)
+        for (sem_t *sem : it_client->second) {
+            if (sem_post(sem) == -1) {
                 ERR_EXIT("error sem_post sem in reply_remote_stats");
+            }
         }
         clients_remote_pending_stat.erase(path);
     }
 }
 
-void handle_pending_remote_reads(const std::string& path, off64_t data_size, bool complete) {
+void handle_pending_remote_reads(const std::string &path, off64_t data_size, bool complete) {
     START_LOG(gettid(), "call(%s, %ld, %d)", path.c_str(), data_size, static_cast<int>(complete));
 
     auto it_client = clients_remote_pending_reads.find(path);
@@ -24,10 +25,12 @@ void handle_pending_remote_reads(const std::string& path, off64_t data_size, boo
         std::list<std::tuple<size_t, size_t, sem_t *>>::iterator it_list, prev_it_list;
         it_list = it_client->second.begin();
         while (it_list != it_client->second.end()) {
-            auto& [offset, nbytes, sem] = *it_list;
+            auto &[offset, nbytes, sem] = *it_list;
             if (complete || (offset + nbytes < data_size)) {
-                if (sem_post(sem) == -1)
-                    ERR_EXIT("sem_post sem in handle_pending_remote_reads");
+                if (sem_post(sem) == -1) {
+                    ERR_EXIT("sem_post sem in "
+                             "handle_pending_remote_reads");
+                }
                 if (it_list == it_client->second.begin()) {
                     it_client->second.erase(it_list);
                     it_list = it_client->second.begin();
@@ -49,7 +52,7 @@ void handle_pending_remote_reads(const std::string& path, off64_t data_size, boo
  * type == 2 -> ".." entry
  */
 
-void write_entry_dir(int tid, const std::string& file_path, const std::string& dir, int type) {
+void write_entry_dir(int tid, const std::string &file_path, const std::string &dir, int type) {
     START_LOG(tid, "call(file_path=%s, dir=%s, type=%d)", file_path.c_str(), dir.c_str(), type);
 
     std::hash<std::string> hash;
@@ -75,7 +78,7 @@ void write_entry_dir(int tid, const std::string& file_path, const std::string& d
     Capio_file &c_file = init_capio_file(dir.c_str(), true);
     void *file_shm = c_file.get_buffer();
     off64_t file_size = c_file.get_stored_size();
-    off64_t data_size = file_size + ld_size; //TODO: check theoreitcal size and sizeof(ld) usage
+    off64_t data_size = file_size + ld_size; // TODO: check theoreitcal size and sizeof(ld) usage
     size_t file_shm_size = c_file.get_buf_size();
     ld.d_off = data_size;
 
@@ -88,7 +91,7 @@ void write_entry_dir(int tid, const std::string& file_path, const std::string& d
         ld.d_type = DT_REG;
     }
     ld.d_name[DNAME_LENGTH] = '\0';
-    memcpy((char *) file_shm + file_size, &ld, sizeof(ld));
+    memcpy((char *)file_shm + file_size, &ld, sizeof(ld));
     off64_t base_offset = file_size;
 
     c_file.insert_sector(base_offset, data_size);
@@ -107,10 +110,10 @@ void write_entry_dir(int tid, const std::string& file_path, const std::string& d
     }
 }
 
-void update_dir(int tid, const std::string& file_path, int rank) {
+void update_dir(int tid, const std::string &file_path, int rank) {
     START_LOG(tid, "call(file_path=%s, rank=%d)", file_path.c_str(), rank);
     std::string dir = get_parent_dir_path(file_path);
-    Capio_file& c_file = get_capio_file(dir.c_str());
+    Capio_file &c_file = get_capio_file(dir.c_str());
     if (c_file.first_write) {
         c_file.first_write = false;
         write_file_location(rank, dir, tid);
@@ -119,13 +122,14 @@ void update_dir(int tid, const std::string& file_path, int rank) {
 }
 
 off64_t create_dir(int tid, const char *pathname, int rank, bool root_dir) {
-    START_LOG(tid, "call(pathname=%s, rank=%d, root_dir=%s)", pathname, rank, root_dir? "true" : "false");
+    START_LOG(tid, "call(pathname=%s, rank=%d, root_dir=%s)", pathname, rank,
+              root_dir ? "true" : "false");
 
     if (!get_file_location_opt(pathname)) {
         Capio_file &c_file = create_capio_file(pathname, true, DIR_INITIAL_SIZE);
         if (c_file.first_write) {
             c_file.first_write = false;
-            //TODO: it works only if there is one prod per file
+            // TODO: it works only if there is one prod per file
             if (root_dir) {
                 add_file_location(pathname, node_name, -1);
             } else {
@@ -142,4 +146,4 @@ off64_t create_dir(int tid, const char *pathname, int rank, bool root_dir) {
     }
 }
 
-#endif //CAPIO_UTIL_FILESYS_HPP
+#endif // CAPIO_UTIL_FILESYS_HPP

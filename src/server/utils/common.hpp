@@ -4,7 +4,6 @@
 #include <string>
 
 #include "capio/constants.hpp"
-
 #include "capio_file.hpp"
 #include "data_structure.hpp"
 #include "types.hpp"
@@ -14,7 +13,8 @@ char *expand_memory_for_file(const std::string &path, off64_t data_size, Capio_f
     return new_p;
 }
 
-off64_t convert_dirent64_to_dirent(char *dirent64_buf, char *dirent_buf, off64_t dirent_64_buf_size) {
+off64_t convert_dirent64_to_dirent(char *dirent64_buf, char *dirent_buf,
+                                   off64_t dirent_64_buf_size) {
     START_LOG(gettid(), "call(%s, %s, %ld)", dirent64_buf, dirent_buf, dirent_64_buf_size);
     off64_t dirent_buf_size = 0;
     off64_t i = 0;
@@ -22,7 +22,7 @@ off64_t convert_dirent64_to_dirent(char *dirent64_buf, char *dirent_buf, off64_t
     struct linux_dirent64 *p_ld64;
     ld.d_reclen = THEORETICAL_SIZE_DIRENT;
     while (i < dirent_64_buf_size) {
-        p_ld64 = (struct linux_dirent64 *) (dirent64_buf + i);
+        p_ld64 = (struct linux_dirent64 *)(dirent64_buf + i);
         ld.d_ino = p_ld64->d_ino;
         ld.d_off = dirent_buf_size + THEORETICAL_SIZE_DIRENT;
         logfile << "dirent_buf_size " << dirent_buf_size << std::endl;
@@ -30,13 +30,12 @@ off64_t convert_dirent64_to_dirent(char *dirent64_buf, char *dirent_buf, off64_t
         ld.d_name[DNAME_LENGTH + 1] = p_ld64->d_type;
         ld.d_name[DNAME_LENGTH] = '\0';
         i += THEORETICAL_SIZE_DIRENT64;
-        memcpy((char *) dirent_buf + dirent_buf_size, &ld, sizeof(ld));
+        memcpy((char *)dirent_buf + dirent_buf_size, &ld, sizeof(ld));
         dirent_buf_size += ld.d_reclen;
     }
 
     return dirent_buf_size;
 }
-
 
 bool is_int(const std::string &s) {
     START_LOG(gettid(), "call(%s)", s.c_str());

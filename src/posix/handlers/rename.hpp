@@ -4,10 +4,10 @@
 #include "globals.hpp"
 #include "utils/filesystem.hpp"
 
-inline off64_t capio_rename(const std::string& oldpath,const std::string& newpath,long tid) {
+inline off64_t capio_rename(const std::string &oldpath, const std::string &newpath, long tid) {
     START_LOG(tid, "call(oldpath=%s, newpath=%s)", oldpath.c_str(), newpath.c_str());
 
-    const std::string* capio_dir = get_capio_dir();
+    const std::string *capio_dir = get_capio_dir();
     std::string oldpath_abs, newpath_abs;
 
     if (is_absolute(&oldpath)) {
@@ -18,7 +18,7 @@ inline off64_t capio_rename(const std::string& oldpath,const std::string& newpat
 
     bool oldpath_capio = is_capio_path(tid, oldpath_abs, *capio_dir);
 
-    if (is_absolute(&newpath)) { //TODO: move this control inside create_absolute_path
+    if (is_absolute(&newpath)) { // TODO: move this control inside create_absolute_path
         newpath_abs = newpath;
     } else {
         newpath_abs = *capio_posix_realpath(tid, &newpath, capio_dir, current_dir);
@@ -26,7 +26,7 @@ inline off64_t capio_rename(const std::string& oldpath,const std::string& newpat
 
     bool newpath_capio = is_capio_path(tid, newpath_abs, *capio_dir);
 
-    if (is_prefix(oldpath_abs, newpath_abs)) {//TODO: The check is more complex
+    if (is_prefix(oldpath_abs, newpath_abs)) { // TODO: The check is more complex
         errno = EINVAL;
         return -1;
     }
@@ -39,13 +39,13 @@ inline off64_t capio_rename(const std::string& oldpath,const std::string& newpat
         if (newpath_capio) {
             copy_file(tid, oldpath_abs, newpath_abs);
             return -1;
-        } else { //Both aren't CAPIO paths
+        } else { // Both aren't CAPIO paths
             return -2;
         }
     }
 }
 
-int rename_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg5, long* result){
+int rename_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg5, long *result) {
     const std::string oldpath(reinterpret_cast<const char *>(arg0));
     const std::string newpath(reinterpret_cast<const char *>(arg1));
     long tid = syscall_no_intercept(SYS_gettid);

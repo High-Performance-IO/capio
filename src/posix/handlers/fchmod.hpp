@@ -3,12 +3,12 @@
 
 #include "globals.hpp"
 
-int fchmod_handler(long arg0, long arg1, long arg2,long arg3, long arg4, long arg5, long* result){
+int fchmod_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg5, long *result) {
     int fd = static_cast<int>(arg0);
     START_LOG(syscall_no_intercept(SYS_gettid), "call(fd=%d)", fd);
 
     if (files->find(fd) == files->end()) {
-      return 1;
+        return 1;
     }
 
     *result = -errno;

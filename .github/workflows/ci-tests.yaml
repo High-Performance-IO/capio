@@ -67,3 +67,18 @@ jobs:
             --build-config ${{ matrix.build_type }} \
             --output-on-failure \
             --test-dir build/tests
+  format-check:
+    name: "Check clang-format conformance to LLVM style"
+    runs-on: ubuntu-22.04
+    strategy:
+      matrix:
+        path:
+          - "src"
+          - "tests"
+    steps:
+      - uses: actions/checkout@v4
+      - name: "Run clang-format style check on ${{ matrix.path }}"
+        uses: jidicula/clang-format-action@v4.11.0
+        with:
+          clang-format-version: "16"
+          check-path: "${{ matrix.path }}"

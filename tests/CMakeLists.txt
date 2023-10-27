@@ -40,6 +40,6 @@ include(Catch)
 # Configure tests
 #####################################
 catch_discover_tests(${TARGET_NAME}
-    PROPERTIES
+        PROPERTIES
         ENVIRONMENT LD_PRELOAD=${CMAKE_BINARY_DIR}/src/posix/libcapio_posix.so
 )

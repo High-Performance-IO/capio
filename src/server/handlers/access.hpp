@@ -13,7 +13,7 @@ inline void handle_access(long tid, char *path) {
     }
 }
 
-void access_handler(const char * const str, int rank) {
+void access_handler(const char *const str, int rank) {
     long tid;
     char path[PATH_MAX];
     sscanf(str, "%ld %s", &tid, path);

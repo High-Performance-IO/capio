@@ -21,11 +21,11 @@ target_link_libraries(request_reply_mpi ${MPI_LIBRARIES} rt)
 target_link_libraries(writev_test)
 
 
-target_link_libraries(simple_fopen  rt)
+target_link_libraries(simple_fopen rt)
 
 # includes MPI
 include_directories(${MPI_INCLUDE_PATH})
-if(MPI_COMPILE_FLAGS)
+if (MPI_COMPILE_FLAGS)
     set_target_properties(simple_write PROPERTIES
             COMPILE_FLAGS "${MPI_COMPILE_FLAGS}")
     set_target_properties(simple_write_fopen PROPERTIES
@@ -38,9 +38,9 @@ if(MPI_COMPILE_FLAGS)
             COMPILE_FLAGS "${MPI_COMPILE_FLAGS}")
     set_target_properties(request_reply_mpi PROPERTIES
             COMPILE_FLAGS "${MPI_COMPILE_FLAGS}")
-endif()
+endif ()
 
-if(MPI_LINK_FLAGS)
+if (MPI_LINK_FLAGS)
     set_target_properties(simple_write PROPERTIES
             LINK_FLAGS "${MPI_LINK_FLAGS}")
     set_target_properties(simple_write_fopen PROPERTIES
@@ -53,6 +53,6 @@ if(MPI_LINK_FLAGS)
             LINK_FLAGS "${MPI_LINK_FLAGS}")
     set_target_properties(request_reply_mpi PROPERTIES
             LINK_FLAGS "${MPI_LINK_FLAGS}")
-endif()
+endif ()
 
 add_subdirectory(circular_buffer)
