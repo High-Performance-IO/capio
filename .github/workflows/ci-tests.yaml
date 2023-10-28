@@ -10,7 +10,29 @@ concurrency:
   group: build-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 jobs:
-  build:
+  codespell-check:
+    name: "Check codespell conformance"
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: "Run codespell"
+        uses: codespell-project/actions-codespell@v2
+  format-check:
+    name: "Check ${{ matrix.path }} clang-format conformance"
+    runs-on: ubuntu-22.04
+    strategy:
+      matrix:
+        path:
+          - "src"
+          - "tests"
+    steps:
+      - uses: actions/checkout@v4
+      - name: "Run clang-format style check"
+        uses: jidicula/clang-format-action@v4.11.0
+        with:
+          clang-format-version: "16"
+          check-path: "${{ matrix.path }}"
+  unit-tests:
     name: "Build ${{ matrix.build_type }} with ${{ matrix.cxx }}"
     runs-on: ubuntu-22.04
     strategy:
@@ -73,18 +95,3 @@ jobs:
       - name: "Show server log on failure"
         if: ${{ steps.run-tests.outcome == 'failure' }}
         run: cat server_rank_0.log
-  format-check:
-    name: "Check ${{ matrix.path }} clang-format conformance"
-    runs-on: ubuntu-22.04
-    strategy:
-      matrix:
-        path:
-          - "src"
-          - "tests"
-    steps:
-      - uses: actions/checkout@v4
-      - name: "Run clang-format style check"
-        uses: jidicula/clang-format-action@v4.11.0
-        with:
-          clang-format-version: "16"
-          check-path: "${{ matrix.path }}"

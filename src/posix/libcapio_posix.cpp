@@ -100,7 +100,7 @@ static int hook(long syscall_number, long arg0, long arg1, long arg2, long arg3,
 
     START_LOG(syscall_no_intercept(SYS_gettid), "call(syscall_number=%ld)", syscall_number);
 
-    // NB: if capio dir is not set as enviroment variable,
+    // NB: if capio dir is not set as environment variable,
     // then capio will not intercept the system calls
     if (capio_dir == nullptr) {
         LOG("CAPIO_DIR env var not set. returning control to kernel");

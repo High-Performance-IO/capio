@@ -3,7 +3,7 @@
 
 #include "globals.hpp"
 
-// TODO: EOVERFLOW is not adressed
+// TODO: EOVERFLOW is not addressed
 inline off64_t capio_lseek(int fd, off64_t offset, int whence, long tid) {
     START_LOG(tid, "call(fd=%d, offset=%ld, whence=%d)", fd, offset, whence);
 

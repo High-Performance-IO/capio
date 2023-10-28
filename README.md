@@ -26,9 +26,9 @@ syscall_intercpet is automatically cloned from the repository, and compiled as d
 
 Capio also depends on:
 
-- [Taywee/args](https://github.com/Taywee/args) to parse server command line imputs
+- [Taywee/args](https://github.com/Taywee/args) to parse server command line inputs
 - [simdjson/simdjson](https://github.com/simdjson/simdjson) to parse json configuration files
-  All dependencies are automatically fetched during cmake configuratoin phase, and compiled when required.
+  All dependencies are automatically fetched during cmake configuration phase, and compiled when required.
 
 ### Compile capio
 
@@ -47,9 +47,9 @@ the first is optional).
 
 1) Write a configuration file for injecting streaming capabilities to your workflow
 
-2) Launch the CAPIO deamons with MPI passing the (eventual) configuration file as argument on the machines in which you
-   want to execute your program (one deamon for each node). If you desire to specify a custom folder
-   for capio, set `CAPIO_DIR` as a enviroment variable.
+2) Launch the CAPIO daemons with MPI passing the (eventual) configuration file as argument on the machines in which you
+   want to execute your program (one daemon for each node). If you desire to specify a custom folder
+   for capio, set `CAPIO_DIR` as a environment variable.
    ```bash
    [CAPIO_DIR=your_capiodir] mpiexec -N 1 --hostfile your_hostfile src/capio_server conf.json 
    ```
@@ -127,7 +127,7 @@ documentation about the configuration file!
 
 ## Examples
 
-The [examples](examples) folder contains some examples that shows how to use mpi_io whith CAPIO. 
+The [examples](examples) folder contains some examples that shows how to use mpi_io with CAPIO. 
 There are also examples on how to write JSON configuration files:
 - [on_close](https://github.com/High-Performance-IO/capio/wiki/Examples#noupdate-semantic): A pipeline composed by a producer and a consumer with "on_close" semantics
 - [noupdate](https://github.com/High-Performance-IO/capio/wiki/Examples#on_close-semantics): A pipeline composed by a producer and a consumer with "update" semantics
@@ -137,7 +137,7 @@ There are also examples on how to write JSON configuration files:
 
 Made with :heart: by:
 
-Alberto Riccardo Martinelli <albertoriccardo.martinelli@unito.it> (Designer and mantainer)\  
+Alberto Riccardo Martinelli <albertoriccardo.martinelli@unito.it> (Designer and maintainer)\  
 Massimo Torquati <massimo.torquati@unipi.it> (Designer)\
 Marco Aldinucci <marco.aldinucci@unito.it> (Designer)\
 Iacopo Colonnelli <iacopo.colonnelli@unito.it> (Workflows expert)\

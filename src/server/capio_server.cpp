@@ -63,7 +63,7 @@ CSRankToNodeMap_t rank_to_node;
 
 /*
  * It contains all the reads requested by local processes to read files that
- * are in the local node for which the data is not yet avaiable. path -> [(tid,
+ * are in the local node for which the data is not yet available. path -> [(tid,
  * fd, numbytes, is_getdents), ...]
  */
 CSPendingReadsMap_t pending_reads;
@@ -322,8 +322,8 @@ void wait_for_n_files(char *const prefix, std::vector<std::string> *files_path, 
     free(sem);
 }
 
-std::vector<std::string> *files_avaiable(const std::string &prefix, const std::string &app,
-                                         const std::string &path_file, int n_files) {
+std::vector<std::string> *files_available(const std::string &prefix, const std::string &app,
+                                          const std::string &path_file, int n_files) {
     START_LOG(gettid(), "call(prefix=%s, app=%s, path_file=%s, n_files=%d)", prefix.c_str(),
               app.c_str(), path_file.c_str(), n_files);
 
@@ -371,7 +371,7 @@ void helper_nreads_req(char *buf_recv, int dest) {
         -1) { // important even if not using the data structure
         ERR_EXIT("sem_wait clients_remote_pending_nfiles_sem in helper_nreads_req");
     }
-    std::vector<std::string> *files = files_avaiable(prefix, app_name, path_file, n_files);
+    std::vector<std::string> *files = files_available(prefix, app_name, path_file, n_files);
     if (sem_post(&clients_remote_pending_nfiles_sem) == -1) {
         ERR_EXIT("sem_post clients_remote_pending_nfiles_sem in helper_nreads_req");
     }
@@ -587,7 +587,7 @@ void capio_helper() {
             long int offset, nbytes;
             sscanf(buf_recv, "read %s %d %ld %ld", path_c, &dest, &offset, &nbytes);
 
-            // check if the data is avaiable
+            // check if the data is available
             Capio_file &c_file  = get_capio_file(path_c);
             size_t file_size    = c_file.get_stored_size();
             bool complete       = c_file.complete;
