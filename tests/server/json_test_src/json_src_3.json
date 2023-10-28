@@ -1,0 +1,52 @@
+{
+  "name": "json_test_3",
+  "IO_Graph": [
+    {
+      "name": "writer",
+      "output_stream": [
+        "file0.dat",
+        "file1.dat",
+        "file2.dat",
+        "file3.dat",
+        "file4.dat",
+        "file5.dat"
+      ],
+      "streaming": [
+        {
+          "name": "file0.dat",
+          "committed": "on_close"
+        },
+        {
+          "name": "file1.dat",
+          "committed": "on_close",
+          "mode": "noupdate"
+        },
+        {
+          "name": "file3.dat",
+          "committed": "on_termination"
+        },
+        {
+          "name": "file4.dat",
+          "committed": "on_close",
+          "mode": "noupdate"
+        },
+        {
+          "name": "file5.dat",
+          "committed": "on_close",
+          "mode": "noupdate"
+        }
+      ]
+    },
+    {
+      "name": "reader",
+      "input_stream": [
+        "file0.dat",
+        "file1.dat",
+        "file2.dat",
+        "file3.dat",
+        "file4.dat",
+        "file5.dat"
+      ]
+    }
+  ]
+}
