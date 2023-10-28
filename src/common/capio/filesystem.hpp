@@ -105,7 +105,7 @@ const std::string *capio_posix_realpath(long tid, const std::string *pathname,
         }
     }
 
-    // if not, then check for realpath trough libc implementation
+    // if not, then check for realpath through libc implementation
     LOG("Computed realpath = %s", posix_real_path);
     return new std::string(posix_real_path);
 }

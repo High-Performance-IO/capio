@@ -54,8 +54,8 @@ inline void handle_create_exclusive(int tid, int fd, const char *path_cstr, int 
 inline void handle_open(int tid, int fd, const char *path_cstr, int rank) {
     START_LOG(gettid(), "call(tid=%d, fd=%d, path_cstr=%s, rank=%d)", tid, fd, path_cstr, rank);
 
-    // it is important that check_files_location is the last beacuse is the
-    // slowest (short circuit evalutation)
+    // it is important that check_files_location is the last because is the
+    // slowest (short circuit evaluation)
     if (get_file_location_opt(path_cstr) || metadata_conf.find(path_cstr) != metadata_conf.end() ||
         match_globs(path_cstr) != -1 || check_file_location(rank, path_cstr)) {
         update_file_metadata(path_cstr, tid, fd, rank, false);

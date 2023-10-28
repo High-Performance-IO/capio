@@ -190,4 +190,4 @@ echo
 
 
 
-echo "Run completed succesfully"
+echo "Run completed successfully"

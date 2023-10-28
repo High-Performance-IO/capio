@@ -83,7 +83,7 @@ constexpr char CAPIO_SERVER_ARG_PARSER_PRE[] =
     "and"
     " Marco Edoardo Santimaria (UniTO).";
 constexpr char CAPIO_SERVER_ARG_PARSER_EPILOGUE[] =
-    "For further help, a full list of the available ENVIROMENT VARIABLES,"
+    "For further help, a full list of the available ENVIRONMENT VARIABLES,"
     " and a guide on config JSON file structure, please visit "
     "https://github.com/High-Performance-IO/capio";
 constexpr char CAPIO_SERVER_ARG_PARSER_PRE_COMMAND[] = "{ENVIRONMENT_VARS}  mpirun -n 1";

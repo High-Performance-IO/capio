@@ -4,7 +4,7 @@ This folder contains syscall handlers for capio.
 
 ## Implement a new systemcall
 
-For each new systemcall imlemented in CAPIO, unless the
+For each new systemcall implemented in CAPIO, unless the
 behaviour is the same of a previously added systemcall, a new file should be added. The handler must have
 the following signature:
 
