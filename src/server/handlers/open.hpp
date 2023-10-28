@@ -15,7 +15,6 @@ inline void update_file_metadata(const std::string &path, int tid, int fd, int r
     auto c_file_opt = get_capio_file_opt(path.c_str());
     Capio_file &c_file =
         (c_file_opt) ? c_file_opt->get() : create_capio_file(path, false, get_file_initial_size());
-    c_file.open();
     add_capio_file_to_tid(tid, fd, path);
     int pid       = pids[tid];
     auto it_files = writers.find(pid);

@@ -1,8 +1,7 @@
 #ifndef CAPIO_POSIX_HANDLERS_GETDENTS_HPP
 #define CAPIO_POSIX_HANDLERS_GETDENTS_HPP
 
-#include "globals.hpp"
-#include "utils/shm.hpp"
+#include "utils/data.hpp"
 
 inline off64_t round(off64_t bytes, bool is_getdents64) {
     off64_t res = 0;
@@ -50,7 +49,7 @@ inline ssize_t capio_getdents(int fd, void *buffer, size_t count, bool is_getden
             bytes_read = count_off;
         }
         bytes_read = round(bytes_read, is_getdents64);
-        read_shm(tid, (*threads_data_bufs)[tid].second, *offset, buffer, bytes_read);
+        read_data(tid, buffer, bytes_read);
 
         *offset = *offset + bytes_read;
 

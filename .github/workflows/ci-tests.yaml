@@ -3,7 +3,6 @@ on:
   push:
     branches:
       - master
-      - code-refactor
   pull_request:
     branches:
       - master
@@ -69,6 +68,7 @@ jobs:
           ctest \
             --build-config ${{ matrix.build_type }} \
             --output-on-failure \
+            --stop-on-failure \
             --test-dir build/tests
       - name: "Show server log on failure"
         if: ${{ steps.run-tests.outcome == 'failure' }}

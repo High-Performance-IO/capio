@@ -41,8 +41,9 @@ inline void handle_close(int tid, int fd, int rank) {
     if (c_file.is_deletable()) {
         delete_capio_file(path.data());
         delete_from_file_locations(path.data(), rank);
+    } else {
+        delete_capio_file_from_tid(tid, fd);
     }
-    delete_capio_file_from_tid(tid, fd);
 }
 
 void close_handler(const char *str, int rank) {

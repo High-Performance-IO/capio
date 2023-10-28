@@ -6,7 +6,6 @@
 #include <tuple>
 
 #include "capio/logger.hpp"
-#include "capio/shm.hpp"
 #include "types.hpp"
 
 int *get_fd_snapshot(long tid) {

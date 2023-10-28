@@ -112,11 +112,13 @@ static int hook(long syscall_number, long arg0, long arg1, long arg2, long arg3,
 
 static __attribute__((constructor)) void init() {
     init_client();
+    init_data_plane();
     char *buf = (char *) malloc(PATH_MAX * sizeof(char));
     syscall_no_intercept(SYS_getcwd, buf, PATH_MAX);
     current_dir = new std::string(buf);
     mtrace_init(syscall_no_intercept(SYS_gettid));
 
-    intercept_hook_point_clone_child = hook_clone_child;
-    intercept_hook_point             = hook;
+    intercept_hook_point_clone_child  = hook_clone_child;
+    intercept_hook_point_clone_parent = hook_clone_parent;
+    intercept_hook_point              = hook;
 }

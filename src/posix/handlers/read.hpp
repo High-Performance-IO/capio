@@ -1,8 +1,7 @@
 #ifndef CAPIO_POSIX_HANDLERS_READ_HPP
 #define CAPIO_POSIX_HANDLERS_READ_HPP
 
-#include "globals.hpp"
-#include "utils/shm.hpp"
+#include "utils/data.hpp"
 
 inline off64_t capio_read(int fd, void *buffer, off64_t count, long tid) {
     START_LOG(tid, "call(fd=%d, buf=0x%08x, count=%ld)", fd, buffer, count);
@@ -17,7 +16,7 @@ inline off64_t capio_read(int fd, void *buffer, off64_t count, long tid) {
         off64_t *offset                               = std::get<0>(*t);
         off64_t end_of_read                           = read_request(fd, count_off, tid);
         off64_t bytes_read                            = end_of_read - *offset;
-        read_shm(tid, (*threads_data_bufs)[tid].second, *offset, buffer, bytes_read);
+        read_data(tid, buffer, bytes_read);
         *offset = *offset + bytes_read;
         return bytes_read;
     } else {
