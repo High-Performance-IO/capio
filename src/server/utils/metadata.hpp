@@ -57,7 +57,7 @@ inline std::vector<int> get_capio_fds_for_tid(int tid) {
 
 inline std::optional<std::reference_wrapper<Capio_file>>
 get_capio_file_opt(const char *const path) {
-    START_LOG(gettid(), "path=%s", path);
+    START_LOG(gettid(), "call(path=%s)", path);
 
     const std::lock_guard<std::mutex> lg(files_metadata_mutex);
     auto it = files_metadata.find(path);
@@ -69,7 +69,7 @@ get_capio_file_opt(const char *const path) {
 }
 
 inline Capio_file &get_capio_file(const char *const path) {
-    START_LOG(gettid(), "path=%s", path);
+    START_LOG(gettid(), "call(path=%s)", path);
 
     auto c_file_opt = get_capio_file_opt(path);
     if (c_file_opt) {
@@ -95,7 +95,10 @@ inline void add_capio_file(const std::string &path, Capio_file *c_file) {
 }
 
 inline void add_capio_file_to_tid(int tid, int fd, const std::string &path) {
+    START_LOG(gettid(), "call(tid=%d, fd=%d, path=%s)", tid, fd, path.c_str());
+
     Capio_file &c_file = get_capio_file(path.data());
+    c_file.open();
     c_file.add_fd(tid, fd);
 
     const std::lock_guard<std::mutex> lg(processes_files_mutex);
@@ -107,14 +110,11 @@ inline void add_capio_file_to_tid(int tid, int fd, const std::string &path) {
 }
 
 inline void clone_capio_file(pid_t parent_tid, pid_t child_tid) {
-    for (auto &it : processes_files_metadata[parent_tid]) {
-        Capio_file &c_file = get_capio_file(it.second.c_str());
-        c_file.open();
-    }
+    START_LOG(gettid(), "call(parent_tid=%d, child_tid=%d)", parent_tid, child_tid);
 
-    const std::lock_guard<std::mutex> lg(processes_files_mutex);
-    processes_files_metadata[child_tid] = processes_files_metadata[parent_tid];
-    processes_files[child_tid]          = processes_files[parent_tid];
+    for (auto &fd : get_capio_fds_for_tid(parent_tid)) {
+        add_capio_file_to_tid(child_tid, fd, processes_files_metadata[parent_tid][fd]);
+    }
 }
 
 Capio_file &create_capio_file(const std::string &path, bool is_dir, size_t init_size) {
@@ -163,15 +163,8 @@ Capio_file &create_capio_file(const std::string &path, bool is_dir, size_t init_
     }
 }
 
-inline void delete_capio_file(const char *const path) {
-    START_LOG(gettid(), "path=%s", path);
-
-    const std::lock_guard<std::mutex> lg(files_metadata_mutex);
-    files_metadata.erase(path);
-}
-
 inline void delete_capio_file_from_tid(int tid, int fd) {
-    START_LOG(gettid(), "tid=%d, fd=%d", tid, fd);
+    START_LOG(gettid(), "call(tid=%d, fd=%d)", tid, fd);
 
     const std::lock_guard<std::mutex> lg(processes_files_mutex);
     Capio_file &c_file = get_capio_file(processes_files_metadata[tid][fd].data());
@@ -179,9 +172,21 @@ inline void delete_capio_file_from_tid(int tid, int fd) {
     processes_files_metadata[tid].erase(fd);
     std::string offset_shm_name = "offset_" + std::to_string(tid) + "_" + std::to_string(fd);
     if (shm_unlink(offset_shm_name.c_str()) == -1) {
-        ERR_EXIT("shm_unlink %s in sig_term_handler", offset_shm_name.c_str());
+        ERR_EXIT("shm_unlink %s", offset_shm_name.c_str());
     }
     processes_files[tid].erase(fd);
+}
+
+inline void delete_capio_file(const char *const path) {
+    START_LOG(gettid(), "call(path=%s)", path);
+
+    Capio_file &c_file = get_capio_file(path);
+    for (auto &[tid, fd] : c_file.get_fds()) {
+        delete_capio_file_from_tid(tid, fd);
+    }
+
+    const std::lock_guard<std::mutex> lg(files_metadata_mutex);
+    files_metadata.erase(path);
 }
 
 inline std::vector<std::string_view> get_capio_file_paths() {
@@ -204,7 +209,7 @@ inline void dup_capio_file(int tid, int old_fd, int new_fd) {
 }
 
 inline Capio_file &init_capio_file(const char *const path, bool home_node) {
-    START_LOG(gettid(), "path=%s, home_node=%s", path, home_node ? "true" : "false");
+    START_LOG(gettid(), "call(path=%s, home_node=%s)", path, home_node ? "true" : "false");
 
     Capio_file &c_file = get_capio_file(path);
     if (c_file.buf_to_allocate()) {
@@ -214,7 +219,7 @@ inline Capio_file &init_capio_file(const char *const path, bool home_node) {
 }
 
 inline void rename_capio_file(const char *const oldpath, const char *const newpath) {
-    START_LOG(gettid(), "oldpath=%s, newpath=%s", oldpath, newpath);
+    START_LOG(gettid(), "call(oldpath=%s, newpath=%s)", oldpath, newpath);
 
     {
         const std::lock_guard<std::mutex> lg(processes_files_mutex);

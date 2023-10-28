@@ -3,7 +3,6 @@
 
 #include "globals.hpp"
 #include "utils/requests.hpp"
-#include "utils/shm.hpp"
 
 inline ssize_t capio_write(int fd, const void *buffer, off64_t count, long tid) {
     START_LOG(tid, "call(fd=%d, buf=0x%08x, count=%ld)", fd, buffer, count);
@@ -16,8 +15,7 @@ inline ssize_t capio_write(int fd, const void *buffer, off64_t count, long tid) 
         }
         off64_t count_off = count;
         write_request(files, fd, count_off, tid); // bottleneck
-        write_shm(tid, (*threads_data_bufs)[tid].first, *std::get<0>((*files)[fd]), buffer,
-                  count_off);
+        write_data(tid, buffer, count);
 
         return count;
     } else {

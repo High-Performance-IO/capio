@@ -162,7 +162,11 @@ class Capio_file {
 
     [[nodiscard]] inline size_t get_buf_size() const { return _buf_size; }
 
-    [[nodiscard]] inline std::string_view get_committed() const { return _committed; }
+    [[nodiscard]] inline const std::string_view &get_committed() const { return _committed; }
+
+    [[nodiscard]] inline const std::vector<std::pair<int, int>> &get_fds() const {
+        return _threads_fd;
+    }
 
     [[nodiscard]] inline off64_t get_file_size() const {
         if (!_sectors.empty()) {

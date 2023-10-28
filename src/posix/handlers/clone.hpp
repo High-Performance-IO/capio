@@ -1,27 +1,41 @@
 #ifndef CAPIO_POSIX_HANDLERS_CLONE_HPP
 #define CAPIO_POSIX_HANDLERS_CLONE_HPP
 
+#include <condition_variable>
+
 #include "globals.hpp"
 #include "utils/requests.hpp"
 
-/*
- * From "The Linux Programming Interface: A Linux and Unix System Programming
- * Handbook", by Micheal Kerrisk: "Within the kernel, fork(), vfork(), and
- * clone() are ultimately implemented by the same function (do_fork() in
- * kernel/fork.c). At this level, cloning is much closer to forking:
- * sys_clone() doesn’t have the func and func_arg arguments, and after the
- * call, sys_clone() returns in the child in the same manner as fork(). The
- * main text describes the clone() wrapper function that glibc provides for
- * sys_clone(). This wrapper function invokes func after sys_clone() returns in
- * the child."
- */
+std::mutex clone_mutex;
+std::condition_variable clone_cv;
+std::set<long> tids;
 
-static void hook_clone_child() {
-    auto parent_tid = static_cast<pid_t>(syscall_no_intercept(SYS_getppid));
-    auto child_tid  = static_cast<pid_t>(syscall_no_intercept(SYS_gettid));
-    START_LOG(parent_tid, "call(parent_tid=%ld, child_tid=%d)", parent_tid, child_tid);
+void hook_clone_child() {
+    long tid = syscall_no_intercept(SYS_gettid);
+    START_LOG(tid, "call()");
+
+    std::unique_lock<std::mutex> lock(clone_mutex);
+    LOG("Waiting initialization from parent thread");
+    clone_cv.wait(lock, [&tid] { return tids.find(tid) != tids.end(); });
+    tids.erase(tid);
+    lock.unlock();
+    LOG("Starting child thread %d", tid);
+}
+
+void hook_clone_parent(long child_tid) {
+    long parent_tid = syscall_no_intercept(SYS_gettid);
+    START_LOG(parent_tid, "call(parent_tid=%d, child_tid=%ld)", parent_tid, child_tid);
+
+    LOG("Initializing child thread %d", child_tid);
     mtrace_init(child_tid);
     clone_request(parent_tid, child_tid);
+    LOG("Child thread %d initialized", child_tid);
+
+    {
+        std::lock_guard<std::mutex> lg(clone_mutex);
+        tids.insert(child_tid);
+    }
+    clone_cv.notify_one();
 }
 
 #endif // CAPIO_POSIX_HANDLERS_CLONE_HPP
