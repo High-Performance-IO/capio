@@ -59,7 +59,7 @@ jobs:
         env:
           CAPIO_DIR: ${{ github.workspace }}
           CAPIO_LOG_LEVEL: -1
-        run: mpirun -n 1 build/src/server/capio_server &
+        run: mpirun -n 1 build/src/server/capio_server --no-config &
       - name: "Run tests"
         id: run-tests
         env:

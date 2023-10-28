@@ -92,4 +92,6 @@ constexpr char CAPIO_SERVER_ARG_PARSER_LOGILE_OPT_HELP[] =
 constexpr char CAPIO_SERVER_ARG_PARSER_CONFIG_OPT_HELP[] =
     "JSON Configuration file for capio_server";
 
+constexpr char CAPIO_SERVER_ARG_PARSER_CONFIG_NO_CONF_FILE_HELP[] =
+    "If specified, server application will start without a config file, using default settings.";
 #endif // CAPIO_COMMON_CONSTANTS_HPP

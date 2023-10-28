@@ -658,6 +658,8 @@ int parseCLI(int argc, char **argv, int rank) {
                                              CAPIO_SERVER_ARG_PARSER_LOGILE_OPT_HELP, {'l', "log"});
     args::ValueFlag<std::string> config(arguments, "filename",
                                         CAPIO_SERVER_ARG_PARSER_CONFIG_OPT_HELP, {'c', "config"});
+    args::Flag noConfigFile(arguments, "no-config",
+                            CAPIO_SERVER_ARG_PARSER_CONFIG_NO_CONF_FILE_HELP, {"no-config"});
 
     try {
         parser.ParseCLI(argc, argv);
@@ -698,14 +700,25 @@ int parseCLI(int argc, char **argv, int rank) {
                   << std::endl;
     }
 
-    if (config) {
-        std::string token            = args::get(config);
-        const std::string *capio_dir = get_capio_dir();
-        std::cout << CAPIO_SERVER_CLI_LOG_SERVER << "parsing config file: " << token << std::endl;
-        parse_conf_file(token, capio_dir);
+    if (noConfigFile) {
+        std::cout << CAPIO_SERVER_CLI_LOG_SERVER << "skipping config file parsing" << std::endl;
     } else {
-        std::cout << CAPIO_SERVER_CLI_LOG_SERVER << "started server with default configuration"
-                  << std::endl;
+        if (config) {
+            std::string token            = args::get(config);
+            const std::string *capio_dir = get_capio_dir();
+            std::cout << CAPIO_SERVER_CLI_LOG_SERVER << "parsing config file: " << token
+                      << std::endl;
+            parse_conf_file(token, capio_dir);
+        } else {
+            std::cout
+                << CAPIO_SERVER_CLI_LOG_SERVER_ERROR
+                << "Error: no config file provided. To skip config file use --no-config option!"
+                << std::endl;
+#ifdef CAPIOLOG
+            log->log("no config file provided, and  --no-config not provided");
+#endif
+            exit(EXIT_FAILURE);
+        }
     }
 
     std::cout << CAPIO_SERVER_CLI_LOG_SERVER << "CAPIO_DIR=" << get_capio_dir()->c_str()
