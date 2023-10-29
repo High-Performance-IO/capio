@@ -3,8 +3,6 @@
 
 #include <sys/types.h>
 
-#define CAPIO_VERSION "0.0.1"
-
 constexpr size_t DIR_INITIAL_SIZE = 1024L * 1024 * 1024;
 
 constexpr int DNAME_LENGTH = 128;

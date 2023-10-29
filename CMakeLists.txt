@@ -44,6 +44,8 @@ find_package(Threads REQUIRED)
 #####################################
 # Definitions
 #####################################
+add_compile_definitions(CAPIO_VERSION="${CMAKE_PROJECT_VERSION}")
+
 IF(CAPIO_LOG)
     message(STATUS "Enabling CAPIO logger")
     add_compile_definitions(CAPIOLOG)
