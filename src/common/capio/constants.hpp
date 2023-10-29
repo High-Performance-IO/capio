@@ -17,7 +17,7 @@ constexpr long MAX_SHM_SIZE = 1024L * 1024 * 1024 * 16;
 constexpr long MAX_SHM_SIZE_FILE = 1024L * 1024 * 1024 * 16;
 
 // capio file mode
-constexpr char CAPIO_FILE_MODE_NOUPDATE[] = "noupdate";
+constexpr char CAPIO_FILE_MODE_NO_UPDATE[] = "no_update";
 
 constexpr int N_ELEMS_DATA_BUFS = 10;
 

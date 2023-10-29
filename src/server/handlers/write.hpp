@@ -40,7 +40,7 @@ inline void handle_write(int tid, int fd, off64_t base_offset, off64_t count, in
     }
     std::string_view mode = c_file.get_mode();
     auto it               = pending_reads.find(path.data());
-    if (it != pending_reads.end() && mode == CAPIO_FILE_MODE_NOUPDATE) {
+    if (it != pending_reads.end() && mode == CAPIO_FILE_MODE_NO_UPDATE) {
         auto &pending_reads_this_file = it->second;
         auto it_vec                   = pending_reads_this_file.begin();
         while (it_vec != pending_reads_this_file.end()) {
@@ -55,7 +55,7 @@ inline void handle_write(int tid, int fd, off64_t base_offset, off64_t count, in
             }
         }
     }
-    if (mode == CAPIO_FILE_MODE_NOUPDATE) {
+    if (mode == CAPIO_FILE_MODE_NO_UPDATE) {
         handle_pending_remote_reads(path.data(), data_size, false);
     }
 }
