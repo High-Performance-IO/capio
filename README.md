@@ -13,22 +13,19 @@ across different distributed applications (e.g. MPI-app1 -> MPI-app2).
 
 ### Dependencies
 
-CAPIO depends on the following software:
+CAPIO depends on the following software that needs to be manually installed:
 
 - `cmake >=3.15`
 - `c++17` or newer
 - `openmpi`
 - `pthreads`
 
-The current implementation is based on [syscall_intercept](https://github.com/pmem/syscall_intercept) as system calls
-interceptor. When compiling CAPIO,
-syscall_intercpet is automatically cloned from the repository, and compiled as dependency.
-
-Capio also depends on:
-
+The following dependencies are automatically fetched during cmake configuration phase, and compiled when required.
+- [syscall_intercept](https://github.com/pmem/syscall_intercept) to intercept syscalls 
 - [Taywee/args](https://github.com/Taywee/args) to parse server command line inputs
 - [simdjson/simdjson](https://github.com/simdjson/simdjson) to parse json configuration files
-  All dependencies are automatically fetched during cmake configuration phase, and compiled when required.
+
+
 
 ### Compile capio
 
@@ -60,7 +57,7 @@ capio_server.
 
 3) Launch your programs preloading the CAPIO shared library like this:
    ```bash
-   CAPIO_DIR=your_capiodir LD_PRELOAD=path/to/src/src/libcapio_posix.so ./your_app args
+   CAPIO_DIR=your_capiodir LD_PRELOAD=<build_folder_path>/src/posix/libcapio_posix.so ./your_app args
     ```
 
 > [!WARNING]  
@@ -122,13 +119,13 @@ The following is an example of a simple configuration:
 ```
 
 > [!NOTE] 
-> We are working in an extension of the possible streaming semantics and in a detailed
+> We are working on an extension of the possible streaming semantics and in a detailed
 documentation about the configuration file!
 
 ## Examples
 
 The [examples](examples) folder contains some examples that shows how to use mpi_io with CAPIO. 
-There are also examples on how to write JSON configuration files:
+There are also examples on how to write JSON configuration files for the semantics implemented by CAPIO:
 - [on_close](https://github.com/High-Performance-IO/capio/wiki/Examples#on_close-semantic): A pipeline composed by a producer and a consumer with "on_close" semantics
 - [noupdate](https://github.com/High-Performance-IO/capio/wiki/Examples#noupdate-semantics): A pipeline composed by a producer and a consumer with "noupdate" semantics
 - [mix_semantics](https://github.com/High-Performance-IO/capio/wiki/Examples#mixed-semantics): A pipeline composed by a producer and a consumer with mix semantics
