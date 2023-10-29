@@ -12,72 +12,57 @@ void parse_conf_file(const std::string &conf_file, const std::string *capio_dir)
 
     simdjson::ondemand::parser parser;
     simdjson::padded_string json;
+    simdjson::ondemand::document entries;
+    simdjson::ondemand::array input_stream, output_stream, streaming, permanent_files;
+    simdjson::error_code error;
+
     try {
         json = simdjson::padded_string::load(conf_file);
     } catch (const simdjson::simdjson_error &e) {
         std::cerr << CAPIO_SERVER_CLI_LOG_SERVER_ERROR
                   << "Exception thrown while opening config file: " << e.what() << std::endl;
-
         ERR_EXIT("Exception thrown while opening config file: %s", e.what());
     }
 
-    simdjson::ondemand::document entries = parser.iterate(json);
-    entries["name"];
+    entries                              = parser.iterate(json);
+    const std::string_view workflow_name = entries["name"].get_string();
+
+    std::cout << CAPIO_SERVER_CLI_LOG_SERVER
+              << "Parsing configuration for workflow: " << workflow_name << std::endl;
+
     auto io_graph = entries["IO_Graph"];
+
     for (auto app : io_graph) {
         std::string_view app_name = app["name"].get_string();
 
-        LOG("Parsing config for app: %s", app_name);
         std::cout << CAPIO_SERVER_CLI_LOG_SERVER << "Parsing config for app " << app_name
                   << std::endl;
 
-        simdjson::ondemand::array input_stream;
-        auto error = app["input_stream"].get_array().get(input_stream);
-
-        if (!error) {
-            for (auto group : input_stream) {
-                std::string_view group_name;
-                error = group["group_name"].get_string().get(group_name);
-
-                if (error) {
-                    std::cout << CAPIO_SERVER_CLI_LOG_SERVER_ERROR << "error on file" << group
-                              << std::endl;
-                    LOG("Error: file %s resulted in error while parsing json file!",
-                        group.get_string());
-                } else {
-                    std::cout << CAPIO_SERVER_CLI_LOG_SERVER << "Found input stream group "
-                              << group_name << std::endl;
-                }
-            }
+        if (app["input_stream"].get_array().get(input_stream)) {
+            std::cout << CAPIO_SERVER_CLI_LOG_SERVER_WARNING
+                      << "No input_stream section found for app " << app_name << std::endl;
+        } else {
+            // TODO: parse input_stream
+            std::cout << CAPIO_SERVER_CLI_LOG_SERVER
+            << "Completed input_stream parsing for app: " << app_name << std::endl;
         }
 
-        std::cout << CAPIO_SERVER_CLI_LOG_SERVER << "Completed input stream file parsing"
-                  << std::endl;
-        LOG("Completed input stream file parsing");
 
-        simdjson::ondemand::array output_stream;
-        error = app["output_stream"].get_array().get(output_stream);
-        if (!error) {
-            for (auto group : output_stream) {
-                std::string_view group_name;
-                error = group["group_name"].get_string().get(group_name);
-
-                if (error) {
-                    std::cout << CAPIO_SERVER_CLI_LOG_SERVER_ERROR << "error on file" << group
-                              << std::endl;
-                    LOG("Error: file %s resulted in error while parsing json file!",
-                        group.get_string());
-                }
-            }
+        if (app["output_stream"].get_array().get(output_stream)) {
+            std::cout << CAPIO_SERVER_CLI_LOG_SERVER_WARNING
+                      << "No output_stream section found for app " << app_name << std::endl;
+        } else {
+            // TODO: parse output stream
+            std::cout << CAPIO_SERVER_CLI_LOG_SERVER
+                      << "Completed output_stream parsing for app: " << app_name << std::endl;
         }
 
-        std::cout << CAPIO_SERVER_CLI_LOG_SERVER << "Completed output stream file parsing"
-                  << std::endl;
-        LOG("Completed output stream file parsing");
+        // PARSING STREAMING FILES
 
-        simdjson::ondemand::array streaming;
-        error = app["streaming"].get_array().get(streaming);
-        if (!error) {
+        if (app["streaming"].get_array().get(streaming)) {
+            std::cout << CAPIO_SERVER_CLI_LOG_SERVER_WARNING
+                      << "No streaming section found for app: " << app_name << std::endl;
+        }else{
             for (auto file : streaming) {
                 std::string_view name;
                 error = file["name"].get_string().get(name);
@@ -148,16 +133,18 @@ void parse_conf_file(const std::string &conf_file, const std::string *capio_dir)
                 update_metadata_conf(path, pos, n_files, batch_size, std::string(commit_rule),
                                      std::string(mode), std::string(app_name), false, n_close);
             }
-        }
-    }
+        } // END PARSING STREAMING FILES
 
-    std::cout << CAPIO_SERVER_CLI_LOG_SERVER<<"Completed parsing of io_graph"<< std::endl;
+    }     // END OF APP MAIN LOOPS
+
+    std::cout << CAPIO_SERVER_CLI_LOG_SERVER << "Completed parsing of io_graph" << std::endl;
     LOG("Completed parsing of io_graph");
 
-    simdjson::ondemand::array permanent_files;
-    auto error          = entries["permanent"].get_array().get(permanent_files);
     long int batch_size = 0;
-    if (!error) {
+    if (entries["permanent"].get_array().get(permanent_files)) { // PARSING PERMANENT FILES
+        std::cout << CAPIO_SERVER_CLI_LOG_SERVER_WARNING
+                  << "No permanent section found for workflow: " << workflow_name << std::endl;
+    }else{
         for (auto file : permanent_files) {
             std::string_view name;
             error            = file.get_string().get(name);
@@ -196,9 +183,9 @@ void parse_conf_file(const std::string &conf_file, const std::string *capio_dir)
                 }
             }
         }
-    }
+    } // END PARSING PERMANENT FILES
 
-    std::cout << CAPIO_SERVER_CLI_LOG_SERVER<<"Completed parsing of permanent files"<< std::endl;
+    std::cout << CAPIO_SERVER_CLI_LOG_SERVER << "Completed parsing of permanent files" << std::endl;
     LOG("Completed parsing of permanent files");
 }
 
