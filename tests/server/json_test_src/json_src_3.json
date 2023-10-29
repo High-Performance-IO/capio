@@ -19,7 +19,7 @@
         {
           "name": "file1.dat",
           "committed": "on_close",
-          "mode": "noupdate"
+          "mode": "no_update"
         },
         {
           "name": "file3.dat",
@@ -28,12 +28,12 @@
         {
           "name": "file4.dat",
           "committed": "on_close",
-          "mode": "noupdate"
+          "mode": "no_update"
         },
         {
           "name": "file5.dat",
           "committed": "on_close",
-          "mode": "noupdate"
+          "mode": "no_update"
         }
       ]
     },
