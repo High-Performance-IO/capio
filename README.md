@@ -15,7 +15,7 @@ across different distributed applications (e.g. MPI-app1 -> MPI-app2).
 
 CAPIO depends on the following software:
 
-- `cmake >=3.11`
+- `cmake >=3.15`
 - `c++17` or newer
 - `openmpi`
 - `pthreads`
@@ -51,7 +51,7 @@ the first is optional).
    want to execute your program (one daemon for each node). If you desire to specify a custom folder
    for capio, set `CAPIO_DIR` as a environment variable.
    ```bash
-   [CAPIO_DIR=your_capiodir] mpiexec -N 1 --hostfile your_hostfile src/capio_server conf.json 
+   [CAPIO_DIR=your_capiodir] mpiexec -N 1 --hostfile your_hostfile src/capio_server -c conf.json 
    ```
 
 > [!NOTE] 
@@ -129,8 +129,8 @@ documentation about the configuration file!
 
 The [examples](examples) folder contains some examples that shows how to use mpi_io with CAPIO. 
 There are also examples on how to write JSON configuration files:
-- [on_close](https://github.com/High-Performance-IO/capio/wiki/Examples#noupdate-semantic): A pipeline composed by a producer and a consumer with "on_close" semantics
-- [noupdate](https://github.com/High-Performance-IO/capio/wiki/Examples#on_close-semantics): A pipeline composed by a producer and a consumer with "update" semantics
+- [on_close](https://github.com/High-Performance-IO/capio/wiki/Examples#on_close-semantic): A pipeline composed by a producer and a consumer with "on_close" semantics
+- [noupdate](https://github.com/High-Performance-IO/capio/wiki/Examples#noupdate-semantics): A pipeline composed by a producer and a consumer with "noupdate" semantics
 - [mix_semantics](https://github.com/High-Performance-IO/capio/wiki/Examples#mixed-semantics): A pipeline composed by a producer and a consumer with mix semantics
 
 ## CAPIO Team
