@@ -44,9 +44,8 @@ void parse_conf_file(const std::string &conf_file, const std::string *capio_dir)
         } else {
             // TODO: parse input_stream
             std::cout << CAPIO_SERVER_CLI_LOG_SERVER
-            << "Completed input_stream parsing for app: " << app_name << std::endl;
+                      << "Completed input_stream parsing for app: " << app_name << std::endl;
         }
-
 
         if (app["output_stream"].get_array().get(output_stream)) {
             std::cout << CAPIO_SERVER_CLI_LOG_SERVER_WARNING
@@ -58,42 +57,36 @@ void parse_conf_file(const std::string &conf_file, const std::string *capio_dir)
         }
 
         // PARSING STREAMING FILES
-
         if (app["streaming"].get_array().get(streaming)) {
             std::cout << CAPIO_SERVER_CLI_LOG_SERVER_WARNING
                       << "No streaming section found for app: " << app_name << std::endl;
-        }else{
+        } else {
             for (auto file : streaming) {
-                std::string_view name;
+                std::string_view name, committed;
+                std::string committed_str, commit_rule;
+                long int n_close = -1;
+
                 error = file["name"].get_string().get(name);
 
-                std::string_view committed;
-                std::string committed_str;
-                error                   = file["committed"].get_string().get(committed);
-                std::string commit_rule = "";
-                long int n_close        = -1;
-                if (!error) {
+                // PARSING COMMITTED
+                if (!file["committed"].get_string().get(committed)) {
+
                     committed_str = std::string(committed);
                     int pos       = committed_str.find(':');
                     if (pos != -1) {
                         commit_rule = committed_str.substr(0, pos);
                         if (commit_rule != "on_close") {
-                            std::cout << CAPIO_SERVER_CLI_LOG_SERVER_ERROR
-                                      << "error conf file: "
-                                         "commit rule "
+                            std::cout << CAPIO_SERVER_CLI_LOG_SERVER_ERROR << "commit rule "
                                       << commit_rule << std::endl;
                             ERR_EXIT("error conf file");
                         }
+
                         std::string n_close_str =
                             committed_str.substr(pos + 1, committed_str.length());
 
                         if (!is_int(n_close_str)) {
                             std::cout << CAPIO_SERVER_CLI_LOG_SERVER_ERROR
-                                      << "error conf file:  "
-                                         "commit rule "
-                                         "on_close invalid "
-                                         "number"
-                                      << std::endl;
+                                      << "commit rule on_close invalid number" << std::endl;
                             ERR_EXIT("error conf file");
                         }
                         n_close = std::stol(n_close_str);
@@ -102,12 +95,10 @@ void parse_conf_file(const std::string &conf_file, const std::string *capio_dir)
                     }
                 } else {
                     std::cout << CAPIO_SERVER_CLI_LOG_SERVER_ERROR
-                              << "error conf file: commit rule is "
-                                 "mandatory in streaming "
-                                 "section"
-                              << std::endl;
+                              << "commit rule is mandatory in streaming section" << std::endl;
                     ERR_EXIT("error conf file");
                 }
+                // END PARSING COMMITTED
 
                 std::string_view mode;
                 error = file["mode"].get_string().get(mode);
@@ -133,9 +124,12 @@ void parse_conf_file(const std::string &conf_file, const std::string *capio_dir)
                 update_metadata_conf(path, pos, n_files, batch_size, std::string(commit_rule),
                                      std::string(mode), std::string(app_name), false, n_close);
             }
+
+            std::cout << CAPIO_SERVER_CLI_LOG_SERVER
+                      << "completed parsing of streaming section" << std::endl;
         } // END PARSING STREAMING FILES
 
-    }     // END OF APP MAIN LOOPS
+    } // END OF APP MAIN LOOPS
 
     std::cout << CAPIO_SERVER_CLI_LOG_SERVER << "Completed parsing of io_graph" << std::endl;
     LOG("Completed parsing of io_graph");
@@ -144,7 +138,7 @@ void parse_conf_file(const std::string &conf_file, const std::string *capio_dir)
     if (entries["permanent"].get_array().get(permanent_files)) { // PARSING PERMANENT FILES
         std::cout << CAPIO_SERVER_CLI_LOG_SERVER_WARNING
                   << "No permanent section found for workflow: " << workflow_name << std::endl;
-    }else{
+    } else {
         for (auto file : permanent_files) {
             std::string_view name;
             error            = file.get_string().get(name);
