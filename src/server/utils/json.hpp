@@ -75,7 +75,7 @@ void parse_conf_file(const std::string &conf_file, const std::string *capio_dir)
                     int pos       = committed_str.find(':');
                     if (pos != -1) {
                         commit_rule = committed_str.substr(0, pos);
-                        if (commit_rule != "on_close") {
+                        if (commit_rule != CAPIO_FILE_MODE_ON_CLOSE) {
                             std::cout << CAPIO_SERVER_CLI_LOG_SERVER_ERROR << "commit rule "
                                       << commit_rule << std::endl;
                             ERR_EXIT("error conf file");
@@ -104,8 +104,7 @@ void parse_conf_file(const std::string &conf_file, const std::string *capio_dir)
                 error = file["mode"].get_string().get(mode);
 
                 long n_files;
-                error = file["n_files"].get_int64().get(n_files);
-                if (error) {
+                if (file["n_files"].get_int64().get(n_files)) {
                     n_files = -1;
                 }
                 long batch_size;
@@ -126,13 +125,11 @@ void parse_conf_file(const std::string &conf_file, const std::string *capio_dir)
             }
 
             std::cout << CAPIO_SERVER_CLI_LOG_SERVER
-                      << "completed parsing of streaming section" << std::endl;
+                      << "completed parsing of streaming section for app: " << app_name
+                      << std::endl;
         } // END PARSING STREAMING FILES
 
     } // END OF APP MAIN LOOPS
-
-    std::cout << CAPIO_SERVER_CLI_LOG_SERVER << "Completed parsing of io_graph" << std::endl;
-    LOG("Completed parsing of io_graph");
 
     long int batch_size = 0;
     if (entries["permanent"].get_array().get(permanent_files)) { // PARSING PERMANENT FILES
@@ -150,18 +147,15 @@ void parse_conf_file(const std::string &conf_file, const std::string *capio_dir)
                 }
                 path = *capio_dir + "/" + path;
             }
-            if (!is_absolute(&path)) {
-                if (path.substr(0, 2) == "./") {
-                    path = path.substr(2, path.length() - 2);
-                }
-                path = *capio_dir + "/" + path;
-            }
+            // NOTE: here there was a copy of the previous structured block.
+            // pretty much sure it is a bug, but it might be wanted...
+
             std::size_t pos = path.find('*');
             if (pos == std::string::npos) {
                 auto it = metadata_conf.find(path);
                 if (it == metadata_conf.end()) {
-                    update_metadata_conf(path, pos, -1, batch_size, "on_termination", "", "", true,
-                                         -1);
+                    update_metadata_conf(path, pos, -1, batch_size, CAPIO_FILE_MODE_ON_TERMINATION,
+                                         "", "", true, -1);
                 } else {
                     std::get<4>(it->second) = true;
                 }
@@ -169,18 +163,19 @@ void parse_conf_file(const std::string &conf_file, const std::string *capio_dir)
                 std::string prefix_str = path.substr(0, pos);
                 long int i             = match_globs(prefix_str);
                 if (i == -1) {
-                    update_metadata_conf(path, pos, -1, batch_size, "on_termination", "", "", true,
-                                         -1);
+                    update_metadata_conf(path, pos, -1, batch_size, CAPIO_FILE_MODE_ON_TERMINATION,
+                                         "", "", true, -1);
                 } else {
                     auto &tuple        = metadata_conf_globs[i];
                     std::get<6>(tuple) = true;
                 }
             }
         }
+        std::cout << CAPIO_SERVER_CLI_LOG_SERVER << "Completed parsing of permanent files"
+                  << std::endl;
     } // END PARSING PERMANENT FILES
 
-    std::cout << CAPIO_SERVER_CLI_LOG_SERVER << "Completed parsing of permanent files" << std::endl;
-    LOG("Completed parsing of permanent files");
+    std::cout << CAPIO_SERVER_CLI_LOG_SERVER << "Completed parsing of io_graph" << std::endl;
 }
 
 #endif // CAPIO_SERVER_UTILS_JSON_HPP
