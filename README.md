@@ -21,11 +21,10 @@ CAPIO depends on the following software that needs to be manually installed:
 - `pthreads`
 
 The following dependencies are automatically fetched during cmake configuration phase, and compiled when required.
-- [syscall_intercept](https://github.com/pmem/syscall_intercept) to intercept syscalls 
+
+- [syscall_intercept](https://github.com/pmem/syscall_intercept) to intercept syscalls
 - [Taywee/args](https://github.com/Taywee/args) to parse server command line inputs
 - [simdjson/simdjson](https://github.com/simdjson/simdjson) to parse json configuration files
-
-
 
 ### Compile capio
 
@@ -51,9 +50,9 @@ the first is optional).
    [CAPIO_DIR=your_capiodir] mpiexec -N 1 --hostfile your_hostfile src/capio_server -c conf.json 
    ```
 
-> [!NOTE] 
+> [!NOTE]
 > if `CAPIO_DIR` is not specified when launching caio_Server, it will default to the current working directory of
-capio_server.
+> capio_server.
 
 3) Launch your programs preloading the CAPIO shared library like this:
    ```bash
@@ -61,8 +60,14 @@ capio_server.
     ```
 
 > [!WARNING]  
-> `CAPIO_DIR` must be specified when launching a program with the CAPIO library. if `CAPIO_DIR` is not specified, CAPIO 
-  will not intercept syscalls.
+> `CAPIO_DIR` must be specified when launching a program with the CAPIO library. if `CAPIO_DIR` is not specified, CAPIO
+> will not intercept syscalls.
+
+### Available environment variables
+
+- `CAPIO_DIR` This environment variable tells to both server and application the mount point of capio
+- `CAPIO_LOG_LEVEL` this environment tells both server and application the log level to use. This variable works only
+  if `-DCAPIO_LOG=TRUE` was specified during cmake phase.
 
 ## How to inject streaming capabilities into your workflow
 
@@ -118,17 +123,21 @@ The following is an example of a simple configuration:
 }
 ```
 
-> [!NOTE] 
+> [!NOTE]
 > We are working on an extension of the possible streaming semantics and in a detailed
-documentation about the configuration file!
+> documentation about the configuration file!
 
 ## Examples
 
-The [examples](examples) folder contains some examples that shows how to use mpi_io with CAPIO. 
+The [examples](examples) folder contains some examples that shows how to use mpi_io with CAPIO.
 There are also examples on how to write JSON configuration files for the semantics implemented by CAPIO:
-- [on_close](https://github.com/High-Performance-IO/capio/wiki/Examples#on_close-semantic): A pipeline composed by a producer and a consumer with "on_close" semantics
-- [noupdate](https://github.com/High-Performance-IO/capio/wiki/Examples#noupdate-semantics): A pipeline composed by a producer and a consumer with "noupdate" semantics
-- [mix_semantics](https://github.com/High-Performance-IO/capio/wiki/Examples#mixed-semantics): A pipeline composed by a producer and a consumer with mix semantics
+
+- [on_close](https://github.com/High-Performance-IO/capio/wiki/Examples#on_close-semantic): A pipeline composed by a
+  producer and a consumer with "on_close" semantics
+- [noupdate](https://github.com/High-Performance-IO/capio/wiki/Examples#noupdate-semantics): A pipeline composed by a
+  producer and a consumer with "noupdate" semantics
+- [mix_semantics](https://github.com/High-Performance-IO/capio/wiki/Examples#mixed-semantics): A pipeline composed by a
+  producer and a consumer with mix semantics
 
 ## CAPIO Team
 

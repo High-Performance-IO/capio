@@ -726,11 +726,17 @@ int parseCLI(int argc, char **argv, int rank) {
 
     delete log;
 
-#ifdef CAPIOLOG
+#ifdef CAPIO_LOG
     CAPIO_LOG_LEVEL = get_capio_log_level();
     std::cout << CAPIO_SERVER_CLI_LOG_SERVER << "LOG_LEVEL set to: " << CAPIO_LOG_LEVEL
               << std::endl;
     std::cout << CAPIO_LOG_CLI_WARNING;
+
+#else
+    if (std::getenv("CAPIO_LOG_LEVEL") != nullptr) {
+        std::cout << CAPIO_SERVER_CLI_LOG_SERVER_WARNING
+                  << CAPIO_LOG_CLI_WARNING_LOG_SET_NOT_COMPILED << std::endl;
+    }
 #endif
 
     std::cout << CAPIO_SERVER_CLI_LOG_SERVER << "server initialization completed!" << std::flush;
@@ -746,8 +752,6 @@ int main(int argc, char **argv) {
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
 
     parseCLI(argc, argv, rank);
-
-    // parse_config(argc, argv, rank);
 
     START_LOG(gettid(), "call()");
     LOG("MPI_Comm_rank returned %d", rank);

@@ -66,11 +66,14 @@ constexpr char CAPIO_LOG_CLI_WARNING[] =
     "[ \033[1;33m SERVER \033[0m ] | this will have impact on performance. "
     "you "
     "should recompile CAPIO |\n"
-    "[ \033[1;33m SERVER \033[0m ] | with -DCAPIOLOG=FALSE                  "
+    "[ \033[1;33m SERVER \033[0m ] | with -DCAPIO_LOG=FALSE                  "
     "   "
     "                       |\n"
     "[ \033[1;33m SERVER \033[0m ] "
     "|==================================================================|\n";
+
+constexpr char CAPIO_LOG_CLI_WARNING_LOG_SET_NOT_COMPILED[] =
+    "CAPIO_LOG set but log support was not compiled into CAPIO!";
 
 // constant strings for argument parser and capio server help
 constexpr char CAPIO_SERVER_ARG_PARSER_PRE[] =
