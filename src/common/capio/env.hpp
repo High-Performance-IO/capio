@@ -18,24 +18,28 @@ const std::string *get_capio_dir() {
     if (capio_dir == nullptr) {
         const char *val = std::getenv("CAPIO_DIR");
         auto buf        = std::unique_ptr<char[]>(new char[PATH_MAX]);
+
         if (val == nullptr) {
-            int res = capio_syscall(SYS_getcwd, buf.get(), PATH_MAX);
-            if (res == -1) {
-                ERR_EXIT("error CAPIO_DIR: current directory not "
-                         "valid");
-            }
+
+            std::cout << "\n"
+                      << CAPIO_SERVER_CLI_LOG_SERVER_ERROR << "Fatal: CAPIO_DIR not provided!"
+                      << std::endl;
+            ERR_EXIT("Fatal:  CAPIO_DIR not provided!");
+
         } else {
+
             const char *realpath_res = capio_realpath(val, buf.get());
             if (realpath_res == nullptr) {
+                std::cout << "\n"
+                          << CAPIO_SERVER_CLI_LOG_SERVER_ERROR
+                          << "Fatal: CAPIO_DIR set, but folder does not exists on filesystem!"
+                          << std::endl;
                 ERR_EXIT("error CAPIO_DIR: directory %s does not "
                          "exist. [buf=%s]",
                          val, buf.get());
             }
         }
         capio_dir = new std::string(buf.get());
-        if (!is_directory(capio_dir->c_str())) {
-            ERR_EXIT("dir %s is not a directory", capio_dir->c_str());
-        }
     }
     LOG("CAPIO=DIR=%s", capio_dir->c_str());
 
