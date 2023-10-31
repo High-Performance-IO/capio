@@ -105,7 +105,7 @@ void write_entry_dir(int tid, const std::string &file_path, const std::string &d
     }
 
     std::string_view mode = c_file.get_mode();
-    if (mode == CAPIO_FILE_MODE_NOUPDATE) {
+    if (mode == CAPIO_FILE_MODE_NO_UPDATE) {
         handle_pending_remote_reads(dir, data_size, c_file.complete);
     }
 }

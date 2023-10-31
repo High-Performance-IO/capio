@@ -103,7 +103,7 @@ The following is an example of a simple configuration:
         {
           "name": "file1.dat",
           "committed": "on_close",
-          "mode": "noupdate"
+          "mode": "no_update"
         },
         {
           "name": "file2.dat",
@@ -132,12 +132,10 @@ The following is an example of a simple configuration:
 The [examples](examples) folder contains some examples that shows how to use mpi_io with CAPIO.
 There are also examples on how to write JSON configuration files for the semantics implemented by CAPIO:
 
-- [on_close](https://github.com/High-Performance-IO/capio/wiki/Examples#on_close-semantic): A pipeline composed by a
-  producer and a consumer with "on_close" semantics
-- [noupdate](https://github.com/High-Performance-IO/capio/wiki/Examples#noupdate-semantics): A pipeline composed by a
-  producer and a consumer with "noupdate" semantics
-- [mix_semantics](https://github.com/High-Performance-IO/capio/wiki/Examples#mixed-semantics): A pipeline composed by a
-  producer and a consumer with mix semantics
+- [on_close](https://github.com/High-Performance-IO/capio/wiki/Examples#on_close-semantic): A pipeline composed by a producer and a consumer with "on_close" semantics
+- [no_update](https://github.com/High-Performance-IO/capio/wiki/Examples#noupdate-semantics): A pipeline composed by a producer and a consumer with "no_update" semantics
+- [mix_semantics](https://github.com/High-Performance-IO/capio/wiki/Examples#mixed-semantics): A pipeline composed by a producer and a consumer with mix semantics
+
 
 ## CAPIO Team
 

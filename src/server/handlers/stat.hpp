@@ -43,7 +43,7 @@ void wait_for_stat(int tid, const std::string &path) {
     std::string_view mode = c_file.get_mode();
     bool complete         = c_file.complete;
     if (complete || strcmp(std::get<0>(get_file_location(path_to_check.c_str())), node_name) == 0 ||
-        mode == CAPIO_FILE_MODE_NOUPDATE) {
+        mode == CAPIO_FILE_MODE_NO_UPDATE) {
         handle_local_stat(tid, path);
     } else {
         handle_remote_stat(tid, path, rank);
@@ -73,7 +73,7 @@ inline void reply_stat(int tid, const std::string &path, int rank) {
     bool complete                = c_file.complete;
     const std::string *capio_dir = get_capio_dir();
     if (complete || strcmp(std::get<0>(file_location_opt->get()), node_name) == 0 ||
-        mode == CAPIO_FILE_MODE_NOUPDATE || *capio_dir == path) {
+        mode == CAPIO_FILE_MODE_NO_UPDATE || *capio_dir == path) {
         handle_local_stat(tid, path);
     } else {
         handle_remote_stat(tid, path, rank);

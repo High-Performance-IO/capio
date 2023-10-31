@@ -592,7 +592,7 @@ void capio_helper() {
             size_t file_size    = c_file.get_stored_size();
             bool complete       = c_file.complete;
             bool data_available = (offset + nbytes <= file_size);
-            if (complete || (c_file.get_mode() == CAPIO_FILE_MODE_NOUPDATE && data_available)) {
+            if (complete || (c_file.get_mode() == CAPIO_FILE_MODE_NO_UPDATE && data_available)) {
                 serve_remote_read(path_c, dest, offset, nbytes, complete);
             } else {
                 auto *sem = (sem_t *) malloc(sizeof(sem_t));
