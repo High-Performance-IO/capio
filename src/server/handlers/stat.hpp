@@ -62,7 +62,8 @@ inline void reply_stat(int tid, const std::string &path, int rank) {
             std::thread t(wait_for_stat, tid, std::string(path));
             t.detach();
         } else {
-            write_response(tid, -1);
+            write_response(tid, -1); // return size
+            write_response(tid, -1); // return is_dir
         }
         return;
     }
