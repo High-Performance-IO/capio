@@ -8,6 +8,7 @@ set(TARGET_SOURCES
         ${CMAKE_CURRENT_SOURCE_DIR}/posix/file.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/posix/rename.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/posix/write.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/posix/stat.cpp
 )
 
 #####################################

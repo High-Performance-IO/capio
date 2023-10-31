@@ -211,14 +211,16 @@ inline off64_t seek_request(const int fd, const off64_t offset, const long tid) 
 }
 
 inline CPStatResponse_t stat_request(const std::string &path, const long tid) {
+    START_LOG(tid, "call(path=%s)", path.c_str());
     char req[CAPIO_REQUEST_MAX_SIZE];
     sprintf(req, "%04d %ld %s", CAPIO_REQUEST_STAT, tid, path.c_str());
     buf_requests->write(req, CAPIO_REQUEST_MAX_SIZE);
-    // FIXME: these two reads don't work in multithreading
     off64_t file_size;
     bufs_response->at(tid)->read(&file_size);
     off64_t is_dir;
+    LOG("Received file size = %d", file_size);
     bufs_response->at(tid)->read(&is_dir);
+    LOG("Received is_dir = %d", is_dir);
     return {file_size, is_dir};
 }
 
