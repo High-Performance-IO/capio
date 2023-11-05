@@ -26,26 +26,21 @@ inline off64_t capio_mkdirat(int dirfd, std::string *pathname, mode_t mode, long
             path_to_check = dir_path + "/" + *pathname;
         }
     }
-    auto res_mismatch = std::mismatch(capio_dir->begin(), capio_dir->end(), path_to_check.begin());
-    if (res_mismatch.first == capio_dir->end()) {
-        if (capio_dir->size() == path_to_check.size()) {
-            return -2;
+
+    if (is_capio_path(path_to_check)) {
+        if (capio_files_paths->find(path_to_check) != capio_files_paths->end()) {
+            errno = EEXIST;
+            return -1;
+        }
+        off64_t res = mkdir_request(path_to_check, tid);
+        if (res == 1) {
+            return -1;
         } else {
-            if (capio_files_paths->find(path_to_check) != capio_files_paths->end()) {
-                errno = EEXIST;
-                return -1;
-            }
-            off64_t res = mkdir_request(path_to_check, tid);
-            if (res == 1) {
-                return -1;
-            } else {
-                LOG("Adding %s to capio_files_path", path_to_check.c_str());
-                capio_files_paths->insert(path_to_check);
-                return res;
-            }
+            LOG("Adding %s to capio_files_path", path_to_check.c_str());
+            capio_files_paths->insert(path_to_check);
+            return res;
         }
     } else {
-        LOG("File %s already present in capio_files_path", path_to_check.c_str());
         return -2;
     }
 }
@@ -62,30 +57,24 @@ inline off64_t capio_rmdir(std::string *pathname, long tid) {
             return -2;
         }
     }
-    auto res_mismatch = std::mismatch(capio_dir->begin(), capio_dir->end(), path_to_check.begin());
-    if (res_mismatch.first == capio_dir->end()) {
-        if (capio_dir->size() == path_to_check.size()) {
-            LOG("capio_dir.size == path_to_check.size");
-            return -2;
+
+    if (is_capio_path(path_to_check)) {
+        if (capio_files_paths->find(path_to_check) == capio_files_paths->end()) {
+            LOG("capio_files_path.find == end. errno = "
+                "ENOENT");
+            errno = ENOENT;
+            return -1;
+        }
+        off64_t res = rmdir_request(path_to_check, tid);
+        if (res == 2) {
+            LOG("res == 2. errno = ENOENT");
+            errno = ENOENT;
+            return -1;
         } else {
-            if (capio_files_paths->find(path_to_check) == capio_files_paths->end()) {
-                LOG("capio_files_path.find == end. errno = "
-                    "ENOENT");
-                errno = ENOENT;
-                return -1;
-            }
-            off64_t res = rmdir_request(path_to_check.c_str(), tid);
-            if (res == 2) {
-                LOG("res == 2. errno = ENOENT");
-                errno = ENOENT;
-                return -1;
-            } else {
-                capio_files_paths->erase(path_to_check);
-                return res;
-            }
+            capio_files_paths->erase(path_to_check);
+            return res;
         }
     } else {
-        LOG("generic return -2");
         return -2;
     }
 }
@@ -94,7 +83,6 @@ int mkdir_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long ar
     std::string pathname(reinterpret_cast<const char *>(arg0));
     auto mode = static_cast<mode_t>(arg1);
     long tid  = syscall_no_intercept(SYS_gettid);
-    START_LOG(tid, "call(pathname=%s, mode=%o)", pathname.c_str(), mode);
 
     off64_t res = capio_mkdirat(AT_FDCWD, &pathname, mode, tid);
 
@@ -111,7 +99,6 @@ int mkdirat_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long 
     std::string pathname(reinterpret_cast<const char *>(arg1));
     auto mode = static_cast<mode_t>(arg2);
     long tid  = syscall_no_intercept(SYS_gettid);
-    START_LOG(tid, "call(dirfd=%d, pathname=%s, mode=%o)", dirfd, pathname.c_str(), mode);
 
     off64_t res = capio_mkdirat(dirfd, &pathname, mode, tid);
 
@@ -125,7 +112,6 @@ int mkdirat_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long 
 int rmdir_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg5, long *result) {
     std::string pathname(reinterpret_cast<const char *>(arg0));
     long tid = syscall_no_intercept(SYS_gettid);
-    START_LOG(tid, "call(directory=%s)", pathname.c_str());
 
     off64_t res = capio_rmdir(&pathname, tid);
     if (res != -2) {

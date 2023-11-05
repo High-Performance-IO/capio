@@ -8,6 +8,7 @@
 #include <fstream>
 #include <iostream>
 
+#include "env.hpp"
 #include "logger.hpp"
 #include "syscall.hpp"
 
@@ -29,6 +30,18 @@ inline bool is_absolute(const std::string *pathname) {
     return pathname != nullptr && (pathname->rfind("/", 0) == 0);
 }
 
+inline bool is_directory(const std::string &path) {
+    START_LOG(capio_syscall(SYS_gettid), "call(path=%s)", path.c_str());
+
+    struct stat statbuf {};
+    if (stat(path.c_str(), &statbuf) != 0) {
+        LOG("Error at is_directory(path=%d) -> %d: %d (%s)", path.c_str(), errno,
+            std::strerror(errno));
+        return -1;
+    }
+    return S_ISDIR(statbuf.st_mode) == 1;
+}
+
 inline bool is_directory(int dirfd) {
     START_LOG(capio_syscall(SYS_gettid), "call(dirfd=%d)", dirfd);
 
@@ -42,30 +55,23 @@ inline bool is_directory(int dirfd) {
     return S_ISDIR(path_stat.st_mode) == 1;
 }
 
-inline bool is_directory(const std::string &path) {
-    START_LOG(capio_syscall(SYS_gettid), "call(path=%s)", path.c_str());
-
-    struct stat statbuf {};
-    if (stat(path.c_str(), &statbuf) != 0) {
-        LOG("Error at is_directory(path=%d) -> %d: %d (%s)", path.c_str(), errno,
-            std::strerror(errno));
-        return -1;
-    }
-    return S_ISDIR(statbuf.st_mode) == 1;
-}
-
-bool is_prefix(std::string path_1, std::string path_2) {
+inline bool is_prefix(const std::string &path_1, const std::string &path_2) {
     auto res = std::mismatch(path_1.begin(), path_1.end(), path_2.begin());
     return res.first == path_2.end();
 }
 
-static inline bool is_capio_path(long tid, const std::string &path_to_check,
-                                 const std::string &capio_dir) {
-    START_LOG(tid, "call(%s, %s)", path_to_check.c_str(), capio_dir.c_str());
+static inline bool is_capio_dir(const std::string &path_to_check) {
+    START_LOG(capio_syscall(SYS_gettid), "call(path_to_check=%s)", path_to_check.c_str());
 
-    return (std::mismatch(capio_dir.begin(), capio_dir.end(), path_to_check.begin()).first ==
-                capio_dir.end() &&
-            capio_dir.size() != path_to_check.size());
+    const std::filesystem::path capio_dir(*get_capio_dir());
+    return capio_dir.compare(path_to_check) == 0;
+}
+
+static inline bool is_capio_path(const std::string &path_to_check) {
+    START_LOG(capio_syscall(SYS_gettid), "call(path_to_check=%s)", path_to_check.c_str());
+
+    const std::filesystem::path capio_dir(*get_capio_dir());
+    return capio_dir.compare(path_to_check) < 0;
 }
 
 const std::string *capio_posix_realpath(long tid, const std::string *pathname,

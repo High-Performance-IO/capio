@@ -3,28 +3,21 @@
 
 #include "globals.hpp"
 
-off64_t capio_unlink_abs(const std::string &abs_path, long pid, bool is_dir) {
-    START_LOG(pid, "call(abs_path=%s, is_dir=%s)", abs_path.c_str(), is_dir ? "true" : "false");
-    off64_t res;
-    const std::string *capio_dir = get_capio_dir();
-    auto it = std::mismatch(capio_dir->begin(), capio_dir->end(), abs_path.begin());
-    if (it.first == capio_dir->end()) {
-        if (capio_dir->size() == abs_path.size()) {
+off64_t capio_unlink_abs(const std::string &abs_path, long tid, bool is_dir) {
+    START_LOG(tid, "call(abs_path=%s, is_dir=%s)", abs_path.c_str(), is_dir ? "true" : "false");
+    if (!is_capio_path(abs_path)) {
+        if (is_capio_dir(abs_path)) {
             ERR_EXIT("ERROR: unlink to the capio_dir %s", abs_path.c_str());
-        }
-        if (is_dir) {
-            res = rmdir_request(abs_path.c_str(), pid);
         } else {
-            res = unlink_request(abs_path.c_str(), pid);
+            return -2;
         }
+    } else {
+        off64_t res = is_dir ? rmdir_request(abs_path, tid) : unlink_request(abs_path, tid);
         if (res == -1) {
             errno = ENOENT;
         }
-    } else {
-        res = -2;
+        return res;
     }
-
-    return res;
 }
 
 inline off64_t capio_unlinkat(int dirfd, const std::string &pathname, int flags, long tid) {
@@ -66,7 +59,6 @@ inline off64_t capio_unlinkat(int dirfd, const std::string &pathname, int flags,
 int unlink_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg5, long *result) {
     std::string pathname(reinterpret_cast<const char *>(arg0));
     long tid = syscall_no_intercept(SYS_gettid);
-    START_LOG(tid, "call(pathname=%s)", pathname.c_str());
 
     off64_t res = capio_unlinkat(AT_FDCWD, pathname, 0, tid);
 
@@ -83,7 +75,6 @@ int unlinkat_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long
     std::string pathname(reinterpret_cast<const char *>(arg1));
     int flags = static_cast<int>(arg2);
     long tid  = syscall_no_intercept(SYS_gettid);
-    START_LOG(tid, "call(dirfd=%d, pathname=%s, flags=%X)", dirfd, pathname.c_str(), flags);
 
     off64_t res = capio_unlinkat(dirfd, pathname, flags, tid);
 

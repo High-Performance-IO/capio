@@ -18,7 +18,6 @@ int ioctl_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long ar
     auto fd      = static_cast<int>(arg0);
     auto request = static_cast<unsigned long>(arg1);
     long tid     = syscall_no_intercept(SYS_gettid);
-    START_LOG(tid, "call(fd=%ld, request=%ld)", arg0, arg1);
 
     int res = capio_ioctl(fd, request, tid);
     if (res != -2) {

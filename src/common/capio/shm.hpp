@@ -11,7 +11,6 @@
 void *create_shm(const std::string &shm_name, const long int size) {
     START_LOG(capio_syscall(SYS_gettid), "call(shm_name=%s, size=%ld)", shm_name.c_str(), size);
 
-    void *p;
     // if we are not creating a new object, mode is equals to 0
     int fd = shm_open(shm_name.c_str(), O_CREAT | O_RDWR,
                       S_IRUSR | S_IWUSR); // to be closed
@@ -21,7 +20,7 @@ void *create_shm(const std::string &shm_name, const long int size) {
     if (ftruncate(fd, size) == -1) {
         ERR_EXIT("ftruncate create_shm %s", shm_name.c_str());
     }
-    p = mmap(nullptr, size, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
+    void *p = mmap(nullptr, size, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
     if (p == MAP_FAILED) {
         ERR_EXIT("mmap create_shm %s", shm_name.c_str());
     }
@@ -34,7 +33,6 @@ void *create_shm(const std::string &shm_name, const long int size) {
 void *get_shm(const std::string &shm_name) {
     START_LOG(capio_syscall(SYS_gettid), "call(shm_name=%s)", shm_name.c_str());
 
-    void *p;
     // if we are not creating a new object, mode is equals to 0
     int fd = shm_open(shm_name.c_str(), O_RDWR, 0); // to be closed
     struct stat sb {};
@@ -47,7 +45,7 @@ void *get_shm(const std::string &shm_name) {
     if (fstat(fd, &sb) == -1) {
         ERR_EXIT("fstat %s", shm_name.c_str());
     }
-    p = mmap(nullptr, sb.st_size, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
+    void *p = mmap(nullptr, sb.st_size, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
     if (p == MAP_FAILED) {
         ERR_EXIT("mmap get_shm %s", shm_name.c_str());
     }
@@ -60,7 +58,6 @@ void *get_shm(const std::string &shm_name) {
 void *get_shm_if_exist(const std::string &shm_name) {
     START_LOG(capio_syscall(SYS_gettid), "call(shm_name=%s)", shm_name.c_str());
 
-    void *p;
     // if we are not creating a new object, mode is equals to 0
     int fd = shm_open(shm_name.c_str(), O_RDWR, 0); // to be closed
     struct stat sb {};
@@ -76,7 +73,7 @@ void *get_shm_if_exist(const std::string &shm_name) {
     if (fstat(fd, &sb) == -1) {
         ERR_EXIT("fstat %s", shm_name.c_str());
     }
-    p = mmap(nullptr, sb.st_size, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
+    void *p = mmap(nullptr, sb.st_size, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
     if (p == MAP_FAILED) {
         ERR_EXIT("mmap get_shm %s", shm_name.c_str());
     }

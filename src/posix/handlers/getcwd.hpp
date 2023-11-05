@@ -19,7 +19,6 @@ int getcwd_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long a
     std::string buf(reinterpret_cast<char *>(arg0));
     auto size = static_cast<size_t>(arg1);
     long tid  = syscall_no_intercept(SYS_gettid);
-    START_LOG(tid, "call(buf=0x%08x, size=%ld)", buf.c_str(), size);
 
     auto rescw = capio_getcwd(&buf, size, tid);
     if (rescw == nullptr) {

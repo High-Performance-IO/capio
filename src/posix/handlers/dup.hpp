@@ -46,7 +46,6 @@ inline int capio_dup2(int fd, int fd2, long tid) {
 int dup_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg5, long *result) {
     long tid = syscall_no_intercept(SYS_gettid);
     int fd   = static_cast<int>(arg0);
-    START_LOG(tid, "call(%d)", fd);
 
     int res = capio_dup(fd, tid);
     if (res != -2) {
@@ -60,7 +59,6 @@ int dup2_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg
     long tid = syscall_no_intercept(SYS_gettid);
     int fd   = static_cast<int>(arg0);
     int fd2  = static_cast<int>(arg1);
-    START_LOG(tid, "call(fd=%d, fd2=%d)", fd, fd2);
 
     int res = capio_dup2(fd, fd2, tid);
     if (res != -2) {

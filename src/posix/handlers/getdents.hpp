@@ -31,7 +31,7 @@ inline off64_t add_getdents_request(int fd, off64_t count,
 
 // TODO: too similar to capio_read, refactoring needed
 inline ssize_t capio_getdents(int fd, void *buffer, size_t count, bool is_getdents64, long tid) {
-    START_LOG(tid, "call(fd=%d, dirp=0x%08x, count=%ld, is64bit=%s", fd, buffer, count,
+    START_LOG(tid, "call(fd=%d, dirp=0x%08x, count=%ld, is64bit=%s)", fd, buffer, count,
               is_getdents64 ? "true" : "false");
 
     if (files->find(fd) != files->end()) {
@@ -64,8 +64,6 @@ inline int getdents_handler_impl(long arg0, long arg1, long arg2, long *result, 
     auto *dirp = reinterpret_cast<struct linux_dirent *>(arg1);
     auto count = static_cast<size_t>(arg2);
     long tid   = syscall_no_intercept(SYS_gettid);
-    START_LOG(tid, "call(fd=%d, dirp=0x%08x, count=%ld, is64bit=%s", fd, dirp, count,
-              is64bit ? "true" : "false");
 
     auto res = capio_getdents(fd, dirp, count, is64bit, tid);
 

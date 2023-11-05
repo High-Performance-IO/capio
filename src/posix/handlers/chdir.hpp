@@ -19,9 +19,7 @@ inline int capio_chdir(const std::string *path, long tid) {
         path_to_check = capio_posix_realpath(tid, path, capio_dir, current_dir);
     }
 
-    auto res = std::mismatch(capio_dir->begin(), capio_dir->end(), path_to_check->c_str());
-
-    if (res.first == capio_dir->end()) {
+    if (is_capio_path(*path_to_check)) {
         delete current_dir;
         current_dir = path_to_check;
         return 0;
@@ -33,12 +31,8 @@ inline int capio_chdir(const std::string *path, long tid) {
 int chdir_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg5, long *result) {
     std::string path(reinterpret_cast<const char *>(arg0));
     long tid = syscall_no_intercept(SYS_gettid);
-    START_LOG(tid, "call(path=%s)", path.c_str());
 
-    const std::string *pathname_abs =
-        capio_posix_realpath(tid, &path, get_capio_dir(), current_dir);
-
-    int res = capio_chdir(pathname_abs, tid);
+    int res = capio_chdir(&path, tid);
 
     if (res != -2) {
         *result = (res < 0 ? -errno : res);
