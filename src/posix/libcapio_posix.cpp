@@ -74,6 +74,7 @@ static constexpr std::array<CPHandler_t, __NR_syscalls> build_syscall_table() {
     _syscallTable[SYS_read]       = read_handler;
     _syscallTable[SYS_rename]     = rename_handler;
     _syscallTable[SYS_stat]       = lstat_handler;
+    _syscallTable[SYS_statx]      = statx_handler;
     _syscallTable[SYS_unlink]     = unlink_handler;
     _syscallTable[SYS_unlinkat]   = unlinkat_handler;
     _syscallTable[SYS_write]      = write_handler;

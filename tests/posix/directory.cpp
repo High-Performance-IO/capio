@@ -1,5 +1,4 @@
 #include <cerrno>
-#include <climits>
 #include <filesystem>
 
 #include <fcntl.h>
@@ -24,6 +23,7 @@ TEST_CASE("Test directory creation, reopening and close", "[posix]") {
 TEST_CASE("Test directory creation, reopening, and close using mkdirat with AT_FDCWD", "[posix]") {
     constexpr const char *PATHNAME = "test";
     REQUIRE(mkdirat(AT_FDCWD, PATHNAME, S_IRWXU) != -1);
+    REQUIRE(faccessat(AT_FDCWD, PATHNAME, F_OK, 0) == 0);
     int flags = O_RDONLY | O_DIRECTORY;
     int fd    = openat(AT_FDCWD, PATHNAME, flags, S_IRUSR | S_IWUSR);
     REQUIRE(fd != -1);
@@ -32,18 +32,17 @@ TEST_CASE("Test directory creation, reopening, and close using mkdirat with AT_F
     REQUIRE(fd != -1);
     REQUIRE(close(fd) != -1);
     REQUIRE(unlinkat(AT_FDCWD, PATHNAME, AT_REMOVEDIR) != -1);
+    REQUIRE(faccessat(AT_FDCWD, PATHNAME, F_OK, 0) != 0);
 }
 
 TEST_CASE("Test that mkdir fails if directory already exists", "[posix]") {
     constexpr const char *PATHNAME = "test";
     REQUIRE(mkdir(PATHNAME, S_IRWXU) != -1);
-    int flags = O_RDONLY | O_DIRECTORY;
-    int fd    = open(PATHNAME, flags, S_IRUSR | S_IWUSR);
-    REQUIRE(fd != -1);
-    REQUIRE(close(fd) != -1);
+    REQUIRE(faccessat(AT_FDCWD, PATHNAME, F_OK, 0) == 0);
     REQUIRE(mkdir(PATHNAME, S_IRWXU) == -1);
     REQUIRE(errno == EEXIST);
     REQUIRE(rmdir(PATHNAME) != -1);
+    REQUIRE(faccessat(AT_FDCWD, PATHNAME, F_OK, 0) != 0);
 }
 
 TEST_CASE("Test directory creation, reopening, and close in a different directory using openat "
@@ -52,6 +51,7 @@ TEST_CASE("Test directory creation, reopening, and close in a different director
     const auto path_fs = std::filesystem::path(std::getenv("PWD")) / std::filesystem::path("test");
     const char *PATHNAME = path_fs.c_str();
     REQUIRE(mkdirat(0, PATHNAME, S_IRWXU) != -1);
+    REQUIRE(faccessat(0, PATHNAME, F_OK, 0) == 0);
     int flags = O_RDONLY | O_DIRECTORY;
     int fd    = openat(0, PATHNAME, flags, S_IRUSR | S_IWUSR);
     REQUIRE(fd != -1);
@@ -60,6 +60,7 @@ TEST_CASE("Test directory creation, reopening, and close in a different director
     REQUIRE(fd != -1);
     REQUIRE(close(fd) != -1);
     REQUIRE(unlinkat(0, PATHNAME, AT_REMOVEDIR) != -1);
+    REQUIRE(faccessat(0, PATHNAME, F_OK, 0) != 0);
 }
 
 TEST_CASE("Test directory creation, reopening, and close in a different directory using mkdirat "
@@ -71,6 +72,7 @@ TEST_CASE("Test directory creation, reopening, and close in a different director
     int dirfd                      = open(DIRPATH, flags);
     REQUIRE(dirfd != -1);
     REQUIRE(mkdirat(dirfd, PATHNAME, S_IRWXU) != -1);
+    REQUIRE(faccessat(dirfd, PATHNAME, F_OK, 0) == 0);
     int fd = openat(dirfd, PATHNAME, flags, S_IRUSR | S_IWUSR);
     REQUIRE(fd != -1);
     REQUIRE(close(fd) != -1);
@@ -78,6 +80,7 @@ TEST_CASE("Test directory creation, reopening, and close in a different director
     REQUIRE(fd != -1);
     REQUIRE(close(fd) != -1);
     REQUIRE(unlinkat(dirfd, PATHNAME, AT_REMOVEDIR) != -1);
+    REQUIRE(faccessat(dirfd, PATHNAME, F_OK, 0) != 0);
     REQUIRE(close(dirfd) != -1);
 }
 
