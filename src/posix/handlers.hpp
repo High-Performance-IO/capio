@@ -22,6 +22,8 @@
 #include "handlers/read.hpp"
 #include "handlers/rename.hpp"
 #include "handlers/stat.hpp"
+#include "handlers/statfs.hpp"
+#include "handlers/statx.hpp"
 #include "handlers/unlink.hpp"
 #include "handlers/write.hpp"
 
