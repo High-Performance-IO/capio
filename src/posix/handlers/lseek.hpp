@@ -1,50 +1,44 @@
 #ifndef CAPIO_POSIX_HANDLERS_LSEEK_HPP
 #define CAPIO_POSIX_HANDLERS_LSEEK_HPP
 
-#include "globals.hpp"
-
 // TODO: EOVERFLOW is not addressed
 inline off64_t capio_lseek(int fd, off64_t offset, int whence, long tid) {
     START_LOG(tid, "call(fd=%d, offset=%ld, whence=%d)", fd, offset, whence);
 
-    auto it = files->find(fd);
-    if (it != files->end()) {
-        std::tuple<off64_t *, off64_t *, int, int> *t = &(*files)[fd];
-        off64_t *file_offset                          = std::get<0>(*t);
+    if (exists_capio_fd(fd)) {
+        off64_t file_offset = get_capio_fd_offset(fd);
         if (whence == SEEK_SET) {
             if (offset >= 0) {
-                *file_offset = offset;
-                seek_request(fd, *file_offset, tid);
-
-                return *file_offset;
+                set_capio_fd_offset(fd, offset);
+                seek_request(fd, offset, tid);
+                return offset;
             } else {
                 errno = EINVAL;
                 return -1;
             }
         } else if (whence == SEEK_CUR) {
-            off64_t new_offset = *file_offset + offset;
+            off64_t new_offset = file_offset + offset;
             if (new_offset >= 0) {
-                *file_offset = new_offset;
-                seek_request(fd, *file_offset, tid);
-
-                return *file_offset;
+                set_capio_fd_offset(fd, new_offset);
+                seek_request(fd, new_offset, tid);
+                return new_offset;
             } else {
                 errno = EINVAL;
                 return -1;
             }
         } else if (whence == SEEK_END) {
-            off64_t file_size = seek_end_request(fd, tid);
-            *file_offset      = file_size + offset;
-
-            return *file_offset;
+            off64_t file_size  = seek_end_request(fd, tid);
+            off64_t new_offset = file_offset + offset;
+            set_capio_fd_offset(fd, new_offset);
+            return new_offset;
         } else if (whence == SEEK_DATA) {
-            *file_offset = seek_data_request(fd, *file_offset, tid);
-
-            return *file_offset;
+            off64_t new_offset = seek_data_request(fd, file_offset, tid);
+            set_capio_fd_offset(fd, new_offset);
+            return new_offset;
         } else if (whence == SEEK_HOLE) {
-            *file_offset = seek_hole_request(fd, *file_offset, tid);
-
-            return *file_offset;
+            off64_t new_offset = seek_hole_request(fd, file_offset, tid);
+            set_capio_fd_offset(fd, new_offset);
+            return new_offset;
         } else {
             errno = EINVAL;
             return -1;

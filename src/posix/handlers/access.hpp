@@ -1,15 +1,12 @@
 #ifndef CAPIO_POSIX_HANDLERS_ACCESS_HPP
 #define CAPIO_POSIX_HANDLERS_ACCESS_HPP
 
-#include "capio/filesystem.hpp"
-#include "globals.hpp"
 #include "utils/filesystem.hpp"
 
 inline off64_t capio_access(const std::string *pathname, mode_t mode, long tid) {
     START_LOG(tid, "call(pathname=%s, mode=%o)", pathname->c_str(), mode);
 
-    const std::string *capio_dir    = get_capio_dir();
-    const std::string *abs_pathname = capio_posix_realpath(tid, pathname, capio_dir, current_dir);
+    const std::string *abs_pathname = capio_posix_realpath(tid, pathname);
     if (abs_pathname->length() == 0) {
         errno = ENONET;
         return -1;

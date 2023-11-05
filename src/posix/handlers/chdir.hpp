@@ -1,7 +1,6 @@
 #ifndef CAPIO_POSIX_HANDLERS_CHDIR_HPP
 #define CAPIO_POSIX_HANDLERS_CHDIR_HPP
 
-#include "globals.hpp"
 #include "utils/filesystem.hpp"
 
 /*
@@ -11,17 +10,15 @@
  */
 
 inline int capio_chdir(const std::string *path, long tid) {
-    const std::string *capio_dir     = get_capio_dir();
     const std::string *path_to_check = path;
     START_LOG(tid, "call(path=%s)", path);
 
     if (!is_absolute(path)) {
-        path_to_check = capio_posix_realpath(tid, path, capio_dir, current_dir);
+        path_to_check = capio_posix_realpath(tid, path);
     }
 
     if (is_capio_path(*path_to_check)) {
-        delete current_dir;
-        current_dir = path_to_check;
+        set_current_dir(path_to_check);
         return 0;
     } else {
         return -2;

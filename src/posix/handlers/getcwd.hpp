@@ -1,16 +1,15 @@
 #ifndef CAPIO_POSIX_HANDLERS_GETCWD_HPP
 #define CAPIO_POSIX_HANDLERS_GETCWD_HPP
 
-#include "globals.hpp"
-
 inline std::string *capio_getcwd(std::string *buf, size_t size, long tid) {
     START_LOG(tid, "call(buf=0x%08x, size=%ld)", buf, size);
 
-    if ((current_dir->length() + 1) * sizeof(char) > size) {
+    const std::string *cwd = get_current_dir();
+    if ((cwd->length() + 1) * sizeof(char) > size) {
         errno = ERANGE;
         return nullptr;
     } else {
-        std::strcpy(buf->data(), current_dir->data());
+        std::strcpy(buf->data(), cwd->c_str());
         return buf;
     }
 }

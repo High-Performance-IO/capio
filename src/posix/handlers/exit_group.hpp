@@ -2,6 +2,7 @@
 #define CAPIO_POSIX_HANDLERS_EXIT_GROUP_HPP
 
 #include "capio/logger.hpp"
+
 #include "utils/requests.hpp"
 
 /*

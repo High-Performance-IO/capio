@@ -1,19 +1,23 @@
 #ifndef CAPIO_POSIX_HANDLERS_OPENAT_HPP
 #define CAPIO_POSIX_HANDLERS_OPENAT_HPP
 
-#include "globals.hpp"
 #include "lseek.hpp"
+
 #include "utils/filesystem.hpp"
+
+std::string get_capio_parent_dir(const std::string &path) {
+    auto pos = path.rfind('/');
+    return path.substr(0, pos);
+}
 
 inline int capio_openat(int dirfd, std::string *pathname, int flags, long tid) {
     START_LOG(tid, "call(dirfd=%d, pathname=%s, flags=%X)", dirfd, pathname->c_str(), flags);
 
-    const std::string *capio_dir = get_capio_dir();
     std::string path_to_check(*pathname);
 
     if (!is_absolute(pathname)) {
         if (dirfd == AT_FDCWD) {
-            path_to_check = *capio_posix_realpath(tid, pathname, capio_dir, current_dir);
+            path_to_check = *capio_posix_realpath(tid, pathname);
             if (path_to_check.length() == 0) {
                 return -2;
             }
@@ -38,9 +42,8 @@ inline int capio_openat(int dirfd, std::string *pathname, int flags, long tid) {
             }
         }
     }
-    auto res = std::mismatch(capio_dir->begin(), capio_dir->end(), path_to_check.begin());
 
-    if (res.first == capio_dir->end()) {
+    if (is_capio_path(path_to_check)) {
         int fd = static_cast<int>(syscall_no_intercept(SYS_open, "/dev/null", O_RDONLY));
         if (fd == -1) {
             ERR_EXIT("capio_open, /dev/null opening");
@@ -66,24 +69,12 @@ inline int capio_openat(int dirfd, std::string *pathname, int flags, long tid) {
                 return -1;
             }
         }
-        syscall_no_intercept_flag = true;
-        off64_t *p_offset         = (off64_t *) create_shm(
-            "offset_" + std::to_string(tid) + "_" + std::to_string(fd), sizeof(off64_t));
-        syscall_no_intercept_flag = false;
-        *p_offset                 = 0;
-        off64_t init_size         = DEFAULT_FILE_INITIAL_SIZE;
-        int actual_flags          = flags;
+        int actual_flags = flags & ~O_CLOEXEC;
         if ((flags & O_DIRECTORY) == O_DIRECTORY) {
             actual_flags = actual_flags | O_LARGEFILE;
         }
-        if ((flags & O_CLOEXEC) == O_CLOEXEC) {
-            actual_flags &= ~O_CLOEXEC;
-            files->insert({fd, std::make_tuple(p_offset, &init_size, actual_flags, FD_CLOEXEC)});
-        } else {
-            files->insert({fd, std::make_tuple(p_offset, &init_size, actual_flags, 0)});
-        }
-        (*capio_files_descriptors)[fd] = path_to_check;
-        capio_files_paths->insert(path_to_check);
+        add_capio_fd(tid, path_to_check, fd, 0, DEFAULT_FILE_INITIAL_SIZE, actual_flags,
+                     (flags & O_CLOEXEC) == O_CLOEXEC);
         if ((flags & O_APPEND) == O_APPEND) {
             capio_lseek(fd, 0, SEEK_END, tid);
         }

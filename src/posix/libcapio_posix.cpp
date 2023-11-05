@@ -4,14 +4,18 @@
  * logs up to CAPIO_MAX_LOG_LEVEL function calls
  */
 
-#include <asm-generic/unistd.h>
-
 #include <array>
 #include <string>
-#include <unordered_map>
+
+#include <asm-generic/unistd.h>
 
 #include "capio/env.hpp"
-#include "globals.hpp"
+#include "capio/syscall.hpp"
+
+#include "utils/clone.hpp"
+#include "utils/filesystem.hpp"
+#include "utils/snapshot.hpp"
+
 #include "handlers.hpp"
 
 /**
@@ -114,10 +118,15 @@ static int hook(long syscall_number, long arg0, long arg1, long arg2, long arg3,
 static __attribute__((constructor)) void init() {
     init_client();
     init_data_plane();
-    char *buf = (char *) malloc(PATH_MAX * sizeof(char));
-    syscall_no_intercept(SYS_getcwd, buf, PATH_MAX);
-    current_dir = new std::string(buf);
-    mtrace_init(syscall_no_intercept(SYS_gettid));
+    init_filesystem();
+    long tid = syscall_no_intercept(SYS_gettid);
+
+    int *fd_shm = get_fd_snapshot(tid);
+    if (fd_shm != nullptr) {
+        initialize_from_snapshot(fd_shm, tid);
+    }
+
+    init_process(tid);
 
     intercept_hook_point_clone_child  = hook_clone_child;
     intercept_hook_point_clone_parent = hook_clone_parent;

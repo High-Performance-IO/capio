@@ -4,7 +4,7 @@
 #include <sys/vfs.h>
 
 #include "capio/env.hpp"
-#include "globals.hpp"
+
 #include "utils/filesystem.hpp"
 #include "utils/requests.hpp"
 
@@ -39,11 +39,9 @@ inline void fill_statbuf(struct stat *statbuf, off_t file_size, bool is_dir, ino
 inline int capio_fstat(int fd, struct stat *statbuf, long tid) {
     START_LOG(tid, "call(fd=%d, statbuf=0x%08x)", fd, statbuf);
 
-    auto it = files->find(fd);
-    if (it != files->end()) {
+    if (exists_capio_fd(fd)) {
         auto [file_size, is_dir] = fstat_request(fd, tid);
-        fill_statbuf(statbuf, file_size, is_dir,
-                     std::hash<std::string>{}((*capio_files_descriptors)[fd]));
+        fill_statbuf(statbuf, file_size, is_dir, std::hash<std::string>{}(get_capio_fd_path(fd)));
         return 0;
     } else {
         return -2;
@@ -68,9 +66,8 @@ inline int capio_lstat_wrapper(const std::string *path, struct stat *statbuf, lo
     if (path == nullptr) {
         return -2;
     }
-    const std::string *capio_dir = get_capio_dir();
 
-    const std::string *absolute_path = capio_posix_realpath(tid, path, capio_dir, current_dir);
+    const std::string *absolute_path = capio_posix_realpath(tid, path);
     if (absolute_path->length() == 0) {
         return -2;
     }

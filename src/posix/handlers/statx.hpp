@@ -32,15 +32,14 @@ inline int capio_statx(int dirfd, const std::string *pathname, int flags, int ma
     START_LOG(tid, "call(dirfd=%d, pathname=%s, flags=%d, mask=%d, statxbuf=0x%08x)", dirfd,
               pathname->c_str(), flags, mask, statxbuf);
 
-    const std::string *capio_dir = get_capio_dir();
-    std::string absolute_path    = *pathname;
+    std::string absolute_path = *pathname;
     if ((flags & AT_EMPTY_PATH) == AT_EMPTY_PATH) {
         if (dirfd == AT_FDCWD) { // operate on currdir
             absolute_path = get_current_dir_name();
         } else { // operate on dirfd. in this case dirfd can refer to any type of file
             if (pathname->length() != 0) {
-                if (files->find(dirfd) != files->end()) {
-                    absolute_path = (*capio_files_descriptors)[dirfd];
+                if (exists_capio_fd(dirfd)) {
+                    absolute_path = get_capio_fd_path(dirfd);
                 } else {
                     return -2;
                 }
@@ -52,7 +51,7 @@ inline int capio_statx(int dirfd, const std::string *pathname, int flags, int ma
     } else {
         if (!is_absolute(pathname)) {
             if (dirfd == AT_FDCWD) {
-                absolute_path = *capio_posix_realpath(tid, pathname, capio_dir, current_dir);
+                absolute_path = *capio_posix_realpath(tid, pathname);
             } else {
                 if (!is_directory(dirfd)) {
                     return -2;

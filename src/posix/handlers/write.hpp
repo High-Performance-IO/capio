@@ -1,20 +1,18 @@
 #ifndef CAPIO_POSIX_HANDLERS_WRITE_HPP
 #define CAPIO_POSIX_HANDLERS_WRITE_HPP
 
-#include "globals.hpp"
 #include "utils/requests.hpp"
 
 inline ssize_t capio_write(int fd, const void *buffer, off64_t count, long tid) {
     START_LOG(tid, "call(fd=%d, buf=0x%08x, count=%ld)", fd, buffer, count);
 
-    auto it = files->find(fd);
-    if (it != files->end()) {
+    if (exists_capio_fd(fd)) {
         if (count > SSIZE_MAX) {
             ERR_EXIT("Capio does not support writes bigger than "
                      "SSIZE_MAX yet");
         }
         off64_t count_off = count;
-        write_request(files, fd, count_off, tid); // bottleneck
+        write_request(fd, count_off, tid);
         write_data(tid, buffer, count);
 
         return count;
@@ -27,8 +25,7 @@ inline ssize_t capio_writev(int fd, const struct iovec *iov, int iovcnt, long ti
     START_LOG(tid, "call(fd=%d, iov.iov_base=0x%08x, iov.iov_len=%ld, iovcnt=%d)", fd,
               iov->iov_base, iov->iov_len, iovcnt);
 
-    auto it = files->find(fd);
-    if (it != files->end()) {
+    if (exists_capio_fd(fd)) {
         ssize_t tot_bytes = 0;
         ssize_t res       = 0;
         int i             = 0;
