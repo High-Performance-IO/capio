@@ -86,10 +86,9 @@ inline void handle_local_read(int tid, int fd, off64_t count, bool dir, bool is_
             }
         }
     } else {
-        c_file  = init_capio_file(path.data(), false);
-        char *p = c_file.get_buffer();
-        size_t bytes_read;
-        bytes_read = count;
+        c_file            = init_capio_file(path.data(), false);
+        char *p           = c_file.get_buffer();
+        size_t bytes_read = count;
         if (is_getdents) {
             off64_t dir_size  = c_file.get_stored_size();
             off64_t n_entries = dir_size / THEORETICAL_SIZE_DIRENT64;
@@ -232,8 +231,9 @@ inline void handle_read(int tid, int fd, off64_t count, bool dir, bool is_getden
     std::string_view path        = get_capio_file_path(tid, fd);
     const std::string *capio_dir = get_capio_dir();
     bool is_prod                 = is_producer(tid, path.data());
+    auto file_location_opt       = get_file_location_opt(path.data());
 
-    if (!get_file_location_opt(path.data()) && !is_prod) {
+    if (!file_location_opt && !is_prod) {
         bool found = check_file_location(rank, path.data());
         if (!found) {
             // launch a thread that checks when the file is created
@@ -241,7 +241,7 @@ inline void handle_read(int tid, int fd, off64_t count, bool dir, bool is_getden
             t.detach();
         }
     }
-    if (is_prod || strcmp(std::get<0>(get_file_location(path.data())), node_name) == 0 ||
+    if (is_prod || strcmp(std::get<0>(file_location_opt->get()), node_name) == 0 ||
         *capio_dir == path) {
         handle_local_read(tid, fd, count, dir, is_getdents, is_prod);
     } else {

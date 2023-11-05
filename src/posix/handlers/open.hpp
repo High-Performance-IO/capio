@@ -96,7 +96,6 @@ inline int capio_openat(int dirfd, std::string *pathname, int flags, long tid) {
 int creat_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg5, long *result) {
     std::string pathname(reinterpret_cast<const char *>(arg0));
     long tid = syscall_no_intercept(SYS_gettid);
-    START_LOG(tid, "call(pathname=%s)", pathname.c_str());
 
     int res = capio_openat(AT_FDCWD, &pathname, O_CREAT | O_WRONLY | O_TRUNC, tid);
 
@@ -112,8 +111,6 @@ int openat_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long a
     std::string pathname(reinterpret_cast<const char *>(arg1));
     int flags = static_cast<int>(arg2);
     long tid  = syscall_no_intercept(SYS_gettid);
-
-    START_LOG(tid, "call(dirfd=%d, pathname=%s, flags=%X)", dirfd, pathname.c_str(), flags);
 
     int res = capio_openat(dirfd, &pathname, flags, tid);
 

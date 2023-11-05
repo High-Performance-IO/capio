@@ -59,7 +59,6 @@ int lseek_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long ar
     auto offset = static_cast<off64_t>(arg1);
     int whence  = static_cast<int>(arg2);
     long tid    = syscall_no_intercept(SYS_gettid);
-    START_LOG(tid, "call(fd=%d, offset=%ld, whence=%d)", fd, offset, whence);
 
     off64_t res = capio_lseek(fd, offset, whence, tid);
 

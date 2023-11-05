@@ -1,12 +1,14 @@
 #ifndef CAPIO_COMMON_ENV_HPP
 #define CAPIO_COMMON_ENV_HPP
 
+#include <sys/stat.h>
+
 #include <charconv>
 #include <climits>
 #include <cstdlib>
 #include <filesystem>
+#include <iostream>
 
-#include "filesystem.hpp"
 #include "logger.hpp"
 #include "syscall.hpp"
 

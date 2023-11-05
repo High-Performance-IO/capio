@@ -14,8 +14,7 @@ inline off64_t capio_access(const std::string *pathname, mode_t mode, long tid) 
         errno = ENONET;
         return -1;
     }
-    auto res = std::mismatch(capio_dir->begin(), capio_dir->end(), abs_pathname->begin());
-    if (res.first == capio_dir->end()) {
+    if (is_capio_path(*abs_pathname)) {
         return access_request(*abs_pathname, tid);
     } else {
         return -2;
@@ -40,17 +39,8 @@ inline off64_t capio_faccessat(int dirfd, const std::string *pathname, mode_t mo
             if (dir_path.length() == 0) {
                 return -2;
             }
-            std::string path             = dir_path + "/" + *pathname;
-            const std::string *capio_dir = get_capio_dir();
-            auto it = std::mismatch(capio_dir->begin(), capio_dir->end(), path.begin());
-            if (it.first == capio_dir->end()) {
-                if (capio_dir->size() == path.size()) {
-                    ERR_EXIT("ERROR: unlink to the capio_dir");
-                }
-                return access_request(path, tid);
-            } else {
-                return -2;
-            }
+            std::string path = dir_path + "/" + *pathname;
+            return is_capio_path(path) ? access_request(path, tid) : -2;
         }
     } else {
         return access_request(*pathname, tid);
@@ -61,7 +51,6 @@ int access_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long a
     std::string pathname(reinterpret_cast<const char *>(arg0));
     auto mode = static_cast<mode_t>(arg1);
     long tid  = syscall_no_intercept(SYS_gettid);
-    START_LOG(tid, "call(pathname=%s, mode=%o)", pathname.c_str(), mode);
 
     off64_t res = capio_access(&pathname, mode, tid);
     if (res != -2) {
@@ -78,9 +67,6 @@ int faccessat_handler(long arg0, long arg1, long arg2, long arg3, long arg4, lon
     auto mode  = static_cast<mode_t>(arg2);
     auto flags = static_cast<int>(arg3);
     long tid   = syscall_no_intercept(SYS_gettid);
-
-    START_LOG(tid, "call(dirfd=%d, pathname=%s, mode=%o, flags=%X)", dirfd, pathname.c_str(), mode,
-              flags);
 
     off64_t res = capio_faccessat(dirfd, &pathname, mode, flags, tid);
     if (res != -2) {

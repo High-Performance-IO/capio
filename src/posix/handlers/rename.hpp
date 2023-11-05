@@ -18,7 +18,7 @@ inline off64_t capio_rename(const std::string &oldpath, const std::string &newpa
         oldpath_abs = *capio_posix_realpath(tid, &oldpath, capio_dir, current_dir);
     }
 
-    bool oldpath_capio = is_capio_path(tid, oldpath_abs, *capio_dir);
+    bool oldpath_capio = is_capio_path(oldpath_abs);
 
     if (is_absolute(&newpath)) { // TODO: move this control inside create_absolute_path
         newpath_abs = newpath;
@@ -26,7 +26,7 @@ inline off64_t capio_rename(const std::string &oldpath, const std::string &newpa
         newpath_abs = *capio_posix_realpath(tid, &newpath, capio_dir, current_dir);
     }
 
-    bool newpath_capio = is_capio_path(tid, newpath_abs, *capio_dir);
+    bool newpath_capio = is_capio_path(newpath_abs);
 
     if (is_prefix(oldpath_abs, newpath_abs)) { // TODO: The check is more complex
         errno = EINVAL;
@@ -51,8 +51,6 @@ int rename_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long a
     const std::string oldpath(reinterpret_cast<const char *>(arg0));
     const std::string newpath(reinterpret_cast<const char *>(arg1));
     long tid = syscall_no_intercept(SYS_gettid);
-
-    START_LOG(tid, "call(oldpath=%s, newpath=%s)", oldpath.c_str(), newpath.c_str());
 
     off64_t res = capio_rename(oldpath, newpath, tid);
 

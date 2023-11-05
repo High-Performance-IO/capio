@@ -4,6 +4,8 @@
 #include <mutex>
 #include <optional>
 
+#include "capio/filesystem.hpp"
+
 CSFilesMetadata_t files_metadata;
 std::mutex files_metadata_mutex;
 

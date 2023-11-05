@@ -42,12 +42,4 @@ std::string get_dir_path(int dirfd) {
     }
 }
 
-inline blkcnt_t get_nblocks(off64_t file_size) {
-    if (file_size % 4096 == 0) {
-        return file_size / 512;
-    }
-
-    return file_size / 512 + 8;
-}
-
 #endif // CAPIO_POSIX_UTILS_FILESYSTEM_HPP

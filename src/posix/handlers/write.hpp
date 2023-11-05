@@ -55,7 +55,6 @@ int write_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long ar
     const auto *buf = reinterpret_cast<const void *>(arg1);
     auto count      = static_cast<off64_t>(arg2);
     long tid        = syscall_no_intercept(SYS_gettid);
-    START_LOG(tid, "call(fd=%d, buf=0x%08x, count=%ld)", fd, buf, count);
 
     ssize_t res = capio_write(fd, buf, count, tid);
 
@@ -72,8 +71,6 @@ int writev_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long a
     const auto *iov = reinterpret_cast<const struct iovec *>(arg1);
     auto iovcnt     = static_cast<int>(arg2);
     long tid        = syscall_no_intercept(SYS_gettid);
-    START_LOG(tid, "call(fd=%d, iov.iov_base=0x%08x, iov.iov_len=%ld, iovcnt=%d)", fd,
-              iov->iov_base, iov->iov_len, iovcnt);
 
     ssize_t res = capio_writev(fd, iov, iovcnt, tid);
 
