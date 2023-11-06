@@ -1,9 +1,10 @@
-#include <fcntl.h>
-#include <unistd.h>
-
 #include <catch2/catch_test_macros.hpp>
-#include <semaphore.h>
+
 #include <thread>
+
+#include <fcntl.h>
+#include <semaphore.h>
+#include <unistd.h>
 
 constexpr int ARRAY_SIZE = 100;
 
@@ -33,7 +34,7 @@ int write_file_stat_clone(FILE *fp) {
     return 0;
 }
 
-TEST_CASE("Test thread clone", "[posix]") {
+TEST_CASE("Test thread clone", "[syscall]") {
     int *num = static_cast<int *>(malloc(sizeof(int)));
     *num     = 12345;
     std::thread t(func, num);
@@ -41,7 +42,7 @@ TEST_CASE("Test thread clone", "[posix]") {
     free(num);
 }
 
-TEST_CASE("Test thread clone producer/consumer", "[posix]") {
+TEST_CASE("Test thread clone producer/consumer", "[syscall]") {
     constexpr const char *PATHNAME = "test_file.txt";
     int flags                      = O_CREAT | O_RDWR | O_TRUNC;
     int fd                         = open(PATHNAME, flags, S_IRUSR | S_IWUSR);
@@ -59,7 +60,7 @@ TEST_CASE("Test thread clone producer/consumer", "[posix]") {
     REQUIRE(unlink(PATHNAME) != -1);
 }
 
-TEST_CASE("Test thread clone producer/consumer with stat", "[posix]") {
+TEST_CASE("Test thread clone producer/consumer with stat", "[syscall]") {
     constexpr const char *PATHNAME = "test_file.txt";
     sem                            = static_cast<sem_t *>(malloc(sizeof(sem_t)));
     REQUIRE(sem_init(sem, 0, 0) == 0);

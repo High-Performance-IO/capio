@@ -15,6 +15,7 @@ typedef std::unordered_map<int, std::string> CPFileDescriptors_t;
 typedef std::unordered_map<std::string, std::unordered_set<int>> CPFilesPaths_t;
 typedef std::unordered_map<int, std::pair<SPSC_queue<char> *, SPSC_queue<char> *>>
     CPThreadDataBufs_t;
+
 typedef int (*CPHandler_t)(long, long, long, long, long, long, long *);
 
 #endif // CAPIO_POSIX_UTILS_TYPES_HPP

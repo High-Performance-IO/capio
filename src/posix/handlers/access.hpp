@@ -6,7 +6,7 @@
 inline off64_t capio_access(const std::string *pathname, mode_t mode, long tid) {
     START_LOG(tid, "call(pathname=%s, mode=%o)", pathname->c_str(), mode);
 
-    const std::string *abs_pathname = capio_posix_realpath(tid, pathname);
+    const std::string *abs_pathname = capio_posix_realpath(pathname);
     if (abs_pathname->length() == 0) {
         errno = ENONET;
         return -1;

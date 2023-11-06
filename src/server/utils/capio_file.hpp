@@ -1,9 +1,16 @@
 #ifndef CAPIO_SERVER_UTILS_CAPIO_FILE_HPP
 #define CAPIO_SERVER_UTILS_CAPIO_FILE_HPP
 
+#include <algorithm>
 #include <set>
 #include <string_view>
 #include <utility>
+
+#include <fcntl.h>
+#include <sys/stat.h>
+#include <unistd.h>
+
+#include "capio/logger.hpp"
 
 /*
  * Only the server have all the information

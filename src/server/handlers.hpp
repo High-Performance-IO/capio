@@ -22,6 +22,5 @@
 #include "handlers/utils/util_filesys.hpp"
 #include "handlers/utils/util_producer.hpp"
 #include "handlers/write.hpp"
-#include "utils/requests.hpp" //TODO: check whether to include requests here or in capio posix
 
 #endif // CAPIO_SERVER_HANDLERS_HPP

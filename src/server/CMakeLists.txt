@@ -31,7 +31,16 @@ add_executable(${TARGET_NAME} ${TARGET_SOURCES} ${simdjson_SOURCE_DIR}/singlehea
 # Include files and directories
 #####################################
 file(GLOB_RECURSE CAPIO_SERVER_HEADERS "*.hpp")
-target_include_directories(${TARGET_NAME} PRIVATE . ${MPI_INCLUDE_PATH} ${args_SOURCE_DIR} ${simdjson_SOURCE_DIR})
+target_sources(${TARGET_NAME} PRIVATE
+        "${CAPIO_COMMON_HEADERS}"
+        "${CAPIO_SERVER_HEADERS}"
+)
+target_include_directories(${TARGET_NAME} PRIVATE
+        ${TARGET_INCLUDE_FOLDER}
+        ${MPI_INCLUDE_PATH}
+        ${args_SOURCE_DIR}
+        ${simdjson_SOURCE_DIR}
+)
 
 #####################################
 # Target properties

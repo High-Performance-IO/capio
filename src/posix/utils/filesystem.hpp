@@ -14,7 +14,6 @@
 #include "capio/logger.hpp"
 #include "capio/syscall.hpp"
 
-#include "requests.hpp"
 #include "types.hpp"
 
 CPFileDescriptors_t *capio_files_descriptors;
@@ -60,12 +59,11 @@ inline void add_capio_fd(long tid, const std::string &path, int fd, off64_t offs
 
 /**
  * Compute the absolute path for @pathname
- * @param tid
  * @param pathname
  * @return
  */
-const std::string *capio_posix_realpath(long tid, const std::string *pathname) {
-    START_LOG(tid, "call(path=%s)", pathname->c_str());
+const std::string *capio_posix_realpath(const std::string *pathname) {
+    START_LOG(syscall_no_intercept(SYS_gettid), "call(path=%s)", pathname->c_str());
     char *posix_real_path = capio_realpath((char *) pathname->c_str(), nullptr);
 
     // if capio_realpath fails, then it should be a capio_file
@@ -75,27 +73,24 @@ const std::string *capio_posix_realpath(long tid, const std::string *pathname) {
         const std::string *capio_dir = get_capio_dir();
         if (current_dir->find(*capio_dir) != std::string::npos) {
             if (pathname[0] != "/") {
-                auto newPath = new std::string(*capio_dir + "/" + *pathname);
+                auto new_path = new std::string(*capio_dir + "/" + *pathname);
 
                 // remove /./ from path
                 std::size_t pos = 0;
-                while ((pos = newPath->find("/./", pos)) != std::string::npos) {
-                    newPath->replace(newPath->find("/./"), 3, "/");
+                while ((pos = new_path->find("/./", pos)) != std::string::npos) {
+                    new_path->replace(new_path->find("/./"), 3, "/");
                     pos += 1;
                 }
 
-                LOG("Computed absolute path = %s", newPath->c_str());
-                return newPath;
+                LOG("Computed absolute path = %s", new_path->c_str());
+                return new_path;
             } else {
                 LOG("Path=%s is already absolute", pathname->c_str());
             }
             return pathname;
         } else {
             // if file not found, then error is returned
-            LOG("Fatal: file %s is not a posix file, nor a capio "
-                "file!",
-                pathname->c_str());
-            exit(EXIT_FAILURE);
+            ERR_EXIT("Fatal: file %s is not a posix file, nor a capio file!", pathname->c_str());
         }
     }
 
@@ -126,6 +121,17 @@ inline void delete_capio_path(const std::string &path) {
         delete_capio_fd(fd);
     }
     capio_files_paths->erase(path);
+}
+
+/**
+ * Destroy metadata structures
+ * @return
+ */
+inline void destroy_filesystem() {
+    delete current_dir;
+    delete capio_files_descriptors;
+    delete capio_files_paths;
+    delete files;
 }
 
 /**

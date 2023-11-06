@@ -1,3 +1,5 @@
+#include <catch2/catch_test_macros.hpp>
+
 #include <cerrno>
 #include <filesystem>
 
@@ -5,11 +7,10 @@
 #include <sys/stat.h>
 #include <unistd.h>
 
-#include <catch2/catch_test_macros.hpp>
-
-TEST_CASE("Test directory creation, reopening and close", "[posix]") {
+TEST_CASE("Test directory creation, reopening and close", "[syscall]") {
     constexpr const char *PATHNAME = "test";
     REQUIRE(mkdir(PATHNAME, S_IRWXU) != -1);
+    REQUIRE(access(PATHNAME, F_OK) == 0);
     int flags = O_RDONLY | O_DIRECTORY;
     int fd    = open(PATHNAME, flags, S_IRUSR | S_IWUSR);
     REQUIRE(fd != -1);
@@ -18,9 +19,11 @@ TEST_CASE("Test directory creation, reopening and close", "[posix]") {
     REQUIRE(fd != -1);
     REQUIRE(close(fd) != -1);
     REQUIRE(rmdir(PATHNAME) != -1);
+    REQUIRE(access(PATHNAME, F_OK) != 0);
 }
 
-TEST_CASE("Test directory creation, reopening, and close using mkdirat with AT_FDCWD", "[posix]") {
+TEST_CASE("Test directory creation, reopening, and close using mkdirat with AT_FDCWD",
+          "[syscall]") {
     constexpr const char *PATHNAME = "test";
     REQUIRE(mkdirat(AT_FDCWD, PATHNAME, S_IRWXU) != -1);
     REQUIRE(faccessat(AT_FDCWD, PATHNAME, F_OK, 0) == 0);
@@ -35,7 +38,7 @@ TEST_CASE("Test directory creation, reopening, and close using mkdirat with AT_F
     REQUIRE(faccessat(AT_FDCWD, PATHNAME, F_OK, 0) != 0);
 }
 
-TEST_CASE("Test that mkdir fails if directory already exists", "[posix]") {
+TEST_CASE("Test that mkdir fails if directory already exists", "[syscall]") {
     constexpr const char *PATHNAME = "test";
     REQUIRE(mkdir(PATHNAME, S_IRWXU) != -1);
     REQUIRE(faccessat(AT_FDCWD, PATHNAME, F_OK, 0) == 0);
@@ -47,7 +50,7 @@ TEST_CASE("Test that mkdir fails if directory already exists", "[posix]") {
 
 TEST_CASE("Test directory creation, reopening, and close in a different directory using openat "
           "with absolute path",
-          "[posix]") {
+          "[syscall]") {
     const auto path_fs = std::filesystem::path(std::getenv("PWD")) / std::filesystem::path("test");
     const char *PATHNAME = path_fs.c_str();
     REQUIRE(mkdirat(0, PATHNAME, S_IRWXU) != -1);
@@ -65,7 +68,7 @@ TEST_CASE("Test directory creation, reopening, and close in a different director
 
 TEST_CASE("Test directory creation, reopening, and close in a different directory using mkdirat "
           "with dirfd",
-          "[posix]") {
+          "[syscall]") {
     constexpr const char *PATHNAME = "test";
     const char *DIRPATH            = std::getenv("PWD");
     int flags                      = O_RDONLY | O_DIRECTORY;
@@ -85,7 +88,7 @@ TEST_CASE("Test directory creation, reopening, and close in a different director
 }
 
 /*
-TEST_CASE("Test obtaining the current directory with getcwd system call", "[posix]") {
+TEST_CASE("Test obtaining the current directory with getcwd system call", "[syscall]") {
     auto expected_path = std::string(std::getenv("PWD"));
     char obtained_path[PATH_MAX];
     getcwd(obtained_path, PATH_MAX);

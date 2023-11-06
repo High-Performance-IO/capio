@@ -4,7 +4,7 @@
 #include "utils/filesystem.hpp"
 
 inline std::string absolute(long tid, const std::string &path) {
-    return is_absolute(&path) ? path : *capio_posix_realpath(tid, &path);
+    return is_absolute(&path) ? path : *capio_posix_realpath(&path);
 }
 
 inline off64_t capio_rename(const std::string &oldpath, const std::string &newpath, long tid) {

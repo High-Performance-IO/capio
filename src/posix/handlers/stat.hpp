@@ -67,7 +67,7 @@ inline int capio_lstat_wrapper(const std::string *path, struct stat *statbuf, lo
         return -2;
     }
 
-    const std::string *absolute_path = capio_posix_realpath(tid, path);
+    const std::string *absolute_path = capio_posix_realpath(path);
     if (absolute_path->length() == 0) {
         return -2;
     }

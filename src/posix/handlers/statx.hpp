@@ -51,7 +51,7 @@ inline int capio_statx(int dirfd, const std::string *pathname, int flags, int ma
     } else {
         if (!is_absolute(pathname)) {
             if (dirfd == AT_FDCWD) {
-                absolute_path = *capio_posix_realpath(tid, pathname);
+                absolute_path = *capio_posix_realpath(pathname);
             } else {
                 if (!is_directory(dirfd)) {
                     return -2;
