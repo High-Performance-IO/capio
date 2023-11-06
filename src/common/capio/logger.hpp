@@ -1,13 +1,13 @@
 #ifndef CAPIO_COMMON_LOGGER_HPP
 #define CAPIO_COMMON_LOGGER_HPP
 
-#include <sys/mman.h>
-
 #include <cstdarg>
 #include <cstdio>
 #include <cstring>
 #include <string>
 #include <utility>
+
+#include <sys/mman.h>
 
 #include "constants.hpp"
 #include "syscall.hpp"

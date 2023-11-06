@@ -1,47 +1,31 @@
 #ifndef CAPIO_POSIX_HANDLERS_RENAME_HPP
 #define CAPIO_POSIX_HANDLERS_RENAME_HPP
 
-#include <filesystem>
-
-#include "globals.hpp"
 #include "utils/filesystem.hpp"
+
+inline std::string absolute(long tid, const std::string &path) {
+    return is_absolute(&path) ? path : *capio_posix_realpath(tid, &path);
+}
 
 inline off64_t capio_rename(const std::string &oldpath, const std::string &newpath, long tid) {
     START_LOG(tid, "call(oldpath=%s, newpath=%s)", oldpath.c_str(), newpath.c_str());
 
-    const std::string *capio_dir = get_capio_dir();
-    std::string oldpath_abs, newpath_abs;
-
-    if (is_absolute(&oldpath)) {
-        oldpath_abs = oldpath;
-    } else {
-        oldpath_abs = *capio_posix_realpath(tid, &oldpath, capio_dir, current_dir);
-    }
-
-    bool oldpath_capio = is_capio_path(oldpath_abs);
-
-    if (is_absolute(&newpath)) { // TODO: move this control inside create_absolute_path
-        newpath_abs = newpath;
-    } else {
-        newpath_abs = *capio_posix_realpath(tid, &newpath, capio_dir, current_dir);
-    }
-
-    bool newpath_capio = is_capio_path(newpath_abs);
+    std::string oldpath_abs = absolute(tid, oldpath);
+    std::string newpath_abs = absolute(tid, newpath);
 
     if (is_prefix(oldpath_abs, newpath_abs)) { // TODO: The check is more complex
         errno = EINVAL;
         return -1;
     }
 
-    if (oldpath_capio) {
-        capio_files_paths->erase(oldpath_abs);
-        capio_files_paths->insert(newpath_abs);
+    if (is_capio_path(oldpath_abs)) {
+        rename_capio_path(oldpath_abs, newpath_abs);
         return rename_request(tid, oldpath_abs, newpath_abs);
     } else {
-        if (newpath_capio) {
+        if (is_capio_path(newpath_abs)) {
             std::filesystem::copy(oldpath_abs, newpath_abs);
             return -1;
-        } else { // Both aren't CAPIO paths
+        } else {
             return -2;
         }
     }

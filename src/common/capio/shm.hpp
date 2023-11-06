@@ -1,12 +1,12 @@
 #ifndef CAPIO_COMMON_SHM_HPP
 #define CAPIO_COMMON_SHM_HPP
 
+#include <string>
+
 #include <fcntl.h>
 #include <sys/mman.h>
 #include <sys/stat.h>
 #include <unistd.h>
-
-#include <string>
 
 void *create_shm(const std::string &shm_name, const long int size) {
     START_LOG(capio_syscall(SYS_gettid), "call(shm_name=%s, size=%ld)", shm_name.c_str(), size);

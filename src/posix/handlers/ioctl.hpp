@@ -1,12 +1,10 @@
 #ifndef CAPIO_POSIX_HANDLERS_IOCTL_HPP
 #define CAPIO_POSIX_HANDLERS_IOCTL_HPP
 
-#include "globals.hpp"
-
 inline int capio_ioctl(int fd, unsigned long request, long tid) {
     START_LOG(tid, "call(fd=%d, request=%ld)", fd, request, tid);
 
-    if (files->find(fd) != files->end()) {
+    if (exists_capio_fd(fd)) {
         errno = ENOTTY;
         return -1;
     } else {

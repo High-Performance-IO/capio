@@ -50,6 +50,7 @@ inline std::vector<int> get_capio_fds_for_tid(int tid) {
     std::vector<int> fds;
     auto it = processes_files.find(tid);
     if (it != processes_files.end()) {
+        fds.reserve(it->second.size());
         for (auto &file : it->second) {
             fds.push_back(file.first);
         }

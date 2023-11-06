@@ -1,12 +1,13 @@
 #ifndef CAPIO_COMMON_FILESYSTEM_HPP
 #define CAPIO_COMMON_FILESYSTEM_HPP
 
-#include <sys/stat.h>
-
 #include <cerrno>
 #include <cstring>
+#include <filesystem>
 #include <fstream>
 #include <iostream>
+
+#include <sys/stat.h>
 
 #include "env.hpp"
 #include "logger.hpp"
@@ -72,48 +73,6 @@ static inline bool is_capio_path(const std::string &path_to_check) {
 
     const std::filesystem::path capio_dir(*get_capio_dir());
     return capio_dir.compare(path_to_check) < 0;
-}
-
-const std::string *capio_posix_realpath(long tid, const std::string *pathname,
-                                        const std::string *capio_dir,
-                                        const std::string *current_dir) {
-    START_LOG(tid, "call(path=%s, capio_dir=%s, current_dir=%s)", pathname->c_str(),
-              capio_dir->c_str(), current_dir->c_str());
-    char *posix_real_path = capio_realpath((char *) pathname->c_str(), nullptr);
-
-    // if capio_realpath fails, then it should be a capio_file
-    if (posix_real_path == nullptr) {
-        LOG("path is null due to errno='%s'", strerror(errno));
-
-        if (current_dir->find(*capio_dir) != std::string::npos) {
-            if (pathname[0] != "/") {
-                auto newPath = new std::string(*capio_dir + "/" + *pathname);
-
-                // remove /./ from path
-                std::size_t pos = 0;
-                while ((pos = newPath->find("/./", pos)) != std::string::npos) {
-                    newPath->replace(newPath->find("/./"), 3, "/");
-                    pos += 1;
-                }
-
-                LOG("Computed absolute path = %s", newPath->c_str());
-                return newPath;
-            } else {
-                LOG("Path=%s is already absolute", pathname->c_str());
-            }
-            return pathname;
-        } else {
-            // if file not found, then error is returned
-            LOG("Fatal: file %s is not a posix file, nor a capio "
-                "file!",
-                pathname->c_str());
-            exit(EXIT_FAILURE);
-        }
-    }
-
-    // if not, then check for realpath through libc implementation
-    LOG("Computed realpath = %s", posix_real_path);
-    return new std::string(posix_real_path);
 }
 
 #endif // CAPIO_COMMON_FILESYSTEM_HPP

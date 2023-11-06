@@ -1,8 +1,6 @@
 #ifndef CAPIO_POSIX_HANDLERS_UNLINK_HPP
 #define CAPIO_POSIX_HANDLERS_UNLINK_HPP
 
-#include "globals.hpp"
-
 off64_t capio_unlink_abs(const std::string &abs_path, long tid, bool is_dir) {
     START_LOG(tid, "call(abs_path=%s, is_dir=%s)", abs_path.c_str(), is_dir ? "true" : "false");
     if (!is_capio_path(abs_path)) {
@@ -23,16 +21,11 @@ off64_t capio_unlink_abs(const std::string &abs_path, long tid, bool is_dir) {
 inline off64_t capio_unlinkat(int dirfd, const std::string &pathname, int flags, long tid) {
     START_LOG(tid, "call(dirfd=%d, pathname=%s, flags=%X)", dirfd, pathname.c_str(), flags);
 
-    const std::string *capio_dir = get_capio_dir();
-    if (capio_dir->length() == 0) {
-        return -2;
-    }
     off64_t res;
     bool is_dir = flags & AT_REMOVEDIR;
     if (!is_absolute(&pathname)) {
         if (dirfd == AT_FDCWD) {
-            const std::string *abs_path =
-                capio_posix_realpath(tid, &pathname, capio_dir, current_dir);
+            const std::string *abs_path = capio_posix_realpath(tid, &pathname);
             if (abs_path->length() == 0) {
                 return -2;
             }

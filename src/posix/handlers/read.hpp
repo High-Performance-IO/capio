@@ -6,18 +6,16 @@
 inline off64_t capio_read(int fd, void *buffer, off64_t count, long tid) {
     START_LOG(tid, "call(fd=%d, buf=0x%08x, count=%ld)", fd, buffer, count);
 
-    auto it = files->find(fd);
-    if (it != files->end()) {
+    if (exists_capio_fd(fd)) {
         if (count >= SSIZE_MAX) {
             ERR_EXIT("src does not support read bigger than SSIZE_MAX yet");
         }
-        off64_t count_off                             = count;
-        std::tuple<off64_t *, off64_t *, int, int> *t = &(*files)[fd];
-        off64_t *offset                               = std::get<0>(*t);
-        off64_t end_of_read                           = read_request(fd, count_off, tid);
-        off64_t bytes_read                            = end_of_read - *offset;
+        off64_t count_off   = count;
+        off64_t offset      = get_capio_fd_offset(fd);
+        off64_t end_of_read = read_request(fd, count_off, tid);
+        off64_t bytes_read  = end_of_read - offset;
         read_data(tid, buffer, bytes_read);
-        *offset = *offset + bytes_read;
+        set_capio_fd_offset(fd, offset + bytes_read);
         return bytes_read;
     } else {
         return -2;

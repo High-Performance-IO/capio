@@ -1,17 +1,15 @@
 #ifndef CAPIO_POSIX_HANDLERS_MKDIR_HPP
 #define CAPIO_POSIX_HANDLERS_MKDIR_HPP
 
-#include "globals.hpp"
 #include "utils/filesystem.hpp"
 
 inline off64_t capio_mkdirat(int dirfd, std::string *pathname, mode_t mode, long tid) {
     START_LOG(tid, "call(dirfd=%d, pathname=%s, mode=%o)", dirfd, pathname->c_str(), mode);
 
-    const std::string *capio_dir = get_capio_dir();
     std::string path_to_check(*pathname);
     if (!is_absolute(pathname)) {
         if (dirfd == AT_FDCWD) {
-            path_to_check = *capio_posix_realpath(tid, pathname, capio_dir, current_dir);
+            path_to_check = *capio_posix_realpath(tid, pathname);
             if (path_to_check.length() == 0) {
                 return -2;
             }
@@ -28,7 +26,7 @@ inline off64_t capio_mkdirat(int dirfd, std::string *pathname, mode_t mode, long
     }
 
     if (is_capio_path(path_to_check)) {
-        if (capio_files_paths->find(path_to_check) != capio_files_paths->end()) {
+        if (exists_capio_path(path_to_check)) {
             errno = EEXIST;
             return -1;
         }
@@ -37,7 +35,7 @@ inline off64_t capio_mkdirat(int dirfd, std::string *pathname, mode_t mode, long
             return -1;
         } else {
             LOG("Adding %s to capio_files_path", path_to_check.c_str());
-            capio_files_paths->insert(path_to_check);
+            add_capio_path(path_to_check);
             return res;
         }
     } else {
@@ -48,10 +46,9 @@ inline off64_t capio_mkdirat(int dirfd, std::string *pathname, mode_t mode, long
 inline off64_t capio_rmdir(std::string *pathname, long tid) {
     START_LOG(tid, "call(pathname=%s)", pathname->c_str());
 
-    const std::string *capio_dir = get_capio_dir();
     std::string path_to_check(*pathname);
     if (!is_absolute(pathname)) {
-        path_to_check = *capio_posix_realpath(tid, pathname, capio_dir, current_dir);
+        path_to_check = *capio_posix_realpath(tid, pathname);
         if (path_to_check.length() == 0) {
             LOG("path_to_check.len = 0!");
             return -2;
@@ -59,7 +56,7 @@ inline off64_t capio_rmdir(std::string *pathname, long tid) {
     }
 
     if (is_capio_path(path_to_check)) {
-        if (capio_files_paths->find(path_to_check) == capio_files_paths->end()) {
+        if (!exists_capio_path(path_to_check)) {
             LOG("capio_files_path.find == end. errno = "
                 "ENOENT");
             errno = ENOENT;
@@ -71,7 +68,7 @@ inline off64_t capio_rmdir(std::string *pathname, long tid) {
             errno = ENOENT;
             return -1;
         } else {
-            capio_files_paths->erase(path_to_check);
+            delete_capio_path(path_to_check);
             return res;
         }
     } else {

@@ -1,13 +1,10 @@
 #ifndef CAPIO_POSIX_HANDLERS_FGETXATTR_HPP
 #define CAPIO_POSIX_HANDLERS_FGETXATTR_HPP
 
-#include "globals.hpp"
-
 inline int capio_fgetxattr(int fd, const std::string &name, void *value, size_t size, long tid) {
     START_LOG(tid, "call(name=%s, value=0x%08x, size=%ld)", name.c_str(), value, size);
 
-    auto it = files->find(fd);
-    if (it != files->end()) {
+    if (exists_capio_fd(fd)) {
         if (std::equal(name.begin(), name.end(), "system.posix_acl_access")) {
             errno = ENODATA;
             return -1;

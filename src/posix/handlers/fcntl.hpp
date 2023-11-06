@@ -1,31 +1,28 @@
 #ifndef CAPIO_POSIX_HANDLERS_FCNTL_HPP
 #define CAPIO_POSIX_HANDLERS_FCNTL_HPP
 
-#include "globals.hpp"
 #include "utils/requests.hpp"
 
 inline int capio_fcntl(int fd, int cmd, int arg, long tid) {
     START_LOG(tid, "call(fd=%d, cmd=%d, arg=%d)", fd, cmd, arg);
 
-    if (files->find(fd) != files->end()) {
+    if (exists_capio_fd(fd)) {
         switch (cmd) {
         case F_GETFD: {
-            int res = std::get<3>((*files)[fd]);
-            return res;
+            return get_capio_fd_cloexec(fd);
         }
 
         case F_SETFD: {
-            std::get<3>((*files)[fd]) = arg;
+            set_capio_fd_cloexec(fd, arg);
             return 0;
         }
 
         case F_GETFL: {
-            int flags = std::get<2>((*files)[fd]);
-            return flags;
+            return get_capio_fd_flags(fd);
         }
 
         case F_SETFL: {
-            std::get<2>((*files)[fd]) = arg;
+            set_capio_fd_flags(fd, arg);
             return 0;
         }
 
@@ -36,12 +33,10 @@ inline int capio_fcntl(int fd, int cmd, int arg, long tid) {
                 ERR_EXIT("open /dev/null");
             }
 
-            int res = fcntl(dev_fd, F_DUPFD_CLOEXEC, arg); //
+            int res = fcntl(dev_fd, F_DUPFD_CLOEXEC, arg);
             close(dev_fd);
-
-            (*files)[res]                   = (*files)[fd];
-            std::get<3>((*files)[res])      = FD_CLOEXEC;
-            (*capio_files_descriptors)[res] = (*capio_files_descriptors)[fd];
+            dup_capio_fd(fd, res);
+            set_capio_fd_cloexec(res, true);
             dup_request(fd, res, tid);
 
             return res;

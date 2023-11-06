@@ -1,17 +1,14 @@
 #ifndef CAPIO_POSIX_HANDLERS_CLOSE_HPP
 #define CAPIO_POSIX_HANDLERS_CLOSE_HPP
 
-#include "globals.hpp"
 #include "utils/requests.hpp"
 
 inline int capio_close(int fd, long tid) {
     START_LOG(tid, "call(fd=%ld)", fd);
 
-    if (files->find(fd) != files->end()) {
+    if (exists_capio_fd(fd)) {
         close_request(fd, tid);
-        capio_files_descriptors->erase(fd);
-        files->erase(fd);
-
+        delete_capio_fd(fd);
         return 0;
     } else {
         return -2;

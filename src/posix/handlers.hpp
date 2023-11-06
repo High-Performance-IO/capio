@@ -3,7 +3,6 @@
 
 #include "handlers/access.hpp"
 #include "handlers/chdir.hpp"
-#include "handlers/clone.hpp"
 #include "handlers/close.hpp"
 #include "handlers/dup.hpp"
 #include "handlers/execve.hpp"

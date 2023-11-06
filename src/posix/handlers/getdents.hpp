@@ -17,16 +17,8 @@ inline off64_t round(off64_t bytes, bool is_getdents64) {
     return res;
 }
 
-inline off64_t add_getdents_request(int fd, off64_t count,
-                                    std::tuple<off64_t *, off64_t *, int, int> &t,
-                                    bool is_getdents64, long tid) {
-    off64_t offset_upperbound =
-        is_getdents64 ? getdents64_request(fd, count, tid) : getdents_request(fd, count, tid);
-    off64_t end_of_read = *std::get<0>(t) + count;
-    if (end_of_read > offset_upperbound) {
-        end_of_read = offset_upperbound;
-    }
-    return offset_upperbound;
+inline off64_t add_getdents_request(int fd, off64_t count, bool is_getdents64, long tid) {
+    return is_getdents64 ? getdents64_request(fd, count, tid) : getdents_request(fd, count, tid);
 }
 
 // TODO: too similar to capio_read, refactoring needed
@@ -34,24 +26,22 @@ inline ssize_t capio_getdents(int fd, void *buffer, size_t count, bool is_getden
     START_LOG(tid, "call(fd=%d, dirp=0x%08x, count=%ld, is64bit=%s)", fd, buffer, count,
               is_getdents64 ? "true" : "false");
 
-    if (files->find(fd) != files->end()) {
+    if (exists_capio_fd(fd)) {
         if (count >= SSIZE_MAX) {
             ERR_EXIT("src does not support read bigger than SSIZE_MAX yet");
         }
-        off64_t count_off                             = count;
-        std::tuple<off64_t *, off64_t *, int, int> *t = &(*files)[fd];
-        off64_t *offset                               = std::get<0>(*t);
-
-        off64_t end_of_read = add_getdents_request(fd, count_off, *t, is_getdents64, tid);
-        off64_t bytes_read  = end_of_read - *offset;
+        auto count_off      = static_cast<off64_t>(count);
+        off64_t offset      = get_capio_fd_offset(fd);
+        off64_t end_of_read = add_getdents_request(fd, count_off, is_getdents64, tid);
+        off64_t bytes_read  = end_of_read - offset;
 
         if (bytes_read > count_off) {
             bytes_read = count_off;
         }
+
         bytes_read = round(bytes_read, is_getdents64);
         read_data(tid, buffer, bytes_read);
-
-        *offset = *offset + bytes_read;
+        set_capio_fd_offset(fd, offset + bytes_read);
 
         return bytes_read;
     } else {

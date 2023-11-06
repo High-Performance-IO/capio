@@ -1,24 +1,21 @@
 #ifndef CAPIO_POSIX_HANDLERS_DUP_HPP
 #define CAPIO_POSIX_HANDLERS_DUP_HPP
 
-#include <libsyscall_intercept_hook_point.h>
-#include <syscall.h>
+#include "capio/syscall.hpp"
 
-#include "globals.hpp"
 #include "utils/requests.hpp"
 
 inline int capio_dup(int fd, long tid) {
     START_LOG(tid, "call(fd=%d)", fd);
 
-    auto it = files->find(fd);
-    if (it != files->end()) {
+    if (exists_capio_fd(fd)) {
         int res = open("/dev/null", O_WRONLY);
         if (res == -1) {
             ERR_EXIT("open in capio_dup");
         }
         dup_request(fd, res, tid);
-        (*files)[res]                   = (*files)[fd];
-        (*capio_files_descriptors)[res] = (*capio_files_descriptors)[fd];
+        dup_capio_fd(fd, res);
+        ;
         return res;
     } else {
         return -2;
@@ -28,15 +25,13 @@ inline int capio_dup(int fd, long tid) {
 inline int capio_dup2(int fd, int fd2, long tid) {
     START_LOG(tid, "call(fd=%d, fd2=%d)", fd, fd2);
 
-    auto it = files->find(fd);
-    if (it != files->end()) {
+    if (exists_capio_fd(fd)) {
         int res = static_cast<int>(syscall_no_intercept(SYS_dup2, fd, fd2));
         if (res == -1) {
             return -1;
         }
         dup_request(fd, res, tid);
-        (*files)[res]                   = (*files)[fd];
-        (*capio_files_descriptors)[res] = (*capio_files_descriptors)[fd];
+        dup_capio_fd(fd, res);
         return res;
     } else {
         return -2;

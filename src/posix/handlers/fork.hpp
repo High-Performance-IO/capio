@@ -1,7 +1,7 @@
 #ifndef CAPIO_POSIX_HANDLERS_FORK_HPP
 #define CAPIO_POSIX_HANDLERS_FORK_HPP
 
-#include "globals.hpp"
+#include "utils/clone.hpp"
 #include "utils/requests.hpp"
 
 inline pid_t capio_fork(long parent_tid) {
@@ -11,7 +11,7 @@ inline pid_t capio_fork(long parent_tid) {
 
     if (pid == 0) { // child
         auto child_tid = static_cast<pid_t>(syscall_no_intercept(SYS_gettid));
-        mtrace_init(child_tid);
+        init_process(child_tid);
         clone_request(parent_tid, child_tid);
         return 0;
     } else {
