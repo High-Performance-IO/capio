@@ -59,10 +59,10 @@ inline void handle_local_read(int tid, int fd, off64_t count, bool dir, bool is_
     off64_t end_of_sector  = c_file.get_sector_end(process_offset);
     off64_t end_of_read    = process_offset + count;
     std::string_view mode  = c_file.get_mode();
-    if (mode != CAPIO_FILE_MODE_NO_UPDATE && !c_file.complete && !writer && !is_prod) {
+    if (mode != CAPIO_FILE_MODE_NO_UPDATE && !c_file.complete && !writer && !is_prod && !dir) {
         pending_reads[path.data()].emplace_back(tid, fd, count, is_getdents);
     } else if (end_of_read > end_of_sector) {
-        if (!is_prod && !writer && !c_file.complete) {
+        if (!is_prod && !writer && !c_file.complete && !dir) {
             pending_reads[path.data()].emplace_back(tid, fd, count, is_getdents);
         } else {
             if (end_of_sector == -1) {
@@ -71,7 +71,7 @@ inline void handle_local_read(int tid, int fd, off64_t count, bool dir, bool is_
             }
             c_file  = init_capio_file(path.data(), false);
             char *p = c_file.get_buffer();
-            if (is_getdents) {
+            if (is_getdents || dir) {
                 off64_t dir_size  = c_file.get_stored_size();
                 off64_t n_entries = dir_size / THEORETICAL_SIZE_DIRENT64;
                 char *p_getdents  = (char *) malloc(n_entries * sizeof(char) * dir_size);
@@ -86,9 +86,10 @@ inline void handle_local_read(int tid, int fd, off64_t count, bool dir, bool is_
             }
         }
     } else {
-        c_file            = init_capio_file(path.data(), false);
-        char *p           = c_file.get_buffer();
-        size_t bytes_read = count;
+        c_file  = init_capio_file(path.data(), false);
+        char *p = c_file.get_buffer();
+        size_t bytes_read;
+        bytes_read = count;
         if (is_getdents) {
             off64_t dir_size  = c_file.get_stored_size();
             off64_t n_entries = dir_size / THEORETICAL_SIZE_DIRENT64;
