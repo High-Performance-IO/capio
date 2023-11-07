@@ -27,5 +27,6 @@ target_link_libraries(${TARGET_NAME} PRIVATE Catch2::Catch2WithMain)
 #####################################
 catch_discover_tests(${TARGET_NAME}
         PROPERTIES
-        ENVIRONMENT LD_PRELOAD=${CMAKE_BINARY_DIR}/src/posix/libcapio_posix.so
+        ENVIRONMENT LD_PRELOAD=${PROJECT_BINARY_DIR}/src/posix/libcapio_posix.so
+        WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}
 )

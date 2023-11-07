@@ -84,6 +84,7 @@ jobs:
         run: mpirun -n 1 build/src/server/capio_server --no-config &
       - name: "Run tests"
         id: run-tests
+        timeout-minutes: 2
         env:
           CAPIO_DIR: ${{ github.workspace }}
         run: |
@@ -93,5 +94,5 @@ jobs:
             --stop-on-failure \
             --test-dir build/tests
       - name: "Show server log on failure"
-        if: ${{ steps.run-tests.outcome == 'failure' }}
+        if: ${{ always() && steps.run-tests.outcome == 'failure' }}
         run: cat server_rank_0.log
