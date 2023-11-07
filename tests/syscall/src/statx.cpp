@@ -13,7 +13,7 @@ void check_statxbuf(struct statx &buf, unsigned long st_size) {
     REQUIRE(buf.stx_uid == getuid());
 }
 
-TEST_CASE("Test statx syscall on file with AT_FDCWD", "[posix]") {
+TEST_CASE("Test statx syscall on file with AT_FDCWD", "[syscall]") {
     constexpr const char *PATHNAME = "test_file.txt";
     constexpr const char *BUFFER =
         "QWERTYUIOPASDFGHJKLZXCVBNM1234567890qwertyuiopasdfghjklzxcvbnm\0";
@@ -29,7 +29,7 @@ TEST_CASE("Test statx syscall on file with AT_FDCWD", "[posix]") {
     REQUIRE(faccessat(AT_FDCWD, PATHNAME, F_OK, 0) != 0);
 }
 
-TEST_CASE("Test statx syscall on folder with AT_FDCWD", "[posix]") {
+TEST_CASE("Test statx syscall on folder with AT_FDCWD", "[syscall]") {
     constexpr const char *PATHNAME = "test";
     REQUIRE(mkdirat(AT_FDCWD, PATHNAME, S_IRWXU) != -1);
     REQUIRE(faccessat(AT_FDCWD, PATHNAME, F_OK, 0) == 0);
@@ -40,7 +40,7 @@ TEST_CASE("Test statx syscall on folder with AT_FDCWD", "[posix]") {
     REQUIRE(faccessat(AT_FDCWD, PATHNAME, F_OK, 0) != 0);
 }
 
-TEST_CASE("Test statx syscall on file in a different directory using absolute path", "[posix]") {
+TEST_CASE("Test statx syscall on file in a different directory using absolute path", "[syscall]") {
     const auto path_fs =
         std::filesystem::path(std::getenv("PWD")) / std::filesystem::path("test_file.txt");
     const char *PATHNAME = path_fs.c_str();
@@ -58,7 +58,8 @@ TEST_CASE("Test statx syscall on file in a different directory using absolute pa
     REQUIRE(faccessat(0, PATHNAME, F_OK, 0) != 0);
 }
 
-TEST_CASE("Test statx syscall on folder in a different directory using absolute path", "[posix]") {
+TEST_CASE("Test statx syscall on folder in a different directory using absolute path",
+          "[syscall]") {
     const auto path_fs = std::filesystem::path(std::getenv("PWD")) / std::filesystem::path("test");
     const char *PATHNAME = path_fs.c_str();
     REQUIRE(mkdirat(0, PATHNAME, S_IRWXU) != -1);
@@ -70,7 +71,7 @@ TEST_CASE("Test statx syscall on folder in a different directory using absolute 
     REQUIRE(faccessat(0, PATHNAME, F_OK, 0) != 0);
 }
 
-TEST_CASE("Test statx syscall on file in a different directory using dirfd", "[posix]") {
+TEST_CASE("Test statx syscall on file in a different directory using dirfd", "[syscall]") {
     constexpr const char *PATHNAME = "test_file.txt";
     const char *DIRPATH            = std::getenv("PWD");
     int dirfd                      = open(DIRPATH, O_RDONLY | O_DIRECTORY);
@@ -88,7 +89,7 @@ TEST_CASE("Test statx syscall on file in a different directory using dirfd", "[p
     REQUIRE(faccessat(dirfd, PATHNAME, F_OK, 0) != 0);
 }
 
-TEST_CASE("Test statx syscall on folder in a different directory using dirfd", "[posix]") {
+TEST_CASE("Test statx syscall on folder in a different directory using dirfd", "[syscall]") {
     constexpr const char *PATHNAME = "test";
     const char *DIRPATH            = std::getenv("PWD");
     int flags                      = O_RDONLY | O_DIRECTORY;

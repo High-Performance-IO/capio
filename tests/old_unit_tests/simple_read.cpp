@@ -52,6 +52,7 @@ void read_from_file(int *data, long int num_elements, long int num_reads, int ra
         std::cerr << "process " << rank << ", error closing the file\n";
     }
 }
+
 void read_from_files(int *data, long int num_elements, long int num_reads, long int num_files,
                      int rank, std::string time_file) {
     std::ofstream file;

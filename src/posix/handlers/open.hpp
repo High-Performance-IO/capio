@@ -17,7 +17,7 @@ inline int capio_openat(int dirfd, std::string *pathname, int flags, long tid) {
 
     if (!is_absolute(pathname)) {
         if (dirfd == AT_FDCWD) {
-            path_to_check = *capio_posix_realpath(tid, pathname);
+            path_to_check = *capio_posix_realpath(pathname);
             if (path_to_check.length() == 0) {
                 return -2;
             }

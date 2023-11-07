@@ -28,7 +28,7 @@
 #include "utils/env.hpp"
 #include "utils/json.hpp"
 #include "utils/metadata.hpp"
-#include "utils/requests.hpp" //TODO: check whether to include requests here or in capio posix
+#include "utils/requests.hpp"
 
 using namespace simdjson;
 

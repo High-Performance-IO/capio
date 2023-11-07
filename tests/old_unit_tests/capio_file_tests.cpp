@@ -205,6 +205,7 @@ void test_seek_hole() {
     res = c_file.seek_hole(9);
     std::cout << "res " << res << std::endl;
 }
+
 int main(int argc, char **argv) {
     std::cout << "test 1" << std::endl;
     test1();

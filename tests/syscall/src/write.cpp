@@ -8,7 +8,7 @@
 #include <sys/uio.h>
 #include <unistd.h>
 
-TEST_CASE("Test file creation, write and close", "[posix]") {
+TEST_CASE("Test file creation, write and close", "[syscall]") {
     constexpr const char *PATHNAME = "test_file.txt";
     constexpr const char *BUFFER =
         "QWERTYUIOPASDFGHJKLZXCVBNM1234567890qwertyuiopasdfghjklzxcvbnm\0";
@@ -52,7 +52,7 @@ TEST_CASE("Test file creation, write with lseek and close") {
     REQUIRE(access(PATHNAME, F_OK) != 0);
 }
 
-TEST_CASE("Test file creation, buffered write and close", "[posix]") {
+TEST_CASE("Test file creation, buffered write and close", "[syscall]") {
     constexpr const char *PATHNAME              = "test_file.txt";
     constexpr const std::array<int, 10> BUFFER1 = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9};
     constexpr const std::array<int, 8> BUFFER2  = {10, 11, 12, 13, 14, 15, 16, 17};
