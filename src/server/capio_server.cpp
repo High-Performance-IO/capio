@@ -726,7 +726,7 @@ int parseCLI(int argc, char **argv, int rank) {
 
     delete log;
 
-#ifdef CAPIO_LOG
+#ifdef CAPIOLOG
     CAPIO_LOG_LEVEL = get_capio_log_level();
     std::cout << CAPIO_SERVER_CLI_LOG_SERVER << "LOG_LEVEL set to: " << CAPIO_LOG_LEVEL
               << std::endl;

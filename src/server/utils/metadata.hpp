@@ -175,7 +175,7 @@ inline void delete_capio_file_from_tid(int tid, int fd) {
     processes_files_metadata[tid].erase(fd);
     std::string offset_shm_name = "offset_" + std::to_string(tid) + "_" + std::to_string(fd);
     if (shm_unlink(offset_shm_name.c_str()) == -1) {
-        ERR_EXIT("shm_unlink %s", offset_shm_name.c_str());
+        ERR_EXIT("ERROR: shm_unlink %s", offset_shm_name.c_str());
     }
     processes_files[tid].erase(fd);
 }
@@ -202,13 +202,14 @@ inline std::vector<std::string_view> get_capio_file_paths() {
 }
 
 inline void dup_capio_file(int tid, int old_fd, int new_fd) {
-
+    START_LOG(tid, "call(old_fd=%d, new_fd=%d)", old_fd, new_fd);
     const std::lock_guard<std::mutex> lg(processes_files_mutex);
     const std::string_view &path          = processes_files_metadata[tid][old_fd];
     processes_files_metadata[tid][new_fd] = path;
     processes_files[tid][new_fd]          = processes_files[tid][old_fd];
     Capio_file &c_file                    = get_capio_file(path.data());
     c_file.open();
+    c_file.add_fd(tid, new_fd);
 }
 
 inline Capio_file &init_capio_file(const char *const path, bool home_node) {

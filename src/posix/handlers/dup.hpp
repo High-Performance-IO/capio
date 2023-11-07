@@ -14,8 +14,8 @@ inline int capio_dup(int fd, long tid) {
             ERR_EXIT("open in capio_dup");
         }
         dup_request(fd, res, tid);
-        dup_capio_fd(fd, res);
-        ;
+        dup_capio_fd(tid, fd, res);
+
         return res;
     } else {
         return -2;
@@ -31,7 +31,7 @@ inline int capio_dup2(int fd, int fd2, long tid) {
             return -1;
         }
         dup_request(fd, res, tid);
-        dup_capio_fd(fd, res);
+        dup_capio_fd(tid, fd, res);
         return res;
     } else {
         return -2;
