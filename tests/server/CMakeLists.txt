@@ -30,4 +30,7 @@ target_link_libraries(${TARGET_NAME} PRIVATE Catch2::Catch2WithMain)
 #####################################
 # Configure tests
 #####################################
-catch_discover_tests(${TARGET_NAME})
+catch_discover_tests(${TARGET_NAME}
+        PROPERTIES
+        WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}
+)

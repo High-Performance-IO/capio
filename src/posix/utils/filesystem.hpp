@@ -77,8 +77,7 @@ const std::string *capio_posix_realpath(const std::string *pathname) {
 
         const std::string *capio_dir = get_capio_dir();
         if (current_dir->find(*capio_dir) != std::string::npos) {
-
-            if (is_absolute(pathname)) {
+            if (!is_absolute(pathname)) {
                 auto new_path = new std::string(*current_dir + "/" + *pathname);
 
                 // remove /./ from path
