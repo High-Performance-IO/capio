@@ -68,7 +68,7 @@ constexpr char CAPIO_LOG_CLI_WARNING[] =
     "[ \033[1;33m SERVER \033[0m ] | this will have impact on performance. "
     "you "
     "should recompile CAPIO |\n"
-    "[ \033[1;33m SERVER \033[0m ] | with -DCAPIO_LOG=FALSE                  "
+    "[ \033[1;33m SERVER \033[0m ] | with -DCAPIO_LOG=FALSE                 "
     "   "
     "                       |\n"
     "[ \033[1;33m SERVER \033[0m ] "

@@ -35,7 +35,7 @@ inline int capio_fcntl(int fd, int cmd, int arg, long tid) {
 
             int res = fcntl(dev_fd, F_DUPFD_CLOEXEC, arg);
             close(dev_fd);
-            dup_capio_fd(fd, res);
+            dup_capio_fd(tid, fd, res);
             set_capio_fd_cloexec(res, true);
             dup_request(fd, res, tid);
 
