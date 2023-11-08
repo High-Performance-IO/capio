@@ -22,6 +22,16 @@ const std::string *current_dir;
 CPFiles_t *files;
 
 /**
+ * Set the CLOEXEC property of a file descriptor in metadata structures
+ * @param fd
+ * @param is_cloexec
+ * @return
+ */
+inline void set_capio_fd_cloexec(int fd, bool is_cloexec) {
+    std::get<3>(files->at(fd)) = is_cloexec;
+}
+
+/**
  * Get the current directory
  * @return the current directory
  */
@@ -31,7 +41,7 @@ auto create_capio_posix_shm(long tid, int fd) {
     std::string shm_name("offset_" + std::to_string(tid) + "_" + std::to_string(fd));
     START_LOG(tid, "call(shm_name=%s)", shm_name.c_str());
     syscall_no_intercept_flag = true;
-    off64_t *p_offset         = static_cast<off64_t *>(create_shm(shm_name, sizeof(off64_t)));
+    auto *p_offset            = static_cast<off64_t *>(create_shm(shm_name, sizeof(off64_t)));
     syscall_no_intercept_flag = false;
     return p_offset;
 }
@@ -145,10 +155,11 @@ inline void destroy_filesystem() {
  * @param newfd
  * @return
  */
-inline void dup_capio_fd(long tid, int oldfd, int newfd) {
+inline void dup_capio_fd(long tid, int oldfd, int newfd, bool is_cloexec) {
     const std::string &path = capio_files_descriptors->at(oldfd);
     capio_files_paths->at(path).insert(newfd);
     files->insert({newfd, files->at(oldfd)});
+    set_capio_fd_cloexec(newfd, is_cloexec);
     capio_files_descriptors->insert({newfd, capio_files_descriptors->at(oldfd)});
 
     create_capio_posix_shm(tid, newfd);
@@ -270,16 +281,6 @@ inline void rename_capio_path(const std::string &oldpath, const std::string &new
     for (auto fd : capio_files_paths->at(newpath)) {
         capio_files_descriptors->at(fd).assign(newpath);
     }
-}
-
-/**
- * Set the CLOEXEC property of a file descriptor in metadata structures
- * @param fd
- * @param is_cloexec
- * @return
- */
-inline void set_capio_fd_cloexec(int fd, bool is_cloexec) {
-    std::get<3>(files->at(fd)) = is_cloexec;
 }
 
 /**

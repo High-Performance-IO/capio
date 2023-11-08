@@ -52,6 +52,7 @@ static constexpr std::array<CPHandler_t, __NR_syscalls> build_syscall_table() {
     _syscallTable[SYS_creat]      = creat_handler;
     _syscallTable[SYS_dup]        = dup_handler;
     _syscallTable[SYS_dup2]       = dup2_handler;
+    _syscallTable[SYS_dup3]       = dup3_handler;
     _syscallTable[SYS_execve]     = execve_handler;
     _syscallTable[SYS_exit]       = exit_handler;
     _syscallTable[SYS_exit_group] = exit_handler;
