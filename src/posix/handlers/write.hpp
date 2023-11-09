@@ -26,9 +26,11 @@ inline ssize_t capio_writev(int fd, const struct iovec *iov, int iovcnt, long ti
               iov->iov_base, iov->iov_len, iovcnt);
 
     if (exists_capio_fd(fd)) {
+        LOG("fd %d exists and is a capio fd", fd);
         ssize_t tot_bytes = 0;
         ssize_t res       = 0;
         int i             = 0;
+        LOG("iov setup completed. starting write request loop");
         while (i < iovcnt && res >= 0) {
             size_t iov_len = iov[i].iov_len;
             if (iov_len != 0) {
@@ -43,6 +45,7 @@ inline ssize_t capio_writev(int fd, const struct iovec *iov, int iovcnt, long ti
             return tot_bytes;
         }
     } else {
+        LOG("fd %d is not a capio fd. returning -2", fd);
         return -2;
     }
 }

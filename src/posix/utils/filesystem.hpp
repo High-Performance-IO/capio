@@ -104,8 +104,9 @@ const std::string *capio_posix_realpath(const std::string *pathname) {
             }
             return pathname;
         } else {
-            // if file not found, then error is returned
-            ERR_EXIT("Fatal: file %s is not a posix file, nor a capio file!", pathname->c_str());
+            // if file not found, then nullptr is returned and errno can be read
+            LOG("file %s is not a posix file, nor a capio file!", pathname->c_str());
+            return new std::string("");
         }
     }
 
@@ -170,7 +171,10 @@ inline void dup_capio_fd(long tid, int oldfd, int newfd, bool is_cloexec) {
  * @param fd
  * @return if the file descriptor exists
  */
-inline bool exists_capio_fd(int fd) { return files->find(fd) != files->end(); }
+inline bool exists_capio_fd(int fd) {
+    START_LOG(capio_syscall(SYS_gettid), "call(fd=%d)", fd);
+    return files->find(fd) != files->end();
+}
 
 /**
  * Check if a path exists in metadata structures
