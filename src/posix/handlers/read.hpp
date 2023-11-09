@@ -3,7 +3,11 @@
 
 #include "utils/data.hpp"
 
-inline off64_t capio_read(int fd, void *buffer, off64_t count, long tid) {
+int read_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg5, long *result) {
+    int fd       = static_cast<int>(arg0);
+    void *buffer = reinterpret_cast<void *>(arg1);
+    auto count   = static_cast<off64_t>(arg2);
+    long tid     = syscall_no_intercept(SYS_gettid);
     START_LOG(tid, "call(fd=%d, buf=0x%08x, count=%ld)", fd, buffer, count);
 
     if (exists_capio_fd(fd)) {
@@ -16,22 +20,7 @@ inline off64_t capio_read(int fd, void *buffer, off64_t count, long tid) {
         off64_t bytes_read  = end_of_read - offset;
         read_data(tid, buffer, bytes_read);
         set_capio_fd_offset(fd, offset + bytes_read);
-        return bytes_read;
-    } else {
-        return -2;
-    }
-}
-
-int read_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg5, long *result) {
-    int fd     = static_cast<int>(arg0);
-    void *buf  = reinterpret_cast<void *>(arg1);
-    auto count = static_cast<off64_t>(arg2);
-    long tid   = syscall_no_intercept(SYS_gettid);
-
-    off64_t res = capio_read(fd, buf, count, tid);
-
-    if (res != -2) {
-        *result = (res < 0 ? -errno : res);
+        *result = bytes_read;
         return 0;
     }
     return 1;

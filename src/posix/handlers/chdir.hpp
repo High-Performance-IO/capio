@@ -9,35 +9,29 @@
  * to the kernel.
  */
 
-inline int capio_chdir(const std::string *path, long tid) {
-    const std::string *path_to_check = path;
-    START_LOG(tid, "call(path=%s)", path);
+int chdir_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg5, long *result) {
+    const std::string path(reinterpret_cast<const char *>(arg0));
+    long tid = syscall_no_intercept(SYS_gettid);
 
-    if (!is_absolute(path)) {
-        path_to_check = capio_posix_realpath(path);
+    const std::string *path_to_check = &path;
+
+    START_LOG(tid, "call(path=%s)", path.c_str());
+
+    if (!is_absolute(&path)) {
+        path_to_check = capio_posix_realpath(&path);
         if (path_to_check->length() == 0) {
-            return -1;
+            *result = -errno;
+            return 0;
         }
     }
 
     if (is_capio_path(*path_to_check)) {
         set_current_dir(path_to_check);
-        return 0;
-    } else {
-        return -2;
-    }
-}
-
-int chdir_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg5, long *result) {
-    std::string path(reinterpret_cast<const char *>(arg0));
-    long tid = syscall_no_intercept(SYS_gettid);
-
-    int res = capio_chdir(&path, tid);
-
-    if (res != -2) {
-        *result = (res < 0 ? -errno : res);
+        errno = 0;
         return 0;
     }
+
+    // if not a capio path, then control is given to kernel
     return 1;
 }
 
