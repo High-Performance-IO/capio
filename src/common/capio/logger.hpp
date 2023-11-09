@@ -8,10 +8,9 @@
 #include <string>
 #include <utility>
 
-#include <sys/mman.h>
-
 #include "constants.hpp"
 #include "syscall.hpp"
+#include <sys/mman.h>
 
 #ifndef __CAPIO_POSIX // fix for older version of gcc found on galileo100 and
 // leonardo
@@ -22,6 +21,9 @@
 
 std::ofstream logfile; // if building for server, self contained logfile
 
+#else
+FILE *logfileFP;
+bool logfileOpen = false;
 #endif
 
 thread_local int current_log_level = 0;
@@ -35,6 +37,36 @@ thread_local int current_log_level = 0;
 
 int CAPIO_LOG_LEVEL = -1;
 
+inline char *get_capio_log_filename() {
+
+    static char *log_filename = nullptr;
+
+    if (log_filename == nullptr) {
+        log_filename = std::getenv("CAPIO_LOGFILE");
+        if (log_filename == nullptr) {
+            log_filename    = new char;
+            log_filename[0] = '\0';
+        }
+    }
+    return log_filename;
+}
+
+void log_write_to(char *buffer, size_t bufflen) {
+#ifdef __CAPIO_POSIX
+    if (current_log_level < CAPIO_MAX_LOG_LEVEL || CAPIO_MAX_LOG_LEVEL < 0) {
+        capio_syscall(SYS_write, fileno(logfileFP), buffer, bufflen);
+        capio_syscall(SYS_write, fileno(logfileFP), "\n", 1);
+        fflush(logfileFP);
+    }
+#else
+    if (current_log_level < CAPIO_LOG_LEVEL || CAPIO_LOG_LEVEL < 0) {
+        logfile << buffer << "\n";
+        logfile.flush();
+    }
+
+#endif
+}
+
 class Logger {
   private:
     long int tid;
@@ -47,12 +79,25 @@ class Logger {
                   const char *message, ...) {
 #ifndef __CAPIO_POSIX
         if (!logfile.is_open()) {
+            // NOTE: should never get to this point as capio_server opens up the log file while
+            // parsing command line arguments. This is only for failsafe purposte
             logfile.open(std::string(CAPIO_SERVER_DEFAULT_LOG_FILE_NAME) + std::to_string(tid) +
                              ".log",
                          std::ofstream::out);
         }
-#endif
+#else
+        if (!logfileOpen) {
+            auto logfile_name = get_capio_log_filename();
 
+            if (logfile_name[0] != '\0') {
+                logfileFP   = fopen(logfile_name, "w");
+                logfileOpen = true;
+            } else {
+                logfileFP   = fopen(CAPIO_APP_LOG_FILE_NAME, "w");
+                logfileOpen = true;
+            }
+        }
+#endif
         strncpy(this->invoker, invoker, sizeof(this->invoker));
         strncpy(this->file, file, sizeof(this->file));
         this->tid = tid;
@@ -71,19 +116,9 @@ class Logger {
                                                           PROT_READ | PROT_WRITE,
                                                           MAP_PRIVATE | MAP_ANONYMOUS, -1, 0));
         vsnprintf(buf, size + 1, format, argpc);
-#ifdef __CAPIO_POSIX
-        if (current_log_level < CAPIO_MAX_LOG_LEVEL || CAPIO_MAX_LOG_LEVEL < 0) {
-            capio_syscall(SYS_write, fileno(stderr), buf, size);
-            capio_syscall(SYS_write, fileno(stderr), "\n", 1);
-            fflush(stderr);
-        }
-#else
-        if (current_log_level < CAPIO_LOG_LEVEL || CAPIO_LOG_LEVEL < 0) {
-            logfile << buf << "\n";
-            logfile.flush();
-        }
 
-#endif
+        log_write_to(buf, strlen(buf));
+
         va_end(argp);
         va_end(argpc);
         capio_syscall(SYS_munmap, buf, size);
@@ -105,18 +140,9 @@ class Logger {
                                                           PROT_READ | PROT_WRITE,
                                                           MAP_PRIVATE | MAP_ANONYMOUS, -1, 0));
         vsnprintf(buf, size + 1, format, argpc);
-#ifdef __CAPIO_POSIX
-        if (current_log_level < CAPIO_MAX_LOG_LEVEL || CAPIO_MAX_LOG_LEVEL < 0) {
-            capio_syscall(SYS_write, fileno(stderr), buf, size);
-            capio_syscall(SYS_write, fileno(stderr), "\n", 1);
-            fflush(stderr);
-        }
-#else
-        if (current_log_level < CAPIO_LOG_LEVEL || CAPIO_LOG_LEVEL < 0) {
-            logfile << buf << "\n";
-            logfile.flush();
-        }
-#endif
+
+        log_write_to(buf, strlen(buf));
+
         va_end(argp);
         va_end(argpc);
         capio_syscall(SYS_munmap, buf, size);
@@ -127,18 +153,8 @@ class Logger {
         sprintf(format, LOG_PRE_MSG, this->tid, this->invoker);
         size_t pre_msg_len = strlen(format);
         strcpy(format + pre_msg_len, "returned");
-#ifdef __CAPIO_POSIX
-        if (current_log_level < CAPIO_MAX_LOG_LEVEL || CAPIO_MAX_LOG_LEVEL < 0) {
-            capio_syscall(SYS_write, fileno(stderr), format, strlen(format));
-            capio_syscall(SYS_write, fileno(stderr), "\n", 1);
-            fflush(stderr);
-        }
-#else
-        if (current_log_level < CAPIO_LOG_LEVEL || CAPIO_LOG_LEVEL < 0) {
-            logfile << format << "\n";
-            logfile.flush();
-        }
-#endif
+
+        log_write_to(format, strlen(format));
     }
 };
 
