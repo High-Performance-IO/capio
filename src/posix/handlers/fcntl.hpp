@@ -89,13 +89,13 @@ int fcntl_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long ar
             }
 
             int res = fcntl(dev_fd, F_DUPFD_CLOEXEC, arg);
+            if (res == -1) {
+                *result = -errno;
+            }
             close(dev_fd);
             dup_capio_fd(tid, fd, res, true);
             dup_request(fd, res, tid);
 
-            if (res == -1) {
-                *result = -errno;
-            }
             return 0;
         }
 

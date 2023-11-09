@@ -115,6 +115,10 @@ inline off64_t getdents64_request(const int fd, const off64_t count, const long 
     return res;
 }
 
+inline off64_t add_getdents_request(int fd, off64_t count, bool is_getdents64, long tid) {
+    return is_getdents64 ? getdents64_request(fd, count, tid) : getdents_request(fd, count, tid);
+}
+
 inline void handshake_anonymous_request(const long tid, const long pid) {
     char req[CAPIO_REQUEST_MAX_SIZE];
     sprintf(req, "%04d %ld %ld", CAPIO_REQUEST_HANDSHAKE_ANONYMOUS, tid, pid);
