@@ -68,6 +68,8 @@ the first is optional).
 - `CAPIO_DIR` This environment variable tells to both server and application the mount point of capio
 - `CAPIO_LOG_LEVEL` this environment tells both server and application the log level to use. This variable works only
   if `-DCAPIO_LOG=TRUE` was specified during cmake phase.
+- `CAPIO_LOGFILE` This environment variable is defined only for capio_posix applications and specifies the
+                 logfile name to which capio will log to. if this variable is not defined, capio will log by default to cerr.
 
 ## How to inject streaming capabilities into your workflow
 
