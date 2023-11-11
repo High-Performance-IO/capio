@@ -15,6 +15,9 @@ inline int capio_chdir(const std::string *path, long tid) {
 
     if (!is_absolute(path)) {
         path_to_check = capio_posix_realpath(path);
+        if (path_to_check->length() == 0) {
+            return -1;
+        }
     }
 
     if (is_capio_path(*path_to_check)) {
