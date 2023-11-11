@@ -68,8 +68,8 @@ the first is optional).
 - `CAPIO_DIR` This environment variable tells to both server and application the mount point of capio
 - `CAPIO_LOG_LEVEL` this environment tells both server and application the log level to use. This variable works only
   if `-DCAPIO_LOG=TRUE` was specified during cmake phase.
-- `CAPIO_LOGFILE` This environment variable is defined only for capio_posix applications and specifies the
-                 logfile name to which capio will log to. if this variable is not defined, capio will log by default to cerr.
+- `CAPIO_LOGFILE` This environment variable is defined only for capio_posix applications and specifies the logfile name
+  to which capio will log to. If this variable is not defined, capio will log by default to stderr.
 
 ## How to inject streaming capabilities into your workflow
 
@@ -134,10 +134,12 @@ The following is an example of a simple configuration:
 The [examples](examples) folder contains some examples that shows how to use mpi_io with CAPIO.
 There are also examples on how to write JSON configuration files for the semantics implemented by CAPIO:
 
-- [on_close](https://github.com/High-Performance-IO/capio/wiki/Examples#on_close-semantic): A pipeline composed by a producer and a consumer with "on_close" semantics
-- [no_update](https://github.com/High-Performance-IO/capio/wiki/Examples#noupdate-semantics): A pipeline composed by a producer and a consumer with "no_update" semantics
-- [mix_semantics](https://github.com/High-Performance-IO/capio/wiki/Examples#mixed-semantics): A pipeline composed by a producer and a consumer with mix semantics
-
+- [on_close](https://github.com/High-Performance-IO/capio/wiki/Examples#on_close-semantic): A pipeline composed by a
+  producer and a consumer with "on_close" semantics
+- [no_update](https://github.com/High-Performance-IO/capio/wiki/Examples#noupdate-semantics): A pipeline composed by a
+  producer and a consumer with "no_update" semantics
+- [mix_semantics](https://github.com/High-Performance-IO/capio/wiki/Examples#mixed-semantics): A pipeline composed by a
+  producer and a consumer with mix semantics
 
 ## CAPIO Team
 
