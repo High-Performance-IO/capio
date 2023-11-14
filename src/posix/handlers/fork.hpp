@@ -4,26 +4,21 @@
 #include "utils/clone.hpp"
 #include "utils/requests.hpp"
 
-inline pid_t capio_fork(long parent_tid) {
-    START_LOG(parent_tid, "call()");
+int fork_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg5, long *result) {
+    long parent_tid = syscall_no_intercept(SYS_gettid);
+    auto pid        = static_cast<pid_t>(syscall_no_intercept(SYS_fork));
 
-    auto pid = static_cast<pid_t>(syscall_no_intercept(SYS_fork));
+    START_LOG(parent_tid, "call(pid=%ld)", pid);
 
     if (pid == 0) { // child
         auto child_tid = static_cast<pid_t>(syscall_no_intercept(SYS_gettid));
         init_process(child_tid);
         clone_request(parent_tid, child_tid);
-        return 0;
+        *result = 0;
     } else {
-        return pid;
+        *result = pid;
     }
-}
 
-int fork_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg5, long *result) {
-    long tid = syscall_no_intercept(SYS_gettid);
-
-    int res = capio_fork(tid);
-    *result = (res < 0 ? -errno : res);
     return 0;
 }
 
