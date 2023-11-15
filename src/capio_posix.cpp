@@ -340,10 +340,6 @@ void mtrace_init(void) {
 	#endif
 }
 
-//* fd -> (shm*, *offset, *mapped_shm_size, *offset_upper_bound, file status flags, file_descriptor_flags)
-//std::unordered_map<int, std::tuple<void*, off64_t*, off64_t*, off64_t*, int, int>>* files = nullptr;
-//std::unordered_map<int, std::string>* capio_files_descriptors = nullptr; 
-//std::unordered_set<std::string>* capio_files_paths = nullptr;
 void create_snapshot() {
 	int fd, status_flags, fd_flags;
 	off64_t offset, mapped_shm_size;
@@ -511,8 +507,6 @@ int add_open_request(const char* pathname, size_t fd, int mode) {
 		buf_requests->write(c_str, 256 * sizeof(char)); //TODO: max upperbound for pathname
 		off64_t res;
 		(*bufs_response)[syscall(SYS_gettid)]->read(&res);
-
-			CAPIO_DBG("open returing %ld\n", res);
 		return res;
 	}
 	else {
@@ -1671,8 +1665,8 @@ pid_t capio_clone(int flags, void* child_stack, void* parent_tidpr, void* tls, v
 	fork_enabled = false;
 	parent_tid = syscall(SYS_gettid); //now syscall(SYS_gettid) is the copy of the father
 	pid = fork();
+	mtrace_init();
 	if (pid == 0) { //child
-		mtrace_init();
 		copy_parent_files();
 		if (sem_family == nullptr) {
 			sem_family = sem_open(("capio_sem_family_" + std::to_string(parent_tid)).c_str(),  O_CREAT | O_RDWR, S_IRUSR | S_IWUSR, 0);
