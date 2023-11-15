@@ -86,7 +86,12 @@ const std::string *capio_posix_realpath(const std::string *pathname) {
         LOG("path is null due to errno='%s'", strerror(errno));
 
         const std::string *capio_dir = get_capio_dir();
-        if (current_dir->find(*capio_dir) != std::string::npos) {
+        /*
+         * The other condition in the if is given to check for a limit case in which the
+         * current_dir is not the capio_dir, but the pathname is an absolute path to capio_dir
+         */
+        if (current_dir->find(*capio_dir) != std::string::npos ||
+            pathname->find(*capio_dir) != std::string::npos) {
             if (!is_absolute(pathname)) {
                 auto new_path = new std::string(*current_dir + "/" + *pathname);
 

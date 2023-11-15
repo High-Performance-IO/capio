@@ -11,6 +11,7 @@ set(TARGET_SOURCES
         ${CMAKE_CURRENT_SOURCE_DIR}/src/stat.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/src/statx.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/src/write.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/src/dirents.cpp
 )
 
 #####################################
