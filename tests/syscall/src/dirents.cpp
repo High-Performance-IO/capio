@@ -49,20 +49,23 @@ TEST_CASE("Test dirents on capio dir set to /tmp/capio", "[syscall]") {
             auto d = (struct dirent64 *) (buf + bpos);
             printf("%8ld  ", d->d_ino);
             char d_type = *(buf + bpos + d->d_reclen - 1);
-            printf("%-10s ", (d_type == DT_REG)    ? "regular"
+            printf("%-10s(%d) ", (d_type == DT_REG)    ? "regular"
                              : (d_type == DT_DIR)  ? "directory"
                              : (d_type == DT_FIFO) ? "FIFO"
                              : (d_type == DT_SOCK) ? "socket"
                              : (d_type == DT_LNK)  ? "symlink"
                              : (d_type == DT_BLK)  ? "block dev"
                              : (d_type == DT_CHR)  ? "char dev"
-                                                   : "???");
+                                                   : "???", d_type);
+
 
             // check for file names being the ones expected
-            bool namesOk = (strcmp(d->d_name, "file1.txt") == 0) ||
+            bool namesOk = (strcmp(d->d_name, ".") == 0) ||
+                           (strcmp(d->d_name, "..") == 0) ||
+                           (strcmp(d->d_name, "file1.txt") == 0) ||
                            (strcmp(d->d_name, "file2.txt") == 0) ||
                            (strcmp(d->d_name, "file3.txt") == 0);
-            //REQUIRE(namesOk);
+            REQUIRE(namesOk);
 
             printf("%4d %10lld  %s\n", d->d_reclen, (long long) d->d_off, d->d_name);
             bpos += d->d_reclen;

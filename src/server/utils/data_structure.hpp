@@ -15,7 +15,8 @@ struct linux_dirent {
     unsigned long d_ino;
     off_t d_off;
     unsigned short d_reclen;
-    char d_name[DNAME_LENGTH + 2];
+    unsigned char d_type;
+    char d_name[DNAME_LENGTH + 1];
 };
 
 struct linux_dirent64 {
