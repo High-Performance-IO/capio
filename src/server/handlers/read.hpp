@@ -33,7 +33,7 @@ inline void handle_pending_read(int tid, int fd, long int process_offset, long i
         off64_t dir_size  = c_file.get_stored_size();
         off64_t n_entries = dir_size / THEORETICAL_SIZE_DIRENT64;
         char *p_getdents  = (char *) malloc(n_entries * sizeof(char) * dir_size);
-        end_of_sector     = convert_dirent64_to_dirent(p, p_getdents, dir_size);
+        end_of_sector     = convert_dirent64_to_dirent(p, p_getdents, dir_size, c_file.is_dir());
         write_response(tid, end_of_sector);
         send_data_to_client(tid, p_getdents + process_offset, end_of_sector - process_offset);
         free(p_getdents);
@@ -75,7 +75,8 @@ inline void handle_local_read(int tid, int fd, off64_t count, bool dir, bool is_
                 off64_t dir_size  = c_file.get_stored_size();
                 off64_t n_entries = dir_size / THEORETICAL_SIZE_DIRENT64;
                 char *p_getdents  = (char *) malloc(n_entries * sizeof(char) * dir_size);
-                end_of_sector     = convert_dirent64_to_dirent(p, p_getdents, dir_size);
+                end_of_sector =
+                    convert_dirent64_to_dirent(p, p_getdents, dir_size, c_file.is_dir());
                 write_response(tid, end_of_sector);
                 send_data_to_client(tid, p_getdents + process_offset,
                                     end_of_sector - process_offset);
@@ -94,7 +95,7 @@ inline void handle_local_read(int tid, int fd, off64_t count, bool dir, bool is_
             off64_t dir_size  = c_file.get_stored_size();
             off64_t n_entries = dir_size / THEORETICAL_SIZE_DIRENT64;
             char *p_getdents  = (char *) malloc(n_entries * sizeof(char) * dir_size);
-            end_of_sector     = convert_dirent64_to_dirent(p, p_getdents, dir_size);
+            end_of_sector = convert_dirent64_to_dirent(p, p_getdents, dir_size, c_file.is_dir());
             write_response(tid, end_of_read);
             send_data_to_client(tid, p_getdents + process_offset, bytes_read);
             free(p_getdents);
@@ -314,7 +315,8 @@ inline void solve_remote_reads(size_t bytes_received, size_t offset, size_t file
                 off64_t dir_size  = c_file.get_stored_size();
                 off64_t n_entries = dir_size / THEORETICAL_SIZE_DIRENT64;
                 char *p_getdents  = (char *) malloc(n_entries * sizeof(char) * dir_size);
-                end_of_sector     = convert_dirent64_to_dirent(p, p_getdents, dir_size);
+                end_of_sector =
+                    convert_dirent64_to_dirent(p, p_getdents, dir_size, c_file.is_dir());
                 write_response(tid, end_of_sector);
                 send_data_to_client(tid, p_getdents + fd_offset, bytes_read);
                 free(p_getdents);

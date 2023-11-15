@@ -13,8 +13,8 @@ char *expand_memory_for_file(const std::string &path, off64_t data_size, Capio_f
     return new_p;
 }
 
-off64_t convert_dirent64_to_dirent(char *dirent64_buf, char *dirent_buf,
-                                   off64_t dirent_64_buf_size, bool is_dir) {
+off64_t convert_dirent64_to_dirent(char *dirent64_buf, char *dirent_buf, off64_t dirent_64_buf_size,
+                                   bool is_dir) {
     START_LOG(gettid(), "call(%s, %s, %ld)", dirent64_buf, dirent_buf, dirent_64_buf_size);
     off64_t dirent_buf_size = 0;
     off64_t i               = 0;
@@ -27,8 +27,8 @@ off64_t convert_dirent64_to_dirent(char *dirent64_buf, char *dirent_buf,
         ld.d_off = dirent_buf_size + THEORETICAL_SIZE_DIRENT;
 
         strcpy(ld.d_name, p_ld64->d_name);
-        ld.d_name[DNAME_LENGTH]     = '\0';
-        ld.d_type = p_ld64->d_type;
+        ld.d_name[DNAME_LENGTH] = '\0';
+        ld.d_type               = p_ld64->d_type;
 
         i += THEORETICAL_SIZE_DIRENT64;
         memcpy((char *) dirent_buf + dirent_buf_size, &ld, sizeof(ld));
@@ -38,9 +38,7 @@ off64_t convert_dirent64_to_dirent(char *dirent64_buf, char *dirent_buf,
     return dirent_buf_size;
 }
 
-off64_t compute_dirent_offset(){
-    return 0;
-}
+off64_t compute_dirent_offset() { return 0; }
 
 bool is_int(const std::string &s) {
     START_LOG(gettid(), "call(%s)", s.c_str());
