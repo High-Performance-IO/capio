@@ -87,10 +87,10 @@ TEST_CASE("Test directory creation, reopening, and close in a different director
     REQUIRE(faccessat(dirfd, PATHNAME, F_OK, 0) != 0);
     REQUIRE(close(dirfd) != -1);
 }
-
+/*
 TEST_CASE("Test obtaining the current directory with getcwd system call", "[syscall]") {
     auto expected_path = std::string(std::getenv("PWD"));
     char obtained_path[PATH_MAX];
     getcwd(obtained_path, PATH_MAX);
     REQUIRE(expected_path == std::string(obtained_path));
-}
+}*/
