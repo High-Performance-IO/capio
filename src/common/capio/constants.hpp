@@ -1,6 +1,7 @@
 #ifndef CAPIO_COMMON_CONSTANTS_HPP
 #define CAPIO_COMMON_CONSTANTS_HPP
 
+#include <dirent.h>
 #include <sys/types.h>
 
 constexpr size_t DIR_INITIAL_SIZE = 1024L * 1024 * 1024;
@@ -23,12 +24,8 @@ constexpr char CAPIO_FILE_MODE_ON_TERMINATION[] = "on_termination";
 
 constexpr int N_ELEMS_DATA_BUFS = 10;
 
-constexpr int THEORETICAL_SIZE_DIRENT64 = sizeof(ino64_t) + sizeof(off64_t) +
-                                          sizeof(unsigned short) + sizeof(unsigned char) +
-                                          sizeof(char) * (DNAME_LENGTH + 1);
-
-constexpr int THEORETICAL_SIZE_DIRENT = sizeof(unsigned long) + sizeof(off_t) +
-                                        sizeof(unsigned short) + sizeof(char) * (DNAME_LENGTH + 2);
+constexpr int THEORETICAL_SIZE_DIRENT64 = sizeof(struct dirent64);
+constexpr int THEORETICAL_SIZE_DIRENT   = sizeof(struct dirent);
 
 constexpr int WINDOW_DATA_BUFS = 256 * 1024;
 

@@ -16,7 +16,7 @@ inline void handle_local_stat(int tid, const std::string &path) {
 
     Capio_file &c_file = get_capio_file(path.c_str());
     write_response(tid, c_file.get_file_size());
-    write_response(tid, static_cast<int>(c_file.is_dir() ? 1 : 0));
+    write_response(tid, static_cast<int>(c_file.is_dir() ? 0 : 1));
 }
 
 inline void handle_remote_stat(int tid, const std::string &path, int rank) {

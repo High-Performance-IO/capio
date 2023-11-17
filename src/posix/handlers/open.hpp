@@ -50,6 +50,7 @@ inline int capio_openat(int dirfd, std::string *pathname, int flags, long tid) {
         }
         bool create = (flags & O_CREAT) == O_CREAT;
         bool excl   = (flags & O_EXCL) == O_EXCL;
+
         if (excl) {
             off64_t return_code = create_exclusive_request(fd, path_to_check, tid);
             if (return_code == 1) {

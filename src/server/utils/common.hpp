@@ -5,7 +5,6 @@
 
 #include "capio/constants.hpp"
 #include "capio_file.hpp"
-#include "data_structure.hpp"
 #include "types.hpp"
 
 char *expand_memory_for_file(const std::string &path, off64_t data_size, Capio_file &c_file) {
@@ -18,11 +17,11 @@ off64_t convert_dirent64_to_dirent(char *dirent64_buf, char *dirent_buf, off64_t
     START_LOG(gettid(), "call(%s, %s, %ld)", dirent64_buf, dirent_buf, dirent_64_buf_size);
     off64_t dirent_buf_size = 0;
     off64_t i               = 0;
-    struct linux_dirent ld;
-    struct linux_dirent64 *p_ld64;
+    struct dirent ld;
+    struct dirent64 *p_ld64;
     ld.d_reclen = THEORETICAL_SIZE_DIRENT;
     while (i < dirent_64_buf_size) {
-        p_ld64   = (struct linux_dirent64 *) (dirent64_buf + i);
+        p_ld64   = (struct dirent64 *) (dirent64_buf + i);
         ld.d_ino = p_ld64->d_ino;
         ld.d_off = dirent_buf_size + THEORETICAL_SIZE_DIRENT;
 
