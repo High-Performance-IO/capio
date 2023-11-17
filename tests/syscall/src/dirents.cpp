@@ -40,6 +40,8 @@ TEST_CASE("Test dirents on capio dir set to /tmp/capio", "[syscall]") {
 
         nread = static_cast<int>(syscall(SYS_getdents64, current_dir, buf, 1024));
 
+        REQUIRE(nread > 0);
+
         if (nread == 0) {
             break;
         }
@@ -48,7 +50,7 @@ TEST_CASE("Test dirents on capio dir set to /tmp/capio", "[syscall]") {
             auto d = (struct dirent64 *) (buf + bpos);
             printf("%8ld  ", d->d_ino);
             char d_type  = *(buf + bpos + d->d_reclen - 1);
-            /*
+
             printf("%-10s(%d) ",
                    (d_type == DT_REG) ? "regular"
                    : (d_type == DT_DIR)  ? "directory"
@@ -59,7 +61,7 @@ TEST_CASE("Test dirents on capio dir set to /tmp/capio", "[syscall]") {
                    : (d_type == DT_CHR)  ? "char dev"
                                          : "???",
                    d_type);
-*/
+
             // check for file names being the ones expected
             bool namesOk = (strcmp(d->d_name, ".") == 0) || (strcmp(d->d_name, "..") == 0) ||
                            (strcmp(d->d_name, "file1.txt") == 0) ||
