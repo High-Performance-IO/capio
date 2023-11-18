@@ -94,3 +94,11 @@ TEST_CASE("Test obtaining the current directory with getcwd system call", "[sysc
     getcwd(obtained_path, PATH_MAX);
     REQUIRE(expected_path == std::string(obtained_path));
 }
+
+TEST_CASE("Test getcwd system call when path is longer than size", "[syscall]") {
+    auto expected_path = std::string(std::getenv("PWD"));
+    REQUIRE(expected_path.size() > 1);
+    char obtained_path[1];
+    REQUIRE(getcwd(obtained_path, 1) == nullptr);
+    REQUIRE(errno == ERANGE);
+}
