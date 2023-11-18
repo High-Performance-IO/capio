@@ -12,7 +12,7 @@ int getcwd_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long a
         *result = -ERANGE;
     } else {
         cwd->copy(buf, size);
-        buf[size] = '\0';
+        buf[cwd->length()] = '\0';
     }
     return 0;
 }
