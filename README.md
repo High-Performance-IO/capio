@@ -32,6 +32,8 @@ The following dependencies are automatically fetched during cmake configuration 
 git clone https://github.com/High-Performance-IO/capio.git capio && cd capio
 mkdir build && cd build
 cmake -DCMAKE_BUILD_TYPE=Release ..
+cmake --build . -j$(nproc)
+sudo cmake --install .
 ```
 
 It is also possible to enable log in CAPIO, by defining `-DCAPIO_LOG=TRUE`.
@@ -47,16 +49,16 @@ the first is optional).
    want to execute your program (one daemon for each node). If you desire to specify a custom folder
    for capio, set `CAPIO_DIR` as a environment variable.
    ```bash
-   [CAPIO_DIR=your_capiodir] mpiexec -N 1 --hostfile your_hostfile src/capio_server -c conf.json 
+   [CAPIO_DIR=your_capiodir] mpiexec -N 1 --hostfile your_hostfile capio_server -c conf.json 
    ```
 
 > [!NOTE]
-> if `CAPIO_DIR` is not specified when launching caio_Server, it will default to the current working directory of
+> if `CAPIO_DIR` is not specified when launching capio_server, it will default to the current working directory of
 > capio_server.
 
 3) Launch your programs preloading the CAPIO shared library like this:
    ```bash
-   CAPIO_DIR=your_capiodir LD_PRELOAD=<build_folder_path>/src/posix/libcapio_posix.so ./your_app args
+   CAPIO_DIR=your_capiodir LD_PRELOAD=libcapio_posix.so ./your_app args
     ```
 
 > [!WARNING]  

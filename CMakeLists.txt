@@ -34,6 +34,7 @@ option(CAPIO_SYNC "Use sync MPI primitives" FALSE)
 # CMake module imports
 #####################################
 include(FetchContent)
+include(GNUInstallDirs)
 
 #####################################
 # Dependencies

@@ -14,24 +14,33 @@ add_library(${TARGET_NAME} SHARED ${TARGET_SOURCES})
 # External projects
 #####################################
 file(MAKE_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/syscall_intercept)
+
+set(SYSCALL_INTERCEPT_INCLUDE_FOLDER "${CMAKE_CURRENT_BINARY_DIR}/syscall_intercept/${CMAKE_INSTALL_INCLUDEDIR}")
+set(SYSCALL_INTERCEPT_LIB_FOLDER "${CMAKE_CURRENT_BINARY_DIR}/syscall_intercept/${CMAKE_INSTALL_LIBDIR}")
+
 execute_process(
         COMMAND ${CMAKE_COMMAND}
         -DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE}
         "${CMAKE_CURRENT_SOURCE_DIR}/syscall_intercept"
         WORKING_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/syscall_intercept"
 )
+
 IF (UNIX)
     execute_process(
-            COMMAND ${CMAKE_COMMAND} --build "${CMAKE_CURRENT_BINARY_DIR}/syscall_intercept"
+            COMMAND ${CMAKE_COMMAND} --build
+            "${CMAKE_CURRENT_BINARY_DIR}/syscall_intercept"
     )
+
+    file(GLOB SYSCALL_INTERCEPT_HEADERS "${SYSCALL_INTERCEPT_INCLUDE_FOLDER}/*.h")
+    file(GLOB SYSCALL_INTERCEPT_LIBS "${SYSCALL_INTERCEPT_LIB_FOLDER}/*.a" "${SYSCALL_INTERCEPT_LIB_FOLDER}/*.so*")
+    file(GLOB SYSCALL_INTERCEPT_PKGCONFIGS "${SYSCALL_INTERCEPT_LIB_FOLDER}/pkgconfig/*.pc")
+
+    install(FILES ${SYSCALL_INTERCEPT_HEADERS} DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}")
+    install(FILES ${SYSCALL_INTERCEPT_LIBS} DESTINATION "${CMAKE_INSTALL_LIBDIR}")
+    install(FILES ${SYSCALL_INTERCEPT_PKGCONFIGS} DESTINATION "${CMAKE_INSTALL_LIBDIR}/pkgconfig")
 ELSE (UNIX)
     message(WARNING, "The syscall_intercept library only supports Unix OS.")
 ENDIF (UNIX)
-set(SYSCALL_INTERCEPT_INCLUDE_FOLDER "${CMAKE_CURRENT_BINARY_DIR}/syscall_intercept/include")
-set(SYSCALL_INTERCEPT_LIB_FOLDERS
-        "${CMAKE_CURRENT_BINARY_DIR}/syscall_intercept/lib"
-        "${CMAKE_CURRENT_BINARY_DIR}/syscall_intercept/lib64"
-)
 
 #####################################
 # Definitions
@@ -54,7 +63,22 @@ target_include_directories(${TARGET_NAME} PRIVATE
 )
 
 #####################################
+# Target properties
+#####################################
+set_target_properties(${TARGET_NAME} PROPERTIES
+        VERSION "${CMAKE_PROJECT_VERSION}"
+        SOVERSION "${CMAKE_PROJECT_VERSION_MAJOR}"
+)
+
+#####################################
 # Link libraries
 #####################################
-target_link_directories(${TARGET_NAME} PRIVATE ${SYSCALL_INTERCEPT_LIB_FOLDERS})
+target_link_directories(${TARGET_NAME} PRIVATE ${SYSCALL_INTERCEPT_LIB_FOLDER})
 target_link_libraries(${TARGET_NAME} PRIVATE rt syscall_intercept)
+
+#####################################
+# Install rules
+#####################################
+install(TARGETS ${TARGET_NAME}
+        LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
+)
