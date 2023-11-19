@@ -75,13 +75,13 @@ jobs:
                 -G Ninja \
                 -B build \
                 -S ${GITHUB_WORKSPACE}
-      - name: "Build with Ninja"
-        run: cmake --build build --target all -j $(nproc)
+          cmake --build build -j $(nproc)
+          sudo cmake --install build --prefix /usr/local
       - name: "Run CAPIO server"
         env:
           CAPIO_DIR: ${{ github.workspace }}
           CAPIO_LOG_LEVEL: -1
-        run: mpirun -n 1 build/src/server/capio_server --no-config &
+        run: mpirun -n 1 capio_server --no-config &
       - name: "Run tests"
         id: run-tests
         timeout-minutes: 2

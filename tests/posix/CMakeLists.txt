@@ -15,12 +15,11 @@ add_executable(${TARGET_NAME} ${TARGET_SOURCES})
 #####################################
 # External projects
 #####################################
-set(SYSCALL_BINARY_DIR "${PROJECT_BINARY_DIR}/src/posix/syscall_intercept")
-set(SYSCALL_INTERCEPT_INCLUDE_FOLDER "${SYSCALL_BINARY_DIR}/include")
-set(SYSCALL_INTERCEPT_LIB_FOLDERS
-        "${SYSCALL_BINARY_DIR}/lib"
-        "${SYSCALL_BINARY_DIR}/lib64"
-)
+set(SYSCALL_INTERCEPT_BINARY_DIR "${PROJECT_BINARY_DIR}/src/posix/syscall_intercept")
+set(SYSCALL_INTERCEPT_INCLUDE_FOLDER
+        "${SYSCALL_INTERCEPT_BINARY_DIR}/${CMAKE_INSTALL_INCLUDEDIR}")
+set(SYSCALL_INTERCEPT_LIB_FOLDER
+        "${SYSCALL_INTERCEPT_BINARY_DIR}/${CMAKE_INSTALL_LIBDIR}")
 
 #####################################
 # Definitions
@@ -45,7 +44,7 @@ target_include_directories(${TARGET_NAME} PRIVATE
 #####################################
 # Link libraries
 #####################################
-target_link_directories(${TARGET_NAME} PRIVATE ${SYSCALL_INTERCEPT_LIB_FOLDERS})
+target_link_directories(${TARGET_NAME} PRIVATE ${SYSCALL_INTERCEPT_LIB_FOLDER})
 target_link_libraries(${TARGET_NAME} PRIVATE rt syscall_intercept Catch2::Catch2WithMain)
 
 #####################################

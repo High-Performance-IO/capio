@@ -57,3 +57,10 @@ ENDIF (MPI_LINK_FLAGS)
 # Link libraries
 #####################################
 target_link_libraries(${TARGET_NAME} PRIVATE ${MPI_LIBRARIES} rt stdc++fs)
+
+#####################################
+# Install rules
+#####################################
+install(TARGETS ${TARGET_NAME}
+        RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
+)
