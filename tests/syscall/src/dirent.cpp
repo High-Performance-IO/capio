@@ -39,6 +39,10 @@ TEST_CASE("Test dirents on capio dir", "[syscall]") {
     while (true) {
 
         nread = static_cast<int>(syscall(SYS_getdents64, current_dir, buf, 1024));
+
+        // on fail sys_getdents returns -1
+        REQUIRE(nread != -1);
+
         if (nread == 0) {
             break;
         }

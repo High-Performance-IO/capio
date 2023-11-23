@@ -112,7 +112,7 @@ inline int capio_fstatat(int dirfd, std::string *pathname, struct stat *statbuf,
             std::string path;
             if (pathname->at(pathname->length() - 1) == '.') {
                 path = dir_path;
-            } else {
+            } else if (pathname[0] != "/") {
                 path = dir_path + "/" + *pathname;
             }
             return capio_lstat(path, statbuf, tid);

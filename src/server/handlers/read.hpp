@@ -337,6 +337,7 @@ inline void solve_remote_reads(size_t bytes_received, size_t offset, size_t file
 }
 
 void getdents_handler(const char *const str, int rank) {
+    START_LOG(gettid(), "call(%s)", str);
     int tid, fd;
     off64_t count;
     sscanf(str, "%d %d %ld", &tid, &fd, &count);
@@ -344,6 +345,7 @@ void getdents_handler(const char *const str, int rank) {
 }
 
 void getdents64_handler(const char *const str, int rank) {
+    START_LOG(gettid(), "call(%s)", str);
     int tid, fd;
     off64_t count;
     sscanf(str, "%d %d %ld", &tid, &fd, &count);

@@ -2,6 +2,7 @@
 #define CAPIO_POSIX_HANDLERS_GETDENTS_HPP
 
 #include "utils/data.hpp"
+#include <dirent.h>
 
 inline off64_t round(off64_t bytes, bool is_getdents64) {
     off64_t res = 0;
@@ -20,16 +21,16 @@ inline off64_t round(off64_t bytes, bool is_getdents64) {
 // TODO: too similar to capio_read, refactoring needed
 inline int getdents_handler_impl(long arg0, long arg1, long arg2, long *result, bool is64bit) {
     auto fd      = static_cast<int>(arg0);
-    auto *buffer = reinterpret_cast<struct linux_dirent *>(arg1);
+    auto *buffer = reinterpret_cast<struct dirent *>(arg1);
     auto count   = static_cast<size_t>(arg2);
     long tid     = syscall_no_intercept(SYS_gettid);
-
-    // auto res = capio_getdents(fd, dirp, count, is64bit, tid);
 
     START_LOG(tid, "call(fd=%d, dirp=0x%08x, count=%ld, is64bit=%s)", fd, buffer, count,
               is64bit ? "true" : "false");
 
     if (exists_capio_fd(fd)) {
+        LOG("fd=%d, is a capio file descriptor", fd);
+
         if (count >= SSIZE_MAX) {
             ERR_EXIT("src does not support read bigger than SSIZE_MAX yet");
         }
@@ -48,6 +49,8 @@ inline int getdents_handler_impl(long arg0, long arg1, long arg2, long *result, 
 
         *result = bytes_read;
         return 0;
+    } else {
+        LOG("fd=%d, is not a capio file descriptor", fd);
     }
     return 1;
 }
