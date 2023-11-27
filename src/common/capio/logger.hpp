@@ -8,19 +8,13 @@
 #include <string>
 #include <utility>
 
-#include "constants.hpp"
-#include "syscall.hpp"
 #include <sys/mman.h>
 
-#ifndef __CAPIO_POSIX // fix for older version of gcc found on galileo100 and
-// leonardo
-#if __GLIBC__ == 2 && __GLIBC_MINOR__ < 30
-#include <sys/syscall.h>
-#define gettid() syscall(SYS_gettid)
-#endif
+#include "constants.hpp"
+#include "syscall.hpp"
 
+#ifndef __CAPIO_POSIX
 std::ofstream logfile; // if building for server, self contained logfile
-
 #else
 FILE *logfileFP;
 bool logfileOpen = false;

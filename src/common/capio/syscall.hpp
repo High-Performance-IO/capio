@@ -25,4 +25,9 @@ inline char *syscall_no_intercept_realpath(const char *path, char *resolved) {
 #define capio_realpath realpath
 #endif
 
+// The gettid function has been introduced in glibc v2.30
+#if __GLIBC__ == 2 && __GLIBC_MINOR__ < 30
+#define gettid() capio_syscall(SYS_gettid)
+#endif
+
 #endif // CAPIO_COMMON_SYSCALL_HPP
