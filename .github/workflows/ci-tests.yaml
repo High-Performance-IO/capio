@@ -45,11 +45,12 @@ jobs:
           - g++-10
           - g++-11
           - g++-12
-          - clang-11
-          - clang-12
+          - g++-13
           - clang-13
           - clang-14
           - clang-15
+          - clang-16
+          - clang-17
     steps:
       - uses: actions/checkout@v4
       - name: "Install packages"
@@ -59,12 +60,24 @@ jobs:
             libopenmpi-dev \
             ninja-build \
             openmpi-bin \
-            pkg-config \
-            ${{ matrix.cxx }}
+            pkg-config
       - name: "Get compiler version"
         run: |
           IFS='-' read -r -a COMPILER <<< "${{ matrix.cxx }}"
           echo "CXX_VERSION=${COMPILER[1]}" >> $GITHUB_ENV
+      - name: "Install Clang"
+        if: ${{ startsWith(matrix.cxx, 'clang-') }}
+        run: |
+          wget -O /tmp/llvm.sh https://apt.llvm.org/llvm.sh
+          chmod u+x /tmp/llvm.sh
+          sudo /tmp/llvm.sh ${{ env.CXX_VERSION }}
+          rm -f /tmp/llvm.sh
+      - name: "Install GCC"
+        if: ${{ startsWith(matrix.cxx, 'g++-') }}
+        run: |
+          sudo add-apt-repository ppa:ubuntu-toolchain-r/ppa
+          sudo apt update
+          sudo apt install -y ${{ matrix.cxx }}
       - name: "Run CMake"
         env:
           CXX: ${{ startsWith(matrix.cxx, 'clang-') && 'clang++' || 'g++' }}-${{ env.CXX_VERSION }}
