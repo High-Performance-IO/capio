@@ -10,6 +10,7 @@ set(TARGET_SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/libcapio_posix.cpp)
 #####################################
 add_library(${TARGET_NAME} SHARED ${TARGET_SOURCES})
 
+
 #####################################
 # External projects
 #####################################
