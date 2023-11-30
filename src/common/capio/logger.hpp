@@ -15,10 +15,6 @@
 #include "syscallnames.h"
 #endif
 
-#ifdef __CAPIO_POSIX
-    #include "syscallnames.h"
-#endif
-
 #ifndef __CAPIO_POSIX
 std::ofstream logfile; // if building for server, self contained logfile
 #else
