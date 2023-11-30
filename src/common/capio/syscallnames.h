@@ -1,1 +1,1 @@
-auto sys_num_to_string(int sysnum) { return "SYSCALL NAME TABLE NOT COMPILED"; };
+auto sys_num_to_string(int sysnum) { return "NotImplemented!"; }
