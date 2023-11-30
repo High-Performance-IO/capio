@@ -47,14 +47,18 @@ find_package(Threads REQUIRED)
 #####################################
 add_compile_definitions(CAPIO_VERSION="${CMAKE_PROJECT_VERSION}")
 
-IF(CAPIO_LOG)
+IF (CAPIO_LOG)
     message(STATUS "Enabling CAPIO logger")
     add_compile_definitions(CAPIOLOG)
-ENDIF(CAPIO_LOG)
+    execute_process(
+            COMMAND bash ${PROJECT_SOURCE_DIR}/scripts/generateSyscallNames.sh
+            WORKING_DIRECTORY "${PROJECT_SOURCE_DIR}"
+    )
+ENDIF (CAPIO_LOG)
 
-IF(CAPIO_SYNC)
+IF (CAPIO_SYNC)
     add_compile_definitions(CAPIOSYNC)
-ENDIF(CAPIO_SYNC)
+ENDIF (CAPIO_SYNC)
 
 #####################################
 # Include files and directories
@@ -68,7 +72,7 @@ include_directories(src/common)
 add_subdirectory(src/posix)
 add_subdirectory(src/server)
 
-IF(CAPIO_BUILD_TESTS)
+IF (CAPIO_BUILD_TESTS)
     message(STATUS "Building CAPIO test suite")
     add_subdirectory(tests)
-ENDIF(CAPIO_BUILD_TESTS)
+ENDIF (CAPIO_BUILD_TESTS)

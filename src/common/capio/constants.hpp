@@ -42,6 +42,10 @@ constexpr long int CAPIO_SEM_TIMEOUT_NANOSEC = 10e5;
 constexpr char CAPIO_SERVER_DEFAULT_LOG_FILE_NAME[] = "server_rank_\0";
 constexpr char CAPIO_APP_LOG_FILE_NAME[]            = "/dev/stderr\0";
 
+constexpr char LOG_CAPIO_START_REQUEST[] = "\n+++++++++++ SYSCALL %s (%d) +++++++++++";
+constexpr char LOG_CAPIO_END_REQUEST[]   = "----------- END SYSCALL ----------\n";
+constexpr char LOG_PRE_MSG[]             = "tid[%ld]-at[%s]: ";
+
 constexpr char CAPIO_SERVER_CLI_LOG_SERVER[]         = "[ \033[1;32m SERVER \033[0m ] ";
 constexpr char CAPIO_SERVER_CLI_LOG_SERVER_WARNING[] = "[ \033[1;33m SERVER \033[0m ] ";
 constexpr char CAPIO_SERVER_CLI_LOG_SERVER_ERROR[]   = "[ \033[1;31m SERVER \033[0m ] ";

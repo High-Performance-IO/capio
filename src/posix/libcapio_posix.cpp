@@ -120,6 +120,7 @@ static __attribute__((constructor)) void init() {
     init_client();
     init_data_plane();
     init_filesystem();
+
     long tid = syscall_no_intercept(SYS_gettid);
 
     int *fd_shm = get_fd_snapshot(tid);
@@ -132,4 +133,6 @@ static __attribute__((constructor)) void init() {
     intercept_hook_point_clone_child  = hook_clone_child;
     intercept_hook_point_clone_parent = hook_clone_parent;
     intercept_hook_point              = hook;
+
+    START_SYSCALL_LOGGING();
 }
