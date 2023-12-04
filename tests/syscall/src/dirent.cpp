@@ -1,25 +1,32 @@
 #include <catch2/catch_test_macros.hpp>
 
+#include <algorithm>
 #include <dirent.h>
 #include <fcntl.h>
 #include <sys/syscall.h>
 #include <unistd.h>
+#include <vector>
 
 struct linux_dirent {
-    unsigned long  d_ino;
-    off_t          d_off;
-    unsigned short d_reclen;
-    char           d_name[];
+    ino64_t d_ino;           /* 64-bit inode number */
+    off64_t d_off;           /* 64-bit offset to next structure */
+    unsigned short d_reclen; /* Size of this dirent */
+    unsigned char d_type;    /* File type */
+    char d_name[];           /* Filename (null-terminated) */
 };
 
 struct linux_dirent64 {
-    ino64_t        d_ino;    /* 64-bit inode number */
-    off64_t        d_off;    /* 64-bit offset to next structure */
+    ino64_t d_ino;           /* 64-bit inode number */
+    off64_t d_off;           /* 64-bit offset to next structure */
     unsigned short d_reclen; /* Size of this dirent */
-    unsigned char  d_type;   /* File type */
-    char           d_name[]; /* Filename (null-terminated) */
+    unsigned char d_type;    /* File type */
+    char d_name[];           /* Filename (null-terminated) */
 };
 
+bool namesAreOk(const std::string &check, const std::vector<std::string> &options) {
+    printf("Checking %s\n", check.c_str());
+    return std::find(options.begin(), options.end(), check) != options.end();
+}
 
 TEST_CASE("Test dirents on capio dir", "[syscall]") {
     constexpr const char *BUFFER =
@@ -27,6 +34,13 @@ TEST_CASE("Test dirents on capio dir", "[syscall]") {
     constexpr const char *path1 = "file1.txt";
     constexpr const char *path2 = "file2.txt";
     constexpr const char *path3 = "file3.txt";
+
+    std::vector<std::string> expectedNames{5};
+    expectedNames[0] = ".";
+    expectedNames[1] = "..";
+    expectedNames[2] = path1;
+    expectedNames[3] = path2;
+    expectedNames[4] = path3;
 
     // Setup of files in capio dir
     int file1 = open(path1, O_CREAT | O_WRONLY | O_TRUNC, S_IRUSR | S_IWUSR);
@@ -70,7 +84,7 @@ TEST_CASE("Test dirents on capio dir", "[syscall]") {
         for (size_t bpos = 0; bpos < nread;) {
             auto d = (struct linux_dirent64 *) (buf + bpos);
             printf("%8ld  ", d->d_ino);
-            d_type = *(buf + bpos + d->d_reclen - 1);
+            d_type = d->d_type;
 
             printf("%-10s(%d) ",
                    (d_type == DT_REG)    ? "regular"
@@ -83,12 +97,8 @@ TEST_CASE("Test dirents on capio dir", "[syscall]") {
                                          : "???",
                    d_type);
 
-            // check for file names being the ones expected
-            bool namesOk = (strcmp(d->d_name, ".") == 0) || (strcmp(d->d_name, "..") == 0) ||
-                           (strcmp(d->d_name, "file1.txt") == 0) ||
-                           (strcmp(d->d_name, "file2.txt") == 0) ||
-                           (strcmp(d->d_name, "file3.txt") == 0);
-           //REQUIRE(namesOk);
+            std::string name = d->d_name;
+            // REQUIRE(namesAreOk(name, expectedNames));
 
             printf("%4d %10lld  %s\n", d->d_reclen, (long long) d->d_off, d->d_name);
             bpos += d->d_reclen;

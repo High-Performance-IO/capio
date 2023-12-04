@@ -12,10 +12,11 @@
 #include "capio_file.hpp"
 
 struct linux_dirent {
-    unsigned long  d_ino;
-    off_t          d_off;
-    unsigned short d_reclen;
-    char           d_name[];
+    ino64_t        d_ino;    /* 64-bit inode number */
+    off64_t        d_off;    /* 64-bit offset to next structure */
+    unsigned short d_reclen; /* Size of this dirent */
+    unsigned char  d_type;   /* File type */
+    char           d_name[]; /* Filename (null-terminated) */
 };
 
 struct linux_dirent64 {
