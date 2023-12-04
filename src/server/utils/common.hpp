@@ -13,27 +13,31 @@ char *expand_memory_for_file(const std::string &path, off64_t data_size, Capio_f
     return new_p;
 }
 
-off64_t convert_dirent64_to_dirent(char *dirent64_buf, char *dirent_buf,
-                                   off64_t dirent_64_buf_size) {
-    START_LOG(gettid(), "call(%s, %s, %ld)", dirent64_buf, dirent_buf, dirent_64_buf_size);
-    off64_t dirent_buf_size = 0;
-    off64_t i               = 0;
-    struct linux_dirent ld;
-    struct linux_dirent64 *p_ld64;
-    ld.d_reclen = THEORETICAL_SIZE_DIRENT64;
-    while (i < dirent_64_buf_size) {
-        p_ld64   = (struct linux_dirent64 *) (dirent64_buf + i);
-        ld.d_ino = p_ld64->d_ino;
-        ld.d_off = dirent_buf_size + THEORETICAL_SIZE_DIRENT64;
-        logfile << "dirent_buf_size " << dirent_buf_size << std::endl;
-        strcpy(ld.d_name, p_ld64->d_name);
-        ld.d_type               = p_ld64->d_type;
+inline off64_t store_dirent(char *incoming, char *target_buffer, off64_t incoming_size) {
+    START_LOG(gettid(), "call(%s, %s, %to_store)", incoming, target_buffer, incoming_size);
+    off64_t stored_size = 0, i = 0;
+    struct linux_dirent64 to_store {
+        0
+    }, *dir_entity;
+
+    to_store.d_reclen = THEORETICAL_SIZE_DIRENT64;
+    while (i < incoming_size) {
+        dir_entity = (struct linux_dirent64 *) (incoming + i);
+
+        to_store.d_ino  = dir_entity->d_ino;
+        to_store.d_off  = stored_size + THEORETICAL_SIZE_DIRENT64;
+        to_store.d_type = dir_entity->d_type;
+
+        strcpy(to_store.d_name, dir_entity->d_name);
+        memcpy((char *) target_buffer + stored_size, &to_store, sizeof(to_store));
+
+        LOG("DIRENT NAME: %s - TARGET NAME: %s", dir_entity->d_name, to_store.d_name);
+
         i += THEORETICAL_SIZE_DIRENT64;
-        memcpy((char *) dirent_buf + dirent_buf_size, &ld, sizeof(ld));
-        dirent_buf_size += ld.d_reclen;
+        stored_size += to_store.d_reclen;
     }
 
-    return dirent_buf_size;
+    return stored_size;
 }
 
 bool is_int(const std::string &s) {

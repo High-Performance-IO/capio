@@ -166,7 +166,7 @@ class Logger {
 #ifdef __CAPIO_POSIX
         if (current_log_level == 0 && loggingSyscall) {
             log_write_to(const_cast<char *>(LOG_CAPIO_END_REQUEST), strlen(LOG_CAPIO_END_REQUEST));
-	}
+        }
 #endif
     }
 };
