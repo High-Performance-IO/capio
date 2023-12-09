@@ -18,7 +18,7 @@ inline int capio_openat(int dirfd, std::string *pathname, int flags, long tid) {
     if (!is_absolute(pathname)) {
         if (dirfd == AT_FDCWD) {
             path_to_check = *capio_posix_realpath(pathname);
-            if (path_to_check.length() == 0) {
+            if (path_to_check.empty()) {
                 return -2;
             }
         } else {
@@ -27,7 +27,7 @@ inline int capio_openat(int dirfd, std::string *pathname, int flags, long tid) {
                 return -2;
             }
             std::string dir_path = get_dir_path(dirfd);
-            if (dir_path.length() == 0) {
+            if (dir_path.empty()) {
                 return -2;
             }
 

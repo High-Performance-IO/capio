@@ -3,52 +3,6 @@
 
 #include "utils/requests.hpp"
 
-inline int capio_fcntl(int fd, int cmd, int arg, long tid) {
-    START_LOG(tid, "call(fd=%d, cmd=%d, arg=%d)", fd, cmd, arg);
-
-    if (exists_capio_fd(fd)) {
-        switch (cmd) {
-        case F_GETFD: {
-            return get_capio_fd_cloexec(fd);
-        }
-
-        case F_SETFD: {
-            set_capio_fd_cloexec(fd, arg);
-            return 0;
-        }
-
-        case F_GETFL: {
-            return get_capio_fd_flags(fd);
-        }
-
-        case F_SETFL: {
-            set_capio_fd_flags(fd, arg);
-            return 0;
-        }
-
-        case F_DUPFD_CLOEXEC: {
-            int dev_fd = open("/dev/null", O_RDONLY);
-
-            if (dev_fd == -1) {
-                ERR_EXIT("open /dev/null");
-            }
-
-            int res = fcntl(dev_fd, F_DUPFD_CLOEXEC, arg);
-            close(dev_fd);
-            dup_capio_fd(tid, fd, res, true);
-            dup_request(fd, res, tid);
-
-            return res;
-        }
-
-        default:
-            ERR_EXIT("fcntl with cmd %d is not yet supported", cmd);
-        }
-    } else {
-        return -2;
-    }
-}
-
 int fcntl_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg5, long *result) {
     auto fd  = static_cast<int>(arg0);
     auto cmd = static_cast<int>(arg1);

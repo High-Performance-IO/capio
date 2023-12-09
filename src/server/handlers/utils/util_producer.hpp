@@ -1,11 +1,11 @@
 #ifndef CAPIO_UTIL_PRODUCER_HPP
 #define CAPIO_UTIL_PRODUCER_HPP
 
-std::string get_producer_name(std::string path) {
+std::string get_producer_name(const std::string &path) {
     START_LOG(gettid(), "call( %s)", path.c_str());
-    std::string producer_name = "";
+    std::string producer_name;
     // we handle also prefixes
-    auto it_metadata          = metadata_conf.find(path);
+    auto it_metadata = metadata_conf.find(path);
     if (it_metadata == metadata_conf.end()) {
         long int pos = match_globs(path);
         if (pos != -1) {
@@ -18,7 +18,7 @@ std::string get_producer_name(std::string path) {
     return producer_name;
 }
 
-bool is_producer(int tid, std::string path) {
+bool is_producer(int tid, const std::string &path) {
     START_LOG(tid, "call(%d, %s)", tid, path.c_str());
     bool res = false;
     auto it  = apps.find(tid);

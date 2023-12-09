@@ -7,7 +7,7 @@ inline off64_t capio_access(const std::string *pathname, mode_t mode, long tid) 
     START_LOG(tid, "call(pathname=%s, mode=%o)", pathname->c_str(), mode);
 
     const std::string *abs_pathname = capio_posix_realpath(pathname);
-    if (abs_pathname->length() == 0) {
+    if (abs_pathname->empty()) {
         errno = ENONET;
         return -1;
     }
@@ -33,7 +33,7 @@ inline off64_t capio_faccessat(int dirfd, const std::string *pathname, mode_t mo
                 return -2;
             }
             std::string dir_path = get_dir_path(dirfd);
-            if (dir_path.length() == 0) {
+            if (dir_path.empty()) {
                 return -2;
             }
             std::string path = dir_path + "/" + *pathname;

@@ -12,7 +12,7 @@ inline void handle_exit_group(int tid, int rank) {
             auto it_conf = metadata_conf.find(path);
             if (it_conf == metadata_conf.end() ||
                 std::get<0>(it_conf->second) == "on_termination" ||
-                std::get<0>(it_conf->second).length() == 0) {
+                std::get<0>(it_conf->second).empty()) {
                 Capio_file &c_file = get_capio_file(path.c_str());
                 if (c_file.is_dir()) {
                     long int n_committed = c_file.n_files_expected;

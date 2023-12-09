@@ -37,7 +37,7 @@ inline int capio_statx(int dirfd, const std::string *pathname, int flags, int ma
         if (dirfd == AT_FDCWD) { // operate on currdir
             absolute_path = get_current_dir_name();
         } else { // operate on dirfd. in this case dirfd can refer to any type of file
-            if (pathname->length() != 0) {
+            if (!pathname->empty()) {
                 if (exists_capio_fd(dirfd)) {
                     absolute_path = get_capio_fd_path(dirfd);
                 } else {
@@ -52,7 +52,7 @@ inline int capio_statx(int dirfd, const std::string *pathname, int flags, int ma
         if (!is_absolute(pathname)) {
             if (dirfd == AT_FDCWD) {
                 absolute_path = *capio_posix_realpath(pathname);
-                if (absolute_path.length() == 0) {
+                if (absolute_path.empty()) {
                     return -1;
                 }
             } else {
@@ -60,7 +60,7 @@ inline int capio_statx(int dirfd, const std::string *pathname, int flags, int ma
                     return -2;
                 }
                 std::string dir_path = get_dir_path(dirfd);
-                if (dir_path.length() == 0) {
+                if (dir_path.empty()) {
                     return -2;
                 }
                 if (pathname->substr(0, 2) == "./") {
