@@ -4,8 +4,8 @@
 #include <string>
 
 #include "capio/constants.hpp"
+#include "capio/data_structure.hpp"
 #include "capio_file.hpp"
-#include "data_structure.hpp"
 #include "types.hpp"
 
 char *expand_memory_for_file(const std::string &path, off64_t data_size, Capio_file &c_file) {
@@ -16,9 +16,8 @@ char *expand_memory_for_file(const std::string &path, off64_t data_size, Capio_f
 inline off64_t store_dirent(char *incoming, char *target_buffer, off64_t incoming_size) {
     START_LOG(gettid(), "call(%s, %s, %to_store)", incoming, target_buffer, incoming_size);
     off64_t stored_size = 0, i = 0;
-    struct linux_dirent64 to_store {
-        0
-    }, *dir_entity;
+    struct linux_dirent64 to_store {};
+    struct linux_dirent64 *dir_entity;
 
     to_store.d_reclen = THEORETICAL_SIZE_DIRENT64;
     while (i < incoming_size) {

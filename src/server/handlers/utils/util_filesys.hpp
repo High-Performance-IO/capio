@@ -1,6 +1,7 @@
 #ifndef CAPIO_UTIL_FILESYS_HPP
 #define CAPIO_UTIL_FILESYS_HPP
 
+#include "capio/data_structure.hpp"
 #include "utils/location.hpp"
 
 void reply_remote_stats(const std::string &path) {
@@ -56,9 +57,7 @@ void write_entry_dir(int tid, const std::string &file_path, const std::string &d
     START_LOG(tid, "call(file_path=%s, dir=%s, type=%d)", file_path.c_str(), dir.c_str(), type);
 
     std::hash<std::string> hash;
-    struct linux_dirent64 ld {
-        0
-    };
+    struct linux_dirent64 ld {};
     ld.d_ino = hash(file_path);
     std::string file_name;
     if (type == 0) {

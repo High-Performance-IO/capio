@@ -1,6 +1,7 @@
 #ifndef CAPIO_COMMON_CONSTANTS_HPP
 #define CAPIO_COMMON_CONSTANTS_HPP
 
+#include <climits>
 #include <sys/types.h>
 
 constexpr size_t DIR_INITIAL_SIZE = 1024L * 1024 * 1024;
@@ -20,32 +21,21 @@ constexpr long MAX_SHM_SIZE_FILE = 1024L * 1024 * 1024 * 16;
 constexpr char CAPIO_FILE_MODE_NO_UPDATE[]      = "no_update";
 constexpr char CAPIO_FILE_MODE_ON_CLOSE[]       = "on_close";
 constexpr char CAPIO_FILE_MODE_ON_TERMINATION[] = "on_termination";
-
-constexpr int N_ELEMS_DATA_BUFS = 10;
-
-constexpr int THEORETICAL_SIZE_DIRENT64 = sizeof(ino64_t) + sizeof(off64_t) +
+constexpr int N_ELEMS_DATA_BUFS                 = 10;
+constexpr int THEORETICAL_SIZE_DIRENT64         = sizeof(ino64_t) + sizeof(off64_t) +
                                           sizeof(unsigned short) + sizeof(unsigned char) +
-                                          sizeof(char) * (DNAME_LENGTH + 1);
+                                          sizeof(char) * NAME_MAX;
 
-constexpr int THEORETICAL_SIZE_DIRENT = sizeof(unsigned long) + sizeof(off_t) +
-                                        sizeof(unsigned short) + sizeof(char) * (DNAME_LENGTH + 2);
-
-constexpr int WINDOW_DATA_BUFS = 256 * 1024;
-
-constexpr int CAPIO_REQUEST_MAX_SIZE = 256 * sizeof(char);
-
-constexpr int CAPIO_LOG_MAX_MSG_LEN = 2048;
-
-constexpr int CAPIO_SEM_RETRIES              = 100;
-constexpr long int CAPIO_SEM_TIMEOUT_NANOSEC = 10e5;
-
-constexpr char CAPIO_SERVER_DEFAULT_LOG_FILE_NAME[] = "server_rank_\0";
-constexpr char CAPIO_APP_LOG_FILE_NAME[]            = "/dev/stderr\0";
-
-constexpr char LOG_CAPIO_START_REQUEST[] = "\n+++++++++++ SYSCALL %s (%d) +++++++++++";
-constexpr char LOG_CAPIO_END_REQUEST[]   = "----------- END SYSCALL ----------\n";
-constexpr char LOG_PRE_MSG[]             = "tid[%ld]-at[%s]: ";
-
+constexpr int WINDOW_DATA_BUFS                       = 256 * 1024;
+constexpr int CAPIO_REQUEST_MAX_SIZE                 = 256 * sizeof(char);
+constexpr int CAPIO_LOG_MAX_MSG_LEN                  = 2048;
+constexpr int CAPIO_SEM_RETRIES                      = 100;
+constexpr long int CAPIO_SEM_TIMEOUT_NANOSEC         = 10e5;
+constexpr char CAPIO_SERVER_DEFAULT_LOG_FILE_NAME[]  = "server_rank_\0";
+constexpr char CAPIO_APP_LOG_FILE_NAME[]             = "/dev/stderr\0";
+constexpr char LOG_CAPIO_START_REQUEST[]             = "\n+++++++++++ SYSCALL %s (%d) +++++++++++";
+constexpr char LOG_CAPIO_END_REQUEST[]               = "----------- END SYSCALL ----------\n";
+constexpr char LOG_PRE_MSG[]                         = "tid[%ld]-at[%s]: ";
 constexpr char CAPIO_SERVER_CLI_LOG_SERVER[]         = "[ \033[1;32m SERVER \033[0m ] ";
 constexpr char CAPIO_SERVER_CLI_LOG_SERVER_WARNING[] = "[ \033[1;33m SERVER \033[0m ] ";
 constexpr char CAPIO_SERVER_CLI_LOG_SERVER_ERROR[]   = "[ \033[1;31m SERVER \033[0m ] ";

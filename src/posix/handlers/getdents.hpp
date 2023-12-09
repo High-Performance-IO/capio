@@ -7,11 +7,8 @@
 inline off64_t round(off64_t bytes, bool is_getdents64) {
     off64_t res = 0;
     off64_t ld_size;
-    if (is_getdents64) {
-        ld_size = THEORETICAL_SIZE_DIRENT64;
-    } else {
-        ld_size = THEORETICAL_SIZE_DIRENT;
-    }
+    ld_size = THEORETICAL_SIZE_DIRENT64;
+
     while (res + ld_size <= bytes) {
         res += ld_size;
     }
@@ -21,7 +18,7 @@ inline off64_t round(off64_t bytes, bool is_getdents64) {
 // TODO: too similar to capio_read, refactoring needed
 inline int getdents_handler_impl(long arg0, long arg1, long arg2, long *result, bool is64bit) {
     auto fd      = static_cast<int>(arg0);
-    auto *buffer = reinterpret_cast<struct dirent *>(arg1);
+    auto *buffer = reinterpret_cast<struct linux_dirent64 *>(arg1);
     auto count   = static_cast<size_t>(arg2);
     long tid     = syscall_no_intercept(SYS_gettid);
 

@@ -8,8 +8,7 @@
 #include <string>
 #include <vector>
 
-#include "capio/constants.hpp"
-#include "capio_file.hpp"
+#include "constants.hpp"
 
 struct linux_dirent64 {
     ino64_t d_ino;           /* 64-bit inode number */
