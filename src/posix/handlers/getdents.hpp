@@ -2,7 +2,6 @@
 #define CAPIO_POSIX_HANDLERS_GETDENTS_HPP
 
 #include "utils/data.hpp"
-#include <dirent.h>
 
 inline off64_t round(off64_t bytes, bool is_getdents64) {
     off64_t res = 0;
