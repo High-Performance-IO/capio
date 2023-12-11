@@ -100,6 +100,6 @@ TEST_CASE("Test dirents on capio dir", "[syscall]") {
     REQUIRE(unlink(path1.c_str()) != -1);
     REQUIRE(unlink(path2.c_str()) != -1);
     REQUIRE(unlink(path3.c_str()) != -1);
-    REQUIRE(unlink(PATHNAME.c_str()) != -1);
-    //   REQUIRE(access(PATHNAME.c_str(), F_OK) != 0);
+    REQUIRE(unlinkat(AT_FDCWD, PATHNAME.c_str(), AT_REMOVEDIR) != -1);
+    REQUIRE(access(PATHNAME.c_str(), F_OK) != 0);
 }
