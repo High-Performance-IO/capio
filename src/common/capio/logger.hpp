@@ -141,6 +141,20 @@ class Logger {
 
         strcpy(format + pre_msg_len, message);
 
+#ifndef __CAPIO_POSIX
+        // if the log message to serve a new request or concludes, add new spaces
+        if (strcmp(invoker, "capio_server") == 0 &&
+            strcmp(CAPIO_SERVER_LOG_START_REQUEST_MSG, message) == 0) {
+            logfile << "\n\n" << message << "\n" << std::flush;
+            return;
+        }
+        if (strcmp(invoker, "capio_server") == 0 &&
+            strcmp(CAPIO_SERVER_LOG_END_REQUEST_MSG, message) == 0) {
+            logfile << message << "\n\n" << std::flush;
+            return;
+        }
+#endif
+
         va_start(argp, message);
         va_copy(argpc, argp);
         int size = vsnprintf(nullptr, 0U, format, argp);

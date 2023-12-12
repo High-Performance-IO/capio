@@ -174,11 +174,13 @@ void capio_server(int rank) {
 
     auto str = std::unique_ptr<char[]>(new char[CAPIO_REQUEST_MAX_SIZE]);
     while (true) {
+        LOG(CAPIO_SERVER_LOG_START_REQUEST_MSG);
         int code = read_next_request(str.get());
         if (code < 0 || code > CAPIO_NR_REQUESTS) {
             ERR_EXIT("Received an invalid request code %d", code);
         }
         request_handlers[code](str.get(), rank);
+        LOG(CAPIO_SERVER_LOG_END_REQUEST_MSG);
     }
 }
 
