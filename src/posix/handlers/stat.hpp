@@ -68,7 +68,7 @@ inline int capio_lstat_wrapper(const std::string *path, struct stat *statbuf, lo
     }
 
     const std::string *absolute_path = capio_posix_realpath(path);
-    if (absolute_path->length() == 0) {
+    if (absolute_path->empty()) {
         return -2;
     }
     return capio_lstat(*absolute_path, statbuf, tid);
@@ -84,7 +84,7 @@ inline int capio_fstatat(int dirfd, std::string *pathname, struct stat *statbuf,
             std::string path(get_current_dir_name());
             return capio_lstat(path, statbuf, tid);
         } else { // operate on dirfd. in this case dirfd can refer to any type of file
-            if (pathname->length() == 0) {
+            if (pathname->empty()) {
                 return capio_fstat(dirfd, statbuf, tid);
             } else {
                 // TODO: set errno
@@ -102,7 +102,7 @@ inline int capio_fstatat(int dirfd, std::string *pathname, struct stat *statbuf,
                 return -2;
             }
             std::string dir_path = get_dir_path(dirfd);
-            if (dir_path.length() == 0) {
+            if (dir_path.empty()) {
                 return -2;
             }
 
@@ -112,7 +112,7 @@ inline int capio_fstatat(int dirfd, std::string *pathname, struct stat *statbuf,
             std::string path;
             if (pathname->at(pathname->length() - 1) == '.') {
                 path = dir_path;
-            } else {
+            } else if (!is_absolute(pathname)) {
                 path = dir_path + "/" + *pathname;
             }
             return capio_lstat(path, statbuf, tid);

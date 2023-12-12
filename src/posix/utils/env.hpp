@@ -6,7 +6,7 @@
 
 const char *get_capio_app_name() {
     static char *capio_app_name = std::getenv("CAPIO_APP_NAME");
-    ;
+
     if (capio_app_name == nullptr) {
         return "default_app";
     }

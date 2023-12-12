@@ -1,6 +1,7 @@
 #ifndef CAPIO_UTIL_FILESYS_HPP
 #define CAPIO_UTIL_FILESYS_HPP
 
+#include "capio/data_structure.hpp"
 #include "utils/location.hpp"
 
 void reply_remote_stats(const std::string &path) {
@@ -56,7 +57,7 @@ void write_entry_dir(int tid, const std::string &file_path, const std::string &d
     START_LOG(tid, "call(file_path=%s, dir=%s, type=%d)", file_path.c_str(), dir.c_str(), type);
 
     std::hash<std::string> hash;
-    struct linux_dirent64 ld;
+    struct linux_dirent64 ld {};
     ld.d_ino = hash(file_path);
     std::string file_name;
     if (type == 0) {
@@ -65,13 +66,15 @@ void write_entry_dir(int tid, const std::string &file_path, const std::string &d
             logfile << "invalid file_path in get_parent_dir_path" << std::endl;
         }
         file_name = file_path.substr(i + 1);
+        LOG("FILENAME: %s", file_name.c_str());
     } else if (type == 1) {
         file_name = ".";
     } else {
         file_name = "..";
     }
 
-    strcpy(ld.d_name, file_name.c_str());
+    strcpy(ld.d_name, file_name.data());
+    LOG("FILENAME LD: %s", ld.d_name);
     long int ld_size = THEORETICAL_SIZE_DIRENT64;
     ld.d_reclen      = ld_size;
 
@@ -85,14 +88,14 @@ void write_entry_dir(int tid, const std::string &file_path, const std::string &d
     if (data_size > file_shm_size) {
         file_shm = expand_memory_for_file(dir, data_size, c_file);
     }
-    if (c_file.is_dir()) {
-        ld.d_type = DT_DIR;
-    } else {
-        ld.d_type = DT_REG;
-    }
-    ld.d_name[DNAME_LENGTH] = '\0';
+
+    ld.d_type = (c_file.is_dir() ? DT_DIR : DT_REG);
+
     memcpy((char *) file_shm + file_size, &ld, sizeof(ld));
     off64_t base_offset = file_size;
+
+    LOG("STORED FILENAME LD: %s",
+        ((struct linux_dirent64 *) ((char *) file_shm + file_size))->d_name);
 
     c_file.insert_sector(base_offset, data_size);
     ++c_file.n_files;

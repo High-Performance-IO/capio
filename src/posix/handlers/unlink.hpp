@@ -26,7 +26,7 @@ inline off64_t capio_unlinkat(int dirfd, const std::string &pathname, int flags,
     if (!is_absolute(&pathname)) {
         if (dirfd == AT_FDCWD) {
             const std::string *abs_path = capio_posix_realpath(&pathname);
-            if (abs_path->length() == 0) {
+            if (abs_path->empty()) {
                 return -2;
             }
             res = capio_unlink_abs(*abs_path, tid, is_dir);
@@ -35,7 +35,7 @@ inline off64_t capio_unlinkat(int dirfd, const std::string &pathname, int flags,
                 return -2;
             }
             std::string dir_path = get_dir_path(dirfd);
-            if (dir_path.length() == 0) {
+            if (dir_path.empty()) {
                 return -2;
             }
             std::string path = dir_path + "/" + pathname;

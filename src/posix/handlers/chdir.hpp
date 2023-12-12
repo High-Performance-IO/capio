@@ -19,7 +19,7 @@ int chdir_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long ar
 
     if (!is_absolute(&path)) {
         path_to_check = capio_posix_realpath(&path);
-        if (path_to_check->length() == 0) {
+        if (path_to_check->empty()) {
             *result = -errno;
             return 0;
         }

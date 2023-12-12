@@ -133,6 +133,5 @@ static __attribute__((constructor)) void init() {
     intercept_hook_point_clone_child  = hook_clone_child;
     intercept_hook_point_clone_parent = hook_clone_parent;
     intercept_hook_point              = hook;
-
     START_SYSCALL_LOGGING();
 }

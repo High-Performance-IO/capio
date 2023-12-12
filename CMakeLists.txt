@@ -31,6 +31,14 @@ option(CAPIO_LOG "Enable capio debug logging" FALSE)
 option(CAPIO_SYNC "Use sync MPI primitives" FALSE)
 
 #####################################
+# Generate syscall name lookup tbl
+#####################################
+add_custom_target(
+        ALL
+        COMMAND sh "${CMAKE_PROJECT_DIR}/scripts/generateSyscallLookupTbl.sh ${CMAKE_PROJECT_DIR}/common/capio/syscallnames.h"
+        COMMENT "Generating syscall lookup table")
+
+#####################################
 # CMake module imports
 #####################################
 include(FetchContent)
