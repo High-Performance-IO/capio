@@ -41,7 +41,7 @@ inline ssize_t capio_writev(int fd, const struct iovec *iov, int iovcnt, long ti
             ++i;
         }
         if (res == -1) {
-            return -1;
+            return POSIX_SYSCALL_HANDLED_BY_CAPIO_SET_ERRNO;
         } else {
             return tot_bytes;
         }

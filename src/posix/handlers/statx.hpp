@@ -52,7 +52,7 @@ inline int capio_statx(int dirfd, const std::string *pathname, int flags, int ma
             } else {
                 LOG("returning -1 due to pathname empty");
                 // TODO: set errno
-                return -1;
+                return POSIX_SYSCALL_HANDLED_BY_CAPIO_SET_ERRNO;
             }
         }
     } else {
@@ -62,7 +62,7 @@ inline int capio_statx(int dirfd, const std::string *pathname, int flags, int ma
                 absolute_path = *capio_posix_realpath(pathname);
                 if (absolute_path.empty()) {
                     LOG("returning -1 due to pathname empty");
-                    return -1;
+                    return POSIX_SYSCALL_HANDLED_BY_CAPIO_SET_ERRNO;
                 }
             } else {
                 if (!is_directory(dirfd)) {

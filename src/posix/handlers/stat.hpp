@@ -88,7 +88,7 @@ inline int capio_fstatat(int dirfd, std::string *pathname, struct stat *statbuf,
                 return capio_fstat(dirfd, statbuf, tid);
             } else {
                 // TODO: set errno
-                return -1;
+                return POSIX_SYSCALL_HANDLED_BY_CAPIO_SET_ERRNO;
             }
         }
     }

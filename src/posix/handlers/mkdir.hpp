@@ -29,11 +29,11 @@ inline off64_t capio_mkdirat(int dirfd, std::string *pathname, mode_t mode, long
     if (is_capio_path(path_to_check)) {
         if (exists_capio_path(path_to_check)) {
             errno = EEXIST;
-            return -1;
+            return POSIX_SYSCALL_HANDLED_BY_CAPIO_SET_ERRNO;
         }
         off64_t res = mkdir_request(path_to_check, tid);
         if (res == 1) {
-            return -1;
+            return POSIX_SYSCALL_HANDLED_BY_CAPIO_SET_ERRNO;
         } else {
             LOG("Adding %s to capio_files_path", path_to_check.c_str());
             add_capio_path(path_to_check);
@@ -61,13 +61,13 @@ inline off64_t capio_rmdir(std::string *pathname, long tid) {
             LOG("capio_files_path.find == end. errno = "
                 "ENOENT");
             errno = ENOENT;
-            return -1;
+            return POSIX_SYSCALL_HANDLED_BY_CAPIO_SET_ERRNO;
         }
         off64_t res = rmdir_request(path_to_check, tid);
         if (res == 2) {
             LOG("res == 2. errno = ENOENT");
             errno = ENOENT;
-            return -1;
+            return POSIX_SYSCALL_HANDLED_BY_CAPIO_SET_ERRNO;
         } else {
             delete_capio_path(path_to_check);
             return res;

@@ -54,19 +54,19 @@ inline int capio_openat(int dirfd, std::string *pathname, int flags, long tid) {
             off64_t return_code = create_exclusive_request(fd, path_to_check, tid);
             if (return_code == 1) {
                 errno = EEXIST;
-                return -1;
+                return POSIX_SYSCALL_HANDLED_BY_CAPIO_SET_ERRNO;
             }
         } else if (create) {
             off64_t return_code = create_request(fd, path_to_check, tid);
             if (return_code == 1) {
                 errno = ENOENT;
-                return -1;
+                return POSIX_SYSCALL_HANDLED_BY_CAPIO_SET_ERRNO;
             }
         } else {
             off64_t return_code = open_request(fd, path_to_check, tid);
             if (return_code == 1) {
                 errno = ENOENT;
-                return -1;
+                return POSIX_SYSCALL_HANDLED_BY_CAPIO_SET_ERRNO;
             }
         }
         int actual_flags = flags & ~O_CLOEXEC;
