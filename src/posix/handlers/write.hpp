@@ -2,6 +2,7 @@
 #define CAPIO_POSIX_HANDLERS_WRITE_HPP
 
 #include "utils/requests.hpp"
+#include "utils/functions.hpp"
 
 inline ssize_t capio_write(int fd, const void *buffer, off64_t count, long tid) {
     START_LOG(tid, "call(fd=%d, buf=0x%08x, count=%ld)", fd, buffer, count);
@@ -56,14 +57,7 @@ int write_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long ar
     auto count      = static_cast<off64_t>(arg2);
     long tid        = syscall_no_intercept(SYS_gettid);
 
-    ssize_t res = capio_write(fd, buf, count, tid);
-
-    if (res != -2) {
-        *result = (res < 0 ? -errno : res);
-        return 0;
-    }
-
-    return 1;
+    return posix_return_value(capio_write(fd, buf, count, tid), result);
 }
 
 int writev_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg5, long *result) {
@@ -72,13 +66,7 @@ int writev_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long a
     auto iovcnt     = static_cast<int>(arg2);
     long tid        = syscall_no_intercept(SYS_gettid);
 
-    ssize_t res = capio_writev(fd, iov, iovcnt, tid);
-
-    if (res != -2) {
-        *result = (res < 0 ? -errno : res);
-        return 0;
-    }
-    return 1;
+    return posix_return_value(capio_writev(fd, iov, iovcnt, tid), result);
 }
 
 #endif // CAPIO_POSIX_HANDLERS_WRITE_HPP

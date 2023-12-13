@@ -2,6 +2,7 @@
 #define CAPIO_POSIX_HANDLERS_MKDIR_HPP
 
 #include "utils/filesystem.hpp"
+#include "utils/functions.hpp"
 
 inline off64_t capio_mkdirat(int dirfd, std::string *pathname, mode_t mode, long tid) {
     START_LOG(tid, "call(dirfd=%d, pathname=%s, mode=%o)", dirfd, pathname->c_str(), mode);
@@ -81,13 +82,7 @@ int mkdir_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long ar
     auto mode = static_cast<mode_t>(arg1);
     long tid  = syscall_no_intercept(SYS_gettid);
 
-    off64_t res = capio_mkdirat(AT_FDCWD, &pathname, mode, tid);
-
-    if (res != -2) {
-        *result = (res < 0 ? -errno : res);
-        return 0;
-    }
-    return 1;
+    return posix_return_value(capio_mkdirat(AT_FDCWD, &pathname, mode, tid), result);
 }
 
 int mkdirat_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg5,
@@ -97,25 +92,14 @@ int mkdirat_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long 
     auto mode = static_cast<mode_t>(arg2);
     long tid  = syscall_no_intercept(SYS_gettid);
 
-    off64_t res = capio_mkdirat(dirfd, &pathname, mode, tid);
-
-    if (res != -2) {
-        *result = (res < 0 ? -errno : res);
-        return 0;
-    }
-    return 1;
+    return posix_return_value(capio_mkdirat(dirfd, &pathname, mode, tid), result);
 }
 
 int rmdir_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg5, long *result) {
     std::string pathname(reinterpret_cast<const char *>(arg0));
     long tid = syscall_no_intercept(SYS_gettid);
 
-    off64_t res = capio_rmdir(&pathname, tid);
-    if (res != -2) {
-        *result = (res < 0 ? -errno : res);
-        return 0;
-    }
-    return 1;
+    return posix_return_value(capio_rmdir(&pathname, tid), result);
 }
 
 #endif // CAPIO_POSIX_HANDLERS_MKDIR_HPP

@@ -4,8 +4,8 @@
 #include <sys/vfs.h>
 
 #include "capio/env.hpp"
-
 #include "utils/filesystem.hpp"
+#include "utils/functions.hpp"
 #include "utils/requests.hpp"
 
 inline blkcnt_t get_nblocks(off64_t file_size) {
@@ -127,13 +127,7 @@ int fstat_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long ar
     auto *buf = reinterpret_cast<struct stat *>(arg1);
     long tid  = syscall_no_intercept(SYS_gettid);
 
-    int res = capio_fstat(fd, buf, tid);
-
-    if (res != -2) {
-        *result = (res < 0 ? -errno : res);
-        return 0;
-    }
-    return 1;
+    return posix_return_value(capio_fstat(fd, buf, tid), result);
 }
 
 int fstatat_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg5,
@@ -144,13 +138,7 @@ int fstatat_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long 
     auto flags    = static_cast<int>(arg3);
     long tid      = syscall_no_intercept(SYS_gettid);
 
-    int res = capio_fstatat(dirfd, &pathname, statbuf, flags, tid);
-
-    if (res != -2) {
-        *result = (res < 0 ? -errno : res);
-        return 0;
-    }
-    return 1;
+    return posix_return_value(capio_fstatat(dirfd, &pathname, statbuf, flags, tid), result);
 }
 
 int lstat_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg5, long *result) {
@@ -158,13 +146,7 @@ int lstat_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long ar
     auto *buf = reinterpret_cast<struct stat *>(arg1);
     long tid  = syscall_no_intercept(SYS_gettid);
 
-    int res = capio_lstat_wrapper(&path, buf, tid);
-
-    if (res != -2) {
-        *result = (res < 0 ? -errno : res);
-        return 0;
-    }
-    return 1;
+    return posix_return_value(capio_lstat_wrapper(&path, buf, tid), result);
 }
 
 #endif // CAPIO_POSIX_HANDLERS_STAT_HPP

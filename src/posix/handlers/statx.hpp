@@ -1,6 +1,8 @@
 #ifndef CAPIO_POSIX_HANDLERS_STATX_HPP
 #define CAPIO_POSIX_HANDLERS_STATX_HPP
 
+#include "utils/functions.hpp"
+
 inline void fill_statxbuf(struct statx *statxbuf, off_t file_size, bool is_dir, ino_t inode,
                           int mask) {
     START_LOG(syscall_no_intercept(SYS_gettid), "call(filesize=%ld, is_dir=%d, inode=%d, mask=%d)",
@@ -105,17 +107,7 @@ int statx_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long ar
     START_LOG(tid, "call(dirfd=%ld, pathname=%s, flags=%d, mask=%d)", dirfd, pathname.c_str(),
               flags, mask);
 
-    int res = capio_statx(dirfd, &pathname, flags, mask, buf, tid);
-
-    LOG("result of capio_statx is %d", res);
-
-    if (res != -2) {
-        *result = (res < 0 ? -errno : res);
-        LOG("statx completed. returning 0");
-        return 0;
-    }
-    LOG("statx completed with error. returning 1");
-    return 1;
+    return posix_return_value(capio_statx(dirfd, &pathname, flags, mask, buf, tid), result);
 }
 
 #endif // CAPIO_POSIX_HANDLERS_STATX_HPP

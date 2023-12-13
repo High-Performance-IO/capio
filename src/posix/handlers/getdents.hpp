@@ -2,17 +2,7 @@
 #define CAPIO_POSIX_HANDLERS_GETDENTS_HPP
 
 #include "utils/data.hpp"
-
-inline off64_t round(off64_t bytes, bool is_getdents64) {
-    off64_t res = 0;
-    off64_t ld_size;
-    ld_size = THEORETICAL_SIZE_DIRENT64;
-
-    while (res + ld_size <= bytes) {
-        res += ld_size;
-    }
-    return res;
-}
+#include "utils/functions.hpp"
 
 // TODO: too similar to capio_read, refactoring needed
 inline int getdents_handler_impl(long arg0, long arg1, long arg2, long *result, bool is64bit) {

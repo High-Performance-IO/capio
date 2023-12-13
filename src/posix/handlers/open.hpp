@@ -2,8 +2,8 @@
 #define CAPIO_POSIX_HANDLERS_OPENAT_HPP
 
 #include "lseek.hpp"
-
 #include "utils/filesystem.hpp"
+#include "utils/functions.hpp"
 
 std::string get_capio_parent_dir(const std::string &path) {
     auto pos = path.rfind('/');
@@ -88,13 +88,8 @@ int creat_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long ar
     std::string pathname(reinterpret_cast<const char *>(arg0));
     long tid = syscall_no_intercept(SYS_gettid);
 
-    int res = capio_openat(AT_FDCWD, &pathname, O_CREAT | O_WRONLY | O_TRUNC, tid);
-
-    if (res != -2) {
-        *result = (res < 0 ? -errno : res);
-        return 0;
-    }
-    return 1;
+    return posix_return_value(capio_openat(AT_FDCWD, &pathname, O_CREAT | O_WRONLY | O_TRUNC, tid),
+                              result);
 }
 
 int openat_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg5, long *result) {
@@ -103,13 +98,7 @@ int openat_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long a
     int flags = static_cast<int>(arg2);
     long tid  = syscall_no_intercept(SYS_gettid);
 
-    int res = capio_openat(dirfd, &pathname, flags, tid);
-
-    if (res != -2) {
-        *result = (res < 0 ? -errno : res);
-        return 0;
-    }
-    return 1;
+    return posix_return_value(capio_openat(dirfd, &pathname, flags, tid), result);
 }
 
 #endif // CAPIO_POSIX_HANDLERS_OPENAT_HPP

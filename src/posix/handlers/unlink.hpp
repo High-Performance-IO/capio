@@ -1,6 +1,8 @@
 #ifndef CAPIO_POSIX_HANDLERS_UNLINK_HPP
 #define CAPIO_POSIX_HANDLERS_UNLINK_HPP
 
+#include "utils/functions.hpp"
+
 off64_t capio_unlink_abs(const std::string &abs_path, long tid, bool is_dir) {
     START_LOG(tid, "call(abs_path=%s, is_dir=%s)", abs_path.c_str(), is_dir ? "true" : "false");
     if (!is_capio_path(abs_path)) {
@@ -53,13 +55,7 @@ int unlink_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long a
     std::string pathname(reinterpret_cast<const char *>(arg0));
     long tid = syscall_no_intercept(SYS_gettid);
 
-    off64_t res = capio_unlinkat(AT_FDCWD, pathname, 0, tid);
-
-    if (res != -2) {
-        *result = (res < 0 ? -errno : res);
-        return 0;
-    }
-    return 1;
+    return posix_return_value(capio_unlinkat(AT_FDCWD, pathname, 0, tid), result);
 }
 
 int unlinkat_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg5,
@@ -69,14 +65,7 @@ int unlinkat_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long
     int flags = static_cast<int>(arg2);
     long tid  = syscall_no_intercept(SYS_gettid);
 
-    off64_t res = capio_unlinkat(dirfd, pathname, flags, tid);
-
-    if (res != -2) {
-        *result = (res < 0 ? -errno : res);
-        return 0;
-    }
-
-    return 1;
+    return posix_return_value(capio_unlinkat(dirfd, pathname, flags, tid), result);
 }
 
 #endif // CAPIO_POSIX_HANDLERS_UNLINK_HPP

@@ -2,7 +2,6 @@
 #define CAPIO_POSIX_HANDLERS_DUP_HPP
 
 #include "capio/syscall.hpp"
-
 #include "utils/requests.hpp"
 
 int dup_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg5, long *result) {

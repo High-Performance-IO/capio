@@ -2,6 +2,7 @@
 #define CAPIO_POSIX_HANDLERS_ACCESS_HPP
 
 #include "utils/filesystem.hpp"
+#include "utils/functions.hpp"
 
 inline off64_t capio_access(const std::string *pathname, mode_t mode, long tid) {
     START_LOG(tid, "call(pathname=%s, mode=%o)", pathname->c_str(), mode);
@@ -49,12 +50,7 @@ int access_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long a
     auto mode = static_cast<mode_t>(arg1);
     long tid  = syscall_no_intercept(SYS_gettid);
 
-    off64_t res = capio_access(&pathname, mode, tid);
-    if (res != -2) {
-        *result = (res < 0 ? -errno : res);
-        return 0;
-    }
-    return 1;
+    return posix_return_value(capio_access(&pathname, mode, tid), result);
 }
 
 int faccessat_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg5,
@@ -65,12 +61,7 @@ int faccessat_handler(long arg0, long arg1, long arg2, long arg3, long arg4, lon
     auto flags = static_cast<int>(arg3);
     long tid   = syscall_no_intercept(SYS_gettid);
 
-    off64_t res = capio_faccessat(dirfd, &pathname, mode, flags, tid);
-    if (res != -2) {
-        *result = (res < 0 ? -errno : res);
-        return 0;
-    }
-    return 1;
+    return posix_return_value(capio_faccessat(dirfd, &pathname, mode, flags, tid), result);
 }
 
 #endif // CAPIO_POSIX_HANDLERS_ACCESS_HPP
