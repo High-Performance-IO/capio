@@ -65,8 +65,10 @@ get_capio_file_opt(const char *const path) {
     const std::lock_guard<std::mutex> lg(files_metadata_mutex);
     auto it = files_metadata.find(path);
     if (it == files_metadata.end()) {
+        LOG("File %s was not found in files_metadata. returning empty object", path);
         return {};
     } else {
+        LOG("File found. returning contained item");
         return {*it->second};
     }
 }
