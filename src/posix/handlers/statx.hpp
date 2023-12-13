@@ -47,7 +47,7 @@ inline int capio_statx(int dirfd, const std::string *pathname, int flags, int ma
                     absolute_path = get_capio_fd_path(dirfd);
                 } else {
                     LOG("returning -2 due to !exists_capio_fd");
-                    return -2;
+                    return POSIX_REQUEST_SYSCALL_TO_HANDLE_BY_KERNEL;
                 }
             } else {
                 LOG("returning -1 due to pathname empty");
@@ -67,12 +67,12 @@ inline int capio_statx(int dirfd, const std::string *pathname, int flags, int ma
             } else {
                 if (!is_directory(dirfd)) {
                     LOG("returning -2 due to !is_directory");
-                    return -2;
+                    return POSIX_REQUEST_SYSCALL_TO_HANDLE_BY_KERNEL;
                 }
                 std::string dir_path = get_dir_path(dirfd);
                 if (dir_path.empty()) {
                     LOG("returning -2 due to dir path empty");
-                    return -2;
+                    return POSIX_REQUEST_SYSCALL_TO_HANDLE_BY_KERNEL;
                 }
                 if (pathname->substr(0, 2) == "./") {
                     absolute_path = pathname->substr(2, pathname->length() - 1);
@@ -86,7 +86,7 @@ inline int capio_statx(int dirfd, const std::string *pathname, int flags, int ma
         }
         if (!is_capio_path(absolute_path)) {
             LOG("returning -2 due to not being a capio path");
-            return -2;
+            return POSIX_REQUEST_SYSCALL_TO_HANDLE_BY_KERNEL;
         }
     }
 

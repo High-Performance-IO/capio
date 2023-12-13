@@ -44,7 +44,7 @@ inline int capio_fstat(int fd, struct stat *statbuf, long tid) {
         fill_statbuf(statbuf, file_size, is_dir, std::hash<std::string>{}(get_capio_fd_path(fd)));
         return POSIX_SYSCALL_HANDLED_BY_CAPIO;
     } else {
-        return -2;
+        return POSIX_REQUEST_SYSCALL_TO_HANDLE_BY_KERNEL;
     }
 }
 
@@ -56,7 +56,7 @@ inline int capio_lstat(const std::string &absolute_path, struct stat *statbuf, l
         fill_statbuf(statbuf, file_size, is_dir, std::hash<std::string>{}(absolute_path));
         return POSIX_SYSCALL_HANDLED_BY_CAPIO;
     } else {
-        return -2;
+        return POSIX_REQUEST_SYSCALL_TO_HANDLE_BY_KERNEL;
     }
 }
 
@@ -64,12 +64,12 @@ inline int capio_lstat_wrapper(const std::string *path, struct stat *statbuf, lo
     START_LOG(tid, "call(path=%s, buf=0x%08x)", path, statbuf);
 
     if (path == nullptr) {
-        return -2;
+        return POSIX_REQUEST_SYSCALL_TO_HANDLE_BY_KERNEL;
     }
 
     const std::string *absolute_path = capio_posix_realpath(path);
     if (absolute_path->empty()) {
-        return -2;
+        return POSIX_REQUEST_SYSCALL_TO_HANDLE_BY_KERNEL;
     }
     return capio_lstat(*absolute_path, statbuf, tid);
 }
@@ -99,11 +99,11 @@ inline int capio_fstatat(int dirfd, std::string *pathname, struct stat *statbuf,
             return capio_lstat_wrapper(pathname, statbuf, tid);
         } else {
             if (!is_directory(dirfd)) {
-                return -2;
+                return POSIX_REQUEST_SYSCALL_TO_HANDLE_BY_KERNEL;
             }
             std::string dir_path = get_dir_path(dirfd);
             if (dir_path.empty()) {
-                return -2;
+                return POSIX_REQUEST_SYSCALL_TO_HANDLE_BY_KERNEL;
             }
 
             if (pathname->substr(0, 2) == "./") {

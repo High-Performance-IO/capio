@@ -15,7 +15,7 @@ inline off64_t capio_access(const std::string *pathname, mode_t mode, long tid) 
     if (is_capio_path(*abs_pathname)) {
         return access_request(*abs_pathname, tid);
     } else {
-        return -2;
+        return POSIX_REQUEST_SYSCALL_TO_HANDLE_BY_KERNEL;
     }
 }
 
@@ -31,11 +31,11 @@ inline off64_t capio_faccessat(int dirfd, const std::string *pathname, mode_t mo
         } else {
             if (!is_directory(dirfd)) {
                 LOG("dirfd does not point to a directory");
-                return -2;
+                return POSIX_REQUEST_SYSCALL_TO_HANDLE_BY_KERNEL;
             }
             std::string dir_path = get_dir_path(dirfd);
             if (dir_path.empty()) {
-                return -2;
+                return POSIX_REQUEST_SYSCALL_TO_HANDLE_BY_KERNEL;
             }
             std::string path = dir_path + "/" + *pathname;
             return is_capio_path(path) ? access_request(path, tid) : -2;

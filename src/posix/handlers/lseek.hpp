@@ -46,7 +46,7 @@ inline off64_t capio_lseek(int fd, off64_t offset, int whence, long tid) {
             return -1;
         }
     } else {
-        return -2;
+        return POSIX_REQUEST_SYSCALL_TO_HANDLE_BY_KERNEL;
     }
 }
 

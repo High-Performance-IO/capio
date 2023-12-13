@@ -19,16 +19,16 @@ inline int capio_openat(int dirfd, std::string *pathname, int flags, long tid) {
         if (dirfd == AT_FDCWD) {
             path_to_check = *capio_posix_realpath(pathname);
             if (path_to_check.empty()) {
-                return -2;
+                return POSIX_REQUEST_SYSCALL_TO_HANDLE_BY_KERNEL;
             }
         } else {
             if (!is_directory(dirfd)) {
                 LOG("dirfd does not point to a directory");
-                return -2;
+                return POSIX_REQUEST_SYSCALL_TO_HANDLE_BY_KERNEL;
             }
             std::string dir_path = get_dir_path(dirfd);
             if (dir_path.empty()) {
-                return -2;
+                return POSIX_REQUEST_SYSCALL_TO_HANDLE_BY_KERNEL;
             }
 
             if (pathname->substr(0, 2) == "./") {
@@ -80,7 +80,7 @@ inline int capio_openat(int dirfd, std::string *pathname, int flags, long tid) {
         }
         return fd;
     } else {
-        return -2;
+        return POSIX_REQUEST_SYSCALL_TO_HANDLE_BY_KERNEL;
     }
 }
 
