@@ -7,7 +7,7 @@ inline void fill_statxbuf(struct statx *statxbuf, off_t file_size, bool is_dir, 
               file_size, static_cast<int>(is_dir), mask);
 
     statx_timestamp time{1, 1};
-    if (is_dir == 0) {
+    if (is_dir == 1) {
         LOG("Filling statx struct for file entry");
         statxbuf->stx_mode = S_IFDIR | S_IRWXU | S_IRGRP | S_IXGRP | S_IROTH | S_IXOTH;
         file_size          = 4096;
@@ -56,6 +56,7 @@ inline int capio_statx(int dirfd, const std::string *pathname, int flags, int ma
     } else {
         if (!is_absolute(pathname)) {
             if (dirfd == AT_FDCWD) {
+                LOG("dirfd is AT_FDCWD");
                 absolute_path = *capio_posix_realpath(pathname);
                 if (absolute_path.empty()) {
                     LOG("returning -1 due to pathname empty");
@@ -101,7 +102,8 @@ int statx_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long ar
     auto *buf  = reinterpret_cast<struct statx *>(arg4);
     long tid   = syscall_no_intercept(SYS_gettid);
 
-    START_LOG(tid, "call(dirfd=%ld, pathname=%s, flags=%d, mask=%d)", dirfd, pathname.c_str(), flags, mask);
+    START_LOG(tid, "call(dirfd=%ld, pathname=%s, flags=%d, mask=%d)", dirfd, pathname.c_str(),
+              flags, mask);
 
     int res = capio_statx(dirfd, &pathname, flags, mask, buf, tid);
 
