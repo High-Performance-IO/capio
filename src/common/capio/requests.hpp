@@ -29,4 +29,15 @@ constexpr const int CAPIO_REQUEST_RMDIR               = 24;
 
 constexpr const int CAPIO_NR_REQUESTS = 25;
 
+/*REQUESTS FOR SERVER TO SERVER COMMUNICATION*/
+
+constexpr const int CAPIO_SERVER_REQUEST_READ    = 0;
+constexpr const int CAPIO_SERVER_REQUEST_SENDING = 1;
+constexpr const int CAPIO_SERVER_REQUEST_STAT    = 2;
+constexpr const int CAPIO_SERVER_REQUEST_SIZE    = 3;
+constexpr const int CAPIO_SERVER_REQUEST_N_READ  = 4;
+constexpr const int CAPIO_SERVER_REQUEST_N_SEND  = 5;
+
+constexpr const int CAPIO_SERVER_NR_REQUEST = 6;
+
 #endif // CAPIO_COMMON_REQUESTS_HPP

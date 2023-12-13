@@ -2,6 +2,7 @@
 #define CAPIO_POSIX_HANDLERS_ACCESS_HPP
 
 #include "utils/filesystem.hpp"
+#include "utils/functions.hpp"
 
 inline off64_t capio_access(const std::string *pathname, mode_t mode, long tid) {
     START_LOG(tid, "call(pathname=%s, mode=%o)", pathname->c_str(), mode);
@@ -9,12 +10,12 @@ inline off64_t capio_access(const std::string *pathname, mode_t mode, long tid) 
     const std::string *abs_pathname = capio_posix_realpath(pathname);
     if (abs_pathname->empty()) {
         errno = ENONET;
-        return -1;
+        return POSIX_SYSCALL_ERRNO;
     }
     if (is_capio_path(*abs_pathname)) {
         return access_request(*abs_pathname, tid);
     } else {
-        return -2;
+        return POSIX_SYSCALL_REQUEST_SKIP;
     }
 }
 
@@ -30,11 +31,11 @@ inline off64_t capio_faccessat(int dirfd, const std::string *pathname, mode_t mo
         } else {
             if (!is_directory(dirfd)) {
                 LOG("dirfd does not point to a directory");
-                return -2;
+                return POSIX_SYSCALL_REQUEST_SKIP;
             }
             std::string dir_path = get_dir_path(dirfd);
             if (dir_path.empty()) {
-                return -2;
+                return POSIX_SYSCALL_REQUEST_SKIP;
             }
             std::string path = dir_path + "/" + *pathname;
             return is_capio_path(path) ? access_request(path, tid) : -2;
@@ -49,12 +50,7 @@ int access_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long a
     auto mode = static_cast<mode_t>(arg1);
     long tid  = syscall_no_intercept(SYS_gettid);
 
-    off64_t res = capio_access(&pathname, mode, tid);
-    if (res != -2) {
-        *result = (res < 0 ? -errno : res);
-        return 0;
-    }
-    return 1;
+    return posix_return_value(capio_access(&pathname, mode, tid), result);
 }
 
 int faccessat_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg5,
@@ -65,12 +61,7 @@ int faccessat_handler(long arg0, long arg1, long arg2, long arg3, long arg4, lon
     auto flags = static_cast<int>(arg3);
     long tid   = syscall_no_intercept(SYS_gettid);
 
-    off64_t res = capio_faccessat(dirfd, &pathname, mode, flags, tid);
-    if (res != -2) {
-        *result = (res < 0 ? -errno : res);
-        return 0;
-    }
-    return 1;
+    return posix_return_value(capio_faccessat(dirfd, &pathname, mode, flags, tid), result);
 }
 
 #endif // CAPIO_POSIX_HANDLERS_ACCESS_HPP

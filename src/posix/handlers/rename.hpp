@@ -3,10 +3,6 @@
 
 #include "utils/filesystem.hpp"
 
-inline std::string absolute(const std::string &path) {
-    return is_absolute(&path) ? path : *capio_posix_realpath(&path);
-}
-
 int rename_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg5, long *result) {
     const std::string oldpath(reinterpret_cast<const char *>(arg0));
     const std::string newpath(reinterpret_cast<const char *>(arg1));
@@ -19,21 +15,21 @@ int rename_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long a
     if (is_prefix(oldpath_abs, newpath_abs)) { // TODO: The check is more complex
         errno   = EINVAL;
         *result = -errno;
-        return 0;
+        return POSIX_SYSCALL_SUCCESS;
     }
 
     if (is_capio_path(oldpath_abs)) {
         rename_capio_path(oldpath_abs, newpath_abs);
         auto res = rename_request(tid, oldpath_abs, newpath_abs);
         *result  = (res < 0 ? -errno : res);
-        return 0;
+        return POSIX_SYSCALL_SUCCESS;
     } else {
         if (is_capio_path(newpath_abs)) {
             std::filesystem::copy(oldpath_abs, newpath_abs);
             *result = -errno;
-            return 0;
+            return POSIX_SYSCALL_SUCCESS;
         } else {
-            return 1;
+            return POSIX_SYSCALL_SKIP;
         }
     }
 }

@@ -343,7 +343,6 @@ void open_files_location(int rank) {
     std::string file_name = "files_location_" + std::to_string(rank) + ".txt";
     int fd;
     if ((fd = open(file_name.c_str(), O_WRONLY | O_APPEND | O_CREAT, 0664)) == -1) {
-        MPI_Finalize();
         ERR_EXIT("writer error opening file");
     }
     fd_files_location = fd;

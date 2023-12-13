@@ -6,18 +6,9 @@
 
 constexpr size_t DIR_INITIAL_SIZE = 1024L * 1024 * 1024;
 
-constexpr int DNAME_LENGTH = 128;
-
 // default initial size for each file (can be overwritten by the user)
 off64_t DEFAULT_FILE_INITIAL_SIZE = 1024L * 1024 * 1024 * 4;
 
-// maximum size of shm
-constexpr long MAX_SHM_SIZE = 1024L * 1024 * 1024 * 16;
-
-// maximum size of shm for each file
-constexpr long MAX_SHM_SIZE_FILE = 1024L * 1024 * 1024 * 16;
-
-// capio file mode
 constexpr char CAPIO_FILE_MODE_NO_UPDATE[]           = "no_update";
 constexpr char CAPIO_FILE_MODE_ON_CLOSE[]            = "on_close";
 constexpr char CAPIO_FILE_MODE_ON_TERMINATION[]      = "on_termination";
@@ -40,6 +31,13 @@ constexpr int CAPIO_SEM_RETRIES                      = 100;
 constexpr int THEORETICAL_SIZE_DIRENT64              = sizeof(ino64_t) + sizeof(off64_t) +
                                           sizeof(unsigned short) + sizeof(unsigned char) +
                                           sizeof(char) * NAME_MAX;
+
+constexpr int POSIX_SYSCALL_SUCCESS      = 0;
+constexpr int POSIX_SYSCALL_SKIP         = 1;
+constexpr int POSIX_SYSCALL_ERRNO        = -1;
+constexpr int POSIX_SYSCALL_REQUEST_SKIP = -2;
+
+constexpr size_t SERVER_MAX_REMOTE_REQUEST_SIZE = sizeof(char) * (PATH_MAX + 81920);
 
 constexpr char CAPIO_BANNER[] =
     "\n\n "
@@ -76,11 +74,8 @@ constexpr char CAPIO_LOG_CLI_WARNING_LOG_SET_NOT_COMPILED[] =
 // constant strings for argument parser and capio server help
 constexpr char CAPIO_SERVER_ARG_PARSER_PRE[] =
     "Cross Application Programmable IO application. developed by Alberto "
-    "Riccardo Martinelli (UniTO), "
-    "Massimo Torquati(UniPI), Marco Aldinucci (UniTO), Iacopo "
-    "Colonneli(UniTO) "
-    "and"
-    " Marco Edoardo Santimaria (UniTO).";
+    "Riccardo Martinelli (UniTO), Massimo Torquati(UniPI), Marco Aldinucci (UniTO), Iacopo "
+    "Colonnelli(UniTO)  and Marco Edoardo Santimaria (UniTO).";
 constexpr char CAPIO_SERVER_ARG_PARSER_EPILOGUE[] =
     "For further help, a full list of the available ENVIRONMENT VARIABLES,"
     " and a guide on config JSON file structure, please visit "
