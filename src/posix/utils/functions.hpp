@@ -3,14 +3,13 @@
 #ifndef CAPIO_FUNCTIONS_H
 #define CAPIO_FUNCTIONS_H
 
-int posix_return_value(long res, long* result){
+int posix_return_value(long res, long *result) {
     if (res != -2) {
         *result = (res < 0 ? -errno : res);
-        return 0;
+        return POSIX_SYSCALL_HANDLED_BY_CAPIO;
     }
-    return 1;
+    return POSIX_SYSCALL_TO_HANDLE_BY_KERNEL;
 }
-
 
 inline off64_t round(off64_t bytes, bool is_getdents64) {
     off64_t res = 0;

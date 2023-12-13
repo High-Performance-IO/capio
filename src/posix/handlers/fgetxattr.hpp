@@ -13,12 +13,12 @@ int fgetxattr_handler(long arg0, long arg1, long arg2, long arg3, long arg4, lon
         if (std::equal(name.begin(), name.end(), "system.posix_acl_access")) {
             errno   = ENODATA;
             *result = -errno;
-            return 0;
+            return POSIX_SYSCALL_HANDLED_BY_CAPIO;
         } else {
             ERR_EXIT("fgetxattr with name %s is not yet supported in CAPIO", name.c_str());
         }
     }
-    return 1;
+    return POSIX_SYSCALL_TO_HANDLE_BY_KERNEL;
 }
 
 #endif // CAPIO_POSIX_HANDLERS_FGETXATTR_HPP

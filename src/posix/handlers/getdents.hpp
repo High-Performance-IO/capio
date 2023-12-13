@@ -34,11 +34,11 @@ inline int getdents_handler_impl(long arg0, long arg1, long arg2, long *result, 
         set_capio_fd_offset(fd, offset + bytes_read);
 
         *result = bytes_read;
-        return 0;
+        return POSIX_SYSCALL_HANDLED_BY_CAPIO;
     } else {
         LOG("fd=%d, is not a capio file descriptor", fd);
     }
-    return 1;
+    return POSIX_SYSCALL_TO_HANDLE_BY_KERNEL;
 }
 
 inline int getdents_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg5,

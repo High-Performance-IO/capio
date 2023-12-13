@@ -18,7 +18,7 @@ int exit_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg
 
     exit_group_request(tid);
 
-    return 1;
+    return POSIX_SYSCALL_TO_HANDLE_BY_KERNEL;
 }
 
 #endif // CAPIO_POSIX_HANDLERS_EXIT_GROUP_HPP

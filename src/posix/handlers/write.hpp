@@ -1,8 +1,8 @@
 #ifndef CAPIO_POSIX_HANDLERS_WRITE_HPP
 #define CAPIO_POSIX_HANDLERS_WRITE_HPP
 
-#include "utils/requests.hpp"
 #include "utils/functions.hpp"
+#include "utils/requests.hpp"
 
 inline ssize_t capio_write(int fd, const void *buffer, off64_t count, long tid) {
     START_LOG(tid, "call(fd=%d, buf=0x%08x, count=%ld)", fd, buffer, count);

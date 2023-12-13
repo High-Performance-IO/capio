@@ -93,7 +93,7 @@ inline int capio_statx(int dirfd, const std::string *pathname, int flags, int ma
     auto [file_size, is_dir] = stat_request(absolute_path, tid);
     LOG("Filling statx buffer");
     fill_statxbuf(statxbuf, file_size, is_dir, std::hash<std::string>{}(absolute_path), mask);
-    return 0;
+    return POSIX_SYSCALL_HANDLED_BY_CAPIO;
 }
 
 int statx_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg5, long *result) {

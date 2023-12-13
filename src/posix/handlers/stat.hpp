@@ -42,7 +42,7 @@ inline int capio_fstat(int fd, struct stat *statbuf, long tid) {
     if (exists_capio_fd(fd)) {
         auto [file_size, is_dir] = fstat_request(fd, tid);
         fill_statbuf(statbuf, file_size, is_dir, std::hash<std::string>{}(get_capio_fd_path(fd)));
-        return 0;
+        return POSIX_SYSCALL_HANDLED_BY_CAPIO;
     } else {
         return -2;
     }
@@ -54,7 +54,7 @@ inline int capio_lstat(const std::string &absolute_path, struct stat *statbuf, l
     if (is_capio_path(absolute_path)) {
         auto [file_size, is_dir] = stat_request(absolute_path, tid);
         fill_statbuf(statbuf, file_size, is_dir, std::hash<std::string>{}(absolute_path));
-        return 0;
+        return POSIX_SYSCALL_HANDLED_BY_CAPIO;
     } else {
         return -2;
     }

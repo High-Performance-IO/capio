@@ -17,22 +17,22 @@ int fcntl_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long ar
         switch (cmd) {
         case F_GETFD: {
             *result = get_capio_fd_cloexec(fd);
-            return 0;
+            return POSIX_SYSCALL_HANDLED_BY_CAPIO;
         }
 
         case F_SETFD: {
             set_capio_fd_cloexec(fd, arg);
-            return 0;
+            return POSIX_SYSCALL_HANDLED_BY_CAPIO;
         }
 
         case F_GETFL: {
             *result = get_capio_fd_flags(fd);
-            return 0;
+            return POSIX_SYSCALL_HANDLED_BY_CAPIO;
         }
 
         case F_SETFL: {
             set_capio_fd_flags(fd, arg);
-            return 0;
+            return POSIX_SYSCALL_HANDLED_BY_CAPIO;
         }
 
         case F_DUPFD_CLOEXEC: {
@@ -50,14 +50,14 @@ int fcntl_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long ar
             dup_capio_fd(tid, fd, res, true);
             dup_request(fd, res, tid);
 
-            return 0;
+            return POSIX_SYSCALL_HANDLED_BY_CAPIO;
         }
 
         default:
             ERR_EXIT("fcntl with cmd %d is not yet supported", cmd);
         }
     }
-    return 1;
+    return POSIX_SYSCALL_TO_HANDLE_BY_KERNEL;
 }
 
 #endif // CAPIO_POSIX_HANDLERS_FCNTL_HPP
