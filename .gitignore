@@ -39,6 +39,10 @@ cmake-build-*
 .vscode
 .ccls
 
+#logfies and capio files
+*.log
+files_location_*.txt
+
 # Other
 debug
 build

@@ -11,14 +11,6 @@
 CSMyRemotePendingStats_t pending_remote_stats;
 std::mutex pending_remote_stats_mutex;
 
-inline void handle_local_stat(int tid, const std::string &path) {
-    START_LOG(tid, "call(tid=%d, path=%s)", tid, path.c_str());
-
-    Capio_file &c_file = get_capio_file(path.c_str());
-    write_response(tid, c_file.get_file_size());
-    write_response(tid, static_cast<int>(c_file.is_dir() ? 0 : 1));
-}
-
 inline void handle_remote_stat(int tid, const std::string &path, int rank) {
     START_LOG(tid, "call(tid=%d, path=%s, rank=%d)", tid, path.c_str(), rank);
 
@@ -44,7 +36,8 @@ void wait_for_stat(int tid, const std::string &path) {
     bool complete         = c_file.complete;
     if (complete || strcmp(std::get<0>(get_file_location(path_to_check.c_str())), node_name) == 0 ||
         mode == CAPIO_FILE_MODE_NO_UPDATE) {
-        handle_local_stat(tid, path);
+        write_response(tid, c_file.get_file_size());
+        write_response(tid, static_cast<int>(c_file.is_dir() ? 1 : 0));
     } else {
         handle_remote_stat(tid, path, rank);
     }
@@ -70,12 +63,15 @@ inline void reply_stat(int tid, const std::string &path, int rank) {
     auto c_file_opt = get_capio_file_opt(path.c_str());
     Capio_file &c_file =
         (c_file_opt) ? c_file_opt->get() : create_capio_file(path, false, get_file_initial_size());
+    LOG("Obtained capio file. ready to reply to client");
     std::string_view mode        = c_file.get_mode();
     bool complete                = c_file.complete;
     const std::string *capio_dir = get_capio_dir();
     if (complete || strcmp(std::get<0>(file_location_opt->get()), node_name) == 0 ||
         mode == CAPIO_FILE_MODE_NO_UPDATE || *capio_dir == path) {
-        handle_local_stat(tid, path);
+        LOG("Sending response to client");
+        write_response(tid, c_file.get_file_size());
+        write_response(tid, static_cast<int>(c_file.is_dir() ? 1 : 0));
     } else {
         handle_remote_stat(tid, path, rank);
     }

@@ -3,14 +3,17 @@
 
 inline void fill_statxbuf(struct statx *statxbuf, off_t file_size, bool is_dir, ino_t inode,
                           int mask) {
+    START_LOG(syscall_no_intercept(SYS_gettid), "call(filesize=%ld, is_dir=%d, inode=%d, mask=%d)",
+              file_size, static_cast<int>(is_dir), mask);
+
     statx_timestamp time{1, 1};
-    if (is_dir == 0) {
-        statxbuf->stx_mode |= S_IFDIR;
-        statxbuf->stx_mode |= S_IRWXU | S_IRGRP | S_IXGRP | S_IROTH | S_IXOTH;
-        file_size = 4096;
+    if (is_dir == 1) {
+        LOG("Filling statx struct for file entry");
+        statxbuf->stx_mode = S_IFDIR | S_IRWXU | S_IRGRP | S_IXGRP | S_IROTH | S_IXOTH;
+        file_size          = 4096;
     } else {
-        statxbuf->stx_mode |= S_IFREG;
-        statxbuf->stx_mode |= S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH;
+        LOG("Filling statx struct for directory entry");
+        statxbuf->stx_mode = S_IFREG | S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH;
     }
     statxbuf->stx_mask            = STATX_BASIC_STATS | STATX_BTIME;
     statxbuf->stx_attributes_mask = 0;
@@ -41,9 +44,11 @@ inline int capio_statx(int dirfd, const std::string *pathname, int flags, int ma
                 if (exists_capio_fd(dirfd)) {
                     absolute_path = get_capio_fd_path(dirfd);
                 } else {
+                    LOG("returning -2 due to !exists_capio_fd");
                     return -2;
                 }
             } else {
+                LOG("returning -1 due to pathname empty");
                 // TODO: set errno
                 return -1;
             }
@@ -51,16 +56,20 @@ inline int capio_statx(int dirfd, const std::string *pathname, int flags, int ma
     } else {
         if (!is_absolute(pathname)) {
             if (dirfd == AT_FDCWD) {
+                LOG("dirfd is AT_FDCWD");
                 absolute_path = *capio_posix_realpath(pathname);
                 if (absolute_path.empty()) {
+                    LOG("returning -1 due to pathname empty");
                     return -1;
                 }
             } else {
                 if (!is_directory(dirfd)) {
+                    LOG("returning -2 due to !is_directory");
                     return -2;
                 }
                 std::string dir_path = get_dir_path(dirfd);
                 if (dir_path.empty()) {
+                    LOG("returning -2 due to dir path empty");
                     return -2;
                 }
                 if (pathname->substr(0, 2) == "./") {
@@ -74,11 +83,13 @@ inline int capio_statx(int dirfd, const std::string *pathname, int flags, int ma
             }
         }
         if (!is_capio_path(absolute_path)) {
+            LOG("returning -2 due to not being a capio path");
             return -2;
         }
     }
 
     auto [file_size, is_dir] = stat_request(absolute_path, tid);
+    LOG("Filling statx buffer");
     fill_statxbuf(statxbuf, file_size, is_dir, std::hash<std::string>{}(absolute_path), mask);
     return 0;
 }
@@ -91,12 +102,19 @@ int statx_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long ar
     auto *buf  = reinterpret_cast<struct statx *>(arg4);
     long tid   = syscall_no_intercept(SYS_gettid);
 
+    START_LOG(tid, "call(dirfd=%ld, pathname=%s, flags=%d, mask=%d)", dirfd, pathname.c_str(),
+              flags, mask);
+
     int res = capio_statx(dirfd, &pathname, flags, mask, buf, tid);
+
+    LOG("result of capio_statx is %d", res);
 
     if (res != -2) {
         *result = (res < 0 ? -errno : res);
+        LOG("statx completed. returning 0");
         return 0;
     }
+    LOG("statx completed with error. returning 1");
     return 1;
 }
 
