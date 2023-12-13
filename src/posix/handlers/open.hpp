@@ -5,11 +5,6 @@
 #include "utils/filesystem.hpp"
 #include "utils/functions.hpp"
 
-std::string get_capio_parent_dir(const std::string &path) {
-    auto pos = path.rfind('/');
-    return path.substr(0, pos);
-}
-
 inline int capio_openat(int dirfd, std::string *pathname, int flags, long tid) {
     START_LOG(tid, "call(dirfd=%d, pathname=%s, flags=%X)", dirfd, pathname->c_str(), flags);
 

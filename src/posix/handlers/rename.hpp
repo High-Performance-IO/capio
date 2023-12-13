@@ -3,10 +3,6 @@
 
 #include "utils/filesystem.hpp"
 
-inline std::string absolute(const std::string &path) {
-    return is_absolute(&path) ? path : *capio_posix_realpath(&path);
-}
-
 int rename_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg5, long *result) {
     const std::string oldpath(reinterpret_cast<const char *>(arg0));
     const std::string newpath(reinterpret_cast<const char *>(arg1));
