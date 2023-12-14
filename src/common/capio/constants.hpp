@@ -82,7 +82,7 @@ constexpr char CAPIO_LOG_CLI_WARNING_LOG_SET_NOT_COMPILED[] =
 constexpr char CAPIO_SERVER_ARG_PARSER_PRE[] =
     "Cross Application Programmable IO application. developed by Alberto "
     "Riccardo Martinelli (UniTO), Massimo Torquati(UniPI), Marco Aldinucci (UniTO), Iacopo "
-    "Colonneli(UniTO)  and Marco Edoardo Santimaria (UniTO).";
+    "Colonnelli(UniTO)  and Marco Edoardo Santimaria (UniTO).";
 constexpr char CAPIO_SERVER_ARG_PARSER_EPILOGUE[] =
     "For further help, a full list of the available ENVIRONMENT VARIABLES,"
     " and a guide on config JSON file structure, please visit "
