@@ -41,10 +41,10 @@ constexpr int THEORETICAL_SIZE_DIRENT64              = sizeof(ino64_t) + sizeof(
                                           sizeof(unsigned short) + sizeof(unsigned char) +
                                           sizeof(char) * NAME_MAX;
 
-constexpr int POSIX_SYSCALL_HANDLED_BY_CAPIO            = 0;
-constexpr int POSIX_SYSCALL_HANDLED_BY_CAPIO_SET_ERRNO  = -1;
-constexpr int POSIX_SYSCALL_TO_HANDLE_BY_KERNEL         = 1;
-constexpr int POSIX_REQUEST_SYSCALL_TO_HANDLE_BY_KERNEL = -2;
+constexpr int POSIX_SYSCALL_SUCCESS      = 0;
+constexpr int POSIX_SYSCALL_SKIP         = 1;
+constexpr int POSIX_SYSCALL_ERRNO        = -1;
+constexpr int POSIX_SYSCALL_REQUEST_SKIP = -2;
 
 constexpr char CAPIO_BANNER[] =
     "\n\n "

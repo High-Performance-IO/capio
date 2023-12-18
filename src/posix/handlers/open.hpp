@@ -14,16 +14,16 @@ inline int capio_openat(int dirfd, std::string *pathname, int flags, long tid) {
         if (dirfd == AT_FDCWD) {
             path_to_check = *capio_posix_realpath(pathname);
             if (path_to_check.empty()) {
-                return POSIX_REQUEST_SYSCALL_TO_HANDLE_BY_KERNEL;
+                return POSIX_SYSCALL_REQUEST_SKIP;
             }
         } else {
             if (!is_directory(dirfd)) {
                 LOG("dirfd does not point to a directory");
-                return POSIX_REQUEST_SYSCALL_TO_HANDLE_BY_KERNEL;
+                return POSIX_SYSCALL_REQUEST_SKIP;
             }
             std::string dir_path = get_dir_path(dirfd);
             if (dir_path.empty()) {
-                return POSIX_REQUEST_SYSCALL_TO_HANDLE_BY_KERNEL;
+                return POSIX_SYSCALL_REQUEST_SKIP;
             }
 
             if (pathname->substr(0, 2) == "./") {
@@ -49,19 +49,19 @@ inline int capio_openat(int dirfd, std::string *pathname, int flags, long tid) {
             off64_t return_code = create_exclusive_request(fd, path_to_check, tid);
             if (return_code == 1) {
                 errno = EEXIST;
-                return POSIX_SYSCALL_HANDLED_BY_CAPIO_SET_ERRNO;
+                return POSIX_SYSCALL_ERRNO;
             }
         } else if (create) {
             off64_t return_code = create_request(fd, path_to_check, tid);
             if (return_code == 1) {
                 errno = ENOENT;
-                return POSIX_SYSCALL_HANDLED_BY_CAPIO_SET_ERRNO;
+                return POSIX_SYSCALL_ERRNO;
             }
         } else {
             off64_t return_code = open_request(fd, path_to_check, tid);
             if (return_code == 1) {
                 errno = ENOENT;
-                return POSIX_SYSCALL_HANDLED_BY_CAPIO_SET_ERRNO;
+                return POSIX_SYSCALL_ERRNO;
             }
         }
         int actual_flags = flags & ~O_CLOEXEC;
@@ -75,7 +75,7 @@ inline int capio_openat(int dirfd, std::string *pathname, int flags, long tid) {
         }
         return fd;
     } else {
-        return POSIX_REQUEST_SYSCALL_TO_HANDLE_BY_KERNEL;
+        return POSIX_SYSCALL_REQUEST_SKIP;
     }
 }
 

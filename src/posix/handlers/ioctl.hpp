@@ -10,9 +10,9 @@ int ioctl_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long ar
     if (exists_capio_fd(fd)) {
         errno   = ENOTTY;
         *result = -errno;
-        return POSIX_SYSCALL_HANDLED_BY_CAPIO;
+        return POSIX_SYSCALL_SUCCESS;
     }
-    return POSIX_SYSCALL_TO_HANDLE_BY_KERNEL;
+    return POSIX_SYSCALL_REQUEST_SKIP;
 }
 
 #endif // CAPIO_POSIX_HANDLERS_IOCTL_HPP

@@ -5,13 +5,13 @@
 
 int posix_return_value(long res, long *result) {
     START_LOG(capio_syscall(SYS_gettid), "cal(res=%ld)", res);
-    if (res != -2) {
+    if (res != POSIX_SYSCALL_REQUEST_SKIP) {
         *result = (res < 0 ? -errno : res);
         LOG("SYSCALL handled by capio. errno is: %s", res < 0 ? strerror(-errno) : "none");
-        return POSIX_SYSCALL_HANDLED_BY_CAPIO;
+        return POSIX_SYSCALL_SUCCESS;
     }
     LOG("SYSCALL delegated to the kernel");
-    return POSIX_SYSCALL_TO_HANDLE_BY_KERNEL;
+    return POSIX_SYSCALL_SKIP;
 }
 
 inline std::string absolute(const std::string &path) {

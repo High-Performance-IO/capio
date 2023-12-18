@@ -42,9 +42,9 @@ inline int capio_fstat(int fd, struct stat *statbuf, long tid) {
     if (exists_capio_fd(fd)) {
         auto [file_size, is_dir] = fstat_request(fd, tid);
         fill_statbuf(statbuf, file_size, is_dir, std::hash<std::string>{}(get_capio_fd_path(fd)));
-        return POSIX_SYSCALL_HANDLED_BY_CAPIO;
+        return POSIX_SYSCALL_SUCCESS;
     } else {
-        return POSIX_REQUEST_SYSCALL_TO_HANDLE_BY_KERNEL;
+        return POSIX_SYSCALL_REQUEST_SKIP;
     }
 }
 
@@ -54,9 +54,9 @@ inline int capio_lstat(const std::string &absolute_path, struct stat *statbuf, l
     if (is_capio_path(absolute_path)) {
         auto [file_size, is_dir] = stat_request(absolute_path, tid);
         fill_statbuf(statbuf, file_size, is_dir, std::hash<std::string>{}(absolute_path));
-        return POSIX_SYSCALL_HANDLED_BY_CAPIO;
+        return POSIX_SYSCALL_SUCCESS;
     } else {
-        return POSIX_REQUEST_SYSCALL_TO_HANDLE_BY_KERNEL;
+        return POSIX_SYSCALL_REQUEST_SKIP;
     }
 }
 
@@ -64,12 +64,12 @@ inline int capio_lstat_wrapper(const std::string *path, struct stat *statbuf, lo
     START_LOG(tid, "call(path=%s, buf=0x%08x)", path, statbuf);
 
     if (path == nullptr) {
-        return POSIX_REQUEST_SYSCALL_TO_HANDLE_BY_KERNEL;
+        return POSIX_SYSCALL_REQUEST_SKIP;
     }
 
     const std::string *absolute_path = capio_posix_realpath(path);
     if (absolute_path->empty()) {
-        return POSIX_REQUEST_SYSCALL_TO_HANDLE_BY_KERNEL;
+        return POSIX_SYSCALL_REQUEST_SKIP;
     }
     return capio_lstat(*absolute_path, statbuf, tid);
 }
@@ -88,7 +88,7 @@ inline int capio_fstatat(int dirfd, std::string *pathname, struct stat *statbuf,
                 return capio_fstat(dirfd, statbuf, tid);
             } else {
                 // TODO: set errno
-                return POSIX_SYSCALL_HANDLED_BY_CAPIO_SET_ERRNO;
+                return POSIX_SYSCALL_ERRNO;
             }
         }
     }
@@ -99,11 +99,11 @@ inline int capio_fstatat(int dirfd, std::string *pathname, struct stat *statbuf,
             return capio_lstat_wrapper(pathname, statbuf, tid);
         } else {
             if (!is_directory(dirfd)) {
-                return POSIX_REQUEST_SYSCALL_TO_HANDLE_BY_KERNEL;
+                return POSIX_SYSCALL_REQUEST_SKIP;
             }
             std::string dir_path = get_dir_path(dirfd);
             if (dir_path.empty()) {
-                return POSIX_REQUEST_SYSCALL_TO_HANDLE_BY_KERNEL;
+                return POSIX_SYSCALL_REQUEST_SKIP;
             }
 
             if (pathname->substr(0, 2) == "./") {

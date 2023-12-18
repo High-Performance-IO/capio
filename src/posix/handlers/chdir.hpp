@@ -21,18 +21,18 @@ int chdir_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long ar
         path_to_check = capio_posix_realpath(&path);
         if (path_to_check->empty()) {
             *result = -errno;
-            return POSIX_SYSCALL_HANDLED_BY_CAPIO;
+            return POSIX_SYSCALL_SUCCESS;
         }
     }
 
     if (is_capio_path(*path_to_check)) {
         set_current_dir(path_to_check);
         errno = 0;
-        return POSIX_SYSCALL_HANDLED_BY_CAPIO;
+        return POSIX_SYSCALL_SUCCESS;
     }
 
     // if not a capio path, then control is given to kernel
-    return POSIX_SYSCALL_TO_HANDLE_BY_KERNEL;
+    return POSIX_SYSCALL_SKIP;
 }
 
 #endif // CAPIO_POSIX_HANDLERS_CHDIR_HPP

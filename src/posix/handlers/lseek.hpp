@@ -16,7 +16,7 @@ inline off64_t capio_lseek(int fd, off64_t offset, int whence, long tid) {
                 return offset;
             } else {
                 errno = EINVAL;
-                return POSIX_SYSCALL_HANDLED_BY_CAPIO_SET_ERRNO;
+                return POSIX_SYSCALL_ERRNO;
             }
         } else if (whence == SEEK_CUR) {
             off64_t new_offset = file_offset + offset;
@@ -26,7 +26,7 @@ inline off64_t capio_lseek(int fd, off64_t offset, int whence, long tid) {
                 return new_offset;
             } else {
                 errno = EINVAL;
-                return POSIX_SYSCALL_HANDLED_BY_CAPIO_SET_ERRNO;
+                return POSIX_SYSCALL_ERRNO;
             }
         } else if (whence == SEEK_END) {
             off64_t file_size  = seek_end_request(fd, tid);
@@ -43,10 +43,10 @@ inline off64_t capio_lseek(int fd, off64_t offset, int whence, long tid) {
             return new_offset;
         } else {
             errno = EINVAL;
-            return POSIX_SYSCALL_HANDLED_BY_CAPIO_SET_ERRNO;
+            return POSIX_SYSCALL_ERRNO;
         }
     } else {
-        return POSIX_REQUEST_SYSCALL_TO_HANDLE_BY_KERNEL;
+        return POSIX_SYSCALL_REQUEST_SKIP;
     }
 }
 

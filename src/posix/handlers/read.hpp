@@ -21,9 +21,9 @@ int read_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg
         read_data(tid, buffer, bytes_read);
         set_capio_fd_offset(fd, offset + bytes_read);
         *result = bytes_read;
-        return POSIX_SYSCALL_HANDLED_BY_CAPIO;
+        return POSIX_SYSCALL_SUCCESS;
     }
-    return POSIX_SYSCALL_TO_HANDLE_BY_KERNEL;
+    return POSIX_SYSCALL_SKIP;
 }
 
 #endif // CAPIO_POSIX_HANDLERS_READ_HPP

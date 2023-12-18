@@ -9,7 +9,7 @@ off64_t capio_unlink_abs(const std::string &abs_path, long tid, bool is_dir) {
         if (is_capio_dir(abs_path)) {
             ERR_EXIT("ERROR: unlink to the capio_dir %s", abs_path.c_str());
         } else {
-            return POSIX_REQUEST_SYSCALL_TO_HANDLE_BY_KERNEL;
+            return POSIX_SYSCALL_REQUEST_SKIP;
         }
     } else {
         off64_t res = is_dir ? rmdir_request(abs_path, tid) : unlink_request(abs_path, tid);
@@ -29,16 +29,16 @@ inline off64_t capio_unlinkat(int dirfd, const std::string &pathname, int flags,
         if (dirfd == AT_FDCWD) {
             const std::string *abs_path = capio_posix_realpath(&pathname);
             if (abs_path->empty()) {
-                return POSIX_REQUEST_SYSCALL_TO_HANDLE_BY_KERNEL;
+                return POSIX_SYSCALL_REQUEST_SKIP;
             }
             res = capio_unlink_abs(*abs_path, tid, is_dir);
         } else {
             if (!is_directory(dirfd)) {
-                return POSIX_REQUEST_SYSCALL_TO_HANDLE_BY_KERNEL;
+                return POSIX_SYSCALL_REQUEST_SKIP;
             }
             std::string dir_path = get_dir_path(dirfd);
             if (dir_path.empty()) {
-                return POSIX_REQUEST_SYSCALL_TO_HANDLE_BY_KERNEL;
+                return POSIX_SYSCALL_REQUEST_SKIP;
             }
             std::string path = dir_path + "/" + pathname;
 
