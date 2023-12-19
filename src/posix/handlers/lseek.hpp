@@ -1,6 +1,8 @@
 #ifndef CAPIO_POSIX_HANDLERS_LSEEK_HPP
 #define CAPIO_POSIX_HANDLERS_LSEEK_HPP
 
+#include "utils/functions.hpp"
+
 // TODO: EOVERFLOW is not addressed
 inline off64_t capio_lseek(int fd, off64_t offset, int whence, long tid) {
     START_LOG(tid, "call(fd=%d, offset=%ld, whence=%d)", fd, offset, whence);
@@ -14,7 +16,7 @@ inline off64_t capio_lseek(int fd, off64_t offset, int whence, long tid) {
                 return offset;
             } else {
                 errno = EINVAL;
-                return -1;
+                return POSIX_SYSCALL_ERRNO;
             }
         } else if (whence == SEEK_CUR) {
             off64_t new_offset = file_offset + offset;
@@ -24,7 +26,7 @@ inline off64_t capio_lseek(int fd, off64_t offset, int whence, long tid) {
                 return new_offset;
             } else {
                 errno = EINVAL;
-                return -1;
+                return POSIX_SYSCALL_ERRNO;
             }
         } else if (whence == SEEK_END) {
             off64_t file_size  = seek_end_request(fd, tid);
@@ -41,10 +43,10 @@ inline off64_t capio_lseek(int fd, off64_t offset, int whence, long tid) {
             return new_offset;
         } else {
             errno = EINVAL;
-            return -1;
+            return POSIX_SYSCALL_ERRNO;
         }
     } else {
-        return -2;
+        return POSIX_SYSCALL_REQUEST_SKIP;
     }
 }
 
@@ -54,13 +56,7 @@ int lseek_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long ar
     int whence  = static_cast<int>(arg2);
     long tid    = syscall_no_intercept(SYS_gettid);
 
-    off64_t res = capio_lseek(fd, offset, whence, tid);
-
-    if (res != -2) {
-        *result = (res < 0 ? -errno : res);
-        return 0;
-    }
-    return 1;
+    return posix_return_value(capio_lseek(fd, offset, whence, tid), result);
 }
 
 #endif // CAPIO_POSIX_HANDLERS_LSEEK_HPP

@@ -41,6 +41,11 @@ constexpr int THEORETICAL_SIZE_DIRENT64              = sizeof(ino64_t) + sizeof(
                                           sizeof(unsigned short) + sizeof(unsigned char) +
                                           sizeof(char) * NAME_MAX;
 
+constexpr int POSIX_SYSCALL_SUCCESS      = 0;
+constexpr int POSIX_SYSCALL_SKIP         = 1;
+constexpr int POSIX_SYSCALL_ERRNO        = -1;
+constexpr int POSIX_SYSCALL_REQUEST_SKIP = -2;
+
 constexpr char CAPIO_BANNER[] =
     "\n\n "
     "\033[1;34m /$$$$$$   /$$$$$$  /$$$$$$$\033[0;96m  /$$$$$$  /$$$$$$ \n"
@@ -76,11 +81,8 @@ constexpr char CAPIO_LOG_CLI_WARNING_LOG_SET_NOT_COMPILED[] =
 // constant strings for argument parser and capio server help
 constexpr char CAPIO_SERVER_ARG_PARSER_PRE[] =
     "Cross Application Programmable IO application. developed by Alberto "
-    "Riccardo Martinelli (UniTO), "
-    "Massimo Torquati(UniPI), Marco Aldinucci (UniTO), Iacopo "
-    "Colonneli(UniTO) "
-    "and"
-    " Marco Edoardo Santimaria (UniTO).";
+    "Riccardo Martinelli (UniTO), Massimo Torquati(UniPI), Marco Aldinucci (UniTO), Iacopo "
+    "Colonnelli(UniTO)  and Marco Edoardo Santimaria (UniTO).";
 constexpr char CAPIO_SERVER_ARG_PARSER_EPILOGUE[] =
     "For further help, a full list of the available ENVIRONMENT VARIABLES,"
     " and a guide on config JSON file structure, please visit "

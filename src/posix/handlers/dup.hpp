@@ -2,7 +2,6 @@
 #define CAPIO_POSIX_HANDLERS_DUP_HPP
 
 #include "capio/syscall.hpp"
-
 #include "utils/requests.hpp"
 
 int dup_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg5, long *result) {
@@ -15,15 +14,15 @@ int dup_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg5
         int res = open("/dev/null", O_WRONLY);
         if (res == -1) {
             *result = -errno;
-            return 0;
+            return POSIX_SYSCALL_SUCCESS;
         }
         dup_request(fd, res, tid);
         dup_capio_fd(tid, fd, res, false);
 
         *result = res;
-        return 0;
+        return POSIX_SYSCALL_SUCCESS;
     }
-    return 1;
+    return POSIX_SYSCALL_SKIP;
 }
 
 int dup2_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg5, long *result) {
@@ -39,16 +38,16 @@ int dup2_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg
         int res = static_cast<int>(syscall_no_intercept(SYS_dup2, fd, fd2));
         if (res == -1) {
             *result = -errno;
-            return 0;
+            return POSIX_SYSCALL_SUCCESS;
         }
         if (fd != res) {
             dup_request(fd, res, tid);
             dup_capio_fd(tid, fd, res, false);
         }
         *result = res;
-        return 0;
+        return POSIX_SYSCALL_SUCCESS;
     }
-    return 1;
+    return POSIX_SYSCALL_SKIP;
 }
 
 int dup3_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg5, long *result) {
@@ -70,16 +69,16 @@ int dup3_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg
         int res = static_cast<int>(syscall_no_intercept(SYS_dup3, fd, fd2, flags));
         if (res == -1) {
             *result = -errno;
-            return 0;
+            return POSIX_SYSCALL_SUCCESS;
         }
         bool is_cloexec = (flags & O_CLOEXEC) == O_CLOEXEC;
         dup_request(fd, res, tid);
         dup_capio_fd(tid, fd, res, is_cloexec);
 
         *result = res;
-        return 0;
+        return POSIX_SYSCALL_SUCCESS;
     }
-    return 1;
+    return POSIX_SYSCALL_SKIP;
 }
 
 #endif // CAPIO_POSIX_HANDLERS_DUP_HPP

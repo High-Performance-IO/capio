@@ -1,6 +1,7 @@
 #ifndef CAPIO_POSIX_HANDLERS_WRITE_HPP
 #define CAPIO_POSIX_HANDLERS_WRITE_HPP
 
+#include "utils/functions.hpp"
 #include "utils/requests.hpp"
 
 inline ssize_t capio_write(int fd, const void *buffer, off64_t count, long tid) {
@@ -17,7 +18,7 @@ inline ssize_t capio_write(int fd, const void *buffer, off64_t count, long tid) 
 
         return count;
     } else {
-        return -2;
+        return POSIX_SYSCALL_REQUEST_SKIP;
     }
 }
 
@@ -40,13 +41,13 @@ inline ssize_t capio_writev(int fd, const struct iovec *iov, int iovcnt, long ti
             ++i;
         }
         if (res == -1) {
-            return -1;
+            return POSIX_SYSCALL_ERRNO;
         } else {
             return tot_bytes;
         }
     } else {
         LOG("fd %d is not a capio fd. returning -2", fd);
-        return -2;
+        return POSIX_SYSCALL_REQUEST_SKIP;
     }
 }
 
@@ -56,14 +57,7 @@ int write_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long ar
     auto count      = static_cast<off64_t>(arg2);
     long tid        = syscall_no_intercept(SYS_gettid);
 
-    ssize_t res = capio_write(fd, buf, count, tid);
-
-    if (res != -2) {
-        *result = (res < 0 ? -errno : res);
-        return 0;
-    }
-
-    return 1;
+    return posix_return_value(capio_write(fd, buf, count, tid), result);
 }
 
 int writev_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg5, long *result) {
@@ -72,13 +66,7 @@ int writev_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long a
     auto iovcnt     = static_cast<int>(arg2);
     long tid        = syscall_no_intercept(SYS_gettid);
 
-    ssize_t res = capio_writev(fd, iov, iovcnt, tid);
-
-    if (res != -2) {
-        *result = (res < 0 ? -errno : res);
-        return 0;
-    }
-    return 1;
+    return posix_return_value(capio_writev(fd, iov, iovcnt, tid), result);
 }
 
 #endif // CAPIO_POSIX_HANDLERS_WRITE_HPP
