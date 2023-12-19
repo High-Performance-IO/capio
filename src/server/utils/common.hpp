@@ -8,8 +8,8 @@
 #include "capio_file.hpp"
 #include "types.hpp"
 
-static inline char *expand_memory_for_file(const std::string &path, off64_t data_size,
-                                           Capio_file &c_file) {
+inline char *expand_memory_for_file(const std::string &path, off64_t data_size,
+                                    Capio_file &c_file) {
     char *new_p = c_file.expand_buffer(data_size);
     return new_p;
 }
@@ -40,7 +40,7 @@ inline off64_t store_dirent(char *incoming, char *target_buffer, off64_t incomin
     return stored_size;
 }
 
-static inline bool is_int(const std::string &s) {
+inline bool is_int(const std::string &s) {
     START_LOG(gettid(), "call(%s)", s.c_str());
     bool res = false;
     if (!s.empty()) {
@@ -51,8 +51,7 @@ static inline bool is_int(const std::string &s) {
     return res;
 }
 
-static inline int find_batch_size(const std::string &glob,
-                                  CSMetadataConfGlobs_t &metadata_conf_globs) {
+inline int find_batch_size(const std::string &glob, CSMetadataConfGlobs_t &metadata_conf_globs) {
     START_LOG(gettid(), "call(%s)", glob.c_str());
     bool found = false;
     int n_files;
