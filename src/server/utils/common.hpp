@@ -8,7 +8,8 @@
 #include "capio_file.hpp"
 #include "types.hpp"
 
-char *expand_memory_for_file(const std::string &path, off64_t data_size, Capio_file &c_file) {
+inline char *expand_memory_for_file(const std::string &path, off64_t data_size,
+                                    Capio_file &c_file) {
     char *new_p = c_file.expand_buffer(data_size);
     return new_p;
 }
@@ -39,7 +40,7 @@ inline off64_t store_dirent(char *incoming, char *target_buffer, off64_t incomin
     return stored_size;
 }
 
-bool is_int(const std::string &s) {
+inline bool is_int(const std::string &s) {
     START_LOG(gettid(), "call(%s)", s.c_str());
     bool res = false;
     if (!s.empty()) {
@@ -48,6 +49,26 @@ bool is_int(const std::string &s) {
         res = *p == 0;
     }
     return res;
+}
+
+inline int find_batch_size(const std::string &glob, CSMetadataConfGlobs_t &metadata_conf_globs) {
+    START_LOG(gettid(), "call(%s)", glob.c_str());
+    bool found = false;
+    int n_files;
+    std::size_t i = 0;
+
+    while (!found && i < metadata_conf_globs.size()) {
+        found = glob == std::get<0>(metadata_conf_globs[i]);
+        ++i;
+    }
+
+    if (found) {
+        n_files = std::get<5>(metadata_conf_globs[i - 1]);
+    } else {
+        n_files = -1;
+    }
+
+    return n_files;
 }
 
 #endif // CAPIO_SERVER_UTILS_COMMON_HPP

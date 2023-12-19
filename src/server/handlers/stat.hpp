@@ -11,37 +11,9 @@
 CSMyRemotePendingStats_t pending_remote_stats;
 std::mutex pending_remote_stats_mutex;
 
-inline void handle_remote_stat(int tid, const std::string &path, int rank) {
-    START_LOG(tid, "call(tid=%d, path=%s, rank=%d)", tid, path.c_str(), rank);
-
-    const std::lock_guard<std::mutex> lg(pending_remote_stats_mutex);
-    std::string str_msg;
-    int dest        = nodes_helper_rank[std::get<0>(get_file_location(path.c_str()))];
-    str_msg         = "stat " + std::to_string(rank) + " " + path;
-    const char *msg = str_msg.c_str();
-    MPI_Send(msg, strlen(msg) + 1, MPI_CHAR, dest, 0, MPI_COMM_WORLD);
-    pending_remote_stats[path].emplace_back(tid);
-}
-
-void wait_for_stat(int tid, const std::string &path) {
-    START_LOG(gettid(), "call(tid=%d, path=%s)", tid, path.c_str());
-
-    int rank;
-    MPI_Comm_rank(MPI_COMM_WORLD, &rank);
-    const std::string &path_to_check(path);
-    loop_check_files_location(path_to_check, rank);
-    // check if the file is local or remote
-    Capio_file &c_file    = get_capio_file(path.c_str());
-    std::string_view mode = c_file.get_mode();
-    bool complete         = c_file.complete;
-    if (complete || strcmp(std::get<0>(get_file_location(path_to_check.c_str())), node_name) == 0 ||
-        mode == CAPIO_FILE_MODE_NO_UPDATE) {
-        write_response(tid, c_file.get_file_size());
-        write_response(tid, static_cast<int>(c_file.is_dir() ? 1 : 0));
-    } else {
-        handle_remote_stat(tid, path, rank);
-    }
-}
+// TODO: replace the direct call with dome king of intra thread communication to avoid passing
+// values from one to another
+#include "../communication_service/remote_listener.hpp"
 
 inline void reply_stat(int tid, const std::string &path, int rank) {
     START_LOG(gettid(), "call(tid=%d, path=%s, rank=%d)", tid, path.c_str(), rank);
@@ -52,7 +24,8 @@ inline void reply_stat(int tid, const std::string &path, int rank) {
         // if it is in configuration file then wait otherwise fails
         if ((metadata_conf.find(path) != metadata_conf.end() || match_globs(path) != -1) &&
             !is_producer(tid, path)) {
-            std::thread t(wait_for_stat, tid, std::string(path));
+            std::thread t(wait_for_stat, tid, std::string(path), rank, &pending_remote_stats,
+                          &pending_remote_stats_mutex);
             t.detach();
         } else {
             write_response(tid, -1); // return size
@@ -73,7 +46,8 @@ inline void reply_stat(int tid, const std::string &path, int rank) {
         write_response(tid, c_file.get_file_size());
         write_response(tid, static_cast<int>(c_file.is_dir() ? 1 : 0));
     } else {
-        handle_remote_stat(tid, path, rank);
+        backend->handle_remote_stat(tid, path, rank, &pending_remote_stats,
+                                    &pending_remote_stats_mutex);
     }
 }
 

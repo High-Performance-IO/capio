@@ -6,18 +6,9 @@
 
 constexpr size_t DIR_INITIAL_SIZE = 1024L * 1024 * 1024;
 
-constexpr int DNAME_LENGTH = 128;
-
 // default initial size for each file (can be overwritten by the user)
 off64_t DEFAULT_FILE_INITIAL_SIZE = 1024L * 1024 * 1024 * 4;
 
-// maximum size of shm
-constexpr long MAX_SHM_SIZE = 1024L * 1024 * 1024 * 16;
-
-// maximum size of shm for each file
-constexpr long MAX_SHM_SIZE_FILE = 1024L * 1024 * 1024 * 16;
-
-// capio file mode
 constexpr char CAPIO_FILE_MODE_NO_UPDATE[]           = "no_update";
 constexpr char CAPIO_FILE_MODE_ON_CLOSE[]            = "on_close";
 constexpr char CAPIO_FILE_MODE_ON_TERMINATION[]      = "on_termination";
@@ -45,6 +36,8 @@ constexpr int POSIX_SYSCALL_SUCCESS      = 0;
 constexpr int POSIX_SYSCALL_SKIP         = 1;
 constexpr int POSIX_SYSCALL_ERRNO        = -1;
 constexpr int POSIX_SYSCALL_REQUEST_SKIP = -2;
+
+constexpr size_t SERVER_MAX_REMOTE_REQUEST_SIZE = sizeof(char) * (PATH_MAX + 81920);
 
 constexpr char CAPIO_BANNER[] =
     "\n\n "
