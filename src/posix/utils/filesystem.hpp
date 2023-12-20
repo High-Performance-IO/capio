@@ -85,26 +85,15 @@ const std::string *capio_posix_realpath(const std::string *pathname) {
     if (posix_real_path == nullptr) {
         LOG("path is null due to errno='%s'", strerror(errno));
 
-        const std::string *capio_dir = get_capio_dir();
-        if (current_dir->find(*capio_dir) != std::string::npos) {
-            if (!is_absolute(pathname)) {
-                auto new_path = new std::string(*current_dir + "/" + *pathname);
-
-                // remove /./ from path
-                std::size_t pos = 0;
-                while ((pos = new_path->find("/./", pos)) != std::string::npos) {
-                    new_path->replace(new_path->find("/./"), 3, "/");
-                    pos += 1;
-                }
-
-                LOG("Computed absolute path = %s", new_path->c_str());
-                return new_path;
-            } else {
-                LOG("Path=%s is already absolute", pathname->c_str());
-            }
+        if (is_absolute(pathname)) {
+            LOG("Path=%s is already absolute", pathname->c_str());
             return pathname;
+        } else if (is_capio_path(*current_dir)) {
+            auto new_path = std::filesystem::path(*current_dir) / *pathname;
+            new_path      = new_path.lexically_normal();
+            LOG("Computed absolute path = %s", new_path.c_str());
+            return new std::string(new_path);
         } else {
-            // if file not found, then nullptr is returned and errno can be read
             LOG("file %s is not a posix file, nor a capio file!", pathname->c_str());
             return new std::string("");
         }
