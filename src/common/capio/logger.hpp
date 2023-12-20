@@ -17,7 +17,7 @@
 #endif
 
 #ifndef __CAPIO_POSIX
-std::ofstream logfile; // if building for server, self contained logfile
+thread_local std::ofstream logfile; // if building for server, self contained logfile
 #else
 FILE *logfileFP;
 bool logfileOpen = false;
