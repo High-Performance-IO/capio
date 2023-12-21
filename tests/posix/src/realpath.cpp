@@ -24,7 +24,7 @@ TEST_CASE("Test absolute paths inside the CAPIO_DIR when path exists", "[posix]"
         std::filesystem::path(*get_capio_dir()) / std::filesystem::path("test");
     REQUIRE(mkdir(PATHNAME.c_str(), S_IRWXU) != -1);
     REQUIRE(access(PATHNAME.c_str(), F_OK) == 0);
-    REQUIRE(*capio_posix_realpath(&PATHNAME) == PATHNAME);
+    REQUIRE(capio_posix_realpath(&PATHNAME) == PATHNAME);
     REQUIRE(rmdir(PATHNAME.c_str()) != -1);
     REQUIRE(access(PATHNAME.c_str(), F_OK) != 0);
 }
@@ -32,19 +32,19 @@ TEST_CASE("Test absolute paths inside the CAPIO_DIR when path exists", "[posix]"
 TEST_CASE("Test absolute paths inside the CAPIO_DIR when path does not exist", "[posix]") {
     const std::string PATHNAME =
         std::filesystem::path(*get_capio_dir()) / std::filesystem::path("test");
-    REQUIRE(*capio_posix_realpath(&PATHNAME) == PATHNAME);
+    REQUIRE(capio_posix_realpath(&PATHNAME) == PATHNAME);
 }
 
 TEST_CASE("Test absolute paths outside the CAPIO_DIR when path exists", "[posix]") {
     const std::string PATHNAME = "/tmp/test";
     REQUIRE(mkdir(PATHNAME.c_str(), S_IRWXU) != -1);
     REQUIRE(access(PATHNAME.c_str(), F_OK) == 0);
-    REQUIRE(*capio_posix_realpath(&PATHNAME) == PATHNAME);
+    REQUIRE(capio_posix_realpath(&PATHNAME) == PATHNAME);
     REQUIRE(rmdir(PATHNAME.c_str()) != -1);
     REQUIRE(access(PATHNAME.c_str(), F_OK) != 0);
 }
 
 TEST_CASE("Test absolute paths outside the CAPIO_DIR when path does not exist", "[posix]") {
     const std::string PATHNAME = "/tmp/test";
-    REQUIRE(*capio_posix_realpath(&PATHNAME) == PATHNAME);
+    REQUIRE(capio_posix_realpath(&PATHNAME) == PATHNAME);
 }
