@@ -10,7 +10,7 @@ inline off64_t capio_mkdirat(int dirfd, std::string *pathname, mode_t mode, long
     std::string path_to_check(*pathname);
     if (!is_absolute(pathname)) {
         if (dirfd == AT_FDCWD) {
-            path_to_check = *capio_posix_realpath(pathname);
+            path_to_check = capio_posix_realpath(pathname);
             if (path_to_check.empty()) {
                 return POSIX_SYSCALL_REQUEST_SKIP;
             }
@@ -49,7 +49,7 @@ inline off64_t capio_rmdir(std::string *pathname, long tid) {
 
     std::string path_to_check(*pathname);
     if (!is_absolute(pathname)) {
-        path_to_check = *capio_posix_realpath(pathname);
+        path_to_check = capio_posix_realpath(pathname);
         if (path_to_check.empty()) {
             LOG("path_to_check.len = 0!");
             return POSIX_SYSCALL_REQUEST_SKIP;

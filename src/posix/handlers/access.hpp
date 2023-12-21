@@ -7,13 +7,13 @@
 inline off64_t capio_access(const std::string *pathname, mode_t mode, long tid) {
     START_LOG(tid, "call(pathname=%s, mode=%o)", pathname->c_str(), mode);
 
-    const std::string *abs_pathname = capio_posix_realpath(pathname);
-    if (abs_pathname->empty()) {
+    const std::string abs_pathname = capio_posix_realpath(pathname);
+    if (abs_pathname.empty()) {
         errno = ENONET;
         return POSIX_SYSCALL_ERRNO;
     }
-    if (is_capio_path(*abs_pathname)) {
-        return access_request(*abs_pathname, tid);
+    if (is_capio_path(abs_pathname)) {
+        return access_request(abs_pathname, tid);
     } else {
         return POSIX_SYSCALL_REQUEST_SKIP;
     }

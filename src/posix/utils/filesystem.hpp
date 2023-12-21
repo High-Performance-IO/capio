@@ -4,6 +4,7 @@
 #include <cerrno>
 #include <climits>
 #include <cstdlib>
+#include <memory>
 #include <string>
 #include <vector>
 
@@ -18,7 +19,7 @@
 
 CPFileDescriptors_t *capio_files_descriptors;
 CPFilesPaths_t *capio_files_paths;
-const std::string *current_dir;
+std::unique_ptr<const std::string> current_dir;
 CPFiles_t *files;
 
 /**
@@ -35,7 +36,7 @@ inline void set_capio_fd_cloexec(int fd, bool is_cloexec) {
  * Get the current directory
  * @return the current directory
  */
-inline const std::string *get_current_dir() { return current_dir; }
+inline const std::string *get_current_dir() { return current_dir.get(); }
 
 auto create_capio_posix_shm(long tid, int fd) {
     std::string shm_name("offset_" + std::to_string(tid) + "_" + std::to_string(fd));
@@ -77,7 +78,7 @@ inline void add_capio_fd(long tid, const std::string &path, int fd, off64_t offs
  * @param pathname
  * @return
  */
-const std::string *capio_posix_realpath(const std::string *pathname) {
+std::string capio_posix_realpath(const std::string *pathname) {
     START_LOG(syscall_no_intercept(SYS_gettid), "call(path=%s)", pathname->c_str());
     char *posix_real_path = capio_realpath((char *) pathname->c_str(), nullptr);
 
@@ -87,21 +88,21 @@ const std::string *capio_posix_realpath(const std::string *pathname) {
 
         if (is_absolute(pathname)) {
             LOG("Path=%s is already absolute", pathname->c_str());
-            return pathname;
+            return {*pathname};
         } else if (is_capio_path(*current_dir)) {
             auto new_path = std::filesystem::path(*current_dir) / *pathname;
             new_path      = new_path.lexically_normal();
             LOG("Computed absolute path = %s", new_path.c_str());
-            return new std::string(new_path);
+            return new_path;
         } else {
             LOG("file %s is not a posix file, nor a capio file!", pathname->c_str());
-            return new std::string("");
+            return {""};
         }
     }
 
     // if not, then check for realpath through libc implementation
     LOG("Computed realpath = %s", posix_real_path);
-    return new std::string(posix_real_path);
+    return {posix_real_path};
 }
 
 /**
@@ -133,7 +134,7 @@ inline void delete_capio_path(const std::string &path) {
  * @return
  */
 inline void destroy_filesystem() {
-    delete current_dir;
+    current_dir.reset();
     delete capio_files_descriptors;
     delete capio_files_paths;
     delete files;
@@ -254,9 +255,9 @@ std::string get_dir_path(int dirfd) {
  * @return
  */
 inline void init_filesystem() {
-    char *buf = static_cast<char *>(malloc(PATH_MAX * sizeof(char)));
-    syscall_no_intercept(SYS_getcwd, buf, PATH_MAX);
-    current_dir             = new std::string(buf);
+    std::unique_ptr<char[]> buf(new char[PATH_MAX]);
+    syscall_no_intercept(SYS_getcwd, buf.get(), PATH_MAX);
+    current_dir             = std::make_unique<std::string>(buf.get());
     capio_files_descriptors = new CPFileDescriptors_t();
     capio_files_paths       = new CPFilesPaths_t();
     files                   = new CPFiles_t();
@@ -296,9 +297,8 @@ inline void set_capio_fd_offset(int fd, off64_t offset) { *std::get<0>(files->at
  * Change the current directory
  * @return the current directory
  */
-inline void set_current_dir(const std::string *cwd) {
-    delete current_dir;
-    current_dir = cwd;
+inline void set_current_dir(const std::string &cwd) {
+    current_dir = std::make_unique<std::string>(cwd);
 }
 
 #endif // CAPIO_POSIX_UTILS_FILESYSTEM_HPP

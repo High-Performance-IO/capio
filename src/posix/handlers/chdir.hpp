@@ -10,23 +10,21 @@
  */
 
 int chdir_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg5, long *result) {
-    const std::string path(reinterpret_cast<const char *>(arg0));
+    std::string path(reinterpret_cast<const char *>(arg0));
     long tid = syscall_no_intercept(SYS_gettid);
-
-    const std::string *path_to_check = &path;
 
     START_LOG(tid, "call(path=%s)", path.c_str());
 
     if (!is_absolute(&path)) {
-        path_to_check = capio_posix_realpath(&path);
-        if (path_to_check->empty()) {
+        path = capio_posix_realpath(&path);
+        if (path.empty()) {
             *result = -errno;
             return POSIX_SYSCALL_SUCCESS;
         }
     }
 
-    if (is_capio_path(*path_to_check)) {
-        set_current_dir(path_to_check);
+    if (is_capio_path(path)) {
+        set_current_dir(path);
         errno = 0;
         return POSIX_SYSCALL_SUCCESS;
     }

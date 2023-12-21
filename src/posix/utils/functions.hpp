@@ -15,7 +15,7 @@ int posix_return_value(long res, long *result) {
 }
 
 inline std::string absolute(const std::string &path) {
-    return is_absolute(&path) ? path : *capio_posix_realpath(&path);
+    return is_absolute(&path) ? path : capio_posix_realpath(&path);
 }
 
 std::string get_capio_parent_dir(const std::string &path) {
