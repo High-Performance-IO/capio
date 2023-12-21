@@ -27,11 +27,11 @@ inline off64_t capio_unlinkat(int dirfd, const std::string &pathname, int flags,
     bool is_dir = flags & AT_REMOVEDIR;
     if (!is_absolute(&pathname)) {
         if (dirfd == AT_FDCWD) {
-            const std::string *abs_path = capio_posix_realpath(&pathname);
-            if (abs_path->empty()) {
+            const std::string abs_path = capio_posix_realpath(&pathname);
+            if (abs_path.empty()) {
                 return POSIX_SYSCALL_REQUEST_SKIP;
             }
-            res = capio_unlink_abs(*abs_path, tid, is_dir);
+            res = capio_unlink_abs(abs_path, tid, is_dir);
         } else {
             if (!is_directory(dirfd)) {
                 return POSIX_SYSCALL_REQUEST_SKIP;
