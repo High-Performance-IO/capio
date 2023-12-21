@@ -11,8 +11,7 @@ inline off64_t capio_access(const std::string *pathname, mode_t mode, long tid) 
     if (abs_pathname.empty()) {
         errno = ENONET;
         return POSIX_SYSCALL_ERRNO;
-    }
-    if (is_capio_path(abs_pathname)) {
+    } else if (is_capio_path(abs_pathname)) {
         return access_request(abs_pathname, tid);
     } else {
         return POSIX_SYSCALL_REQUEST_SKIP;
@@ -40,8 +39,10 @@ inline off64_t capio_faccessat(int dirfd, const std::string *pathname, mode_t mo
             std::string path = dir_path + "/" + *pathname;
             return is_capio_path(path) ? access_request(path, tid) : -2;
         }
-    } else {
+    } else if (is_capio_path(*pathname)) {
         return access_request(*pathname, tid);
+    } else {
+        return POSIX_SYSCALL_REQUEST_SKIP;
     }
 }
 
