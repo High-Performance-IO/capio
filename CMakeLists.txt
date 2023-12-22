@@ -31,14 +31,6 @@ option(CAPIO_LOG "Enable capio debug logging" FALSE)
 option(CAPIO_SYNC "Use sync MPI primitives" FALSE)
 
 #####################################
-# Generate syscall name lookup tbl
-#####################################
-add_custom_target(
-        ALL
-        COMMAND sh "${CMAKE_PROJECT_DIR}/scripts/generateSyscallLookupTbl.sh ${CMAKE_PROJECT_DIR}/common/capio/syscallnames.h"
-        COMMENT "Generating syscall lookup table")
-
-#####################################
 # CMake module imports
 #####################################
 include(FetchContent)
@@ -59,8 +51,8 @@ IF (CAPIO_LOG)
     message(STATUS "Enabling CAPIO logger")
     add_compile_definitions(CAPIOLOG)
     execute_process(
-            COMMAND bash ${PROJECT_SOURCE_DIR}/scripts/generateSyscallNames.sh
-            WORKING_DIRECTORY "${PROJECT_SOURCE_DIR}"
+            COMMAND bash "${PROJECT_SOURCE_DIR}/scripts/gen_syscallnames.sh"
+            "${PROJECT_BINARY_DIR}/include/syscall/syscallnames.h"
     )
 ENDIF (CAPIO_LOG)
 
@@ -73,6 +65,10 @@ ENDIF (CAPIO_SYNC)
 #####################################
 file(GLOB_RECURSE CAPIO_COMMON_HEADERS "src/common/capio/*.hpp")
 include_directories(src/common)
+
+IF (CAPIO_LOG)
+    include_directories("${PROJECT_BINARY_DIR}/include/syscall")
+ENDIF (CAPIO_LOG)
 
 #####################################
 # Targets
