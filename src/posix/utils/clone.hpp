@@ -48,6 +48,11 @@ void hook_clone_parent(long child_tid) {
     long parent_tid = syscall_no_intercept(SYS_gettid);
     START_LOG(parent_tid, "call(parent_tid=%d, child_tid=%ld)", parent_tid, child_tid);
 
+    if (child_tid < 0) {
+        LOG("Skipping clone as child tid is set to %d: %s", child_tid, std::strerror(child_tid));
+        return;
+    }
+
     LOG("Initializing child thread %d", child_tid);
     init_process(child_tid);
     clone_request(parent_tid, child_tid);
