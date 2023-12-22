@@ -17,6 +17,40 @@ jobs:
       - uses: actions/checkout@v4
       - name: "Run codespell"
         uses: codespell-project/actions-codespell@v2
+  docker-check:
+    name: "Check Docker image"
+    runs-on: ubuntu-22.04
+    strategy:
+      matrix:
+        cmake-build-type:
+          - "Debug"
+          - "Release"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-qemu-action@v3
+      - uses: docker/setup-buildx-action@v3
+      - name: "Build Docker image"
+        uses: docker/build-push-action@v5
+        with:
+          build-args: |
+            CAPIO_BUILD_TESTS=${{ matrix.cmake-build-type == 'Debug' && 'ON' || 'OFF' }}
+            CAPIO_LOG=${{ matrix.cmake-build-type == 'Debug' && 'ON' || 'OFF' }}
+            CMAKE_BUILD_TYPE=${{ matrix.cmake-build-type }}
+          load: true
+          tags: hpio/capio:latest
+      - name: "Run test with Docker"
+        run: |
+          docker run --detach --rm              \
+            --env CAPIO_DIR=/tmp                \
+            --env CAPIO_LOG_LEVEL=-1            \
+            --name capio-docker                 \
+            hpio/capio:latest                   \
+            capio_server --no-config
+          docker exec                           \
+            --env LD_PRELOAD=libcapio_posix.so  \
+            capio-docker                        \
+            sh -c "mkdir /tmp/test && touch /tmp/test/file1 && ls /tmp/test && rm -rf /tmp/test"
+          docker stop capio-docker
   format-check:
     name: "Check ${{ matrix.path }} clang-format conformance"
     runs-on: ubuntu-22.04
