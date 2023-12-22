@@ -263,12 +263,11 @@ int main(int argc, char **argv) {
     std::cout << CAPIO_BANNER;
     backend = new MPI_backend();
 
-    backend->initialize(argc, argv, &rank, &provided);
-
     parseCLI(argc, argv, rank);
 
     START_LOG(gettid(), "call()");
-    LOG("MPI_Comm_rank returned %d", rank);
+
+    backend->initialize(argc, argv, &rank, &provided);
 
     int res = sem_init(&internal_server_sem, 0, 0);
     if (res != 0) {
