@@ -11,7 +11,7 @@
 
 #include "constants.hpp"
 #include "syscall.hpp"
-#ifdef __CAPIO_POSIX
+#if defined(CAPIOLOG) && defined(__CAPIO_POSIX)
 #include "syscallnames.h"
 #endif
 
@@ -109,7 +109,7 @@ class Logger {
         va_start(argp, message);
         va_copy(argpc, argp);
 
-#ifdef __CAPIO_POSIX
+#if defined(CAPIOLOG) && defined(__CAPIO_POSIX)
         if (current_log_level == 0 && loggingSyscall) {
             int syscallNumber = va_arg(argp, int);
             auto buf1         = reinterpret_cast<char *>(capio_syscall(
