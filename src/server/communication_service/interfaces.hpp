@@ -171,7 +171,7 @@ inline void solve_remote_reads(size_t bytes_received, size_t offset, size_t file
 void wait_for_n_files(char *const prefix, std::vector<std::string> *files_path, size_t n_files,
                       int dest, sem_t *sem);
 
-inline void wait_for_file(int tid, int fd, off64_t count, bool dir, bool is_getdents,
+inline void wait_for_file(int tid, int fd, off64_t count, bool dir, bool is_getdents, int rank,
                           CSMyRemotePendingReads_t *pending_remote_reads,
                           std::mutex *pending_remote_reads_mutex,
                           void (*handle_local_read)(int, int, off64_t, bool, bool, bool));

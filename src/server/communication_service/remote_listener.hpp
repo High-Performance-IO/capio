@@ -37,8 +37,7 @@ void solve_remote_reads(size_t bytes_received, size_t offset, size_t file_size, 
     }
 
     START_LOG(gettid(),
-              "call(bytes_received=%ld, offset=%ld, file_size=%ld, path_c=%s, "
-              "complete=%s)",
+              "call(bytes_received=%ld, offset=%ld, file_size=%ld, path_c=%s, complete=%s)",
               bytes_received, offset, file_size, path_c, complete ? "true" : "false");
 
     Capio_file &c_file    = get_capio_file(path_c);
@@ -76,7 +75,7 @@ void solve_remote_reads(size_t bytes_received, size_t offset, size_t file_size, 
                 end_of_sector     = store_dirent(p, p_getdents, dir_size);
                 write_response(tid, end_of_sector);
                 send_data_to_client(tid, p_getdents + fd_offset, bytes_read);
-                free(p_getdents);
+                delete[] p_getdents;
             } else {
                 write_response(tid, end_of_sector);
                 send_data_to_client(tid, p + fd_offset, bytes_read);
@@ -108,15 +107,13 @@ void wait_for_n_files(char *const prefix, std::vector<std::string> *files_path, 
     delete sem;
 }
 
-void wait_for_file(int tid, int fd, off64_t count, bool dir, bool is_getdents,
+void wait_for_file(int tid, int fd, off64_t count, bool dir, bool is_getdents, int rank,
                    CSMyRemotePendingReads_t *pending_remote_reads,
                    std::mutex *pending_remote_reads_mutex,
                    void (*handle_local_read)(int, int, off64_t, bool, bool, bool)) {
     START_LOG(gettid(), "call(tid=%d, fd=%d, count=%ld, dir=%s, is_getdents=%s)", tid, fd, count,
               dir ? "true" : "false", is_getdents ? "true" : "false");
 
-    int rank;
-    MPI_Comm_rank(MPI_COMM_WORLD, &rank);
     std::string_view path_to_check = get_capio_file_path(tid, fd);
     loop_check_files_location(path_to_check.data(), rank);
 
@@ -233,7 +230,7 @@ void recv_nfiles(RemoteRequest *request, void *arg1, void *arg2) {
         } else {
             std::string node_name     = rank_to_node[source];
             const char *node_name_str = node_name.c_str();
-            char *p_node_name         = (char *) malloc(sizeof(char) * (strlen(node_name_str) + 1));
+            auto p_node_name         = new char[strlen(node_name_str) + 1];
             strcpy(p_node_name, node_name_str);
             add_file_location(path, p_node_name, -1);
             p_shm              = new char[file_size];
@@ -343,10 +340,8 @@ void remote_listener_nreads_req(RemoteRequest *request, void *arg1, void *arg2) 
          * create a thread that waits for the completion of such
          * files and then send those files
          */
-        char *prefix_c = (char *) malloc(sizeof(char) * strlen(prefix));
-        if (prefix_c == nullptr) {
-            ERR_EXIT("malloc 2 in capio_remote_listener");
-        }
+        auto prefix_c = new char[strlen(prefix)];
+
         strcpy(prefix_c, prefix);
 
         if (sem_init(sem, 0, 0) == -1) {
@@ -407,7 +402,7 @@ void remote_listener_remote_sending(RemoteRequest *request, void *arg1, void *ar
     bool complete = complete_tmp;
     std::string path(path_c);
 
-    void *file_shm;
+    void *file_shm = nullptr;
     Capio_file &c_file = init_capio_file(path.c_str(), file_shm);
     if (bytes_received != 0) {
         off64_t file_shm_size = c_file.get_buf_size();

@@ -251,7 +251,7 @@ int parseCLI(int argc, char **argv, int rank) {
 }
 
 int main(int argc, char **argv) {
-    int rank, provided;
+    int rank=0, provided=0;
 
     std::cout << CAPIO_LOG_SERVER_BANNER;
     backend = new MPI_backend();
