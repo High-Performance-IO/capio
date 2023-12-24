@@ -1,5 +1,9 @@
-#ifndef CAPIO_UTIL_PRODUCER_HPP
-#define CAPIO_UTIL_PRODUCER_HPP
+#ifndef CAPIO_SERVER_UTILS_PRODUCER_HPP
+#define CAPIO_SERVER_UTILS_PRODUCER_HPP
+
+#include <string>
+
+#include "metadata.hpp"
 
 std::string get_producer_name(const std::string &path) {
     START_LOG(gettid(), "call( %s)", path.c_str());
@@ -32,4 +36,4 @@ bool is_producer(int tid, const std::string &path) {
     return res;
 }
 
-#endif // CAPIO_UTIL_PRODUCER_HPP
+#endif // CAPIO_SERVER_UTILS_PRODUCER_HPP

@@ -10,13 +10,13 @@
  */
 
 int chdir_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg5, long *result) {
-    std::string path(reinterpret_cast<const char *>(arg0));
+    std::filesystem::path path(reinterpret_cast<const char *>(arg0));
     long tid = syscall_no_intercept(SYS_gettid);
 
     START_LOG(tid, "call(path=%s)", path.c_str());
 
-    if (!is_absolute(&path)) {
-        path = capio_posix_realpath(&path);
+    if (path.is_relative()) {
+        path = capio_posix_realpath(path);
         if (path.empty()) {
             *result = -errno;
             return POSIX_SYSCALL_SUCCESS;

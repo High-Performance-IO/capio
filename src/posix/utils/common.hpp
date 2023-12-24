@@ -14,15 +14,6 @@ int posix_return_value(long res, long *result) {
     return POSIX_SYSCALL_SKIP;
 }
 
-inline std::string absolute(const std::string &path) {
-    return is_absolute(&path) ? path : capio_posix_realpath(&path);
-}
-
-std::string get_capio_parent_dir(const std::string &path) {
-    auto pos = path.rfind('/');
-    return path.substr(0, pos);
-}
-
 inline off64_t round(off64_t bytes, bool is_getdents64) {
     off64_t res = 0;
     off64_t ld_size;

@@ -1,6 +1,8 @@
 #ifndef CAPIO_COMMON_CIRCULAR_BUFFER_HPP
 #define CAPIO_COMMON_CIRCULAR_BUFFER_HPP
 
+#include <iostream>
+
 #include <semaphore.h>
 
 #include "capio/logger.hpp"

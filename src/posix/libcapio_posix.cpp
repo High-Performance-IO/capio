@@ -9,7 +9,6 @@
 
 #include <asm-generic/unistd.h>
 
-#include "capio/env.hpp"
 #include "capio/syscall.hpp"
 
 #include "utils/clone.hpp"

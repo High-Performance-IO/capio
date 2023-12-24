@@ -5,8 +5,8 @@
 #include <thread>
 
 #include "utils/location.hpp"
+#include "utils/producer.hpp"
 #include "utils/types.hpp"
-#include "utils/util_producer.hpp"
 
 CSMyRemotePendingStats_t pending_remote_stats;
 std::mutex pending_remote_stats_mutex;
@@ -37,11 +37,11 @@ inline void reply_stat(int tid, const std::string &path, int rank) {
     Capio_file &c_file =
         (c_file_opt) ? c_file_opt->get() : create_capio_file(path, false, get_file_initial_size());
     LOG("Obtained capio file. ready to reply to client");
-    std::string_view mode        = c_file.get_mode();
-    bool complete                = c_file.complete;
-    const std::string *capio_dir = get_capio_dir();
+    std::string_view mode                  = c_file.get_mode();
+    bool complete                          = c_file.complete;
+    const std::filesystem::path &capio_dir = get_capio_dir();
     if (complete || strcmp(std::get<0>(file_location_opt->get()), node_name) == 0 ||
-        mode == CAPIO_FILE_MODE_NO_UPDATE || *capio_dir == path) {
+        mode == CAPIO_FILE_MODE_NO_UPDATE || capio_dir == path) {
         LOG("Sending response to client");
         write_response(tid, c_file.get_file_size());
         write_response(tid, static_cast<int>(c_file.is_dir() ? 1 : 0));

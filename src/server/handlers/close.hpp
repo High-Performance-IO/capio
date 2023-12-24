@@ -2,7 +2,8 @@
 #define CAPIO_SERVER_HANDLERS_CLOSE_HPP
 
 #include "read.hpp"
-#include "utils/util_filesys.hpp"
+
+#include "utils/filesystem.hpp"
 
 inline void handle_close(int tid, int fd, int rank) {
     START_LOG(gettid(), "call(tid=%d, fd=%d, rank=%d)", tid, fd, rank);

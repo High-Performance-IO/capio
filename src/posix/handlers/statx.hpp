@@ -1,12 +1,12 @@
 #ifndef CAPIO_POSIX_HANDLERS_STATX_HPP
 #define CAPIO_POSIX_HANDLERS_STATX_HPP
 
-#include "utils/functions.hpp"
+#include "utils/common.hpp"
 
 inline void fill_statxbuf(struct statx *statxbuf, off_t file_size, bool is_dir, ino_t inode,
                           int mask) {
-    START_LOG(syscall_no_intercept(SYS_gettid), "call(filesize=%ld, is_dir=%d, inode=%d, mask=%d)",
-              file_size, static_cast<int>(is_dir), mask);
+    START_LOG(syscall_no_intercept(SYS_gettid), "call(filesize=%ld, is_dir=%s, inode=%d, mask=%d)",
+              file_size, is_dir ? "true" : "false", mask);
 
     statx_timestamp time{1, 1};
     if (is_dir == 1) {
@@ -32,19 +32,18 @@ inline void fill_statxbuf(struct statx *statxbuf, off_t file_size, bool is_dir, 
     statxbuf->stx_mtime           = time;
 }
 
-inline int capio_statx(int dirfd, const std::string *pathname, int flags, int mask,
+inline int capio_statx(int dirfd, std::filesystem::path &pathname, int flags, int mask,
                        struct statx *statxbuf, long tid) {
     START_LOG(tid, "call(dirfd=%d, pathname=%s, flags=%d, mask=%d, statxbuf=0x%08x)", dirfd,
-              pathname->c_str(), flags, mask, statxbuf);
+              pathname.c_str(), flags, mask, statxbuf);
 
-    std::string absolute_path = *pathname;
     if ((flags & AT_EMPTY_PATH) == AT_EMPTY_PATH) {
         if (dirfd == AT_FDCWD) { // operate on currdir
-            absolute_path = *get_current_dir();
+            pathname = get_current_dir();
         } else { // operate on dirfd. in this case dirfd can refer to any type of file
-            if (!pathname->empty()) {
+            if (!pathname.empty()) {
                 if (exists_capio_fd(dirfd)) {
-                    absolute_path = get_capio_fd_path(dirfd);
+                    pathname = get_capio_fd_path(dirfd);
                 } else {
                     LOG("returning -2 due to !exists_capio_fd");
                     return POSIX_SYSCALL_REQUEST_SKIP;
@@ -56,11 +55,11 @@ inline int capio_statx(int dirfd, const std::string *pathname, int flags, int ma
             }
         }
     } else {
-        if (!is_absolute(pathname)) {
+        if (pathname.is_relative()) {
             if (dirfd == AT_FDCWD) {
                 LOG("dirfd is AT_FDCWD");
-                absolute_path = capio_posix_realpath(pathname);
-                if (absolute_path.empty()) {
+                pathname = capio_posix_realpath(pathname);
+                if (pathname.empty()) {
                     LOG("returning -1 due to pathname empty");
                     return POSIX_SYSCALL_ERRNO;
                 }
@@ -69,36 +68,29 @@ inline int capio_statx(int dirfd, const std::string *pathname, int flags, int ma
                     LOG("returning -2 due to !is_directory");
                     return POSIX_SYSCALL_REQUEST_SKIP;
                 }
-                std::string dir_path = get_dir_path(dirfd);
+                const std::filesystem::path dir_path = get_dir_path(dirfd);
                 if (dir_path.empty()) {
                     LOG("returning -2 due to dir path empty");
                     return POSIX_SYSCALL_REQUEST_SKIP;
                 }
-                if (pathname->substr(0, 2) == "./") {
-                    absolute_path = pathname->substr(2, pathname->length() - 1);
-                }
-                if (absolute_path.at(absolute_path.length() - 1) == '.') {
-                    absolute_path = dir_path;
-                } else {
-                    absolute_path = dir_path + "/" + absolute_path;
-                }
+                pathname = (dir_path / pathname).lexically_normal();
             }
         }
-        if (!is_capio_path(absolute_path)) {
+        if (!is_capio_path(pathname)) {
             LOG("returning -2 due to not being a capio path");
             return POSIX_SYSCALL_REQUEST_SKIP;
         }
     }
 
-    auto [file_size, is_dir] = stat_request(absolute_path, tid);
+    auto [file_size, is_dir] = stat_request(pathname, tid);
     LOG("Filling statx buffer");
-    fill_statxbuf(statxbuf, file_size, is_dir, std::hash<std::string>{}(absolute_path), mask);
+    fill_statxbuf(statxbuf, file_size, is_dir, std::hash<std::string>{}(pathname), mask);
     return POSIX_SYSCALL_SUCCESS;
 }
 
 int statx_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg5, long *result) {
     auto dirfd = static_cast<int>(arg0);
-    std::string pathname(reinterpret_cast<const char *>(arg1));
+    std::filesystem::path pathname(reinterpret_cast<const char *>(arg1));
     auto flags = static_cast<int>(arg2);
     auto mask  = static_cast<int>(arg3);
     auto *buf  = reinterpret_cast<struct statx *>(arg4);
@@ -107,7 +99,7 @@ int statx_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long ar
     START_LOG(tid, "call(dirfd=%ld, pathname=%s, flags=%d, mask=%d)", dirfd, pathname.c_str(),
               flags, mask);
 
-    return posix_return_value(capio_statx(dirfd, &pathname, flags, mask, buf, tid), result);
+    return posix_return_value(capio_statx(dirfd, pathname, flags, mask, buf, tid), result);
 }
 
 #endif // CAPIO_POSIX_HANDLERS_STATX_HPP

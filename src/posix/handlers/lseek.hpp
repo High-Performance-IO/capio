@@ -1,7 +1,7 @@
 #ifndef CAPIO_POSIX_HANDLERS_LSEEK_HPP
 #define CAPIO_POSIX_HANDLERS_LSEEK_HPP
 
-#include "utils/functions.hpp"
+#include "utils/common.hpp"
 
 // TODO: EOVERFLOW is not addressed
 inline off64_t capio_lseek(int fd, off64_t offset, int whence, long tid) {

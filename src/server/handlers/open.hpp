@@ -1,9 +1,9 @@
 #ifndef CAPIO_SERVER_HANDLERS_OPEN_HPP
 #define CAPIO_SERVER_HANDLERS_OPEN_HPP
 
+#include "utils/filesystem.hpp"
 #include "utils/location.hpp"
 #include "utils/metadata.hpp"
-#include "utils/util_filesys.hpp"
 
 inline void update_file_metadata(const std::string &path, int tid, int fd, int rank,
                                  bool is_creat) {

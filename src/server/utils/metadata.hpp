@@ -245,8 +245,8 @@ inline void rename_capio_file(const char *const oldpath, const char *const newpa
     }
 }
 
-void update_metadata_conf(std::string &path, size_t pos, long int n_files, size_t batch_size,
-                          const std::string &committed, const std::string &mode,
+void update_metadata_conf(std::filesystem::path &path, size_t pos, long int n_files,
+                          size_t batch_size, const std::string &committed, const std::string &mode,
                           const std::string &app_name, bool permanent, long int n_close) {
     START_LOG(gettid(),
               "call(path=%s, pos=%ld, n_files=%ld, batch_size=%ld, committed=%s, "
@@ -258,7 +258,7 @@ void update_metadata_conf(std::string &path, size_t pos, long int n_files, size_
         metadata_conf[path] =
             std::make_tuple(committed, mode, app_name, n_files, permanent, n_close);
     } else {
-        std::string prefix_str = path.substr(0, pos);
+        std::string prefix_str = path.native().substr(0, pos);
         metadata_conf_globs.emplace_back(prefix_str, committed, mode, app_name, n_files, batch_size,
                                          permanent, n_close);
     }

@@ -7,14 +7,15 @@ int getcwd_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long a
 
     START_LOG(tid, "call(buf=0x%08x, size=%ld)", buf, size);
 
-    const std::string cwd(*get_current_dir());
+    const std::filesystem::path &cwd = get_current_dir();
+    const size_t length              = cwd.native().length();
 
-    if ((cwd.length() + 1) * sizeof(char) > size) {
+    if ((length + 1) * sizeof(char) > size) {
         *result = -ERANGE;
     } else {
         LOG("CWD: %s", cwd.c_str());
-        cwd.copy(buf, size);
-        buf[cwd.length()] = '\0';
+        cwd.native().copy(buf, size);
+        buf[length] = '\0';
     }
     return POSIX_SYSCALL_SUCCESS;
 }

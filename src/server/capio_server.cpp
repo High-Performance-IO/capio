@@ -68,15 +68,6 @@ CSRankToNodeMap_t rank_to_node;
  */
 CSPendingReadsMap_t pending_reads;
 
-/*
- * It contains all the read requested by other nodes for which the data is not
- * yet available path -> [(offset, numbytes, sem_pointer), ...]
- */
-
-CSClientsRemotePendingReads_t clients_remote_pending_reads;
-
-CSClientsRemotePendingStats_t clients_remote_pending_stat;
-
 // it contains the file saved on disk
 CSOnDiskMap_t on_disk;
 
@@ -134,9 +125,9 @@ void capio_server(int rank) {
     setup_signal_handlers();
     backend->handshake_servers(rank);
     open_files_location(rank);
-    int pid                      = getpid();
-    const std::string *capio_dir = get_capio_dir();
-    create_dir(pid, capio_dir->c_str(), rank,
+    pid_t pid                              = getpid();
+    const std::filesystem::path &capio_dir = get_capio_dir();
+    create_dir(pid, capio_dir.c_str(), rank,
                true); // TODO: can be a problem if a process execute readdir
     // on capio_dir
 
@@ -218,8 +209,8 @@ int parseCLI(int argc, char **argv, int rank) {
         std::cout << CAPIO_SERVER_CLI_LOG_SERVER << "skipping config file parsing" << std::endl;
     } else {
         if (config) {
-            std::string token            = args::get(config);
-            const std::string *capio_dir = get_capio_dir();
+            std::string token                      = args::get(config);
+            const std::filesystem::path &capio_dir = get_capio_dir();
             std::cout << CAPIO_SERVER_CLI_LOG_SERVER << "parsing config file: " << token
                       << std::endl;
             parse_conf_file(token, capio_dir);
@@ -235,7 +226,7 @@ int parseCLI(int argc, char **argv, int rank) {
         }
     }
 
-    std::cout << CAPIO_SERVER_CLI_LOG_SERVER << "CAPIO_DIR=" << get_capio_dir()->c_str()
+    std::cout << CAPIO_SERVER_CLI_LOG_SERVER << "CAPIO_DIR=" << get_capio_dir().c_str()
               << std::endl;
 
     delete log;

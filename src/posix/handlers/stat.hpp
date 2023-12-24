@@ -4,8 +4,9 @@
 #include <sys/vfs.h>
 
 #include "capio/env.hpp"
+
+#include "utils/common.hpp"
 #include "utils/filesystem.hpp"
-#include "utils/functions.hpp"
 #include "utils/requests.hpp"
 
 inline blkcnt_t get_nblocks(off64_t file_size) {
@@ -13,6 +14,10 @@ inline blkcnt_t get_nblocks(off64_t file_size) {
 }
 
 inline void fill_statbuf(struct stat *statbuf, off_t file_size, bool is_dir, ino_t inode) {
+    START_LOG(syscall_no_intercept(SYS_gettid),
+              "call(statbuf=0x%08x, file_size=%ld, is_dir=%s, inode=%ul)", statbuf, file_size,
+              is_dir ? "true" : "false", inode);
+
     struct timespec time {
         1, 1
     };
@@ -48,7 +53,7 @@ inline int capio_fstat(int fd, struct stat *statbuf, long tid) {
     }
 }
 
-inline int capio_lstat(const std::string &absolute_path, struct stat *statbuf, long tid) {
+inline int capio_lstat(const std::filesystem::path &absolute_path, struct stat *statbuf, long tid) {
     START_LOG(tid, "call(absolute_path=%s, statbuf=0x%08x)", absolute_path.c_str(), statbuf);
 
     if (is_capio_path(absolute_path)) {
@@ -60,31 +65,26 @@ inline int capio_lstat(const std::string &absolute_path, struct stat *statbuf, l
     }
 }
 
-inline int capio_lstat_wrapper(const std::string *path, struct stat *statbuf, long tid) {
-    START_LOG(tid, "call(path=%s, buf=0x%08x)", path, statbuf);
+inline int capio_lstat_wrapper(const std::filesystem::path &path, struct stat *statbuf, long tid) {
+    START_LOG(tid, "call(path=%s, buf=0x%08x)", path.c_str(), statbuf);
 
-    if (path == nullptr) {
-        return POSIX_SYSCALL_REQUEST_SKIP;
-    }
-
-    const std::string absolute_path = capio_posix_realpath(path);
+    const std::filesystem::path absolute_path = capio_posix_realpath(path);
     if (absolute_path.empty()) {
         return POSIX_SYSCALL_REQUEST_SKIP;
     }
     return capio_lstat(absolute_path, statbuf, tid);
 }
 
-inline int capio_fstatat(int dirfd, std::string *pathname, struct stat *statbuf, int flags,
-                         long tid) {
+inline int capio_fstatat(int dirfd, std::filesystem::path &pathname, struct stat *statbuf,
+                         int flags, long tid) {
     START_LOG(tid, "call(dirfd=%ld, pathname=%s, statbuf=0x%08x, flags=%X)", dirfd,
-              pathname->c_str(), statbuf, flags);
+              pathname.c_str(), statbuf, flags);
 
     if ((flags & AT_EMPTY_PATH) == AT_EMPTY_PATH) {
         if (dirfd == AT_FDCWD) { // operate on currdir
-            std::string path(*get_current_dir());
-            return capio_lstat(path, statbuf, tid);
+            return capio_lstat(get_current_dir(), statbuf, tid);
         } else { // operate on dirfd. in this case dirfd can refer to any type of file
-            if (pathname->empty()) {
+            if (pathname.empty()) {
                 return capio_fstat(dirfd, statbuf, tid);
             } else {
                 // TODO: set errno
@@ -93,7 +93,7 @@ inline int capio_fstatat(int dirfd, std::string *pathname, struct stat *statbuf,
         }
     }
 
-    if (!is_absolute(pathname)) {
+    if (pathname.is_relative()) {
         if (dirfd == AT_FDCWD) {
             // pathname is interpreted relative to currdir
             return capio_lstat_wrapper(pathname, statbuf, tid);
@@ -101,24 +101,16 @@ inline int capio_fstatat(int dirfd, std::string *pathname, struct stat *statbuf,
             if (!is_directory(dirfd)) {
                 return POSIX_SYSCALL_REQUEST_SKIP;
             }
-            std::string dir_path = get_dir_path(dirfd);
+            const std::filesystem::path dir_path = get_dir_path(dirfd);
             if (dir_path.empty()) {
                 return POSIX_SYSCALL_REQUEST_SKIP;
             }
 
-            if (pathname->substr(0, 2) == "./") {
-                *pathname = pathname->substr(2, pathname->length() - 1);
-            }
-            std::string path;
-            if (pathname->at(pathname->length() - 1) == '.') {
-                path = dir_path;
-            } else if (!is_absolute(pathname)) {
-                path = dir_path + "/" + *pathname;
-            }
-            return capio_lstat(path, statbuf, tid);
+            pathname = (dir_path / pathname).lexically_normal();
+            return capio_lstat(pathname, statbuf, tid);
         }
     } else {
-        return capio_lstat(*pathname, statbuf, tid);
+        return capio_lstat(pathname, statbuf, tid);
     }
 }
 
@@ -133,20 +125,20 @@ int fstat_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long ar
 int fstatat_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg5,
                     long *result) {
     auto dirfd = static_cast<int>(arg0);
-    std::string pathname(reinterpret_cast<const char *>(arg1));
+    std::filesystem::path pathname(reinterpret_cast<const char *>(arg1));
     auto *statbuf = reinterpret_cast<struct stat *>(arg2);
     auto flags    = static_cast<int>(arg3);
     long tid      = syscall_no_intercept(SYS_gettid);
 
-    return posix_return_value(capio_fstatat(dirfd, &pathname, statbuf, flags, tid), result);
+    return posix_return_value(capio_fstatat(dirfd, pathname, statbuf, flags, tid), result);
 }
 
 int lstat_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg5, long *result) {
-    std::string path(reinterpret_cast<const char *>(arg0));
+    std::filesystem::path path(reinterpret_cast<const char *>(arg0));
     auto *buf = reinterpret_cast<struct stat *>(arg1);
     long tid  = syscall_no_intercept(SYS_gettid);
 
-    return posix_return_value(capio_lstat_wrapper(&path, buf, tid), result);
+    return posix_return_value(capio_lstat_wrapper(path, buf, tid), result);
 }
 
 #endif // CAPIO_POSIX_HANDLERS_STAT_HPP
