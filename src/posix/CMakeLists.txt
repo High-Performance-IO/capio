@@ -10,6 +10,10 @@ set(TARGET_SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/libcapio_posix.cpp)
 #####################################
 add_library(${TARGET_NAME} SHARED ${TARGET_SOURCES})
 
+#####################################
+# CMake module imports
+#####################################
+include(ProcessorCount)
 
 #####################################
 # External projects
@@ -27,9 +31,11 @@ execute_process(
 )
 
 IF (UNIX)
+    ProcessorCount(NPROC)
     execute_process(
             COMMAND ${CMAKE_COMMAND} --build
             "${CMAKE_CURRENT_BINARY_DIR}/syscall_intercept"
+            --parallel "${NPROC}"
     )
 
     file(GLOB SYSCALL_INTERCEPT_HEADERS "${SYSCALL_INTERCEPT_INCLUDE_FOLDER}/*.h")
