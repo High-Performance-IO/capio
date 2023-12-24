@@ -34,8 +34,7 @@ class MPI_backend : public backend_interface {
     void destroy(std::vector<sem_t *> *sems) override {
         START_LOG(gettid(), "Call()");
         for (auto sem : *sems) {
-            int res = sem_destroy(sem);
-            if (res != 0) {
+            if (sem_destroy(sem) != 0) {
                 MPI_Finalize();
                 ERR_EXIT("sem_destroy internal_server_sem failed with status %d", res);
             }
@@ -121,9 +120,8 @@ class MPI_backend : public backend_interface {
         size_t prefix_length = prefix.length();
         for (const std::string &path : *files_to_send) {
             Capio_file &c_file = get_capio_file(path.c_str());
-            msg += " " + path.substr(prefix_length);
-            size_t file_size = c_file.get_stored_size();
-            msg += " " + std::to_string(file_size);
+            msg.append(" " + path.substr(prefix_length) + " " +
+                       std::to_string(c_file.get_stored_size()));
         }
 
         MPI_Send(msg.c_str(), msg.length() + 1, MPI_CHAR, dest, 0, MPI_COMM_WORLD);
@@ -138,15 +136,13 @@ class MPI_backend : public backend_interface {
                                   int complete) override {
         START_LOG(gettid(), "call(pach_c=%s, dest=%d, offset=%ld, nbytes=%ld, complete=%d)", path_c,
                   dest, offset, nbytes, complete);
-        if (sem_wait(&remote_read_sem) == -1) {
-            ERR_EXIT("sem_wait remote_read_sem in serve_remote_read");
-        }
+
+        SEM_WAIT_CHECK(&remote_read_sem, "remote_read_sems");
 
         // Send all the rest of the file not only the number of bytes requested
         // Useful for caching
         Capio_file &c_file         = get_capio_file(path_c);
-        size_t file_size           = c_file.get_stored_size();
-        nbytes                     = file_size - offset;
+        nbytes                     = c_file.get_stored_size() - offset;
         off64_t prefetch_data_size = get_prefetch_data_size();
 
         if (prefetch_data_size != 0 && nbytes > prefetch_data_size) {
@@ -156,7 +152,7 @@ class MPI_backend : public backend_interface {
         std::string nbytes_str    = std::to_string(nbytes);
         std::string offset_str    = std::to_string(offset);
         std::string complete_str  = std::to_string(complete);
-        std::string file_size_str = std::to_string(file_size);
+        std::string file_size_str = std::to_string(c_file.get_stored_size());
 
         auto buf_send =
             new char[sizeof(int) + strlen(path_c) + offset_str.length() + nbytes_str.length() +
@@ -172,10 +168,8 @@ class MPI_backend : public backend_interface {
         delete[] buf_send;
         // send data
         send_file(c_file.get_buffer() + offset, nbytes, dest);
-
-        if (sem_post(&remote_read_sem) == -1) {
-            ERR_EXIT("sem_post remote_read_sem in serve_remote_read");
-        }
+        
+        SEM_POST_CHECK(&remote_read_sem, "remote_read_sem");
     }
 
     inline void handle_remote_read(int tid, int fd, off64_t count, int rank, bool dir,
