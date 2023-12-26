@@ -8,7 +8,7 @@
 #include "communication_service/backends/mpi.hpp"
 #include "utils/location.hpp"
 #include "utils/metadata.hpp"
-#include "utils/util_producer.hpp"
+#include "utils/producer.hpp"
 
 CSMyRemotePendingReads_t pending_remote_reads;
 std::mutex pending_remote_reads_mutex;
@@ -111,10 +111,10 @@ inline void handle_read(int tid, int fd, off64_t count, bool dir, bool is_getden
     START_LOG(gettid(), "call(tid=%d, fd=%d, count=%ld, dir=%s, is_getdents=%s, rank=%d)", tid, fd,
               count, dir ? "true" : "false", is_getdents ? "true" : "false", rank);
 
-    std::string_view path        = get_capio_file_path(tid, fd);
-    const std::string *capio_dir = get_capio_dir();
-    bool is_prod                 = is_producer(tid, path.data());
-    auto file_location_opt       = get_file_location_opt(path.data());
+    std::string_view path                  = get_capio_file_path(tid, fd);
+    const std::filesystem::path &capio_dir = get_capio_dir();
+    bool is_prod                           = is_producer(tid, path.data());
+    auto file_location_opt                 = get_file_location_opt(path.data());
 
     if (!file_location_opt && !is_prod) {
         bool found = check_file_location(rank, path.data());
@@ -126,7 +126,7 @@ inline void handle_read(int tid, int fd, off64_t count, bool dir, bool is_getden
         }
     }
     if (is_prod || strcmp(std::get<0>(file_location_opt->get()), node_name) == 0 ||
-        *capio_dir == path) {
+        capio_dir == path) {
         handle_local_read(tid, fd, count, dir, is_getdents, is_prod);
     } else {
         Capio_file &c_file = get_capio_file(path.data());

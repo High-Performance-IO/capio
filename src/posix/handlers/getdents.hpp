@@ -1,8 +1,8 @@
 #ifndef CAPIO_POSIX_HANDLERS_GETDENTS_HPP
 #define CAPIO_POSIX_HANDLERS_GETDENTS_HPP
 
+#include "utils/common.hpp"
 #include "utils/data.hpp"
-#include "utils/functions.hpp"
 
 // TODO: too similar to capio_read, refactoring needed
 inline int getdents_handler_impl(long arg0, long arg1, long arg2, long *result, bool is64bit) {

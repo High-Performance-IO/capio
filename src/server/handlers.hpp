@@ -19,8 +19,6 @@
 #include "handlers/seek.hpp"
 #include "handlers/stat.hpp"
 #include "handlers/unlink.hpp"
-#include "handlers/utils/util_filesys.hpp"
-#include "handlers/utils/util_producer.hpp"
 #include "handlers/write.hpp"
 
 #endif // CAPIO_SERVER_HANDLERS_HPP

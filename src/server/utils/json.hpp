@@ -6,9 +6,9 @@
 #include "utils/metadata.hpp"
 #include "utils/types.hpp"
 
-void parse_conf_file(const std::string &conf_file, const std::string *capio_dir) {
+void parse_conf_file(const std::string &conf_file, const std::filesystem::path &capio_dir) {
     START_LOG(gettid(), "call(config_file='%s', capio_dir='%s')", conf_file.c_str(),
-              capio_dir->c_str());
+              capio_dir.c_str());
 
     simdjson::ondemand::parser parser;
     simdjson::padded_string json;
@@ -112,14 +112,11 @@ void parse_conf_file(const std::string &conf_file, const std::string *capio_dir)
                 if (error) {
                     batch_size = 0;
                 }
-                std::string path = std::string(name);
-                if (!is_absolute(&path)) {
-                    if (path.substr(0, 2) == "./") {
-                        path = path.substr(2, path.length() - 2);
-                    }
-                    path = *capio_dir + "/" + path;
+                std::filesystem::path path(name);
+                if (path.is_relative()) {
+                    path = (capio_dir / path).lexically_normal();
                 }
-                std::size_t pos = path.find('*');
+                std::size_t pos = path.native().find('*');
                 update_metadata_conf(path, pos, n_files, batch_size, std::string(commit_rule),
                                      std::string(mode), std::string(app_name), false, n_close);
             }
@@ -138,19 +135,16 @@ void parse_conf_file(const std::string &conf_file, const std::string *capio_dir)
     } else {
         for (auto file : permanent_files) {
             std::string_view name;
-            error            = file.get_string().get(name);
-            std::string path = std::string(name);
+            error = file.get_string().get(name);
+            std::filesystem::path path(name);
 
-            if (!is_absolute(&path)) {
-                if (path.substr(0, 2) == "./") {
-                    path = path.substr(2, path.length() - 2);
-                }
-                path = *capio_dir + "/" + path;
+            if (path.is_relative()) {
+                path = (capio_dir / path).lexically_normal();
             }
             // NOTE: here there was a copy of the previous structured block.
             // pretty much sure it is a bug, but it might be wanted...
 
-            std::size_t pos = path.find('*');
+            std::size_t pos = path.native().find('*');
             if (pos == std::string::npos) {
                 auto it = metadata_conf.find(path);
                 if (it == metadata_conf.end()) {
@@ -160,7 +154,7 @@ void parse_conf_file(const std::string &conf_file, const std::string *capio_dir)
                     std::get<4>(it->second) = true;
                 }
             } else {
-                std::string prefix_str = path.substr(0, pos);
+                std::string prefix_str = path.native().substr(0, pos);
                 long int i             = match_globs(prefix_str);
                 if (i == -1) {
                     update_metadata_conf(path, pos, -1, batch_size, CAPIO_FILE_MODE_ON_TERMINATION,

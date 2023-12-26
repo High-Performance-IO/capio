@@ -12,12 +12,12 @@
 #include "logger.hpp"
 #include "syscall.hpp"
 
-const std::string *get_capio_dir() {
-    static std::string *capio_dir = nullptr;
+const std::filesystem::path &get_capio_dir() {
+    static std::filesystem::path capio_dir{};
     START_LOG(capio_syscall(SYS_gettid), "call()");
     // TODO: if CAPIO_DIR is not set, it should be left as null
 
-    if (capio_dir == nullptr) {
+    if (capio_dir.empty()) {
         const char *val = std::getenv("CAPIO_DIR");
         auto buf        = std::unique_ptr<char[]>(new char[PATH_MAX]);
 
@@ -41,9 +41,9 @@ const std::string *get_capio_dir() {
                          val, buf.get());
             }
         }
-        capio_dir = new std::string(buf.get());
+        capio_dir = std::filesystem::path(buf.get());
     }
-    LOG("CAPIO=DIR=%s", capio_dir->c_str());
+    LOG("CAPIO=DIR=%s", capio_dir.c_str());
 
     return capio_dir;
 }

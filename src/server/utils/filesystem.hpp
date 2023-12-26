@@ -1,8 +1,21 @@
-#ifndef CAPIO_UTIL_FILESYS_HPP
-#define CAPIO_UTIL_FILESYS_HPP
+#ifndef CAPIO_SERVER_UTILS_FILESYSTEM_HPP
+#define CAPIO_SERVER_UTILS_FILESYSTEM_HPP
+
+#include <filesystem>
+#include <list>
+
+#include <dirent.h>
 
 #include "capio/data_structure.hpp"
-#include "utils/location.hpp"
+
+#include "capio_file.hpp"
+#include "common.hpp"
+#include "location.hpp"
+#include "metadata.hpp"
+#include "types.hpp"
+
+CSClientsRemotePendingReads_t clients_remote_pending_reads;
+CSClientsRemotePendingStats_t clients_remote_pending_stat;
 
 void reply_remote_stats(const std::string &path) {
     START_LOG(gettid(), "call(%s)", path.c_str());
@@ -53,19 +66,15 @@ void handle_pending_remote_reads(const std::string &path, off64_t data_size, boo
  * type == 2 -> ".." entry
  */
 
-void write_entry_dir(int tid, const std::string &file_path, const std::string &dir, int type) {
+void write_entry_dir(int tid, const std::filesystem::path &file_path, const std::string &dir,
+                     int type) {
     START_LOG(tid, "call(file_path=%s, dir=%s, type=%d)", file_path.c_str(), dir.c_str(), type);
 
-    std::hash<std::string> hash;
     struct linux_dirent64 ld {};
-    ld.d_ino = hash(file_path);
-    std::string file_name;
+    ld.d_ino = std::hash<std::string>{}(file_path);
+    std::filesystem::path file_name;
     if (type == 0) {
-        std::size_t i = file_path.rfind('/');
-        if (i == std::string::npos) {
-            logfile << "invalid file_path in get_parent_dir_path" << std::endl;
-        }
-        file_name = file_path.substr(i + 1);
+        file_name = file_path.filename();
         LOG("FILENAME: %s", file_name.c_str());
     } else if (type == 1) {
         file_name = ".";
@@ -73,7 +82,7 @@ void write_entry_dir(int tid, const std::string &file_path, const std::string &d
         file_name = "..";
     }
 
-    strcpy(ld.d_name, file_name.data());
+    strcpy(ld.d_name, file_name.c_str());
     LOG("FILENAME LD: %s", ld.d_name);
     long int ld_size = THEORETICAL_SIZE_DIRENT64;
     ld.d_reclen      = ld_size;
@@ -113,10 +122,10 @@ void write_entry_dir(int tid, const std::string &file_path, const std::string &d
     }
 }
 
-void update_dir(int tid, const std::string &file_path, int rank) {
+void update_dir(int tid, const std::filesystem::path &file_path, int rank) {
     START_LOG(tid, "call(file_path=%s, rank=%d)", file_path.c_str(), rank);
-    std::string dir    = get_parent_dir_path(file_path);
-    Capio_file &c_file = get_capio_file(dir.c_str());
+    const std::filesystem::path dir = get_parent_dir_path(file_path);
+    Capio_file &c_file              = get_capio_file(dir.c_str());
     if (c_file.first_write) {
         c_file.first_write = false;
         write_file_location(rank, dir, tid);
@@ -140,7 +149,7 @@ off64_t create_dir(int tid, const char *pathname, int rank, bool root_dir) {
                 update_dir(tid, pathname, rank);
             }
             write_entry_dir(tid, pathname, pathname, 1);
-            std::string parent_dir = get_parent_dir_path(pathname);
+            const std::filesystem::path parent_dir = get_parent_dir_path(pathname);
             write_entry_dir(tid, parent_dir, pathname, 2);
         }
         return 0;
@@ -149,4 +158,4 @@ off64_t create_dir(int tid, const char *pathname, int rank, bool root_dir) {
     }
 }
 
-#endif // CAPIO_UTIL_FILESYS_HPP
+#endif // CAPIO_SERVER_UTILS_FILESYSTEM_HPP
