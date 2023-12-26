@@ -43,7 +43,7 @@ const std::filesystem::path &get_capio_dir() {
         }
         capio_dir = std::filesystem::path(buf.get());
     }
-    LOG("CAPIO=DIR=%s", capio_dir.c_str());
+    LOG("CAPIO_DIR=%s", capio_dir.c_str());
 
     return capio_dir;
 }
