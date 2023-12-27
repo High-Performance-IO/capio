@@ -51,13 +51,14 @@ void wait_for_stat(int tid, const std::string &path, int rank,
 
     loop_check_files_location(path, rank);
     // check if the file is local or remote
-    Capio_file &c_file    = get_capio_file(path.c_str());
-    std::string_view mode = c_file.get_mode();
-    bool complete         = c_file.complete;
-    if (complete || strcmp(std::get<0>(get_file_location(path.c_str())), node_name) == 0 ||
-        mode == CAPIO_FILE_MODE_NO_UPDATE) {
+    Capio_file &c_file = get_capio_file(path.c_str());
+
+    if (c_file.complete || c_file.get_mode() == CAPIO_FILE_MODE_NO_UPDATE ||
+        strcmp(std::get<0>(get_file_location(path.c_str())), node_name) == 0) {
+
         write_response(tid, c_file.get_file_size());
         write_response(tid, static_cast<int>(c_file.is_dir() ? 1 : 0));
+
     } else {
         backend->handle_remote_stat(tid, path, rank, pending_remote_stats,
                                     pending_remote_stats_mutex);
@@ -71,27 +72,27 @@ void wait_for_file(int tid, int fd, off64_t count, bool dir, bool is_getdents, i
     START_LOG(gettid(), "call(tid=%d, fd=%d, count=%ld, dir=%s, is_getdents=%s)", tid, fd, count,
               dir ? "true" : "false", is_getdents ? "true" : "false");
 
-    std::string_view path_to_check = get_capio_file_path(tid, fd);
-    loop_check_files_location(path_to_check.data(), rank);
+    auto path_to_check = get_capio_file_path(tid, fd).data();
+    loop_check_files_location(path_to_check, rank);
 
     // check if the file is local or remote
-    if (strcmp(std::get<0>(get_file_location(path_to_check.data())), node_name) == 0) {
+    if (strcmp(std::get<0>(get_file_location(path_to_check)), node_name) == 0) {
         handle_local_read(tid, fd, count, dir, is_getdents, false);
     } else {
-        Capio_file &c_file = get_capio_file(path_to_check.data());
+        Capio_file &c_file = get_capio_file(path_to_check);
         if (!c_file.complete) {
-            auto it             = apps.find(tid);
-            bool nreads_handled = false;
-            if (it != apps.end()) {
-                std::string app_name = it->second;
-                nreads_handled       = backend->handle_nreads(
-                    path_to_check.data(), app_name,
-                    nodes_helper_rank[std::get<0>(get_file_location(path_to_check.data()))]);
-            }
-            if (nreads_handled) {
-                const std::lock_guard<std::mutex> lg(*pending_remote_reads_mutex);
-                (*pending_remote_reads)[path_to_check.data()].emplace_back(tid, fd, count,
-                                                                           is_getdents);
+            auto remote_app = apps.find(tid);
+
+            if (remote_app != apps.end()) {
+                auto offset          = std::get<0>(get_file_location(path_to_check));
+                auto remote_app_name = remote_app->second;
+                if (!backend->handle_nreads(path_to_check, remote_app_name,
+                                            nodes_helper_rank[offset])) {
+
+                    const std::lock_guard<std::mutex> lg(*pending_remote_reads_mutex);
+                    (*pending_remote_reads)[path_to_check].emplace_back(tid, fd, count,
+                                                                        is_getdents);
+                }
             }
         }
 
