@@ -227,7 +227,7 @@ class Logger {
     int res = sem_destroy(sem);                                                                    \
     if ((res = sem_destroy(sem)) != 0) {                                                           \
         action;                                                                                    \
-        ERR_EXIT("sem_destroy internal_server_sem failed with status %d", res);                    \
+        ERR_EXIT("destruction of semaphore %s failed with status %d", sem_name, res);              \
     };
 
 #endif // CAPIO_COMMON_LOGGER_HPP

@@ -17,8 +17,8 @@ void wait_for_n_files(char *const prefix, std::vector<std::string> *files_path, 
     backend->send_n_files(prefix, files_path, n_files, dest);
 
     delete files_path;
-    delete[] prefix;
     delete n_files_ready;
+    delete[] prefix;
 }
 
 static inline void wait_for_completion(char *const path, const Capio_file &c_file, int dest,
@@ -29,7 +29,7 @@ static inline void wait_for_completion(char *const path, const Capio_file &c_fil
     backend->serve_remote_stat(path, dest, c_file);
 
     delete data_is_complete;
-    delete path;
+    delete[] path;
 }
 
 void wait_for_data(char *const path, off64_t offset, int dest, off64_t nbytes,
@@ -40,8 +40,8 @@ void wait_for_data(char *const path, off64_t offset, int dest, off64_t nbytes,
     SEM_WAIT_CHECK(data_is_available, "data_is_available");
     backend->serve_remote_read(path, dest, offset, nbytes, get_capio_file(path).complete);
 
-    delete path;
     delete data_is_available;
+    delete[] path;
 }
 
 void wait_for_stat(int tid, const std::string &path, int rank,
@@ -61,6 +61,42 @@ void wait_for_stat(int tid, const std::string &path, int rank,
     } else {
         backend->handle_remote_stat(tid, path, rank, pending_remote_stats,
                                     pending_remote_stats_mutex);
+    }
+}
+
+void wait_for_file(int tid, int fd, off64_t count, bool dir, bool is_getdents, int rank,
+                   CSMyRemotePendingReads_t *pending_remote_reads,
+                   std::mutex *pending_remote_reads_mutex,
+                   void (*handle_local_read)(int, int, off64_t, bool, bool, bool)) {
+    START_LOG(gettid(), "call(tid=%d, fd=%d, count=%ld, dir=%s, is_getdents=%s)", tid, fd, count,
+              dir ? "true" : "false", is_getdents ? "true" : "false");
+
+    std::string_view path_to_check = get_capio_file_path(tid, fd);
+    loop_check_files_location(path_to_check.data(), rank);
+
+    // check if the file is local or remote
+    if (strcmp(std::get<0>(get_file_location(path_to_check.data())), node_name) == 0) {
+        handle_local_read(tid, fd, count, dir, is_getdents, false);
+    } else {
+        Capio_file &c_file = get_capio_file(path_to_check.data());
+        if (!c_file.complete) {
+            auto it             = apps.find(tid);
+            bool nreads_handled = false;
+            if (it != apps.end()) {
+                std::string app_name = it->second;
+                nreads_handled       = backend->handle_nreads(
+                    path_to_check.data(), app_name,
+                    nodes_helper_rank[std::get<0>(get_file_location(path_to_check.data()))]);
+            }
+            if (nreads_handled) {
+                const std::lock_guard<std::mutex> lg(*pending_remote_reads_mutex);
+                (*pending_remote_reads)[path_to_check.data()].emplace_back(tid, fd, count,
+                                                                           is_getdents);
+            }
+        }
+
+        backend->handle_remote_read(tid, fd, count, rank, dir, is_getdents, pending_remote_reads,
+                                    pending_remote_reads_mutex, handle_local_read);
     }
 }
 
@@ -126,42 +162,6 @@ void solve_remote_reads(size_t bytes_received, size_t offset, size_t file_size, 
             prev_it = it;
             ++it;
         }
-    }
-}
-
-void wait_for_file(int tid, int fd, off64_t count, bool dir, bool is_getdents, int rank,
-                   CSMyRemotePendingReads_t *pending_remote_reads,
-                   std::mutex *pending_remote_reads_mutex,
-                   void (*handle_local_read)(int, int, off64_t, bool, bool, bool)) {
-    START_LOG(gettid(), "call(tid=%d, fd=%d, count=%ld, dir=%s, is_getdents=%s)", tid, fd, count,
-              dir ? "true" : "false", is_getdents ? "true" : "false");
-
-    std::string_view path_to_check = get_capio_file_path(tid, fd);
-    loop_check_files_location(path_to_check.data(), rank);
-
-    // check if the file is local or remote
-    if (strcmp(std::get<0>(get_file_location(path_to_check.data())), node_name) == 0) {
-        handle_local_read(tid, fd, count, dir, is_getdents, false);
-    } else {
-        Capio_file &c_file = get_capio_file(path_to_check.data());
-        if (!c_file.complete) {
-            auto it             = apps.find(tid);
-            bool nreads_handled = false;
-            if (it != apps.end()) {
-                std::string app_name = it->second;
-                nreads_handled       = backend->handle_nreads(
-                    path_to_check.data(), app_name,
-                    nodes_helper_rank[std::get<0>(get_file_location(path_to_check.data()))]);
-            }
-            if (nreads_handled) {
-                const std::lock_guard<std::mutex> lg(*pending_remote_reads_mutex);
-                (*pending_remote_reads)[path_to_check.data()].emplace_back(tid, fd, count,
-                                                                           is_getdents);
-            }
-        }
-
-        backend->handle_remote_read(tid, fd, count, rank, dir, is_getdents, pending_remote_reads,
-                                    pending_remote_reads_mutex, handle_local_read);
     }
 }
 
@@ -303,8 +303,6 @@ void remote_listener_stat_req(RemoteRequest *request, void *arg1, void *arg2) {
         std::thread t(wait_for_completion, path_c, std::cref(c_file), dest, sem);
         t.detach();
     }
-
-    delete[] path_c;
 }
 
 void remote_listener_nreads_req(RemoteRequest *request, void *arg1, void *arg2) {
