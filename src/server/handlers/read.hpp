@@ -120,8 +120,8 @@ inline void handle_read(int tid, int fd, off64_t count, bool dir, bool is_getden
         bool found = check_file_location(rank, path.data());
         if (!found) {
             // launch a thread that checks when the file is created
-            std::thread t(wait_for_file, tid, fd, count, dir, is_getdents, rank, &pending_remote_reads,
-                          &pending_remote_reads_mutex, handle_local_read);
+            std::thread t(wait_for_file, tid, fd, count, dir, is_getdents, rank,
+                          &pending_remote_reads, &pending_remote_reads_mutex, handle_local_read);
             t.detach();
         }
     }

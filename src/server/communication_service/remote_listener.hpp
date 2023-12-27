@@ -129,8 +129,6 @@ void solve_remote_reads(size_t bytes_received, size_t offset, size_t file_size, 
     }
 }
 
-
-
 void wait_for_file(int tid, int fd, off64_t count, bool dir, bool is_getdents, int rank,
                    CSMyRemotePendingReads_t *pending_remote_reads,
                    std::mutex *pending_remote_reads_mutex,
@@ -272,8 +270,6 @@ void recv_nfiles(RemoteRequest *request, void *arg1, void *arg2) {
                            pending_remote_reads_mutex);
     }
 }
-
-
 
 void remote_listener_handle_stat_reply(RemoteRequest *request, void *arg1, void *arg2) {
     START_LOG(gettid(), "call(buf_recv=%s)", request->getRequest());

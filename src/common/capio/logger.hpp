@@ -216,7 +216,7 @@ class Logger {
         ERR_EXIT(message);                                                                         \
     }
 
-#define SEM_POST_CHECK(sem, sem_name)                                                               \
+#define SEM_POST_CHECK(sem, sem_name)                                                              \
     if (sem_post(sem) == -1) {                                                                     \
         char message[1024];                                                                        \
         sprintf(message, "unable to post on %s", sem_name);                                        \

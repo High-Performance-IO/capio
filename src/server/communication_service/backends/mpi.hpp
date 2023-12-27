@@ -34,7 +34,8 @@ class MPI_backend : public backend_interface {
     void destroy(std::vector<sem_t *> *sems) override {
         START_LOG(gettid(), "Call()");
         for (auto sem : *sems) {
-            if (sem_destroy(sem) != 0) {
+            int res = 0;
+            if ((res = sem_destroy(sem)) != 0) {
                 MPI_Finalize();
                 ERR_EXIT("sem_destroy internal_server_sem failed with status %d", res);
             }
@@ -168,7 +169,7 @@ class MPI_backend : public backend_interface {
         delete[] buf_send;
         // send data
         send_file(c_file.get_buffer() + offset, nbytes, dest);
-        
+
         SEM_POST_CHECK(&remote_read_sem, "remote_read_sem");
     }
 
