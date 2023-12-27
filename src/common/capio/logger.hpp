@@ -223,4 +223,11 @@ class Logger {
         ERR_EXIT(message);                                                                         \
     }
 
+#define SEM_DESTROY_CHECK(sem, sem_name, action)                                                   \
+    int res = sem_destroy(sem);                                                                    \
+    if ((res = sem_destroy(sem)) != 0) {                                                           \
+        action;                                                                                    \
+        ERR_EXIT("sem_destroy internal_server_sem failed with status %d", res);                    \
+    };
+
 #endif // CAPIO_COMMON_LOGGER_HPP
