@@ -46,3 +46,25 @@ TEST_CASE("Test absolute paths outside the CAPIO_DIR when path does not exist", 
     const std::filesystem::path PATHNAME = "/tmp/test";
     REQUIRE(capio_posix_realpath(PATHNAME) == PATHNAME);
 }
+
+TEST_CASE("Test relative paths inside the CAPIO_DIR when cwd is the CAPIO_DIR") {
+    const std::filesystem::path &capio_dir = get_capio_dir();
+    const std::filesystem::path PATHNAME   = capio_dir / "test";
+    set_current_dir(capio_dir);
+    REQUIRE(mkdir(PATHNAME.c_str(), S_IRWXU) != -1);
+    REQUIRE(access(PATHNAME.c_str(), F_OK) == 0);
+    REQUIRE(capio_posix_realpath("test") == PATHNAME);
+    REQUIRE(rmdir(PATHNAME.c_str()) != -1);
+    REQUIRE(access(PATHNAME.c_str(), F_OK) != 0);
+}
+
+TEST_CASE("Test relative paths inside the CAPIO_DIR when cwd is a parent of the CAPIO_DIR") {
+    const std::filesystem::path &capio_dir = get_capio_dir();
+    const std::filesystem::path PATHNAME   = capio_dir / "test";
+    set_current_dir(capio_dir.parent_path());
+    REQUIRE(mkdir(PATHNAME.c_str(), S_IRWXU) != -1);
+    REQUIRE(access(PATHNAME.c_str(), F_OK) == 0);
+    REQUIRE(capio_posix_realpath(capio_dir.filename() / "test") == PATHNAME);
+    REQUIRE(rmdir(PATHNAME.c_str()) != -1);
+    REQUIRE(access(PATHNAME.c_str(), F_OK) != 0);
+}
