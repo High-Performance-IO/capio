@@ -123,4 +123,3 @@ If the command succeeds, it should print something like this
  ✔ Container example-capio-1  Removed  0.4s 
  ✔ Network example_capionet   Removed  0.3s 
 ```
-
