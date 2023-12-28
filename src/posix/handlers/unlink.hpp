@@ -5,18 +5,19 @@
 
 off64_t capio_unlink_abs(const std::filesystem::path &abs_path, long tid, bool is_dir) {
     START_LOG(tid, "call(abs_path=%s, is_dir=%s)", abs_path.c_str(), is_dir ? "true" : "false");
-    if (!is_capio_path(abs_path)) {
+
+    if (is_capio_path(abs_path)) {
         if (is_capio_dir(abs_path)) {
             ERR_EXIT("ERROR: unlink to the capio_dir %s", abs_path.c_str());
         } else {
-            return POSIX_SYSCALL_REQUEST_SKIP;
+            off64_t res = is_dir ? rmdir_request(abs_path, tid) : unlink_request(abs_path, tid);
+            if (res == -1) {
+                errno = ENOENT;
+            }
+            return res;
         }
     } else {
-        off64_t res = is_dir ? rmdir_request(abs_path, tid) : unlink_request(abs_path, tid);
-        if (res == -1) {
-            errno = ENOENT;
-        }
-        return res;
+        return POSIX_SYSCALL_REQUEST_SKIP;
     }
 }
 
