@@ -89,13 +89,15 @@ std::filesystem::path capio_posix_realpath(const std::filesystem::path &pathname
         if (pathname.is_absolute()) {
             LOG("Path=%s is already absolute", pathname.c_str());
             return {pathname};
-        } else if (is_capio_path(*current_dir)) {
-            const std::filesystem::path new_path = (*current_dir / pathname).lexically_normal();
-            LOG("Computed absolute path = %s", new_path.c_str());
-            return new_path;
         } else {
-            LOG("file %s is not a posix file, nor a capio file!", pathname.c_str());
-            return {};
+            std::filesystem::path new_path = (*current_dir / pathname).lexically_normal();
+            if (is_capio_path(new_path)) {
+                LOG("Computed absolute path = %s", new_path.c_str());
+                return new_path;
+            } else {
+                LOG("file %s is not a posix file, nor a capio file!", pathname.c_str());
+                return {};
+            }
         }
     }
 
