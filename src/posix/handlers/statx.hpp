@@ -37,21 +37,17 @@ inline int capio_statx(int dirfd, std::filesystem::path &pathname, int flags, in
     START_LOG(tid, "call(dirfd=%d, pathname=%s, flags=%d, mask=%d, statxbuf=0x%08x)", dirfd,
               pathname.c_str(), flags, mask, statxbuf);
 
-    if ((flags & AT_EMPTY_PATH) == AT_EMPTY_PATH) {
+    if (pathname.empty() && (flags & AT_EMPTY_PATH) == AT_EMPTY_PATH) {
+        LOG("pathname is empty and AT_EMPTY_PATH is set");
         if (dirfd == AT_FDCWD) { // operate on currdir
+            LOG("dirfd is AT_FDCWD");
             pathname = get_current_dir();
         } else { // operate on dirfd. in this case dirfd can refer to any type of file
-            if (!pathname.empty()) {
-                if (exists_capio_fd(dirfd)) {
-                    pathname = get_capio_fd_path(dirfd);
-                } else {
-                    LOG("returning -2 due to !exists_capio_fd");
-                    return POSIX_SYSCALL_REQUEST_SKIP;
-                }
+            if (exists_capio_fd(dirfd)) {
+                pathname = get_capio_fd_path(dirfd);
             } else {
-                LOG("returning -1 due to pathname empty");
-                // TODO: set errno
-                return POSIX_SYSCALL_ERRNO;
+                LOG("returning -2 due to !exists_capio_fd");
+                return POSIX_SYSCALL_REQUEST_SKIP;
             }
         }
     } else {
@@ -61,12 +57,14 @@ inline int capio_statx(int dirfd, std::filesystem::path &pathname, int flags, in
                 pathname = capio_posix_realpath(pathname);
                 if (pathname.empty()) {
                     LOG("returning -1 due to pathname empty");
+                    errno = ENOENT;
                     return POSIX_SYSCALL_ERRNO;
                 }
             } else {
                 if (!is_directory(dirfd)) {
                     LOG("returning -2 due to !is_directory");
-                    return POSIX_SYSCALL_REQUEST_SKIP;
+                    errno = ENOTDIR;
+                    return POSIX_SYSCALL_ERRNO;
                 }
                 const std::filesystem::path dir_path = get_dir_path(dirfd);
                 if (dir_path.empty()) {
@@ -83,7 +81,10 @@ inline int capio_statx(int dirfd, std::filesystem::path &pathname, int flags, in
     }
 
     auto [file_size, is_dir] = stat_request(pathname, tid);
-    LOG("Filling statx buffer");
+    if (file_size == -1) {
+        errno = ENOENT;
+        return POSIX_SYSCALL_ERRNO;
+    }
     fill_statxbuf(statxbuf, file_size, is_dir, std::hash<std::string>{}(pathname), mask);
     return POSIX_SYSCALL_SUCCESS;
 }

@@ -250,8 +250,7 @@ std::filesystem::path get_dir_path(int dirfd) {
         char proclnk[128];
         char dir_pathname[PATH_MAX];
         sprintf(proclnk, "/proc/self/fd/%d", dirfd);
-        ssize_t r = readlink(proclnk, dir_pathname, PATH_MAX);
-        if (r < 0) {
+        if (syscall_no_intercept(SYS_readlink, proclnk, dir_pathname, PATH_MAX) < 0) {
             fprintf(stderr, "failed to readlink\n");
             return {};
         }

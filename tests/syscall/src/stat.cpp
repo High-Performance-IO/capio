@@ -41,6 +41,12 @@ TEST_CASE("Test stat syscall on folder", "[syscall]") {
     REQUIRE(access(PATHNAME, F_OK) != 0);
 }
 
+TEST_CASE("Test stat syscall on nonexistent file", "[syscall]") {
+    struct stat statbuf {};
+    REQUIRE(stat("test", &statbuf) == -1);
+    REQUIRE(errno == ENOENT);
+}
+
 TEST_CASE("Test fstat syscall on file", "[syscall]") {
     constexpr const char *PATHNAME = "test_file.txt";
     constexpr const char *BUFFER =
@@ -70,6 +76,12 @@ TEST_CASE("Test fstat syscall on folder", "[syscall]") {
     REQUIRE(close(fd) != -1);
     REQUIRE(rmdir(PATHNAME) != -1);
     REQUIRE(access(PATHNAME, F_OK) != 0);
+}
+
+TEST_CASE("Test fstat syscall on invalid fd", "[syscall]") {
+    struct stat statbuf {};
+    REQUIRE(fstat(-1, &statbuf) == -1);
+    REQUIRE(errno == EBADF);
 }
 
 TEST_CASE("Test fstatat syscall on file with AT_FDCWD", "[syscall]") {
@@ -163,6 +175,60 @@ TEST_CASE("Test fstatat syscall on folder in a different directory using dirfd",
     REQUIRE(unlinkat(dirfd, PATHNAME, AT_REMOVEDIR) != -1);
     REQUIRE(faccessat(dirfd, PATHNAME, F_OK, 0) != 0);
     REQUIRE(close(dirfd) != -1);
+}
+
+TEST_CASE("Test fstatat syscall using AT_EMPTY_PATH and AT_FDCWD", "[syscall]") {
+    struct stat statbuf {};
+    REQUIRE(fstatat(AT_FDCWD, "", &statbuf, AT_EMPTY_PATH) == 0);
+    check_statbuf(statbuf, 4096);
+}
+
+TEST_CASE("Test fstatat syscall on file using AT_EMPTY_PATH and dirfd", "[syscall]") {
+    constexpr const char *PATHNAME = "test_file.txt";
+    constexpr const char *BUFFER =
+        "QWERTYUIOPASDFGHJKLZXCVBNM1234567890qwertyuiopasdfghjklzxcvbnm\0";
+    int dirfd = openat(AT_FDCWD, PATHNAME, O_CREAT | O_WRONLY | O_TRUNC, S_IRUSR | S_IWUSR);
+    REQUIRE(faccessat(AT_FDCWD, PATHNAME, F_OK, 0) == 0);
+    REQUIRE(write(dirfd, BUFFER, strlen(BUFFER)) == strlen(BUFFER));
+    struct stat statbuf {};
+    REQUIRE(fstatat(dirfd, "", &statbuf, AT_EMPTY_PATH) == 0);
+    check_statbuf(statbuf, strlen(BUFFER) * sizeof(char));
+    REQUIRE(close(dirfd) != -1);
+    REQUIRE(unlinkat(AT_FDCWD, PATHNAME, 0) != -1);
+    REQUIRE(faccessat(AT_FDCWD, PATHNAME, F_OK, 0) != 0);
+}
+
+TEST_CASE("Test fstatat syscall on folder using AT_EMPTY_PATH and dirfd", "[syscall]") {
+    constexpr const char *PATHNAME = "test";
+    REQUIRE(mkdirat(AT_FDCWD, PATHNAME, S_IRWXU) != -1);
+    REQUIRE(faccessat(AT_FDCWD, PATHNAME, F_OK, 0) == 0);
+    int dirfd = openat(AT_FDCWD, PATHNAME, O_RDONLY | O_DIRECTORY);
+    REQUIRE(dirfd != -1);
+    struct stat statbuf {};
+    REQUIRE(fstatat(dirfd, "", &statbuf, AT_EMPTY_PATH) == 0);
+    check_statbuf(statbuf, 4096);
+    REQUIRE(close(dirfd) != -1);
+    REQUIRE(unlinkat(AT_FDCWD, PATHNAME, AT_REMOVEDIR) != -1);
+    REQUIRE(faccessat(AT_FDCWD, PATHNAME, F_OK, 0) != 0);
+}
+
+TEST_CASE("Test fstatat syscall on nonexistent file", "[syscall]") {
+    struct stat statbuf {};
+    REQUIRE(fstatat(AT_FDCWD, "test", &statbuf, 0) == -1);
+    REQUIRE(errno == ENOENT);
+}
+
+TEST_CASE("Test fstatat syscall on relative path with invalid dirfd", "[syscall]") {
+    constexpr const char *PATHNAME = "test";
+    struct stat statbuf {};
+    REQUIRE(fstatat(-1, PATHNAME, &statbuf, 0) == -1);
+    REQUIRE(errno == EBADF);
+}
+
+TEST_CASE("Test fstatat syscall with empty path and no AT_EMPTY_PATH flag", "[syscall]") {
+    struct stat statbuf {};
+    REQUIRE(fstatat(AT_FDCWD, "", &statbuf, 0) == -1);
+    REQUIRE(errno == ENOENT);
 }
 
 TEST_CASE("Test file creation, write and close using stat", "[syscall]") {
