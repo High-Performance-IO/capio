@@ -201,6 +201,7 @@ static __attribute__((constructor)) void init() {
     init_client();
     init_data_plane();
     init_filesystem();
+    init_threading_support();
 
     long tid = syscall_no_intercept(SYS_gettid);
 
@@ -210,6 +211,7 @@ static __attribute__((constructor)) void init() {
     }
 
     init_process(tid);
+    register_capio_tid(tid);
 
     intercept_hook_point_clone_child  = hook_clone_child;
     intercept_hook_point_clone_parent = hook_clone_parent;

@@ -10,7 +10,7 @@ constexpr int ARRAY_SIZE = 100;
 
 sem_t *sem;
 
-int func(int *num) {
+int func(const int *num) {
     REQUIRE(*num == 12345);
     return 0;
 }
