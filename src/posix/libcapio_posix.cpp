@@ -146,7 +146,7 @@ static constexpr std::array<CPHandler_t, __NR_syscalls> build_syscall_table() {
     _syscallTable[SYS_rename] = rename_handler;
 #endif
 #ifdef SYS_stat
-    _syscallTable[SYS_stat] = lstat_handler;
+    _syscallTable[SYS_stat] = stat_handler;
 #endif
 #ifdef SYS_statx
     _syscallTable[SYS_statx] = statx_handler;
