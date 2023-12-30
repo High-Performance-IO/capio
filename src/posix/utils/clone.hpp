@@ -45,6 +45,7 @@ void hook_clone_child() {
 }
 
 void hook_clone_parent(long child_tid) {
+    SUSPEND_SYSCALL_LOGGING();
     long parent_tid = syscall_no_intercept(SYS_gettid);
     START_LOG(parent_tid, "call(parent_tid=%d, child_tid=%d)", parent_tid, child_tid);
 
