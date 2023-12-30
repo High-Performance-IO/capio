@@ -22,17 +22,15 @@ FILE *logfileFP;
 bool logfileOpen = false;
 #endif
 
-bool loggingSyscall = false; // this variable tells the logger that syscall logging has started and
-                             // we are not in setup phase
-
 thread_local int current_log_level = 0;
+thread_local bool logging_syscall  = false; // this variable tells the logger that syscall logging
+                                            // has started and we are not in setup phase
 
-#ifndef CAPIO_MAX_LOG_LEVEL // capio max log level. defaults to -1, where
-// everythong is logged
+#ifndef CAPIO_MAX_LOG_LEVEL // capio max log level. defaults to -1, where everything is logged
 #define CAPIO_MAX_LOG_LEVEL -1
 #endif
 
-int CAPIO_LOG_LEVEL = -1;
+int CAPIO_LOG_LEVEL = CAPIO_MAX_LOG_LEVEL;
 
 inline char *get_capio_log_filename() {
 
@@ -64,6 +62,12 @@ void log_write_to(char *buffer, size_t bufflen) {
 #endif
 }
 
+class SyscallLoggingSuspender {
+  public:
+    SyscallLoggingSuspender() { logging_syscall = false; }
+    ~SyscallLoggingSuspender() { logging_syscall = true; }
+};
+
 class Logger {
   private:
     long int tid;
@@ -85,7 +89,6 @@ class Logger {
 #else
         if (!logfileOpen) {
             auto logfile_name = get_capio_log_filename();
-
             if (logfile_name[0] != '\0') {
                 logfileFP   = fopen(logfile_name, "w");
                 logfileOpen = true;
@@ -110,11 +113,12 @@ class Logger {
         va_copy(argpc, argp);
 
 #if defined(CAPIOLOG) && defined(__CAPIO_POSIX)
-        if (current_log_level == 0 && loggingSyscall) {
+        if (current_log_level == 0 && logging_syscall) {
             int syscallNumber = va_arg(argp, int);
             auto buf1         = reinterpret_cast<char *>(capio_syscall(
                 SYS_mmap, nullptr, 50, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0));
-            sprintf(buf1, LOG_CAPIO_START_REQUEST, sys_num_to_string(syscallNumber), syscallNumber);
+            sprintf(buf1, LOG_CAPIO_START_REQUEST, tid, sys_num_to_string(syscallNumber),
+                    syscallNumber);
             log_write_to(buf1, strlen(buf1));
             capio_syscall(SYS_munmap, buf1, 50);
         }
@@ -144,13 +148,13 @@ class Logger {
 #ifndef __CAPIO_POSIX
         // if the log message to serve a new request or concludes, add new spaces
         if (strcmp(invoker, "capio_server") == 0 &&
-            strcmp(CAPIO_SERVER_LOG_START_REQUEST_MSG, message) == 0) {
-            logfile << "\n\n" << message << "\n" << std::flush;
-            return;
-        }
-        if (strcmp(invoker, "capio_server") == 0 &&
-            strcmp(CAPIO_SERVER_LOG_END_REQUEST_MSG, message) == 0) {
-            logfile << message << "\n\n" << std::flush;
+            (strcmp(CAPIO_SERVER_LOG_START_REQUEST_MSG, message) == 0 ||
+             strcmp(CAPIO_SERVER_LOG_END_REQUEST_MSG, message) == 0)) {
+            auto buf1 = reinterpret_cast<char *>(capio_syscall(
+                SYS_mmap, nullptr, 50, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0));
+            sprintf(buf1, message, this->tid);
+            logfile << buf1 << std::endl;
+            capio_syscall(SYS_munmap, buf1, 50);
             return;
         }
 #endif
@@ -178,8 +182,12 @@ class Logger {
 
         log_write_to(format, strlen(format));
 #ifdef __CAPIO_POSIX
-        if (current_log_level == 0 && loggingSyscall) {
-            log_write_to(const_cast<char *>(LOG_CAPIO_END_REQUEST), strlen(LOG_CAPIO_END_REQUEST));
+        if (current_log_level == 0 && logging_syscall) {
+            auto buf1 = reinterpret_cast<char *>(capio_syscall(
+                SYS_mmap, nullptr, 50, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0));
+            sprintf(buf1, LOG_CAPIO_END_REQUEST, this->tid);
+            log_write_to(buf1, strlen(buf1));
+            capio_syscall(SYS_munmap, buf1, 50);
         }
 #endif
     }
@@ -190,12 +198,14 @@ class Logger {
 #define LOG(message, ...) log.log(message, ##__VA_ARGS__)
 #define START_LOG(tid, message, ...)                                                               \
     Logger log(__func__, __FILE__, __LINE__, tid, message, ##__VA_ARGS__)
-#define START_SYSCALL_LOGGING() loggingSyscall = true;
+#define START_SYSCALL_LOGGING() logging_syscall = true
+#define SUSPEND_SYSCALL_LOGGING() SyscallLoggingSuspender sls{};
 #else
 #define ERR_EXIT(message, ...) exit(EXIT_FAILURE)
 #define LOG(message, ...)
 #define START_LOG(tid, message, ...)
 #define START_SYSCALL_LOGGING()
+#define SUSPEND_SYSCALL_LOGGING()
 #endif
 
 #endif // CAPIO_COMMON_LOGGER_HPP
