@@ -74,7 +74,7 @@ class Capio_file {
 			_mode = mode;
 			_directory = directory;
 			_permanent = permanent;
-			this->n_files_expected = n_files_expected + 2; // +2 for . and ..
+			this->n_files_expected = (n_files_expected == -1) ? -1 : n_files_expected + 2; // +2 for . and ..
 			_buf_size = init_size;
 			threads_fd = new std::vector<std::pair<int, int>>;
 			_n_close_expected = n_close_expected;
