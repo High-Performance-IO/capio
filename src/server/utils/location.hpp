@@ -144,9 +144,9 @@ int check_file_location(std::size_t index, int rank, const std::string &path_to_
         }
         std::string line_str(line), *path, *node;
         auto separator = line_str.find_first_of(' ');
-        path = new std::string(line_str.substr(0, separator));
-        node = new std::string(
-            line_str.substr(separator + 1, line_str.length() - 1)); // remove ' ' and \n
+        path           = new std::string(line_str.substr(0, separator));
+        node = new std::string(line_str.substr(separator + 1, line_str.length())); // remove ' '
+        node->pop_back(); //remove \n from node name
 
         LOG("found [%s]@[%s]", path->c_str(), node->c_str());
 

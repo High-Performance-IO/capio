@@ -17,11 +17,13 @@ std::mutex pending_remote_stats_mutex;
 
 inline void reply_stat(int tid, const std::string &path, int rank) {
     START_LOG(gettid(), "call(tid=%d, path=%s, rank=%d)", tid, path.c_str(), rank);
-
     auto file_location_opt = get_file_location_opt(path.c_str());
-    if (!file_location_opt) {
-        LOG("get_file_location_opt returned an empty object!");
-        check_file_location(rank, path);
+    LOG("File %s is local? %s", path.c_str(), file_location_opt ? "True" : "False");
+    auto file_is_remote = check_file_location(rank, path);
+    LOG("File %s is remote? %s", path.c_str(), file_is_remote ? "True" : "False");
+
+    if (!file_is_remote && !file_location_opt) {
+        LOG("get_file_location_opt returned an empty object and check_files_location failed!");
         // if it is in configuration file then wait otherwise fails
         if ((metadata_conf.find(path) != metadata_conf.end() || match_globs(path) != -1) &&
             !is_producer(tid, path)) {
@@ -37,14 +39,16 @@ inline void reply_stat(int tid, const std::string &path, int rank) {
         return;
     }
     auto c_file_opt = get_capio_file_opt(path.c_str());
-    Capio_file &c_file =
+    auto c_file =
         (c_file_opt) ? c_file_opt->get() : create_capio_file(path, false, get_file_initial_size());
     LOG("Obtained capio file. ready to reply to client");
-    std::string_view mode                  = c_file.get_mode();
-    bool complete                          = c_file.complete;
-    const std::filesystem::path &capio_dir = get_capio_dir();
-    if (complete || strcmp(std::get<0>(file_location_opt->get()), node_name) == 0 ||
-        mode == CAPIO_FILE_MODE_NO_UPDATE || capio_dir == path) {
+    std::string_view mode = c_file.get_mode();
+    LOG("Mode: %s", mode);
+    bool complete = c_file.complete;
+    LOG("complete: %s", complete ? "Yes" : "No");
+    bool file_is_local = strcmp(std::get<0>(file_location_opt->get()), node_name) == 0;
+    LOG("file_is_local? %s", file_is_local ? "Yes" : "No");
+    if (complete || file_is_local || mode == CAPIO_FILE_MODE_NO_UPDATE || get_capio_dir() == path) {
         LOG("Sending response to client");
         write_response(tid, c_file.get_file_size());
         write_response(tid, static_cast<int>(c_file.is_dir() ? 1 : 0));
