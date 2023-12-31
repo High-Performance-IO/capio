@@ -142,4 +142,4 @@ jobs:
             --test-dir build/tests
       - name: "Show server log on failure"
         if: ${{ always() && steps.run-tests.outcome == 'failure' }}
-        run: cat server_rank_0.log
+        run: cat server_rank_*.log

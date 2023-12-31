@@ -82,10 +82,12 @@ class Logger {
 #ifndef __CAPIO_POSIX
         if (!logfile.is_open()) {
             // NOTE: should never get to this point as capio_server opens up the log file while
-            // parsing command line arguments. This is only for failsafe purposte
-            logfile.open(std::string(CAPIO_LOG_SERVER_DEFAULT_FILE_NAME) + std::to_string(tid) +
-                             ".log",
+            // parsing command line arguments. This is only for failsafe purpose
+            auto hostname = new char[HOST_NAME_MAX];
+            gethostname(hostname, HOST_NAME_MAX);
+            logfile.open(std::string(CAPIO_LOG_SERVER_DEFAULT_FILE_NAME) + hostname + ".log",
                          std::ofstream::out);
+            delete[] hostname;
         }
 #else
         if (!logfileOpen) {

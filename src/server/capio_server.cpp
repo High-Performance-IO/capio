@@ -184,26 +184,45 @@ int parseCLI(int argc, char **argv, int rank) {
         exit(EXIT_FAILURE);
     }
     if (logfile_src) {
+#ifdef CAPIOLOG
         // log file was given
         std::string token = args::get(logfile_src);
         if (token.find(".log") != std::string::npos) {
             token.erase(token.length() - 4); // delete .log if for some reason
             // is given as parameter
         }
+        auto hostname = new char[HOST_NAME_MAX];
+        gethostname(hostname, HOST_NAME_MAX);
 
-        std::string filename = token + "_" + std::to_string(rank) + ".log";
+        std::string filename = token + "_" + hostname + ".log";
         logfile.open(filename, std::ofstream::out);
         log = new Logger(__func__, __FILE__, __LINE__, gettid(), "Created new log file");
         std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_INFO << "started logging to: " << filename
                   << std::endl;
+        delete[] hostname;
+#else
+        std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_WARNING
+                  << "Capio logfile provided, but logging capabilities not compiled into capio!"
+                  << std::endl;
+#endif
     } else {
+#ifdef CAPIOLOG
         // log file not given. starting with default name
-        const std::string logname(CAPIO_LOG_SERVER_DEFAULT_FILE_NAME + std::to_string(rank) +
-                                  ".log");
+        auto hostname = new char[HOST_NAME_MAX];
+        gethostname(hostname, HOST_NAME_MAX);
+
+        const std::string logname =
+            CAPIO_LOG_SERVER_DEFAULT_FILE_NAME + std::string(hostname) + ".log";
         logfile.open(logname, std::ofstream::out);
         log = new Logger(__func__, __FILE__, __LINE__, gettid(), "Created new log file");
         std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_INFO << "started logging to default logfile "
                   << logname << std::endl;
+        delete[] hostname;
+#else
+        std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_WARNING
+                  << "Capio logfile provided, but logging capabilities not compiled into capio!"
+                  << std::endl;
+#endif
     }
 
     if (noConfigFile) {
