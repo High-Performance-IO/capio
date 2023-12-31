@@ -24,10 +24,12 @@ inline void reply_stat(int tid, const std::string &path, int rank) {
         // if it is in configuration file then wait otherwise fails
         if ((metadata_conf.find(path) != metadata_conf.end() || match_globs(path) != -1) &&
             !is_producer(tid, path)) {
+            LOG("File not ready yet. Starting a thread to wait for file.");
             std::thread t(wait_for_stat, tid, std::string(path), rank, &pending_remote_stats,
                           &pending_remote_stats_mutex);
             t.detach();
         } else {
+            LOG("Metadata do not contains file or globs did not contain file or app is producer.");
             write_response(tid, -1); // return size
             write_response(tid, -1); // return is_dir
         }
@@ -46,6 +48,7 @@ inline void reply_stat(int tid, const std::string &path, int rank) {
         write_response(tid, c_file.get_file_size());
         write_response(tid, static_cast<int>(c_file.is_dir() ? 1 : 0));
     } else {
+        LOG("Delegating backend to reply to remote stats");
         backend->handle_remote_stat(tid, path, rank, &pending_remote_stats,
                                     &pending_remote_stats_mutex);
     }

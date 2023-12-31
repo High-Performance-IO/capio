@@ -59,8 +59,10 @@ get_file_location_opt(const char *const path) {
     const std::lock_guard<std::mutex> lg(files_metadata_mutex);
     auto it = files_location.find(path);
     if (it == files_location.end()) {
+        LOG("File was not found in files_locations. returning empty object");
         return {};
     } else {
+        LOG("File found on remote node %s", it->second);
         return {it->second};
     }
 }
@@ -180,15 +182,14 @@ int check_file_location(std::size_t index, int rank, const std::string &path_to_
 bool check_file_location(int my_rank, const std::string &path_to_check) {
     START_LOG(gettid(), "call(my_rank=%d, path_to_check=%s)", my_rank, path_to_check.c_str());
 
-    bool found = false;
-    int rank = 0, res = -1;
-    while (!found && rank < n_servers) {
-        std::string rank_str = std::to_string(rank);
-        res                  = check_file_location(rank, my_rank, path_to_check);
-        found                = res == 1;
-        ++rank;
+    for (int rank = 0; rank < n_servers; rank++) {
+        if (check_file_location(rank, my_rank, path_to_check) == 1) {
+            LOG("path: %s, was found on node with rank %d",path_to_check.c_str(), rank);
+            return true;
+        }
     }
-    return found;
+    LOG("path %s has not been found on remote nodes", path_to_check.c_str());
+    return false;
 }
 
 void clean_files_location(int n_servers) {
