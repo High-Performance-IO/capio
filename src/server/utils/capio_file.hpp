@@ -31,17 +31,17 @@ class Capio_file {
   private:
     char *_buf = nullptr; // buffer containing the data
     std::size_t _buf_size;
-    std::string_view _committed;
-    bool _directory;
+    std::string_view _committed = CAPIO_FILE_MODE_NO_UPDATE;
+    bool _directory             = false;
     // _fd is useful only when the file is memory-mapped
-    int _fd         = -1;
-    bool _home_node = false;
-    std::string_view _mode;
-    int _n_links               = 1;
-    long int _n_close          = 0;
-    long int _n_close_expected = -1;
-    int _n_opens               = 0;
-    bool _permanent;
+    int _fd                     = -1;
+    bool _home_node             = false;
+    std::string_view _mode      = CAPIO_FILE_MODE_ON_CLOSE;
+    int _n_links                = 1;
+    long int _n_close           = 0;
+    long int _n_close_expected  = -1;
+    int _n_opens                = 0;
+    bool _permanent             = false;
     // _sectors stored in memory of the files (only the home node is forced to
     // be up to date)
     std::set<std::pair<off64_t, off64_t>, compare> _sectors;
