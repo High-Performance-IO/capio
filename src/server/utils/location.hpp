@@ -111,7 +111,6 @@ int check_file_location(std::size_t index, int rank, const std::string &path_to_
     bool seek_needed;
     char *line = nullptr;
     size_t len = 0;
-    ssize_t read;
     int fd; /* file descriptor to identify a file within a process */
 
     if (index < fd_files_location_reads.size()) {
@@ -119,64 +118,62 @@ int check_file_location(std::size_t index, int rank, const std::string &path_to_
         fp          = std::get<1>(fd_files_location_reads[index]);
         seek_needed = std::get<2>(fd_files_location_reads[index]);
     } else {
-        std::string file_name = "files_location.txt";
-        fp                    = fopen(file_name.c_str(), "r+");
-        if (fp == nullptr) {
+        if ((fp = fopen("files_location.txt", "r+")) == nullptr) {
+            LOG("Unable to open file_locations.txt");
             return 0;
         }
-        fd = fileno(fp);
-        if (fd == -1) {
-            ERR_EXIT("fileno in check_file_location");
+
+        if ((fd = fileno(fp)) == -1) {
+            ERR_EXIT("Unable to get fileno from files_location.txt FILE ptr.");
         }
         seek_needed = false;
-        fd_files_location_reads.push_back(std::make_tuple(fd, fp, seek_needed));
+
+        fd_files_location_reads.emplace_back(fd, fp, seek_needed);
     }
 
     const flock_guard fg(fd, F_RDLCK, false);
-    bool found = false;
+
     if (seek_needed) {
         long offset = ftell(fp);
         if (fseek(fp, offset, SEEK_SET) == -1) {
             ERR_EXIT("fseek in check_file_location");
         }
     }
-    while (!found && (read = getline(&line, &len, fp)) != -1) {
-        if (line[0] == '0') {
+
+    auto path = new char[1024];
+    auto node = new char[1024];
+    while (getline(&line, &len, fp) != -1) {
+        if (line[0] == CAPIO_SERVER_INVALIDATE_FILE_PATH_CHAR) {
             continue;
         }
-        char path[1024]; // TODO: heap memory
-        int i = 0;
-        while (line[i] != ' ') {
+        int i, j;
+        for (i = 0; line[i] != ' '; i++) {
             path[i] = line[i];
-            ++i;
         }
         path[i] = '\0';
-        char node_str[1024]; // TODO: heap memory
-        ++i;
-        int j = 0;
-        while (line[i] != '\n') {
-            node_str[j] = line[i];
-            ++i;
-            ++j;
+        i++;
+        for (j = 0; line[i] != '\n'; ++i, ++j) {
+            node[j] = line[i];
         }
-        node_str[j]      = '\0';
-        char *p_node_str = (char *) malloc(sizeof(char) * (strlen(node_str) + 1));
-        strcpy(p_node_str, node_str);
+
+        node[j]         = '\0';
+        auto p_node_str = new char[strlen(node) + 1]; // do not call delete[] on this
+        strcpy(p_node_str, node);
         long offset = ftell(fp);
         if (offset == -1) {
             ERR_EXIT("ftell in check_file_location");
         }
         add_file_location(path, p_node_str, offset);
         if (strcmp(path, path_to_check.c_str()) == 0) {
-            found = true;
+            delete[] path;
+            return 1;
         }
     }
-    if (found) {
-        return 1;
-    } else {
-        std::get<2>(fd_files_location_reads[index]) = true;
-        return 2;
-    }
+
+    delete[] path;
+
+    std::get<2>(fd_files_location_reads[index]) = true;
+    return 2;
 }
 
 bool check_file_location(int my_rank, const std::string &path_to_check) {
@@ -184,7 +181,7 @@ bool check_file_location(int my_rank, const std::string &path_to_check) {
 
     for (int rank = 0; rank < n_servers; rank++) {
         if (check_file_location(rank, my_rank, path_to_check) == 1) {
-            LOG("path: %s, was found on node with rank %d",path_to_check.c_str(), rank);
+            LOG("path: %s, was found on node with rank %d", path_to_check.c_str(), rank);
             return true;
         }
     }
