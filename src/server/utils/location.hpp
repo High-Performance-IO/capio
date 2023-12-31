@@ -133,44 +133,36 @@ int check_file_location(std::size_t index, int rank, const std::string &path_to_
 
     const flock_guard fg(fd, F_RDLCK, false);
 
-    if (seek_needed) {
-        long offset = ftell(fp);
-        if (fseek(fp, offset, SEEK_SET) == -1) {
-            ERR_EXIT("fseek in check_file_location");
-        }
+    if (seek_needed && (fseek(fp, ftell(fp), SEEK_SET) == -1)) {
+        ERR_EXIT("fseek in check_file_location");
     }
 
-    auto path = new char[1024];
-    auto node = new char[1024];
     while (getline(&line, &len, fp) != -1) {
+
         if (line[0] == CAPIO_SERVER_INVALIDATE_FILE_PATH_CHAR) {
             continue;
         }
-        int i, j;
-        for (i = 0; line[i] != ' '; i++) {
-            path[i] = line[i];
-        }
-        path[i] = '\0';
-        i++;
-        for (j = 0; line[i] != '\n'; ++i, ++j) {
-            node[j] = line[i];
-        }
+        std::string line_str(line), *path, *node;
+        auto separator = line_str.find_first_of(' ');
+        path           = new std::string(line_str.substr(0, separator));
+        node           = new std::string(line_str.substr(separator, line_str.length()));
 
-        node[j]         = '\0';
-        auto p_node_str = new char[strlen(node) + 1]; // do not call delete[] on this
-        strcpy(p_node_str, node);
+        LOG("found [%s]@[%s]", path->c_str(), node->c_str());
+
+        auto node_str = new char[node->length() + 1]; // do not call delete[] on this
+        strcpy(node_str, node->c_str());
         long offset = ftell(fp);
         if (offset == -1) {
             ERR_EXIT("ftell in check_file_location");
         }
-        add_file_location(path, p_node_str, offset);
-        if (strcmp(path, path_to_check.c_str()) == 0) {
-            delete[] path;
+        add_file_location(path->c_str(), node_str, offset);
+        if (*path == path_to_check) {
+            delete[] line;
+
             return 1;
         }
+        delete[] line;
     }
-
-    delete[] path;
 
     std::get<2>(fd_files_location_reads[index]) = true;
     return 2;
