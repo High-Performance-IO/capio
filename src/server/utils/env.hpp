@@ -14,7 +14,7 @@ off64_t get_file_initial_size() {
         if (val != nullptr) {
             file_initial_size = std::strtol(val, nullptr, 10);
         } else {
-            file_initial_size = DEFAULT_FILE_INITIAL_SIZE;
+            file_initial_size = CAPIO_DEFAULT_FILE_INITIAL_SIZE;
         }
     }
 

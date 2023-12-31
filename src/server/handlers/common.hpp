@@ -8,11 +8,11 @@ inline void init_process(int tid) {
         register_listener(tid);
 
         auto *write_data_cb = new SPSC_queue<char>(
-            "capio_write_data_buffer_tid_" + std::to_string(tid), N_ELEMS_DATA_BUFS,
-            WINDOW_DATA_BUFS, CAPIO_SEM_TIMEOUT_NANOSEC, CAPIO_SEM_RETRIES);
+            "capio_write_data_buffer_tid_" + std::to_string(tid), CAPIO_DATA_BUFFER_LENGTH,
+            CAPIO_DATA_BUFFER_ELEMENT_SIZE, CAPIO_SEM_TIMEOUT_NANOSEC, CAPIO_SEM_MAX_RETRIES);
         auto *read_data_cb = new SPSC_queue<char>(
-            "capio_read_data_buffer_tid_" + std::to_string(tid), N_ELEMS_DATA_BUFS,
-            WINDOW_DATA_BUFS, CAPIO_SEM_TIMEOUT_NANOSEC, CAPIO_SEM_RETRIES);
+            "capio_read_data_buffer_tid_" + std::to_string(tid), CAPIO_DATA_BUFFER_LENGTH,
+            CAPIO_DATA_BUFFER_ELEMENT_SIZE, CAPIO_SEM_TIMEOUT_NANOSEC, CAPIO_SEM_MAX_RETRIES);
         data_buffers.insert({tid, {write_data_cb, read_data_cb}});
     }
 }
@@ -20,15 +20,15 @@ inline void init_process(int tid) {
 void send_data_to_client(int tid, char *buf, long int count) {
     START_LOG(tid, "call(%d,%s, %ld)", tid, buf, count);
     auto *data_buf  = data_buffers[tid].second;
-    size_t n_writes = count / WINDOW_DATA_BUFS;
-    size_t r        = count % WINDOW_DATA_BUFS;
+    size_t n_writes = count / CAPIO_DATA_BUFFER_ELEMENT_SIZE;
+    size_t r        = count % CAPIO_DATA_BUFFER_ELEMENT_SIZE;
     size_t i        = 0;
     while (i < n_writes) {
-        data_buf->write(buf + i * WINDOW_DATA_BUFS);
+        data_buf->write(buf + i * CAPIO_DATA_BUFFER_ELEMENT_SIZE);
         ++i;
     }
     if (r) {
-        data_buf->write(buf + i * WINDOW_DATA_BUFS, r);
+        data_buf->write(buf + i * CAPIO_DATA_BUFFER_ELEMENT_SIZE, r);
     }
 }
 

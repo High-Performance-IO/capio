@@ -71,7 +71,7 @@ void solve_remote_reads(size_t bytes_received, size_t offset, size_t file_size, 
             }
             if (is_getdent) {
                 off64_t dir_size  = c_file.get_stored_size();
-                off64_t n_entries = dir_size / THEORETICAL_SIZE_DIRENT64;
+                off64_t n_entries = dir_size / CAPIO_THEORETICAL_SIZE_DIRENT64;
                 char *p_getdents  = (char *) malloc(n_entries * sizeof(char) * dir_size);
                 end_of_sector     = store_dirent(p, p_getdents, dir_size);
                 write_response(tid, end_of_sector);

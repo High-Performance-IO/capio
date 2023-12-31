@@ -134,7 +134,7 @@ Capio_file &create_capio_file(const std::string &path, bool is_dir, size_t init_
         long int pos = match_globs(path);
         if (pos == -1) {
             if (is_dir) {
-                init_size = DIR_INITIAL_SIZE;
+                init_size = CAPIO_DEFAULT_DIR_INITIAL_SIZE;
             }
             c_file = new Capio_file(is_dir, false, init_size);
             add_capio_file(path, c_file);
@@ -146,7 +146,7 @@ Capio_file &create_capio_file(const std::string &path, bool is_dir, size_t init_
                 n_files = 0;
             }
             if (n_files > 0) {
-                init_size = DIR_INITIAL_SIZE;
+                init_size = CAPIO_DEFAULT_DIR_INITIAL_SIZE;
                 is_dir    = true;
             }
             metadata_conf[path] =
@@ -160,7 +160,7 @@ Capio_file &create_capio_file(const std::string &path, bool is_dir, size_t init_
         auto &[committed, mode, app_name, n_files, permanent, n_close] = it->second;
         if (n_files > 0) {
             is_dir    = true;
-            init_size = DIR_INITIAL_SIZE;
+            init_size = CAPIO_DEFAULT_DIR_INITIAL_SIZE;
         }
         c_file = new Capio_file(committed, mode, is_dir, n_files, permanent, init_size, n_close);
         add_capio_file(path, c_file);

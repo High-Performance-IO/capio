@@ -13,8 +13,8 @@ inline void handle_write(int tid, int fd, off64_t base_offset, off64_t count, in
     Capio_file &c_file    = init_capio_file(path.data(), true);
     size_t file_shm_size  = c_file.get_buf_size();
     auto *data_buf        = data_buffers[tid].first;
-    size_t n_reads        = count / WINDOW_DATA_BUFS;
-    size_t r              = count % WINDOW_DATA_BUFS;
+    size_t n_reads        = count / CAPIO_DATA_BUFFER_ELEMENT_SIZE;
+    size_t r              = count % CAPIO_DATA_BUFFER_ELEMENT_SIZE;
     size_t i              = 0;
     char *p;
     if (data_size > file_shm_size) {
@@ -23,11 +23,11 @@ inline void handle_write(int tid, int fd, off64_t base_offset, off64_t count, in
     p = c_file.get_buffer();
     p = p + base_offset;
     while (i < n_reads) {
-        data_buf->read(p + i * WINDOW_DATA_BUFS);
+        data_buf->read(p + i * CAPIO_DATA_BUFFER_ELEMENT_SIZE);
         ++i;
     }
     if (r) {
-        data_buf->read(p + i * WINDOW_DATA_BUFS, r);
+        data_buf->read(p + i * CAPIO_DATA_BUFFER_ELEMENT_SIZE, r);
     }
     int pid                   = pids[tid];
     writers[pid][path.data()] = true;

@@ -22,7 +22,7 @@ int exit_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg
         remove_capio_tid(tid);
     }
 
-    return POSIX_SYSCALL_SKIP;
+    return CAPIO_POSIX_SYSCALL_SKIP;
 }
 
 #endif // CAPIO_POSIX_HANDLERS_EXIT_GROUP_HPP

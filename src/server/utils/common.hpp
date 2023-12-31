@@ -20,12 +20,12 @@ inline off64_t store_dirent(char *incoming, char *target_buffer, off64_t incomin
     struct linux_dirent64 to_store {};
     struct linux_dirent64 *dir_entity;
 
-    to_store.d_reclen = THEORETICAL_SIZE_DIRENT64;
+    to_store.d_reclen = CAPIO_THEORETICAL_SIZE_DIRENT64;
     while (i < incoming_size) {
         dir_entity = (struct linux_dirent64 *) (incoming + i);
 
         to_store.d_ino  = dir_entity->d_ino;
-        to_store.d_off  = stored_size + THEORETICAL_SIZE_DIRENT64;
+        to_store.d_off  = stored_size + CAPIO_THEORETICAL_SIZE_DIRENT64;
         to_store.d_type = dir_entity->d_type;
 
         strcpy(to_store.d_name, dir_entity->d_name);
@@ -33,7 +33,7 @@ inline off64_t store_dirent(char *incoming, char *target_buffer, off64_t incomin
 
         LOG("DIRENT NAME: %s - TARGET NAME: %s", dir_entity->d_name, to_store.d_name);
 
-        i += THEORETICAL_SIZE_DIRENT64;
+        i += CAPIO_THEORETICAL_SIZE_DIRENT64;
         stored_size += to_store.d_reclen;
     }
 

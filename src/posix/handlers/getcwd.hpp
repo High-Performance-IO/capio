@@ -15,7 +15,7 @@ int getcwd_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long a
      * file systems such as NFS.
      */
     if (!is_capio_path(cwd)) {
-        return POSIX_SYSCALL_SKIP;
+        return CAPIO_POSIX_SYSCALL_SKIP;
     }
 
     const size_t length = cwd.native().length();
@@ -26,7 +26,7 @@ int getcwd_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long a
         cwd.native().copy(buf, size);
         buf[length] = '\0';
     }
-    return POSIX_SYSCALL_SUCCESS;
+    return CAPIO_POSIX_SYSCALL_SUCCESS;
 }
 
 #endif // CAPIO_POSIX_HANDLERS_GETCWD_HPP

@@ -13,7 +13,7 @@ int close_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long ar
         delete_capio_fd(fd);
         *result = 0;
     }
-    return POSIX_SYSCALL_SKIP;
+    return CAPIO_POSIX_SYSCALL_SKIP;
 }
 
 #endif // CAPIO_POSIX_HANDLERS_CLOSE_HPP

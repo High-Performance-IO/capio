@@ -139,13 +139,13 @@ void capio_server(int rank) {
 
     auto str = std::unique_ptr<char[]>(new char[CAPIO_REQUEST_MAX_SIZE]);
     while (true) {
-        LOG(CAPIO_SERVER_LOG_START_REQUEST_MSG);
+        LOG(CAPIO_LOG_SERVER_REQUEST_START);
         int code = read_next_request(str.get());
         if (code < 0 || code > CAPIO_NR_REQUESTS) {
             ERR_EXIT("Received an invalid request code %d", code);
         }
         request_handlers[code](str.get(), rank);
-        LOG(CAPIO_SERVER_LOG_END_REQUEST_MSG);
+        LOG(CAPIO_LOG_SERVER_REQUEST_END);
     }
 }
 
@@ -194,29 +194,30 @@ int parseCLI(int argc, char **argv, int rank) {
         std::string filename = token + "_" + std::to_string(rank) + ".log";
         logfile.open(filename, std::ofstream::out);
         log = new Logger(__func__, __FILE__, __LINE__, gettid(), "Created new log file");
-        std::cout << CAPIO_SERVER_CLI_LOG_SERVER << "started logging to: " << filename << std::endl;
+        std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_INFO << "started logging to: " << filename
+                  << std::endl;
     } else {
         // log file not given. starting with default name
-        const std::string logname(CAPIO_SERVER_DEFAULT_LOG_FILE_NAME + std::to_string(rank) +
+        const std::string logname(CAPIO_LOG_SERVER_DEFAULT_FILE_NAME + std::to_string(rank) +
                                   ".log");
         logfile.open(logname, std::ofstream::out);
         log = new Logger(__func__, __FILE__, __LINE__, gettid(), "Created new log file");
-        std::cout << CAPIO_SERVER_CLI_LOG_SERVER << "started logging to default logfile " << logname
-                  << std::endl;
+        std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_INFO << "started logging to default logfile "
+                  << logname << std::endl;
     }
 
     if (noConfigFile) {
-        std::cout << CAPIO_SERVER_CLI_LOG_SERVER << "skipping config file parsing" << std::endl;
+        std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_INFO << "skipping config file parsing" << std::endl;
     } else {
         if (config) {
             std::string token                      = args::get(config);
             const std::filesystem::path &capio_dir = get_capio_dir();
-            std::cout << CAPIO_SERVER_CLI_LOG_SERVER << "parsing config file: " << token
+            std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_INFO << "parsing config file: " << token
                       << std::endl;
             parse_conf_file(token, capio_dir);
         } else {
             std::cout
-                << CAPIO_SERVER_CLI_LOG_SERVER_ERROR
+                << CAPIO_LOG_SERVER_CLI_LEVEL_ERROR
                 << "Error: no config file provided. To skip config file use --no-config option!"
                 << std::endl;
 #ifdef CAPIOLOG
@@ -226,32 +227,33 @@ int parseCLI(int argc, char **argv, int rank) {
         }
     }
 
-    std::cout << CAPIO_SERVER_CLI_LOG_SERVER << "CAPIO_DIR=" << get_capio_dir().c_str()
+    std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_INFO << "CAPIO_DIR=" << get_capio_dir().c_str()
               << std::endl;
 
     delete log;
 
 #ifdef CAPIOLOG
     CAPIO_LOG_LEVEL = get_capio_log_level();
-    std::cout << CAPIO_SERVER_CLI_LOG_SERVER << "LOG_LEVEL set to: " << CAPIO_LOG_LEVEL
+    std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_INFO << "LOG_LEVEL set to: " << CAPIO_LOG_LEVEL
               << std::endl;
-    std::cout << CAPIO_LOG_CLI_WARNING;
+    std::cout << CAPIO_LOG_SERVER_CLI_LOGGING_ENABLED_WARNING;
 
 #else
     if (std::getenv("CAPIO_LOG_LEVEL") != nullptr) {
-        std::cout << CAPIO_SERVER_CLI_LOG_SERVER_WARNING
-                  << CAPIO_LOG_CLI_WARNING_LOG_SET_NOT_COMPILED << std::endl;
+        std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_WARNING
+                  << CAPIO_LOG_SERVER_CLI_LOGGING_NOT_AVAILABLE << std::endl;
     }
 #endif
 
-    std::cout << CAPIO_SERVER_CLI_LOG_SERVER << "server initialization completed!" << std::flush;
+    std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_INFO << "server initialization completed!"
+              << std::flush;
     return 0;
 }
 
 int main(int argc, char **argv) {
     int rank, provided;
 
-    std::cout << CAPIO_BANNER;
+    std::cout << CAPIO_LOG_SERVER_BANNER;
     backend = new MPI_backend();
 
     parseCLI(argc, argv, rank);

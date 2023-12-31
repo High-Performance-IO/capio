@@ -24,7 +24,7 @@ const std::filesystem::path &get_capio_dir() {
         if (val == nullptr) {
 
             std::cout << "\n"
-                      << CAPIO_SERVER_CLI_LOG_SERVER_ERROR << "Fatal: CAPIO_DIR not provided!"
+                      << CAPIO_LOG_SERVER_CLI_LEVEL_ERROR << "Fatal: CAPIO_DIR not provided!"
                       << std::endl;
             ERR_EXIT("Fatal:  CAPIO_DIR not provided!");
 
@@ -33,7 +33,7 @@ const std::filesystem::path &get_capio_dir() {
             const char *realpath_res = capio_realpath(val, buf.get());
             if (realpath_res == nullptr) {
                 std::cout << "\n"
-                          << CAPIO_SERVER_CLI_LOG_SERVER_ERROR
+                          << CAPIO_LOG_SERVER_CLI_LEVEL_ERROR
                           << "Fatal: CAPIO_DIR set, but folder does not exists on filesystem!"
                           << std::endl;
                 ERR_EXIT("error CAPIO_DIR: directory %s does not "
@@ -42,6 +42,11 @@ const std::filesystem::path &get_capio_dir() {
             }
         }
         capio_dir = std::filesystem::path(buf.get());
+        for (auto &forbidden_path : CAPIO_DIR_FORBIDDEN_PATHS) {
+            if (capio_dir.native().rfind(forbidden_path, 0) == 0) {
+                ERR_EXIT("CAPIO_DIR inside %s file system is not supported", forbidden_path);
+            }
+        }
     }
     LOG("CAPIO_DIR=%s", capio_dir.c_str());
 
@@ -57,7 +62,7 @@ inline int get_capio_log_level() {
         } else {
             auto [ptr, ec] = std::from_chars(log_level, log_level + strlen(log_level), level);
             if (ec != std::errc()) {
-                std::cout << CAPIO_SERVER_CLI_LOG_SERVER_WARNING << "invalid CAPIO_LOG_LEVEL value"
+                std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_WARNING << "invalid CAPIO_LOG_LEVEL value"
                           << std::endl;
                 level = 0;
             }

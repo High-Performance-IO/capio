@@ -17,42 +17,48 @@ off64_t capio_unlink_abs(const std::filesystem::path &abs_path, long tid, bool i
             return res;
         }
     } else {
-        return POSIX_SYSCALL_REQUEST_SKIP;
+        return CAPIO_POSIX_SYSCALL_REQUEST_SKIP;
     }
 }
 
-inline off64_t capio_unlinkat(int dirfd, std::filesystem::path &pathname, int flags, long tid) {
-    START_LOG(tid, "call(dirfd=%d, pathname=%s, flags=%X)", dirfd, pathname.c_str(), flags);
+inline off64_t capio_unlinkat(int dirfd, const std::string_view &pathname, int flags, long tid) {
+    START_LOG(tid, "call(dirfd=%d, pathname=%s, flags=%X)", dirfd, pathname.data(), flags);
+
+    if (is_forbidden_path(pathname)) {
+        LOG("Path %s is forbidden: skip", pathname.data());
+        return CAPIO_POSIX_SYSCALL_REQUEST_SKIP;
+    }
 
     off64_t res;
     bool is_dir = flags & AT_REMOVEDIR;
-    if (pathname.is_relative()) {
+    std::filesystem::path path(pathname);
+    if (path.is_relative()) {
         if (dirfd == AT_FDCWD) {
-            pathname = capio_posix_realpath(pathname);
-            if (pathname.empty()) {
-                return POSIX_SYSCALL_REQUEST_SKIP;
+            path = capio_posix_realpath(path);
+            if (path.empty()) {
+                return CAPIO_POSIX_SYSCALL_REQUEST_SKIP;
             }
-            res = capio_unlink_abs(pathname, tid, is_dir);
+            res = capio_unlink_abs(path, tid, is_dir);
         } else {
             if (!is_directory(dirfd)) {
-                return POSIX_SYSCALL_REQUEST_SKIP;
+                return CAPIO_POSIX_SYSCALL_REQUEST_SKIP;
             }
             const std::filesystem::path dir_path = get_dir_path(dirfd);
             if (dir_path.empty()) {
-                return POSIX_SYSCALL_REQUEST_SKIP;
+                return CAPIO_POSIX_SYSCALL_REQUEST_SKIP;
             }
-            const std::filesystem::path path = (dir_path / pathname).lexically_normal();
-            res                              = capio_unlink_abs(path, tid, is_dir);
+            path = (dir_path / path).lexically_normal();
+            res  = capio_unlink_abs(path, tid, is_dir);
         }
     } else {
-        res = capio_unlink_abs(pathname, tid, is_dir);
+        res = capio_unlink_abs(path, tid, is_dir);
     }
 
     return res;
 }
 
 int unlink_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg5, long *result) {
-    std::filesystem::path pathname(reinterpret_cast<const char *>(arg0));
+    const std::string_view pathname(reinterpret_cast<const char *>(arg0));
     long tid = syscall_no_intercept(SYS_gettid);
 
     return posix_return_value(capio_unlinkat(AT_FDCWD, pathname, 0, tid), result);
@@ -61,7 +67,7 @@ int unlink_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long a
 int unlinkat_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg5,
                      long *result) {
     int dirfd = static_cast<int>(arg0);
-    std::filesystem::path pathname(reinterpret_cast<const char *>(arg1));
+    const std::string_view pathname(reinterpret_cast<const char *>(arg1));
     int flags = static_cast<int>(arg2);
     long tid  = syscall_no_intercept(SYS_gettid);
 
