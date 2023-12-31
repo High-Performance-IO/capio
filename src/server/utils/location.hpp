@@ -144,8 +144,9 @@ int check_file_location(std::size_t index, int rank, const std::string &path_to_
         }
         std::string line_str(line), *path, *node;
         auto separator = line_str.find_first_of(' ');
-        path           = new std::string(line_str.substr(0, separator));
-        node           = new std::string(line_str.substr(separator, line_str.length()));
+        path = new std::string(line_str.substr(0, separator));
+        node = new std::string(
+            line_str.substr(separator + 1, line_str.length() - 1)); // remove ' ' and \n
 
         LOG("found [%s]@[%s]", path->c_str(), node->c_str());
 
@@ -155,7 +156,7 @@ int check_file_location(std::size_t index, int rank, const std::string &path_to_
         if (offset == -1) {
             ERR_EXIT("ftell in check_file_location");
         }
-        add_file_location(path->c_str(), node_str, offset);
+        add_file_location(*path, node_str, offset);
         if (*path == path_to_check) {
             delete[] line;
 

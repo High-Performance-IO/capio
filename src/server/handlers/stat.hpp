@@ -20,6 +20,7 @@ inline void reply_stat(int tid, const std::string &path, int rank) {
 
     auto file_location_opt = get_file_location_opt(path.c_str());
     if (!file_location_opt) {
+        LOG("get_file_location_opt returned an empty object!");
         check_file_location(rank, path);
         // if it is in configuration file then wait otherwise fails
         if ((metadata_conf.find(path) != metadata_conf.end() || match_globs(path) != -1) &&
