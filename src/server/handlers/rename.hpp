@@ -17,8 +17,7 @@ void handle_rename(int tid, const char *oldpath, const char *newpath, int rank) 
             }
         }
     }
-    int res = delete_from_file_locations("files_location_" + std::to_string(rank) + ".txt", oldpath,
-                                         rank);
+    int res = delete_from_file_locations("files_location.txt", oldpath, rank);
     if (res != 1) {
         write_response(tid, 1);
         return;

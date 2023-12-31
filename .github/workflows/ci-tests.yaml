@@ -141,5 +141,5 @@ jobs:
             --stop-on-failure \
             --test-dir build/tests
       - name: "Show server log on failure"
-        if: ${{ always() && steps.run-tests.outcome == 'failure' }}
-        run: cat server_rank_0.log
+        if: ${{ always() && steps.run-tests.outcome == 'failure' && matrix.build_type == 'Debug' }}
+        run: cat server_rank_*.log

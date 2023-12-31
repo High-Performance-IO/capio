@@ -9,6 +9,41 @@ backend_interface *backend;
 
 #include "backends/mpi.hpp"
 
+void wait_for_n_files(char *const prefix, std::vector<std::string> *files_path, size_t n_files,
+                      int dest, sem_t *n_files_ready) {
+    START_LOG(gettid(), "call(prefix=%s, n_files=%ld, dest=%d)", prefix, n_files, dest);
+
+    SEM_WAIT_CHECK(n_files_ready, "n_files_ready");
+    backend->send_n_files(prefix, files_path, n_files, dest);
+
+    delete files_path;
+    delete n_files_ready;
+    delete[] prefix;
+}
+
+static inline void wait_for_completion(char *const path, const Capio_file &c_file, int dest,
+                                       sem_t *data_is_complete) {
+    START_LOG(gettid(), "call(path=%s, dest=%d)", path, dest);
+
+    SEM_WAIT_CHECK(data_is_complete, "data_is_complete");
+    backend->serve_remote_stat(path, dest, c_file);
+
+    delete data_is_complete;
+    delete[] path;
+}
+
+void wait_for_data(char *const path, off64_t offset, int dest, off64_t nbytes,
+                   sem_t *data_is_available) {
+    START_LOG(gettid(), "call(path=%s, offset=%ld, dest=%d, nbytes=%ld)", path, offset, dest,
+              nbytes);
+
+    SEM_WAIT_CHECK(data_is_available, "data_is_available");
+    backend->serve_remote_read(path, dest, offset, nbytes, get_capio_file(path).complete);
+
+    delete data_is_available;
+    delete[] path;
+}
+
 void wait_for_stat(int tid, const std::string &path, int rank,
                    CSMyRemotePendingStats_t *pending_remote_stats,
                    std::mutex *pending_remote_stats_mutex) {
@@ -16,16 +51,53 @@ void wait_for_stat(int tid, const std::string &path, int rank,
 
     loop_check_files_location(path, rank);
     // check if the file is local or remote
-    Capio_file &c_file    = get_capio_file(path.c_str());
-    std::string_view mode = c_file.get_mode();
-    bool complete         = c_file.complete;
-    if (complete || strcmp(std::get<0>(get_file_location(path.c_str())), node_name) == 0 ||
-        mode == CAPIO_FILE_MODE_NO_UPDATE) {
+    Capio_file &c_file = get_capio_file(path.c_str());
+
+    if (c_file.complete || c_file.get_mode() == CAPIO_FILE_MODE_NO_UPDATE ||
+        strcmp(std::get<0>(get_file_location(path.c_str())), node_name) == 0) {
+
         write_response(tid, c_file.get_file_size());
         write_response(tid, static_cast<int>(c_file.is_dir() ? 1 : 0));
+
     } else {
         backend->handle_remote_stat(tid, path, rank, pending_remote_stats,
                                     pending_remote_stats_mutex);
+    }
+}
+
+void wait_for_file(int tid, int fd, off64_t count, bool dir, bool is_getdents, int rank,
+                   CSMyRemotePendingReads_t *pending_remote_reads,
+                   std::mutex *pending_remote_reads_mutex,
+                   void (*handle_local_read)(int, int, off64_t, bool, bool, bool)) {
+    START_LOG(gettid(), "call(tid=%d, fd=%d, count=%ld, dir=%s, is_getdents=%s)", tid, fd, count,
+              dir ? "true" : "false", is_getdents ? "true" : "false");
+
+    auto path_to_check = get_capio_file_path(tid, fd).data();
+    loop_check_files_location(path_to_check, rank);
+
+    // check if the file is local or remote
+    if (strcmp(std::get<0>(get_file_location(path_to_check)), node_name) == 0) {
+        handle_local_read(tid, fd, count, dir, is_getdents, false);
+    } else {
+        Capio_file &c_file = get_capio_file(path_to_check);
+        if (!c_file.complete) {
+            auto remote_app = apps.find(tid);
+
+            if (remote_app != apps.end()) {
+                auto offset          = std::get<0>(get_file_location(path_to_check));
+                auto remote_app_name = remote_app->second;
+                if (!backend->handle_nreads(path_to_check, remote_app_name,
+                                            nodes_helper_rank[offset])) {
+
+                    const std::lock_guard<std::mutex> lg(*pending_remote_reads_mutex);
+                    (*pending_remote_reads)[path_to_check].emplace_back(tid, fd, count,
+                                                                        is_getdents);
+                }
+            }
+        }
+
+        backend->handle_remote_read(tid, fd, count, rank, dir, is_getdents, pending_remote_reads,
+                                    pending_remote_reads_mutex, handle_local_read);
     }
 }
 
@@ -37,8 +109,7 @@ void solve_remote_reads(size_t bytes_received, size_t offset, size_t file_size, 
     }
 
     START_LOG(gettid(),
-              "call(bytes_received=%ld, offset=%ld, file_size=%ld, path_c=%s, "
-              "complete=%s)",
+              "call(bytes_received=%ld, offset=%ld, file_size=%ld, path_c=%s, complete=%s)",
               bytes_received, offset, file_size, path_c, complete ? "true" : "false");
 
     Capio_file &c_file    = get_capio_file(path_c);
@@ -76,7 +147,7 @@ void solve_remote_reads(size_t bytes_received, size_t offset, size_t file_size, 
                 end_of_sector     = store_dirent(p, p_getdents, dir_size);
                 write_response(tid, end_of_sector);
                 send_data_to_client(tid, p_getdents + fd_offset, bytes_read);
-                free(p_getdents);
+                delete[] p_getdents;
             } else {
                 write_response(tid, end_of_sector);
                 send_data_to_client(tid, p + fd_offset, bytes_read);
@@ -95,72 +166,21 @@ void solve_remote_reads(size_t bytes_received, size_t offset, size_t file_size, 
     }
 }
 
-void wait_for_n_files(char *const prefix, std::vector<std::string> *files_path, size_t n_files,
-                      int dest, sem_t *sem) {
-    START_LOG(gettid(), "call(prefix=%s, n_files=%ld, dest=%d)", prefix, n_files, dest);
-
-    if (sem_wait(sem) == -1) {
-        ERR_EXIT("sem_wait in wait_for_n_files");
-    }
-    backend->send_n_files(prefix, files_path, n_files, dest);
-    delete files_path;
-    delete[] prefix;
-    delete sem;
-}
-
-void wait_for_file(int tid, int fd, off64_t count, bool dir, bool is_getdents,
-                   CSMyRemotePendingReads_t *pending_remote_reads,
-                   std::mutex *pending_remote_reads_mutex,
-                   void (*handle_local_read)(int, int, off64_t, bool, bool, bool)) {
-    START_LOG(gettid(), "call(tid=%d, fd=%d, count=%ld, dir=%s, is_getdents=%s)", tid, fd, count,
-              dir ? "true" : "false", is_getdents ? "true" : "false");
-
-    int rank;
-    MPI_Comm_rank(MPI_COMM_WORLD, &rank);
-    std::string_view path_to_check = get_capio_file_path(tid, fd);
-    loop_check_files_location(path_to_check.data(), rank);
-
-    // check if the file is local or remote
-    if (strcmp(std::get<0>(get_file_location(path_to_check.data())), node_name) == 0) {
-        handle_local_read(tid, fd, count, dir, is_getdents, false);
-    } else {
-        Capio_file &c_file = get_capio_file(path_to_check.data());
-        if (!c_file.complete) {
-            auto it  = apps.find(tid);
-            bool res = false;
-            if (it != apps.end()) {
-                std::string app_name = it->second;
-                res                  = backend->handle_nreads(
-                    path_to_check.data(), app_name,
-                    nodes_helper_rank[std::get<0>(get_file_location(path_to_check.data()))]);
-            }
-            if (res) {
-                const std::lock_guard<std::mutex> lg(*pending_remote_reads_mutex);
-                (*pending_remote_reads)[path_to_check.data()].emplace_back(tid, fd, count,
-                                                                           is_getdents);
-            }
-        }
-
-        backend->handle_remote_read(tid, fd, count, rank, dir, is_getdents, pending_remote_reads,
-                                    pending_remote_reads_mutex, handle_local_read);
-    }
-}
-
 bool read_from_local_mem(int tid, off64_t process_offset, off64_t end_of_read,
                          off64_t end_of_sector, off64_t count, const std::string &path) {
     START_LOG(tid,
               "call(tid=%d, process_ofset=%ld, end_of_read=%ld, "
               "end_of_sector=%ld, count=%ld, path=%s)",
               tid, process_offset, end_of_read, end_of_sector, count, path.c_str());
-    bool res = false;
+
     if (end_of_read <= end_of_sector) {
         Capio_file &c_file = init_capio_file(path.c_str(), false);
         char *p            = c_file.get_buffer();
         write_response(tid, end_of_sector);
         send_data_to_client(tid, p + process_offset, count);
-        res = true;
+        return true;
     }
-    return res;
+    return false;
 }
 
 std::vector<std::string> *files_available(const std::string &prefix, const std::string &app,
@@ -168,7 +188,7 @@ std::vector<std::string> *files_available(const std::string &prefix, const std::
     START_LOG(gettid(), "call(prefix=%s, app=%s, path_file=%s, n_files=%d)", prefix.c_str(),
               app.c_str(), path_file.c_str(), n_files);
 
-    auto *files_to_send                    = new std::vector<std::string>;
+    auto files_to_send                     = new std::vector<std::string>;
     std::unordered_set<std::string> &files = files_sent[app];
 
     auto capio_file_opt = get_capio_file_opt(path_file.c_str());
@@ -231,11 +251,8 @@ void recv_nfiles(RemoteRequest *request, void *arg1, void *arg2) {
             }
             c_file.first_write = false;
         } else {
-            std::string node_name     = rank_to_node[source];
-            const char *node_name_str = node_name.c_str();
-            char *p_node_name         = (char *) malloc(sizeof(char) * (strlen(node_name_str) + 1));
-            strcpy(p_node_name, node_name_str);
-            add_file_location(path, p_node_name, -1);
+            auto node_name_src = rank_to_node[source];
+            add_file_location(path, node_name_src.c_str(), -1);
             p_shm              = new char[file_size];
             Capio_file &c_file = create_capio_file(path, false, file_size);
             c_file.insert_sector(0, file_size);
@@ -247,47 +264,21 @@ void recv_nfiles(RemoteRequest *request, void *arg1, void *arg2) {
     }
 
     for (const auto &pair : files) {
-        std::string file_path      = pair.first;
-        std::string bytes_received = pair.second;
-        solve_remote_reads(std::stol(bytes_received), 0, std::stol(bytes_received),
+        auto file_path        = pair.first;
+        auto bytes_received_1 = pair.second;
+        solve_remote_reads(std::stol(bytes_received_1), 0, std::stol(bytes_received_1),
                            file_path.c_str(), true, pending_remote_reads,
                            pending_remote_reads_mutex);
     }
 }
 
-static inline void wait_for_completion(char *const path, const Capio_file &c_file, int dest,
-                                       sem_t *sem) {
-    START_LOG(gettid(), "call(path=%s, dest=%d)", path, dest);
-
-    if (sem_wait(sem) == -1) {
-        ERR_EXIT("sem_wait in wait_for_completion");
-    }
-    delete sem;
-
-    backend->serve_remote_stat(path, dest, c_file);
-    delete path;
-}
-
-void wait_for_data(char *const path, off64_t offset, int dest, off64_t nbytes, sem_t *sem) {
-    START_LOG(gettid(), "call(path=%s, offset=%ld, dest=%d, nbytes=%ld)", path, offset, dest,
-              nbytes);
-    if (sem_wait(sem) == -1) {
-        ERR_EXIT("sem_wait in wait_for_data");
-    }
-
-    backend->serve_remote_read(path, dest, offset, nbytes, get_capio_file(path).complete);
-    delete path;
-    delete sem;
-}
-
 void remote_listener_handle_stat_reply(RemoteRequest *request, void *arg1, void *arg2) {
-    const char *buf_recv = request->getRequest();
-    START_LOG(gettid(), "call(buf_recv=%s)", buf_recv);
+    START_LOG(gettid(), "call(buf_recv=%s)", request->getRequest());
 
     char *path_c = new char[1024];
     off64_t size;
     int dir, trash;
-    sscanf(buf_recv, "%d %s %ld %d", &trash, path_c, &size, &dir);
+    sscanf(request->getRequest(), "%d %s %ld %d", &trash, path_c, &size, &dir);
     stat_reply_request(path_c, size, dir);
     delete[] path_c;
 }
@@ -313,28 +304,24 @@ void remote_listener_stat_req(RemoteRequest *request, void *arg1, void *arg2) {
         std::thread t(wait_for_completion, path_c, std::cref(c_file), dest, sem);
         t.detach();
     }
-
-    delete[] path_c;
 }
+
 void remote_listener_nreads_req(RemoteRequest *request, void *arg1, void *arg2) {
-    const char *buf_recv = request->getRequest();
-    int dest             = request->getSource();
-    START_LOG(gettid(), "call(%ld, %d)", buf_recv, dest);
+    START_LOG(gettid(), "call(%ld, %d)", request->getRequest(), request->getSource());
+    auto dest      = request->getSource();
     auto prefix    = new char[PATH_MAX];
     auto path_file = new char[PATH_MAX];
     auto app_name  = new char[512];
     std::size_t n_files;
     auto sem = new sem_t;
     int trash;
-    sscanf(buf_recv, "%d %zu %s %s %s", &trash, &n_files, app_name, prefix, path_file);
+    sscanf(request->getRequest(), "%d %zu %s %s %s", &trash, &n_files, app_name, prefix, path_file);
     n_files = find_batch_size(prefix, metadata_conf_globs);
-    if (sem_wait(&clients_remote_pending_nfiles_sem) == -1) {
-        ERR_EXIT("sem_wait clients_remote_pending_nfiles_sem in remote_listener_nreads_req");
-    }
+
+    SEM_WAIT_CHECK(&clients_remote_pending_nfiles_sem, "clients_remote_pending_nfiles_sem");
     std::vector<std::string> *files = files_available(prefix, app_name, path_file, n_files);
-    if (sem_post(&clients_remote_pending_nfiles_sem) == -1) {
-        ERR_EXIT("sem_post clients_remote_pending_nfiles_sem in remote_listener_nreads_req");
-    }
+    SEM_POST_CHECK(&clients_remote_pending_nfiles_sem, "clients_remote_pending_nfiles_sem");
+
     if (files->size() == n_files) {
         backend->send_n_files(prefix, files, n_files, dest);
         delete files;
@@ -343,25 +330,18 @@ void remote_listener_nreads_req(RemoteRequest *request, void *arg1, void *arg2) 
          * create a thread that waits for the completion of such
          * files and then send those files
          */
-        char *prefix_c = (char *) malloc(sizeof(char) * strlen(prefix));
-        if (prefix_c == nullptr) {
-            ERR_EXIT("malloc 2 in capio_remote_listener");
-        }
+        auto prefix_c = new char[strlen(prefix)];
+
         strcpy(prefix_c, prefix);
 
         if (sem_init(sem, 0, 0) == -1) {
             ERR_EXIT("sem_init in remote_listener_nreads_req");
         }
         std::thread t(wait_for_n_files, prefix, files, n_files, dest, sem);
-        if (sem_wait(&clients_remote_pending_nfiles_sem) == -1) {
-            ERR_EXIT("sem_wait clients_remote_pending_nfiles_sem in "
-                     "remote_listener_nreads_req");
-        }
+
+        SEM_WAIT_CHECK(&clients_remote_pending_nfiles_sem, "clients_remote_pending_nfiles_sem");
         clients_remote_pending_nfiles[app_name].emplace_back(prefix_c, n_files, dest, files, sem);
-        if (sem_post(&clients_remote_pending_nfiles_sem) == -1) {
-            ERR_EXIT("sem_post clients_remote_pending_nfiles_sem in "
-                     "remote_listener_nreads_req");
-        }
+        SEM_POST_CHECK(&clients_remote_pending_nfiles_sem, "clients_remote_pending_nfiles_sem");
     }
 
     delete[] prefix;
@@ -379,12 +359,11 @@ void remote_listener_remote_read(RemoteRequest *request, void *arg1, void *arg2)
     sscanf(request->getRequest(), "%d %s %d %ld %ld", &trash, path_c, &dest, &offset, &nbytes);
 
     // check if the data is available
-    Capio_file &c_file  = get_capio_file(path_c);
-    size_t file_size    = c_file.get_stored_size();
-    bool complete       = c_file.complete;
-    bool data_available = (offset + nbytes <= file_size);
-    if (complete || (c_file.get_mode() == CAPIO_FILE_MODE_NO_UPDATE && data_available)) {
-        backend->serve_remote_read(path_c, dest, offset, nbytes, complete);
+    Capio_file &c_file = get_capio_file(path_c);
+
+    bool data_available = (offset + nbytes <= c_file.get_stored_size());
+    if (c_file.complete || (c_file.get_mode() == CAPIO_FILE_MODE_NO_UPDATE && data_available)) {
+        backend->serve_remote_read(path_c, dest, offset, nbytes, c_file.complete);
     } else {
         auto sem = new sem_t;
 
@@ -399,25 +378,25 @@ void remote_listener_remote_read(RemoteRequest *request, void *arg1, void *arg2)
 
 void remote_listener_remote_sending(RemoteRequest *request, void *arg1, void *arg2) {
     off64_t bytes_received, offset;
-    char path_c[1024];
+    std::string path;
+    path.reserve(1024);
     int complete_tmp, trash;
     size_t file_size;
-    sscanf(request->getRequest(), "%d %s %ld %ld %d %zu", &trash, path_c, &offset, &bytes_received,
-           &complete_tmp, &file_size);
-    bool complete = complete_tmp;
-    std::string path(path_c);
-
-    void *file_shm;
+    sscanf(request->getRequest(), "%d %s %ld %ld %d %zu", &trash, path.data(), &offset,
+           &bytes_received, &complete_tmp, &file_size);
+    bool complete      = complete_tmp;
+    void *file_shm     = nullptr;
     Capio_file &c_file = init_capio_file(path.c_str(), file_shm);
     if (bytes_received != 0) {
-        off64_t file_shm_size = c_file.get_buf_size();
-        off64_t file_size     = offset + bytes_received;
-        if (file_size > file_shm_size) {
-            file_shm = expand_memory_for_file(path, file_size, c_file);
+        auto file_shm_size  = c_file.get_buf_size();
+        auto file_size_recv = offset + bytes_received;
+        if (file_size_recv > file_shm_size) {
+            file_shm = expand_memory_for_file(path, file_size_recv, c_file);
         }
         backend->recv_file((char *) file_shm + offset, request->getSource(), bytes_received);
         bytes_received *= sizeof(char);
     }
+
     solve_remote_reads(bytes_received, offset, file_size, path.c_str(), complete,
                        &pending_remote_reads, &pending_remote_reads_mutex);
 }

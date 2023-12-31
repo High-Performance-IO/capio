@@ -31,20 +31,16 @@ class MPI_backend : public backend_interface {
         LOG("Node name = %s, length=%d", node_name, node_name_len);
     }
 
-    void destroy(std::vector<sem_t *> *sems) override {
+    inline void destroy(std::vector<sem_t *> *sems) override {
         START_LOG(gettid(), "Call()");
-        for (auto sem : *sems) {
-            int res = sem_destroy(sem);
-            if (res != 0) {
-                MPI_Finalize();
-                ERR_EXIT("sem_destroy internal_server_sem failed with status %d", res);
-            }
+        for (auto sem_to_destroy : *sems) {
+            SEM_DESTROY_CHECK(sem_to_destroy, "sem_destroy", MPI_Finalize());
         }
         LOG("Semaphores deleted. finalizing MPI");
         MPI_Finalize();
     }
 
-    void handshake_servers(int rank) override {
+    inline void handshake_servers(int rank) override {
         START_LOG(gettid(), "call(%d)", rank);
 
         auto buf = new char[MPI_MAX_PROCESSOR_NAME];
@@ -112,8 +108,8 @@ class MPI_backend : public backend_interface {
         }
     }
 
-    void send_n_files(const std::string &prefix, std::vector<std::string> *files_to_send,
-                      int n_files, int dest) override {
+    inline void send_n_files(const std::string &prefix, std::vector<std::string> *files_to_send,
+                             int n_files, int dest) override {
         START_LOG(gettid(), "call(prefix=%s, files_to_send=%ld, n_files=%d, dest=%d)",
                   prefix.c_str(), files_to_send, n_files, dest);
 
@@ -121,9 +117,8 @@ class MPI_backend : public backend_interface {
         size_t prefix_length = prefix.length();
         for (const std::string &path : *files_to_send) {
             Capio_file &c_file = get_capio_file(path.c_str());
-            msg += " " + path.substr(prefix_length);
-            size_t file_size = c_file.get_stored_size();
-            msg += " " + std::to_string(file_size);
+            msg.append(" " + path.substr(prefix_length) + " " +
+                       std::to_string(c_file.get_stored_size()));
         }
 
         MPI_Send(msg.c_str(), msg.length() + 1, MPI_CHAR, dest, 0, MPI_COMM_WORLD);
@@ -138,15 +133,13 @@ class MPI_backend : public backend_interface {
                                   int complete) override {
         START_LOG(gettid(), "call(pach_c=%s, dest=%d, offset=%ld, nbytes=%ld, complete=%d)", path_c,
                   dest, offset, nbytes, complete);
-        if (sem_wait(&remote_read_sem) == -1) {
-            ERR_EXIT("sem_wait remote_read_sem in serve_remote_read");
-        }
+
+        SEM_WAIT_CHECK(&remote_read_sem, "remote_read_sems");
 
         // Send all the rest of the file not only the number of bytes requested
         // Useful for caching
         Capio_file &c_file         = get_capio_file(path_c);
-        size_t file_size           = c_file.get_stored_size();
-        nbytes                     = file_size - offset;
+        nbytes                     = c_file.get_stored_size() - offset;
         off64_t prefetch_data_size = get_prefetch_data_size();
 
         if (prefetch_data_size != 0 && nbytes > prefetch_data_size) {
@@ -156,7 +149,7 @@ class MPI_backend : public backend_interface {
         std::string nbytes_str    = std::to_string(nbytes);
         std::string offset_str    = std::to_string(offset);
         std::string complete_str  = std::to_string(complete);
-        std::string file_size_str = std::to_string(file_size);
+        std::string file_size_str = std::to_string(c_file.get_stored_size());
 
         auto buf_send =
             new char[sizeof(int) + strlen(path_c) + offset_str.length() + nbytes_str.length() +
@@ -169,13 +162,12 @@ class MPI_backend : public backend_interface {
 
         // send warning
         MPI_Send(buf_send, strlen(buf_send) + 1, MPI_CHAR, dest, 0, MPI_COMM_WORLD);
-        delete[] buf_send;
         // send data
         send_file(c_file.get_buffer() + offset, nbytes, dest);
 
-        if (sem_post(&remote_read_sem) == -1) {
-            ERR_EXIT("sem_post remote_read_sem in serve_remote_read");
-        }
+        SEM_POST_CHECK(&remote_read_sem, "remote_read_sem");
+
+        delete[] buf_send;
     }
 
     inline void handle_remote_read(int tid, int fd, off64_t count, int rank, bool dir,
@@ -243,12 +235,11 @@ class MPI_backend : public backend_interface {
         return false;
     }
 
-    void serve_remote_stat(const char *path, int dest, const Capio_file &c_file) override {
+    inline void serve_remote_stat(const char *path, int dest, const Capio_file &c_file) override {
         START_LOG(gettid(), "call(%s, %d, %ld)", path, dest, c_file.get_buf_size());
         auto msg = new char[PATH_MAX + 1024];
 
-        off64_t size = c_file.get_file_size();
-        sprintf(msg, "%d %s %ld %d", CAPIO_SERVER_REQUEST_SIZE, path, size,
+        sprintf(msg, "%d %s %ld %d", CAPIO_SERVER_REQUEST_SIZE, path, c_file.get_file_size(),
                 c_file.is_dir() ? 1 : 0);
 
         MPI_Send(msg, strlen(msg) + 1, MPI_CHAR, dest, 0, MPI_COMM_WORLD);
@@ -269,7 +260,7 @@ class MPI_backend : public backend_interface {
         (*pending_remote_stats)[path].emplace_back(tid);
     }
 
-    void recv_file(char *shm, int source, long int bytes_expected) override {
+    inline void recv_file(char *shm, int source, long int bytes_expected) override {
         START_LOG(gettid(), "call(%ld, %d, %ld)", shm, source, bytes_expected);
         MPI_Status status;
         int bytes_received, count;
