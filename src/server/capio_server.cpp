@@ -22,6 +22,7 @@
 
 #include "capio/env.hpp"
 #include "capio/logger.hpp"
+#include "capio/semaphore.hpp"
 #include "utils/capio_file.hpp"
 #include "utils/common.hpp"
 #include "utils/env.hpp"
@@ -170,21 +171,18 @@ int parseCLI(int argc, char **argv, int rank) {
         parser.ParseCLI(argc, argv);
     } catch (args::Help &) {
         std::cout << CAPIO_SERVER_ARG_PARSER_PRE_COMMAND << parser;
-        MPI_Finalize();
         exit(EXIT_SUCCESS);
     } catch (args::ParseError &e) {
         std::cerr << e.what() << std::endl;
         std::cerr << parser;
-        MPI_Finalize();
         exit(EXIT_FAILURE);
     } catch (args::ValidationError &e) {
         std::cerr << e.what() << std::endl;
         std::cerr << parser;
-        MPI_Finalize();
         exit(EXIT_FAILURE);
     }
-    if (logfile_src) {
 
+    if (logfile_src) {
 #ifdef CAPIOLOG
         // log file was given
         std::string token = args::get(logfile_src);
@@ -243,14 +241,13 @@ int parseCLI(int argc, char **argv, int rank) {
     std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_INFO << "CAPIO_DIR=" << get_capio_dir().c_str()
               << std::endl;
 
-    delete log;
-
 #ifdef CAPIOLOG
     CAPIO_LOG_LEVEL = get_capio_log_level();
     std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_INFO << "LOG_LEVEL set to: " << CAPIO_LOG_LEVEL
               << std::endl;
     std::cout << CAPIO_LOG_SERVER_CLI_LOGGING_ENABLED_WARNING;
-
+    log->log("LOG_LEVEL set to: %d", CAPIO_LOG_LEVEL);
+    delete log;
 #else
     if (std::getenv("CAPIO_LOG_LEVEL") != nullptr) {
         std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_WARNING
