@@ -16,7 +16,7 @@ CSBufResponse_t *bufs_response;
 inline void init_server() {
     // TODO: replace number with constexpr
     buf_requests  = new CSBufRequest_t("circular_buffer", 1024 * 1024, CAPIO_REQUEST_MAX_SIZE,
-                                       CAPIO_SEM_TIMEOUT_NANOSEC, CAPIO_SEM_RETRIES);
+                                       CAPIO_SEM_TIMEOUT_NANOSEC, CAPIO_SEM_MAX_RETRIES);
     bufs_response = new CSBufResponse_t();
 }
 
@@ -26,14 +26,14 @@ inline void init_server() {
  */
 inline void destroy_server() {
     buf_requests->free_shm();
-    std::cout << CAPIO_SERVER_CLI_LOG_SERVER_WARNING << "buf_requests cleanup completed"
+    std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_WARNING << "buf_requests cleanup completed"
               << std::endl;
 
     for (auto &pair : *bufs_response) {
         pair.second->free_shm();
         delete pair.second;
     }
-    std::cout << CAPIO_SERVER_CLI_LOG_SERVER_WARNING << "buf_response cleanup completed"
+    std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_WARNING << "buf_response cleanup completed"
               << std::endl;
 }
 
@@ -46,7 +46,7 @@ inline void register_listener(long tid) {
     // TODO: replace numbers with constexpr
     auto *p_buf_response =
         new Circular_buffer<off_t>("buf_response_" + std::to_string(tid), 8 * 1024 * 1024,
-                                   sizeof(off_t), CAPIO_SEM_TIMEOUT_NANOSEC, CAPIO_SEM_RETRIES);
+                                   sizeof(off_t), CAPIO_SEM_TIMEOUT_NANOSEC, CAPIO_SEM_MAX_RETRIES);
     bufs_response->insert(std::make_pair(tid, p_buf_response));
 }
 

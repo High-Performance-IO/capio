@@ -33,7 +33,7 @@ inline void handle_pending_read(int tid, int fd, long int process_offset, long i
     }
     if (is_getdents) {
         off64_t dir_size  = c_file.get_stored_size();
-        off64_t n_entries = dir_size / THEORETICAL_SIZE_DIRENT64;
+        off64_t n_entries = dir_size / CAPIO_THEORETICAL_SIZE_DIRENT64;
         char *p_getdents  = (char *) malloc(n_entries * sizeof(char) * dir_size);
         end_of_sector     = store_dirent(p, p_getdents, dir_size);
         write_response(tid, end_of_sector);
@@ -75,7 +75,7 @@ inline void handle_local_read(int tid, int fd, off64_t count, bool dir, bool is_
             char *p = c_file.get_buffer();
             if (is_getdents || dir) {
                 off64_t dir_size  = c_file.get_stored_size();
-                off64_t n_entries = dir_size / THEORETICAL_SIZE_DIRENT64;
+                off64_t n_entries = dir_size / CAPIO_THEORETICAL_SIZE_DIRENT64;
                 char *p_getdents  = (char *) malloc(n_entries * sizeof(char) * dir_size);
                 end_of_sector     = store_dirent(p, p_getdents, dir_size);
                 write_response(tid, end_of_sector);
@@ -94,7 +94,7 @@ inline void handle_local_read(int tid, int fd, off64_t count, bool dir, bool is_
         bytes_read = count;
         if (is_getdents) {
             off64_t dir_size  = c_file.get_stored_size();
-            off64_t n_entries = dir_size / THEORETICAL_SIZE_DIRENT64;
+            off64_t n_entries = dir_size / CAPIO_THEORETICAL_SIZE_DIRENT64;
             char *p_getdents  = (char *) malloc(n_entries * sizeof(char) * dir_size);
             end_of_sector     = store_dirent(p, p_getdents, dir_size);
             write_response(tid, end_of_read);

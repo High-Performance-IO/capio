@@ -11,6 +11,7 @@
 
 #include "constants.hpp"
 #include "syscall.hpp"
+
 #if defined(CAPIOLOG) && defined(__CAPIO_POSIX)
 #include "syscallnames.h"
 #endif
@@ -82,7 +83,7 @@ class Logger {
         if (!logfile.is_open()) {
             // NOTE: should never get to this point as capio_server opens up the log file while
             // parsing command line arguments. This is only for failsafe purposte
-            logfile.open(std::string(CAPIO_SERVER_DEFAULT_LOG_FILE_NAME) + std::to_string(tid) +
+            logfile.open(std::string(CAPIO_LOG_SERVER_DEFAULT_FILE_NAME) + std::to_string(tid) +
                              ".log",
                          std::ofstream::out);
         }
@@ -93,7 +94,7 @@ class Logger {
                 logfileFP   = fopen(logfile_name, "w");
                 logfileOpen = true;
             } else {
-                logfileFP   = fopen(CAPIO_APP_LOG_FILE_NAME, "w");
+                logfileFP   = fopen(CAPIO_LOG_POSIX_DEFAULT_FILE_NAME, "w");
                 logfileOpen = true;
             }
         }
@@ -104,7 +105,7 @@ class Logger {
 
         va_list argp, argpc;
 
-        sprintf(format, LOG_PRE_MSG, this->tid, this->invoker);
+        sprintf(format, CAPIO_LOG_PRE_MSG, this->tid, this->invoker);
         size_t pre_msg_len = strlen(format);
 
         strcpy(format + pre_msg_len, message);
@@ -117,7 +118,7 @@ class Logger {
             int syscallNumber = va_arg(argp, int);
             auto buf1         = reinterpret_cast<char *>(capio_syscall(
                 SYS_mmap, nullptr, 50, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0));
-            sprintf(buf1, LOG_CAPIO_START_REQUEST, tid, sys_num_to_string(syscallNumber),
+            sprintf(buf1, CAPIO_LOG_POSIX_SYSCALL_START, tid, sys_num_to_string(syscallNumber),
                     syscallNumber);
             log_write_to(buf1, strlen(buf1));
             capio_syscall(SYS_munmap, buf1, 50);
@@ -140,7 +141,7 @@ class Logger {
     inline void log(const char *message, ...) {
         va_list argp, argpc;
 
-        sprintf(format, LOG_PRE_MSG, this->tid, this->invoker);
+        sprintf(format, CAPIO_LOG_PRE_MSG, this->tid, this->invoker);
         size_t pre_msg_len = strlen(format);
 
         strcpy(format + pre_msg_len, message);
@@ -148,8 +149,8 @@ class Logger {
 #ifndef __CAPIO_POSIX
         // if the log message to serve a new request or concludes, add new spaces
         if (strcmp(invoker, "capio_server") == 0 &&
-            (strcmp(CAPIO_SERVER_LOG_START_REQUEST_MSG, message) == 0 ||
-             strcmp(CAPIO_SERVER_LOG_END_REQUEST_MSG, message) == 0)) {
+            (strcmp(CAPIO_LOG_SERVER_REQUEST_START, message) == 0 ||
+             strcmp(CAPIO_LOG_SERVER_REQUEST_END, message) == 0)) {
             auto buf1 = reinterpret_cast<char *>(capio_syscall(
                 SYS_mmap, nullptr, 50, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0));
             sprintf(buf1, message, this->tid);
@@ -176,7 +177,7 @@ class Logger {
 
     inline ~Logger() {
         current_log_level--;
-        sprintf(format, LOG_PRE_MSG, this->tid, this->invoker);
+        sprintf(format, CAPIO_LOG_PRE_MSG, this->tid, this->invoker);
         size_t pre_msg_len = strlen(format);
         strcpy(format + pre_msg_len, "returned");
 
@@ -185,7 +186,7 @@ class Logger {
         if (current_log_level == 0 && logging_syscall) {
             auto buf1 = reinterpret_cast<char *>(capio_syscall(
                 SYS_mmap, nullptr, 50, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0));
-            sprintf(buf1, LOG_CAPIO_END_REQUEST, this->tid);
+            sprintf(buf1, CAPIO_LOG_POSIX_SYSCALL_END, this->tid);
             log_write_to(buf1, strlen(buf1));
             capio_syscall(SYS_munmap, buf1, 50);
         }

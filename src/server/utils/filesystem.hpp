@@ -84,7 +84,7 @@ void write_entry_dir(int tid, const std::filesystem::path &file_path, const std:
 
     strcpy(ld.d_name, file_name.c_str());
     LOG("FILENAME LD: %s", ld.d_name);
-    long int ld_size = THEORETICAL_SIZE_DIRENT64;
+    long int ld_size = CAPIO_THEORETICAL_SIZE_DIRENT64;
     ld.d_reclen      = ld_size;
 
     Capio_file &c_file   = init_capio_file(dir.c_str(), true);
@@ -138,7 +138,7 @@ off64_t create_dir(int tid, const char *pathname, int rank, bool root_dir) {
               root_dir ? "true" : "false");
 
     if (!get_file_location_opt(pathname)) {
-        Capio_file &c_file = create_capio_file(pathname, true, DIR_INITIAL_SIZE);
+        Capio_file &c_file = create_capio_file(pathname, true, CAPIO_DEFAULT_DIR_INITIAL_SIZE);
         if (c_file.first_write) {
             c_file.first_write = false;
             // TODO: it works only if there is one prod per file

@@ -32,73 +32,76 @@ inline void fill_statxbuf(struct statx *statxbuf, off_t file_size, bool is_dir, 
     statxbuf->stx_mtime           = time;
 }
 
-inline int capio_statx(int dirfd, std::filesystem::path &pathname, int flags, int mask,
+inline int capio_statx(int dirfd, const std::string_view &pathname, int flags, int mask,
                        struct statx *statxbuf, long tid) {
     START_LOG(tid, "call(dirfd=%d, pathname=%s, flags=%d, mask=%d, statxbuf=0x%08x)", dirfd,
-              pathname.c_str(), flags, mask, statxbuf);
+              pathname.data(), flags, mask, statxbuf);
 
-    if (pathname.empty() && (flags & AT_EMPTY_PATH) == AT_EMPTY_PATH) {
+    if (is_forbidden_path(pathname)) {
+        LOG("Path %s is forbidden: skip", pathname.data());
+        return CAPIO_POSIX_SYSCALL_REQUEST_SKIP;
+    }
+
+    std::filesystem::path path(pathname);
+    if (path.empty() && (flags & AT_EMPTY_PATH) == AT_EMPTY_PATH) {
         LOG("pathname is empty and AT_EMPTY_PATH is set");
         if (dirfd == AT_FDCWD) { // operate on currdir
             LOG("dirfd is AT_FDCWD");
-            pathname = get_current_dir();
+            path = get_current_dir();
         } else { // operate on dirfd. in this case dirfd can refer to any type of file
             if (exists_capio_fd(dirfd)) {
-                pathname = get_capio_fd_path(dirfd);
+                path = get_capio_fd_path(dirfd);
             } else {
                 LOG("returning -2 due to !exists_capio_fd");
-                return POSIX_SYSCALL_REQUEST_SKIP;
+                return CAPIO_POSIX_SYSCALL_REQUEST_SKIP;
             }
         }
     } else {
-        if (pathname.is_relative()) {
+        if (path.is_relative()) {
             if (dirfd == AT_FDCWD) {
                 LOG("dirfd is AT_FDCWD");
-                pathname = capio_posix_realpath(pathname);
-                if (pathname.empty()) {
+                path = capio_posix_realpath(path);
+                if (path.empty()) {
                     LOG("returning -1 due to pathname empty");
                     errno = ENOENT;
-                    return POSIX_SYSCALL_ERRNO;
+                    return CAPIO_POSIX_SYSCALL_ERRNO;
                 }
             } else {
                 if (!is_directory(dirfd)) {
                     LOG("returning -2 due to !is_directory");
                     errno = ENOTDIR;
-                    return POSIX_SYSCALL_ERRNO;
+                    return CAPIO_POSIX_SYSCALL_ERRNO;
                 }
                 const std::filesystem::path dir_path = get_dir_path(dirfd);
                 if (dir_path.empty()) {
                     LOG("returning -2 due to dir path empty");
-                    return POSIX_SYSCALL_REQUEST_SKIP;
+                    return CAPIO_POSIX_SYSCALL_REQUEST_SKIP;
                 }
-                pathname = (dir_path / pathname).lexically_normal();
+                path = (dir_path / path).lexically_normal();
             }
         }
-        if (!is_capio_path(pathname)) {
+        if (!is_capio_path(path)) {
             LOG("returning -2 due to not being a capio path");
-            return POSIX_SYSCALL_REQUEST_SKIP;
+            return CAPIO_POSIX_SYSCALL_REQUEST_SKIP;
         }
     }
 
-    auto [file_size, is_dir] = stat_request(pathname, tid);
+    auto [file_size, is_dir] = stat_request(path, tid);
     if (file_size == -1) {
         errno = ENOENT;
-        return POSIX_SYSCALL_ERRNO;
+        return CAPIO_POSIX_SYSCALL_ERRNO;
     }
-    fill_statxbuf(statxbuf, file_size, is_dir, std::hash<std::string>{}(pathname), mask);
-    return POSIX_SYSCALL_SUCCESS;
+    fill_statxbuf(statxbuf, file_size, is_dir, std::hash<std::string>{}(path), mask);
+    return CAPIO_POSIX_SYSCALL_SUCCESS;
 }
 
 int statx_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg5, long *result) {
     auto dirfd = static_cast<int>(arg0);
-    std::filesystem::path pathname(reinterpret_cast<const char *>(arg1));
+    const std::string_view pathname(reinterpret_cast<const char *>(arg1));
     auto flags = static_cast<int>(arg2);
     auto mask  = static_cast<int>(arg3);
     auto *buf  = reinterpret_cast<struct statx *>(arg4);
     long tid   = syscall_no_intercept(SYS_gettid);
-
-    START_LOG(tid, "call(dirfd=%ld, pathname=%s, flags=%d, mask=%d)", dirfd, pathname.c_str(),
-              flags, mask);
 
     return posix_return_value(capio_statx(dirfd, pathname, flags, mask, buf, tid), result);
 }

@@ -13,9 +13,9 @@ int fstatfs_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long 
         const std::filesystem::path path(get_capio_fd_path(fd));
 
         *result = static_cast<int>(syscall_no_intercept(SYS_statfs, get_capio_dir().c_str(), buf));
-        return POSIX_SYSCALL_SUCCESS;
+        return CAPIO_POSIX_SYSCALL_SUCCESS;
     }
-    return POSIX_SYSCALL_SKIP;
+    return CAPIO_POSIX_SYSCALL_SKIP;
 }
 
 #endif // CAPIO_POSIX_HANDLERS_STATFS_HPP

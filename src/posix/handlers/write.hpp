@@ -18,7 +18,7 @@ inline ssize_t capio_write(int fd, const void *buffer, off64_t count, long tid) 
 
         return count;
     } else {
-        return POSIX_SYSCALL_REQUEST_SKIP;
+        return CAPIO_POSIX_SYSCALL_REQUEST_SKIP;
     }
 }
 
@@ -41,13 +41,13 @@ inline ssize_t capio_writev(int fd, const struct iovec *iov, int iovcnt, long ti
             ++i;
         }
         if (res == -1) {
-            return POSIX_SYSCALL_ERRNO;
+            return CAPIO_POSIX_SYSCALL_ERRNO;
         } else {
             return tot_bytes;
         }
     } else {
         LOG("fd %d is not a capio fd. returning -2", fd);
-        return POSIX_SYSCALL_REQUEST_SKIP;
+        return CAPIO_POSIX_SYSCALL_REQUEST_SKIP;
     }
 }
 

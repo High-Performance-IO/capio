@@ -7,10 +7,10 @@ void sig_term_handler(int signum, siginfo_t *info, void *ptr) {
     START_LOG(gettid(), "call(signal=[%d] %s)", signum, strsignal(signum));
 
     std::cout << std::endl
-              << CAPIO_SERVER_CLI_LOG_SERVER_WARNING << "shutting down server" << std::endl;
+              << CAPIO_LOG_SERVER_CLI_LEVEL_WARNING << "shutting down server" << std::endl;
 
     if (signum == SIGSEGV) {
-        std::cout << CAPIO_SERVER_CLI_LOG_SERVER_ERROR << "Segfault detected!" << std::endl;
+        std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_ERROR << "Segfault detected!" << std::endl;
     }
 
     // free all the memory used
@@ -19,18 +19,18 @@ void sig_term_handler(int signum, siginfo_t *info, void *ptr) {
             delete_capio_file_from_tid(it.first, fd);
         }
     }
-    std::cout << CAPIO_SERVER_CLI_LOG_SERVER_WARNING << "shm cleanup completed" << std::endl;
+    std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_WARNING << "shm cleanup completed" << std::endl;
 
     for (auto &p : data_buffers) {
         p.second.first->free_shm();
         p.second.second->free_shm();
     }
 
-    std::cout << CAPIO_SERVER_CLI_LOG_SERVER_WARNING << "data_buffers cleanup completed"
+    std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_WARNING << "data_buffers cleanup completed"
               << std::endl;
 
     destroy_server();
-    std::cout << CAPIO_SERVER_CLI_LOG_SERVER << "shutdown completed" << std::endl;
+    std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_INFO << "shutdown completed" << std::endl;
     MPI_Finalize();
     exit(EXIT_SUCCESS);
 }

@@ -16,7 +16,7 @@ inline off64_t capio_lseek(int fd, off64_t offset, int whence, long tid) {
                 return offset;
             } else {
                 errno = EINVAL;
-                return POSIX_SYSCALL_ERRNO;
+                return CAPIO_POSIX_SYSCALL_ERRNO;
             }
         } else if (whence == SEEK_CUR) {
             off64_t new_offset = file_offset + offset;
@@ -26,10 +26,10 @@ inline off64_t capio_lseek(int fd, off64_t offset, int whence, long tid) {
                 return new_offset;
             } else {
                 errno = EINVAL;
-                return POSIX_SYSCALL_ERRNO;
+                return CAPIO_POSIX_SYSCALL_ERRNO;
             }
         } else if (whence == SEEK_END) {
-            off64_t file_size  = seek_end_request(fd, tid);
+            seek_end_request(fd, tid);
             off64_t new_offset = file_offset + offset;
             set_capio_fd_offset(fd, new_offset);
             return new_offset;
@@ -43,10 +43,10 @@ inline off64_t capio_lseek(int fd, off64_t offset, int whence, long tid) {
             return new_offset;
         } else {
             errno = EINVAL;
-            return POSIX_SYSCALL_ERRNO;
+            return CAPIO_POSIX_SYSCALL_ERRNO;
         }
     } else {
-        return POSIX_SYSCALL_REQUEST_SKIP;
+        return CAPIO_POSIX_SYSCALL_REQUEST_SKIP;
     }
 }
 

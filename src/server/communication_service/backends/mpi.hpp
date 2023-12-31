@@ -69,10 +69,10 @@ class MPI_backend : public backend_interface {
     RemoteRequest *read_next_request() override {
         START_LOG(gettid(), "call()");
         MPI_Status status;
-        char *buff = new char[SERVER_MAX_REMOTE_REQUEST_SIZE];
+        char *buff = new char[CAPIO_SERVER_REQUEST_MAX_SIZE];
 #ifdef CAPIOSYNC
         LOG("initiating a synchronized MPI receive");
-        MPI_Recv(buff, SERVER_MAX_REMOTE_REQUEST_SIZE, MPI_CHAR, MPI_ANY_SOURCE, 0, MPI_COMM_WORLD,
+        MPI_Recv(buff, CAPIO_SERVER_REQUEST_MAX_SIZE, MPI_CHAR, MPI_ANY_SOURCE, 0, MPI_COMM_WORLD,
                  &status); // receive from server
 #else
         LOG("initiating a lightweight MPI receive");
@@ -80,7 +80,7 @@ class MPI_backend : public backend_interface {
         int received = 0;
 
         // receive from server
-        MPI_Irecv(buff, SERVER_MAX_REMOTE_REQUEST_SIZE, MPI_CHAR, MPI_ANY_SOURCE, 0, MPI_COMM_WORLD,
+        MPI_Irecv(buff, CAPIO_SERVER_REQUEST_MAX_SIZE, MPI_CHAR, MPI_ANY_SOURCE, 0, MPI_COMM_WORLD,
                   &request);
         struct timespec sleepTime {};
         struct timespec returnTime {};
