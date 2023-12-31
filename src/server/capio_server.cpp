@@ -81,7 +81,7 @@ sem_t clients_remote_pending_nfiles_sem;
 #include "utils/location.hpp"
 #include "utils/signals.hpp"
 
-#include "comms/remote_listener.hpp"
+#include "comm/remote_listener.hpp"
 
 static constexpr std::array<CSHandler_t, CAPIO_NR_REQUESTS> build_request_handlers_table() {
     std::array<CSHandler_t, CAPIO_NR_REQUESTS> _request_handlers{0};
@@ -184,6 +184,7 @@ int parseCLI(int argc, char **argv, int rank) {
         exit(EXIT_FAILURE);
     }
     if (logfile_src) {
+
 #ifdef CAPIOLOG
         // log file was given
         std::string token = args::get(logfile_src);
@@ -218,32 +219,25 @@ int parseCLI(int argc, char **argv, int rank) {
         std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_INFO << "started logging to default logfile "
                   << logname << std::endl;
         delete[] hostname;
-#else
-        std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_WARNING
-                  << "Capio logfile provided, but logging capabilities not compiled into capio!"
-                  << std::endl;
 #endif
     }
 
-    if (noConfigFile) {
+    if (config) {
+        std::string token                      = args::get(config);
+        const std::filesystem::path &capio_dir = get_capio_dir();
+        std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_INFO << "parsing config file: " << token
+                  << std::endl;
+        parse_conf_file(token, capio_dir);
+    } else if (noConfigFile) {
         std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_INFO << "skipping config file parsing" << std::endl;
     } else {
-        if (config) {
-            std::string token                      = args::get(config);
-            const std::filesystem::path &capio_dir = get_capio_dir();
-            std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_INFO << "parsing config file: " << token
-                      << std::endl;
-            parse_conf_file(token, capio_dir);
-        } else {
-            std::cout
-                << CAPIO_LOG_SERVER_CLI_LEVEL_ERROR
-                << "Error: no config file provided. To skip config file use --no-config option!"
-                << std::endl;
+        std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_ERROR
+                  << "Error: no config file provided. To skip config file use --no-config option!"
+                  << std::endl;
 #ifdef CAPIOLOG
-            log->log("no config file provided, and  --no-config not provided");
+        log->log("no config file provided, and  --no-config not provided");
 #endif
-            exit(EXIT_FAILURE);
-        }
+        exit(EXIT_FAILURE);
     }
 
     std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_INFO << "CAPIO_DIR=" << get_capio_dir().c_str()

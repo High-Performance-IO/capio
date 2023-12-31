@@ -37,31 +37,11 @@ FROM debian:bookworm
 
 ENV LD_LIBRARY_PATH="/usr/local/lib"
 
-RUN apt update                                                \
- && apt install -y --no-install-recommends                    \
-        libcapstone4                                          \
-        openmpi-bin                                           \
-        openssh-server                                        \
- && rm -rf /var/lib/apt/lists/*                               \
- && mkdir -p /run/sshd                                        \
- && adduser                                                   \
-        --disabled-password                                   \
-        --gecos ""                                            \
-        capio                                                 \
- && mkdir -p ~capio/.ssh                                      \
- && ssh-keygen -q                                             \
-        -t ed25519                                            \
-        -C "capio@hpio"                                       \
-            -N ""                                             \
-        -f"/home/capio/.ssh/id_ed25519"                       \
- && cp ~capio/.ssh/id_ed25519.pub ~capio/.ssh/authorized_keys \
- && echo "StrictHostKeyChecking no" > ~capio/.ssh/config      \
- && chown -R capio:capio ~capio/.ssh                          \
- && chmod 700 ~capio/.ssh                                     \
- && chmod 600                                                 \
-    ~capio/.ssh/authorized_keys                               \
-    ~capio/.ssh/config                                        \
-    ~capio/.ssh/id_ed25519.pub
+RUN apt update                              \
+ && apt install -y --no-install-recommends  \
+        libcapstone4                        \
+        openmpi-bin                         \
+ && rm -rf /var/lib/apt/lists/*
 
 # Include files
 COPY --from=builder                                         \
@@ -97,7 +77,3 @@ COPY --from=builder                                         \
 COPY --from=builder                                         \
     /usr/local/lib/cmake/simdjson/                          \
     /usr/local/lib/cmake/
-
-# Start SSH server
-EXPOSE 22
-CMD ["/usr/sbin/sshd", "-D"]
