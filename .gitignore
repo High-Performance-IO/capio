@@ -41,7 +41,7 @@ cmake-build-*
 
 #logfies and capio files
 *.log
-files_location_*.txt
+files_location*.txt
 
 # Other
 debug

@@ -81,7 +81,7 @@ sem_t clients_remote_pending_nfiles_sem;
 #include "utils/location.hpp"
 #include "utils/signals.hpp"
 
-#include "communication_service/remote_listener.hpp"
+#include "comms/remote_listener.hpp"
 
 static constexpr std::array<CSHandler_t, CAPIO_NR_REQUESTS> build_request_handlers_table() {
     std::array<CSHandler_t, CAPIO_NR_REQUESTS> _request_handlers{0};

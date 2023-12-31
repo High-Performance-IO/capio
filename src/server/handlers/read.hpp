@@ -5,7 +5,7 @@
 #include <thread>
 
 // TODO: remove this inclusion with some kind of inter process communication
-#include "communication_service/backends/mpi.hpp"
+#include "comms/backends/mpi.hpp"
 #include "utils/location.hpp"
 #include "utils/metadata.hpp"
 #include "utils/producer.hpp"

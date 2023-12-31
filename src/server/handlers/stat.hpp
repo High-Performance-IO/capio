@@ -13,7 +13,7 @@ std::mutex pending_remote_stats_mutex;
 
 // TODO: replace the direct call with dome king of intra thread communication to avoid passing
 // values from one to another
-#include "../communication_service/remote_listener.hpp"
+#include "../comms/remote_listener.hpp"
 
 inline void reply_stat(int tid, const std::string &path, int rank) {
     START_LOG(gettid(), "call(tid=%d, path=%s, rank=%d)", tid, path.c_str(), rank);

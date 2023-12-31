@@ -117,7 +117,7 @@ int check_file_location(std::size_t index, int rank, const std::string &path_to_
         fp          = std::get<1>(fd_files_location_reads[index]);
         seek_needed = std::get<2>(fd_files_location_reads[index]);
     } else {
-        std::string file_name = "files_location_" + std::to_string(index) + ".txt";
+        std::string file_name = "files_location.txt";
         fp                    = fopen(file_name.c_str(), "r+");
         if (fp == nullptr) {
             return 0;
@@ -196,7 +196,7 @@ void clean_files_location(int n_servers) {
 
     std::string file_name;
     for (int rank = 0; rank < n_servers; ++rank) {
-        file_name = "files_location_" + std::to_string(rank) + ".txt";
+        file_name = "files_location.txt";
         remove(file_name.c_str());
     }
 }
@@ -278,7 +278,7 @@ void delete_from_file_locations(const std::string &path_metadata, long int offse
     if (rank < fd_files_location_reads.size()) {
         fd = std::get<0>(fd_files_location_reads[rank]);
     } else {
-        std::string file_name = "files_location_" + std::to_string(rank) + ".txt";
+        std::string file_name = "files_location.txt";
         FILE *fp              = fopen(file_name.c_str(), "r+");
         if (fp == nullptr) {
             ERR_EXIT("fopen %s delete_from_file_locations", file_name.c_str());
@@ -314,14 +314,13 @@ void delete_from_file_locations(const std::string &path, int rank) {
     if (offset == -1) { // TODO: very inefficient
         int r = 0;
         while (!found && r < n_servers) {
-            res   = delete_from_file_locations("files_location_" + std::to_string(r) + ".txt", path,
-                                               rank);
+            res   = delete_from_file_locations("files_location.txt", path, rank);
             found = res == 1;
             ++r;
         }
     } else {
         int r = (node == std::string(node_name)) ? rank : nodes_helper_rank[node];
-        delete_from_file_locations("files_location_" + std::to_string(r) + ".txt", offset, rank, r);
+        delete_from_file_locations("files_location.txt", offset, rank, r);
     }
     erase_from_files_location(path.c_str());
     for (auto &pair : writers) {
@@ -340,7 +339,7 @@ void loop_check_files_location(const std::string &path_to_check, int rank) {
 void open_files_location(int rank) {
     START_LOG(gettid(), "call(%d)", rank);
 
-    std::string file_name = "files_location_" + std::to_string(rank) + ".txt";
+    std::string file_name = "files_location.txt";
     int fd;
     if ((fd = open(file_name.c_str(), O_WRONLY | O_APPEND | O_CREAT, 0664)) == -1) {
         ERR_EXIT("writer error opening file");
