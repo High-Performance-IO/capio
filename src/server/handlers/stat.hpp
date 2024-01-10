@@ -42,13 +42,12 @@ inline void reply_stat(int tid, const std::string &path, int rank) {
     auto c_file =
         (c_file_opt) ? c_file_opt->get() : create_capio_file(path, false, get_file_initial_size());
     LOG("Obtained capio file. ready to reply to client");
-    std::string_view mode = c_file.get_mode().data();
-    LOG("Mode: %s", mode);
+    std::string_view mode = c_file.get_mode();
+    LOG("Mode: %s", mode.data());
     bool complete = c_file.complete;
     LOG("complete: %s", complete ? "Yes" : "No");
-    bool file_is_local = strcmp(std::get<0>(file_location_opt->get()), node_name) == 0;
-    LOG("file_is_local? %s", file_is_local ? "Yes" : "No");
-    if (complete || file_is_local || mode == CAPIO_FILE_MODE_NO_UPDATE || get_capio_dir() == path) {
+
+    if (complete || !file_is_remote || mode == CAPIO_FILE_MODE_NO_UPDATE || get_capio_dir() == path) {
         LOG("Sending response to client");
         write_response(tid, c_file.get_file_size());
         write_response(tid, static_cast<int>(c_file.is_dir() ? 1 : 0));

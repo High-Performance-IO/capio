@@ -169,7 +169,7 @@ int check_file_location(std::size_t index, int rank, const std::string &path_to_
     return 2;
 }
 
-bool check_file_location(int my_rank, const std::string &path_to_check) {
+[[nodiscard]] bool check_file_location(int my_rank, const std::string &path_to_check) {
     START_LOG(gettid(), "call(my_rank=%d, path_to_check=%s)", my_rank, path_to_check.c_str());
 
     for (int rank = 0; rank < n_servers; rank++) {

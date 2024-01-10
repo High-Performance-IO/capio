@@ -255,8 +255,10 @@ class MPI_backend : public backend_interface {
         auto dest = nodes_helper_rank[std::get<0>(get_file_location(path.c_str()))];
         auto msg =
             std::to_string(CAPIO_SERVER_REQUEST_STAT) + " " + std::to_string(rank) + " " + path;
+        LOG("destination=%d, message=%s", dest, msg.c_str());
 
         MPI_Send(msg.c_str(), msg.length() + 1, MPI_CHAR, dest, 0, MPI_COMM_WORLD);
+        LOG("message sent");
         (*pending_remote_stats)[path].emplace_back(tid);
     }
 
