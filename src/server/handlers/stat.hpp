@@ -42,7 +42,7 @@ inline void reply_stat(int tid, const std::string &path, int rank) {
     auto c_file =
         (c_file_opt) ? c_file_opt->get() : create_capio_file(path, false, get_file_initial_size());
     LOG("Obtained capio file. ready to reply to client");
-    std::string_view mode = c_file.get_mode();
+    std::string_view mode = c_file.get_mode().data();
     LOG("Mode: %s", mode);
     bool complete = c_file.complete;
     LOG("complete: %s", complete ? "Yes" : "No");
