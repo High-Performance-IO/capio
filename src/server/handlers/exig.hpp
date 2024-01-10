@@ -9,18 +9,22 @@ inline void handle_exit_group(int tid, int rank) {
     for (auto &pair : files) {
         std::string path = pair.first;
         if (pair.second) {
+            LOG("Handling file %s", path.c_str());
             auto it_conf = metadata_conf.find(path);
             if (it_conf == metadata_conf.end() ||
-                std::get<0>(it_conf->second) == "on_termination" ||
+                std::get<0>(it_conf->second) == CAPIO_FILE_MODE_ON_TERMINATION ||
                 std::get<0>(it_conf->second).empty()) {
                 Capio_file &c_file = get_capio_file(path.c_str());
                 if (c_file.is_dir()) {
+                    LOG("file %s is dir", path.c_str());
                     long int n_committed = c_file.n_files_expected;
                     if (n_committed <= c_file.n_files) {
                         reply_remote_stats(path);
+                        LOG("Setting file %s to complete", path.c_str());
                         c_file.complete = true;
                     }
                 } else {
+                    LOG("Setting file %s to complete", path.c_str());
                     c_file.complete = true;
                     c_file.commit();
                 }
@@ -28,6 +32,7 @@ inline void handle_exit_group(int tid, int rank) {
 
             auto it = pending_reads.find(path);
             if (it != pending_reads.end()) {
+                LOG("Handling pending reads for file %s", path.c_str());
                 auto &pending_reads_this_file = it->second;
                 auto it_vec                   = pending_reads_this_file.begin();
                 while (it_vec != pending_reads_this_file.end()) {

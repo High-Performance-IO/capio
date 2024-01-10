@@ -287,14 +287,16 @@ void remote_listener_stat_req(RemoteRequest *request, void *arg1, void *arg2) {
     const char *buf_recv = request->getRequest();
     START_LOG(gettid(), "call(%s)", buf_recv);
     auto path_c = new char[PATH_MAX];
-    int dest, trash;
+    int dest;
 
-    sscanf(buf_recv, "%d %d %s", &trash, &dest, path_c);
+    sscanf(buf_recv, "%d %s", &dest, path_c);
 
     Capio_file &c_file = get_capio_file(path_c);
     if (c_file.complete) {
+        LOG("file is complete. serving file");
         backend->serve_remote_stat(path_c, dest, c_file);
     } else { // wait for completion
+        LOG("File is not complete. awaiting completion on different thread");
         auto sem = new sem_t;
 
         if (sem_init(sem, 0, 0) == -1) {

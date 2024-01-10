@@ -28,6 +28,7 @@ constexpr size_t CAPIO_REQUEST_MAX_SIZE        = 256 * sizeof(char);
 
 // CAPIO streaming semantics
 constexpr char CAPIO_FILE_MODE_NO_UPDATE[]      = "no_update";
+constexpr char CAPIO_FILE_MODE_UPDATE[]         = "update";
 constexpr char CAPIO_FILE_MODE_ON_CLOSE[]       = "on_close";
 constexpr char CAPIO_FILE_MODE_ON_TERMINATION[] = "on_termination";
 

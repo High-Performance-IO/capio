@@ -31,12 +31,12 @@ class Capio_file {
   private:
     char *_buf = nullptr; // buffer containing the data
     std::size_t _buf_size;
-    std::string_view _committed = CAPIO_FILE_MODE_NO_UPDATE;
+    std::string_view _committed = CAPIO_FILE_MODE_UPDATE;
     bool _directory             = false;
     // _fd is useful only when the file is memory-mapped
     int _fd                     = -1;
     bool _home_node             = false;
-    std::string_view _mode      = CAPIO_FILE_MODE_ON_CLOSE;
+    std::string_view _mode      = CAPIO_FILE_MODE_ON_TERMINATION;
     int _n_links                = 1;
     long int _n_close           = 0;
     long int _n_close_expected  = -1;
@@ -49,7 +49,7 @@ class Capio_file {
     std::vector<std::pair<int, int>> _threads_fd;
 
   public:
-    bool complete              = false;
+    bool complete              = false; //whether the file is completed / committed
     bool first_write           = true;
     long int n_files           = 0;  // useful for directories
     long int n_files_expected  = -1; // useful for directories
