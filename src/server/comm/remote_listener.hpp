@@ -363,7 +363,8 @@ void remote_listener_remote_read(RemoteRequest *request, void *arg1, void *arg2)
     Capio_file &c_file = get_capio_file(path_c);
 
     bool data_available = (offset + nbytes <= c_file.get_stored_size());
-    if (c_file.is_complete() || (c_file.get_mode() == CAPIO_FILE_MODE_NO_UPDATE && data_available)) {
+    if (c_file.is_complete() ||
+        (c_file.get_mode() == CAPIO_FILE_MODE_NO_UPDATE && data_available)) {
         backend->serve_remote_read(path_c, dest, offset, nbytes, c_file.is_complete());
     } else {
         auto sem = new sem_t;

@@ -77,6 +77,7 @@ class Capio_file {
 
     ~Capio_file() {
         START_LOG(gettid(), "call()");
+        LOG("Deleting capio_file");
 
         if (_permanent && _home_node) {
             if (_directory) {

@@ -7,8 +7,8 @@
 
 inline void update_file_metadata(const std::string &path, int tid, int fd, int rank,
                                  bool is_creat) {
-    START_LOG(tid, "call(path=%s, fd=%d, rank=%d, is_creat=%s)", path.c_str(), fd, rank,
-              is_creat ? "true" : "false");
+    START_LOG(tid, "call(path=%s, client_tid=%d fd=%d, rank=%d, is_creat=%s)", path.c_str(), tid,
+              fd, rank, is_creat ? "true" : "false");
 
     // TODO: check the size that the user wrote in the configuration file
     //*caching_info[tid].second += 2;
@@ -20,10 +20,12 @@ inline void update_file_metadata(const std::string &path, int tid, int fd, int r
     auto it_files = writers.find(pid);
     if (it_files != writers.end()) {
         if (it_files->second.find(path) == it_files->second.end()) {
+            LOG("setting writers[%ld][%s]=false 1", pid, path.c_str());
             writers[pid][path] = false;
         }
     } else {
-        writers[pid][path] = false;
+        LOG("setting writers[%ld][%s]=true", pid, path.c_str());
+        writers[pid][path] = true;
     }
     if (c_file.first_write && is_creat) {
         c_file.first_write = false;

@@ -62,7 +62,7 @@ get_file_location_opt(const char *const path) {
         LOG("File was not found in files_locations. returning empty object");
         return {};
     } else {
-        LOG("File found on remote node %s", it->second);
+        LOG("File found on node %s", it->second);
         return {it->second};
     }
 }
@@ -146,7 +146,7 @@ int check_file_location(std::size_t index, int rank, const std::string &path_to_
         auto separator = line_str.find_first_of(' ');
         path           = new std::string(line_str.substr(0, separator));
         node = new std::string(line_str.substr(separator + 1, line_str.length())); // remove ' '
-        node->pop_back(); //remove \n from node name
+        node->pop_back(); // remove \n from node name
 
         LOG("found [%s]@[%s]", path->c_str(), node->c_str());
 
@@ -169,6 +169,12 @@ int check_file_location(std::size_t index, int rank, const std::string &path_to_
     return 2;
 }
 
+/**
+ * Returns true if path_to_check is present on node with my_rank, false otherwise
+ * @param my_rank
+ * @param path_to_check
+ * @return
+ */
 [[nodiscard]] bool check_file_location(int my_rank, const std::string &path_to_check) {
     START_LOG(gettid(), "call(my_rank=%d, path_to_check=%s)", my_rank, path_to_check.c_str());
 

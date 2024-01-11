@@ -4,10 +4,13 @@
 inline void handle_exit_group(int tid, int rank) {
     START_LOG(gettid(), "call(tid=%d, rank=%d)", tid, rank);
 
-    int pid    = pids[tid];
+    LOG("retrieving pid for process with tid = %d", tid);
+    int pid = pids[tid];
+    LOG("retrieving files from writers for process with pid = %d", pid);
     auto files = writers[pid];
     for (auto &pair : files) {
         std::string path = pair.first;
+        LOG("Path %s found. handling? %s", path.c_str(), pair.second ? "yes" : "no");
         if (pair.second) {
             LOG("Handling file %s", path.c_str());
             auto it_conf = metadata_conf.find(path);
@@ -45,6 +48,7 @@ inline void handle_exit_group(int tid, int rank) {
             }
         }
     }
+
     for (auto &fd : get_capio_fds_for_tid(tid)) {
         handle_close(tid, fd, rank);
     }
