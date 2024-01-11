@@ -43,18 +43,21 @@ inline int capio_openat(int dirfd, const std::string_view &pathname, int flags, 
         bool create = (flags & O_CREAT) == O_CREAT;
         bool excl   = (flags & O_EXCL) == O_EXCL;
         if (excl) {
+            LOG("excl");
             off64_t return_code = create_exclusive_request(fd, path, tid);
             if (return_code == 1) {
                 errno = EEXIST;
                 return CAPIO_POSIX_SYSCALL_ERRNO;
             }
         } else if (create) {
+            LOG("create");
             off64_t return_code = create_request(fd, path, tid);
             if (return_code == 1) {
                 errno = ENOENT;
                 return CAPIO_POSIX_SYSCALL_ERRNO;
             }
         } else {
+            LOG("!excl && !create");
             off64_t return_code = open_request(fd, path, tid);
             if (return_code == 1) {
                 errno = ENOENT;

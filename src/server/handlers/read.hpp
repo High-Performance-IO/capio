@@ -115,20 +115,25 @@ inline void handle_read(int tid, int fd, off64_t count, bool dir, bool is_getden
     const std::filesystem::path &capio_dir = get_capio_dir();
     bool is_prod                           = is_producer(tid, path.data());
     auto file_location_opt                 = get_file_location_opt(path.data());
-
+    LOG("got to first checkpoint");
     if (!file_location_opt && !is_prod) {
+        LOG("got to second checkpoint");
         bool found = check_file_location(rank, path.data());
         if (!found) {
+            LOG("got to third checkpoint");
             // launch a thread that checks when the file is created
             std::thread t(wait_for_file, tid, fd, count, dir, is_getdents, rank,
                           &pending_remote_reads, &pending_remote_reads_mutex, handle_local_read);
             t.detach();
         }
+        LOG("got to fourth checkpoint");
     }
     if (is_prod || strcmp(std::get<0>(file_location_opt->get()), node_name) == 0 ||
         capio_dir == path) {
+        LOG("got to 5 checkpoint");
         handle_local_read(tid, fd, count, dir, is_getdents, is_prod);
     } else {
+        LOG("got to 6 checkpoint");
         Capio_file &c_file = get_capio_file(path.data());
         if (!c_file.is_complete()) {
             auto it  = apps.find(tid);
