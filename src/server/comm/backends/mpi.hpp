@@ -188,7 +188,7 @@ class MPI_backend : public backend_interface {
         off64_t end_of_read    = process_offset + count;
         off64_t end_of_sector  = c_file.get_sector_end(process_offset);
 
-        if (c_file.complete &&
+        if (c_file.is_complete() &&
             (end_of_read <= end_of_sector ||
              (end_of_sector == -1 ? 0 : end_of_sector) == c_file.real_file_size)) {
             handle_local_read(tid, fd, count, dir, is_getdents, true);

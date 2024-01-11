@@ -17,7 +17,7 @@ inline void handle_close(int tid, int fd, int rank) {
     Capio_file &c_file = get_capio_file(path.data());
     c_file.close();
     if (c_file.get_committed() == "on_close" && c_file.is_closed()) {
-        c_file.complete = true;
+        c_file.set_complete();
         auto it         = pending_reads.find(path.data());
         if (it != pending_reads.end()) {
             auto &pending_reads_this_file = it->second;

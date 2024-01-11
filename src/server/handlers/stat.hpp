@@ -44,7 +44,7 @@ inline void reply_stat(int tid, const std::string &path, int rank) {
     LOG("Obtained capio file. ready to reply to client");
     std::string_view mode = c_file.get_mode();
     LOG("Mode: %s", mode.data());
-    bool complete = c_file.complete;
+    bool complete = c_file.is_complete();
     LOG("complete: %s", complete ? "Yes" : "No");
 
     if (complete || !file_is_remote || mode == CAPIO_FILE_MODE_NO_UPDATE || get_capio_dir() == path) {

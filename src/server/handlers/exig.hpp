@@ -21,11 +21,11 @@ inline void handle_exit_group(int tid, int rank) {
                     if (n_committed <= c_file.n_files) {
                         reply_remote_stats(path);
                         LOG("Setting file %s to complete", path.c_str());
-                        c_file.complete = true;
+                        c_file.set_complete();
                     }
                 } else {
                     LOG("Setting file %s to complete", path.c_str());
-                    c_file.complete = true;
+                    c_file.set_complete();
                     c_file.commit();
                 }
             }

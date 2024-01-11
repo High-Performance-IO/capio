@@ -47,9 +47,9 @@ class Capio_file {
     std::set<std::pair<off64_t, off64_t>, compare> _sectors;
     // vector of (tid, fd)
     std::vector<std::pair<int, int>> _threads_fd;
+    bool complete = false; // whether the file is completed / committed
 
   public:
-    bool complete              = false; //whether the file is completed / committed
     bool first_write           = true;
     long int n_files           = 0;  // useful for directories
     long int n_files_expected  = -1; // useful for directories
@@ -90,6 +90,21 @@ class Capio_file {
         } else {
             delete[] _buf;
         }
+    }
+
+    inline void set_complete() {
+        START_LOG(capio_syscall(SYS_gettid), "Setting capio_file to complete");
+        this->complete = true;
+    }
+    inline void set_complete(bool _complete) {
+        START_LOG(capio_syscall(SYS_gettid), "setting capio_file.complete=%s",
+                  _complete ? "true" : "false");
+        this->complete = _complete;
+    }
+    [[nodiscard]] inline bool is_complete() const {
+        START_LOG(capio_syscall(SYS_gettid), "capio_file is complete? %s",
+                  this->complete ? "true" : "false");
+        return this->complete;
     }
 
     inline void add_fd(int tid, int fd) { _threads_fd.emplace_back(tid, fd); }

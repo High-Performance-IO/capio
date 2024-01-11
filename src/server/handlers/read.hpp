@@ -61,10 +61,10 @@ inline void handle_local_read(int tid, int fd, off64_t count, bool dir, bool is_
     off64_t end_of_sector  = c_file.get_sector_end(process_offset);
     off64_t end_of_read    = process_offset + count;
     std::string_view mode  = c_file.get_mode();
-    if (mode != CAPIO_FILE_MODE_NO_UPDATE && !c_file.complete && !writer && !is_prod && !dir) {
+    if (mode != CAPIO_FILE_MODE_NO_UPDATE && !c_file.is_complete() && !writer && !is_prod && !dir) {
         pending_reads[path.data()].emplace_back(tid, fd, count, is_getdents);
     } else if (end_of_read > end_of_sector) {
-        if (!is_prod && !writer && !c_file.complete && !dir) {
+        if (!is_prod && !writer && !c_file.is_complete() && !dir) {
             pending_reads[path.data()].emplace_back(tid, fd, count, is_getdents);
         } else {
             if (end_of_sector == -1) {
@@ -130,7 +130,7 @@ inline void handle_read(int tid, int fd, off64_t count, bool dir, bool is_getden
         handle_local_read(tid, fd, count, dir, is_getdents, is_prod);
     } else {
         Capio_file &c_file = get_capio_file(path.data());
-        if (!c_file.complete) {
+        if (!c_file.is_complete()) {
             auto it  = apps.find(tid);
             bool res = false;
             if (it != apps.end()) {
