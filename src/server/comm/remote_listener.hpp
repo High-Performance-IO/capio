@@ -403,8 +403,8 @@ void remote_listener_remote_sending(RemoteRequest *request, void *arg1, void *ar
                        &pending_remote_reads, &pending_remote_reads_mutex);
 }
 
-void capio_remote_listener() {
-    START_LOG(gettid(), "call()");
+void capio_remote_listener(int rank) {
+    START_LOG(gettid(), "call(rank=%d)", rank);
 
     std::array<CComsHandler_t, CAPIO_SERVER_NR_REQUEST> remote_request_map{};
     remote_request_map[CAPIO_SERVER_REQUEST_READ]    = remote_listener_remote_read;

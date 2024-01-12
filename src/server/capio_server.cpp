@@ -284,7 +284,9 @@ int main(int argc, char **argv) {
         ERR_EXIT("sem_init clients_remote_pending_nfiles_sem in main");
     }
     std::thread server_thread(capio_server, rank);
-    std::thread helper_thread(capio_remote_listener);
+    LOG("capio_server thread started");
+    std::thread helper_thread(capio_remote_listener, rank);
+    LOG("capio_remote_listener thread started.");
     server_thread.join();
     helper_thread.join();
 

@@ -19,10 +19,12 @@ class MPI_backend : public backend_interface {
         int node_name_len;
         START_LOG(gettid(), "call()");
         MPI_Init_thread(&argc, &argv, MPI_THREAD_MULTIPLE, provided);
+        LOG("Mpi has multithreading support? %s (%d)",
+            *provided == MPI_THREAD_MULTIPLE ? "yes" : "no", *provided);
         MPI_Comm_rank(MPI_COMM_WORLD, rank);
-        LOG("node_rank=%d", rank);
+        LOG("node_rank=%d", *rank);
         if (*provided != MPI_THREAD_MULTIPLE) {
-            LOG("Error: The threading support level is lesser than that demanded");
+            LOG("Error: The threading support level is not MPI_THREAD_MULTIPLE (is %d)", *provided);
             MPI_Abort(MPI_COMM_WORLD, EXIT_FAILURE);
         }
 
@@ -98,11 +100,15 @@ class MPI_backend : public backend_interface {
     void send_file(char *shm, long int nbytes, int dest) override {
         START_LOG(gettid(), "call(%s, %ld, %d)", shm, nbytes, dest);
 
-        long int elem_to_snd = 0;
+        int elem_to_snd = 0;
 
         for (long int k = 0; k < nbytes; k += elem_to_snd) {
-            (nbytes - k > MPI_MAX_ELEM_COUNT) ? elem_to_snd = MPI_MAX_ELEM_COUNT
-                                              : elem_to_snd = nbytes - k;
+
+            if (nbytes - k > MPI_MAX_ELEM_COUNT) {
+                elem_to_snd = static_cast<int>(MPI_MAX_ELEM_COUNT);
+            } else {
+                elem_to_snd = static_cast<int>(nbytes - k);
+            }
 
             LOG("Sending %d bytes to %d", elem_to_snd, dest);
             MPI_Isend(shm + k, elem_to_snd, MPI_BYTE, dest, 0, MPI_COMM_WORLD, &req);
@@ -269,11 +275,16 @@ class MPI_backend : public backend_interface {
     inline void recv_file(char *shm, int source, long int bytes_expected) override {
         START_LOG(gettid(), "call(shm=%ld, source=%d, length=%ld)", shm, source, bytes_expected);
         MPI_Status status;
-        int bytes_received, count;
+        int bytes_received = 0, count = 0;
 
         for (long int k = 0; k < bytes_expected; k += bytes_received) {
-            (bytes_expected - k > MPI_MAX_ELEM_COUNT) ? count = MPI_MAX_ELEM_COUNT
-                                                      : count = bytes_expected - k;
+
+            if (bytes_expected - k > MPI_MAX_ELEM_COUNT) {
+                count = static_cast<int>(MPI_MAX_ELEM_COUNT);
+            } else {
+                count = static_cast<int>(bytes_expected - k);
+            }
+
             LOG("Expected %ld bytes from %d", count, source);
             MPI_Recv(shm + k, count, MPI_BYTE, source, 0, MPI_COMM_WORLD, &status);
             LOG("Received chunk");
