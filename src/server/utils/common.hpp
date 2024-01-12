@@ -10,6 +10,7 @@
 
 inline char *expand_memory_for_file(const std::string &path, off64_t data_size,
                                     Capio_file &c_file) {
+    START_LOG(capio_syscall(SYS_gettid), "call(path=%s)", path.c_str());
     char *new_p = c_file.expand_buffer(data_size);
     return new_p;
 }

@@ -110,7 +110,8 @@ class MPI_backend : public backend_interface {
                 elem_to_snd = static_cast<int>(nbytes - k);
             }
 
-            LOG("Sending %d bytes to %d", elem_to_snd, dest);
+            LOG("Sending %d bytes to %d with offset from beginning odf k=%ld", elem_to_snd, dest,
+                k);
             MPI_Isend(shm + k, elem_to_snd, MPI_BYTE, dest, 0, MPI_COMM_WORLD, &req);
             LOG("Sent chunk of %d bytes", elem_to_snd);
         }
@@ -203,6 +204,7 @@ class MPI_backend : public backend_interface {
             handle_local_read(tid, fd, count, dir, is_getdents, true);
             return;
         }
+
         // when is not complete but mode = append
         if (read_from_local_mem(tid, process_offset, end_of_read, end_of_sector, count,
                                 path.data())) {
@@ -276,7 +278,9 @@ class MPI_backend : public backend_interface {
         START_LOG(gettid(), "call(shm=%ld, source=%d, length=%ld)", shm, source, bytes_expected);
         MPI_Status status;
         int bytes_received = 0, count = 0;
-
+        LOG("Buffer is valid? %s",
+            shm != nullptr ? "yes"
+                           : "NO! a nullptr was given to receive. this will make mpi crash!");
         for (long int k = 0; k < bytes_expected; k += bytes_received) {
 
             if (bytes_expected - k > MPI_MAX_ELEM_COUNT) {
@@ -285,7 +289,8 @@ class MPI_backend : public backend_interface {
                 count = static_cast<int>(bytes_expected - k);
             }
 
-            LOG("Expected %ld bytes from %d", count, source);
+            LOG("Expected %ld bytes from %d with offset from beginning odf k=%ld", count, source,
+                k);
             MPI_Recv(shm + k, count, MPI_BYTE, source, 0, MPI_COMM_WORLD, &status);
             LOG("Received chunk");
             MPI_Get_count(&status, MPI_BYTE, &bytes_received);

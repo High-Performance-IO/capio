@@ -4,7 +4,8 @@
 #include <csignal>
 
 void sig_term_handler(int signum, siginfo_t *info, void *ptr) {
-    START_LOG(gettid(), "call(signal=[%d] %s)", signum, strsignal(signum));
+    START_LOG(gettid(), "call(signal=[%d] (%s) from process with pid=%ld)", signum,
+              strsignal(signum), info->si_pid);
 
     std::cout << std::endl
               << CAPIO_LOG_SERVER_CLI_LEVEL_WARNING << "shutting down server" << std::endl;

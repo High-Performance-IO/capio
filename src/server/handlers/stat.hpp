@@ -55,6 +55,8 @@ inline void reply_stat(int tid, const std::string &path, int rank) {
         write_response(tid, static_cast<int>(c_file.is_dir() ? 1 : 0));
     } else {
         LOG("Delegating backend to reply to remote stats");
+        // init a capio file that is remote so that buffer is going to be allocated
+        init_capio_file(path.c_str(), false);
         backend->handle_remote_stat(tid, path, rank, &pending_remote_stats,
                                     &pending_remote_stats_mutex);
     }

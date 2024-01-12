@@ -379,6 +379,7 @@ void remote_listener_remote_read(RemoteRequest *request, void *arg1, void *arg2)
 }
 
 void remote_listener_remote_sending(RemoteRequest *request, void *arg1, void *arg2) {
+    START_LOG(capio_syscall(SYS_gettid), "call(request=%s)", request->getRequest());
     off64_t bytes_received, offset;
     std::string path;
     path.reserve(1024);
@@ -394,7 +395,10 @@ void remote_listener_remote_sending(RemoteRequest *request, void *arg1, void *ar
         auto file_size_recv = offset + bytes_received;
         if (file_size_recv > file_shm_size) {
             file_shm = expand_memory_for_file(path, file_size_recv, c_file);
+        } else {
+            file_shm = c_file.get_buffer();
         }
+
         backend->recv_file((char *) file_shm + offset, request->getSource(), bytes_received);
         bytes_received *= sizeof(char);
     }
