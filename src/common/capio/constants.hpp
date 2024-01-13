@@ -21,26 +21,26 @@ constexpr int CAPIO_SEM_MAX_RETRIES          = 100;
 constexpr long int CAPIO_SEM_TIMEOUT_NANOSEC = 10e5;
 
 // CAPIO communication constants
-constexpr int CAPIO_DATA_BUFFER_LENGTH               = 10;
-constexpr int CAPIO_DATA_BUFFER_ELEMENT_SIZE         = 256 * 1024;
-constexpr size_t CAPIO_SERVER_REQUEST_MAX_SIZE       = sizeof(char) * (PATH_MAX + 81920);
-constexpr size_t CAPIO_REQUEST_MAX_SIZE              = 256 * sizeof(char);
-constexpr char CAPIO_SERVER_DEFAULT_LOG_FILE_NAME[]  = "server_thread_\0";
-constexpr char CAPIO_SERVER_DEFAULT_LOG_FOLDER[]     = "capio_logs\0";
-constexpr char CAPIO_APP_LOG_FILE_NAME[]             = "/dev/stderr\0";
-constexpr char LOG_PRE_MSG[]                         = "tid[%ld]-at[%s]: ";
-constexpr char CAPIO_SERVER_CLI_LOG_SERVER[]         = "[ \033[1;32m SERVER \033[0m ] ";
-constexpr char CAPIO_SERVER_CLI_LOG_SERVER_WARNING[] = "[ \033[1;33m SERVER \033[0m ] ";
-constexpr char CAPIO_SERVER_CLI_LOG_SERVER_ERROR[]   = "[ \033[1;31m SERVER \033[0m ] ";
-constexpr char LOG_CAPIO_START_REQUEST[]             = "\n+++++++++++ SYSCALL %s (%d) +++++++++++";
-constexpr char LOG_CAPIO_END_REQUEST[]               = "----------- END SYSCALL ----------\n";
-constexpr char CAPIO_SERVER_LOG_START_REQUEST_MSG[]  = "+++++++++++++++++REQUEST+++++++++++++++++";
-constexpr char CAPIO_SERVER_LOG_END_REQUEST_MSG[]    = "~~~~~~~~~~~~~~~END REQUEST~~~~~~~~~~~~~~~";
-constexpr int N_ELEMS_DATA_BUFS                      = 10;
-constexpr int WINDOW_DATA_BUFS                       = 256 * 1024;
-constexpr int CAPIO_LOG_MAX_MSG_LEN                  = 2048;
-constexpr int CAPIO_SEM_RETRIES                      = 100;
-constexpr int THEORETICAL_SIZE_DIRENT64              = sizeof(ino64_t) + sizeof(off64_t) +
+constexpr int CAPIO_DATA_BUFFER_LENGTH                = 10;
+constexpr int CAPIO_DATA_BUFFER_ELEMENT_SIZE          = 256 * 1024;
+constexpr size_t CAPIO_SERVER_REQUEST_MAX_SIZE        = sizeof(char) * (PATH_MAX + 81920);
+constexpr size_t CAPIO_REQUEST_MAX_SIZE               = 256 * sizeof(char);
+constexpr char CAPIO_SERVER_DEFAULT_LOG_FILE_PREFIX[] = "server_thread_\0";
+constexpr char CAPIO_SERVER_DEFAULT_LOG_FOLDER[]      = "capio_logs\0";
+constexpr char CAPIO_APP_LOG_FILE_NAME[]              = "/dev/stderr\0";
+constexpr char LOG_PRE_MSG[]                          = "tid[%ld]-at[%s]: ";
+constexpr char CAPIO_SERVER_CLI_LOG_SERVER[]          = "[ \033[1;32m SERVER \033[0m ] ";
+constexpr char CAPIO_SERVER_CLI_LOG_SERVER_WARNING[]  = "[ \033[1;33m SERVER \033[0m ] ";
+constexpr char CAPIO_SERVER_CLI_LOG_SERVER_ERROR[]    = "[ \033[1;31m SERVER \033[0m ] ";
+constexpr char LOG_CAPIO_START_REQUEST[]              = "\n+++++++++++ SYSCALL %s (%d) +++++++++++";
+constexpr char LOG_CAPIO_END_REQUEST[]                = "----------- END SYSCALL ----------\n";
+constexpr char CAPIO_SERVER_LOG_START_REQUEST_MSG[]   = "+++++++++++++++++REQUEST+++++++++++++++++";
+constexpr char CAPIO_SERVER_LOG_END_REQUEST_MSG[]     = "~~~~~~~~~~~~~~~END REQUEST~~~~~~~~~~~~~~~";
+constexpr int N_ELEMS_DATA_BUFS                       = 10;
+constexpr int WINDOW_DATA_BUFS                        = 256 * 1024;
+constexpr int CAPIO_LOG_MAX_MSG_LEN                   = 2048;
+constexpr int CAPIO_SEM_RETRIES                       = 100;
+constexpr int THEORETICAL_SIZE_DIRENT64               = sizeof(ino64_t) + sizeof(off64_t) +
                                           sizeof(unsigned short) + sizeof(unsigned char) +
                                           sizeof(char) * NAME_MAX;
 
@@ -97,9 +97,8 @@ constexpr char CAPIO_LOG_SERVER_CLI_LOGGING_ENABLED_WARNING[] =
     "|==================================================================|\n";
 constexpr char CAPIO_LOG_SERVER_CLI_LOGGING_NOT_AVAILABLE[] =
     "CAPIO_LOG set but log support was not compiled into CAPIO!";
-constexpr char CAPIO_LOG_SERVER_DEFAULT_FILE_NAME[] = "server_rank_\0";
-constexpr char CAPIO_LOG_SERVER_REQUEST_START[]     = "\n+++++++++++ [%ld] REQUEST +++++++++++";
-constexpr char CAPIO_LOG_SERVER_REQUEST_END[]       = "~~~~~~~~~ [%ld] END REQUEST ~~~~~~~~~\n";
+constexpr char CAPIO_LOG_SERVER_REQUEST_START[] = "\n+++++++++++ [%ld] REQUEST +++++++++++";
+constexpr char CAPIO_LOG_SERVER_REQUEST_END[]   = "~~~~~~~~~ [%ld] END REQUEST ~~~~~~~~~\n";
 
 // CAPIO server argument parser
 constexpr char CAPIO_SERVER_ARG_PARSER_PRE[] =
@@ -111,6 +110,8 @@ constexpr char CAPIO_SERVER_ARG_PARSER_EPILOGUE[] =
     " and a guide on config JSON file structure, please visit "
     "https://github.com/High-Performance-IO/capio";
 constexpr char CAPIO_SERVER_ARG_PARSER_PRE_COMMAND[] = "{ENVIRONMENT_VARS}  mpirun -n 1";
+constexpr char CAPIO_SERVER_ARG_PARSER_LOGILE_DIR_OPT_HELP[] =
+    "Name of the folder to which capio server will put log files into";
 constexpr char CAPIO_SERVER_ARG_PARSER_LOGILE_OPT_HELP[] =
     "Filename to which capio_server will log to, without extension";
 constexpr char CAPIO_SERVER_ARG_PARSER_CONFIG_OPT_HELP[] =

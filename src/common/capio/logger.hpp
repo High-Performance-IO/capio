@@ -20,6 +20,8 @@
 #ifndef __CAPIO_POSIX
 #include <filesystem>
 thread_local std::ofstream logfile; // if building for server, self contained logfile
+std::string log_master_dir_name = CAPIO_SERVER_DEFAULT_LOG_FOLDER;
+std::string logfile_prefix      = CAPIO_SERVER_DEFAULT_LOG_FILE_PREFIX;
 #else
 FILE *logfileFP;
 bool logfileOpen = false;
@@ -54,13 +56,11 @@ inline auto open_server_logfile() {
     auto hostname = new char[HOST_NAME_MAX];
     gethostname(hostname, HOST_NAME_MAX);
 
-    const std::filesystem::path output_folder =
-        std::string{CAPIO_SERVER_DEFAULT_LOG_FOLDER} + "/" + hostname;
+    const std::filesystem::path output_folder = std::string{log_master_dir_name + "/" + hostname};
 
     std::filesystem::create_directories(output_folder);
 
-    const std::filesystem::path logfile_name = output_folder.string() + "/" +
-                                               std::string(CAPIO_SERVER_DEFAULT_LOG_FILE_NAME) +
+    const std::filesystem::path logfile_name = output_folder.string() + "/" + logfile_prefix +
                                                std::to_string(capio_syscall(SYS_gettid)) + ".log";
 
     logfile.open(logfile_name, std::ofstream::out);
@@ -137,8 +137,8 @@ class Logger {
             int syscallNumber = va_arg(argp, int);
             auto buf1         = reinterpret_cast<char *>(capio_syscall(
                 SYS_mmap, nullptr, 50, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0));
-            sprintf(buf1, CAPIO_LOG_POSIX_SYSCALL_START, tid, sys_num_to_string(syscallNumber),
-                    syscallNumber);
+            sprintf(buf1, CAPIO_LOG_POSIX_SYSCALL_START, capio_syscall(SYS_gettid),
+                    sys_num_to_string(syscallNumber), syscallNumber);
             log_write_to(buf1, strlen(buf1));
             capio_syscall(SYS_munmap, buf1, 50);
         }

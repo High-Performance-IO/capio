@@ -162,6 +162,8 @@ int parseCLI(int argc, char **argv, int rank) {
     args::HelpFlag help(arguments, "help", "Display this help menu", {'h', "help"});
     args::ValueFlag<std::string> logfile_src(arguments, "filename",
                                              CAPIO_SERVER_ARG_PARSER_LOGILE_OPT_HELP, {'l', "log"});
+    args::ValueFlag<std::string> logfile_folder(
+        arguments, "filename", CAPIO_SERVER_ARG_PARSER_LOGILE_DIR_OPT_HELP, {'d', "log-dir"});
     args::ValueFlag<std::string> config(arguments, "filename",
                                         CAPIO_SERVER_ARG_PARSER_CONFIG_OPT_HELP, {'c', "config"});
     args::Flag noConfigFile(arguments, "no-config",
@@ -182,6 +184,16 @@ int parseCLI(int argc, char **argv, int rank) {
         exit(EXIT_FAILURE);
     }
 
+    if (logfile_folder) {
+#ifdef CAPIOLOG
+        log_master_dir_name = args::get(logfile_folder);
+#else
+        std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_WARNING
+                  << "Capio logfile folder, but logging capabilities not compiled into capio!"
+                  << std::endl;
+#endif
+    }
+
     if (logfile_src) {
 #ifdef CAPIOLOG
         // log file was given
@@ -190,26 +202,19 @@ int parseCLI(int argc, char **argv, int rank) {
             token.erase(token.length() - 4); // delete .log if for some reason
             // is given as parameter
         }
-
-        std::string filename = token + "-" + std::to_string(capio_syscall(SYS_gettid)) + +".log";
-        logfile.open(filename, std::ofstream::out);
-        log = new Logger(__func__, __FILE__, __LINE__, gettid(), "Created new log file");
-        std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_INFO << "started logging to: " << filename
-                  << std::endl;
+        logfile_prefix = token;
 #else
         std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_WARNING
                   << "Capio logfile provided, but logging capabilities not compiled into capio!"
                   << std::endl;
 #endif
-    } else {
-#ifdef CAPIOLOG
-        // log file not given. starting with default name
-        auto logname = open_server_logfile();
-        log          = new Logger(__func__, __FILE__, __LINE__, gettid(), "Created new log file");
-        std::cout << CAPIO_SERVER_CLI_LOG_SERVER << "started logging to default logfile " << logname
-                  << std::endl;
-#endif
     }
+#ifdef CAPIOLOG
+    auto logname = open_server_logfile();
+    log          = new Logger(__func__, __FILE__, __LINE__, gettid(), "Created new log file");
+    std::cout << CAPIO_SERVER_CLI_LOG_SERVER << "started logging to logfile " << logname
+              << std::endl;
+#endif
 
     if (config) {
         std::string token                      = args::get(config);
