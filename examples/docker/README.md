@@ -61,16 +61,15 @@ docker compose -p example exec                \
   --detach                                    \
   --index 1                                   \
   --env CAPIO_DIR=/tmp/capio                  \
-  --env CAPIO_LOG_LEVEL=-1                    \
   --user capio                                \
   --workdir /home/capio/server                \
   capio                                       \
-  sh -c 'mpirun                               \
+  mpirun                                      \
   -N 1                                        \
   --hostfile /home/capio/hostfile             \
   -x CAPIO_DIR                                \
-  -x CAPIO_LOG_LEVEL                          \
-  capio_server --no-config > server.out 2>&1'
+  sh -c ' capio_server --no-config            \
+  > server_${OMPI_COMM_WORLD_RANK}.out 2>&1'
 ```
 
 Let's examine some of the options introduced in the previous command. The `--detach` option allows to run a command in background. The `--env` option adds environment variables to the target container instance, in this case the one called `example-capio-1`. The `-x` option of the `mpirun` command propagates the specified list of environment variables to all nodes it targets. Finally, the `--workdir` option specifies that the CAPIO server should use the shared `/home/capio/server` directory as the working directory, to store logs and other configuration files.
