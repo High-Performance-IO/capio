@@ -7,6 +7,7 @@
 #include <fstream>
 #include <string>
 #include <sys/mman.h>
+#include <unistd.h>
 #include <utility>
 
 #include "constants.hpp"
@@ -17,6 +18,7 @@
 #endif
 
 #ifndef __CAPIO_POSIX
+#include <filesystem>
 thread_local std::ofstream logfile; // if building for server, self contained logfile
 #else
 FILE *logfileFP;
@@ -46,6 +48,27 @@ inline char *get_capio_log_filename() {
     }
     return log_filename;
 }
+
+#ifndef __CAPIO_POSIX
+inline auto open_server_logfile() {
+    auto hostname = new char[HOST_NAME_MAX];
+    gethostname(hostname, HOST_NAME_MAX);
+
+    const std::filesystem::path output_folder =
+        std::string{CAPIO_SERVER_DEFAULT_LOG_FOLDER} + "/" + hostname;
+
+    std::filesystem::create_directories(output_folder);
+
+    const std::filesystem::path logfile_name = output_folder.string() + "/" +
+                                               std::string(CAPIO_SERVER_DEFAULT_LOG_FILE_NAME) +
+                                               std::to_string(capio_syscall(SYS_gettid)) + ".log";
+
+    logfile.open(logfile_name, std::ofstream::out);
+    delete[] hostname;
+
+    return logfile_name;
+}
+#endif
 
 void log_write_to(char *buffer, size_t bufflen) {
 #ifdef __CAPIO_POSIX
@@ -82,9 +105,7 @@ class Logger {
         if (!logfile.is_open()) {
             // NOTE: should never get to this point as capio_server opens up the log file while
             // parsing command line arguments. This is only for failsafe purpose
-            logfile.open(std::string(CAPIO_LOG_SERVER_DEFAULT_FILE_NAME) + std::to_string(tid) +
-                             ".log",
-                         std::ofstream::out);
+            open_server_logfile();
         }
 #else
         if (!logfileOpen) {

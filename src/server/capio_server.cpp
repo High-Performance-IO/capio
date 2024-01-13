@@ -204,12 +204,10 @@ int parseCLI(int argc, char **argv, int rank) {
     } else {
 #ifdef CAPIOLOG
         // log file not given. starting with default name
-        const std::string logname =
-            CAPIO_LOG_SERVER_DEFAULT_FILE_NAME + std::to_string(rank) + ".log";
-        logfile.open(logname, std::ofstream::out);
-        log = new Logger(__func__, __FILE__, __LINE__, gettid(), "Created new log file");
-        std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_INFO << "started logging to default logfile "
-                  << logname << std::endl;
+        auto logname = open_server_logfile();
+        log          = new Logger(__func__, __FILE__, __LINE__, gettid(), "Created new log file");
+        std::cout << CAPIO_SERVER_CLI_LOG_SERVER << "started logging to default logfile " << logname
+                  << std::endl;
 #endif
     }
 
