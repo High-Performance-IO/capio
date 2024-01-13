@@ -103,12 +103,8 @@ class MPI_backend : public backend_interface {
         int elem_to_snd = 0;
 
         for (long int k = 0; k < nbytes; k += elem_to_snd) {
-
-            if (nbytes - k > MPI_MAX_ELEM_COUNT) {
-                elem_to_snd = static_cast<int>(MPI_MAX_ELEM_COUNT);
-            } else {
-                elem_to_snd = static_cast<int>(nbytes - k);
-            }
+            //Compute the maximum amount to send for this chunk
+            elem_to_snd = static_cast<int>(std::min(nbytes - k, MPI_MAX_ELEM_COUNT));
 
             LOG("Sending %d bytes to %d with offset from beginning odf k=%ld", elem_to_snd, dest,
                 k);
@@ -283,11 +279,7 @@ class MPI_backend : public backend_interface {
                            : "NO! a nullptr was given to receive. this will make mpi crash!");
         for (long int k = 0; k < bytes_expected; k += bytes_received) {
 
-            if (bytes_expected - k > MPI_MAX_ELEM_COUNT) {
-                count = static_cast<int>(MPI_MAX_ELEM_COUNT);
-            } else {
-                count = static_cast<int>(bytes_expected - k);
-            }
+            count = static_cast<int>(std::min(bytes_expected - k, MPI_MAX_ELEM_COUNT));
 
             LOG("Expected %ld bytes from %d with offset from beginning odf k=%ld", count, source,
                 k);
