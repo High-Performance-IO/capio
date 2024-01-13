@@ -93,11 +93,7 @@ class Capio_file {
         }
     }
 
-    inline void set_complete() {
-        START_LOG(capio_syscall(SYS_gettid), "Setting capio_file to complete");
-        this->complete = true;
-    }
-    inline void set_complete(bool _complete) {
+    inline void set_complete(bool _complete = true) {
         START_LOG(capio_syscall(SYS_gettid), "setting capio_file.complete=%s",
                   _complete ? "true" : "false");
         this->complete = _complete;
