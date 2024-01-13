@@ -58,18 +58,37 @@ TEST_CASE("Test file creation, buffered write and close", "[syscall]") {
     constexpr const std::array<int, 8> BUFFER2  = {10, 11, 12, 13, 14, 15, 16, 17};
     constexpr const std::array<int, 2> BUFFER3  = {18, 19};
 
-    struct iovec iov[3];
-    iov[0].iov_base = const_cast<int *>(BUFFER1.data());
-    iov[0].iov_len  = BUFFER1.size() * sizeof(int);
-    iov[1].iov_base = const_cast<int *>(BUFFER2.data());
-    iov[1].iov_len  = BUFFER2.size() * sizeof(int);
-    iov[2].iov_base = const_cast<int *>(BUFFER3.data());
-    iov[2].iov_len  = BUFFER3.size() * sizeof(int);
+    struct iovec iov_write[3];
+    iov_write[0].iov_base = const_cast<int *>(BUFFER1.data());
+    iov_write[0].iov_len  = BUFFER1.size() * sizeof(int);
+    iov_write[1].iov_base = const_cast<int *>(BUFFER2.data());
+    iov_write[1].iov_len  = BUFFER2.size() * sizeof(int);
+    iov_write[2].iov_base = const_cast<int *>(BUFFER3.data());
+    iov_write[2].iov_len  = BUFFER3.size() * sizeof(int);
 
     int fd = open(PATHNAME, O_CREAT | O_RDWR | O_TRUNC, S_IRUSR | S_IWUSR);
     REQUIRE(fd != -1);
     REQUIRE(access(PATHNAME, F_OK) == 0);
-    REQUIRE(writev(fd, iov, 3));
+    REQUIRE(writev(fd, iov_write, 3));
+    REQUIRE(lseek(fd, 0, SEEK_SET) == 0);
+
+    std::array<int, 10> buf1{};
+    std::array<int, 8> buf2{};
+    std::array<int, 2> buf3{};
+
+    struct iovec iov_read[3];
+    iov_read[0].iov_base = const_cast<int *>(buf1.data());
+    iov_read[0].iov_len  = buf1.size() * sizeof(int);
+    iov_read[1].iov_base = const_cast<int *>(buf2.data());
+    iov_read[1].iov_len  = buf2.size() * sizeof(int);
+    iov_read[2].iov_base = const_cast<int *>(buf3.data());
+    iov_read[2].iov_len  = buf3.size() * sizeof(int);
+
+    REQUIRE(readv(fd, iov_read, 3));
+    REQUIRE(BUFFER1 == buf1);
+    REQUIRE(BUFFER2 == buf2);
+    REQUIRE(BUFFER3 == buf3);
+
     REQUIRE(close(fd) != -1);
     REQUIRE(unlink(PATHNAME) != -1);
     REQUIRE(access(PATHNAME, F_OK) != 0);

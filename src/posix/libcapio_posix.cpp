@@ -142,6 +142,9 @@ static constexpr std::array<CPHandler_t, __NR_syscalls> build_syscall_table() {
 #ifdef SYS_read
     _syscallTable[SYS_read] = read_handler;
 #endif
+#ifdef SYS_readv
+    _syscallTable[SYS_readv] = readv_handler;
+#endif
 #ifdef SYS_rename
     _syscallTable[SYS_rename] = rename_handler;
 #endif

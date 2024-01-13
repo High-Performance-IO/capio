@@ -36,15 +36,14 @@ inline ssize_t capio_writev(int fd, const struct iovec *iov, int iovcnt, long ti
             size_t iov_len = iov[i].iov_len;
             if (iov_len != 0) {
                 res = capio_write(fd, iov[i].iov_base, iov[i].iov_len, tid);
+                if (res == -1) {
+                    return CAPIO_POSIX_SYSCALL_ERRNO;
+                }
                 tot_bytes += res;
             }
             ++i;
         }
-        if (res == -1) {
-            return CAPIO_POSIX_SYSCALL_ERRNO;
-        } else {
-            return tot_bytes;
-        }
+        return tot_bytes;
     } else {
         LOG("fd %d is not a capio fd. returning -2", fd);
         return CAPIO_POSIX_SYSCALL_REQUEST_SKIP;
