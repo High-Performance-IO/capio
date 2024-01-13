@@ -17,7 +17,7 @@
 #endif
 
 #ifndef __CAPIO_POSIX
-static thread_local std::ofstream logfile; // if building for server, self contained logfile
+std::ofstream logfile; // if building for server, self contained logfile
 #else
 FILE *logfileFP;
 bool logfileOpen = false;
@@ -82,12 +82,9 @@ class Logger {
         if (!logfile.is_open()) {
             // NOTE: should never get to this point as capio_server opens up the log file while
             // parsing command line arguments. This is only for failsafe purpose
-            auto hostname = new char[HOST_NAME_MAX];
-            gethostname(hostname, HOST_NAME_MAX);
-            logfile.open(std::string(CAPIO_LOG_SERVER_DEFAULT_FILE_NAME) + hostname + "-" +
-                             std::to_string(capio_syscall(SYS_gettid)) + ".log",
+            logfile.open(std::string(CAPIO_LOG_SERVER_DEFAULT_FILE_NAME) + std::to_string(tid) +
+                             ".log",
                          std::ofstream::out);
-            delete[] hostname;
         }
 #else
         if (!logfileOpen) {

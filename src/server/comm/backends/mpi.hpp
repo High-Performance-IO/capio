@@ -103,7 +103,7 @@ class MPI_backend : public backend_interface {
         int elem_to_snd = 0;
 
         for (long int k = 0; k < nbytes; k += elem_to_snd) {
-            //Compute the maximum amount to send for this chunk
+            // Compute the maximum amount to send for this chunk
             elem_to_snd = static_cast<int>(std::min(nbytes - k, MPI_MAX_ELEM_COUNT));
 
             LOG("Sending %d bytes to %d with offset from beginning odf k=%ld", elem_to_snd, dest,
