@@ -59,8 +59,10 @@ get_file_location_opt(const char *const path) {
     const std::lock_guard<std::mutex> lg(files_metadata_mutex);
     auto it = files_location.find(path);
     if (it == files_location.end()) {
+        LOG("File was not found in files_locations. returning empty object");
         return {};
     } else {
+        LOG("File found on node %s", it->second);
         return {it->second};
     }
 }
@@ -109,7 +111,6 @@ int check_file_location(std::size_t index, int rank, const std::string &path_to_
     bool seek_needed;
     char *line = nullptr;
     size_t len = 0;
-    ssize_t read;
     int fd; /* file descriptor to identify a file within a process */
 
     if (index < fd_files_location_reads.size()) {
@@ -117,78 +118,74 @@ int check_file_location(std::size_t index, int rank, const std::string &path_to_
         fp          = std::get<1>(fd_files_location_reads[index]);
         seek_needed = std::get<2>(fd_files_location_reads[index]);
     } else {
-        std::string file_name = "files_location.txt";
-        fp                    = fopen(file_name.c_str(), "r+");
-        if (fp == nullptr) {
+        if ((fp = fopen("files_location.txt", "r+")) == nullptr) {
+            LOG("Unable to open file_locations.txt");
             return 0;
         }
-        fd = fileno(fp);
-        if (fd == -1) {
-            ERR_EXIT("fileno in check_file_location");
+
+        if ((fd = fileno(fp)) == -1) {
+            ERR_EXIT("Unable to get fileno from files_location.txt FILE ptr.");
         }
         seek_needed = false;
-        fd_files_location_reads.push_back(std::make_tuple(fd, fp, seek_needed));
+
+        fd_files_location_reads.emplace_back(fd, fp, seek_needed);
     }
 
     const flock_guard fg(fd, F_RDLCK, false);
-    bool found = false;
-    if (seek_needed) {
-        long offset = ftell(fp);
-        if (fseek(fp, offset, SEEK_SET) == -1) {
-            ERR_EXIT("fseek in check_file_location");
-        }
+
+    if (seek_needed && (fseek(fp, ftell(fp), SEEK_SET) == -1)) {
+        ERR_EXIT("fseek in check_file_location");
     }
-    while (!found && (read = getline(&line, &len, fp)) != -1) {
-        if (line[0] == '0') {
+
+    while (getline(&line, &len, fp) != -1) {
+
+        if (line[0] == CAPIO_SERVER_INVALIDATE_FILE_PATH_CHAR) {
             continue;
         }
-        char path[1024]; // TODO: heap memory
-        int i = 0;
-        while (line[i] != ' ') {
-            path[i] = line[i];
-            ++i;
-        }
-        path[i] = '\0';
-        char node_str[1024]; // TODO: heap memory
-        ++i;
-        int j = 0;
-        while (line[i] != '\n') {
-            node_str[j] = line[i];
-            ++i;
-            ++j;
-        }
-        node_str[j]      = '\0';
-        char *p_node_str = (char *) malloc(sizeof(char) * (strlen(node_str) + 1));
-        strcpy(p_node_str, node_str);
+        std::string line_str(line), *path, *node;
+        auto separator = line_str.find_first_of(' ');
+        path           = new std::string(line_str.substr(0, separator));
+        node = new std::string(line_str.substr(separator + 1, line_str.length())); // remove ' '
+        node->pop_back(); // remove \n from node name
+
+        LOG("found [%s]@[%s]", path->c_str(), node->c_str());
+
+        auto node_str = new char[node->length() + 1]; // do not call delete[] on this
+        strcpy(node_str, node->c_str());
         long offset = ftell(fp);
         if (offset == -1) {
             ERR_EXIT("ftell in check_file_location");
         }
-        add_file_location(path, p_node_str, offset);
-        if (strcmp(path, path_to_check.c_str()) == 0) {
-            found = true;
+        add_file_location(*path, node_str, offset);
+        if (*path == path_to_check) {
+            delete[] line;
+
+            return 1;
         }
+        delete[] line;
     }
-    if (found) {
-        return 1;
-    } else {
-        std::get<2>(fd_files_location_reads[index]) = true;
-        return 2;
-    }
+
+    std::get<2>(fd_files_location_reads[index]) = true;
+    return 2;
 }
 
-bool check_file_location(int my_rank, const std::string &path_to_check) {
+/**
+ * Returns true if path_to_check is present on node with my_rank, false otherwise
+ * @param my_rank
+ * @param path_to_check
+ * @return
+ */
+[[nodiscard]] bool check_file_location(int my_rank, const std::string &path_to_check) {
     START_LOG(gettid(), "call(my_rank=%d, path_to_check=%s)", my_rank, path_to_check.c_str());
 
-    bool found = false;
-    int rank = 0, res = -1;
-    while (!found && rank < n_servers) {
-        std::string rank_str = std::to_string(rank);
-        res                  = check_file_location(rank, my_rank, path_to_check);
-        found                = res == 1;
-        ++rank;
+    for (int rank = 0; rank < n_servers; rank++) {
+        if (check_file_location(rank, my_rank, path_to_check) == 1) {
+            LOG("path: %s, was found on node with rank %d", path_to_check.c_str(), rank);
+            return true;
+        }
     }
-    return found;
+    LOG("path %s has not been found on remote nodes", path_to_check.c_str());
+    return false;
 }
 
 void clean_files_location(int n_servers) {

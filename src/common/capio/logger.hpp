@@ -71,7 +71,6 @@ class SyscallLoggingSuspender {
 
 class Logger {
   private:
-    long int tid;
     char invoker[256]{0};
     char file[256]{0};
     char format[CAPIO_LOG_MAX_MSG_LEN]{0};
@@ -83,11 +82,9 @@ class Logger {
         if (!logfile.is_open()) {
             // NOTE: should never get to this point as capio_server opens up the log file while
             // parsing command line arguments. This is only for failsafe purpose
-            auto hostname = new char[HOST_NAME_MAX];
-            gethostname(hostname, HOST_NAME_MAX);
-            logfile.open(std::string(CAPIO_LOG_SERVER_DEFAULT_FILE_NAME) + hostname + ".log",
+            logfile.open(std::string(CAPIO_LOG_SERVER_DEFAULT_FILE_NAME) + std::to_string(tid) +
+                             ".log",
                          std::ofstream::out);
-            delete[] hostname;
         }
 #else
         if (!logfileOpen) {
@@ -103,11 +100,10 @@ class Logger {
 #endif
         strncpy(this->invoker, invoker, sizeof(this->invoker));
         strncpy(this->file, file, sizeof(this->file));
-        this->tid = tid;
 
         va_list argp, argpc;
 
-        sprintf(format, CAPIO_LOG_PRE_MSG, this->tid, this->invoker);
+        sprintf(format, CAPIO_LOG_PRE_MSG, capio_syscall(SYS_gettid), this->invoker);
         size_t pre_msg_len = strlen(format);
 
         strcpy(format + pre_msg_len, message);
@@ -143,7 +139,7 @@ class Logger {
     inline void log(const char *message, ...) {
         va_list argp, argpc;
 
-        sprintf(format, CAPIO_LOG_PRE_MSG, this->tid, this->invoker);
+        sprintf(format, CAPIO_LOG_PRE_MSG, capio_syscall(SYS_gettid), this->invoker);
         size_t pre_msg_len = strlen(format);
 
         strcpy(format + pre_msg_len, message);
@@ -155,7 +151,7 @@ class Logger {
              strcmp(CAPIO_LOG_SERVER_REQUEST_END, message) == 0)) {
             auto buf1 = reinterpret_cast<char *>(capio_syscall(
                 SYS_mmap, nullptr, 50, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0));
-            sprintf(buf1, message, this->tid);
+            sprintf(buf1, message, capio_syscall(SYS_gettid));
             logfile << buf1 << std::endl;
             capio_syscall(SYS_munmap, buf1, 50);
             return;
@@ -179,7 +175,7 @@ class Logger {
 
     inline ~Logger() {
         current_log_level--;
-        sprintf(format, CAPIO_LOG_PRE_MSG, this->tid, this->invoker);
+        sprintf(format, CAPIO_LOG_PRE_MSG, capio_syscall(SYS_gettid), this->invoker);
         size_t pre_msg_len = strlen(format);
         strcpy(format + pre_msg_len, "returned");
 
@@ -188,7 +184,7 @@ class Logger {
         if (current_log_level == 0 && logging_syscall) {
             auto buf1 = reinterpret_cast<char *>(capio_syscall(
                 SYS_mmap, nullptr, 50, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0));
-            sprintf(buf1, CAPIO_LOG_POSIX_SYSCALL_END, this->tid);
+            sprintf(buf1, CAPIO_LOG_POSIX_SYSCALL_END, capio_syscall(SYS_gettid));
             log_write_to(buf1, strlen(buf1));
             capio_syscall(SYS_munmap, buf1, 50);
         }

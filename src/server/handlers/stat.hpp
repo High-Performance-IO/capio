@@ -17,17 +17,22 @@ std::mutex pending_remote_stats_mutex;
 
 inline void reply_stat(int tid, const std::string &path, int rank) {
     START_LOG(gettid(), "call(tid=%d, path=%s, rank=%d)", tid, path.c_str(), rank);
-
     auto file_location_opt = get_file_location_opt(path.c_str());
-    if (!file_location_opt) {
-        check_file_location(rank, path);
+
+    auto file_is_remote = check_file_location(rank, path);
+    LOG("File %s is local? %s", path.c_str(), file_is_remote ? "True" : "False");
+
+    if (!file_is_remote && !file_location_opt) {
+        LOG("get_file_location_opt returned an empty object and check_files_location failed!");
         // if it is in configuration file then wait otherwise fails
         if ((metadata_conf.find(path) != metadata_conf.end() || match_globs(path) != -1) &&
             !is_producer(tid, path)) {
+            LOG("File not ready yet. Starting a thread to wait for file.");
             std::thread t(wait_for_stat, tid, std::string(path), rank, &pending_remote_stats,
                           &pending_remote_stats_mutex);
             t.detach();
         } else {
+            LOG("Metadata do not contains file or globs did not contain file or app is producer.");
             write_response(tid, -1); // return size
             write_response(tid, -1); // return is_dir
         }
@@ -37,15 +42,21 @@ inline void reply_stat(int tid, const std::string &path, int rank) {
     Capio_file &c_file =
         (c_file_opt) ? c_file_opt->get() : create_capio_file(path, false, get_file_initial_size());
     LOG("Obtained capio file. ready to reply to client");
-    std::string_view mode                  = c_file.get_mode();
-    bool complete                          = c_file.complete;
     const std::filesystem::path &capio_dir = get_capio_dir();
-    if (complete || strcmp(std::get<0>(file_location_opt->get()), node_name) == 0 ||
-        mode == CAPIO_FILE_MODE_NO_UPDATE || capio_dir == path) {
+    LOG("Obtained capio_dir");
+    if (!file_location_opt) {
+        LOG("File is now present from remote node. retrieving file again.");
+        file_location_opt = get_file_location_opt(path.c_str());
+    }
+    if (c_file.is_complete() || strcmp(std::get<0>(file_location_opt->get()), node_name) == 0 ||
+        c_file.get_mode() == CAPIO_FILE_MODE_NO_UPDATE || capio_dir == path) {
         LOG("Sending response to client");
         write_response(tid, c_file.get_file_size());
         write_response(tid, static_cast<int>(c_file.is_dir() ? 1 : 0));
     } else {
+        LOG("Delegating backend to reply to remote stats");
+        // init a capio file that is remote so that buffer is going to be allocated
+        init_capio_file(path.c_str(), false);
         backend->handle_remote_stat(tid, path, rank, &pending_remote_stats,
                                     &pending_remote_stats_mutex);
     }

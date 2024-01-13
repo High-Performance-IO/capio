@@ -31,25 +31,25 @@ class Capio_file {
   private:
     char *_buf = nullptr; // buffer containing the data
     std::size_t _buf_size;
-    std::string_view _committed;
-    bool _directory;
+    std::string_view _committed = CAPIO_FILE_MODE_UPDATE;
+    bool _directory             = false;
     // _fd is useful only when the file is memory-mapped
-    int _fd         = -1;
-    bool _home_node = false;
-    std::string_view _mode;
-    int _n_links               = 1;
-    long int _n_close          = 0;
-    long int _n_close_expected = -1;
-    int _n_opens               = 0;
-    bool _permanent;
+    int _fd                     = -1;
+    bool _home_node             = false;
+    std::string_view _mode      = CAPIO_FILE_MODE_ON_TERMINATION;
+    int _n_links                = 1;
+    long int _n_close           = 0;
+    long int _n_close_expected  = -1;
+    int _n_opens                = 0;
+    bool _permanent             = false;
     // _sectors stored in memory of the files (only the home node is forced to
     // be up to date)
     std::set<std::pair<off64_t, off64_t>, compare> _sectors;
     // vector of (tid, fd)
     std::vector<std::pair<int, int>> _threads_fd;
+    bool complete = false; // whether the file is completed / committed
 
   public:
-    bool complete              = false;
     bool first_write           = true;
     long int n_files           = 0;  // useful for directories
     long int n_files_expected  = -1; // useful for directories
@@ -77,6 +77,7 @@ class Capio_file {
 
     ~Capio_file() {
         START_LOG(gettid(), "call()");
+        LOG("Deleting capio_file");
 
         if (_permanent && _home_node) {
             if (_directory) {
@@ -90,6 +91,17 @@ class Capio_file {
         } else {
             delete[] _buf;
         }
+    }
+
+    inline void set_complete(bool _complete = true) {
+        START_LOG(capio_syscall(SYS_gettid), "setting capio_file.complete=%s",
+                  _complete ? "true" : "false");
+        this->complete = _complete;
+    }
+    [[nodiscard]] inline bool is_complete() const {
+        START_LOG(capio_syscall(SYS_gettid), "capio_file is complete? %s",
+                  this->complete ? "true" : "false");
+        return this->complete;
     }
 
     inline void add_fd(int tid, int fd) { _threads_fd.emplace_back(tid, fd); }

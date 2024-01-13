@@ -190,15 +190,12 @@ int parseCLI(int argc, char **argv, int rank) {
             token.erase(token.length() - 4); // delete .log if for some reason
             // is given as parameter
         }
-        auto hostname = new char[HOST_NAME_MAX];
-        gethostname(hostname, HOST_NAME_MAX);
 
-        std::string filename = token + "_" + hostname + ".log";
+        std::string filename = token + "-" + std::to_string(capio_syscall(SYS_gettid)) + +".log";
         logfile.open(filename, std::ofstream::out);
         log = new Logger(__func__, __FILE__, __LINE__, gettid(), "Created new log file");
         std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_INFO << "started logging to: " << filename
                   << std::endl;
-        delete[] hostname;
 #else
         std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_WARNING
                   << "Capio logfile provided, but logging capabilities not compiled into capio!"
@@ -207,16 +204,12 @@ int parseCLI(int argc, char **argv, int rank) {
     } else {
 #ifdef CAPIOLOG
         // log file not given. starting with default name
-        auto hostname = new char[HOST_NAME_MAX];
-        gethostname(hostname, HOST_NAME_MAX);
-
         const std::string logname =
-            CAPIO_LOG_SERVER_DEFAULT_FILE_NAME + std::string(hostname) + ".log";
+            CAPIO_LOG_SERVER_DEFAULT_FILE_NAME + std::to_string(rank) + ".log";
         logfile.open(logname, std::ofstream::out);
         log = new Logger(__func__, __FILE__, __LINE__, gettid(), "Created new log file");
         std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_INFO << "started logging to default logfile "
                   << logname << std::endl;
-        delete[] hostname;
 #endif
     }
 
@@ -283,7 +276,9 @@ int main(int argc, char **argv) {
         ERR_EXIT("sem_init clients_remote_pending_nfiles_sem in main");
     }
     std::thread server_thread(capio_server, rank);
-    std::thread helper_thread(capio_remote_listener);
+    LOG("capio_server thread started");
+    std::thread helper_thread(capio_remote_listener, rank);
+    LOG("capio_remote_listener thread started.");
     server_thread.join();
     helper_thread.join();
 

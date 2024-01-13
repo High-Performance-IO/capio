@@ -19,10 +19,12 @@ class MPI_backend : public backend_interface {
         int node_name_len;
         START_LOG(gettid(), "call()");
         MPI_Init_thread(&argc, &argv, MPI_THREAD_MULTIPLE, provided);
+        LOG("Mpi has multithreading support? %s (%d)",
+            *provided == MPI_THREAD_MULTIPLE ? "yes" : "no", *provided);
         MPI_Comm_rank(MPI_COMM_WORLD, rank);
-        LOG("node_rank=%d", rank);
+        LOG("node_rank=%d", *rank);
         if (*provided != MPI_THREAD_MULTIPLE) {
-            LOG("Error: The threading support level is lesser than that demanded");
+            LOG("Error: The threading support level is not MPI_THREAD_MULTIPLE (is %d)", *provided);
             MPI_Abort(MPI_COMM_WORLD, EXIT_FAILURE);
         }
 
@@ -96,15 +98,18 @@ class MPI_backend : public backend_interface {
     }
 
     void send_file(char *shm, long int nbytes, int dest) override {
-        START_LOG(gettid(), "call(%s), %ld, %d", shm, nbytes, dest);
+        START_LOG(gettid(), "call(%s, %ld, %d)", shm, nbytes, dest);
 
-        long int elem_to_snd = 0;
+        int elem_to_snd = 0;
 
         for (long int k = 0; k < nbytes; k += elem_to_snd) {
-            (nbytes - k > MPI_MAX_ELEM_COUNT) ? elem_to_snd = MPI_MAX_ELEM_COUNT
-                                              : elem_to_snd = nbytes - k;
+            // Compute the maximum amount to send for this chunk
+            elem_to_snd = static_cast<int>(std::min(nbytes - k, MPI_MAX_ELEM_COUNT));
 
+            LOG("Sending %d bytes to %d with offset from beginning odf k=%ld", elem_to_snd, dest,
+                k);
             MPI_Isend(shm + k, elem_to_snd, MPI_BYTE, dest, 0, MPI_COMM_WORLD, &req);
+            LOG("Sent chunk of %d bytes", elem_to_snd);
         }
     }
 
@@ -188,16 +193,19 @@ class MPI_backend : public backend_interface {
         off64_t end_of_read    = process_offset + count;
         off64_t end_of_sector  = c_file.get_sector_end(process_offset);
 
-        if (c_file.complete &&
+        if (c_file.is_complete() &&
             (end_of_read <= end_of_sector ||
              (end_of_sector == -1 ? 0 : end_of_sector) == c_file.real_file_size)) {
+            LOG("Handling local read");
             handle_local_read(tid, fd, count, dir, is_getdents, true);
             return;
         }
+
         // when is not complete but mode = append
         if (read_from_local_mem(tid, process_offset, end_of_read, end_of_sector, count,
                                 path.data())) {
             // it means end_of_read < end_of_sector
+            LOG("end_of_read < end_of_sector");
             return;
         }
 
@@ -209,7 +217,7 @@ class MPI_backend : public backend_interface {
         auto message = std::to_string(CAPIO_SERVER_REQUEST_READ) + " " + std::string(path) + " " +
                        std::to_string(rank) + " " + std::to_string(offset) + " " +
                        std::to_string(count);
-
+        LOG("Message = %s", message.c_str());
         MPI_Send(message.c_str(), message.length() + 1, MPI_CHAR, dest, 0, MPI_COMM_WORLD);
         (*pending_remote_reads)[path.data()].emplace_back(tid, fd, count, is_getdents);
     }
@@ -255,22 +263,30 @@ class MPI_backend : public backend_interface {
         auto dest = nodes_helper_rank[std::get<0>(get_file_location(path.c_str()))];
         auto msg =
             std::to_string(CAPIO_SERVER_REQUEST_STAT) + " " + std::to_string(rank) + " " + path;
+        LOG("destination=%d, message=%s", dest, msg.c_str());
 
         MPI_Send(msg.c_str(), msg.length() + 1, MPI_CHAR, dest, 0, MPI_COMM_WORLD);
+        LOG("message sent");
         (*pending_remote_stats)[path].emplace_back(tid);
     }
 
     inline void recv_file(char *shm, int source, long int bytes_expected) override {
-        START_LOG(gettid(), "call(%ld, %d, %ld)", shm, source, bytes_expected);
+        START_LOG(gettid(), "call(shm=%ld, source=%d, length=%ld)", shm, source, bytes_expected);
         MPI_Status status;
-        int bytes_received, count;
-
+        int bytes_received = 0, count = 0;
+        LOG("Buffer is valid? %s",
+            shm != nullptr ? "yes"
+                           : "NO! a nullptr was given to receive. this will make mpi crash!");
         for (long int k = 0; k < bytes_expected; k += bytes_received) {
-            (bytes_expected - k > MPI_MAX_ELEM_COUNT) ? count = MPI_MAX_ELEM_COUNT
-                                                      : count = bytes_expected - k;
 
+            count = static_cast<int>(std::min(bytes_expected - k, MPI_MAX_ELEM_COUNT));
+
+            LOG("Expected %ld bytes from %d with offset from beginning odf k=%ld", count, source,
+                k);
             MPI_Recv(shm + k, count, MPI_BYTE, source, 0, MPI_COMM_WORLD, &status);
+            LOG("Received chunk");
             MPI_Get_count(&status, MPI_BYTE, &bytes_received);
+            LOG("Chunk size is %ld bytes", bytes_received);
         }
     }
 

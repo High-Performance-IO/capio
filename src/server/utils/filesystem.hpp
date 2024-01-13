@@ -112,13 +112,13 @@ void write_entry_dir(int tid, const std::filesystem::path &file_path, const std:
     writers[pid][dir] = true;
 
     if (c_file.n_files == c_file.n_files_expected) {
-        c_file.complete = true;
+        c_file.set_complete();
         reply_remote_stats(dir);
     }
 
     std::string_view mode = c_file.get_mode();
     if (mode == CAPIO_FILE_MODE_NO_UPDATE) {
-        handle_pending_remote_reads(dir, data_size, c_file.complete);
+        handle_pending_remote_reads(dir, data_size, c_file.is_complete());
     }
 }
 
