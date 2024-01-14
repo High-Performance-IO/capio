@@ -71,7 +71,9 @@ the first is optional).
 - `CAPIO_LOG_LEVEL` this environment tells both server and application the log level to use. This variable works only
   if `-DCAPIO_LOG=TRUE` was specified during cmake phase.
 - `CAPIO_LOGFILE` This environment variable is defined only for capio_posix applications and specifies the logfile name
-  to which capio will log to. If this variable is not defined, capio will log by default to stderr.
+  to which capio will log to. If this variable is not defined, capio will log by default to `posix_thread_*.log`. An equivalent is available on capio server with option `-l`
+  - `CAPIO_LOGDIR` This environment variable is defined only for capio_posix applications and specifies the directory name
+  to which capio will log to. If this variable is not defined, capio will log by default to `capio_logs`. An eqivalent is available on capio server with option `-d`
 
 ## How to inject streaming capabilities into your workflow
 
