@@ -9,6 +9,9 @@ across different distributed applications (e.g. MPI-app1 -> MPI-app2).
 
 [Get help](https://github.com/High-Performance-IO/capio/wiki)
 
+> [!TIP]
+> A [wiki](https://github.com/High-Performance-IO/capio/wiki) is in development! You might want to check the wiki to get more in depth informations about CAPIO!
+
 ## Build and run tests
 
 ### Dependencies
