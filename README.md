@@ -10,7 +10,8 @@ across different distributed applications (e.g. MPI-app1 -> MPI-app2).
 [Get help](https://github.com/High-Performance-IO/capio/wiki)
 
 > [!TIP]
-> A [wiki](https://github.com/High-Performance-IO/capio/wiki) is in development! You might want to check the wiki to get more in depth informations about CAPIO!
+> A [wiki](https://github.com/High-Performance-IO/capio/wiki) is in development! You might want to check the wiki to get
+> more in depth information about CAPIO!
 
 ## Build and run tests
 
@@ -73,10 +74,13 @@ the first is optional).
 - `CAPIO_DIR` This environment variable tells to both server and application the mount point of capio
 - `CAPIO_LOG_LEVEL` this environment tells both server and application the log level to use. This variable works only
   if `-DCAPIO_LOG=TRUE` was specified during cmake phase.
-- `CAPIO_LOGFILE` This environment variable is defined only for capio_posix applications and specifies the logfile name
-  to which capio will log to. If this variable is not defined, capio will log by default to `posix_thread_*.log`. An equivalent is available on capio server with option `-l`
-  - `CAPIO_LOGDIR` This environment variable is defined only for capio_posix applications and specifies the directory name
-  to which capio will log to. If this variable is not defined, capio will log by default to `capio_logs`. An equivalent is available on capio server with option `-d`
+- `CAPIO_LOG_PREFIX` This environment variable is defined only for capio_posix applications and specifies the logfile name
+  to which capio will log to. If this variable is not defined, capio will log by default to `posix_thread_*.log`. An
+  equivalent is available on capio server with option `-l`
+    - `CAPIO_LOG_DIR` This environment variable is defined only for capio_posix applications and specifies the directory
+      name
+      to which capio will log to. If this variable is not defined, capio will log by default to `capio_logs`. An
+      equivalent is available on capio server with option `-d`
 
 ## How to inject streaming capabilities into your workflow
 
@@ -153,8 +157,8 @@ There are also examples on how to write JSON configuration files for the semanti
 Made with :heart: by:
 
 Alberto Riccardo Martinelli <albertoriccardo.martinelli@unito.it> (Designer and maintainer)\
-Marco Edoardo Santimaria <marcoedoardo.santimaria@unito.it> (Designer and mantainer) \
-Iacopo Colonnelli <iacopo.colonnelli@unito.it> (Workflows expert and mantainer)\
+Marco Edoardo Santimaria <marcoedoardo.santimaria@unito.it> (Designer and maintainer) \
+Iacopo Colonnelli <iacopo.colonnelli@unito.it> (Workflows expert and maintainer)\
 Massimo Torquati <massimo.torquati@unipi.it> (Designer)\
 Marco Aldinucci <marco.aldinucci@unito.it> (Designer)
 
