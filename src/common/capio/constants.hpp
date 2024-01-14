@@ -58,8 +58,8 @@ constexpr char CAPIO_DEFAULT_LOG_FOLDER[] = "capio_logs\0";
 
 // CAPIO logger - POSIX
 constexpr char CAPIO_LOG_POSIX_DEFAULT_LOG_FILE_PREFIX[] = "posix_thread_\0";
-constexpr char CAPIO_LOG_POSIX_SYSCALL_START[]       = "\n+++++++++ SYSCALL %s (%d) +++++++++";
-constexpr char CAPIO_LOG_POSIX_SYSCALL_END[]         = "---------  END SYSCALL --------\n";
+constexpr char CAPIO_LOG_POSIX_SYSCALL_START[]           = "\n+++++++++ SYSCALL %s (%d) +++++++++";
+constexpr char CAPIO_LOG_POSIX_SYSCALL_END[]             = "---------  END SYSCALL --------\n";
 
 // CAPIO logger - server
 constexpr char CAPIO_SERVER_DEFAULT_LOG_FILE_PREFIX[] = "server_thread_\0";

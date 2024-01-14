@@ -13,6 +13,69 @@
 #include "constants.hpp"
 #include "syscall.hpp"
 
+#ifdef __CAPIO_POSIX
+#include <sys/stat.h>
+#include <sys/types.h>
+#include <unistd.h>
+
+/* recursive mkdir from https://gist.github.com/ChisholmKyle/0cbedcd3e64132243a39 */
+int mkdir_p(const char *dir, const mode_t mode) {
+    char tmp[PATH_MAX];
+    char *p = nullptr;
+    struct stat sb;
+    size_t len;
+
+    /* copy path */
+    len = strnlen(dir, PATH_MAX);
+    if (len == 0 || len == PATH_MAX) {
+        return -1;
+    }
+    memcpy(tmp, dir, len);
+    tmp[len] = '\0';
+
+    /* remove trailing slash */
+    if (tmp[len - 1] == '/') {
+        tmp[len - 1] = '\0';
+    }
+
+    /* check if path exists and is a directory */
+    if (capio_syscall(SYS_stat, tmp, &sb) == 0) {
+        if (S_ISDIR(sb.st_mode)) {
+            return 0;
+        }
+    }
+
+    /* recursive mkdir */
+    for (p = tmp + 1; *p; p++) {
+        if (*p == '/') {
+            *p = 0;
+            /* test path */
+            if (capio_syscall(SYS_stat, tmp, &sb) != 0) {
+                /* path does not exist - create directory */
+                if (capio_syscall(SYS_mkdir, tmp, mode) < 0) {
+                    return -1;
+                }
+            } else if (!S_ISDIR(sb.st_mode)) {
+                /* not a directory */
+                return -1;
+            }
+            *p = '/';
+        }
+    }
+    /* test path */
+    if (capio_syscall(SYS_stat, tmp, &sb) != 0) {
+        /* path does not exist - create directory */
+        if (capio_syscall(SYS_mkdir, tmp, mode) < 0) {
+            return -1;
+        }
+    } else if (!S_ISDIR(sb.st_mode)) {
+        /* not a directory */
+        return -1;
+    }
+    return 0;
+}
+#endif
+
 #if defined(CAPIOLOG) && defined(__CAPIO_POSIX)
 #include "syscallnames.h"
 #endif
@@ -142,28 +205,25 @@ class Logger {
 #else
         if (!logfileOpen) {
             setup_posix_log_filenames();
-            //create recursively all capio directory structure
-            char tmp[256];
-            char *p = nullptr;
-            size_t len;
-            snprintf(tmp, sizeof(tmp), "%s", posix_log_dir_path);
-            len = strlen(tmp);
-            if (tmp[len - 1] == '/') {
-                tmp[len - 1] = 0;
+            if (mkdir_p(posix_log_dir_path, 0777) == -1) {
+                capio_syscall(SYS_write, fileno(stdout),
+                              "Err mkdir file: ", strlen("Err mkdir file: "));
+                capio_syscall(SYS_write, fileno(stdout), posix_log_dir_path,
+                              strlen(posix_log_dir_path));
+                capio_syscall(SYS_write, fileno(stdout), "\n", 1);
+                exit(EXIT_FAILURE);
             }
-            for (p = tmp + 1; *p; p++) {
-                if (*p == '/') {
-                    *p = 0;
-                    capio_syscall(SYS_mkdir, tmp, 0777);
-                    *p = '/';
-                }
-            }
-            capio_syscall(SYS_mkdir, tmp, 0777);
 
             logfileFP = fopen(logfile_path, "w");
 
             if (logfileFP == nullptr) {
-                capio_syscall(SYS_write, fileno(stdout), "Err fopen\0", strlen("Err fopen\0"));
+                capio_syscall(SYS_write, fileno(stdout),
+                              "Err fopen file: ", strlen("Err fopen file: "));
+                capio_syscall(SYS_write, fileno(stdout), logfile_path, strlen(logfile_path));
+                capio_syscall(SYS_write, fileno(stdout), " ", 1);
+                capio_syscall(SYS_write, fileno(stdout), strerror(errno), strlen(strerror(errno)));
+                capio_syscall(SYS_write, fileno(stdout), "\n", 1);
+                exit(EXIT_FAILURE);
             } else {
                 logfileOpen = true;
             }
