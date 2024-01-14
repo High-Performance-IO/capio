@@ -20,11 +20,15 @@
 #ifndef __CAPIO_POSIX
 #include <filesystem>
 thread_local std::ofstream logfile; // if building for server, self contained logfile
-std::string log_master_dir_name = CAPIO_SERVER_DEFAULT_LOG_FOLDER;
+std::string log_master_dir_name = CAPIO_DEFAULT_LOG_FOLDER;
 std::string logfile_prefix      = CAPIO_SERVER_DEFAULT_LOG_FILE_PREFIX;
 #else
 FILE *logfileFP;
-bool logfileOpen = false;
+bool logfileOpen                       = false;
+static char *posix_log_master_dir_name = nullptr;
+static char *posix_logfile_prefix      = nullptr;
+static char *posix_hostname            = nullptr;
+static thread_local char *logfile_path = nullptr;
 #endif
 
 thread_local int current_log_level = 0;
@@ -37,26 +41,14 @@ thread_local bool logging_syscall  = false; // this variable tells the logger th
 
 int CAPIO_LOG_LEVEL = CAPIO_MAX_LOG_LEVEL;
 
-inline char *get_capio_log_filename() {
 
-    static char *log_filename = nullptr;
-
-    if (log_filename == nullptr) {
-        log_filename = std::getenv("CAPIO_LOGFILE");
-        if (log_filename == nullptr) {
-            log_filename    = new char;
-            log_filename[0] = '\0';
-        }
-    }
-    return log_filename;
-}
 
 #ifndef __CAPIO_POSIX
 inline auto open_server_logfile() {
     auto hostname = new char[HOST_NAME_MAX];
     gethostname(hostname, HOST_NAME_MAX);
 
-    const std::filesystem::path output_folder = std::string{log_master_dir_name + "/" + hostname};
+    const std::filesystem::path output_folder = std::string{log_master_dir_name + "/server/" + hostname};
 
     std::filesystem::create_directories(output_folder);
 
@@ -67,6 +59,38 @@ inline auto open_server_logfile() {
     delete[] hostname;
 
     return logfile_name;
+}
+#else
+inline void setup_posix_log_filenames() {
+    if (posix_log_master_dir_name == nullptr) {
+        posix_log_master_dir_name = std::getenv("CAPIO_LOGDIR");
+        if (posix_log_master_dir_name == nullptr) {
+            posix_log_master_dir_name = new char[strlen(CAPIO_DEFAULT_LOG_FOLDER)];
+            strcpy(posix_log_master_dir_name, CAPIO_DEFAULT_LOG_FOLDER);
+        }
+    }
+    if (posix_logfile_prefix == nullptr) {
+        posix_logfile_prefix = std::getenv("CAPIO_LOGFILE");
+        if (posix_logfile_prefix == nullptr) {
+            posix_logfile_prefix = new char[strlen(CAPIO_LOG_POSIX_DEFAULT_LOG_FILE_PREFIX)];
+            strcpy(posix_logfile_prefix, CAPIO_LOG_POSIX_DEFAULT_LOG_FILE_PREFIX);
+        }
+    }
+
+    if (posix_hostname == nullptr) {
+        posix_hostname = new char[HOST_NAME_MAX];
+        gethostname(posix_hostname, HOST_NAME_MAX);
+    }
+
+    if (logfile_path == nullptr) {
+        // allocate space for a path in the following structure (including 10 digits for thread id
+        // max
+        //  log_master_dir_name/posix/logfile_prefix_<tid>.log
+        logfile_path = new char[strlen(posix_log_master_dir_name) + 1 + 5 + 1 +
+                                strlen(posix_logfile_prefix) + 13];
+        sprintf(logfile_path, "%s/posix/%s%ld.log", posix_log_master_dir_name, posix_logfile_prefix,
+                capio_syscall(SYS_gettid));
+    }
 }
 #endif
 
@@ -109,14 +133,8 @@ class Logger {
         }
 #else
         if (!logfileOpen) {
-            auto logfile_name = get_capio_log_filename();
-            if (logfile_name[0] != '\0') {
-                logfileFP   = fopen(logfile_name, "w");
-                logfileOpen = true;
-            } else {
-                logfileFP   = fopen(CAPIO_LOG_POSIX_DEFAULT_FILE_NAME, "w");
-                logfileOpen = true;
-            }
+            setup_posix_log_filenames();
+            logfileFP = fopen(logfile_path, "w");
         }
 #endif
         strncpy(this->invoker, invoker, sizeof(this->invoker));
@@ -137,8 +155,8 @@ class Logger {
             int syscallNumber = va_arg(argp, int);
             auto buf1         = reinterpret_cast<char *>(capio_syscall(
                 SYS_mmap, nullptr, 50, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0));
-            sprintf(buf1, CAPIO_LOG_POSIX_SYSCALL_START, capio_syscall(SYS_gettid),
-                    sys_num_to_string(syscallNumber), syscallNumber);
+            sprintf(buf1, CAPIO_LOG_POSIX_SYSCALL_START, sys_num_to_string(syscallNumber),
+                    syscallNumber);
             log_write_to(buf1, strlen(buf1));
             capio_syscall(SYS_munmap, buf1, 50);
         }
@@ -205,8 +223,7 @@ class Logger {
         if (current_log_level == 0 && logging_syscall) {
             auto buf1 = reinterpret_cast<char *>(capio_syscall(
                 SYS_mmap, nullptr, 50, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0));
-            sprintf(buf1, CAPIO_LOG_POSIX_SYSCALL_END, capio_syscall(SYS_gettid));
-            log_write_to(buf1, strlen(buf1));
+            log_write_to(const_cast<char *>(CAPIO_LOG_POSIX_SYSCALL_END), strlen(buf1));
             capio_syscall(SYS_munmap, buf1, 50);
         }
 #endif
