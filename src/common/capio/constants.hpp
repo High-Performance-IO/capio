@@ -25,8 +25,6 @@ constexpr int CAPIO_DATA_BUFFER_LENGTH               = 10;
 constexpr int CAPIO_DATA_BUFFER_ELEMENT_SIZE         = 256 * 1024;
 constexpr size_t CAPIO_SERVER_REQUEST_MAX_SIZE       = sizeof(char) * (PATH_MAX + 81920);
 constexpr size_t CAPIO_REQUEST_MAX_SIZE              = 256 * sizeof(char);
-constexpr char CAPIO_APP_LOG_FILE_NAME[]             = "/dev/stderr\0";
-constexpr char LOG_PRE_MSG[]                         = "tid[%ld]-at[%s]: ";
 constexpr char CAPIO_SERVER_CLI_LOG_SERVER[]         = "[ \033[1;32m SERVER \033[0m ] ";
 constexpr char CAPIO_SERVER_CLI_LOG_SERVER_WARNING[] = "[ \033[1;33m SERVER \033[0m ] ";
 constexpr char CAPIO_SERVER_CLI_LOG_SERVER_ERROR[]   = "[ \033[1;31m SERVER \033[0m ] ";
@@ -59,7 +57,7 @@ constexpr char CAPIO_LOG_PRE_MSG[]        = "at[%s]: ";
 constexpr char CAPIO_DEFAULT_LOG_FOLDER[] = "capio_logs\0";
 
 // CAPIO logger - POSIX
-constexpr char CAPIO_LOG_POSIX_DEFAULT_LOG_FILE_PREFIX[] = "posix_threas_\0";
+constexpr char CAPIO_LOG_POSIX_DEFAULT_LOG_FILE_PREFIX[] = "posix_thread_\0";
 constexpr char CAPIO_LOG_POSIX_SYSCALL_START[]       = "\n+++++++++ SYSCALL %s (%d) +++++++++";
 constexpr char CAPIO_LOG_POSIX_SYSCALL_END[]         = "---------  END SYSCALL --------\n";
 

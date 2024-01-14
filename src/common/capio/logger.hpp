@@ -29,6 +29,7 @@ static char *posix_log_master_dir_name = nullptr;
 static char *posix_logfile_prefix      = nullptr;
 static char *posix_hostname            = nullptr;
 static thread_local char *logfile_path = nullptr;
+static char *posix_log_dir_path        = nullptr;
 #endif
 
 thread_local int current_log_level = 0;
@@ -41,14 +42,13 @@ thread_local bool logging_syscall  = false; // this variable tells the logger th
 
 int CAPIO_LOG_LEVEL = CAPIO_MAX_LOG_LEVEL;
 
-
-
 #ifndef __CAPIO_POSIX
 inline auto open_server_logfile() {
     auto hostname = new char[HOST_NAME_MAX];
     gethostname(hostname, HOST_NAME_MAX);
 
-    const std::filesystem::path output_folder = std::string{log_master_dir_name + "/server/" + hostname};
+    const std::filesystem::path output_folder =
+        std::string{log_master_dir_name + "/server/" + hostname};
 
     std::filesystem::create_directories(output_folder);
 
@@ -81,15 +81,23 @@ inline void setup_posix_log_filenames() {
         posix_hostname = new char[HOST_NAME_MAX];
         gethostname(posix_hostname, HOST_NAME_MAX);
     }
+    if (posix_log_dir_path == nullptr) {
+        // allocate space for a path in the following structure (including 10 digits for thread id
+        // max
+        //  log_master_dir_name/posix/hostname/logfile_prefix_<tid>.log
+        posix_log_dir_path = new char[strlen(posix_log_master_dir_name) + 1 + 5 + 1 +
+                                      HOST_NAME_MAX + 1 + strlen(posix_logfile_prefix) + 13];
+        sprintf(posix_log_dir_path, "%s/posix/%s/", posix_log_master_dir_name, posix_hostname);
+    }
 
     if (logfile_path == nullptr) {
         // allocate space for a path in the following structure (including 10 digits for thread id
         // max
         //  log_master_dir_name/posix/logfile_prefix_<tid>.log
-        logfile_path = new char[strlen(posix_log_master_dir_name) + 1 + 5 + 1 +
+        logfile_path = new char[strlen(posix_log_master_dir_name) + 1 + 5 + 1 + HOST_NAME_MAX + 1 +
                                 strlen(posix_logfile_prefix) + 13];
-        sprintf(logfile_path, "%s/posix/%s%ld.log", posix_log_master_dir_name, posix_logfile_prefix,
-                capio_syscall(SYS_gettid));
+        sprintf(logfile_path, "%s/posix/%s/%s%ld.log", posix_log_master_dir_name, posix_hostname,
+                posix_logfile_prefix, capio_syscall(SYS_gettid));
     }
 }
 #endif
@@ -134,7 +142,31 @@ class Logger {
 #else
         if (!logfileOpen) {
             setup_posix_log_filenames();
+            //create recursively all capio directory structure
+            char tmp[256];
+            char *p = nullptr;
+            size_t len;
+            snprintf(tmp, sizeof(tmp), "%s", posix_log_dir_path);
+            len = strlen(tmp);
+            if (tmp[len - 1] == '/') {
+                tmp[len - 1] = 0;
+            }
+            for (p = tmp + 1; *p; p++) {
+                if (*p == '/') {
+                    *p = 0;
+                    capio_syscall(SYS_mkdir, tmp, 0777);
+                    *p = '/';
+                }
+            }
+            capio_syscall(SYS_mkdir, tmp, 0777);
+
             logfileFP = fopen(logfile_path, "w");
+
+            if (logfileFP == nullptr) {
+                capio_syscall(SYS_write, fileno(stdout), "Err fopen\0", strlen("Err fopen\0"));
+            } else {
+                logfileOpen = true;
+            }
         }
 #endif
         strncpy(this->invoker, invoker, sizeof(this->invoker));
