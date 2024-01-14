@@ -152,8 +152,9 @@ There are also examples on how to write JSON configuration files for the semanti
 
 Made with :heart: by:
 
-Alberto Riccardo Martinelli <albertoriccardo.martinelli@unito.it> (Designer and maintainer)\  
+Alberto Riccardo Martinelli <albertoriccardo.martinelli@unito.it> (Designer and maintainer)\
+Marco Edoardo Santimaria <marcoedoardo.santimaria@unito.it> (Designer and mantainer) \
+Iacopo Colonnelli <iacopo.colonnelli@unito.it> (Workflows expert and mantainer)\
 Massimo Torquati <massimo.torquati@unipi.it> (Designer)\
-Marco Aldinucci <marco.aldinucci@unito.it> (Designer)\
-Iacopo Colonnelli <iacopo.colonnelli@unito.it> (Workflows expert)\
-Marco Edoardo Santimaria <marcoedoardo.santimaria@unito.it> (Designer)
+Marco Aldinucci <marco.aldinucci@unito.it> (Designer)
+
