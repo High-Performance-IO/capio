@@ -95,8 +95,8 @@ constexpr char CAPIO_LOG_SERVER_CLI_LOGGING_ENABLED_WARNING[] =
     "|==================================================================|\n";
 constexpr char CAPIO_LOG_SERVER_CLI_LOGGING_NOT_AVAILABLE[] =
     "CAPIO_LOG set but log support was not compiled into CAPIO!";
-constexpr char CAPIO_LOG_SERVER_REQUEST_START[] = "\n+++++++++++ [%ld] REQUEST +++++++++++";
-constexpr char CAPIO_LOG_SERVER_REQUEST_END[]   = "~~~~~~~~~ [%ld] END REQUEST ~~~~~~~~~\n";
+constexpr char CAPIO_LOG_SERVER_REQUEST_START[] = "\n+++++++++++ REQUEST +++++++++++";
+constexpr char CAPIO_LOG_SERVER_REQUEST_END[]   = "~~~~~~~~~ END REQUEST ~~~~~~~~~\n";
 
 // CAPIO server argument parser
 constexpr char CAPIO_SERVER_ARG_PARSER_PRE[] =

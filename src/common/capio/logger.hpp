@@ -280,11 +280,7 @@ class Logger {
         if (strcmp(invoker, "capio_server") == 0 &&
             (strcmp(CAPIO_LOG_SERVER_REQUEST_START, message) == 0 ||
              strcmp(CAPIO_LOG_SERVER_REQUEST_END, message) == 0)) {
-            auto buf1 = reinterpret_cast<char *>(capio_syscall(
-                SYS_mmap, nullptr, 50, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0));
-            sprintf(buf1, message, capio_syscall(SYS_gettid));
-            logfile << buf1 << std::endl;
-            capio_syscall(SYS_munmap, buf1, 50);
+            logfile << message << std::endl;
             return;
         }
 #endif
