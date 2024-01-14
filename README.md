@@ -73,7 +73,7 @@ the first is optional).
 - `CAPIO_LOGFILE` This environment variable is defined only for capio_posix applications and specifies the logfile name
   to which capio will log to. If this variable is not defined, capio will log by default to `posix_thread_*.log`. An equivalent is available on capio server with option `-l`
   - `CAPIO_LOGDIR` This environment variable is defined only for capio_posix applications and specifies the directory name
-  to which capio will log to. If this variable is not defined, capio will log by default to `capio_logs`. An eqivalent is available on capio server with option `-d`
+  to which capio will log to. If this variable is not defined, capio will log by default to `capio_logs`. An equivalent is available on capio server with option `-d`
 
 ## How to inject streaming capabilities into your workflow
 
