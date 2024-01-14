@@ -83,6 +83,7 @@ docker compose -p example exec        \
   --index 1                           \
   --env CAPIO_DIR=/tmp/capio          \
   --env LD_PRELOAD=libcapio_posix.so  \
+  --workdir /home/capio/server        \
   --user capio                        \
   capio                               \
   touch /tmp/capio/test_file.txt
@@ -95,6 +96,7 @@ docker compose -p example exec        \
   --index 2                           \
   --env CAPIO_DIR=/tmp/capio          \
   --env LD_PRELOAD=libcapio_posix.so  \
+  --workdir /home/capio/server        \
   --user capio                        \
   capio                               \
   ls -la /tmp/capio/test_file.txt
