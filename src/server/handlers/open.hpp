@@ -37,7 +37,7 @@ inline void update_file_metadata(const std::string &path, int tid, int fd, int r
 inline void handle_create(int tid, int fd, const char *path_cstr, int rank) {
     START_LOG(gettid(), "call(tid=%d, fd=%d, path_cstr=%s, rank=%d)", tid, fd, path_cstr, rank);
 
-    bool is_creat = !(get_file_location_opt(path_cstr) || check_file_location(rank, path_cstr));
+    bool is_creat = !(get_file_location_opt(path_cstr) || load_file_location(path_cstr));
     update_file_metadata(path_cstr, tid, fd, rank, is_creat);
     write_response(tid, 0);
 }
@@ -59,7 +59,7 @@ inline void handle_open(int tid, int fd, const char *path_cstr, int rank) {
     // it is important that check_files_location is the last because is the
     // slowest (short circuit evaluation)
     if (get_file_location_opt(path_cstr) || metadata_conf.find(path_cstr) != metadata_conf.end() ||
-        match_globs(path_cstr) != -1 || check_file_location(rank, path_cstr)) {
+        match_globs(path_cstr) != -1 || load_file_location(path_cstr)) {
         update_file_metadata(path_cstr, tid, fd, rank, false);
     } else {
         write_response(tid, 1);

@@ -18,25 +18,26 @@ std::mutex pending_remote_stats_mutex;
 inline void reply_stat(int tid, const std::string &path, int rank) {
     START_LOG(gettid(), "call(tid=%d, path=%s, rank=%d)", tid, path.c_str(), rank);
     auto file_location_opt = get_file_location_opt(path.c_str());
+    LOG("File %s is local? %s", path.c_str(), file_location_opt ? "True" : "False");
 
-    auto file_is_remote = check_file_location(rank, path);
-    LOG("File %s is local? %s", path.c_str(), file_is_remote ? "True" : "False");
-
-    if (!file_is_remote && !file_location_opt) {
-        LOG("get_file_location_opt returned an empty object and check_files_location failed!");
-        // if it is in configuration file then wait otherwise fails
-        if ((metadata_conf.find(path) != metadata_conf.end() || match_globs(path) != -1) &&
-            !is_producer(tid, path)) {
-            LOG("File not ready yet. Starting a thread to wait for file.");
-            std::thread t(wait_for_stat, tid, std::string(path), rank, &pending_remote_stats,
-                          &pending_remote_stats_mutex);
-            t.detach();
-        } else {
-            LOG("Metadata do not contains file or globs did not contain file or app is producer.");
-            write_response(tid, -1); // return size
-            write_response(tid, -1); // return is_dir
+    if (!file_location_opt) {
+        if (!load_file_location(path)) {
+            LOG("path %s is not present in any node", path.c_str());
+            // if it is in configuration file then wait otherwise fail
+            if ((metadata_conf.find(path) != metadata_conf.end() || match_globs(path) != -1) &&
+                !is_producer(tid, path)) {
+                LOG("File not ready yet. Starting a thread to wait for file.");
+                std::thread t(wait_for_stat, tid, std::string(path), rank, &pending_remote_stats,
+                              &pending_remote_stats_mutex);
+                t.detach();
+            } else {
+                LOG("Metadata do not contains file or globs did not contain file or app is "
+                    "producer.");
+                write_response(tid, -1); // return size
+                write_response(tid, -1); // return is_dir
+            }
+            return;
         }
-        return;
     }
     auto c_file_opt = get_capio_file_opt(path.c_str());
     Capio_file &c_file =
