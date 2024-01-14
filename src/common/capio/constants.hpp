@@ -57,7 +57,7 @@ constexpr int CAPIO_POSIX_SYSCALL_SKIP         = 1;
 constexpr int CAPIO_POSIX_SYSCALL_SUCCESS      = 0;
 
 // CAPIO logger - common
-constexpr char CAPIO_LOG_PRE_MSG[] = "tid[%ld]-at[%s]: ";
+constexpr char CAPIO_LOG_PRE_MSG[] = "at[%s]: ";
 
 // CAPIO logger - POSIX
 constexpr char CAPIO_LOG_POSIX_DEFAULT_FILE_NAME[] = "/dev/stderr\0";

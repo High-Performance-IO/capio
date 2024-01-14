@@ -124,7 +124,7 @@ class Logger {
 
         va_list argp, argpc;
 
-        sprintf(format, CAPIO_LOG_PRE_MSG, capio_syscall(SYS_gettid), this->invoker);
+        sprintf(format, CAPIO_LOG_PRE_MSG, this->invoker);
         size_t pre_msg_len = strlen(format);
 
         strcpy(format + pre_msg_len, message);
@@ -160,7 +160,7 @@ class Logger {
     inline void log(const char *message, ...) {
         va_list argp, argpc;
 
-        sprintf(format, CAPIO_LOG_PRE_MSG, capio_syscall(SYS_gettid), this->invoker);
+        sprintf(format, CAPIO_LOG_PRE_MSG, this->invoker);
         size_t pre_msg_len = strlen(format);
 
         strcpy(format + pre_msg_len, message);
@@ -196,7 +196,7 @@ class Logger {
 
     inline ~Logger() {
         current_log_level--;
-        sprintf(format, CAPIO_LOG_PRE_MSG, capio_syscall(SYS_gettid), this->invoker);
+        sprintf(format, CAPIO_LOG_PRE_MSG, this->invoker);
         size_t pre_msg_len = strlen(format);
         strcpy(format + pre_msg_len, "returned");
 
