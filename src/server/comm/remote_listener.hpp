@@ -49,7 +49,7 @@ void wait_for_stat(int tid, const std::string &path, int rank,
                    std::mutex *pending_remote_stats_mutex) {
     START_LOG(gettid(), "call(tid=%d, path=%s)", tid, path.c_str());
 
-    loop_check_files_location(path, rank);
+    loop_load_file_location(path);
     // check if the file is local or remote
     Capio_file &c_file = get_capio_file(path.c_str());
 
@@ -73,7 +73,7 @@ void wait_for_file(int tid, int fd, off64_t count, bool dir, bool is_getdents, i
               dir ? "true" : "false", is_getdents ? "true" : "false");
 
     auto path_to_check = get_capio_file_path(tid, fd).data();
-    loop_check_files_location(path_to_check, rank);
+    loop_load_file_location(path_to_check);
 
     // check if the file is local or remote
     if (strcmp(std::get<0>(get_file_location(path_to_check)), node_name) == 0) {

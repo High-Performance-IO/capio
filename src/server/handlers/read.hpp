@@ -118,7 +118,7 @@ inline void handle_read(int tid, int fd, off64_t count, bool dir, bool is_getden
     LOG("got to first checkpoint");
     if (!file_location_opt && !is_prod) {
         LOG("got to second checkpoint");
-        bool found = check_file_location(rank, path.data());
+        bool found = load_file_location(path.data());
         if (!found) {
             LOG("got to third checkpoint");
             // launch a thread that checks when the file is created
