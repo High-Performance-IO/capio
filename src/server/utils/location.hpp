@@ -104,11 +104,10 @@ void rename_file_location(const char *const oldpath, const char *const newpath) 
  */
 bool load_file_location(const std::string &path_to_load) {
     START_LOG(gettid(), "call(path_to_load=%s)", path_to_load.c_str());
-
+    auto line = reinterpret_cast<char *>(malloc((PATH_MAX + HOST_NAME_MAX + 10) * sizeof(char)));
     for (int rank = 0; rank < n_servers; rank++) {
         FILE *fp;
         bool seek_needed;
-        char *line = nullptr;
         size_t len = 0;
         int fd;
 
@@ -159,16 +158,16 @@ bool load_file_location(const std::string &path_to_load) {
             }
             add_file_location(*path, node_str, offset);
             if (*path == path_to_load) {
-                delete[] line;
+                free(line);
 
                 LOG("path: %s, was found on node with rank %d", path_to_load.c_str(), rank);
                 return true;
             }
-            delete[] line;
         }
 
         std::get<2>(fd_files_location_reads[rank]) = true;
     }
+    free(line);
     LOG("path %s has not been found on remote nodes", path_to_load.c_str());
     return false;
 }
