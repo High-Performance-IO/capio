@@ -9,6 +9,10 @@ across different distributed applications (e.g. MPI-app1 -> MPI-app2).
 
 [Get help](https://github.com/High-Performance-IO/capio/wiki)
 
+> [!TIP]
+> A [wiki](https://github.com/High-Performance-IO/capio/wiki) is in development! You might want to check the wiki to get
+> more in depth information about CAPIO!
+
 ## Build and run tests
 
 ### Dependencies
@@ -70,8 +74,13 @@ the first is optional).
 - `CAPIO_DIR` This environment variable tells to both server and application the mount point of capio
 - `CAPIO_LOG_LEVEL` this environment tells both server and application the log level to use. This variable works only
   if `-DCAPIO_LOG=TRUE` was specified during cmake phase.
-- `CAPIO_LOGFILE` This environment variable is defined only for capio_posix applications and specifies the logfile name
-  to which capio will log to. If this variable is not defined, capio will log by default to stderr.
+- `CAPIO_LOG_PREFIX` This environment variable is defined only for capio_posix applications and specifies the prefix of
+  the logfile name to which capio will log to. The default value is `posix_thread_`, which means that capio will log by
+  default to a set of files called `posix_thread_*.log`. An equivalent behaviour can be set on the capio server using
+  the `-l` option.
+- `CAPIO_LOG_DIR` This environment variable is defined only for capio_posix applications and specifies the directory
+  name to which capio will be created. If this variable is not defined, capio will log by default to `capio_logs`. An
+  equivalent behaviour can be set on the capio server using the `-d` option.
 
 ## How to inject streaming capabilities into your workflow
 
@@ -147,8 +156,9 @@ There are also examples on how to write JSON configuration files for the semanti
 
 Made with :heart: by:
 
-Alberto Riccardo Martinelli <albertoriccardo.martinelli@unito.it> (Designer and maintainer)\  
+Alberto Riccardo Martinelli <albertoriccardo.martinelli@unito.it> (Designer and maintainer)\
+Marco Edoardo Santimaria <marcoedoardo.santimaria@unito.it> (Designer and maintainer) \
+Iacopo Colonnelli <iacopo.colonnelli@unito.it> (Workflows expert and maintainer)\
 Massimo Torquati <massimo.torquati@unipi.it> (Designer)\
-Marco Aldinucci <marco.aldinucci@unito.it> (Designer)\
-Iacopo Colonnelli <iacopo.colonnelli@unito.it> (Workflows expert)\
-Marco Edoardo Santimaria <marcoedoardo.santimaria@unito.it> (Designer)
+Marco Aldinucci <marco.aldinucci@unito.it> (Designer)
+
