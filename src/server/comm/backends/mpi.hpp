@@ -48,7 +48,7 @@ class MPI_backend : public backend_interface {
         auto buf = new char[MPI_MAX_PROCESSOR_NAME];
 
         if (rank == 0) {
-            clean_files_location(n_servers);
+            clean_files_location();
         }
         for (int i = 0; i < n_servers; i += 1) {
             if (i != rank) {
@@ -121,7 +121,7 @@ class MPI_backend : public backend_interface {
         std::string msg      = std::to_string(CAPIO_SERVER_REQUEST_N_SEND) + " " + prefix;
         size_t prefix_length = prefix.length();
         for (const std::string &path : *files_to_send) {
-            Capio_file &c_file = get_capio_file(path.c_str());
+            Capio_file &c_file = get_capio_file(path);
             msg.append(" " + path.substr(prefix_length) + " " +
                        std::to_string(c_file.get_stored_size()));
         }
@@ -134,45 +134,37 @@ class MPI_backend : public backend_interface {
         }
     }
 
-    inline void serve_remote_read(const char *path_c, int dest, long int offset, long int nbytes,
-                                  int complete) override {
-        START_LOG(gettid(), "call(pach_c=%s, dest=%d, offset=%ld, nbytes=%ld, complete=%d)", path_c,
-                  dest, offset, nbytes, complete);
+    inline void serve_remote_read(const std::filesystem::path &path, int dest, long int offset,
+                                  long int nbytes, int complete) override {
+        START_LOG(gettid(), "call(pach_c=%s, dest=%d, offset=%ld, nbytes=%ld, complete=%d)",
+                  path.c_str(), dest, offset, nbytes, complete);
 
         SEM_WAIT_CHECK(&remote_read_sem, "remote_read_sems");
 
         // Send all the rest of the file not only the number of bytes requested
         // Useful for caching
-        Capio_file &c_file         = get_capio_file(path_c);
+        Capio_file &c_file         = get_capio_file(path);
         nbytes                     = c_file.get_stored_size() - offset;
         off64_t prefetch_data_size = get_prefetch_data_size();
 
         if (prefetch_data_size != 0 && nbytes > prefetch_data_size) {
             nbytes = prefetch_data_size;
         }
+        const off64_t file_size = c_file.get_stored_size();
 
-        std::string nbytes_str    = std::to_string(nbytes);
-        std::string offset_str    = std::to_string(offset);
-        std::string complete_str  = std::to_string(complete);
-        std::string file_size_str = std::to_string(c_file.get_stored_size());
-
-        auto buf_send =
-            new char[sizeof(int) + strlen(path_c) + offset_str.length() + nbytes_str.length() +
-                     complete_str.length() + file_size_str.length() + 6];
-
-        // TODO:add malloc check
-        sprintf(buf_send, "%d %s %s %s %s %s", CAPIO_SERVER_REQUEST_SENDING, path_c,
-                offset_str.c_str(), nbytes_str.c_str(), complete_str.c_str(),
-                file_size_str.c_str());
+        const char *const format = "%04d %s %ld %ld %d %ld";
+        const int size = snprintf(nullptr, 0, format, CAPIO_SERVER_REQUEST_SENDING, path.c_str(),
+                                  offset, nbytes, complete, file_size);
+        const std::unique_ptr<char[]> message(new char[size]);
+        sprintf(message.get(), format, CAPIO_SERVER_REQUEST_SENDING, path.c_str(), offset, nbytes,
+                complete, file_size);
 
         // send warning
-        MPI_Send(buf_send, strlen(buf_send) + 1, MPI_CHAR, dest, 0, MPI_COMM_WORLD);
+        MPI_Send(message.get(), size + 1, MPI_CHAR, dest, 0, MPI_COMM_WORLD);
         // send data
         send_file(c_file.get_buffer() + offset, nbytes, dest);
 
         SEM_POST_CHECK(&remote_read_sem, "remote_read_sem");
-
-        delete[] buf_send;
     }
 
     inline void handle_remote_read(int tid, int fd, off64_t count, int rank, bool dir,
@@ -187,11 +179,11 @@ class MPI_backend : public backend_interface {
         // before sending the request to the remote node, it checks
         // in the local cache
         const std::lock_guard<std::mutex> lg(*pending_remote_reads_mutex);
-        std::string_view path  = get_capio_file_path(tid, fd);
-        Capio_file &c_file     = get_capio_file(path.data());
-        off64_t process_offset = get_capio_file_offset(tid, fd);
-        off64_t end_of_read    = process_offset + count;
-        off64_t end_of_sector  = c_file.get_sector_end(process_offset);
+        const std::filesystem::path &path = get_capio_file_path(tid, fd);
+        Capio_file &c_file                = get_capio_file(path);
+        off64_t process_offset            = get_capio_file_offset(tid, fd);
+        off64_t end_of_read               = process_offset + count;
+        off64_t end_of_sector             = c_file.get_sector_end(process_offset);
 
         if (c_file.is_complete() &&
             (end_of_read <= end_of_sector ||
@@ -202,8 +194,7 @@ class MPI_backend : public backend_interface {
         }
 
         // when is not complete but mode = append
-        if (read_from_local_mem(tid, process_offset, end_of_read, end_of_sector, count,
-                                path.data())) {
+        if (read_from_local_mem(tid, process_offset, end_of_read, end_of_sector, count, path)) {
             // it means end_of_read < end_of_sector
             LOG("end_of_read < end_of_sector");
             return;
@@ -211,18 +202,21 @@ class MPI_backend : public backend_interface {
 
         // If it is not in cache then send the request to the remote node
 
-        int dest      = nodes_helper_rank[std::get<0>(get_file_location(path.data()))];
+        int dest      = nodes_helper_rank[std::get<0>(get_file_location(path))];
         size_t offset = get_capio_file_offset(tid, fd);
 
-        auto message = std::to_string(CAPIO_SERVER_REQUEST_READ) + " " + std::string(path) + " " +
-                       std::to_string(rank) + " " + std::to_string(offset) + " " +
-                       std::to_string(count);
-        LOG("Message = %s", message.c_str());
-        MPI_Send(message.c_str(), message.length() + 1, MPI_CHAR, dest, 0, MPI_COMM_WORLD);
-        (*pending_remote_reads)[path.data()].emplace_back(tid, fd, count, is_getdents);
+        const char *const format = "%04d %s %d %ld %ld";
+        const int size = snprintf(nullptr, 0, format, CAPIO_SERVER_REQUEST_READ, path.c_str(), rank,
+                                  offset, count);
+        const std::unique_ptr<char[]> message(new char[size]);
+        sprintf(message.get(), format, CAPIO_SERVER_REQUEST_READ, path.c_str(), rank, offset,
+                count);
+        LOG("Message = %s", message.get());
+        MPI_Send(message.get(), size + 1, MPI_CHAR, dest, 0, MPI_COMM_WORLD);
+        (*pending_remote_reads)[path].emplace_back(tid, fd, count, is_getdents);
     }
 
-    inline bool handle_nreads(const std::string &path, const std::string &app_name,
+    inline bool handle_nreads(const std::filesystem::path &path, const std::string &app_name,
                               int dest) override {
         START_LOG(gettid(), "call(path=%s, app_name=%s, dest=%d)", path.c_str(), app_name.c_str(),
                   dest);
@@ -233,7 +227,7 @@ class MPI_backend : public backend_interface {
             std::size_t batch_size = std::get<5>(metadata_conf_globs[pos]);
             if (batch_size > 0) {
                 auto msg = new char[sizeof(char) * (512 + PATH_MAX)];
-                sprintf(msg, "%d %zu %s %s %s", CAPIO_SERVER_REQUEST_N_READ, batch_size,
+                sprintf(msg, "%04d %zu %s %s %s", CAPIO_SERVER_REQUEST_N_READ, batch_size,
                         app_name.c_str(), glob.c_str(), path.c_str());
                 MPI_Send(msg, strlen(msg) + 1, MPI_CHAR, dest, 0, MPI_COMM_WORLD);
                 delete[] msg;
@@ -247,25 +241,28 @@ class MPI_backend : public backend_interface {
         START_LOG(gettid(), "call(%s, %d, %ld)", path, dest, c_file.get_buf_size());
         auto msg = new char[PATH_MAX + 1024];
 
-        sprintf(msg, "%d %s %ld %d", CAPIO_SERVER_REQUEST_SIZE, path, c_file.get_file_size(),
+        sprintf(msg, "%04d %s %ld %d", CAPIO_SERVER_REQUEST_SIZE, path, c_file.get_file_size(),
                 c_file.is_dir() ? 1 : 0);
 
         MPI_Send(msg, strlen(msg) + 1, MPI_CHAR, dest, 0, MPI_COMM_WORLD);
     }
 
-    inline void handle_remote_stat(int tid, const std::string &path, int rank,
+    inline void handle_remote_stat(int tid, const std::filesystem::path &path, int rank,
                                    CSMyRemotePendingStats_t *pending_remote_stats,
                                    std::mutex *pending_remote_stats_mutex) override {
         START_LOG(tid, "call(tid=%d, path=%s, rank=%d)", tid, path.c_str(), rank);
 
         const std::lock_guard<std::mutex> lg(*pending_remote_stats_mutex);
 
-        auto dest = nodes_helper_rank[std::get<0>(get_file_location(path.c_str()))];
-        auto msg =
-            std::to_string(CAPIO_SERVER_REQUEST_STAT) + " " + std::to_string(rank) + " " + path;
-        LOG("destination=%d, message=%s", dest, msg.c_str());
+        auto dest                = nodes_helper_rank[std::get<0>(get_file_location(path))];
+        const char *const format = "%04d %d %s";
+        const int size =
+            snprintf(nullptr, 0, format, CAPIO_SERVER_REQUEST_STAT, rank, path.c_str());
+        const std::unique_ptr<char[]> message(new char[size]);
+        sprintf(message.get(), format, CAPIO_SERVER_REQUEST_STAT, rank, path.c_str());
+        LOG("destination=%d, message=%s", dest, message.get());
 
-        MPI_Send(msg.c_str(), msg.length() + 1, MPI_CHAR, dest, 0, MPI_COMM_WORLD);
+        MPI_Send(message.get(), size + 1, MPI_CHAR, dest, 0, MPI_COMM_WORLD);
         LOG("message sent");
         (*pending_remote_stats)[path].emplace_back(tid);
     }

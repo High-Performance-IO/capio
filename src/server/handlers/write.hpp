@@ -8,17 +8,17 @@ inline void handle_write(int tid, int fd, off64_t base_offset, off64_t count, in
     START_LOG(gettid(), "call(tid=%d, fd=%d, base_offset=%ld, count=%ld, rank=%d)", tid, fd,
               base_offset, count, rank);
     // check if another process is waiting for this data
-    off64_t data_size     = base_offset + count;
-    std::string_view path = get_capio_file_path(tid, fd);
-    Capio_file &c_file    = init_capio_file(path.data(), true);
-    size_t file_shm_size  = c_file.get_buf_size();
-    auto *data_buf        = data_buffers[tid].first;
-    size_t n_reads        = count / CAPIO_DATA_BUFFER_ELEMENT_SIZE;
-    size_t r              = count % CAPIO_DATA_BUFFER_ELEMENT_SIZE;
-    size_t i              = 0;
+    off64_t data_size                 = base_offset + count;
+    const std::filesystem::path &path = get_capio_file_path(tid, fd);
+    Capio_file &c_file                = init_capio_file(path, true);
+    size_t file_shm_size              = c_file.get_buf_size();
+    auto *data_buf                    = data_buffers[tid].first;
+    size_t n_reads                    = count / CAPIO_DATA_BUFFER_ELEMENT_SIZE;
+    size_t r                          = count % CAPIO_DATA_BUFFER_ELEMENT_SIZE;
+    size_t i                          = 0;
     char *p;
     if (data_size > file_shm_size) {
-        p = expand_memory_for_file(path.data(), data_size, c_file);
+        c_file.expand_buffer(data_size);
     }
     p = c_file.get_buffer();
     p = p + base_offset;
@@ -29,17 +29,17 @@ inline void handle_write(int tid, int fd, off64_t base_offset, off64_t count, in
     if (r) {
         data_buf->read(p + i * CAPIO_DATA_BUFFER_ELEMENT_SIZE, r);
     }
-    int pid                   = pids[tid];
-    writers[pid][path.data()] = true;
+    int pid            = pids[tid];
+    writers[pid][path] = true;
     c_file.insert_sector(base_offset, data_size);
     if (c_file.first_write) {
         c_file.first_write = false;
-        write_file_location(rank, path.data(), tid);
+        write_file_location(rank, path, tid);
         // TODO: it works only if there is one prod per file
-        update_dir(tid, path.data(), rank);
+        update_dir(tid, path, rank);
     }
     std::string_view mode = c_file.get_mode();
-    auto it               = pending_reads.find(path.data());
+    auto it               = pending_reads.find(path);
     if (it != pending_reads.end() && mode == CAPIO_FILE_MODE_NO_UPDATE) {
         auto &pending_reads_this_file = it->second;
         auto it_vec                   = pending_reads_this_file.begin();
@@ -56,7 +56,7 @@ inline void handle_write(int tid, int fd, off64_t base_offset, off64_t count, in
         }
     }
     if (mode == CAPIO_FILE_MODE_NO_UPDATE) {
-        handle_pending_remote_reads(path.data(), data_size, false);
+        handle_pending_remote_reads(path, data_size, false);
     }
 }
 

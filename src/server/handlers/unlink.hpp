@@ -1,8 +1,8 @@
 #ifndef CAPIO_SERVER_HANDLERS_UNLINK_HPP
 #define CAPIO_SERVER_HANDLERS_UNLINK_HPP
 
-inline void handle_unlink(int tid, const char *path, int rank) {
-    START_LOG(gettid(), "call(tid=%d, path=%s, rank=%d)", tid, path, rank);
+inline void handle_unlink(int tid, const std::filesystem::path &path, int rank) {
+    START_LOG(gettid(), "call(tid=%d, path=%s, rank=%d)", tid, path.c_str(), rank);
 
     auto c_file_opt = get_capio_file_opt(path);
     if (c_file_opt) { // TODO: it works only in the local case

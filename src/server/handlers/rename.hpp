@@ -3,9 +3,10 @@
 
 #include "utils/location.hpp"
 
-void handle_rename(int tid, const char *oldpath, const char *newpath, int rank) {
-    START_LOG(gettid(), "call(tid=%d, oldpath=%s, newpath=%s, rank=%d)", tid, oldpath, newpath,
-              rank);
+void handle_rename(int tid, const std::filesystem::path &oldpath,
+                   const std::filesystem::path &newpath, int rank) {
+    START_LOG(gettid(), "call(tid=%d, oldpath=%s, newpath=%s, rank=%d)", tid, oldpath.c_str(),
+              newpath.c_str(), rank);
 
     if (get_capio_file_opt(oldpath)) {
         rename_capio_file(oldpath, newpath);
