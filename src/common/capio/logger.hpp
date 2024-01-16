@@ -27,7 +27,6 @@ std::string logfile_prefix      = CAPIO_SERVER_DEFAULT_LOG_FILE_PREFIX;
 thread_local bool logfileOpen = false;
 thread_local int logfileFD    = -1;
 thread_local char logfile_path[PATH_MAX]{'\0'};
-
 #endif
 
 thread_local int current_log_level = 0;
@@ -119,7 +118,7 @@ inline auto get_host_log_dir() {
     return host_log_dir_path;
 }
 
-inline void setup_posix_log_filenames() {
+inline void setup_posix_log_filename() {
     if (logfile_path[0] == '\0') {
         sprintf(logfile_path, "%s/%s%ld.log", get_host_log_dir(), get_log_prefix(),
                 capio_syscall(SYS_gettid));
@@ -132,7 +131,6 @@ void log_write_to(char *buffer, size_t bufflen) {
     if (current_log_level < CAPIO_MAX_LOG_LEVEL || CAPIO_MAX_LOG_LEVEL < 0) {
         capio_syscall(SYS_write, logfileFD, buffer, bufflen);
         capio_syscall(SYS_write, logfileFD, "\n", 1);
-        // fflush(logfileFD);
     }
 #else
     if (current_log_level < CAPIO_LOG_LEVEL || CAPIO_LOG_LEVEL < 0) {
@@ -166,14 +164,10 @@ class Logger {
         }
 #else
         if (!logfileOpen) {
-            setup_posix_log_filenames();
+            setup_posix_log_filename();
 
-            char mkdir_cmd[PATH_MAX];
             capio_syscall(SYS_mkdir, get_log_dir(), 0755);
-
-            sprintf(mkdir_cmd, "%s/posix", get_log_dir());
-            capio_syscall(SYS_mkdir, mkdir_cmd, 0755);
-
+            capio_syscall(SYS_mkdir, get_posix_log_dir(), 0755);
             capio_syscall(SYS_mkdir, get_host_log_dir(), 0755);
 
             logfileFD = capio_syscall(SYS_open, logfile_path, O_CREAT | O_WRONLY | O_TRUNC, 0644);
