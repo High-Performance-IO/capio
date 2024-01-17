@@ -165,7 +165,7 @@ inline bool read_from_local_mem(int tid, off64_t process_offset, off64_t end_of_
                                 const std::filesystem::path &path);
 
 inline void solve_remote_reads(size_t bytes_received, size_t offset, size_t file_size,
-                               const char *path_c, bool complete,
+                               const std::filesystem::path &path, bool complete,
                                CSMyRemotePendingReads_t *pending_remote_reads,
                                std::mutex *pending_remote_reads_mutex);
 

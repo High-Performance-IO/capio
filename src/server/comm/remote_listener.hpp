@@ -378,11 +378,12 @@ void remote_listener_remote_read(RemoteRequest *request, void *arg1, void *arg2)
 void remote_listener_remote_sending(RemoteRequest *request, void *arg1, void *arg2) {
     START_LOG(capio_syscall(SYS_gettid), "call(request=%s)", request->getRequest());
     off64_t bytes_received, offset;
-    std::string path;
-    path.reserve(1024);
+    //std::string path;
+    //path.reserve(1024);
+    char path[PATH_MAX];
     int complete_tmp;
     size_t file_size;
-    sscanf(request->getRequest(), "%s %ld %ld %d %zu", path.data(), &offset, &bytes_received,
+    sscanf(request->getRequest(), "%s %ld %ld %d %zu", path, &offset, &bytes_received,
            &complete_tmp, &file_size);
     bool complete      = complete_tmp;
     void *file_shm     = nullptr;
