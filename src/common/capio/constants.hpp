@@ -41,10 +41,10 @@ constexpr int THEORETICAL_SIZE_DIRENT64              = sizeof(ino64_t) + sizeof(
                                           sizeof(char) * NAME_MAX;
 
 // CAPIO streaming semantics
-constexpr char CAPIO_FILE_MODE_NO_UPDATE[]      = "no_update";
-constexpr char CAPIO_FILE_MODE_UPDATE[]         = "update";
-constexpr char CAPIO_FILE_MODE_ON_CLOSE[]       = "on_close";
-constexpr char CAPIO_FILE_MODE_ON_TERMINATION[] = "on_termination";
+constexpr char CAPIO_FILE_MODE_NO_UPDATE[]           = "no_update";
+constexpr char CAPIO_FILE_MODE_UPDATE[]              = "update";
+constexpr char CAPIO_FILE_COMMITTED_ON_CLOSE[]       = "on_close";
+constexpr char CAPIO_FILE_COMMITTED_ON_TERMINATION[] = "on_termination";
 
 // CAPIO POSIX return codes
 constexpr int CAPIO_POSIX_SYSCALL_ERRNO        = -1;

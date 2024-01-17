@@ -135,7 +135,7 @@ void update_dir(int tid, const std::filesystem::path &file_path, int rank) {
 }
 
 off64_t create_dir(int tid, const std::filesystem::path &path, int rank) {
-    START_LOG(gettid(), "call(path=%s, rank=%d, root_dir=%s)", path.c_str(), rank);
+    START_LOG(tid, "call(path=%s, rank=%d)", path.c_str(), rank);
 
     if (!get_file_location_opt(path)) {
         Capio_file &c_file = create_capio_file(path, true, CAPIO_DEFAULT_DIR_INITIAL_SIZE);

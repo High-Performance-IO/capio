@@ -15,7 +15,7 @@ inline void handle_exit_group(int tid, int rank) {
             LOG("Handling file %s", path.c_str());
             auto it_conf = metadata_conf.find(path);
             if (it_conf == metadata_conf.end() ||
-                std::get<0>(it_conf->second) == CAPIO_FILE_MODE_ON_TERMINATION ||
+                std::get<0>(it_conf->second) == CAPIO_FILE_COMMITTED_ON_TERMINATION ||
                 std::get<0>(it_conf->second).empty()) {
                 Capio_file &c_file = get_capio_file(path.c_str());
                 if (c_file.is_dir()) {

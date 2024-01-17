@@ -16,7 +16,7 @@ inline void handle_close(int tid, int fd, int rank) {
 
     Capio_file &c_file = get_capio_file(path);
     c_file.close();
-    if (c_file.get_committed() == CAPIO_FILE_MODE_ON_CLOSE && c_file.is_closed()) {
+    if (c_file.get_committed() == CAPIO_FILE_COMMITTED_ON_CLOSE && c_file.is_closed()) {
         LOG("Capio_file is closed and mode is on_close");
         c_file.set_complete();
         auto it = pending_reads.find(path);

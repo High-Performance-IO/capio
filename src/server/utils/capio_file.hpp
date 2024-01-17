@@ -31,7 +31,7 @@ class Capio_file {
   private:
     char *_buf = nullptr; // buffer containing the data
     std::size_t _buf_size;
-    std::string_view _committed = CAPIO_FILE_MODE_ON_TERMINATION;
+    std::string_view _committed = CAPIO_FILE_COMMITTED_ON_TERMINATION;
     bool _directory             = false;
     // _fd is useful only when the file is memory-mapped
     int _fd                     = -1;
