@@ -252,7 +252,7 @@ void update_metadata_conf(std::filesystem::path &path, size_t pos, long int n_fi
                           const std::string &app_name, bool permanent, long int n_close) {
     START_LOG(gettid(),
               "call(path=%s, pos=%ld, n_files=%ld, batch_size=%ld, committed=%s, "
-              "mode=%s, app_name=%s, permanent=&s, n_close=%ld)",
+              "mode=%s, app_name=%s, permanent=%s, n_close=%ld)",
               path.c_str(), pos, n_files, batch_size, committed.c_str(), mode.c_str(),
               app_name.c_str(), permanent ? "true" : "false", n_close);
 

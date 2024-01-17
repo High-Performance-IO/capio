@@ -31,12 +31,12 @@ class Capio_file {
   private:
     char *_buf = nullptr; // buffer containing the data
     std::size_t _buf_size;
-    std::string_view _committed = CAPIO_FILE_MODE_UPDATE;
+    std::string_view _committed = CAPIO_FILE_MODE_ON_TERMINATION;
     bool _directory             = false;
     // _fd is useful only when the file is memory-mapped
     int _fd                     = -1;
     bool _home_node             = false;
-    std::string_view _mode      = CAPIO_FILE_MODE_ON_TERMINATION;
+    std::string_view _mode      = CAPIO_FILE_MODE_UPDATE;
     int _n_links                = 1;
     long int _n_close           = 0;
     long int _n_close_expected  = -1;

@@ -100,8 +100,7 @@ void parse_conf_file(const std::string &conf_file, const std::filesystem::path &
                 }
                 // END PARSING COMMITTED
 
-                std::string_view mode;
-                error = file["mode"].get_string().get(mode);
+                std::string mode = CAPIO_FILE_MODE_UPDATE;
 
                 long n_files;
                 if (file["n_files"].get_int64().get(n_files)) {
@@ -118,7 +117,7 @@ void parse_conf_file(const std::string &conf_file, const std::filesystem::path &
                 }
                 std::size_t pos = path.native().find('*');
                 update_metadata_conf(path, pos, n_files, batch_size, std::string(commit_rule),
-                                     std::string(mode), std::string(app_name), false, n_close);
+                                     mode, std::string(app_name), false, n_close);
             }
 
             std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_INFO
