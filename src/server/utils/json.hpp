@@ -21,6 +21,7 @@ void parse_conf_file(const std::string &conf_file, const std::filesystem::path &
     } catch (const simdjson::simdjson_error &e) {
         std::cerr << CAPIO_LOG_SERVER_CLI_LEVEL_ERROR
                   << "Exception thrown while opening config file: " << e.what() << std::endl;
+        LOG("Exception thrown while opening config file: %s", e.what());
         ERR_EXIT("Exception thrown while opening config file: %s", e.what());
     }
 
@@ -29,6 +30,7 @@ void parse_conf_file(const std::string &conf_file, const std::filesystem::path &
 
     std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_INFO
               << "Parsing configuration for workflow: " << workflow_name << std::endl;
+    LOG("Parsing configuration for workflow: %s", workflow_name);
 
     auto io_graph = entries["IO_Graph"];
 
@@ -37,29 +39,35 @@ void parse_conf_file(const std::string &conf_file, const std::filesystem::path &
 
         std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_INFO << "Parsing config for app " << app_name
                   << std::endl;
+        LOG("Parsing config for app %s", app_name);
 
         if (app["input_stream"].get_array().get(input_stream)) {
             std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_WARNING
                       << "No input_stream section found for app " << app_name << std::endl;
+            LOG("No input_stream section found for app %s", app_name);
         } else {
             // TODO: parse input_stream
             std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_INFO
                       << "Completed input_stream parsing for app: " << app_name << std::endl;
+            LOG("Completed input_stream parsing for app: %s", app_name);
         }
 
         if (app["output_stream"].get_array().get(output_stream)) {
             std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_WARNING
                       << "No output_stream section found for app " << app_name << std::endl;
+            LOG("No output_stream section found for app %s", app_name);
         } else {
             // TODO: parse output stream
             std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_INFO
                       << "Completed output_stream parsing for app: " << app_name << std::endl;
+            LOG("Completed output_stream parsing for app: %s", app_name);
         }
 
         // PARSING STREAMING FILES
         if (app["streaming"].get_array().get(streaming)) {
             std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_WARNING
                       << "No streaming section found for app: " << app_name << std::endl;
+            LOG("No streaming section found for app: %s", app_name);
         } else {
             for (auto file : streaming) {
                 std::string_view name, committed;
@@ -78,7 +86,7 @@ void parse_conf_file(const std::string &conf_file, const std::filesystem::path &
                         if (commit_rule != CAPIO_FILE_MODE_ON_CLOSE) {
                             std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_ERROR << "commit rule "
                                       << commit_rule << std::endl;
-                            ERR_EXIT("error conf file");
+                            ERR_EXIT("error commit rule: %s", commit_rule.c_str());
                         }
 
                         std::string n_close_str =
@@ -87,7 +95,7 @@ void parse_conf_file(const std::string &conf_file, const std::filesystem::path &
                         if (!is_int(n_close_str)) {
                             std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_ERROR
                                       << "commit rule on_close invalid number" << std::endl;
-                            ERR_EXIT("error conf file");
+                            ERR_EXIT("error commit rule on_close invalid number: !is_int()");
                         }
                         n_close = std::stol(n_close_str);
                     } else {
@@ -96,7 +104,7 @@ void parse_conf_file(const std::string &conf_file, const std::filesystem::path &
                 } else {
                     std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_ERROR
                               << "commit rule is mandatory in streaming section" << std::endl;
-                    ERR_EXIT("error conf file");
+                    ERR_EXIT("error commit rule is mandatory in streaming section");
                 }
                 // END PARSING COMMITTED
 
@@ -116,21 +124,23 @@ void parse_conf_file(const std::string &conf_file, const std::filesystem::path &
                     path = (capio_dir / path).lexically_normal();
                 }
                 std::size_t pos = path.native().find('*');
-                update_metadata_conf(path, pos, n_files, batch_size, std::string(commit_rule),
-                                     mode, std::string(app_name), false, n_close);
+                update_metadata_conf(path, pos, n_files, batch_size, std::string(commit_rule), mode,
+                                     std::string(app_name), false, n_close);
             }
 
             std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_INFO
                       << "completed parsing of streaming section for app: " << app_name
                       << std::endl;
+            LOG("completed parsing of streaming section for app: %s", app_name);
         } // END PARSING STREAMING FILES
 
     } // END OF APP MAIN LOOPS
-
+    LOG("Completed parsing of io_graph app main loops");
     long int batch_size = 0;
     if (entries["permanent"].get_array().get(permanent_files)) { // PARSING PERMANENT FILES
         std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_WARNING
                   << "No permanent section found for workflow: " << workflow_name << std::endl;
+        LOG("No permanent section found for workflow: %s", workflow_name);
     } else {
         for (auto file : permanent_files) {
             std::string_view name;
@@ -166,9 +176,11 @@ void parse_conf_file(const std::string &conf_file, const std::filesystem::path &
         }
         std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_INFO << "Completed parsing of permanent files"
                   << std::endl;
+        LOG("Completed parsing of permanent files");
     } // END PARSING PERMANENT FILES
 
     std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_INFO << "Completed parsing of io_graph" << std::endl;
+    LOG("Completed parsing of io_graph");
 }
 
 #endif // CAPIO_SERVER_UTILS_JSON_HPP
