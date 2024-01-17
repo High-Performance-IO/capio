@@ -19,20 +19,23 @@ CSMetadataConfGlobs_t metadata_conf_globs;
 long int match_globs(const std::filesystem::path &path) {
     START_LOG(gettid(), "call(path=%s)", path.c_str());
 
-    long int res             = -1;
-    size_t i                 = 0;
+    long int resolved_glob_offset = -1;
     size_t max_length_prefix = 0;
-    while (i < metadata_conf_globs.size()) {
+    // compute the most accurate and precise glob for a given path
+    for (long int i = 0; i < metadata_conf_globs.size(); i++) {
         std::string prefix_str = std::get<0>(metadata_conf_globs[i]);
         size_t prefix_length   = prefix_str.length();
-        if (path.native().compare(0, prefix_length, prefix_str) == 0 &&
-            prefix_length > max_length_prefix) {
-            res               = i;
-            max_length_prefix = prefix_length;
+        bool path_matches = static_cast<bool>(path.native().compare(0, prefix_length, prefix_str));
+        LOG("path=%s, prefix_str=%s, path_matches=%s", path.c_str(), prefix_str.c_str(),
+            path_matches ? "True" : "False");
+        if (path_matches && prefix_length > max_length_prefix) {
+            resolved_glob_offset = i;
+            max_length_prefix    = prefix_length;
+            LOG("Path matches with offset of %ld", resolved_glob_offset);
         }
-        ++i;
     }
-    return res;
+    LOG("Result of glob %s: %d", path.c_str(), resolved_glob_offset);
+    return resolved_glob_offset;
 }
 
 inline std::unordered_map<int, std::vector<int>> get_capio_fds() {
@@ -257,10 +260,12 @@ void update_metadata_conf(std::filesystem::path &path, size_t pos, long int n_fi
               app_name.c_str(), permanent ? "true" : "false", n_close);
 
     if (pos == std::string::npos && n_files == -1) {
+        LOG("Path is not a glob (does not end with *), and n_files is -1");
         metadata_conf[path] =
             std::make_tuple(committed, mode, app_name, n_files, permanent, n_close);
     } else {
         std::string prefix_str = path.native().substr(0, pos);
+        LOG("prefix_str=%s", prefix_str.c_str());
         metadata_conf_globs.emplace_back(prefix_str, committed, mode, app_name, n_files, batch_size,
                                          permanent, n_close);
     }
