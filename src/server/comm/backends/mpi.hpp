@@ -173,8 +173,8 @@ class MPI_backend : public backend_interface {
                                    void (*handle_local_read)(int, int, off64_t, bool, bool,
                                                              bool)) override {
 
-        START_LOG(tid, "call(tid=%d, fd=%d, count=%ld, rank=%d, dir=%s, is_getdents=%s)", tid, fd,
-                  count, rank, dir ? "true" : "false", is_getdents ? "true" : "false");
+        START_LOG(gettid(), "call(tid=%d, fd=%d, count=%ld, rank=%d, dir=%s, is_getdents=%s)", tid,
+                  fd, count, rank, dir ? "true" : "false", is_getdents ? "true" : "false");
 
         // before sending the request to the remote node, it checks
         // in the local cache
@@ -250,7 +250,7 @@ class MPI_backend : public backend_interface {
     inline void handle_remote_stat(int tid, const std::filesystem::path &path, int rank,
                                    CSMyRemotePendingStats_t *pending_remote_stats,
                                    std::mutex *pending_remote_stats_mutex) override {
-        START_LOG(tid, "call(tid=%d, path=%s, rank=%d)", tid, path.c_str(), rank);
+        START_LOG(gettid(), "call(tid=%d, path=%s, rank=%d)", tid, path.c_str(), rank);
 
         const std::lock_guard<std::mutex> lg(*pending_remote_stats_mutex);
 

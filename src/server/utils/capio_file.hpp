@@ -94,13 +94,11 @@ class Capio_file {
     }
 
     inline void set_complete(bool _complete = true) {
-        START_LOG(capio_syscall(SYS_gettid), "setting capio_file.complete=%s",
-                  _complete ? "true" : "false");
+        START_LOG(gettid(), "setting capio_file.complete=%s", _complete ? "true" : "false");
         this->complete = _complete;
     }
     [[nodiscard]] inline bool is_complete() const {
-        START_LOG(capio_syscall(SYS_gettid), "capio_file is complete? %s",
-                  this->complete ? "true" : "false");
+        START_LOG(gettid(), "capio_file is complete? %s", this->complete ? "true" : "false");
         return this->complete;
     }
 

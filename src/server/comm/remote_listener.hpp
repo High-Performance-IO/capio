@@ -167,7 +167,7 @@ void solve_remote_reads(size_t bytes_received, size_t offset, size_t file_size,
 
 bool read_from_local_mem(int tid, off64_t process_offset, off64_t end_of_read,
                          off64_t end_of_sector, off64_t count, const std::filesystem::path &path) {
-    START_LOG(tid,
+    START_LOG(gettid(),
               "call(tid=%d, process_ofset=%ld, end_of_read=%ld, "
               "end_of_sector=%ld, count=%ld, path=%s)",
               tid, process_offset, end_of_read, end_of_sector, count, path.c_str());
@@ -376,10 +376,10 @@ void remote_listener_remote_read(RemoteRequest *request, void *arg1, void *arg2)
 }
 
 void remote_listener_remote_sending(RemoteRequest *request, void *arg1, void *arg2) {
-    START_LOG(capio_syscall(SYS_gettid), "call(request=%s)", request->getRequest());
+    START_LOG(gettid(), "call(request=%s)", request->getRequest());
     off64_t bytes_received, offset;
-    //std::string path;
-    //path.reserve(1024);
+    // std::string path;
+    // path.reserve(1024);
     char path[PATH_MAX];
     int complete_tmp;
     size_t file_size;

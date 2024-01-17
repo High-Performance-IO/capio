@@ -16,8 +16,8 @@ std::mutex local_read_mutex;
 
 inline void handle_pending_read(int tid, int fd, long int process_offset, long int count,
                                 bool is_getdents) {
-    START_LOG(tid, "call(tid=%d, fd=%d, process_offset=%ld, count=%ld, is_getdents=%s)", tid, fd,
-              process_offset, count, is_getdents ? "true" : "false");
+    START_LOG(gettid(), "call(tid=%d, fd=%d, process_offset=%ld, count=%ld, is_getdents=%s)", tid,
+              fd, process_offset, count, is_getdents ? "true" : "false");
 
     const std::filesystem::path &path = get_capio_file_path(tid, fd);
     Capio_file &c_file                = init_capio_file(path, false);
@@ -48,8 +48,8 @@ inline void handle_pending_read(int tid, int fd, long int process_offset, long i
 
 inline void handle_local_read(int tid, int fd, off64_t count, bool dir, bool is_getdents,
                               bool is_prod) {
-    START_LOG(tid, "call(tid=%d, fd=%d, count=%ld, dir=%s, is_getdents=%s, is_prod=%s)", tid, fd,
-              count, dir ? "true" : "false", is_getdents ? "true" : "false",
+    START_LOG(gettid(), "call(tid=%d, fd=%d, count=%ld, dir=%s, is_getdents=%s, is_prod=%s)", tid,
+              fd, count, dir ? "true" : "false", is_getdents ? "true" : "false",
               is_prod ? "true" : "false");
 
     const std::lock_guard<std::mutex> lg(local_read_mutex);

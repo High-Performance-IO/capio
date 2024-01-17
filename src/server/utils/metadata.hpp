@@ -205,7 +205,7 @@ inline std::vector<std::filesystem::path> get_capio_file_paths() {
 }
 
 inline void dup_capio_file(int tid, int old_fd, int new_fd) {
-    START_LOG(tid, "call(old_fd=%d, new_fd=%d)", old_fd, new_fd);
+    START_LOG(gettid(), "call(old_fd=%d, new_fd=%d)", old_fd, new_fd);
     const std::lock_guard<std::mutex> lg(processes_files_mutex);
     const std::string &path               = processes_files_metadata[tid][old_fd];
     processes_files_metadata[tid][new_fd] = path;
