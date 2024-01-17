@@ -23,7 +23,7 @@ std::string get_producer_name(const std::filesystem::path &path) {
 }
 
 bool is_producer(int tid, const std::filesystem::path &path) {
-    START_LOG(tid, "call(%d, %s)", tid, path.c_str());
+    START_LOG(gettid(), "call(%d, %s)", tid, path.c_str());
     bool res = false;
 
     if (apps.find(tid) != apps.end()) {

@@ -325,7 +325,7 @@ void open_files_location(int rank) {
 }
 
 void write_file_location(int rank, const std::filesystem::path &path_to_write, int tid) {
-    START_LOG(tid, "call(rank=%d, path_to_write=%s)", rank, path_to_write.c_str());
+    START_LOG(gettid(), "call(rank=%d, path_to_write=%s)", rank, path_to_write.c_str());
 
     const flock_guard fg(fd_files_location, F_WRLCK, false);
 

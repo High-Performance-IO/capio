@@ -7,8 +7,8 @@
 
 inline void update_file_metadata(const std::filesystem::path &path, int tid, int fd, int rank,
                                  bool is_creat) {
-    START_LOG(tid, "call(path=%s, client_tid=%d fd=%d, rank=%d, is_creat=%s)", path.c_str(), tid,
-              fd, rank, is_creat ? "true" : "false");
+    START_LOG(gettid(), "call(path=%s, client_tid=%d fd=%d, rank=%d, is_creat=%s)", path.c_str(),
+              tid, fd, rank, is_creat ? "true" : "false");
 
     // TODO: check the size that the user wrote in the configuration file
     //*caching_info[tid].second += 2;

@@ -4,29 +4,28 @@
 class RemoteRequest {
   private:
     char *_buf_recv;
-    int _request_code;
+    int _code;
     int _source;
 
-    auto static read_next_request_code(char *req) {
-        int code;
-        auto [ptr, ec] = std::from_chars(req, req + 4, code);
-        if (ec == std::errc()) {
-            strcpy(req, ptr + 1);
-            return code;
-        } else {
-            return -1;
-        }
-    }
-
   public:
-    RemoteRequest(char *buf_recv, int source) : _buf_recv(buf_recv), _source(source) {
-        this->_request_code = RemoteRequest::read_next_request_code(buf_recv);
+    RemoteRequest(char *buf_recv, int source) : _source(source) {
+        START_LOG(gettid(), "call(buf_recv=%s, source=%d)", buf_recv, source);
+        int code;
+        auto [ptr, ec] = std::from_chars(buf_recv, buf_recv + 4, code);
+        if (ec == std::errc()) {
+            this->_code     = code;
+            this->_buf_recv = new char[CAPIO_SERVER_REQUEST_MAX_SIZE];
+            strcpy(this->_buf_recv, ptr + 1);
+            LOG("Received request %d from %d : %s", this->_code, this->_source, this->_buf_recv);
+        } else {
+            this->_code = -1;
+        }
     };
     ~RemoteRequest() { delete[] _buf_recv; }
 
     [[nodiscard]] auto getSource() const { return this->_source; }
     auto getRequest() { return this->_buf_recv; }
-    [[nodiscard]] auto getRequestCode() const { return this->_request_code; }
+    [[nodiscard]] auto getRequestCode() const { return this->_code; }
 };
 
 typedef void (*CComsHandler_t)(RemoteRequest *, void *, void *);
@@ -166,7 +165,7 @@ inline bool read_from_local_mem(int tid, off64_t process_offset, off64_t end_of_
                                 const std::filesystem::path &path);
 
 inline void solve_remote_reads(size_t bytes_received, size_t offset, size_t file_size,
-                               const char *path_c, bool complete,
+                               const std::filesystem::path &path, bool complete,
                                CSMyRemotePendingReads_t *pending_remote_reads,
                                std::mutex *pending_remote_reads_mutex);
 

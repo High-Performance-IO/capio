@@ -68,7 +68,8 @@ void handle_pending_remote_reads(const std::string &path, off64_t data_size, boo
 
 void write_entry_dir(int tid, const std::filesystem::path &file_path,
                      const std::filesystem::path &dir, int type) {
-    START_LOG(tid, "call(file_path=%s, dir=%s, type=%d)", file_path.c_str(), dir.c_str(), type);
+    START_LOG(gettid(), "call(file_path=%s, dir=%s, type=%d)", file_path.c_str(), dir.c_str(),
+              type);
 
     struct linux_dirent64 ld {};
     ld.d_ino = std::hash<std::string>{}(file_path);
@@ -123,7 +124,7 @@ void write_entry_dir(int tid, const std::filesystem::path &file_path,
 }
 
 void update_dir(int tid, const std::filesystem::path &file_path, int rank) {
-    START_LOG(tid, "call(file_path=%s, rank=%d)", file_path.c_str(), rank);
+    START_LOG(gettid(), "call(file_path=%s, rank=%d)", file_path.c_str(), rank);
     const std::filesystem::path dir = get_parent_dir_path(file_path);
     Capio_file &c_file              = get_capio_file(dir.c_str());
     if (c_file.first_write) {
@@ -134,7 +135,7 @@ void update_dir(int tid, const std::filesystem::path &file_path, int rank) {
 }
 
 off64_t create_dir(int tid, const std::filesystem::path &path, int rank) {
-    START_LOG(tid, "call(path=%s, rank=%d, root_dir=%s)", path.c_str(), rank);
+    START_LOG(gettid(), "call(path=%s, rank=%d, root_dir=%s)", path.c_str(), rank);
 
     if (!get_file_location_opt(path)) {
         Capio_file &c_file = create_capio_file(path, true, CAPIO_DEFAULT_DIR_INITIAL_SIZE);
