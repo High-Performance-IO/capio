@@ -19,11 +19,11 @@ inline void handle_pending_read(int tid, int fd, long int process_offset, long i
     START_LOG(tid, "call(tid=%d, fd=%d, process_offset=%ld, count=%ld, is_getdents=%s)", tid, fd,
               process_offset, count, is_getdents ? "true" : "false");
 
-    std::string_view path = get_capio_file_path(tid, fd);
-    Capio_file &c_file    = init_capio_file(path.data(), false);
-    char *p               = c_file.get_buffer();
-    off64_t end_of_sector = c_file.get_sector_end(process_offset);
-    off64_t end_of_read   = process_offset + count;
+    const std::filesystem::path &path = get_capio_file_path(tid, fd);
+    Capio_file &c_file                = init_capio_file(path, false);
+    char *p                           = c_file.get_buffer();
+    off64_t end_of_sector             = c_file.get_sector_end(process_offset);
+    off64_t end_of_read               = process_offset + count;
     size_t bytes_read;
     if (end_of_sector > end_of_read) {
         end_of_sector = end_of_read;
@@ -53,25 +53,25 @@ inline void handle_local_read(int tid, int fd, off64_t count, bool dir, bool is_
               is_prod ? "true" : "false");
 
     const std::lock_guard<std::mutex> lg(local_read_mutex);
-    std::string_view path  = get_capio_file_path(tid, fd);
-    Capio_file &c_file     = get_capio_file(path.data());
-    off64_t process_offset = get_capio_file_offset(tid, fd);
-    int pid                = pids[tid];
-    bool writer            = writers[pid][path.data()];
-    off64_t end_of_sector  = c_file.get_sector_end(process_offset);
-    off64_t end_of_read    = process_offset + count;
-    std::string_view mode  = c_file.get_mode();
+    const std::filesystem::path &path = get_capio_file_path(tid, fd);
+    Capio_file &c_file                = get_capio_file(path);
+    off64_t process_offset            = get_capio_file_offset(tid, fd);
+    int pid                           = pids[tid];
+    bool writer                       = writers[pid][path];
+    off64_t end_of_sector             = c_file.get_sector_end(process_offset);
+    off64_t end_of_read               = process_offset + count;
+    std::string_view mode             = c_file.get_mode();
     if (mode != CAPIO_FILE_MODE_NO_UPDATE && !c_file.is_complete() && !writer && !is_prod && !dir) {
-        pending_reads[path.data()].emplace_back(tid, fd, count, is_getdents);
+        pending_reads[path].emplace_back(tid, fd, count, is_getdents);
     } else if (end_of_read > end_of_sector) {
         if (!is_prod && !writer && !c_file.is_complete() && !dir) {
-            pending_reads[path.data()].emplace_back(tid, fd, count, is_getdents);
+            pending_reads[path].emplace_back(tid, fd, count, is_getdents);
         } else {
             if (end_of_sector == -1) {
                 write_response(tid, 0);
                 return;
             }
-            c_file  = init_capio_file(path.data(), false);
+            c_file  = init_capio_file(path, false);
             char *p = c_file.get_buffer();
             if (is_getdents || dir) {
                 off64_t dir_size  = c_file.get_stored_size();
@@ -88,7 +88,7 @@ inline void handle_local_read(int tid, int fd, off64_t count, bool dir, bool is_
             }
         }
     } else {
-        c_file  = init_capio_file(path.data(), false);
+        c_file  = init_capio_file(path, false);
         char *p = c_file.get_buffer();
         size_t bytes_read;
         bytes_read = count;
@@ -111,14 +111,14 @@ inline void handle_read(int tid, int fd, off64_t count, bool dir, bool is_getden
     START_LOG(gettid(), "call(tid=%d, fd=%d, count=%ld, dir=%s, is_getdents=%s, rank=%d)", tid, fd,
               count, dir ? "true" : "false", is_getdents ? "true" : "false", rank);
 
-    std::string_view path                  = get_capio_file_path(tid, fd);
+    const std::filesystem::path &path      = get_capio_file_path(tid, fd);
     const std::filesystem::path &capio_dir = get_capio_dir();
-    bool is_prod                           = is_producer(tid, path.data());
-    auto file_location_opt                 = get_file_location_opt(path.data());
+    bool is_prod                           = is_producer(tid, path);
+    auto file_location_opt                 = get_file_location_opt(path);
     LOG("got to first checkpoint");
     if (!file_location_opt && !is_prod) {
         LOG("got to second checkpoint");
-        bool found = load_file_location(path.data());
+        bool found = load_file_location(path);
         if (!found) {
             LOG("got to third checkpoint");
             // launch a thread that checks when the file is created
@@ -134,7 +134,7 @@ inline void handle_read(int tid, int fd, off64_t count, bool dir, bool is_getden
         handle_local_read(tid, fd, count, dir, is_getdents, is_prod);
     } else {
         LOG("got to 6 checkpoint");
-        Capio_file &c_file = get_capio_file(path.data());
+        Capio_file &c_file = get_capio_file(path);
         if (!c_file.is_complete()) {
             auto it  = apps.find(tid);
             bool res = false;
@@ -142,13 +142,12 @@ inline void handle_read(int tid, int fd, off64_t count, bool dir, bool is_getden
                 std::string app_name = it->second;
                 if (!dir) {
                     res = backend->handle_nreads(
-                        path.data(), app_name,
-                        nodes_helper_rank[std::get<0>(get_file_location(path.data()))]);
+                        path, app_name, nodes_helper_rank[std::get<0>(get_file_location(path))]);
                 }
             }
             if (res) {
                 const std::lock_guard<std::mutex> lg(pending_remote_reads_mutex);
-                pending_remote_reads[path.data()].emplace_back(tid, fd, count, is_getdents);
+                pending_remote_reads[path].emplace_back(tid, fd, count, is_getdents);
                 return;
             }
         }

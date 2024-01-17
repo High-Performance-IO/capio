@@ -3,8 +3,9 @@
 
 #include "utils/location.hpp"
 
-inline void handle_rmdir(int tid, const char *dir_to_remove, int rank) {
-    START_LOG(gettid(), "call(tid=%d, dir_to_remove=%s, rank=%d)", tid, dir_to_remove, rank);
+inline void handle_rmdir(int tid, const std::filesystem::path &dir_to_remove, int rank) {
+    START_LOG(gettid(), "call(tid=%d, dir_to_remove=%s, rank=%d)", tid, dir_to_remove.c_str(),
+              rank);
 
     long res = delete_from_file_locations("files_location.txt", dir_to_remove, rank);
     erase_from_files_location(dir_to_remove);

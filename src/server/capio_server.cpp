@@ -69,9 +69,6 @@ CSRankToNodeMap_t rank_to_node;
  */
 CSPendingReadsMap_t pending_reads;
 
-// it contains the file saved on disk
-CSOnDiskMap_t on_disk;
-
 CSClientsRemotePendingNFilesMap_t clients_remote_pending_nfiles;
 
 sem_t internal_server_sem;
@@ -126,10 +123,8 @@ void capio_server(int rank) {
     setup_signal_handlers();
     backend->handshake_servers(rank);
     open_files_location(rank);
-    pid_t pid                              = getpid();
-    const std::filesystem::path &capio_dir = get_capio_dir();
-    create_dir(pid, capio_dir.c_str(), rank,
-               true); // TODO: can be a problem if a process execute readdir
+    create_dir(getpid(), get_capio_dir(),
+               rank); // TODO: can be a problem if a process execute readdir
     // on capio_dir
 
     init_server();

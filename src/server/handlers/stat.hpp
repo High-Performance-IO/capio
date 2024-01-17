@@ -15,9 +15,10 @@ std::mutex pending_remote_stats_mutex;
 // values from one to another
 #include "../comm/remote_listener.hpp"
 
-inline void reply_stat(int tid, const std::string &path, int rank) {
+inline void reply_stat(int tid, const std::filesystem::path &path, int rank) {
     START_LOG(gettid(), "call(tid=%d, path=%s, rank=%d)", tid, path.c_str(), rank);
-    auto file_location_opt = get_file_location_opt(path.c_str());
+
+    auto file_location_opt = get_file_location_opt(path);
     LOG("File %s is local? %s", path.c_str(), file_location_opt ? "True" : "False");
 
     if (!file_location_opt) {
@@ -27,8 +28,8 @@ inline void reply_stat(int tid, const std::string &path, int rank) {
             if ((metadata_conf.find(path) != metadata_conf.end() || match_globs(path) != -1) &&
                 !is_producer(tid, path)) {
                 LOG("File not ready yet. Starting a thread to wait for file.");
-                std::thread t(wait_for_stat, tid, std::string(path), rank, &pending_remote_stats,
-                              &pending_remote_stats_mutex);
+                std::thread t(wait_for_stat, tid, std::filesystem::path(path), rank,
+                              &pending_remote_stats, &pending_remote_stats_mutex);
                 t.detach();
             } else {
                 LOG("Metadata do not contains file or globs did not contain file or app is "
@@ -39,7 +40,7 @@ inline void reply_stat(int tid, const std::string &path, int rank) {
             return;
         }
     }
-    auto c_file_opt = get_capio_file_opt(path.c_str());
+    auto c_file_opt = get_capio_file_opt(path);
     Capio_file &c_file =
         (c_file_opt) ? c_file_opt->get() : create_capio_file(path, false, get_file_initial_size());
     LOG("Obtained capio file. ready to reply to client");
@@ -47,7 +48,7 @@ inline void reply_stat(int tid, const std::string &path, int rank) {
     LOG("Obtained capio_dir");
     if (!file_location_opt) {
         LOG("File is now present from remote node. retrieving file again.");
-        file_location_opt = get_file_location_opt(path.c_str());
+        file_location_opt = get_file_location_opt(path);
     }
     if (c_file.is_complete() || strcmp(std::get<0>(file_location_opt->get()), node_name) == 0 ||
         c_file.get_mode() == CAPIO_FILE_MODE_NO_UPDATE || capio_dir == path) {
@@ -57,21 +58,21 @@ inline void reply_stat(int tid, const std::string &path, int rank) {
     } else {
         LOG("Delegating backend to reply to remote stats");
         // init a capio file that is remote so that buffer is going to be allocated
-        init_capio_file(path.c_str(), false);
+        init_capio_file(path, false);
         backend->handle_remote_stat(tid, path, rank, &pending_remote_stats,
                                     &pending_remote_stats_mutex);
     }
 }
 
-inline void handle_stat_reply(const char *path_c, off64_t size, int dir) {
-    START_LOG(gettid(), "call(path_c=%s, size=%ld, dir=%d)", path_c, size, dir);
+inline void handle_stat_reply(const std::filesystem::path &path, off64_t size, int dir) {
+    START_LOG(gettid(), "call(path_c=%s, size=%ld, dir=%d)", path.c_str(), size, dir);
 
     const std::lock_guard<std::mutex> lg(pending_remote_stats_mutex);
-    auto it = pending_remote_stats.find(path_c);
+    auto it = pending_remote_stats.find(path);
     if (it == pending_remote_stats.end()) {
         LOG("handle_stat_reply %s not found, stat already answered for "
             "optimization",
-            path_c);
+            path.c_str());
     } else {
         for (int tid : it->second) {
             write_response(tid, size);
@@ -84,7 +85,7 @@ inline void handle_stat_reply(const char *path_c, off64_t size, int dir) {
 void fstat_handler(const char *const str, int rank) {
     int tid, fd;
     sscanf(str, "%d %d", &tid, &fd);
-    reply_stat(tid, get_capio_file_path(tid, fd).data(), rank);
+    reply_stat(tid, get_capio_file_path(tid, fd), rank);
 }
 
 void stat_handler(const char *const str, int rank) {

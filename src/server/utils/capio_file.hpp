@@ -132,16 +132,15 @@ class Capio_file {
      * To be called when a process
      * execute a read or a write syscall
      */
-    void create_buffer(const std::string &path, bool home_node) {
+    void create_buffer(const std::filesystem::path &path, bool home_node) {
         START_LOG(gettid(), "call(path=%s, home_node=%s)", path.c_str(),
                   home_node ? "true" : "false");
 
         _home_node = home_node;
         if (_permanent && home_node) {
             if (_directory) {
-                if (mkdir(path.c_str(), 0700) == -1) {
-                    ERR_EXIT("mkdir capio_file create_buffer");
-                }
+                std::filesystem::create_directory(path);
+                std::filesystem::permissions(path, std::filesystem::perms::owner_all);
                 _buf = new char[_buf_size];
             } else {
                 LOG("creating mem mapped file");
@@ -195,7 +194,7 @@ class Capio_file {
         }
     }
 
-    [[nodiscard]] inline std::string_view get_mode() const { return _mode; }
+    [[nodiscard]] inline const std::string_view &get_mode() const { return _mode; }
 
     /*
      * Returns the offset to the end of the sector

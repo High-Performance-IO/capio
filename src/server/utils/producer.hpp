@@ -5,7 +5,7 @@
 
 #include "metadata.hpp"
 
-std::string get_producer_name(const std::string &path) {
+std::string get_producer_name(const std::filesystem::path &path) {
     START_LOG(gettid(), "call( %s)", path.c_str());
     std::string producer_name;
     // we handle also prefixes
@@ -22,12 +22,11 @@ std::string get_producer_name(const std::string &path) {
     return producer_name;
 }
 
-bool is_producer(int tid, const std::string &path) {
+bool is_producer(int tid, const std::filesystem::path &path) {
     START_LOG(tid, "call(%d, %s)", tid, path.c_str());
     bool res = false;
-    auto it  = apps.find(tid);
 
-    if (it != apps.end()) {
+    if (apps.find(tid) != apps.end()) {
         std::string app_name  = apps[tid];
         std::string prod_name = get_producer_name(path);
         res                   = app_name == prod_name;

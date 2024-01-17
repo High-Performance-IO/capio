@@ -89,15 +89,15 @@ inline auto read_next_request(char *str) {
  * @param offset
  * @return
  */
-inline auto write_response(int tid, off64_t offset) {
+inline void write_response(int tid, off64_t offset) {
     START_LOG(gettid(), "call(tid=%d, offset=%ld)", tid, offset);
 
     return bufs_response->at(tid)->write(&offset);
 }
 
-inline void stat_reply_request(const char *const path, off64_t size, int dir) {
+inline void stat_reply_request(const std::filesystem::path &path, off64_t size, int dir) {
     char req[CAPIO_REQUEST_MAX_SIZE];
-    sprintf(req, "%04d %s %ld %d", CAPIO_REQUEST_STAT_REPLY, path, size, dir);
+    sprintf(req, "%04d %s %ld %d", CAPIO_REQUEST_STAT_REPLY, path.c_str(), size, dir);
     buf_requests->write(req, CAPIO_REQUEST_MAX_SIZE);
 }
 

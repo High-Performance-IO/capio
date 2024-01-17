@@ -66,8 +66,8 @@ void handle_pending_remote_reads(const std::string &path, off64_t data_size, boo
  * type == 2 -> ".." entry
  */
 
-void write_entry_dir(int tid, const std::filesystem::path &file_path, const std::string &dir,
-                     int type) {
+void write_entry_dir(int tid, const std::filesystem::path &file_path,
+                     const std::filesystem::path &dir, int type) {
     START_LOG(tid, "call(file_path=%s, dir=%s, type=%d)", file_path.c_str(), dir.c_str(), type);
 
     struct linux_dirent64 ld {};
@@ -87,7 +87,7 @@ void write_entry_dir(int tid, const std::filesystem::path &file_path, const std:
     long int ld_size = CAPIO_THEORETICAL_SIZE_DIRENT64;
     ld.d_reclen      = ld_size;
 
-    Capio_file &c_file   = init_capio_file(dir.c_str(), true);
+    Capio_file &c_file   = init_capio_file(dir, true);
     void *file_shm       = c_file.get_buffer();
     off64_t file_size    = c_file.get_stored_size();
     off64_t data_size    = file_size + ld_size; // TODO: check theoreitcal size and sizeof(ld) usage
@@ -95,7 +95,7 @@ void write_entry_dir(int tid, const std::filesystem::path &file_path, const std:
     ld.d_off             = data_size;
 
     if (data_size > file_shm_size) {
-        file_shm = expand_memory_for_file(dir, data_size, c_file);
+        file_shm = c_file.expand_buffer(data_size);
     }
 
     ld.d_type = (c_file.is_dir() ? DT_DIR : DT_REG);
@@ -133,24 +133,23 @@ void update_dir(int tid, const std::filesystem::path &file_path, int rank) {
     write_entry_dir(tid, file_path, dir, 0);
 }
 
-off64_t create_dir(int tid, const char *pathname, int rank, bool root_dir) {
-    START_LOG(tid, "call(pathname=%s, rank=%d, root_dir=%s)", pathname, rank,
-              root_dir ? "true" : "false");
+off64_t create_dir(int tid, const std::filesystem::path &path, int rank) {
+    START_LOG(tid, "call(path=%s, rank=%d, root_dir=%s)", path.c_str(), rank);
 
-    if (!get_file_location_opt(pathname)) {
-        Capio_file &c_file = create_capio_file(pathname, true, CAPIO_DEFAULT_DIR_INITIAL_SIZE);
+    if (!get_file_location_opt(path)) {
+        Capio_file &c_file = create_capio_file(path, true, CAPIO_DEFAULT_DIR_INITIAL_SIZE);
         if (c_file.first_write) {
             c_file.first_write = false;
             // TODO: it works only if there is one prod per file
-            if (root_dir) {
-                add_file_location(pathname, node_name, -1);
+            if (is_capio_dir(path)) {
+                add_file_location(path, node_name, -1);
             } else {
-                write_file_location(rank, pathname, tid);
-                update_dir(tid, pathname, rank);
+                write_file_location(rank, path, tid);
+                update_dir(tid, path, rank);
             }
-            write_entry_dir(tid, pathname, pathname, 1);
-            const std::filesystem::path parent_dir = get_parent_dir_path(pathname);
-            write_entry_dir(tid, parent_dir, pathname, 2);
+            write_entry_dir(tid, path, path, 1);
+            const std::filesystem::path parent_dir = get_parent_dir_path(path);
+            write_entry_dir(tid, parent_dir, path, 2);
         }
         return 0;
     } else {

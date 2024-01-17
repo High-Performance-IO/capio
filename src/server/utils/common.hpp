@@ -5,15 +5,9 @@
 
 #include "capio/constants.hpp"
 #include "capio/data_structure.hpp"
+
 #include "capio_file.hpp"
 #include "types.hpp"
-
-inline char *expand_memory_for_file(const std::string &path, off64_t data_size,
-                                    Capio_file &c_file) {
-    START_LOG(capio_syscall(SYS_gettid), "call(path=%s)", path.c_str());
-    char *new_p = c_file.expand_buffer(data_size);
-    return new_p;
-}
 
 inline off64_t store_dirent(char *incoming, char *target_buffer, off64_t incoming_size) {
     START_LOG(gettid(), "call(%s, %s, %to_store)", incoming, target_buffer, incoming_size);

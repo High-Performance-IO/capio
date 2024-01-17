@@ -1,5 +1,5 @@
-#ifndef CAPIO_INTERFACES_HPP
-#define CAPIO_INTERFACES_HPP
+#ifndef CAPIO_SERVER_COMM_INTERFACES_HPP
+#define CAPIO_SERVER_COMM_INTERFACES_HPP
 
 class RemoteRequest {
   private:
@@ -96,8 +96,8 @@ class backend_interface {
      * @param nbytes
      * @param complete
      */
-    virtual void serve_remote_read(const char *path_c, int dest, long int offset, long int nbytes,
-                                   int complete) = 0;
+    virtual void serve_remote_read(const std::filesystem::path &path, int dest, long int offset,
+                                   long int nbytes, int complete) = 0;
 
     /**
      * Handle a remote read request
@@ -124,7 +124,8 @@ class backend_interface {
      * @param dest
      * @return
      */
-    virtual bool handle_nreads(const std::string &path, const std::string &app_name, int dest) = 0;
+    virtual bool handle_nreads(const std::filesystem::path &path, const std::string &app_name,
+                               int dest) = 0;
 
     /**
      * Handle a remote stat
@@ -142,7 +143,7 @@ class backend_interface {
      * @param pending_remote_stats
      * @param pending_remote_stats_mutex
      */
-    virtual void handle_remote_stat(int tid, const std::string &path, int rank,
+    virtual void handle_remote_stat(int tid, const std::filesystem::path &path, int rank,
                                     CSMyRemotePendingStats_t *pending_remote_stats,
                                     std::mutex *pending_remote_stats_mutex) = 0;
 
@@ -161,7 +162,8 @@ class backend_interface {
  */
 
 inline bool read_from_local_mem(int tid, off64_t process_offset, off64_t end_of_read,
-                                off64_t end_of_sector, off64_t count, const std::string &path);
+                                off64_t end_of_sector, off64_t count,
+                                const std::filesystem::path &path);
 
 inline void solve_remote_reads(size_t bytes_received, size_t offset, size_t file_size,
                                const char *path_c, bool complete,
@@ -176,4 +178,4 @@ inline void wait_for_file(int tid, int fd, off64_t count, bool dir, bool is_getd
                           std::mutex *pending_remote_reads_mutex,
                           void (*handle_local_read)(int, int, off64_t, bool, bool, bool));
 
-#endif // CAPIO_INTERFACES_HPP
+#endif // CAPIO_SERVER_COMM_INTERFACES_HPP

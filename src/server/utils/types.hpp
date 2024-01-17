@@ -15,7 +15,8 @@ typedef std::unordered_map<int, std::string> CSAppsMap_t;
 typedef std::unordered_map<std::string, std::unordered_set<std::string>> CSFilesSentMap_t;
 typedef std::unordered_map<int, std::unordered_map<int, std::pair<Capio_file *, off64_t *>>>
     CSProcessFileMap_t;
-typedef std::unordered_map<int, std::unordered_map<int, std::string>> CSProcessFileMetadataMap_t;
+typedef std::unordered_map<int, std::unordered_map<int, std::filesystem::path>>
+    CSProcessFileMetadataMap_t;
 typedef std::unordered_map<int, std::pair<SPSC_queue<char> *, SPSC_queue<char> *>>
     CSDataBufferMap_t;
 typedef std::unordered_map<std::string, Capio_file *> CSFilesMetadata_t;
@@ -38,7 +39,6 @@ typedef std::unordered_map<std::string, std::list<int>> CSMyRemotePendingStats_t
 typedef std::unordered_map<std::string, std::list<std::tuple<size_t, size_t, sem_t *>>>
     CSClientsRemotePendingReads_t;
 typedef std::unordered_map<std::string, std::list<sem_t *>> CSClientsRemotePendingStats_t;
-typedef std::unordered_set<std::string> CSOnDiskMap_t;
 typedef std::unordered_map<
     std::string, std::list<std::tuple<char *, size_t, int, std::vector<std::string> *, sem_t *>>>
     CSClientsRemotePendingNFilesMap_t;

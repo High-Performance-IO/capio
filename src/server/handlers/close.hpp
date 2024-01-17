@@ -8,18 +8,18 @@
 inline void handle_close(int tid, int fd, int rank) {
     START_LOG(gettid(), "call(tid=%d, fd=%d, rank=%d)", tid, fd, rank);
 
-    std::string_view path = get_capio_file_path(tid, fd);
+    const std::filesystem::path &path = get_capio_file_path(tid, fd);
     if (path.empty()) { // avoid to try to close a file that does not exists
         // (example: try to close() on a dir
         return;
     }
 
-    Capio_file &c_file = get_capio_file(path.data());
+    Capio_file &c_file = get_capio_file(path);
     c_file.close();
     if (c_file.get_committed() == CAPIO_FILE_MODE_ON_CLOSE && c_file.is_closed()) {
         LOG("Capio_file is closed and mode is on_close");
         c_file.set_complete();
-        auto it = pending_reads.find(path.data());
+        auto it = pending_reads.find(path);
         if (it != pending_reads.end()) {
             auto &pending_reads_this_file = it->second;
             auto it_vec                   = pending_reads_this_file.begin();
@@ -32,17 +32,17 @@ inline void handle_close(int tid, int fd, int rank) {
             pending_reads.erase(it);
         }
         if (c_file.is_dir()) {
-            reply_remote_stats(path.data());
+            reply_remote_stats(path);
         }
         // TODO: error if seek are done and also do this on exit
-        handle_pending_remote_reads(path.data(), c_file.get_sector_end(0), true);
-        handle_pending_remote_nfiles(path.data());
+        handle_pending_remote_reads(path, c_file.get_sector_end(0), true);
+        handle_pending_remote_nfiles(path);
         c_file.commit();
     }
 
     if (c_file.is_deletable()) {
-        delete_capio_file(path.data());
-        delete_from_file_locations(path.data(), rank);
+        delete_capio_file(path);
+        delete_from_file_locations(path, rank);
     } else {
         LOG("Deleting capio file from tid=%d", tid);
         delete_capio_file_from_tid(tid, fd);

@@ -50,7 +50,7 @@ void free_resources(int tid) {
     }
 }
 
-void handle_pending_remote_nfiles(const std::string &path) {
+void handle_pending_remote_nfiles(const std::filesystem::path &path) {
     START_LOG(gettid(), "call(%s)", path.c_str());
 
     if (sem_wait(&clients_remote_pending_nfiles_sem) == -1) {
@@ -64,11 +64,11 @@ void handle_pending_remote_nfiles(const std::string &path) {
         while (it != app_pending_nfiles.end()) {
             auto &[prefix, n_files, dest, files_path, sem] = *it;
             std::unordered_set<std::string> &files         = files_sent[app];
-            auto file_location_opt                         = get_file_location_opt(path.c_str());
+            auto file_location_opt                         = get_file_location_opt(path);
             auto next_it                                   = std::next(it);
             if (files.find(path) == files.end() && file_location_opt &&
                 strcmp(std::get<0>(file_location_opt->get()), node_name) == 0 &&
-                path.compare(0, strlen(prefix), prefix) == 0) {
+                path.native().compare(0, strlen(prefix), prefix) == 0) {
                 files_path->push_back(path);
                 files.insert(path);
                 if (files_path->size() == n_files) {
