@@ -90,7 +90,7 @@ class MPI_backend : public backend_interface {
             nanosleep(&sleepTime, &returnTime);
         }
         int bytes_received;
-        MPI_Get_count(&status, MPI_BYTE, &bytes_received);
+        MPI_Get_count(&status, MPI_CHAR, &bytes_received);
 #endif
 
         LOG("receive completed!");
