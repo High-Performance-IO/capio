@@ -20,7 +20,7 @@ long int match_globs(const std::filesystem::path &path) {
     START_LOG(gettid(), "call(path=%s)", path.c_str());
 
     long int resolved_glob_offset = -1;
-    size_t max_length_prefix = 0;
+    size_t max_length_prefix      = 0;
     // compute the most accurate and precise glob for a given path
     for (long int i = 0; i < metadata_conf_globs.size(); i++) {
         std::string prefix_str = std::get<0>(metadata_conf_globs[i]);
@@ -99,8 +99,11 @@ inline off64_t get_capio_file_offset(int tid, int fd) {
 }
 
 inline void add_capio_file(const std::filesystem::path &path, Capio_file *c_file) {
+    START_LOG(gettid(), "call(path=%s, capio_file=%ld)", path.c_str(), c_file);
     const std::lock_guard<std::mutex> lg(files_metadata_mutex);
     files_metadata[path] = c_file;
+    LOG("Capio file added to files_metadata. capio_file==nullptr? %s",
+        c_file == nullptr ? "TRUE" : "FALSE");
 }
 
 inline void add_capio_file_to_tid(int tid, int fd, const std::filesystem::path &path) {
@@ -135,15 +138,19 @@ Capio_file &create_capio_file(const std::filesystem::path &path, bool is_dir, si
     Capio_file *c_file;
     auto it = metadata_conf.find(path);
     if (it == metadata_conf.end()) {
+        LOG("File was not found in metadata_conf. resolving it as glob");
         long int pos = match_globs(path);
+        LOG("Glob %s offset is %d", path.c_str(), pos);
         if (pos == -1) {
+            LOG("Glob %s was not found.", path.c_str());
             if (is_dir) {
                 init_size = CAPIO_DEFAULT_DIR_INITIAL_SIZE;
+                LOG("Glob %s is a directory", path.c_str());
             }
             c_file = new Capio_file(is_dir, false, init_size);
             add_capio_file(path, c_file);
-            return *c_file;
         } else {
+            LOG("Path %s is found in metadata_conf_globs", path.c_str());
             auto &[glob, committed, mode, app_name, n_files, batch_size, permanent, n_close] =
                 metadata_conf_globs[pos];
             if (in_dir(path, glob)) {
@@ -155,21 +162,23 @@ Capio_file &create_capio_file(const std::filesystem::path &path, bool is_dir, si
             }
             metadata_conf[path] =
                 std::make_tuple(committed, mode, app_name, n_files, permanent, n_close);
+            LOG("Creating new capio_file. committed=%s, mode=%s", committed.c_str(), mode.c_str());
             c_file =
                 new Capio_file(committed, mode, is_dir, n_files, permanent, init_size, n_close);
             add_capio_file(path, c_file);
-            return *c_file;
         }
     } else {
+        LOG("File was found in metadata_conf. handling as normal file");
         auto &[committed, mode, app_name, n_files, permanent, n_close] = it->second;
         if (n_files > 0) {
             is_dir    = true;
             init_size = CAPIO_DEFAULT_DIR_INITIAL_SIZE;
         }
+        LOG("Creating new capio_file. committed=%s, mode=%s", committed.c_str(), mode.c_str());
         c_file = new Capio_file(committed, mode, is_dir, n_files, permanent, init_size, n_close);
         add_capio_file(path, c_file);
-        return *c_file;
     }
+    return *c_file;
 }
 
 inline void delete_capio_file_from_tid(int tid, int fd) {
