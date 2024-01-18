@@ -280,28 +280,45 @@ void remote_listener_handle_stat_reply(RemoteRequest *request, void *arg1, void 
     stat_reply_request(path, size, dir);
 }
 
+inline void wait_for_c_file(char *path_c, int dest, Capio_file &capioFile) {
+    START_LOG(gettid(), "call(path_c=%s, dest=%d, c_file=%ld)", path_c, dest, &capioFile);
+    auto sem = new sem_t;
+
+    if (sem_init(sem, 0, 0) == -1) {
+        ERR_EXIT("sem_init in remote_listener_stat_req");
+    }
+    clients_remote_pending_stat[path_c].emplace_back(sem);
+    std::thread t(wait_for_completion, path_c, std::cref(capioFile), dest, sem);
+    t.detach();
+}
+
 void remote_listener_stat_req(RemoteRequest *request, void *arg1, void *arg2) {
     const char *buf_recv = request->getRequest();
-    START_LOG(gettid(), "call(%s)", buf_recv);
-    auto path_c = new char[PATH_MAX];
+    auto path_c          = new char[PATH_MAX];
     int dest;
-
     sscanf(buf_recv, "%d %s", &dest, path_c);
 
-    Capio_file &c_file = get_capio_file(path_c);
-    if (c_file.is_complete()) {
-        LOG("file is complete. serving file");
-        backend->serve_remote_stat(path_c, dest, c_file);
-    } else { // wait for completion
-        LOG("File is not complete. awaiting completion on different thread");
-        auto sem = new sem_t;
+    START_LOG(gettid(), "call(path=%s, dest=%d)", path_c, dest);
 
-        if (sem_init(sem, 0, 0) == -1) {
-            ERR_EXIT("sem_init in remote_listener_stat_req");
+    auto c_file = get_capio_file_opt(path_c);
+    if (c_file) {
+        if (c_file->get().is_complete()) {
+            LOG("file is complete. serving file");
+            backend->serve_remote_stat(path_c, dest, c_file->get());
+        } else { // wait for completion
+            LOG("File is not complete. awaiting completion on different thread");
+            wait_for_c_file(path_c, dest, c_file->get());
         }
-        clients_remote_pending_stat[path_c].emplace_back(sem);
-        std::thread t(wait_for_completion, path_c, std::cref(c_file), dest, sem);
-        t.detach();
+    } else {
+        LOG("CAPIO file is not in metadata. checking in globs for files to be created");
+        if (match_globs(path_c) != -1) {
+            LOG("File is in globs. creating capio_file and starting thread awaiting for future "
+                "creation of file");
+            auto file = create_capio_file(path_c, false, CAPIO_DEFAULT_FILE_INITIAL_SIZE);
+            wait_for_c_file(path_c, dest, file);
+        } else {
+            ERR_EXIT("Error capio file is not present, nor is going to be created in the future.");
+        }
     }
 }
 
