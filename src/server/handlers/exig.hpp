@@ -22,7 +22,7 @@ inline void handle_exit_group(int tid, int rank) {
                     LOG("file %s is dir", path.c_str());
                     long int n_committed = c_file.n_files_expected;
                     if (n_committed <= c_file.n_files) {
-                        reply_remote_stats(path);
+                        wake_pending_remote_stats(path);
                         LOG("Setting file %s to complete", path.c_str());
                         c_file.set_complete();
                     }

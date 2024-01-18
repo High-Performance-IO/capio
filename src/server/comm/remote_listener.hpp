@@ -26,6 +26,7 @@ static inline void wait_for_completion(char *const path, const Capio_file &c_fil
     START_LOG(gettid(), "call(path=%s, dest=%d)", path, dest);
 
     SEM_WAIT_CHECK(data_is_complete, "data_is_complete");
+    LOG("File %s has been completed. serving stats data", path);
     backend->serve_remote_stat(path, dest, c_file);
 
     delete data_is_complete;
@@ -280,7 +281,7 @@ void remote_listener_handle_stat_reply(RemoteRequest *request, void *arg1, void 
     stat_reply_request(path, size, dir);
 }
 
-inline void wait_for_c_file(char *path_c, int dest, Capio_file &capioFile) {
+inline void wait_for_c_file_stat(char *path_c, int dest, Capio_file &capioFile) {
     START_LOG(gettid(), "call(path_c=%s, dest=%d, c_file=%ld)", path_c, dest, &capioFile);
     auto sem = new sem_t;
 
@@ -307,7 +308,7 @@ void remote_listener_stat_req(RemoteRequest *request, void *arg1, void *arg2) {
             backend->serve_remote_stat(path_c, dest, c_file->get());
         } else { // wait for completion
             LOG("File is not complete. awaiting completion on different thread");
-            wait_for_c_file(path_c, dest, c_file->get());
+            wait_for_c_file_stat(path_c, dest, c_file->get());
         }
     } else {
         LOG("CAPIO file is not in metadata. checking in globs for files to be created");
@@ -315,7 +316,7 @@ void remote_listener_stat_req(RemoteRequest *request, void *arg1, void *arg2) {
             LOG("File is in globs. creating capio_file and starting thread awaiting for future "
                 "creation of file");
             auto file = create_capio_file(path_c, false, CAPIO_DEFAULT_FILE_INITIAL_SIZE);
-            wait_for_c_file(path_c, dest, file);
+            wait_for_c_file_stat(path_c, dest, file);
         } else {
             ERR_EXIT("Error capio file is not present, nor is going to be created in the future.");
         }
