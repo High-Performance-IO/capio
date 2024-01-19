@@ -31,12 +31,12 @@ class Capio_file {
   private:
     char *_buf = nullptr; // buffer containing the data
     std::size_t _buf_size;
-    std::string_view _committed = CAPIO_FILE_MODE_UPDATE;
+    std::string_view _committed = CAPIO_FILE_COMMITTED_ON_TERMINATION;
     bool _directory             = false;
     // _fd is useful only when the file is memory-mapped
     int _fd                     = -1;
     bool _home_node             = false;
-    std::string_view _mode      = CAPIO_FILE_MODE_ON_TERMINATION;
+    std::string_view _mode      = CAPIO_FILE_MODE_UPDATE;
     int _n_links                = 1;
     long int _n_close           = 0;
     long int _n_close_expected  = -1;
@@ -61,7 +61,8 @@ class Capio_file {
     std::size_t real_file_size = 0;
 
     Capio_file()
-        : _buf_size(0), _committed("on_termination"), _directory(false), _permanent(false) {}
+        : _buf_size(0), _committed(CAPIO_FILE_COMMITTED_ON_TERMINATION), _directory(false),
+          _permanent(false) {}
 
     Capio_file(const std::string_view &committed, const std::string_view &mode, bool directory,
                long int n_files_expected, bool permanent, std::size_t init_size,
@@ -72,8 +73,8 @@ class Capio_file {
 
     Capio_file(bool directory, bool permanent, std::size_t init_size,
                long int n_close_expected = -1)
-        : _buf_size(init_size), _committed("on_termination"), _directory(directory),
-          _n_close_expected(n_close_expected), _permanent(permanent) {}
+        : _buf_size(init_size), _committed(CAPIO_FILE_COMMITTED_ON_TERMINATION),
+          _directory(directory), _n_close_expected(n_close_expected), _permanent(permanent) {}
 
     ~Capio_file() {
         START_LOG(gettid(), "call()");

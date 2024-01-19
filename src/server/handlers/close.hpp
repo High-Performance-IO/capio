@@ -16,8 +16,8 @@ inline void handle_close(int tid, int fd, int rank) {
 
     Capio_file &c_file = get_capio_file(path);
     c_file.close();
-    if (c_file.get_committed() == CAPIO_FILE_MODE_ON_CLOSE && c_file.is_closed()) {
-        LOG("Capio_file is closed and mode is on_close");
+    if (c_file.get_committed() == CAPIO_FILE_COMMITTED_ON_CLOSE && c_file.is_closed()) {
+        LOG("Capio_file is closed and commit rule is on_close");
         c_file.set_complete();
         auto it = pending_reads.find(path);
         if (it != pending_reads.end()) {
@@ -32,7 +32,7 @@ inline void handle_close(int tid, int fd, int rank) {
             pending_reads.erase(it);
         }
         if (c_file.is_dir()) {
-            reply_remote_stats(path);
+            wake_pending_remote_stats(path);
         }
         // TODO: error if seek are done and also do this on exit
         handle_pending_remote_reads(path, c_file.get_sector_end(0), true);

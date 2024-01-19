@@ -15,14 +15,14 @@ inline void handle_exit_group(int tid, int rank) {
             LOG("Handling file %s", path.c_str());
             auto it_conf = metadata_conf.find(path);
             if (it_conf == metadata_conf.end() ||
-                std::get<0>(it_conf->second) == CAPIO_FILE_MODE_ON_TERMINATION ||
+                std::get<0>(it_conf->second) == CAPIO_FILE_COMMITTED_ON_TERMINATION ||
                 std::get<0>(it_conf->second).empty()) {
                 Capio_file &c_file = get_capio_file(path.c_str());
                 if (c_file.is_dir()) {
                     LOG("file %s is dir", path.c_str());
                     long int n_committed = c_file.n_files_expected;
                     if (n_committed <= c_file.n_files) {
-                        reply_remote_stats(path);
+                        wake_pending_remote_stats(path);
                         LOG("Setting file %s to complete", path.c_str());
                         c_file.set_complete();
                     }
