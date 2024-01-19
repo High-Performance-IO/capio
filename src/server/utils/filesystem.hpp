@@ -92,7 +92,7 @@ void write_entry_dir(int tid, const std::filesystem::path &file_path,
     long int ld_size = CAPIO_THEORETICAL_SIZE_DIRENT64;
     ld.d_reclen      = ld_size;
 
-    Capio_file &c_file   = init_capio_file(dir, true);
+    CapioFile &c_file    = init_capio_file(dir, true);
     void *file_shm       = c_file.get_buffer();
     off64_t file_size    = c_file.get_stored_size();
     off64_t data_size    = file_size + ld_size; // TODO: check theoreitcal size and sizeof(ld) usage
@@ -130,7 +130,7 @@ void write_entry_dir(int tid, const std::filesystem::path &file_path,
 void update_dir(int tid, const std::filesystem::path &file_path, int rank) {
     START_LOG(gettid(), "call(file_path=%s, rank=%d)", file_path.c_str(), rank);
     const std::filesystem::path dir = get_parent_dir_path(file_path);
-    Capio_file &c_file              = get_capio_file(dir.c_str());
+    CapioFile &c_file               = get_capio_file(dir.c_str());
     if (c_file.first_write) {
         c_file.first_write = false;
         write_file_location(rank, dir, tid);
@@ -142,7 +142,7 @@ off64_t create_dir(int tid, const std::filesystem::path &path, int rank) {
     START_LOG(tid, "call(path=%s, rank=%d)", path.c_str(), rank);
 
     if (!get_file_location_opt(path)) {
-        Capio_file &c_file = create_capio_file(path, true, CAPIO_DEFAULT_DIR_INITIAL_SIZE);
+        CapioFile &c_file = create_capio_file(path, true, CAPIO_DEFAULT_DIR_INITIAL_SIZE);
         if (c_file.first_write) {
             c_file.first_write = false;
             // TODO: it works only if there is one prod per file

@@ -95,6 +95,14 @@ inline void write_response(int tid, off64_t offset) {
     return bufs_response->at(tid)->write(&offset);
 }
 
+inline void read_reply_request(const std::filesystem::path &path, off64_t size, off64_t offset,
+                               off64_t nbytes, bool complete) {
+    char req[CAPIO_REQUEST_MAX_SIZE];
+    sprintf(req, "%04d %s %ld %ld %ld %d", CAPIO_REQUEST_READ_REPLY, path.c_str(), size, offset,
+            nbytes, complete);
+    buf_requests->write(req, CAPIO_REQUEST_MAX_SIZE);
+}
+
 inline void stat_reply_request(const std::filesystem::path &path, off64_t size, int dir) {
     char req[CAPIO_REQUEST_MAX_SIZE];
     sprintf(req, "%04d %s %ld %d", CAPIO_REQUEST_STAT_REPLY, path.c_str(), size, dir);

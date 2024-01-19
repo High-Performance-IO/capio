@@ -6,7 +6,7 @@ inline void handle_unlink(int tid, const std::filesystem::path &path, int rank) 
 
     auto c_file_opt = get_capio_file_opt(path);
     if (c_file_opt) { // TODO: it works only in the local case
-        Capio_file &c_file = c_file_opt->get();
+        CapioFile &c_file = c_file_opt->get();
         c_file.unlink();
         if (c_file.is_deletable()) {
             delete_capio_file(path);

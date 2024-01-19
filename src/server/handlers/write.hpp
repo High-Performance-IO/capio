@@ -10,7 +10,7 @@ inline void handle_write(int tid, int fd, off64_t base_offset, off64_t count, in
     // check if another process is waiting for this data
     off64_t data_size                 = base_offset + count;
     const std::filesystem::path &path = get_capio_file_path(tid, fd);
-    Capio_file &c_file                = init_capio_file(path, true);
+    CapioFile &c_file                 = init_capio_file(path, true);
     size_t file_shm_size              = c_file.get_buf_size();
     auto *data_buf                    = data_buffers[tid].first;
     size_t n_reads                    = count / CAPIO_DATA_BUFFER_ELEMENT_SIZE;

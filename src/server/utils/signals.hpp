@@ -3,6 +3,8 @@
 
 #include <csignal>
 
+#include "remote/backend.hpp"
+
 void sig_term_handler(int signum, siginfo_t *info, void *ptr) {
     START_LOG(gettid(), "call(signal=[%d] (%s) from process with pid=%ld)", signum,
               strsignal(signum), info->si_pid);
@@ -32,7 +34,7 @@ void sig_term_handler(int signum, siginfo_t *info, void *ptr) {
 
     destroy_server();
     std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_INFO << "shutdown completed" << std::endl;
-    MPI_Finalize();
+    backend->destroy();
     exit(EXIT_SUCCESS);
 }
 

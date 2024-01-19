@@ -15,8 +15,7 @@
     }
 
 #define SEM_DESTROY_CHECK(sem, sem_name, action)                                                   \
-    int res = sem_destroy(sem);                                                                    \
-    if ((res = sem_destroy(sem)) != 0) {                                                           \
+    if (sem_destroy(sem) != 0) {                                                                   \
         action;                                                                                    \
-        ERR_EXIT("destruction of semaphore %s failed with status %d", sem_name, res);              \
+        ERR_EXIT("destruction of semaphore %s failed", sem_name);                                  \
     };

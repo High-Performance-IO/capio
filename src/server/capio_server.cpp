@@ -79,7 +79,7 @@ sem_t clients_remote_pending_nfiles_sem;
 #include "utils/location.hpp"
 #include "utils/signals.hpp"
 
-#include "comm/remote_listener.hpp"
+#include "remote/listener.hpp"
 
 static constexpr std::array<CSHandler_t, CAPIO_NR_REQUESTS> build_request_handlers_table() {
     std::array<CSHandler_t, CAPIO_NR_REQUESTS> _request_handlers{0};
@@ -99,6 +99,7 @@ static constexpr std::array<CSHandler_t, CAPIO_NR_REQUESTS> build_request_handle
     _request_handlers[CAPIO_REQUEST_MKDIR]               = mkdir_handler;
     _request_handlers[CAPIO_REQUEST_OPEN]                = open_handler;
     _request_handlers[CAPIO_REQUEST_READ]                = read_handler;
+    _request_handlers[CAPIO_REQUEST_READ_REPLY]          = read_reply_handler;
     _request_handlers[CAPIO_REQUEST_RENAME]              = rename_handler;
     _request_handlers[CAPIO_REQUEST_RMDIR]               = rmdir_handler;
     _request_handlers[CAPIO_REQUEST_SEEK]                = lseek_handler;
@@ -113,7 +114,7 @@ static constexpr std::array<CSHandler_t, CAPIO_NR_REQUESTS> build_request_handle
     return _request_handlers;
 }
 
-void capio_server(int rank) {
+[[noreturn]] void capio_server(int rank) {
     static const std::array<CSHandler_t, CAPIO_NR_REQUESTS> request_handlers =
         build_request_handlers_table();
 
@@ -255,7 +256,7 @@ int main(int argc, char **argv) {
     int rank = 0, provided = 0;
 
     std::cout << CAPIO_LOG_SERVER_BANNER;
-    backend = new MPI_backend();
+    backend = new MPIBackend();
 
     parseCLI(argc, argv, rank);
 
@@ -275,12 +276,13 @@ int main(int argc, char **argv) {
     }
     std::thread server_thread(capio_server, rank);
     LOG("capio_server thread started");
-    std::thread helper_thread(capio_remote_listener, rank);
+    std::thread remote_listener_thread(capio_remote_listener, rank);
     LOG("capio_remote_listener thread started.");
     server_thread.join();
-    helper_thread.join();
+    remote_listener_thread.join();
 
-    backend->destroy(new std::vector<sem_t *>{&internal_server_sem, &(backend->remote_read_sem)});
+    SEM_DESTROY_CHECK(&internal_server_sem, "sem_destroy", backend->destroy());
+    backend->destroy();
 
     return 0;
 }

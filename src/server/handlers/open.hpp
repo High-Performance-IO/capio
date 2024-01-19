@@ -13,7 +13,7 @@ inline void update_file_metadata(const std::filesystem::path &path, int tid, int
     // TODO: check the size that the user wrote in the configuration file
     //*caching_info[tid].second += 2;
     auto c_file_opt = get_capio_file_opt(path);
-    Capio_file &c_file =
+    CapioFile &c_file =
         (c_file_opt) ? c_file_opt->get() : create_capio_file(path, false, get_file_initial_size());
     add_capio_file_to_tid(tid, fd, path);
     int pid       = pids[tid];

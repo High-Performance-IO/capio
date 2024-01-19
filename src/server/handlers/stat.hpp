@@ -4,6 +4,7 @@
 #include <mutex>
 #include <thread>
 
+#include "remote/backend.hpp"
 #include "utils/location.hpp"
 #include "utils/producer.hpp"
 #include "utils/types.hpp"
@@ -11,9 +12,25 @@
 CSMyRemotePendingStats_t pending_remote_stats;
 std::mutex pending_remote_stats_mutex;
 
-// TODO: replace the direct call with dome king of intra thread communication to avoid passing
-// values from one to another
-#include "../comm/remote_listener.hpp"
+void wait_for_stat(int tid, const std::filesystem::path &path, int rank) {
+    START_LOG(gettid(), "call(tid=%d, path=%s)", tid, path.c_str());
+
+    loop_load_file_location(path);
+    // check if the file is local or remote
+    CapioFile &c_file = get_capio_file(path);
+
+    if (c_file.is_complete() || c_file.get_mode() == CAPIO_FILE_MODE_NO_UPDATE ||
+        strcmp(std::get<0>(get_file_location(path)), node_name) == 0) {
+
+        write_response(tid, c_file.get_file_size());
+        write_response(tid, static_cast<int>(c_file.is_dir() ? 1 : 0));
+
+    } else {
+        backend->handle_remote_stat(tid, path, rank);
+        const std::lock_guard<std::mutex> lg(pending_remote_stats_mutex);
+        pending_remote_stats[path].emplace_back(tid);
+    }
+}
 
 inline void reply_stat(int tid, const std::filesystem::path &path, int rank) {
     START_LOG(gettid(), "call(tid=%d, path=%s, rank=%d)", tid, path.c_str(), rank);
@@ -28,8 +45,7 @@ inline void reply_stat(int tid, const std::filesystem::path &path, int rank) {
             if ((metadata_conf.find(path) != metadata_conf.end() || match_globs(path) != -1) &&
                 !is_producer(tid, path)) {
                 LOG("File not ready yet. Starting a thread to wait for file.");
-                std::thread t(wait_for_stat, tid, std::filesystem::path(path), rank,
-                              &pending_remote_stats, &pending_remote_stats_mutex);
+                std::thread t(wait_for_stat, tid, std::filesystem::path(path), rank);
                 t.detach();
             } else {
                 LOG("Metadata do not contains file or globs did not contain file or app is "
@@ -41,7 +57,7 @@ inline void reply_stat(int tid, const std::filesystem::path &path, int rank) {
         }
     }
     auto c_file_opt = get_capio_file_opt(path);
-    Capio_file &c_file =
+    CapioFile &c_file =
         (c_file_opt) ? c_file_opt->get() : create_capio_file(path, false, get_file_initial_size());
     LOG("Obtained capio file. ready to reply to client");
     const std::filesystem::path &capio_dir = get_capio_dir();
@@ -59,8 +75,9 @@ inline void reply_stat(int tid, const std::filesystem::path &path, int rank) {
         LOG("Delegating backend to reply to remote stats");
         // init a capio file that is remote so that buffer is going to be allocated
         init_capio_file(path, false);
-        backend->handle_remote_stat(tid, path, rank, &pending_remote_stats,
-                                    &pending_remote_stats_mutex);
+        backend->handle_remote_stat(tid, path, rank);
+        const std::lock_guard<std::mutex> lg(pending_remote_stats_mutex);
+        pending_remote_stats[path].emplace_back(tid);
     }
 }
 

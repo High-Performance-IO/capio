@@ -1,5 +1,5 @@
-#ifndef CAPIO_SERVER_COMM_INTERFACES_HPP
-#define CAPIO_SERVER_COMM_INTERFACES_HPP
+#ifndef CAPIO_SERVER_REMOTE_BACKEND_HPP
+#define CAPIO_SERVER_REMOTE_BACKEND_HPP
 
 class RemoteRequest {
   private:
@@ -23,12 +23,10 @@ class RemoteRequest {
     };
     ~RemoteRequest() { delete[] _buf_recv; }
 
-    [[nodiscard]] auto getSource() const { return this->_source; }
-    auto getRequest() { return this->_buf_recv; }
-    [[nodiscard]] auto getRequestCode() const { return this->_code; }
+    [[nodiscard]] auto get_source() const { return this->_source; }
+    [[nodiscard]] auto get_content() const { return this->_buf_recv; }
+    [[nodiscard]] auto get_code() const { return this->_code; }
 };
-
-typedef void (*CComsHandler_t)(RemoteRequest *, void *, void *);
 
 /**
  * This class is the interface prototype
@@ -36,7 +34,7 @@ typedef void (*CComsHandler_t)(RemoteRequest *, void *, void *);
  * To implement a new backend, please implement the following
  * functions in a dedicated backend.
  */
-class backend_interface {
+class Backend {
   public:
     sem_t remote_read_sem{};
 
@@ -53,9 +51,8 @@ class backend_interface {
 
     /**
      * Gracefully terminates the communication backend service
-     * @param sems
      */
-    virtual void destroy(std::vector<sem_t *> *sems) = 0;
+    virtual void destroy() = 0;
 
     /**
      * Handshake the server applications
@@ -67,7 +64,7 @@ class backend_interface {
      * Read the next message from the incoming queue
      * @return A RemoteRequest class object containing the request contents
      */
-    virtual RemoteRequest *read_next_request() = 0;
+    virtual RemoteRequest read_next_request() = 0;
 
     /**
      * Send file
@@ -78,14 +75,15 @@ class backend_interface {
     virtual void send_file(char *shm, long int nbytes, int dest) = 0;
 
     /**
-     * Sends a bunch of files to another node
+     * Sends a batch of files to another node
      * @param prefix
      * @param files_to_send An array of file names to be sent
-     * @param n_files The count of files to be sent
+     * @param nfiles The count of files to be sent
      * @param dest The target destination
      */
-    virtual void send_n_files(const std::string &prefix, std::vector<std::string> *files_to_send,
-                              int n_files, int dest) = 0;
+    virtual void send_files_batch(const std::string &prefix,
+                                  std::vector<std::string> *files_to_send, int nfiles,
+                                  int dest) = 0;
 
     /**
      *
@@ -100,21 +98,13 @@ class backend_interface {
 
     /**
      * Handle a remote read request
-     * @param tid
-     * @param fd
+     * @param path
+     * @param offset
      * @param count
      * @param rank
-     * @param dir
-     * @param is_getdents
-     * @param pending_remote_reads
-     * @param pending_remote_reads_mutex
-     * @param handle_local_read
      */
-    virtual void
-    handle_remote_read(int tid, int fd, off64_t count, int rank, bool dir, bool is_getdents,
-                       CSMyRemotePendingReads_t *pending_remote_reads,
-                       std::mutex *pending_remote_reads_mutex,
-                       void (*handle_local_read)(int, int, off64_t, bool, bool, bool)) = 0;
+    virtual void handle_remote_read(const std::filesystem::path &path, off64_t offset,
+                                    off64_t count, int rank) = 0;
 
     /**
      * Handle several remote read requests
@@ -132,19 +122,16 @@ class backend_interface {
      * @param dest Target to send the stats of @param path to
      * @param c_file the capio file on which the stat is carried out
      */
-    virtual void serve_remote_stat(const char *path, int dest, const Capio_file &c_file) = 0;
+    virtual void serve_remote_stat(const std::filesystem::path &path, int dest,
+                                   const CapioFile &c_file) = 0;
 
     /**
      * Handle a remote stat request
      * @param tid
      * @param path
      * @param rank
-     * @param pending_remote_stats
-     * @param pending_remote_stats_mutex
      */
-    virtual void handle_remote_stat(int tid, const std::filesystem::path &path, int rank,
-                                    CSMyRemotePendingStats_t *pending_remote_stats,
-                                    std::mutex *pending_remote_stats_mutex) = 0;
+    virtual void handle_remote_stat(int tid, const std::filesystem::path &path, int rank) = 0;
 
     /**
      * receive a file from another process
@@ -155,26 +142,6 @@ class backend_interface {
     virtual void recv_file(char *shm, int source, long int bytes_expected) = 0;
 };
 
-/**
-    THE FOLLOWING FUNCTIONS PROTOTYPES ARE HERE TO ALLOW FOR DEFINITION AND INCLUSION IN DIFFERENT
-   FILES
- */
+Backend *backend;
 
-inline bool read_from_local_mem(int tid, off64_t process_offset, off64_t end_of_read,
-                                off64_t end_of_sector, off64_t count,
-                                const std::filesystem::path &path);
-
-inline void solve_remote_reads(size_t bytes_received, size_t offset, size_t file_size,
-                               const std::filesystem::path &path, bool complete,
-                               CSMyRemotePendingReads_t *pending_remote_reads,
-                               std::mutex *pending_remote_reads_mutex);
-
-void wait_for_n_files(char *const prefix, std::vector<std::string> *files_path, size_t n_files,
-                      int dest, sem_t *n_files_ready);
-
-inline void wait_for_file(int tid, int fd, off64_t count, bool dir, bool is_getdents, int rank,
-                          CSMyRemotePendingReads_t *pending_remote_reads,
-                          std::mutex *pending_remote_reads_mutex,
-                          void (*handle_local_read)(int, int, off64_t, bool, bool, bool));
-
-#endif // CAPIO_SERVER_COMM_INTERFACES_HPP
+#endif // CAPIO_SERVER_REMOTE_BACKEND_HPP
