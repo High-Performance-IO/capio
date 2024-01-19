@@ -62,7 +62,7 @@ inline std::vector<int> get_capio_fds_for_tid(int tid) {
     return fds;
 }
 
-inline std::optional<std::reference_wrapper<Capio_file>>
+inline std::optional<std::reference_wrapper<CapioFile>>
 get_capio_file_opt(const std::filesystem::path &path) {
     START_LOG(gettid(), "call(path=%s)", path.c_str());
 
@@ -77,7 +77,7 @@ get_capio_file_opt(const std::filesystem::path &path) {
     }
 }
 
-inline Capio_file &get_capio_file(const std::filesystem::path &path) {
+inline CapioFile &get_capio_file(const std::filesystem::path &path) {
     START_LOG(gettid(), "call(path=%s)", path.c_str());
 
     auto c_file_opt = get_capio_file_opt(path);
@@ -98,7 +98,7 @@ inline off64_t get_capio_file_offset(int tid, int fd) {
     return *std::get<1>(processes_files[tid][fd]);
 }
 
-inline void add_capio_file(const std::filesystem::path &path, Capio_file *c_file) {
+inline void add_capio_file(const std::filesystem::path &path, CapioFile *c_file) {
     START_LOG(gettid(), "call(path=%s, capio_file=%ld)", path.c_str(), c_file);
     const std::lock_guard<std::mutex> lg(files_metadata_mutex);
     files_metadata[path] = c_file;
@@ -109,7 +109,7 @@ inline void add_capio_file(const std::filesystem::path &path, Capio_file *c_file
 inline void add_capio_file_to_tid(int tid, int fd, const std::filesystem::path &path) {
     START_LOG(gettid(), "call(tid=%d, fd=%d, path=%s)", tid, fd, path.c_str());
 
-    Capio_file &c_file = get_capio_file(path);
+    CapioFile &c_file = get_capio_file(path);
     c_file.open();
     c_file.add_fd(tid, fd);
 
@@ -129,13 +129,13 @@ inline void clone_capio_file(pid_t parent_tid, pid_t child_tid) {
     }
 }
 
-Capio_file &create_capio_file(const std::filesystem::path &path, bool is_dir, size_t init_size) {
+CapioFile &create_capio_file(const std::filesystem::path &path, bool is_dir, size_t init_size) {
     START_LOG(gettid(), "call(path=%s, is_dir=%s, init_size=%ld)", path.c_str(),
               is_dir ? "true" : "false", init_size);
 
     std::string shm_name = path;
     std::replace(shm_name.begin(), shm_name.end(), '/', '_');
-    Capio_file *c_file;
+    CapioFile *c_file;
     auto it = metadata_conf.find(path);
     if (it == metadata_conf.end()) {
         LOG("File was not found in metadata_conf. resolving it as glob");
@@ -147,7 +147,7 @@ Capio_file &create_capio_file(const std::filesystem::path &path, bool is_dir, si
                 init_size = CAPIO_DEFAULT_DIR_INITIAL_SIZE;
                 LOG("Glob %s is a directory", path.c_str());
             }
-            c_file = new Capio_file(is_dir, false, init_size);
+            c_file = new CapioFile(is_dir, false, init_size);
             add_capio_file(path, c_file);
         } else {
             LOG("Path %s is found in metadata_conf_globs", path.c_str());
@@ -163,8 +163,7 @@ Capio_file &create_capio_file(const std::filesystem::path &path, bool is_dir, si
             metadata_conf[path] =
                 std::make_tuple(committed, mode, app_name, n_files, permanent, n_close);
             LOG("Creating new capio_file. committed=%s, mode=%s", committed.c_str(), mode.c_str());
-            c_file =
-                new Capio_file(committed, mode, is_dir, n_files, permanent, init_size, n_close);
+            c_file = new CapioFile(committed, mode, is_dir, n_files, permanent, init_size, n_close);
             add_capio_file(path, c_file);
         }
     } else {
@@ -175,7 +174,7 @@ Capio_file &create_capio_file(const std::filesystem::path &path, bool is_dir, si
             init_size = CAPIO_DEFAULT_DIR_INITIAL_SIZE;
         }
         LOG("Creating new capio_file. committed=%s, mode=%s", committed.c_str(), mode.c_str());
-        c_file = new Capio_file(committed, mode, is_dir, n_files, permanent, init_size, n_close);
+        c_file = new CapioFile(committed, mode, is_dir, n_files, permanent, init_size, n_close);
         add_capio_file(path, c_file);
     }
     return *c_file;
@@ -185,7 +184,7 @@ inline void delete_capio_file_from_tid(int tid, int fd) {
     START_LOG(gettid(), "call(tid=%d, fd=%d)", tid, fd);
 
     const std::lock_guard<std::mutex> lg(processes_files_mutex);
-    Capio_file &c_file = get_capio_file(processes_files_metadata[tid][fd]);
+    CapioFile &c_file = get_capio_file(processes_files_metadata[tid][fd]);
     c_file.remove_fd(tid, fd);
     processes_files_metadata[tid].erase(fd);
     const std::string offset_shm_name = "offset_" + std::to_string(tid) + "_" + std::to_string(fd);
@@ -198,7 +197,7 @@ inline void delete_capio_file_from_tid(int tid, int fd) {
 inline void delete_capio_file(const std::filesystem::path &path) {
     START_LOG(gettid(), "call(path=%s)", path.c_str());
 
-    Capio_file &c_file = get_capio_file(path);
+    CapioFile &c_file = get_capio_file(path);
     for (auto &[tid, fd] : c_file.get_fds()) {
         delete_capio_file_from_tid(tid, fd);
     }
@@ -222,15 +221,15 @@ inline void dup_capio_file(int tid, int old_fd, int new_fd) {
     const std::string &path               = processes_files_metadata[tid][old_fd];
     processes_files_metadata[tid][new_fd] = path;
     processes_files[tid][new_fd]          = processes_files[tid][old_fd];
-    Capio_file &c_file                    = get_capio_file(path);
+    CapioFile &c_file                     = get_capio_file(path);
     c_file.open();
     c_file.add_fd(tid, new_fd);
 }
 
-inline Capio_file &init_capio_file(const std::filesystem::path &path, bool home_node) {
+inline CapioFile &init_capio_file(const std::filesystem::path &path, bool home_node) {
     START_LOG(gettid(), "call(path=%s, home_node=%s)", path.c_str(), home_node ? "true" : "false");
 
-    Capio_file &c_file = get_capio_file(path);
+    CapioFile &c_file = get_capio_file(path);
     if (c_file.buf_to_allocate()) {
         c_file.create_buffer(path, home_node);
     }

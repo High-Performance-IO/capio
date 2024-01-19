@@ -68,7 +68,7 @@ void handle_pending_remote_nfiles(const std::filesystem::path &path) {
             auto next_it                                   = std::next(it);
             if (files.find(path) == files.end() && file_location_opt &&
                 strcmp(std::get<0>(file_location_opt->get()), node_name) == 0 &&
-                path.native().compare(0, strlen(prefix), prefix) == 0) {
+                path.native().compare(0, prefix.native().length(), prefix) == 0) {
                 files_path->push_back(path);
                 files.insert(path);
                 if (files_path->size() == n_files) {

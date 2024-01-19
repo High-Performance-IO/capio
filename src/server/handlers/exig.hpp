@@ -17,7 +17,7 @@ inline void handle_exit_group(int tid, int rank) {
             if (it_conf == metadata_conf.end() ||
                 std::get<0>(it_conf->second) == CAPIO_FILE_COMMITTED_ON_TERMINATION ||
                 std::get<0>(it_conf->second).empty()) {
-                Capio_file &c_file = get_capio_file(path.c_str());
+                CapioFile &c_file = get_capio_file(path.c_str());
                 if (c_file.is_dir()) {
                     LOG("file %s is dir", path.c_str());
                     long int n_committed = c_file.n_files_expected;

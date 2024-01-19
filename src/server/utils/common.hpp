@@ -49,7 +49,7 @@ inline bool is_int(const std::string &s) {
 inline int find_batch_size(const std::string &glob, CSMetadataConfGlobs_t &metadata_conf_globs) {
     START_LOG(gettid(), "call(%s)", glob.c_str());
     bool found = false;
-    int n_files;
+    int nfiles;
     std::size_t i = 0;
 
     while (!found && i < metadata_conf_globs.size()) {
@@ -58,12 +58,12 @@ inline int find_batch_size(const std::string &glob, CSMetadataConfGlobs_t &metad
     }
 
     if (found) {
-        n_files = std::get<5>(metadata_conf_globs[i - 1]);
+        nfiles = std::get<5>(metadata_conf_globs[i - 1]);
     } else {
-        n_files = -1;
+        nfiles = -1;
     }
 
-    return n_files;
+    return nfiles;
 }
 
 #endif // CAPIO_SERVER_UTILS_COMMON_HPP

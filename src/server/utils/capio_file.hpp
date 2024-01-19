@@ -27,7 +27,7 @@ struct compare {
     }
 };
 
-class Capio_file {
+class CapioFile {
   private:
     char *_buf = nullptr; // buffer containing the data
     std::size_t _buf_size;
@@ -60,23 +60,22 @@ class Capio_file {
      */
     std::size_t real_file_size = 0;
 
-    Capio_file()
+    CapioFile()
         : _buf_size(0), _committed(CAPIO_FILE_COMMITTED_ON_TERMINATION), _directory(false),
           _permanent(false) {}
 
-    Capio_file(const std::string_view &committed, const std::string_view &mode, bool directory,
-               long int n_files_expected, bool permanent, std::size_t init_size,
-               long int n_close_expected)
+    CapioFile(const std::string_view &committed, const std::string_view &mode, bool directory,
+              long int n_files_expected, bool permanent, std::size_t init_size,
+              long int n_close_expected)
         : _buf_size(init_size), _committed(committed), _directory(directory), _mode(mode),
           _n_close_expected(n_close_expected), _permanent(permanent),
           n_files_expected(n_files_expected + 2) {}
 
-    Capio_file(bool directory, bool permanent, std::size_t init_size,
-               long int n_close_expected = -1)
+    CapioFile(bool directory, bool permanent, std::size_t init_size, long int n_close_expected = -1)
         : _buf_size(init_size), _committed(CAPIO_FILE_COMMITTED_ON_TERMINATION),
           _directory(directory), _n_close_expected(n_close_expected), _permanent(permanent) {}
 
-    ~Capio_file() {
+    ~CapioFile() {
         START_LOG(gettid(), "call()");
         LOG("Deleting capio_file");
 
@@ -86,7 +85,7 @@ class Capio_file {
             } else {
                 int res = munmap(_buf, _buf_size);
                 if (res == -1) {
-                    ERR_EXIT("munmap Capio_file");
+                    ERR_EXIT("munmap CapioFile");
                 }
             }
         } else {
@@ -145,15 +144,15 @@ class Capio_file {
                 LOG("creating mem mapped file");
                 _fd = ::open(path.c_str(), O_RDWR | O_CREAT, S_IRWXU | S_IRGRP | S_IROTH);
                 if (_fd == -1) {
-                    ERR_EXIT("open %s Capio_file constructor", path.c_str());
+                    ERR_EXIT("open %s CapioFile constructor", path.c_str());
                 }
                 if (ftruncate(_fd, _buf_size) == -1) {
-                    ERR_EXIT("ftruncate Capio_file constructor");
+                    ERR_EXIT("ftruncate CapioFile constructor");
                 }
                 _buf =
                     (char *) mmap(nullptr, _buf_size, PROT_READ | PROT_WRITE, MAP_SHARED, _fd, 0);
                 if (_buf == MAP_FAILED) {
-                    ERR_EXIT("mmap Capio_file constructor");
+                    ERR_EXIT("mmap CapioFile constructor");
                 }
             }
         } else {
@@ -167,7 +166,7 @@ class Capio_file {
         char *new_buf      = new char[new_size];
         //	memcpy(new_p, old_p, file_shm_size); //TODO memcpy only the
         // sector
-        // stored in Capio_file
+        // stored in CapioFile
         memcpy_capio_file(new_buf, _buf);
         delete[] _buf;
         _buf      = new_buf;

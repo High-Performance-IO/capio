@@ -6,14 +6,14 @@
 inline void handle_lseek(int tid, int fd, size_t offset) {
     START_LOG(gettid(), "call(tid=%d, fd=%d, offset=%ld)", tid, fd, offset);
 
-    Capio_file &c_file = get_capio_file(get_capio_file_path(tid, fd));
+    CapioFile &c_file = get_capio_file(get_capio_file_path(tid, fd));
     write_response(tid, c_file.get_sector_end(offset));
 }
 
 void handle_seek_data(int tid, int fd, size_t offset) {
     START_LOG(gettid(), "call(tid=%d, fd=%d, offset=%ld)", tid, fd, offset);
 
-    Capio_file &c_file = get_capio_file(get_capio_file_path(tid, fd));
+    CapioFile &c_file = get_capio_file(get_capio_file_path(tid, fd));
     write_response(tid, c_file.seek_data(offset));
 }
 
@@ -27,7 +27,7 @@ inline void handle_seek_end(int tid, int fd, int rank) {
 inline void handle_seek_hole(int tid, int fd, size_t offset) {
     START_LOG(gettid(), "call(tid=%d, fd=%d, offset=%ld)", tid, fd, offset);
 
-    Capio_file &c_file = get_capio_file(get_capio_file_path(tid, fd));
+    CapioFile &c_file = get_capio_file(get_capio_file_path(tid, fd));
     write_response(tid, c_file.seek_hole(offset));
 }
 
