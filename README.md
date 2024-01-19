@@ -34,7 +34,7 @@ Good news! You don't need to modify your code to benefit from the features of CA
 
 2) Launch the CAPIO deamons with MPI passing the (eventual) configuration file as argument on the machines in which you want to execute your program (one deamon for each node).
 ```bash
-mpiexec -N 1 --hostfile your_hostfile src/capio_server conf.json 
+mpiexec -N 1 --hostfile your_hostfile src/capio_server server_file.log [conf.json] 
 ```
 3) Launch your programs preloading the CAPIO shared library like this:
 ```bash
