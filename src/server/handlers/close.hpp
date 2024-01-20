@@ -19,21 +19,8 @@ inline void handle_close(int tid, int fd, int rank) {
     if (c_file.get_committed() == CAPIO_FILE_COMMITTED_ON_CLOSE && c_file.is_closed()) {
         LOG("CapioFile is closed and commit rule is on_close");
         c_file.set_complete();
-        auto it = pending_reads.find(path);
-        if (it != pending_reads.end()) {
-            auto &pending_reads_this_file = it->second;
-            auto it_vec                   = pending_reads_this_file.begin();
-            while (it_vec != pending_reads_this_file.end()) {
-                auto &[pending_tid, fd, count, is_getdents] = *it_vec;
-                size_t process_offset                       = get_capio_file_offset(tid, fd);
-                handle_pending_read(pending_tid, fd, process_offset, count, is_getdents);
-                it_vec = pending_reads_this_file.erase(it_vec);
-            }
-            pending_reads.erase(it);
-        }
-        // TODO: error if seek are done and also do this on exit
-        handle_pending_remote_reads(path, c_file.get_sector_end(0), true);
         handle_pending_remote_nfiles(path);
+
         c_file.commit();
     }
 

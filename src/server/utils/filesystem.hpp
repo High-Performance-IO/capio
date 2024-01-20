@@ -14,37 +14,6 @@
 #include "metadata.hpp"
 #include "types.hpp"
 
-CSClientsRemotePendingReads_t clients_remote_pending_reads;
-
-void handle_pending_remote_reads(const std::string &path, off64_t data_size, bool complete) {
-    START_LOG(gettid(), "call(%s, %ld, %d)", path.c_str(), data_size, static_cast<int>(complete));
-
-    auto it_client = clients_remote_pending_reads.find(path);
-    if (it_client != clients_remote_pending_reads.end()) {
-        std::list<std::tuple<size_t, size_t, sem_t *>>::iterator it_list, prev_it_list;
-        it_list = it_client->second.begin();
-        while (it_list != it_client->second.end()) {
-            auto &[offset, nbytes, sem] = *it_list;
-            if (complete || (offset + nbytes < data_size)) {
-                if (sem_post(sem) == -1) {
-                    ERR_EXIT("sem_post sem in "
-                             "handle_pending_remote_reads");
-                }
-                if (it_list == it_client->second.begin()) {
-                    it_client->second.erase(it_list);
-                    it_list = it_client->second.begin();
-                } else {
-                    it_client->second.erase(it_list);
-                    it_list = std::next(prev_it_list);
-                }
-            } else {
-                prev_it_list = it_list;
-                ++it_list;
-            }
-        }
-    }
-}
-
 /*
  * type == 0 -> regular entry
  * type == 1 -> "." entry
@@ -100,11 +69,6 @@ void write_entry_dir(int tid, const std::filesystem::path &file_path,
 
     if (c_file.n_files == c_file.n_files_expected) {
         c_file.set_complete();
-    }
-
-    std::string_view mode = c_file.get_mode();
-    if (mode == CAPIO_FILE_MODE_NO_UPDATE) {
-        handle_pending_remote_reads(dir, data_size, c_file.is_complete());
     }
 }
 

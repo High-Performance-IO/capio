@@ -13,22 +13,19 @@ inline void handle_write(int tid, int fd, off64_t base_offset, off64_t count, in
     CapioFile &c_file                 = get_capio_file(path);
     size_t file_shm_size              = c_file.get_buf_size();
     auto *data_buf                    = data_buffers[tid].first;
-    size_t n_reads                    = count / CAPIO_DATA_BUFFER_ELEMENT_SIZE;
-    size_t r                          = count % CAPIO_DATA_BUFFER_ELEMENT_SIZE;
-    size_t i                          = 0;
-    char *p;
+    off64_t n_reads                   = count / CAPIO_DATA_BUFFER_ELEMENT_SIZE;
+    off64_t r                         = count % CAPIO_DATA_BUFFER_ELEMENT_SIZE;
+
     c_file.create_buffer_if_needed(path, true);
     if (data_size > file_shm_size) {
         c_file.expand_buffer(data_size);
     }
-    p = c_file.get_buffer();
-    p = p + base_offset;
-    while (i < n_reads) {
-        data_buf->read(p + i * CAPIO_DATA_BUFFER_ELEMENT_SIZE);
-        ++i;
+    for (int i = 0; i < n_reads; i++) {
+        c_file.read_from_queue(*data_buf, base_offset + i * CAPIO_DATA_BUFFER_ELEMENT_SIZE);
     }
     if (r) {
-        data_buf->read(p + i * CAPIO_DATA_BUFFER_ELEMENT_SIZE, r);
+        c_file.read_from_queue(*data_buf, base_offset + n_reads * CAPIO_DATA_BUFFER_ELEMENT_SIZE,
+                               r);
     }
     int pid            = pids[tid];
     writers[pid][path] = true;
@@ -38,26 +35,6 @@ inline void handle_write(int tid, int fd, off64_t base_offset, off64_t count, in
         write_file_location(rank, path, tid);
         // TODO: it works only if there is one prod per file
         update_dir(tid, path, rank);
-    }
-    std::string_view mode = c_file.get_mode();
-    auto it               = pending_reads.find(path);
-    if (it != pending_reads.end() && mode == CAPIO_FILE_MODE_NO_UPDATE) {
-        auto &pending_reads_this_file = it->second;
-        auto it_vec                   = pending_reads_this_file.begin();
-        while (it_vec != pending_reads_this_file.end()) {
-            auto &[pending_tid, fd, count, is_getdents] = *it_vec;
-            size_t process_offset                       = get_capio_file_offset(tid, fd);
-            size_t file_size                            = c_file.get_stored_size();
-            if (process_offset + count <= file_size) {
-                handle_pending_read(pending_tid, fd, process_offset, count, is_getdents);
-                it_vec = pending_reads_this_file.erase(it_vec);
-            } else {
-                ++it_vec;
-            }
-        }
-    }
-    if (mode == CAPIO_FILE_MODE_NO_UPDATE) {
-        handle_pending_remote_reads(path, data_size, false);
     }
 }
 

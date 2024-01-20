@@ -30,12 +30,6 @@ typedef std::unordered_map<std::string, std::pair<const char *const, long int>>
     CSFilesLocationMap_t;
 typedef std::unordered_map<std::string, int> CSNodesHelperRankMap_t;
 typedef std::unordered_map<int, std::string> CSRankToNodeMap_t;
-typedef std::unordered_map<std::string, std::vector<std::tuple<int, int, off64_t, bool>>>
-    CSPendingReadsMap_t;
-typedef std::unordered_map<std::string, std::list<std::tuple<int, int, off64_t, bool>>>
-    CSMyRemotePendingReads_t;
-typedef std::unordered_map<std::string, std::list<std::tuple<size_t, size_t, sem_t *>>>
-    CSClientsRemotePendingReads_t;
 typedef std::unordered_map<std::string,
                            std::list<std::tuple<const std::filesystem::path, size_t, int,
                                                 std::vector<std::string> *, sem_t *>>>

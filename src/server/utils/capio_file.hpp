@@ -12,6 +12,9 @@
 #include <unistd.h>
 
 #include "capio/logger.hpp"
+#include "capio/spsc_queue.hpp"
+
+#include "remote/backend.hpp"
 
 /*
  * Only the server have all the information
@@ -53,16 +56,23 @@ class CapioFile {
     /*sync variables*/
     mutable std::mutex _mutex;
     mutable std::condition_variable _complete_cv;
+    mutable std::condition_variable _data_avail_cv;
+
+    inline off64_t _get_stored_size() const {
+        auto it = _sectors.rbegin();
+        return (it == _sectors.rend()) ? 0 : it->second;
+    }
 
   public:
-    bool first_write           = true;
-    long int n_files           = 0;  // useful for directories
-    long int n_files_expected  = -1; // useful for directories
+    bool first_write          = true;
+    long int n_files          = 0;  // useful for directories
+    long int n_files_expected = -1; // useful for directories
     /*
      * file size in the home node. In a given moment could not be up-to-date.
      * This member is useful because a node different from the home node
      * could need to known the size of the file but not its content
      */
+
     std::size_t real_file_size = 0;
 
     CapioFile()
@@ -114,6 +124,15 @@ class CapioFile {
         _complete_cv.wait(lock, [this] { return _complete; });
     }
 
+    inline void wait_for_data(long offset) const {
+        START_LOG(gettid(), "call()");
+        LOG("Thread waiting for data to be available");
+        std::unique_lock<std::mutex> lock(_mutex);
+        _data_avail_cv.wait(lock, [offset, this] {
+            return (offset <= this->_get_stored_size()) || this->_complete;
+        });
+    }
+
     inline void set_complete(bool complete = true) {
         START_LOG(gettid(), "setting capio_file._complete=%s", complete ? "true" : "false");
         std::lock_guard<std::mutex> lg(_mutex);
@@ -121,13 +140,17 @@ class CapioFile {
             this->_complete = complete;
             if (this->_complete) {
                 _complete_cv.notify_all();
+                _data_avail_cv.notify_all();
             }
         }
     }
 
     inline void add_fd(int tid, int fd) { _threads_fd.emplace_back(tid, fd); }
 
-    [[nodiscard]] inline bool buf_to_allocate() const { return _buf == nullptr; }
+    [[nodiscard]] inline bool buf_to_allocate() const {
+        std::lock_guard<std::mutex> lg(_mutex);
+        return _buf == nullptr;
+    }
 
     inline void close() {
         _n_close++;
@@ -156,7 +179,8 @@ class CapioFile {
     void create_buffer(const std::filesystem::path &path, bool home_node) {
         START_LOG(gettid(), "call(path=%s, home_node=%s)", path.c_str(),
                   home_node ? "true" : "false");
-
+        std::lock_guard<std::mutex> lock(_mutex);
+        // TODO: will use malloc in order to be able to use realloc
         _home_node = home_node;
         if (_permanent && home_node) {
             if (_directory) {
@@ -202,6 +226,7 @@ class CapioFile {
         size_t double_size = _buf_size * 2;
         size_t new_size    = data_size > double_size ? data_size : double_size;
         char *new_buf      = new char[new_size];
+        std::lock_guard<std::mutex> lock(_mutex);
         //	memcpy(new_p, old_p, file_shm_size); //TODO memcpy only the
         // sector
         // stored in CapioFile
@@ -223,6 +248,7 @@ class CapioFile {
     }
 
     [[nodiscard]] inline off64_t get_file_size() const {
+        std::lock_guard<std::mutex> lock(_mutex);
         if (!_sectors.empty()) {
             return _sectors.rbegin()->second;
         } else {
@@ -258,8 +284,8 @@ class CapioFile {
      * the real size of the file
      */
     [[nodiscard]] inline off64_t get_stored_size() const {
-        auto it = _sectors.rbegin();
-        return (it == _sectors.rend()) ? 0 : it->second;
+        std::lock_guard<std::mutex> lock(_mutex);
+        return this->_get_stored_size();
     }
 
     /*
@@ -276,6 +302,7 @@ class CapioFile {
      */
     void insert_sector(off64_t new_start, off64_t new_end) {
         auto p = std::make_pair(new_start, new_end);
+        std::lock_guard<std::mutex> lock(_mutex);
 
         if (_sectors.empty()) {
             _sectors.insert(p);
@@ -433,6 +460,33 @@ class CapioFile {
         if (it != _threads_fd.end()) {
             _threads_fd.erase(it);
         }
+    }
+
+    /**
+     * Save data inside the capio_file buffer
+     * @param buffer
+     * @return
+     */
+    inline void read_from_node(int dest, off64_t offset, off64_t buffer_size) {
+        std::unique_lock<std::mutex> lock(_mutex);
+        backend->recv_file(_buf + offset, dest, buffer_size);
+        _data_avail_cv.notify_all();
+    }
+
+    inline void read_from_queue(SPSCQueue<char> &queue, size_t offset) {
+        START_LOG(gettid(), "call()");
+
+        std::unique_lock<std::mutex> lock(_mutex);
+        queue.read(_buf + offset);
+        _data_avail_cv.notify_all();
+    }
+
+    inline void read_from_queue(SPSCQueue<char> &queue, size_t offset, long int num_bytes) {
+        START_LOG(gettid(), "call()");
+
+        std::unique_lock<std::mutex> lock(_mutex);
+        queue.read(_buf + offset, num_bytes);
+        _data_avail_cv.notify_all();
     }
 
     inline void unlink() { _n_links--; }

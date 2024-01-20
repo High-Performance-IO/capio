@@ -73,6 +73,7 @@ void handle_pending_remote_nfiles(const std::filesystem::path &path) {
                 files.insert(path);
                 if (files_path->size() == batch_size) {
                     app_pending_nfiles.erase(it);
+                    // wake wait_for_nfiles
                     if (sem_post(sem) == -1) {
                         ERR_EXIT("sem_post sem in "
                                  "handle_pending_remote_nfiles");

@@ -31,20 +31,6 @@ inline void handle_exit_group(int tid, int rank) {
                     c_file.commit();
                 }
             }
-
-            auto it = pending_reads.find(path);
-            if (it != pending_reads.end()) {
-                LOG("Handling pending reads for file %s", path.c_str());
-                auto &pending_reads_this_file = it->second;
-                auto it_vec                   = pending_reads_this_file.begin();
-                while (it_vec != pending_reads_this_file.end()) {
-                    auto &[pending_tid, fd, count, is_getdents] = *it_vec;
-                    size_t process_offset                       = get_capio_file_offset(tid, fd);
-                    handle_pending_read(pending_tid, fd, process_offset, count, is_getdents);
-                    it_vec = pending_reads_this_file.erase(it_vec);
-                }
-                pending_reads.erase(it);
-            }
         }
     }
 
