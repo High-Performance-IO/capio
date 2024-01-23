@@ -223,6 +223,24 @@ class Logger {
         current_log_level++;
     }
 
+    Logger(const Logger &)            = delete;
+    Logger &operator=(const Logger &) = delete;
+
+    inline ~Logger() {
+        current_log_level--;
+        sprintf(format, CAPIO_LOG_PRE_MSG, this->invoker);
+        size_t pre_msg_len = strlen(format);
+        strcpy(format + pre_msg_len, "returned");
+
+        log_write_to(format, strlen(format));
+#ifdef __CAPIO_POSIX
+        if (current_log_level == 0 && logging_syscall) {
+            log_write_to(const_cast<char *>(CAPIO_LOG_POSIX_SYSCALL_END),
+                         strlen(CAPIO_LOG_POSIX_SYSCALL_END));
+        }
+#endif
+    }
+
     inline void log(const char *message, ...) {
         va_list argp, argpc;
 
@@ -254,21 +272,6 @@ class Logger {
         va_end(argp);
         va_end(argpc);
         capio_syscall(SYS_munmap, buf, size);
-    }
-
-    inline ~Logger() {
-        current_log_level--;
-        sprintf(format, CAPIO_LOG_PRE_MSG, this->invoker);
-        size_t pre_msg_len = strlen(format);
-        strcpy(format + pre_msg_len, "returned");
-
-        log_write_to(format, strlen(format));
-#ifdef __CAPIO_POSIX
-        if (current_log_level == 0 && logging_syscall) {
-            log_write_to(const_cast<char *>(CAPIO_LOG_POSIX_SYSCALL_END),
-                         strlen(CAPIO_LOG_POSIX_SYSCALL_END));
-        }
-#endif
     }
 };
 

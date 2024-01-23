@@ -17,8 +17,7 @@ typedef std::unordered_map<int, std::unordered_map<int, std::pair<CapioFile *, o
     CSProcessFileMap_t;
 typedef std::unordered_map<int, std::unordered_map<int, std::filesystem::path>>
     CSProcessFileMetadataMap_t;
-typedef std::unordered_map<int, std::pair<SPSC_queue<char> *, SPSC_queue<char> *>>
-    CSDataBufferMap_t;
+typedef std::unordered_map<int, std::pair<SPSCQueue<char> *, SPSCQueue<char> *>> CSDataBufferMap_t;
 typedef std::unordered_map<std::string, CapioFile *> CSFilesMetadata_t;
 typedef std::unordered_map<
     std::string, std::tuple<std::string, std::string, std::string, long int, bool, long int>>
@@ -43,8 +42,8 @@ typedef std::unordered_map<std::string,
                            std::list<std::tuple<const std::filesystem::path, size_t, int,
                                                 std::vector<std::string> *, sem_t *>>>
     CSClientsRemotePendingNFilesMap_t;
-typedef std::unordered_map<int, Circular_buffer<off_t> *> CSBufResponse_t;
-typedef Circular_buffer<char> CSBufRequest_t;
+typedef std::unordered_map<int, CircularBuffer<off_t> *> CSBufResponse_t;
+typedef CircularBuffer<char> CSBufRequest_t;
 
 typedef void (*CSHandler_t)(const char *const, int);
 

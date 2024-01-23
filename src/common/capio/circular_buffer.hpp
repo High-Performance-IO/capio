@@ -13,7 +13,7 @@
  * Each element of the circular buffer has the same size.
  */
 
-template <class T> class Circular_buffer {
+template <class T> class CircularBuffer {
   private:
     void *_shm;
     const long int _max_num_elems;
@@ -46,8 +46,8 @@ template <class T> class Circular_buffer {
     }
 
   public:
-    Circular_buffer(const std::string &shm_name, const long int _max_num_elems,
-                    const long int elem_size, long int sem_timeout, int sem_retries)
+    CircularBuffer(const std::string &shm_name, const long int _max_num_elems,
+                   const long int elem_size, long int sem_timeout, int sem_retries)
         : _max_num_elems(_max_num_elems), _elem_size(elem_size), _shm_name(shm_name) {
         START_LOG(capio_syscall(SYS_gettid),
                   "call(shm_name=%s, _max_num_elems=%ld, elem_size=%ld, "
@@ -86,7 +86,10 @@ template <class T> class Circular_buffer {
         }
     }
 
-    ~Circular_buffer() {
+    CircularBuffer(const CircularBuffer &)            = delete;
+    CircularBuffer &operator=(const CircularBuffer &) = delete;
+
+    ~CircularBuffer() {
         sem_close(_mutex);
         sem_close(_sem_num_elems);
         sem_close(_sem_num_empty);
