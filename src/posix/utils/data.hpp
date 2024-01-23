@@ -17,12 +17,12 @@ inline void init_data_plane() { threads_data_bufs = new CPThreadDataBufs_t; }
  * @return
  */
 inline void register_data_listener(long tid) {
-    auto *write_queue = new SPSC_queue<char>(
+    auto *write_queue = new SPSCQueue<char>(
         "capio_write_data_buffer_tid_" + std::to_string(tid), CAPIO_DATA_BUFFER_LENGTH,
         CAPIO_DATA_BUFFER_ELEMENT_SIZE, CAPIO_SEM_TIMEOUT_NANOSEC, CAPIO_SEM_MAX_RETRIES);
-    auto *read_queue = new SPSC_queue<char>(
-        "capio_read_data_buffer_tid_" + std::to_string(tid), CAPIO_DATA_BUFFER_LENGTH,
-        CAPIO_DATA_BUFFER_ELEMENT_SIZE, CAPIO_SEM_TIMEOUT_NANOSEC, CAPIO_SEM_MAX_RETRIES);
+    auto *read_queue = new SPSCQueue<char>("capio_read_data_buffer_tid_" + std::to_string(tid),
+                                           CAPIO_DATA_BUFFER_LENGTH, CAPIO_DATA_BUFFER_ELEMENT_SIZE,
+                                           CAPIO_SEM_TIMEOUT_NANOSEC, CAPIO_SEM_MAX_RETRIES);
     threads_data_bufs->insert({static_cast<int>(tid), {write_queue, read_queue}});
 }
 
