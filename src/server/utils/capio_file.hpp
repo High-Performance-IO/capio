@@ -75,6 +75,9 @@ class CapioFile {
         : _buf_size(init_size), _committed(CAPIO_FILE_COMMITTED_ON_TERMINATION),
           _directory(directory), _n_close_expected(n_close_expected), _permanent(permanent) {}
 
+    CapioFile(const CapioFile &)            = delete;
+    CapioFile &operator=(const CapioFile &) = delete;
+
     ~CapioFile() {
         START_LOG(gettid(), "call()");
         LOG("Deleting capio_file");
@@ -157,6 +160,21 @@ class CapioFile {
             }
         } else {
             _buf = new char[_buf_size];
+        }
+    }
+
+    inline void create_buffer_if_needed(const std::filesystem::path &path, bool home_node) {
+        if (buf_to_allocate()) {
+            create_buffer(path, home_node);
+        }
+    }
+
+    void memcpy_capio_file(char *new_p, char *old_p) const {
+        for (auto &sector : _sectors) {
+            off64_t lbound        = sector.first;
+            off64_t ubound        = sector.second;
+            off64_t sector_length = ubound - lbound;
+            memcpy(new_p + lbound, old_p + lbound, sector_length);
         }
     }
 
@@ -305,15 +323,6 @@ class CapioFile {
     [[nodiscard]] inline bool is_deletable() const { return _n_opens == 0 && _n_links <= 0; }
 
     [[nodiscard]] inline bool is_dir() const { return _directory; }
-
-    void memcpy_capio_file(char *new_p, char *old_p) const {
-        for (auto &sector : _sectors) {
-            off64_t lbound        = sector.first;
-            off64_t ubound        = sector.second;
-            off64_t sector_length = ubound - lbound;
-            memcpy(new_p + lbound, old_p + lbound, sector_length);
-        }
-    }
 
     inline void open() { _n_opens++; }
 

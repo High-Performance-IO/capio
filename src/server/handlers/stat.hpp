@@ -74,7 +74,7 @@ inline void reply_stat(int tid, const std::filesystem::path &path, int rank) {
     } else {
         LOG("Delegating backend to reply to remote stats");
         // init a capio file that is remote so that buffer is going to be allocated
-        init_capio_file(path, false);
+        c_file.create_buffer_if_needed(path, false);
         backend->handle_remote_stat(tid, path, rank);
         const std::lock_guard<std::mutex> lg(pending_remote_stats_mutex);
         pending_remote_stats[path].emplace_back(tid);

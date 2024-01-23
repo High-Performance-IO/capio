@@ -98,7 +98,7 @@ void parse_conf_file(const std::string &conf_file, const std::filesystem::path &
                     ERR_EXIT("error commit rule is mandatory in streaming section");
                 } else {
                     auto pos = committed.find(':');
-                    if (pos != -1) {
+                    if (pos != std::string::npos) {
                         commit_rule = committed.substr(0, pos);
                         if (commit_rule != CAPIO_FILE_COMMITTED_ON_CLOSE) {
                             std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_ERROR << "commit rule "

@@ -75,6 +75,9 @@ template <class T> class SPSCQueue {
         }
     }
 
+    SPSCQueue(const SPSCQueue &)            = delete;
+    SPSCQueue &operator=(const SPSCQueue &) = delete;
+
     ~SPSCQueue() {
         sem_close(_sem_num_elems);
         sem_close(_sem_num_empty);

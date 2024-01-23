@@ -124,7 +124,7 @@ class MPIBackend : public Backend {
         MPI_Send(msg.c_str(), msg.length() + 1, MPI_CHAR, dest, 0, MPI_COMM_WORLD);
 
         for (const std::string &path : *files_to_send) {
-            CapioFile c_file = get_capio_file(path.c_str());
+            CapioFile &c_file = get_capio_file(path.c_str());
             send_file(c_file.get_buffer(), c_file.get_stored_size(), dest);
         }
     }

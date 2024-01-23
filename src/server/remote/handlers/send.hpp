@@ -10,7 +10,8 @@ inline void handle_remote_send(const std::filesystem::path &path, off64_t offset
               path.c_str(), offset, nbytes, complete ? "true" : "false", file_size, dest);
 
     char *file_shm    = nullptr;
-    CapioFile &c_file = init_capio_file(path, file_shm);
+    CapioFile &c_file = get_capio_file(path);
+    c_file.create_buffer_if_needed(path, false);
     if (nbytes != 0) {
         auto file_shm_size  = c_file.get_buf_size();
         auto file_size_recv = offset + nbytes;
@@ -32,7 +33,8 @@ handle_remote_send_batch(const std::vector<std::pair<std::filesystem::path, off6
         void *p_shm;
         auto c_file_opt = get_capio_file_opt(path);
         if (c_file_opt) {
-            CapioFile &c_file    = init_capio_file(path, false);
+            CapioFile &c_file = get_capio_file(path);
+            c_file.create_buffer_if_needed(path, false);
             p_shm                = c_file.get_buffer();
             size_t file_shm_size = c_file.get_buf_size();
             if (nbytes > file_shm_size) {

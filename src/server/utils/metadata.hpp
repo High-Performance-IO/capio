@@ -16,20 +16,20 @@ std::mutex processes_files_mutex;
 CSMetadataConfMap_t metadata_conf;
 CSMetadataConfGlobs_t metadata_conf_globs;
 
-long int match_globs(const std::filesystem::path &path) {
+long match_globs(const std::filesystem::path &path) {
     START_LOG(gettid(), "call(path=%s)", path.c_str());
 
     long int resolved_glob_offset = -1;
     size_t max_length_prefix      = 0;
     // compute the most accurate and precise glob for a given path
-    for (long int i = 0; i < metadata_conf_globs.size(); i++) {
+    for (std::size_t i = 0; i < metadata_conf_globs.size(); i++) {
         std::string prefix_str = std::get<0>(metadata_conf_globs[i]);
         size_t prefix_length   = prefix_str.length();
         bool path_matches = static_cast<bool>(path.native().compare(0, prefix_length, prefix_str));
         LOG("path=%s, prefix_str=%s, path_matches=%s", path.c_str(), prefix_str.c_str(),
             path_matches ? "True" : "False");
         if (path_matches && prefix_length > max_length_prefix) {
-            resolved_glob_offset = i;
+            resolved_glob_offset = static_cast<long>(i);
             max_length_prefix    = prefix_length;
             LOG("Path matches with offset of %ld", resolved_glob_offset);
         }
@@ -224,16 +224,6 @@ inline void dup_capio_file(int tid, int old_fd, int new_fd) {
     CapioFile &c_file                     = get_capio_file(path);
     c_file.open();
     c_file.add_fd(tid, new_fd);
-}
-
-inline CapioFile &init_capio_file(const std::filesystem::path &path, bool home_node) {
-    START_LOG(gettid(), "call(path=%s, home_node=%s)", path.c_str(), home_node ? "true" : "false");
-
-    CapioFile &c_file = get_capio_file(path);
-    if (c_file.buf_to_allocate()) {
-        c_file.create_buffer(path, home_node);
-    }
-    return c_file;
 }
 
 inline void rename_capio_file(const std::filesystem::path &oldpath,
