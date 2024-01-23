@@ -43,7 +43,7 @@ inline void handle_remote_stat(const std::filesystem::path &path, int dest) {
         if (match_globs(path) != -1) {
             LOG("File is in globs. creating capio_file and starting thread awaiting for future "
                 "creation of file");
-            auto file = create_capio_file(path, false, CAPIO_DEFAULT_FILE_INITIAL_SIZE);
+            CapioFile &file = create_capio_file(path, false, CAPIO_DEFAULT_FILE_INITIAL_SIZE);
             wait_for_file_stat(path, dest, file);
         } else {
             ERR_EXIT("Error capio file is not present, nor is going to be created in the future.");

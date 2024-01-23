@@ -92,7 +92,8 @@ void write_entry_dir(int tid, const std::filesystem::path &file_path,
     long int ld_size = CAPIO_THEORETICAL_SIZE_DIRENT64;
     ld.d_reclen      = ld_size;
 
-    CapioFile &c_file    = init_capio_file(dir, true);
+    CapioFile &c_file = get_capio_file(dir);
+    c_file.create_buffer_if_needed(dir, true);
     void *file_shm       = c_file.get_buffer();
     off64_t file_size    = c_file.get_stored_size();
     off64_t data_size    = file_size + ld_size; // TODO: check theoreitcal size and sizeof(ld) usage

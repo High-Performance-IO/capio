@@ -14,14 +14,14 @@ std::mutex files_location_mutex;
 int fd_files_location;
 CSFDFileLocationReadsVector_t fd_files_location_reads;
 
-class flock_guard {
+class FlockGuard {
   private:
     int _fd;
     struct flock _lock;
     bool _close_file;
 
   public:
-    inline explicit flock_guard(const int fd, const short l_type, bool close_file)
+    inline explicit FlockGuard(const int fd, const short l_type, bool close_file)
         : _fd(fd), _lock(), _close_file(close_file) {
         START_LOG(gettid(), "call(fd=%d, l_type=%d, close_file=%s)", _fd, l_type,
                   close_file ? "true" : "false");
@@ -37,7 +37,10 @@ class flock_guard {
         }
     }
 
-    inline ~flock_guard() {
+    FlockGuard(const FlockGuard &)            = delete;
+    FlockGuard &operator=(const FlockGuard &) = delete;
+
+    inline ~FlockGuard() {
         START_LOG(gettid(), "call(fd=%d)", _fd);
 
         _lock.l_type = F_UNLCK;
@@ -133,7 +136,7 @@ bool load_file_location(const std::filesystem::path &path_to_load) {
             fd_files_location_reads.emplace_back(fd, fp, seek_needed);
         }
 
-        const flock_guard fg(fd, F_RDLCK, false);
+        const FlockGuard fg(fd, F_RDLCK, false);
 
         if (seek_needed && (fseek(fp, ftell(fp), SEEK_SET) == -1)) {
             ERR_EXIT("fseek in load_file_location");
@@ -203,7 +206,7 @@ int delete_from_file_locations(const std::string &file_name,
     if (fd == -1) {
         ERR_EXIT("fileno delete_from_file_location");
     }
-    const flock_guard fg(fd, F_WRLCK, true);
+    const FlockGuard fg(fd, F_WRLCK, true);
     int found = 0;
     long byte = 0;
     while (read != -1 && !found) {
@@ -268,7 +271,7 @@ void delete_from_file_locations(long offset, std::size_t rank) {
         fd_files_location_reads.emplace_back(fd, fp, false);
     }
 
-    flock_guard fg(fd, F_WRLCK, false);
+    FlockGuard fg(fd, F_WRLCK, false);
     LOG("fast remove offset %ld", offset);
     long old_offset = lseek(fd, 0, SEEK_CUR);
     if (old_offset == -1) {
@@ -327,7 +330,7 @@ void open_files_location(int rank) {
 void write_file_location(int rank, const std::filesystem::path &path_to_write, int tid) {
     START_LOG(gettid(), "call(rank=%d, path_to_write=%s)", rank, path_to_write.c_str());
 
-    const flock_guard fg(fd_files_location, F_WRLCK, false);
+    const FlockGuard fg(fd_files_location, F_WRLCK, false);
 
     long offset = lseek(fd_files_location, 0, SEEK_CUR);
     if (offset == -1) {

@@ -21,6 +21,10 @@ class RemoteRequest {
             this->_code = -1;
         }
     };
+
+    RemoteRequest(const RemoteRequest &)            = delete;
+    RemoteRequest &operator=(const RemoteRequest &) = delete;
+
     ~RemoteRequest() { delete[] _buf_recv; }
 
     [[nodiscard]] auto get_source() const { return this->_source; }
