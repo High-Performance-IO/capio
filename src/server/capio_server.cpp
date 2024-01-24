@@ -62,13 +62,6 @@ CSNodesHelperRankMap_t nodes_helper_rank;
 // rank -> node
 CSRankToNodeMap_t rank_to_node;
 
-/*
- * It contains all the reads requested by local processes to read files that
- * are in the local node for which the data is not yet available. path -> [(tid,
- * fd, numbytes, is_getdents), ...]
- */
-CSPendingReadsMap_t pending_reads;
-
 CSClientsRemotePendingNFilesMap_t clients_remote_pending_nfiles;
 
 sem_t internal_server_sem;
@@ -99,7 +92,6 @@ static constexpr std::array<CSHandler_t, CAPIO_NR_REQUESTS> build_request_handle
     _request_handlers[CAPIO_REQUEST_MKDIR]               = mkdir_handler;
     _request_handlers[CAPIO_REQUEST_OPEN]                = open_handler;
     _request_handlers[CAPIO_REQUEST_READ]                = read_handler;
-    _request_handlers[CAPIO_REQUEST_READ_REPLY]          = read_reply_handler;
     _request_handlers[CAPIO_REQUEST_RENAME]              = rename_handler;
     _request_handlers[CAPIO_REQUEST_RMDIR]               = rmdir_handler;
     _request_handlers[CAPIO_REQUEST_SEEK]                = lseek_handler;
@@ -264,9 +256,6 @@ int main(int argc, char **argv) {
     int res = sem_init(&internal_server_sem, 0, 0);
     if (res != 0) {
         ERR_EXIT("sem_init internal_server_sem failed with status %d", res);
-    }
-    if (sem_init(&(backend->remote_read_sem), 0, 1) == -1) {
-        ERR_EXIT("sem_init remote_read_sem in main");
     }
     if (sem_init(&clients_remote_pending_nfiles_sem, 0, 1) == -1) {
         ERR_EXIT("sem_init clients_remote_pending_nfiles_sem in main");

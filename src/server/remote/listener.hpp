@@ -15,9 +15,10 @@ build_server_request_handlers_table() {
     std::array<CComsHandler_t, CAPIO_SERVER_NR_REQUEST> _server_request_handlers{0};
 
     _server_request_handlers[CAPIO_SERVER_REQUEST_READ]       = remote_read_handler;
+    _server_request_handlers[CAPIO_SERVER_REQUEST_READ_REPLY] = remote_read_reply_handler;
     _server_request_handlers[CAPIO_SERVER_REQUEST_READ_BATCH] = remote_read_batch_handler;
-    _server_request_handlers[CAPIO_SERVER_REQUEST_SEND]       = remote_send_handler;
-    _server_request_handlers[CAPIO_SERVER_REQUEST_SEND_BATCH] = remote_send_batch_handler;
+    _server_request_handlers[CAPIO_SERVER_REQUEST_READ_BATCH_REPLY] =
+        remote_read_batch_reply_handler;
     _server_request_handlers[CAPIO_SERVER_REQUEST_STAT]       = remote_stat_handler;
     _server_request_handlers[CAPIO_SERVER_REQUEST_STAT_REPLY] = remote_stat_reply_handler;
 

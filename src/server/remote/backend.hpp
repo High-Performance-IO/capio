@@ -1,5 +1,7 @@
 #ifndef CAPIO_SERVER_REMOTE_BACKEND_HPP
 #define CAPIO_SERVER_REMOTE_BACKEND_HPP
+#include "capio/logger.hpp"
+#include <charconv>
 
 class RemoteRequest {
   private:
@@ -40,8 +42,6 @@ class RemoteRequest {
  */
 class Backend {
   public:
-    sem_t remote_read_sem{};
-
     /**
      * This function parses argv and sets up required elements for the communication library
      * It also sets up the node rank.
@@ -81,44 +81,50 @@ class Backend {
     /**
      * Sends a batch of files to another node
      * @param prefix
-     * @param files_to_send An array of file names to be sent
-     * @param nfiles The count of files to be sent
      * @param dest The target destination
+     * @param tid
+     * @param fd
+     * @param count
+     * @param is_getdents
+     * @param files_to_send An array of file names to be sent
      */
-    virtual void send_files_batch(const std::string &prefix,
-                                  std::vector<std::string> *files_to_send, int nfiles,
-                                  int dest) = 0;
+    virtual void send_files_batch(const std::string &prefix, int dest, int tid, int fd,
+                                  off64_t count, bool is_getdents,
+                                  const std::vector<std::string> *files_to_send) = 0;
 
     /**
      *
      * @param path_c
      * @param dest
      * @param offset
-     * @param nbytes
      * @param complete
      */
-    virtual void serve_remote_read(const std::filesystem::path &path, int dest, long int offset,
-                                   long int nbytes, int complete) = 0;
+    virtual void serve_remote_read(const std::filesystem::path &path, int dest, int tid, int fd,
+                                   off64_t count, off64_t offset, bool complete,
+                                   bool is_getdents) = 0;
 
     /**
      * Handle a remote read request
-     * @param path
-     * @param offset
+     * @param tid
+     * @param fd
      * @param count
-     * @param rank
+     * @param is_getdents
      */
-    virtual void handle_remote_read(const std::filesystem::path &path, off64_t offset,
-                                    off64_t count, int rank) = 0;
+    virtual void handle_remote_read(int tid, int fd, off64_t count, bool is_getdents) = 0;
 
     /**
      * Handle several remote read requests
-     * @param path
+     * @param tid
+     * @param fd
+     * @param count
      * @param app_name
-     * @param dest
-     * @return
+     * @param prefix
+     * @param batch_size
+     * @param is_getdents
      */
-    virtual bool handle_nreads(const std::filesystem::path &path, const std::string &app_name,
-                               int dest) = 0;
+    virtual void handle_remote_read_batch(int tid, int fd, off64_t count,
+                                          const std::string &app_name, const std::string &prefix,
+                                          off64_t batch_size, bool is_getdents) = 0;
 
     /**
      * Handle a remote stat
