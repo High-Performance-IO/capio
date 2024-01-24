@@ -31,9 +31,6 @@ inline void handle_close(int tid, int fd, int rank) {
             }
             pending_reads.erase(it);
         }
-        if (c_file.is_dir()) {
-            wake_pending_remote_stats(path);
-        }
         // TODO: error if seek are done and also do this on exit
         handle_pending_remote_reads(path, c_file.get_sector_end(0), true);
         handle_pending_remote_nfiles(path);

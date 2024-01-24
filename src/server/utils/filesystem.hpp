@@ -15,25 +15,6 @@
 #include "types.hpp"
 
 CSClientsRemotePendingReads_t clients_remote_pending_reads;
-CSClientsRemotePendingStats_t clients_remote_pending_stat;
-
-void wake_pending_remote_stats(const std::string &path) {
-    START_LOG(gettid(), "call(%s)", path.c_str());
-
-    auto it_client = clients_remote_pending_stat.find(path);
-    if (it_client != clients_remote_pending_stat.end()) {
-        LOG("File %s has pending threads waiting for its completion", path.c_str());
-        for (sem_t *sem : it_client->second) {
-            if (sem_post(sem) == -1) {
-                ERR_EXIT("error sem_post sem in wake_pending_remote_stats");
-            }
-            LOG("Woke thread waiting on file %s", path.c_str());
-        }
-        clients_remote_pending_stat.erase(path);
-    } else {
-        LOG("File %s has no pending remote stats. continuing", path.c_str());
-    }
-}
 
 void handle_pending_remote_reads(const std::string &path, off64_t data_size, bool complete) {
     START_LOG(gettid(), "call(%s, %ld, %d)", path.c_str(), data_size, static_cast<int>(complete));
@@ -119,7 +100,6 @@ void write_entry_dir(int tid, const std::filesystem::path &file_path,
 
     if (c_file.n_files == c_file.n_files_expected) {
         c_file.set_complete();
-        wake_pending_remote_stats(dir);
     }
 
     std::string_view mode = c_file.get_mode();

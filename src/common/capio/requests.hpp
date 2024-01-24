@@ -23,12 +23,11 @@ constexpr const int CAPIO_REQUEST_SEEK_DATA           = 18;
 constexpr const int CAPIO_REQUEST_SEEK_END            = 19;
 constexpr const int CAPIO_REQUEST_SEEK_HOLE           = 20;
 constexpr const int CAPIO_REQUEST_STAT                = 21;
-constexpr const int CAPIO_REQUEST_STAT_REPLY          = 22;
-constexpr const int CAPIO_REQUEST_UNLINK              = 23;
-constexpr const int CAPIO_REQUEST_WRITE               = 24;
-constexpr const int CAPIO_REQUEST_RMDIR               = 25;
+constexpr const int CAPIO_REQUEST_UNLINK              = 22;
+constexpr const int CAPIO_REQUEST_WRITE               = 23;
+constexpr const int CAPIO_REQUEST_RMDIR               = 24;
 
-constexpr const int CAPIO_NR_REQUESTS = 26;
+constexpr const int CAPIO_NR_REQUESTS = 25;
 
 /*REQUESTS FOR SERVER TO SERVER COMMUNICATION*/
 

@@ -34,10 +34,8 @@ typedef std::unordered_map<std::string, std::vector<std::tuple<int, int, off64_t
     CSPendingReadsMap_t;
 typedef std::unordered_map<std::string, std::list<std::tuple<int, int, off64_t, bool>>>
     CSMyRemotePendingReads_t;
-typedef std::unordered_map<std::string, std::list<int>> CSMyRemotePendingStats_t;
 typedef std::unordered_map<std::string, std::list<std::tuple<size_t, size_t, sem_t *>>>
     CSClientsRemotePendingReads_t;
-typedef std::unordered_map<std::string, std::list<sem_t *>> CSClientsRemotePendingStats_t;
 typedef std::unordered_map<std::string,
                            std::list<std::tuple<const std::filesystem::path, size_t, int,
                                                 std::vector<std::string> *, sem_t *>>>
