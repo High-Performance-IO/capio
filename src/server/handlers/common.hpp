@@ -18,7 +18,7 @@ inline void init_process(int tid) {
 }
 
 void send_data_to_client(int tid, char *buf, long int count) {
-    START_LOG(gettid(), "call(%d,%s, %ld)", tid, buf, count);
+    START_LOG(gettid(), "call(%d,%.10s, %ld)", tid, buf, count);
     auto *data_buf  = data_buffers[tid].second;
     size_t n_writes = count / CAPIO_DATA_BUFFER_ELEMENT_SIZE;
     size_t r        = count % CAPIO_DATA_BUFFER_ELEMENT_SIZE;

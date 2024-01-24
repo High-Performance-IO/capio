@@ -115,7 +115,7 @@ class MPIBackend : public Backend {
         const char *const format = "%04d %s %d %d %ld %d";
         const int size = snprintf(nullptr, 0, format, CAPIO_SERVER_REQUEST_READ_BATCH_REPLY,
                                   prefix.c_str(), tid, fd, count, is_getdents);
-        const std::unique_ptr<char[]> header(new char[size+1]);
+        const std::unique_ptr<char[]> header(new char[size + 1]);
         sprintf(header.get(), format, CAPIO_SERVER_REQUEST_READ_BATCH_REPLY, prefix.c_str(), tid,
                 fd, count, is_getdents);
         std::string message(header.get());
@@ -142,7 +142,7 @@ class MPIBackend : public Backend {
         START_LOG(gettid(),
                   "call(path=%s, dest=%d, tid=%d, fd=%d, count=%ld, offset=%ld, complete=%s, "
                   "is_getdents=%s)",
-                  path.c_str(), dest, tid, fd, offset, complete ? "true" : "false",
+                  path.c_str(), dest, tid, fd, count, offset, complete ? "true" : "false",
                   is_getdents ? "true" : "false");
 
         // Send all the rest of the file not only the number of bytes requested
@@ -159,7 +159,7 @@ class MPIBackend : public Backend {
         const char *const format = "%04d %d %d %ld %ld %ld %d %d";
         const int size = snprintf(nullptr, 0, format, CAPIO_SERVER_REQUEST_READ_REPLY, tid, fd,
                                   count, nbytes, file_size, complete, is_getdents);
-        const std::unique_ptr<char[]> message(new char[size+1]);
+        const std::unique_ptr<char[]> message(new char[size + 1]);
         sprintf(message.get(), format, CAPIO_SERVER_REQUEST_READ_REPLY, tid, fd, count, nbytes,
                 file_size, complete, is_getdents);
         LOG("Message = %s", message.get());
