@@ -150,7 +150,7 @@ class MPIBackend : public Backend {
         const char *const format = "%04d %s %ld %ld %d %ld";
         const int size = snprintf(nullptr, 0, format, CAPIO_SERVER_REQUEST_SEND, path.c_str(),
                                   offset, nbytes, complete, file_size);
-        const std::unique_ptr<char[]> message(new char[size]);
+        const std::unique_ptr<char[]> message(new char[size + 1]);
         sprintf(message.get(), format, CAPIO_SERVER_REQUEST_SEND, path.c_str(), offset, nbytes,
                 complete, file_size);
 
@@ -173,7 +173,7 @@ class MPIBackend : public Backend {
         const char *const format = "%04d %s %d %ld %ld";
         const int size = snprintf(nullptr, 0, format, CAPIO_SERVER_REQUEST_READ, path.c_str(), rank,
                                   offset, count);
-        const std::unique_ptr<char[]> message(new char[size]);
+        const std::unique_ptr<char[]> message(new char[size + 1]);
         sprintf(message.get(), format, CAPIO_SERVER_REQUEST_READ, path.c_str(), rank, offset,
                 count);
         LOG("Message = %s", message.get());
@@ -202,25 +202,30 @@ class MPIBackend : public Backend {
     }
 
     inline void serve_remote_stat(const std::filesystem::path &path, int dest,
-                                  const CapioFile &c_file) override {
-        START_LOG(gettid(), "call(%s, %d, %ld)", path.c_str(), dest, c_file.get_buf_size());
-        auto msg = new char[PATH_MAX + 1024];
+                                  int source_tid) override {
+        START_LOG(gettid(), "call(path=%s, dest=%d, source_tid%d)", path.c_str(), dest, source_tid);
 
-        sprintf(msg, "%04d %s %ld %d", CAPIO_SERVER_REQUEST_STAT_REPLY, path.c_str(),
-                c_file.get_file_size(), c_file.is_dir() ? 1 : 0);
-
-        MPI_Send(msg, strlen(msg) + 1, MPI_CHAR, dest, 0, MPI_COMM_WORLD);
+        const CapioFile &c_file  = get_capio_file(path);
+        off64_t file_size        = c_file.get_file_size();
+        bool is_dir              = c_file.is_dir();
+        const char *const format = "%04d %s %d %ld %d";
+        const int size = snprintf(nullptr, 0, format, CAPIO_SERVER_REQUEST_STAT_REPLY, path.c_str(),
+                                  source_tid, file_size, is_dir);
+        const std::unique_ptr<char[]> message(new char[size + 1]);
+        sprintf(message.get(), format, CAPIO_SERVER_REQUEST_STAT_REPLY, path.c_str(), source_tid,
+                file_size, is_dir);
+        MPI_Send(message.get(), size + 1, MPI_CHAR, dest, 0, MPI_COMM_WORLD);
     }
 
     inline void handle_remote_stat(int tid, const std::filesystem::path &path, int rank) override {
         START_LOG(gettid(), "call(tid=%d, path=%s, rank=%d)", tid, path.c_str(), rank);
 
-        auto dest                = nodes_helper_rank[std::get<0>(get_file_location(path))];
-        const char *const format = "%04d %d %s";
+        int dest                 = nodes_helper_rank[std::get<0>(get_file_location(path))];
+        const char *const format = "%04d %d %d %s";
         const int size =
-            snprintf(nullptr, 0, format, CAPIO_SERVER_REQUEST_STAT, rank, path.c_str());
-        const std::unique_ptr<char[]> message(new char[size]);
-        sprintf(message.get(), format, CAPIO_SERVER_REQUEST_STAT, rank, path.c_str());
+            snprintf(nullptr, 0, format, CAPIO_SERVER_REQUEST_STAT, tid, rank, path.c_str());
+        const std::unique_ptr<char[]> message(new char[size + 1]);
+        sprintf(message.get(), format, CAPIO_SERVER_REQUEST_STAT, tid, rank, path.c_str());
         LOG("destination=%d, message=%s", dest, message.get());
 
         MPI_Send(message.get(), size + 1, MPI_CHAR, dest, 0, MPI_COMM_WORLD);

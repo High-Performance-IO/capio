@@ -2,6 +2,7 @@
 #define CAPIO_SERVER_UTILS_CAPIO_FILE_HPP
 
 #include <algorithm>
+#include <condition_variable>
 #include <set>
 #include <string_view>
 #include <utility>
@@ -47,14 +48,18 @@ class CapioFile {
     std::set<std::pair<off64_t, off64_t>, compare> _sectors;
     // vector of (tid, fd)
     std::vector<std::pair<int, int>> _threads_fd;
-    bool complete = false; // whether the file is completed / committed
+    bool _complete = false; // whether the file is completed / committed
+
+    /*sync variables*/
+    mutable std::mutex _mutex;
+    mutable std::condition_variable _complete_cv;
 
   public:
     bool first_write           = true;
     long int n_files           = 0;  // useful for directories
     long int n_files_expected  = -1; // useful for directories
     /*
-     * file size in the home node. In a given moment could not be up to date.
+     * file size in the home node. In a given moment could not be up-to-date.
      * This member is useful because a node different from the home node
      * could need to known the size of the file but not its content
      */
@@ -96,13 +101,28 @@ class CapioFile {
         }
     }
 
-    inline void set_complete(bool _complete = true) {
-        START_LOG(gettid(), "setting capio_file.complete=%s", _complete ? "true" : "false");
-        this->complete = _complete;
-    }
     [[nodiscard]] inline bool is_complete() const {
-        START_LOG(gettid(), "capio_file is complete? %s", this->complete ? "true" : "false");
-        return this->complete;
+        START_LOG(gettid(), "capio_file is complete? %s", this->_complete ? "true" : "false");
+        std::lock_guard<std::mutex> lg(_mutex);
+        return this->_complete;
+    }
+
+    inline void wait_for_completion() const {
+        START_LOG(gettid(), "call()");
+        LOG("Thread waiting for file to be committed");
+        std::unique_lock<std::mutex> lock(_mutex);
+        _complete_cv.wait(lock, [this] { return _complete; });
+    }
+
+    inline void set_complete(bool complete = true) {
+        START_LOG(gettid(), "setting capio_file._complete=%s", complete ? "true" : "false");
+        std::lock_guard<std::mutex> lg(_mutex);
+        if (this->_complete != complete) {
+            this->_complete = complete;
+            if (this->_complete) {
+                _complete_cv.notify_all();
+            }
+        }
     }
 
     inline void add_fd(int tid, int fd) { _threads_fd.emplace_back(tid, fd); }

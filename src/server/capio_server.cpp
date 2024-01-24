@@ -107,7 +107,6 @@ static constexpr std::array<CSHandler_t, CAPIO_NR_REQUESTS> build_request_handle
     _request_handlers[CAPIO_REQUEST_SEEK_END]            = seek_end_handler;
     _request_handlers[CAPIO_REQUEST_SEEK_HOLE]           = seek_hole_handler;
     _request_handlers[CAPIO_REQUEST_STAT]                = stat_handler;
-    _request_handlers[CAPIO_REQUEST_STAT_REPLY]          = stat_reply_handler;
     _request_handlers[CAPIO_REQUEST_UNLINK]              = unlink_handler;
     _request_handlers[CAPIO_REQUEST_WRITE]               = write_handler;
 
@@ -124,9 +123,7 @@ static constexpr std::array<CSHandler_t, CAPIO_NR_REQUESTS> build_request_handle
     setup_signal_handlers();
     backend->handshake_servers(rank);
     open_files_location(rank);
-    create_dir(getpid(), get_capio_dir(),
-               rank); // TODO: can be a problem if a process execute readdir
-    // on capio_dir
+    create_dir(getpid(), get_capio_dir(), rank);
 
     init_server();
 

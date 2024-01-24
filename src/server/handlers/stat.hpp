@@ -9,16 +9,14 @@
 #include "utils/producer.hpp"
 #include "utils/types.hpp"
 
-CSMyRemotePendingStats_t pending_remote_stats;
-std::mutex pending_remote_stats_mutex;
-
-void wait_for_stat(int tid, const std::filesystem::path &path, int rank) {
+void wait_for_file_completion(int tid, const std::filesystem::path &path, int rank) {
     START_LOG(gettid(), "call(tid=%d, path=%s)", tid, path.c_str());
 
     loop_load_file_location(path);
     // check if the file is local or remote
     CapioFile &c_file = get_capio_file(path);
 
+    // if file is streamable
     if (c_file.is_complete() || c_file.get_mode() == CAPIO_FILE_MODE_NO_UPDATE ||
         strcmp(std::get<0>(get_file_location(path)), node_name) == 0) {
 
@@ -27,8 +25,6 @@ void wait_for_stat(int tid, const std::filesystem::path &path, int rank) {
 
     } else {
         backend->handle_remote_stat(tid, path, rank);
-        const std::lock_guard<std::mutex> lg(pending_remote_stats_mutex);
-        pending_remote_stats[path].emplace_back(tid);
     }
 }
 
@@ -45,7 +41,7 @@ inline void reply_stat(int tid, const std::filesystem::path &path, int rank) {
             if ((metadata_conf.find(path) != metadata_conf.end() || match_globs(path) != -1) &&
                 !is_producer(tid, path)) {
                 LOG("File not ready yet. Starting a thread to wait for file.");
-                std::thread t(wait_for_stat, tid, std::filesystem::path(path), rank);
+                std::thread t(wait_for_file_completion, tid, std::filesystem::path(path), rank);
                 t.detach();
             } else {
                 LOG("Metadata do not contains file or globs did not contain file or app is "
@@ -73,29 +69,9 @@ inline void reply_stat(int tid, const std::filesystem::path &path, int rank) {
         write_response(tid, static_cast<int>(c_file.is_dir() ? 1 : 0));
     } else {
         LOG("Delegating backend to reply to remote stats");
-        // init a capio file that is remote so that buffer is going to be allocated
+        // send a request for file. then start a thread to wait for the request completion
         c_file.create_buffer_if_needed(path, false);
         backend->handle_remote_stat(tid, path, rank);
-        const std::lock_guard<std::mutex> lg(pending_remote_stats_mutex);
-        pending_remote_stats[path].emplace_back(tid);
-    }
-}
-
-inline void handle_stat_reply(const std::filesystem::path &path, off64_t size, int dir) {
-    START_LOG(gettid(), "call(path_c=%s, size=%ld, dir=%d)", path.c_str(), size, dir);
-
-    const std::lock_guard<std::mutex> lg(pending_remote_stats_mutex);
-    auto it = pending_remote_stats.find(path);
-    if (it == pending_remote_stats.end()) {
-        LOG("handle_stat_reply %s not found, stat already answered for "
-            "optimization",
-            path.c_str());
-    } else {
-        for (int tid : it->second) {
-            write_response(tid, size);
-            write_response(tid, static_cast<off64_t>(dir));
-        }
-        pending_remote_stats.erase(it);
     }
 }
 
@@ -110,14 +86,6 @@ void stat_handler(const char *const str, int rank) {
     int tid;
     sscanf(str, "%d %s", &tid, path);
     reply_stat(tid, path, rank);
-}
-
-void stat_reply_handler(const char *const str, int rank) {
-    char path_c[1024];
-    off64_t size;
-    int dir;
-    sscanf(str, "%s %ld %d", path_c, &size, &dir);
-    handle_stat_reply(path_c, size, dir);
 }
 
 #endif // CAPIO_SERVER_HANDLERS_STAT_HPP

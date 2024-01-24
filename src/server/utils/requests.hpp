@@ -103,10 +103,4 @@ inline void read_reply_request(const std::filesystem::path &path, off64_t size, 
     buf_requests->write(req, CAPIO_REQUEST_MAX_SIZE);
 }
 
-inline void stat_reply_request(const std::filesystem::path &path, off64_t size, int dir) {
-    char req[CAPIO_REQUEST_MAX_SIZE];
-    sprintf(req, "%04d %s %ld %d", CAPIO_REQUEST_STAT_REPLY, path.c_str(), size, dir);
-    buf_requests->write(req, CAPIO_REQUEST_MAX_SIZE);
-}
-
 #endif // CAPIO_SERVER_REQUESTS_HPP

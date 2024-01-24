@@ -124,10 +124,9 @@ class Backend {
      * Handle a remote stat
      * @param path Pathname of stat to be carried on
      * @param dest Target to send the stats of @param path to
-     * @param c_file the capio file on which the stat is carried out
+     * @param source_tid The tid to which to reply to
      */
-    virtual void serve_remote_stat(const std::filesystem::path &path, int dest,
-                                   const CapioFile &c_file) = 0;
+    virtual void serve_remote_stat(const std::filesystem::path &path, int dest, int source_tid) = 0;
 
     /**
      * Handle a remote stat request
