@@ -72,19 +72,19 @@ void write_entry_dir(int tid, const std::filesystem::path &file_path,
     }
 }
 
-void update_dir(int tid, const std::filesystem::path &file_path, int rank) {
-    START_LOG(gettid(), "call(file_path=%s, rank=%d)", file_path.c_str(), rank);
+void update_dir(int tid, const std::filesystem::path &file_path) {
+    START_LOG(gettid(), "call(file_path=%s)", file_path.c_str());
     const std::filesystem::path dir = get_parent_dir_path(file_path);
     CapioFile &c_file               = get_capio_file(dir.c_str());
     if (c_file.first_write) {
         c_file.first_write = false;
-        write_file_location(rank, dir, tid);
+        write_file_location(dir);
     }
     write_entry_dir(tid, file_path, dir, 0);
 }
 
-off64_t create_dir(int tid, const std::filesystem::path &path, int rank) {
-    START_LOG(tid, "call(path=%s, rank=%d)", path.c_str(), rank);
+off64_t create_dir(int tid, const std::filesystem::path &path) {
+    START_LOG(tid, "call(path=%s)", path.c_str());
 
     if (!get_file_location_opt(path)) {
         CapioFile &c_file = create_capio_file(path, true, CAPIO_DEFAULT_DIR_INITIAL_SIZE);
@@ -94,8 +94,8 @@ off64_t create_dir(int tid, const std::filesystem::path &path, int rank) {
             if (is_capio_dir(path)) {
                 add_file_location(path, node_name, -1);
             } else {
-                write_file_location(rank, path, tid);
-                update_dir(tid, path, rank);
+                write_file_location(path);
+                update_dir(tid, path);
             }
             write_entry_dir(tid, path, path, 1);
             const std::filesystem::path parent_dir = get_parent_dir_path(path);

@@ -18,13 +18,13 @@ void handle_rename(int tid, const std::filesystem::path &oldpath,
             }
         }
     }
-    int res = delete_from_file_locations("files_location.txt", oldpath, rank);
+    int res = delete_from_files_location(oldpath);
     if (res != 1) {
         write_response(tid, 1);
         return;
     }
     rename_file_location(oldpath, newpath);
-    write_file_location(rank, newpath, tid);
+    write_file_location(newpath);
     write_response(tid, 0);
 }
 

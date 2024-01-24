@@ -114,8 +114,7 @@ static constexpr std::array<CSHandler_t, CAPIO_NR_REQUESTS> build_request_handle
     MPI_Comm_size(MPI_COMM_WORLD, &n_servers);
     setup_signal_handlers();
     backend->handshake_servers(rank);
-    open_files_location(rank);
-    create_dir(getpid(), get_capio_dir(), rank);
+    create_dir(getpid(), get_capio_dir());
 
     init_server();
 
@@ -251,6 +250,7 @@ int main(int argc, char **argv) {
 
     START_LOG(gettid(), "call()");
 
+    open_files_location();
     backend->initialize(argc, argv, &rank, &provided);
 
     int res = sem_init(&internal_server_sem, 0, 0);
