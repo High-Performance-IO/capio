@@ -29,8 +29,8 @@ inline void update_file_metadata(const std::filesystem::path &path, int tid, int
     }
     if (c_file.first_write && is_creat) {
         c_file.first_write = false;
-        write_file_location(rank, path, tid);
-        update_dir(tid, path, rank);
+        write_file_location(path);
+        update_dir(tid, path);
     }
 }
 

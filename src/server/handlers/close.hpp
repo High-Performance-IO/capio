@@ -5,8 +5,8 @@
 
 #include "utils/filesystem.hpp"
 
-inline void handle_close(int tid, int fd, int rank) {
-    START_LOG(gettid(), "call(tid=%d, fd=%d, rank=%d)", tid, fd, rank);
+inline void handle_close(int tid, int fd) {
+    START_LOG(gettid(), "call(tid=%d, fd=%d)", tid, fd);
 
     const std::filesystem::path &path = get_capio_file_path(tid, fd);
     if (path.empty()) { // avoid to try to close a file that does not exists
@@ -26,7 +26,7 @@ inline void handle_close(int tid, int fd, int rank) {
 
     if (c_file.is_deletable()) {
         delete_capio_file(path);
-        delete_from_file_locations(path, rank);
+        delete_from_files_location(path);
     } else {
         LOG("Deleting capio file from tid=%d", tid);
         delete_capio_file_from_tid(tid, fd);
@@ -36,7 +36,7 @@ inline void handle_close(int tid, int fd, int rank) {
 void close_handler(const char *str, int rank) {
     int tid, fd;
     sscanf(str, "%d %d", &tid, &fd);
-    handle_close(tid, fd, rank);
+    handle_close(tid, fd);
 }
 
 #endif // CAPIO_SERVER_HANDLERS_CLOSE_HPP

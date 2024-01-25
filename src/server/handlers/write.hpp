@@ -32,9 +32,9 @@ inline void handle_write(int tid, int fd, off64_t base_offset, off64_t count, in
     c_file.insert_sector(base_offset, data_size);
     if (c_file.first_write) {
         c_file.first_write = false;
-        write_file_location(rank, path, tid);
+        write_file_location(path);
         // TODO: it works only if there is one prod per file
-        update_dir(tid, path, rank);
+        update_dir(tid, path);
     }
 }
 

@@ -1,8 +1,8 @@
 #ifndef CAPIO_SERVER_HANDLERS_EXITG_HPP
 #define CAPIO_SERVER_HANDLERS_EXITG_HPP
 
-inline void handle_exit_group(int tid, int rank) {
-    START_LOG(gettid(), "call(tid=%d, rank=%d)", tid, rank);
+inline void handle_exit_group(int tid) {
+    START_LOG(gettid(), "call(tid=%d)", tid);
 
     LOG("retrieving pid for process with tid = %d", tid);
     int pid = pids[tid];
@@ -35,7 +35,7 @@ inline void handle_exit_group(int tid, int rank) {
     }
 
     for (auto &fd : get_capio_fds_for_tid(tid)) {
-        handle_close(tid, fd, rank);
+        handle_close(tid, fd);
     }
     free_resources(tid);
 }
@@ -43,7 +43,7 @@ inline void handle_exit_group(int tid, int rank) {
 void exit_group_handler(const char *const str, int rank) {
     int tid;
     sscanf(str, "%d", &tid);
-    handle_exit_group(tid, rank);
+    handle_exit_group(tid);
 }
 
 #endif // CAPIO_SERVER_HANDLERS_EXITG_HPP

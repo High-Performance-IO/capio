@@ -39,10 +39,6 @@ class MPIBackend : public Backend {
         START_LOG(gettid(), "call(%d)", rank);
 
         auto buf = new char[MPI_MAX_PROCESSOR_NAME];
-
-        if (rank == 0) {
-            clean_files_location();
-        }
         for (int i = 0; i < n_servers; i += 1) {
             if (i != rank) {
                 // TODO: possible deadlock

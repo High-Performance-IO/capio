@@ -9,7 +9,6 @@
 #include "capio/circular_buffer.hpp"
 #include "capio/spsc_queue.hpp"
 
-typedef std::vector<std::tuple<int, FILE *, bool>> CSFDFileLocationReadsVector_t;
 typedef std::unordered_map<int, int> CSPidsMap_T;
 typedef std::unordered_map<int, std::string> CSAppsMap_t;
 typedef std::unordered_map<std::string, std::unordered_set<std::string>> CSFilesSentMap_t;
@@ -26,8 +25,7 @@ typedef std::vector<std::tuple<std::string, std::string, std::string, std::strin
                                long int, bool, long int>>
     CSMetadataConfGlobs_t;
 typedef std::unordered_map<int, std::unordered_map<std::string, bool>> CSWritersMap_t;
-typedef std::unordered_map<std::string, std::pair<const char *const, long int>>
-    CSFilesLocationMap_t;
+typedef std::unordered_map<std::string, std::pair<const char *const, off64_t>> CSFilesLocationMap_t;
 typedef std::unordered_map<std::string, int> CSNodesHelperRankMap_t;
 typedef std::unordered_map<int, std::string> CSRankToNodeMap_t;
 typedef std::unordered_map<std::string,
