@@ -11,6 +11,49 @@
 
 std::mutex local_read_mutex;
 
+inline void handle_remote_read_batch(int tid, int fd, off64_t count, const std::string &app_name,
+                                     const std::string &prefix, off64_t batch_size,
+                                     bool is_getdents) {
+    START_LOG(gettid(),
+              "call(tid=%d, fd=%d, count=%ld, app_name=%s, prefix=%s, "
+              "batch_size=%ld, is_getdents=%s)",
+              tid, fd, count, app_name.c_str(), prefix.c_str(), batch_size,
+              is_getdents ? "true" : "false");
+
+    const std::filesystem::path &path = get_capio_file_path(tid, fd);
+    int dest                          = nodes_helper_rank[std::get<0>(get_file_location(path))];
+
+    const char *const format = "%04d %s %d %d %ld %ld %s %s %d";
+    const int size =
+        snprintf(nullptr, 0, format, CAPIO_SERVER_REQUEST_READ_BATCH, path.c_str(), tid, fd, count,
+                 batch_size, app_name.c_str(), prefix.c_str(), is_getdents);
+    const std::unique_ptr<char[]> message(new char[size + 1]);
+    sprintf(message.get(), format, CAPIO_SERVER_REQUEST_READ_BATCH, path.c_str(), tid, fd, count,
+            batch_size, app_name.c_str(), prefix.c_str(), is_getdents);
+    LOG("Message = %s", message.get());
+    backend->send_request(message.get(), size + 1, dest);
+}
+
+inline void handle_remote_read(int tid, int fd, off64_t count, bool is_getdents) {
+    START_LOG(gettid(), "call(tid=%d, fd=%d, count=%ld, is_getdents=%s)", tid, fd, count,
+              is_getdents ? "true" : "false");
+
+    // If it is not in cache then send the request to the remote node
+    const std::filesystem::path &path = get_capio_file_path(tid, fd);
+    off64_t offset                    = get_capio_file_offset(tid, fd);
+    int dest                          = nodes_helper_rank[std::get<0>(get_file_location(path))];
+
+    const char *const format = "%04d %s %d %d %ld %ld %d";
+    const int size = snprintf(nullptr, 0, format, CAPIO_SERVER_REQUEST_READ, path.c_str(), tid, fd,
+                              count, offset, is_getdents);
+    const std::unique_ptr<char[]> message(new char[size + 1]);
+    sprintf(message.get(), format, CAPIO_SERVER_REQUEST_READ, path.c_str(), tid, fd, count, offset,
+            is_getdents);
+
+    LOG("Message = %s", message.get());
+    backend->send_request(message.get(), size + 1, dest);
+}
+
 inline void handle_pending_read(int tid, int fd, long int process_offset, long int count,
                                 bool is_getdents) {
     START_LOG(gettid(), "call(tid=%d, fd=%d, process_offset=%ld, count=%ld, is_getdents=%s)", tid,
@@ -139,7 +182,7 @@ inline void request_remote_read(int tid, int fd, off64_t count, bool is_dir, boo
         send_data_to_client(tid, p + offset, count);
     } else {
         LOG("Delegating to backend remote read");
-        backend->handle_remote_read(tid, fd, count, is_getdents);
+        handle_remote_read(tid, fd, count, is_getdents);
     }
 }
 
@@ -163,8 +206,8 @@ void wait_for_file_creation(int tid, int fd, off64_t count, bool dir, bool is_ge
                 std::string prefix                 = std::get<0>(metadata_conf_globs[pos]);
                 off64_t batch_size                 = std::get<5>(metadata_conf_globs[pos]);
                 if (batch_size > 0) {
-                    backend->handle_remote_read_batch(tid, fd, count, remote_app_name, prefix,
-                                                      batch_size, is_getdents);
+                    handle_remote_read_batch(tid, fd, count, remote_app_name, prefix, batch_size,
+                                             is_getdents);
                     return;
                 }
             }
@@ -204,8 +247,8 @@ inline void handle_read(int tid, int fd, off64_t count, bool dir, bool is_getden
                 off64_t batch_size = std::get<5>(metadata_conf_globs[pos]);
                 if (batch_size > 0) {
                     LOG("Handling batch file");
-                    backend->handle_remote_read_batch(tid, fd, count, app_name, prefix, batch_size,
-                                                      is_getdents);
+                    handle_remote_read_batch(tid, fd, count, app_name, prefix, batch_size,
+                                             is_getdents);
                     return;
                 }
             }

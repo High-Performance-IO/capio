@@ -3,6 +3,67 @@
 
 #include "remote/backend.hpp"
 
+inline void serve_remote_read(const std::filesystem::path &path, int dest, int tid, int fd,
+                              off64_t count, off64_t offset, bool complete, bool is_getdents) {
+    START_LOG(gettid(),
+              "call(path=%s, dest=%d, tid=%d, fd=%d, count=%ld, offset=%ld, complete=%s, "
+              "is_getdents=%s)",
+              path.c_str(), dest, tid, fd, count, offset, complete ? "true" : "false",
+              is_getdents ? "true" : "false");
+
+    // Send all the rest of the file not only the number of bytes requested
+    // Useful for caching
+    CapioFile &c_file          = get_capio_file(path);
+    long int nbytes            = c_file.get_stored_size() - offset;
+    off64_t prefetch_data_size = get_prefetch_data_size();
+
+    if (prefetch_data_size != 0 && nbytes > prefetch_data_size) {
+        nbytes = prefetch_data_size;
+    }
+    const off64_t file_size = c_file.get_stored_size();
+
+    const char *const format = "%04d %d %d %ld %ld %ld %d %d";
+    const int size = snprintf(nullptr, 0, format, CAPIO_SERVER_REQUEST_READ_REPLY, tid, fd, count,
+                              nbytes, file_size, complete, is_getdents);
+    const std::unique_ptr<char[]> message(new char[size + 1]);
+    sprintf(message.get(), format, CAPIO_SERVER_REQUEST_READ_REPLY, tid, fd, count, nbytes,
+            file_size, complete, is_getdents);
+    LOG("Message = %s", message.get());
+
+    // send request
+    backend->send_request(message.get(), size + 1, dest);
+    // send data
+    backend->send_file(c_file.get_buffer() + offset, nbytes, dest);
+}
+
+inline void send_files_batch(const std::string &prefix, int dest, int tid, int fd, off64_t count,
+                             bool is_getdents, const std::vector<std::string> *files_to_send) {
+    START_LOG(gettid(), "call(prefix=%s, dest=%d, tid=%d, fd=%d, count=%ld, is_getdents=%s)",
+              prefix.c_str(), dest, tid, fd, count, is_getdents ? "true" : "false");
+
+    const char *const format = "%04d %s %d %d %ld %d";
+    const int size           = snprintf(nullptr, 0, format, CAPIO_SERVER_REQUEST_READ_BATCH_REPLY,
+                                        prefix.c_str(), tid, fd, count, is_getdents);
+    const std::unique_ptr<char[]> header(new char[size + 1]);
+    sprintf(header.get(), format, CAPIO_SERVER_REQUEST_READ_BATCH_REPLY, prefix.c_str(), tid, fd,
+            count, is_getdents);
+    std::string message(header.get());
+    for (const std::string &path : *files_to_send) {
+        CapioFile &c_file = get_capio_file(path);
+        message.append(" " + path.substr(prefix.length()) + " " +
+                       std::to_string(c_file.get_stored_size()));
+    }
+    LOG("Message = %s", message.c_str());
+
+    // send request
+    backend->send_request(message.c_str(), message.length(), dest);
+    // send data
+    for (const std::string &path : *files_to_send) {
+        CapioFile &c_file = get_capio_file(path);
+        backend->send_file(c_file.get_buffer(), c_file.get_stored_size(), dest);
+    }
+}
+
 // FIXME: understand the logic on n_files
 std::vector<std::string> *files_available(const std::string &prefix, const std::string &app_name,
                                           const std::string &path, off64_t batch_size) {
@@ -88,8 +149,7 @@ void wait_for_data(const std::filesystem::path &path, int dest, int tid, int fd,
     const CapioFile &c_file = get_capio_file(path);
     // wait that nbytes are written
     c_file.wait_for_data(offset + count);
-    backend->serve_remote_read(path, dest, tid, fd, count, offset, c_file.is_complete(),
-                               is_getdents);
+    serve_remote_read(path, dest, tid, fd, count, offset, c_file.is_complete(), is_getdents);
 }
 
 void wait_for_files_batch(const std::filesystem::path &prefix, int dest, int tid, int fd,
@@ -99,7 +159,7 @@ void wait_for_files_batch(const std::filesystem::path &prefix, int dest, int tid
               prefix.c_str(), dest, tid, fd, count, is_getdents ? "true" : "false");
 
     SEM_WAIT_CHECK(n_files_ready, "n_files_ready");
-    backend->send_files_batch(prefix, dest, tid, fd, count, is_getdents, files);
+    send_files_batch(prefix, dest, tid, fd, count, is_getdents, files);
 
     delete n_files_ready;
 }
@@ -122,7 +182,7 @@ inline void handle_remote_read_batch(const std::filesystem::path &path, int dest
     SEM_POST_CHECK(&clients_remote_pending_nfiles_sem, "clients_remote_pending_nfiles_sem");
 
     if (files->size() == batch_size) {
-        backend->send_files_batch(prefix, dest, tid, fd, count, is_getdents, files);
+        send_files_batch(prefix, dest, tid, fd, count, is_getdents, files);
     } else {
         /*
          * create a thread that waits for the completion of such
@@ -182,8 +242,7 @@ inline void handle_remote_read(const std::filesystem::path &path, int dest, int 
     bool data_available = (offset + count <= c_file.get_stored_size());
     if (c_file.is_complete() ||
         (c_file.get_mode() == CAPIO_FILE_MODE_NO_UPDATE && data_available)) {
-        backend->serve_remote_read(path, dest, tid, fd, count, offset, c_file.is_complete(),
-                                   is_getdents);
+        serve_remote_read(path, dest, tid, fd, count, offset, c_file.is_complete(), is_getdents);
     } else {
         std::thread t(wait_for_data, path, dest, tid, fd, count, offset, is_getdents);
         t.detach();

@@ -79,76 +79,14 @@ class Backend {
     virtual void send_file(char *shm, long int nbytes, int dest) = 0;
 
     /**
-     * Sends a batch of files to another node
-     * @param prefix
-     * @param dest The target destination
-     * @param tid
-     * @param fd
-     * @param count
-     * @param is_getdents
-     * @param files_to_send An array of file names to be sent
-     */
-    virtual void send_files_batch(const std::string &prefix, int dest, int tid, int fd,
-                                  off64_t count, bool is_getdents,
-                                  const std::vector<std::string> *files_to_send) = 0;
-
-    /**
-     *
-     * @param path_c
-     * @param dest
-     * @param offset
-     * @param complete
-     */
-    virtual void serve_remote_read(const std::filesystem::path &path, int dest, int tid, int fd,
-                                   off64_t count, off64_t offset, bool complete,
-                                   bool is_getdents) = 0;
-
-    /**
-     * Handle a remote read request
-     * @param tid
-     * @param fd
-     * @param count
-     * @param is_getdents
-     */
-    virtual void handle_remote_read(int tid, int fd, off64_t count, bool is_getdents) = 0;
-
-    /**
-     * Handle several remote read requests
-     * @param tid
-     * @param fd
-     * @param count
-     * @param app_name
-     * @param prefix
-     * @param batch_size
-     * @param is_getdents
-     */
-    virtual void handle_remote_read_batch(int tid, int fd, off64_t count,
-                                          const std::string &app_name, const std::string &prefix,
-                                          off64_t batch_size, bool is_getdents) = 0;
-
-    /**
-     * Handle a remote stat
-     * @param path Pathname of stat to be carried on
-     * @param dest Target to send the stats of @param path to
-     * @param source_tid The tid to which to reply to
-     */
-    virtual void serve_remote_stat(const std::filesystem::path &path, int dest, int source_tid) = 0;
-
-    /**
-     * Handle a remote stat request
-     * @param tid
-     * @param path
-     * @param rank
-     */
-    virtual void handle_remote_stat(int tid, const std::filesystem::path &path, int rank) = 0;
-
-    /**
      * receive a file from another process
      * @param shm Buffer that will be filled with incoming data
      * @param source The source target to receive from
      * @param bytes_expected Size of expected incoming buffer
      */
     virtual void recv_file(char *shm, int source, long int bytes_expected) = 0;
+
+    virtual void send_request(const char *message, int message_len, int destination) = 0;
 };
 
 Backend *backend;

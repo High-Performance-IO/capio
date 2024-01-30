@@ -3,13 +3,30 @@
 
 #include "remote/backend.hpp"
 
+inline void serve_remote_stat(const std::filesystem::path &path, int dest, int source_tid) {
+    START_LOG(gettid(), "call(path=%s, dest=%d, source_tid%d)", path.c_str(), dest, source_tid);
+
+    const CapioFile &c_file  = get_capio_file(path);
+    off64_t file_size        = c_file.get_file_size();
+    bool is_dir              = c_file.is_dir();
+    const char *const format = "%04d %s %d %ld %d";
+    const int size = snprintf(nullptr, 0, format, CAPIO_SERVER_REQUEST_STAT_REPLY, path.c_str(),
+                              source_tid, file_size, is_dir);
+    const std::unique_ptr<char[]> message(new char[size + 1]);
+
+    sprintf(message.get(), "%04d %s %d %ld %d", CAPIO_SERVER_REQUEST_STAT_REPLY, path.c_str(),
+            source_tid, file_size, is_dir);
+
+    backend->send_request(message.get(), size + 1, dest);
+}
+
 void wait_for_completion(const std::filesystem::path &path, int source_tid, int dest) {
     START_LOG(gettid(), "call(path=%s, dest=%d)", path.c_str(), dest);
 
     const CapioFile &c_file = get_capio_file(path);
     c_file.wait_for_completion();
     LOG("File %s has been completed. serving stats data", path.c_str());
-    backend->serve_remote_stat(path, dest, source_tid);
+    serve_remote_stat(path, dest, source_tid);
 }
 
 inline void handle_remote_stat(int source_tid, const std::filesystem::path &path, int dest) {
@@ -19,7 +36,7 @@ inline void handle_remote_stat(int source_tid, const std::filesystem::path &path
     if (c_file) {
         if (c_file->get().is_complete() || c_file->get().get_mode() == CAPIO_FILE_MODE_NO_UPDATE) {
             LOG("file is complete. serving file");
-            backend->serve_remote_stat(path, dest, source_tid);
+            serve_remote_stat(path, dest, source_tid);
         } else { // wait for completion
             LOG("File is not _complete. awaiting completion on different thread");
             std::thread t(wait_for_completion, path, source_tid, dest);
