@@ -4,12 +4,13 @@
 #include "remote/backend.hpp"
 #include "remote/requests.hpp"
 
-inline void serve_remote_read(const std::filesystem::path &path, int dest, int tid, int fd,
-                              off64_t count, off64_t offset, bool complete, bool is_getdents) {
+inline void serve_remote_read(const std::filesystem::path &path, const std::string &dest, int tid,
+                              int fd, off64_t count, off64_t offset, bool complete,
+                              bool is_getdents) {
     START_LOG(gettid(),
-              "call(path=%s, dest=%d, tid=%d, fd=%d, count=%ld, offset=%ld, complete=%s, "
+              "call(path=%s, dest=%s, tid=%d, fd=%d, count=%ld, offset=%ld, complete=%s, "
               "is_getdents=%s)",
-              path.c_str(), dest, tid, fd, count, offset, complete ? "true" : "false",
+              path.c_str(), dest.c_str(), tid, fd, count, offset, complete ? "true" : "false",
               is_getdents ? "true" : "false");
 
     // Send all the rest of the file not only the number of bytes requested
@@ -29,10 +30,11 @@ inline void serve_remote_read(const std::filesystem::path &path, int dest, int t
     backend->send_file(c_file.get_buffer() + offset, nbytes, dest);
 }
 
-inline void send_files_batch(const std::string &prefix, int dest, int tid, int fd, off64_t count,
-                             bool is_getdents, const std::vector<std::string> *files_to_send) {
-    START_LOG(gettid(), "call(prefix=%s, dest=%d, tid=%d, fd=%d, count=%ld, is_getdents=%s)",
-              prefix.c_str(), dest, tid, fd, count, is_getdents ? "true" : "false");
+inline void send_files_batch(const std::string &prefix, const std::string &dest, int tid, int fd,
+                             off64_t count, bool is_getdents,
+                             const std::vector<std::string> *files_to_send) {
+    START_LOG(gettid(), "call(prefix=%s, dest=%s, tid=%d, fd=%d, count=%ld, is_getdents=%s)",
+              prefix.c_str(), dest.c_str(), tid, fd, count, is_getdents ? "true" : "false");
 
     // send request
     send_files_batch_request(prefix, tid, fd, count, is_getdents, dest, files_to_send);
@@ -120,11 +122,11 @@ inline void handle_read_reply(int tid, int fd, long count, off64_t file_size, of
     }
 }
 
-void wait_for_data(const std::filesystem::path &path, int dest, int tid, int fd, off64_t count,
-                   off64_t offset, bool is_getdents) {
+void wait_for_data(const std::filesystem::path &path, const std::string &dest, int tid, int fd,
+                   off64_t count, off64_t offset, bool is_getdents) {
     START_LOG(gettid(),
-              "call(path=%s, dest=%d, tid=%d, fs=%d, count=%ld, offset=%ld, is_getdents=%s)",
-              path.c_str(), dest, tid, fd, count, offset, is_getdents ? "true" : "false");
+              "call(path=%s, dest=%s, tid=%d, fs=%d, count=%ld, offset=%ld, is_getdents=%s)",
+              path.c_str(), dest.c_str(), tid, fd, count, offset, is_getdents ? "true" : "false");
 
     const CapioFile &c_file = get_capio_file(path);
     // wait that nbytes are written
@@ -132,11 +134,11 @@ void wait_for_data(const std::filesystem::path &path, int dest, int tid, int fd,
     serve_remote_read(path, dest, tid, fd, count, offset, c_file.is_complete(), is_getdents);
 }
 
-void wait_for_files_batch(const std::filesystem::path &prefix, int dest, int tid, int fd,
-                          off64_t count, bool is_getdents, const std::vector<std::string> *files,
-                          sem_t *n_files_ready) {
-    START_LOG(gettid(), "call(prefix=%s, dest=%d, tid=%d, fd=%d, count=%ld, is_getdents=%s)",
-              prefix.c_str(), dest, tid, fd, count, is_getdents ? "true" : "false");
+void wait_for_files_batch(const std::filesystem::path &prefix, const std::string &dest, int tid,
+                          int fd, off64_t count, bool is_getdents,
+                          const std::vector<std::string> *files, sem_t *n_files_ready) {
+    START_LOG(gettid(), "call(prefix=%s, dest=%s, tid=%d, fd=%d, count=%ld, is_getdents=%s)",
+              prefix.c_str(), dest.c_str(), tid, fd, count, is_getdents ? "true" : "false");
 
     SEM_WAIT_CHECK(n_files_ready, "n_files_ready");
     send_files_batch(prefix, dest, tid, fd, count, is_getdents, files);
@@ -144,14 +146,15 @@ void wait_for_files_batch(const std::filesystem::path &prefix, int dest, int tid
     delete n_files_ready;
 }
 
-inline void handle_remote_read_batch(const std::filesystem::path &path, int dest, int tid, int fd,
-                                     off64_t count, off64_t batch_size, const std::string &app_name,
+inline void handle_remote_read_batch(const std::filesystem::path &path, std::string &dest, int tid,
+                                     int fd, off64_t count, off64_t batch_size,
+                                     const std::string &app_name,
                                      const std::filesystem::path &prefix, bool is_getdents) {
     START_LOG(
         gettid(),
-        "call(path=%s, dest=%d, tid=%d, fd=%d, count=%ld, batch_size=%ld, app_name=%s, prefix=%s, "
+        "call(path=%s, dest=%s, tid=%d, fd=%d, count=%ld, batch_size=%ld, app_name=%s, prefix=%s, "
         "is_getdents=%s)",
-        path.c_str(), dest, tid, fd, count, batch_size, app_name.c_str(), prefix.c_str(),
+        path.c_str(), dest.c_str(), tid, fd, count, batch_size, app_name.c_str(), prefix.c_str(),
         is_getdents ? "true" : "false");
 
     // FIXME: this assignment always overrides the request parameter, which is never used
@@ -181,11 +184,11 @@ inline void handle_remote_read_batch(const std::filesystem::path &path, int dest
 }
 
 inline void
-handle_remote_read_batch_reply(int dest, int tid, int fd, off64_t count,
+handle_remote_read_batch_reply(std::string &dest, int tid, int fd, off64_t count,
                                const std::vector<std::pair<std::filesystem::path, off64_t>> &files,
                                bool is_getdents) {
-    START_LOG(gettid(), "call(dest=%d, tid=%d, fd=%d, count=%ld, is_getdents=%s)", dest, tid, fd,
-              count, is_getdents ? "true" : "false");
+    START_LOG(gettid(), "call(dest=%s, tid=%d, fd=%d, count=%ld, is_getdents=%s)", dest.c_str(),
+              tid, fd, count, is_getdents ? "true" : "false");
 
     for (const auto &[path, nbytes] : files) {
         auto c_file_opt = get_capio_file_opt(path);
@@ -198,8 +201,7 @@ handle_remote_read_batch_reply(int dest, int tid, int fd, off64_t count,
             }
             c_file.first_write = false;
         } else {
-            auto node_name_src = rank_to_node[dest];
-            add_file_location(path, node_name_src.c_str(), -1);
+            add_file_location(path, dest.c_str(), -1);
             CapioFile &c_file = create_capio_file(path, false, nbytes);
             c_file.insert_sector(0, nbytes);
             c_file.real_file_size = nbytes;
@@ -212,11 +214,11 @@ handle_remote_read_batch_reply(int dest, int tid, int fd, off64_t count,
     }
 }
 
-inline void handle_remote_read(const std::filesystem::path &path, int dest, int tid, int fd,
-                               off64_t count, off64_t offset, bool is_getdents) {
+inline void handle_remote_read(const std::filesystem::path &path, std::string &dest, int tid,
+                               int fd, off64_t count, off64_t offset, bool is_getdents) {
     START_LOG(gettid(),
-              "call(path=%s, dest=%d, tid=%d, fd=%d, count=%ld, offset=%ld, is_getdents=%s)",
-              path.c_str(), dest, tid, fd, count, offset, is_getdents ? "true" : "false");
+              "call(path=%s, dest=%s, tid=%d, fd=%d, count=%ld, offset=%ld, is_getdents=%s)",
+              path.c_str(), dest.c_str(), tid, fd, count, offset, is_getdents ? "true" : "false");
 
     CapioFile &c_file   = get_capio_file(path);
     bool data_available = (offset + count <= c_file.get_stored_size());
@@ -229,12 +231,13 @@ inline void handle_remote_read(const std::filesystem::path &path, int dest, int 
     }
 }
 
-inline void handle_remote_read_reply(int dest, int tid, int fd, off64_t count, off64_t nbytes,
-                                     off64_t file_size, bool complete, bool is_getdents) {
+inline void handle_remote_read_reply(std::string &dest, int tid, int fd, off64_t count,
+                                     off64_t nbytes, off64_t file_size, bool complete,
+                                     bool is_getdents) {
     START_LOG(gettid(),
-              "call(dest=%d, tid=%d, fd=%d, count=%ld, nbytes=%ld, file_size=%ld, complete=%s, "
+              "call(dest=%s, tid=%d, fd=%d, count=%ld, nbytes=%ld, file_size=%ld, complete=%s, "
               "is_getdents=%s)",
-              dest, tid, fd, count, nbytes, file_size, complete ? "true" : "false",
+              dest.c_str(), tid, fd, count, nbytes, file_size, complete ? "true" : "false",
               is_getdents ? "true" : "false");
 
     const std::filesystem::path &path = get_capio_file_path(tid, fd);
@@ -255,7 +258,7 @@ inline void handle_remote_read_reply(int dest, int tid, int fd, off64_t count, o
 }
 
 void remote_read_batch_handler(const RemoteRequest &request) {
-    int dest = request.get_source();
+    std::string dest = request.get_source();
     int tid, fd, is_getdents;
     off64_t count, batch_size;
     char path[PATH_MAX], app_name[512], prefix[PATH_MAX];
@@ -265,7 +268,7 @@ void remote_read_batch_handler(const RemoteRequest &request) {
 }
 
 void remote_read_batch_reply_handler(const RemoteRequest &request) {
-    int dest = request.get_source();
+    std::string dest = request.get_source();
     std::string path, prefix, tmp;
     std::vector<std::pair<std::filesystem::path, off64_t>> files;
 
@@ -290,7 +293,7 @@ void remote_read_batch_reply_handler(const RemoteRequest &request) {
 }
 
 void remote_read_handler(const RemoteRequest &request) {
-    int dest = request.get_source();
+    std::string dest = request.get_source();
     char path[PATH_MAX];
     int tid, fd, is_getdents;
     off64_t count, offset;
@@ -300,7 +303,7 @@ void remote_read_handler(const RemoteRequest &request) {
 }
 
 void remote_read_reply_handler(const RemoteRequest &request) {
-    int dest = request.get_source();
+    std::string dest = request.get_source();
     off64_t count, nbytes, file_size;
     int tid, fd, complete, is_getdents;
     sscanf(request.get_content(), "%d %d %ld %ld %ld %d %d", &tid, &fd, &count, &nbytes, &file_size,

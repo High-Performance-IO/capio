@@ -5,8 +5,8 @@
 #include "utils/metadata.hpp"
 
 inline void handle_write(int tid, int fd, off64_t base_offset, off64_t count) {
-    START_LOG(gettid(), "call(tid=%d, fd=%d, base_offset=%ld, count=%ld)", tid, fd,
-              base_offset, count);
+    START_LOG(gettid(), "call(tid=%d, fd=%d, base_offset=%ld, count=%ld)", tid, fd, base_offset,
+              count);
     // check if another process is waiting for this data
     off64_t data_size                 = base_offset + count;
     const std::filesystem::path &path = get_capio_file_path(tid, fd);
@@ -38,7 +38,7 @@ inline void handle_write(int tid, int fd, off64_t base_offset, off64_t count) {
     }
 }
 
-void write_handler(const char *const str, int rank) {
+void write_handler(const char *const str) {
     std::string request;
     int tid, fd;
     off64_t base_offset, count;

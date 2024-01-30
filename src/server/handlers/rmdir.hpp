@@ -10,7 +10,7 @@ inline void handle_rmdir(int tid, const std::filesystem::path &dir_to_remove) {
     write_response(tid, res);
 }
 
-void rmdir_handler(const char *const str, int rank) {
+void rmdir_handler(const char *const str) {
     char dir_to_remove[PATH_MAX];
     int tid;
     sscanf(str, "%s %d", dir_to_remove, &tid);

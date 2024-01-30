@@ -18,7 +18,7 @@ inline void handle_unlink(int tid, const std::filesystem::path &path) {
     }
 }
 
-void unlink_handler(const char *const str, int rank) {
+void unlink_handler(const char *const str) {
     char path[PATH_MAX];
     int tid;
     sscanf(str, "%d %s", &tid, path);

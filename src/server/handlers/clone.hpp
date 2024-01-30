@@ -18,7 +18,7 @@ inline void handle_clone(pid_t parent_tid, pid_t child_tid) {
     }
 }
 
-void clone_handler(const char *const str, int rank) {
+void clone_handler(const char *const str) {
     pid_t parent_tid, child_tid;
     sscanf(str, "%d %d", &parent_tid, &child_tid);
     handle_clone(parent_tid, child_tid);

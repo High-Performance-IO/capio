@@ -4,8 +4,10 @@
 #include "remote/backend.hpp"
 #include "remote/requests.hpp"
 
-inline void serve_remote_stat(const std::filesystem::path &path, int dest, int source_tid) {
-    START_LOG(gettid(), "call(path=%s, dest=%d, source_tid%d)", path.c_str(), dest, source_tid);
+inline void serve_remote_stat(const std::filesystem::path &path, const std::string &dest,
+                              int source_tid) {
+    START_LOG(gettid(), "call(path=%s, dest=%s, source_tid%d)", path.c_str(), dest.c_str(),
+              source_tid);
 
     const CapioFile &c_file = get_capio_file(path);
     off64_t file_size       = c_file.get_file_size();
@@ -13,8 +15,9 @@ inline void serve_remote_stat(const std::filesystem::path &path, int dest, int s
     serve_remote_stat_request(path, source_tid, file_size, is_dir, dest);
 }
 
-void wait_for_completion(const std::filesystem::path &path, int source_tid, int dest) {
-    START_LOG(gettid(), "call(path=%s, dest=%d)", path.c_str(), dest);
+void wait_for_completion(const std::filesystem::path &path, int source_tid,
+                         const std::string &dest) {
+    START_LOG(gettid(), "call(path=%s, dest=%s)", path.c_str(), dest.c_str());
 
     const CapioFile &c_file = get_capio_file(path);
     c_file.wait_for_completion();
@@ -22,8 +25,10 @@ void wait_for_completion(const std::filesystem::path &path, int source_tid, int 
     serve_remote_stat(path, dest, source_tid);
 }
 
-inline void handle_remote_stat(int source_tid, const std::filesystem::path &path, int dest) {
-    START_LOG(gettid(), "call(source_tid=%d, path=%s, dest=%d)", source_tid, path.c_str(), dest);
+inline void handle_remote_stat(int source_tid, const std::filesystem::path &path,
+                               std::string &dest) {
+    START_LOG(gettid(), "call(source_tid=%d, path=%s, dest=%s)", source_tid, path.c_str(),
+              dest.c_str());
 
     auto c_file = get_capio_file_opt(path);
     if (c_file) {
@@ -60,8 +65,10 @@ inline void handle_remote_stat_reply(const std::filesystem::path &path, int sour
 
 void remote_stat_handler(const RemoteRequest &request) {
     char path[PATH_MAX];
-    int dest, tid;
-    sscanf(request.get_content(), "%d %d %s", &tid, &dest, path);
+    int tid;
+    std::string dest;
+    dest.reserve(1024);
+    sscanf(request.get_content(), "%d %s %s", &tid, dest.data(), path);
     handle_remote_stat(tid, path, dest);
 }
 

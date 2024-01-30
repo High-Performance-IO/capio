@@ -2,7 +2,7 @@
 #define CAPIO_REMOTE_REQUESTS_HPP
 
 inline void serve_remote_stat_request(const std::filesystem::path &path, int source_tid,
-                                      off64_t file_size, bool is_dir, int dest) {
+                                      off64_t file_size, bool is_dir, const std::string &dest) {
     const char *const format = "%04d %s %d %ld %d";
     const int size = snprintf(nullptr, 0, format, CAPIO_SERVER_REQUEST_STAT_REPLY, path.c_str(),
                               source_tid, file_size, is_dir);
@@ -16,7 +16,7 @@ inline void serve_remote_stat_request(const std::filesystem::path &path, int sou
 
 inline void serve_remote_read_request(int tid, int fd, int count, long int nbytes,
                                       const off64_t file_size, bool complete, bool is_getdents,
-                                      int dest) {
+                                      const std::string &dest) {
     START_LOG(gettid(), "call()");
     const char *const format = "%04d %d %d %ld %ld %ld %d %d";
     const int size = snprintf(nullptr, 0, format, CAPIO_SERVER_REQUEST_READ_REPLY, tid, fd, count,
@@ -31,7 +31,7 @@ inline void serve_remote_read_request(int tid, int fd, int count, long int nbyte
 }
 
 inline void send_files_batch_request(const std::string &prefix, int tid, int fd, int count,
-                                     bool is_getdents, int dest,
+                                     bool is_getdents, const std::string &dest,
                                      const std::vector<std::string> *files_to_send) {
     START_LOG(gettid(), "call()");
     const char *const format = "%04d %s %d %d %ld %d";
@@ -52,16 +52,16 @@ inline void send_files_batch_request(const std::string &prefix, int tid, int fd,
     backend->send_request(message.c_str(), message.length(), dest);
 }
 
-inline void handle_remote_stat_request(int tid, const std::filesystem::path &path, int rank) {
-    START_LOG(gettid(), "call(tid=%d, path=%s, rank=%d)", tid, path.c_str(), rank);
+inline void handle_remote_stat_request(int tid, const std::filesystem::path &path) {
+    START_LOG(gettid(), "call(tid=%d, path=%s)", tid, path.c_str());
 
-    int dest                 = nodes_helper_rank[std::get<0>(get_file_location(path))];
-    const char *const format = "%04d %d %d %s";
+    std::string dest         = std::get<0>(get_file_location(path));
+    const char *const format = "%04d %d %s %s";
     const int size =
-        snprintf(nullptr, 0, format, CAPIO_SERVER_REQUEST_STAT, tid, rank, path.c_str());
+        snprintf(nullptr, 0, format, CAPIO_SERVER_REQUEST_STAT, tid, node_name, path.c_str());
     const std::unique_ptr<char[]> message(new char[size + 1]);
-    sprintf(message.get(), format, CAPIO_SERVER_REQUEST_STAT, tid, rank, path.c_str());
-    LOG("destination=%d, message=%s", dest, message.get());
+    sprintf(message.get(), format, CAPIO_SERVER_REQUEST_STAT, tid, node_name, path.c_str());
+    LOG("destination=%s, message=%s", dest.c_str(), message.get());
 
     backend->send_request(message.get(), size + 1, dest);
     LOG("message sent");
@@ -77,7 +77,7 @@ inline void handle_remote_read_batch_request(int tid, int fd, off64_t count,
               is_getdents ? "true" : "false");
 
     const std::filesystem::path &path = get_capio_file_path(tid, fd);
-    int dest                          = nodes_helper_rank[std::get<0>(get_file_location(path))];
+    std::string dest                  = std::get<0>(get_file_location(path));
 
     const char *const format = "%04d %s %d %d %ld %ld %s %s %d";
     const int size =
@@ -97,7 +97,7 @@ inline void handle_remote_read_request(int tid, int fd, off64_t count, bool is_g
     // If it is not in cache then send the request to the remote node
     const std::filesystem::path &path = get_capio_file_path(tid, fd);
     off64_t offset                    = get_capio_file_offset(tid, fd);
-    int dest                          = nodes_helper_rank[std::get<0>(get_file_location(path))];
+    std::string dest                  = std::get<0>(get_file_location(path));
 
     const char *const format = "%04d %s %d %d %ld %ld %d";
     const int size = snprintf(nullptr, 0, format, CAPIO_SERVER_REQUEST_READ, path.c_str(), tid, fd,

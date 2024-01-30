@@ -28,7 +28,7 @@ void handle_rename(int tid, const std::filesystem::path &oldpath,
     write_response(tid, 0);
 }
 
-void rename_handler(const char *const str, int rank) {
+void rename_handler(const char *const str) {
     char oldpath[PATH_MAX];
     char newpath[PATH_MAX];
     int tid;

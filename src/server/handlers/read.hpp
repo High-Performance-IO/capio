@@ -217,21 +217,21 @@ inline void handle_read(int tid, int fd, off64_t count, bool dir, bool is_getden
     }
 }
 
-void getdents_handler(const char *const str, int rank) {
+void getdents_handler(const char *const str) {
     int tid, fd;
     off64_t count;
     sscanf(str, "%d %d %ld", &tid, &fd, &count);
     handle_read(tid, fd, count, true, true);
 }
 
-void getdents64_handler(const char *const str, int rank) {
+void getdents64_handler(const char *const str) {
     int tid, fd;
     off64_t count;
     sscanf(str, "%d %d %ld", &tid, &fd, &count);
     handle_read(tid, fd, count, true, false);
 }
 
-void read_handler(const char *const str, int rank) {
+void read_handler(const char *const str) {
     int tid, fd;
     off64_t count;
     sscanf(str, "%d %d %ld", &tid, &fd, &count);

@@ -33,7 +33,7 @@ inline void handle_close(int tid, int fd) {
     }
 }
 
-void close_handler(const char *str, int rank) {
+void close_handler(const char *str) {
     int tid, fd;
     sscanf(str, "%d %d", &tid, &fd);
     handle_close(tid, fd);
