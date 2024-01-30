@@ -22,16 +22,8 @@ inline void serve_remote_read(const std::filesystem::path &path, int dest, int t
     }
     const off64_t file_size = c_file.get_stored_size();
 
-    const char *const format = "%04d %d %d %ld %ld %ld %d %d";
-    const int size = snprintf(nullptr, 0, format, CAPIO_SERVER_REQUEST_READ_REPLY, tid, fd, count,
-                              nbytes, file_size, complete, is_getdents);
-    const std::unique_ptr<char[]> message(new char[size + 1]);
-    sprintf(message.get(), format, CAPIO_SERVER_REQUEST_READ_REPLY, tid, fd, count, nbytes,
-            file_size, complete, is_getdents);
-    LOG("Message = %s", message.get());
-
     // send request
-    backend->send_request(message.get(), size + 1, dest);
+    serve_remote_read_request(tid, fd, count, nbytes, file_size, complete, is_getdents, dest);
     // send data
     backend->send_file(c_file.get_buffer() + offset, nbytes, dest);
 }
@@ -41,22 +33,9 @@ inline void send_files_batch(const std::string &prefix, int dest, int tid, int f
     START_LOG(gettid(), "call(prefix=%s, dest=%d, tid=%d, fd=%d, count=%ld, is_getdents=%s)",
               prefix.c_str(), dest, tid, fd, count, is_getdents ? "true" : "false");
 
-    const char *const format = "%04d %s %d %d %ld %d";
-    const int size           = snprintf(nullptr, 0, format, CAPIO_SERVER_REQUEST_READ_BATCH_REPLY,
-                                        prefix.c_str(), tid, fd, count, is_getdents);
-    const std::unique_ptr<char[]> header(new char[size + 1]);
-    sprintf(header.get(), format, CAPIO_SERVER_REQUEST_READ_BATCH_REPLY, prefix.c_str(), tid, fd,
-            count, is_getdents);
-    std::string message(header.get());
-    for (const std::string &path : *files_to_send) {
-        CapioFile &c_file = get_capio_file(path);
-        message.append(" " + path.substr(prefix.length()) + " " +
-                       std::to_string(c_file.get_stored_size()));
-    }
-    LOG("Message = %s", message.c_str());
-
     // send request
-    backend->send_request(message.c_str(), message.length(), dest);
+    send_files_batch_request(prefix, tid, fd, count, is_getdents, dest, files_to_send);
+
     // send data
     for (const std::string &path : *files_to_send) {
         CapioFile &c_file = get_capio_file(path);

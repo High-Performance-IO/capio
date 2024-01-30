@@ -5,24 +5,12 @@
 #include <thread>
 
 #include "remote/backend.hpp"
+
+#include "remote/handlers/requests.hpp"
+
 #include "utils/location.hpp"
 #include "utils/producer.hpp"
 #include "utils/types.hpp"
-
-inline void handle_remote_stat_request(int tid, const std::filesystem::path &path, int rank) {
-    START_LOG(gettid(), "call(tid=%d, path=%s, rank=%d)", tid, path.c_str(), rank);
-
-    int dest                 = nodes_helper_rank[std::get<0>(get_file_location(path))];
-    const char *const format = "%04d %d %d %s";
-    const int size =
-        snprintf(nullptr, 0, format, CAPIO_SERVER_REQUEST_STAT, tid, rank, path.c_str());
-    const std::unique_ptr<char[]> message(new char[size + 1]);
-    sprintf(message.get(), format, CAPIO_SERVER_REQUEST_STAT, tid, rank, path.c_str());
-    LOG("destination=%d, message=%s", dest, message.get());
-
-    backend->send_request(message.get(), size + 1, dest);
-    LOG("message sent");
-}
 
 void wait_for_file_completion(int tid, const std::filesystem::path &path, int rank) {
     START_LOG(gettid(), "call(tid=%d, path=%s)", tid, path.c_str());

@@ -6,18 +6,10 @@
 inline void serve_remote_stat(const std::filesystem::path &path, int dest, int source_tid) {
     START_LOG(gettid(), "call(path=%s, dest=%d, source_tid%d)", path.c_str(), dest, source_tid);
 
-    const CapioFile &c_file  = get_capio_file(path);
-    off64_t file_size        = c_file.get_file_size();
-    bool is_dir              = c_file.is_dir();
-    const char *const format = "%04d %s %d %ld %d";
-    const int size = snprintf(nullptr, 0, format, CAPIO_SERVER_REQUEST_STAT_REPLY, path.c_str(),
-                              source_tid, file_size, is_dir);
-    const std::unique_ptr<char[]> message(new char[size + 1]);
-
-    sprintf(message.get(), "%04d %s %d %ld %d", CAPIO_SERVER_REQUEST_STAT_REPLY, path.c_str(),
-            source_tid, file_size, is_dir);
-
-    backend->send_request(message.get(), size + 1, dest);
+    const CapioFile &c_file = get_capio_file(path);
+    off64_t file_size       = c_file.get_file_size();
+    bool is_dir             = c_file.is_dir();
+    serve_remote_stat_request(path, source_tid, file_size, is_dir, dest);
 }
 
 void wait_for_completion(const std::filesystem::path &path, int source_tid, int dest) {
