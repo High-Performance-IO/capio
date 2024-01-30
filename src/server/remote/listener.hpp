@@ -4,7 +4,7 @@
 #include "capio/logger.hpp"
 
 #include "backend.hpp"
-#include "backend/mpi.hpp"
+#include "backend/backends.hpp"
 
 #include "handlers.hpp"
 
