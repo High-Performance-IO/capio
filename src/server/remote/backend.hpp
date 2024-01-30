@@ -43,22 +43,6 @@ class RemoteRequest {
 class Backend {
   public:
     /**
-     * This function parses argv and sets up required elements for the communication library
-     * It also sets up the node rank.
-     * It also allocates the node_name variable, and fills it with the node name.
-     * @param argc program argc parameter
-     * @param argv program argv argument
-     * @param rank A ptr to integer variable to store the rank
-     * @param provided A ptr to integer variable that tells whether multithreading is available
-     */
-    virtual void initialize(int argc, char **argv, int *rank, int *provided) = 0;
-
-    /**
-     * Gracefully terminates the communication backend service
-     */
-    virtual void destroy() = 0;
-
-    /**
      * Handshake the server applications
      * @param rank Rank of the invoker thread
      */

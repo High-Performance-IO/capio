@@ -12,7 +12,7 @@ class MPIBackend : public Backend {
     static constexpr long MPI_MAX_ELEM_COUNT = 1024L * 1024 * 1024;
 
   public:
-    void initialize(int argc, char **argv, int *rank, int *provided) override {
+    MPIBackend(int argc, char **argv, int *rank, int *provided) {
         int node_name_len;
         START_LOG(gettid(), "call()");
         MPI_Init_thread(&argc, &argv, MPI_THREAD_MULTIPLE, provided);
@@ -30,7 +30,7 @@ class MPIBackend : public Backend {
         LOG("Node name = %s, length=%d", node_name, node_name_len);
     }
 
-    inline void destroy() override {
+    ~MPIBackend() {
         START_LOG(gettid(), "Call()");
         MPI_Finalize();
     }
@@ -57,11 +57,6 @@ class MPIBackend : public Backend {
         START_LOG(gettid(), "call()");
         MPI_Status status;
         char *buff = new char[CAPIO_SERVER_REQUEST_MAX_SIZE];
-#ifdef CAPIOSYNC
-        LOG("initiating a synchronized MPI receive");
-        MPI_Recv(buff, CAPIO_SERVER_REQUEST_MAX_SIZE, MPI_CHAR, MPI_ANY_SOURCE, 0, MPI_COMM_WORLD,
-                 &status); // receive from server
-#else
         LOG("initiating a lightweight MPI receive");
         MPI_Request request;
         int received = 0;
@@ -80,7 +75,6 @@ class MPIBackend : public Backend {
         }
         int bytes_received;
         MPI_Get_count(&status, MPI_CHAR, &bytes_received);
-#endif
 
         LOG("receive completed!");
         return {buff, status.MPI_SOURCE};

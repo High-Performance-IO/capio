@@ -2,6 +2,7 @@
 #define CAPIO_SERVER_REMOTE_HANDLERS_READ_HPP
 
 #include "remote/backend.hpp"
+#include "remote/requests.hpp"
 
 inline void serve_remote_read(const std::filesystem::path &path, int dest, int tid, int fd,
                               off64_t count, off64_t offset, bool complete, bool is_getdents) {

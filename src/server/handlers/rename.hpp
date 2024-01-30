@@ -4,9 +4,9 @@
 #include "utils/location.hpp"
 
 void handle_rename(int tid, const std::filesystem::path &oldpath,
-                   const std::filesystem::path &newpath, int rank) {
-    START_LOG(gettid(), "call(tid=%d, oldpath=%s, newpath=%s, rank=%d)", tid, oldpath.c_str(),
-              newpath.c_str(), rank);
+                   const std::filesystem::path &newpath) {
+    START_LOG(gettid(), "call(tid=%d, oldpath=%s, newpath=%s)", tid, oldpath.c_str(),
+              newpath.c_str());
 
     if (get_capio_file_opt(oldpath)) {
         rename_capio_file(oldpath, newpath);
@@ -33,7 +33,7 @@ void rename_handler(const char *const str, int rank) {
     char newpath[PATH_MAX];
     int tid;
     sscanf(str, "%s %s %d", oldpath, newpath, &tid);
-    handle_rename(tid, oldpath, newpath, rank);
+    handle_rename(tid, oldpath, newpath);
 }
 
 #endif // CAPIO_SERVER_HANDLERS_RENAME_HPP

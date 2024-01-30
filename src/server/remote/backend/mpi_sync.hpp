@@ -15,7 +15,7 @@ class MPISYNCBackend : public Backend {
     static constexpr long MPI_MAX_ELEM_COUNT = 1024L * 1024 * 1024;
 
   public:
-    void initialize(int argc, char **argv, int *rank, int *provided) override {
+    MPISYNCBackend(int argc, char **argv, int *rank, int *provided) {
         int node_name_len;
         START_LOG(gettid(), "call()");
         MPI_Init_thread(&argc, &argv, MPI_THREAD_MULTIPLE, provided);
@@ -33,7 +33,7 @@ class MPISYNCBackend : public Backend {
         LOG("Node name = %s, length=%d", node_name, node_name_len);
     }
 
-    inline void destroy() override {
+    ~MPISYNCBackend() {
         START_LOG(gettid(), "Call()");
         MPI_Finalize();
     }

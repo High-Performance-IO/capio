@@ -34,7 +34,7 @@ void sig_term_handler(int signum, siginfo_t *info, void *ptr) {
 
     destroy_server();
     std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_INFO << "shutdown completed" << std::endl;
-    backend->destroy();
+    delete backend;
     exit(EXIT_SUCCESS);
 }
 

@@ -8,6 +8,7 @@
 
 #include "handlers.hpp"
 
+
 typedef void (*CComsHandler_t)(const RemoteRequest &);
 
 static constexpr std::array<CComsHandler_t, CAPIO_SERVER_NR_REQUEST>

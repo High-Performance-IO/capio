@@ -244,14 +244,13 @@ int main(int argc, char **argv) {
     int rank = 0, provided = 0;
 
     std::cout << CAPIO_LOG_SERVER_BANNER;
-    backend = new MPIBackend();
 
     parseCLI(argc, argv, rank);
 
     START_LOG(gettid(), "call()");
 
     open_files_location();
-    backend->initialize(argc, argv, &rank, &provided);
+    backend = new MPIBackend(argc, argv, &rank, &provided);
 
     int res = sem_init(&internal_server_sem, 0, 0);
     if (res != 0) {
@@ -267,8 +266,8 @@ int main(int argc, char **argv) {
     server_thread.join();
     remote_listener_thread.join();
 
-    SEM_DESTROY_CHECK(&internal_server_sem, "sem_destroy", backend->destroy());
-    backend->destroy();
+    SEM_DESTROY_CHECK(&internal_server_sem, "sem_destroy", delete backend;);
 
+    delete backend;
     return 0;
 }

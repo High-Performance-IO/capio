@@ -2,6 +2,7 @@
 #define CAPIO_SERVER_REMOTE_HANDLERS_STAT_HPP
 
 #include "remote/backend.hpp"
+#include "remote/requests.hpp"
 
 inline void serve_remote_stat(const std::filesystem::path &path, int dest, int source_tid) {
     START_LOG(gettid(), "call(path=%s, dest=%d, source_tid%d)", path.c_str(), dest, source_tid);

@@ -5,7 +5,7 @@
 #include <thread>
 
 #include "remote/backend.hpp"
-#include "remote/handlers/requests.hpp"
+#include "remote/requests.hpp"
 
 #include "utils/location.hpp"
 #include "utils/metadata.hpp"

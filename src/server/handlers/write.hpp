@@ -4,9 +4,9 @@
 #include "utils/location.hpp"
 #include "utils/metadata.hpp"
 
-inline void handle_write(int tid, int fd, off64_t base_offset, off64_t count, int rank) {
-    START_LOG(gettid(), "call(tid=%d, fd=%d, base_offset=%ld, count=%ld, rank=%d)", tid, fd,
-              base_offset, count, rank);
+inline void handle_write(int tid, int fd, off64_t base_offset, off64_t count) {
+    START_LOG(gettid(), "call(tid=%d, fd=%d, base_offset=%ld, count=%ld)", tid, fd,
+              base_offset, count);
     // check if another process is waiting for this data
     off64_t data_size                 = base_offset + count;
     const std::filesystem::path &path = get_capio_file_path(tid, fd);
@@ -43,7 +43,7 @@ void write_handler(const char *const str, int rank) {
     int tid, fd;
     off64_t base_offset, count;
     sscanf(str, "%d %d %ld %ld", &tid, &fd, &base_offset, &count);
-    handle_write(tid, fd, base_offset, count, rank);
+    handle_write(tid, fd, base_offset, count);
 }
 
 #endif // CAPIO_SERVER_HANDLERS_WRITE_HPP
