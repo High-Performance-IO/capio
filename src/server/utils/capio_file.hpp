@@ -467,7 +467,7 @@ class CapioFile {
      * @param buffer
      * @return
      */
-    inline void read_from_node(std::string &dest, off64_t offset, off64_t buffer_size) {
+    inline void read_from_node(const std::string &dest, off64_t offset, off64_t buffer_size) {
         std::unique_lock<std::mutex> lock(_mutex);
         backend->recv_file(_buf + offset, dest, buffer_size);
         _data_avail_cv.notify_all();

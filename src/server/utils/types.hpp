@@ -27,7 +27,7 @@ typedef std::vector<std::tuple<std::string, std::string, std::string, std::strin
 typedef std::unordered_map<int, std::unordered_map<std::string, bool>> CSWritersMap_t;
 typedef std::unordered_map<std::string, std::pair<const char *const, off64_t>> CSFilesLocationMap_t;
 typedef std::unordered_map<std::string,
-                           std::list<std::tuple<const std::filesystem::path, size_t, std::string &,
+                           std::list<std::tuple<const std::filesystem::path, size_t, std::string,
                                                 std::vector<std::string> *, sem_t *>>>
     CSClientsRemotePendingNFilesMap_t;
 typedef std::unordered_map<int, CircularBuffer<off_t> *> CSBufResponse_t;

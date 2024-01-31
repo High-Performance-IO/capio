@@ -29,7 +29,7 @@ build_server_request_handlers_table() {
     static const std::array<CComsHandler_t, CAPIO_SERVER_NR_REQUEST> server_request_handlers =
         build_server_request_handlers_table();
 
-    START_LOG(gettid(), "call(rank=%d)");
+    START_LOG(gettid(), "call()");
 
     sem_wait(&internal_server_sem);
     while (true) {

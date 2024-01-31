@@ -109,7 +109,7 @@ class MPIBackend : public Backend {
         MPI_Send(message, message_len + 1, MPI_CHAR, destination, 0, MPI_COMM_WORLD);
     }
 
-    inline void recv_file(char *shm, std::string &source, long int bytes_expected) override {
+    inline void recv_file(char *shm, const std::string &source, long int bytes_expected) override {
         START_LOG(gettid(), "call(shm=%ld, source=%d, length=%ld)", shm, source.c_str(),
                   bytes_expected);
         MPI_Status status;

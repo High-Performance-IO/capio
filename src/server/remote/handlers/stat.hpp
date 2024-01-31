@@ -26,17 +26,20 @@ void wait_for_completion(const std::filesystem::path &path, int source_tid,
 }
 
 inline void handle_remote_stat(int source_tid, const std::filesystem::path &path,
-                               std::string &dest) {
+                               const std::string &dest) {
     START_LOG(gettid(), "call(source_tid=%d, path=%s, dest=%s)", source_tid, path.c_str(),
               dest.c_str());
 
     auto c_file = get_capio_file_opt(path);
     if (c_file) {
+        LOG("File %s is present on capio file system", path.c_str());
         if (c_file->get().is_complete() || c_file->get().get_mode() == CAPIO_FILE_MODE_NO_UPDATE) {
             LOG("file is complete. serving file");
             serve_remote_stat(path, dest, source_tid);
         } else { // wait for completion
-            LOG("File is not _complete. awaiting completion on different thread");
+            LOG("File is not complete. awaiting completion on different thread. parameters of wait "
+                "are: path=%s, source_tid=%s, dest=%s",
+                path.c_str(), source_tid, dest.c_str());
             std::thread t(wait_for_completion, path, source_tid, dest);
             t.detach();
         }

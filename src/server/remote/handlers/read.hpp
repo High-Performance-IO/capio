@@ -146,8 +146,8 @@ void wait_for_files_batch(const std::filesystem::path &prefix, const std::string
     delete n_files_ready;
 }
 
-inline void handle_remote_read_batch(const std::filesystem::path &path, std::string &dest, int tid,
-                                     int fd, off64_t count, off64_t batch_size,
+inline void handle_remote_read_batch(const std::filesystem::path &path, const std::string &dest,
+                                     int tid, int fd, off64_t count, off64_t batch_size,
                                      const std::string &app_name,
                                      const std::filesystem::path &prefix, bool is_getdents) {
     START_LOG(
@@ -184,10 +184,10 @@ inline void handle_remote_read_batch(const std::filesystem::path &path, std::str
 }
 
 inline void
-handle_remote_read_batch_reply(std::string &dest, int tid, int fd, off64_t count,
+handle_remote_read_batch_reply(const std::string &source, int tid, int fd, off64_t count,
                                const std::vector<std::pair<std::filesystem::path, off64_t>> &files,
                                bool is_getdents) {
-    START_LOG(gettid(), "call(dest=%s, tid=%d, fd=%d, count=%ld, is_getdents=%s)", dest.c_str(),
+    START_LOG(gettid(), "call(source=%s, tid=%d, fd=%d, count=%ld, is_getdents=%s)", source.c_str(),
               tid, fd, count, is_getdents ? "true" : "false");
 
     for (const auto &[path, nbytes] : files) {
@@ -201,7 +201,7 @@ handle_remote_read_batch_reply(std::string &dest, int tid, int fd, off64_t count
             }
             c_file.first_write = false;
         } else {
-            add_file_location(path, dest.c_str(), -1);
+            add_file_location(path, source.c_str(), -1);
             CapioFile &c_file = create_capio_file(path, false, nbytes);
             c_file.insert_sector(0, nbytes);
             c_file.real_file_size = nbytes;
@@ -209,35 +209,35 @@ handle_remote_read_batch_reply(std::string &dest, int tid, int fd, off64_t count
             c_file.set_complete();
         }
         // as was done previously, write to the capio file buffer from its beginning
-        c_file_opt->get().read_from_node(dest, 0, nbytes);
+        c_file_opt->get().read_from_node(source, 0, nbytes);
         handle_read_reply(tid, fd, count, nbytes, nbytes, true, is_getdents);
     }
 }
 
-inline void handle_remote_read(const std::filesystem::path &path, std::string &dest, int tid,
-                               int fd, off64_t count, off64_t offset, bool is_getdents) {
+inline void handle_remote_read(const std::filesystem::path &path, const std::string &source,
+                               int tid, int fd, off64_t count, off64_t offset, bool is_getdents) {
     START_LOG(gettid(),
-              "call(path=%s, dest=%s, tid=%d, fd=%d, count=%ld, offset=%ld, is_getdents=%s)",
-              path.c_str(), dest.c_str(), tid, fd, count, offset, is_getdents ? "true" : "false");
+              "call(path=%s, source=%s, tid=%d, fd=%d, count=%ld, offset=%ld, is_getdents=%s)",
+              path.c_str(), source.c_str(), tid, fd, count, offset, is_getdents ? "true" : "false");
 
     CapioFile &c_file   = get_capio_file(path);
     bool data_available = (offset + count <= c_file.get_stored_size());
     if (c_file.is_complete() ||
         (c_file.get_mode() == CAPIO_FILE_MODE_NO_UPDATE && data_available)) {
-        serve_remote_read(path, dest, tid, fd, count, offset, c_file.is_complete(), is_getdents);
+        serve_remote_read(path, source, tid, fd, count, offset, c_file.is_complete(), is_getdents);
     } else {
-        std::thread t(wait_for_data, path, dest, tid, fd, count, offset, is_getdents);
+        std::thread t(wait_for_data, path, source, tid, fd, count, offset, is_getdents);
         t.detach();
     }
 }
 
-inline void handle_remote_read_reply(std::string &dest, int tid, int fd, off64_t count,
+inline void handle_remote_read_reply(const std::string &source, int tid, int fd, off64_t count,
                                      off64_t nbytes, off64_t file_size, bool complete,
                                      bool is_getdents) {
     START_LOG(gettid(),
-              "call(dest=%s, tid=%d, fd=%d, count=%ld, nbytes=%ld, file_size=%ld, complete=%s, "
+              "call(source=%s, tid=%d, fd=%d, count=%ld, nbytes=%ld, file_size=%ld, complete=%s, "
               "is_getdents=%s)",
-              dest.c_str(), tid, fd, count, nbytes, file_size, complete ? "true" : "false",
+              source.c_str(), tid, fd, count, nbytes, file_size, complete ? "true" : "false",
               is_getdents ? "true" : "false");
 
     const std::filesystem::path &path = get_capio_file_path(tid, fd);
@@ -251,7 +251,7 @@ inline void handle_remote_read_reply(std::string &dest, int tid, int fd, off64_t
         if (file_size_recv > file_shm_size) {
             c_file.expand_buffer(file_size_recv);
         }
-        c_file.read_from_node(dest, offset, nbytes);
+        c_file.read_from_node(source, offset, nbytes);
         nbytes *= sizeof(char);
     }
     handle_read_reply(tid, fd, count, file_size, nbytes, complete, is_getdents);
@@ -267,6 +267,7 @@ void remote_read_batch_handler(const RemoteRequest &request) {
     handle_remote_read_batch(path, dest, tid, fd, count, batch_size, app_name, prefix, is_getdents);
 }
 
+// TODO: refactor this
 void remote_read_batch_reply_handler(const RemoteRequest &request) {
     std::string dest = request.get_source();
     std::string path, prefix, tmp;

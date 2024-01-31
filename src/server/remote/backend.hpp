@@ -70,8 +70,14 @@ class Backend {
      * @param source The source target to receive from
      * @param bytes_expected Size of expected incoming buffer
      */
-    virtual void recv_file(char *shm, std::string &target, long int bytes_expected) = 0;
+    virtual void recv_file(char *shm, const std::string &source, long int bytes_expected) = 0;
 
+    /**
+     *
+     * @param message
+     * @param message_len
+     * @param target
+     */
     virtual void send_request(const char *message, int message_len, const std::string &target) = 0;
 };
 
