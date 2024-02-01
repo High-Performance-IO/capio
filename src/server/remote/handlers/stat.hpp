@@ -38,7 +38,7 @@ inline void handle_remote_stat(int source_tid, const std::filesystem::path &path
             serve_remote_stat(path, dest, source_tid);
         } else { // wait for completion
             LOG("File is not complete. awaiting completion on different thread. parameters of wait "
-                "are: path=%s, source_tid=%s, dest=%s",
+                "are: path=%s, source_tid=%d, dest=%s",
                 path.c_str(), source_tid, dest.c_str());
             std::thread t(wait_for_completion, path, source_tid, dest);
             t.detach();

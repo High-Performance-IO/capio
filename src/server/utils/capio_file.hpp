@@ -256,7 +256,10 @@ class CapioFile {
         }
     }
 
-    [[nodiscard]] inline const std::string_view &get_mode() const { return _mode; }
+    [[nodiscard]] inline const std::string_view &get_mode() const {
+        START_LOG(gettid(), "call()");
+        return _mode;
+    }
 
     /*
      * Returns the offset to the end of the sector

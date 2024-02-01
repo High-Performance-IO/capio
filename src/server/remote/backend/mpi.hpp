@@ -105,8 +105,10 @@ class MPIBackend : public Backend {
     void send_request(const char *message, int message_len, const std::string &target) override {
         START_LOG(gettid(), "call(message=%s, message_len=%d, target=%s)", message, message_len,
                   target.c_str());
-        int destination = std::stoi(rank_nodes_equivalence[target]);
-        MPI_Send(message, message_len + 1, MPI_CHAR, destination, 0, MPI_COMM_WORLD);
+        auto mpi_target = rank_nodes_equivalence[target];
+        LOG("MPI_rank for target %s is %s", target.c_str(), mpi_target.c_str());
+
+        MPI_Send(message, message_len + 1, MPI_CHAR, std::stoi(mpi_target), 0, MPI_COMM_WORLD);
     }
 
     inline void recv_file(char *shm, const std::string &source, long int bytes_expected) override {
