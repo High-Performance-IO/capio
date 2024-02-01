@@ -5,10 +5,10 @@
 #include "utils/location.hpp"
 #include "utils/metadata.hpp"
 
-inline void update_file_metadata(const std::filesystem::path &path, int tid, int fd, int rank,
+inline void update_file_metadata(const std::filesystem::path &path, int tid, int fd,
                                  bool is_creat) {
-    START_LOG(gettid(), "call(path=%s, client_tid=%d fd=%d, rank=%d, is_creat=%s)", path.c_str(),
-              tid, fd, rank, is_creat ? "true" : "false");
+    START_LOG(gettid(), "call(path=%s, client_tid=%d fd=%d, is_creat=%s)", path.c_str(), tid, fd,
+              is_creat ? "true" : "false");
 
     // TODO: check the size that the user wrote in the configuration file
     //*caching_info[tid].second += 2;
@@ -34,58 +34,58 @@ inline void update_file_metadata(const std::filesystem::path &path, int tid, int
     }
 }
 
-inline void handle_create(int tid, int fd, const std::filesystem::path &path, int rank) {
-    START_LOG(gettid(), "call(tid=%d, fd=%d, path_cstr=%s, rank=%d)", tid, fd, path.c_str(), rank);
+inline void handle_create(int tid, int fd, const std::filesystem::path &path) {
+    START_LOG(gettid(), "call(tid=%d, fd=%d, path_cstr=%s)", tid, fd, path.c_str());
 
     bool is_creat = !(get_file_location_opt(path) || load_file_location(path));
-    update_file_metadata(path, tid, fd, rank, is_creat);
+    update_file_metadata(path, tid, fd, is_creat);
     write_response(tid, 0);
 }
 
-inline void handle_create_exclusive(int tid, int fd, const std::filesystem::path &path, int rank) {
-    START_LOG(gettid(), "call(tid=%d, fd=%d, path_cstr=%s, rank=%d)", tid, fd, path.c_str(), rank);
+inline void handle_create_exclusive(int tid, int fd, const std::filesystem::path &path) {
+    START_LOG(gettid(), "call(tid=%d, fd=%d, path_cstr=%s)", tid, fd, path.c_str());
 
     if (get_capio_file_opt(path)) {
         write_response(tid, 1);
     } else {
         write_response(tid, 0);
-        update_file_metadata(path, tid, fd, rank, true);
+        update_file_metadata(path, tid, fd, true);
     }
 }
 
-inline void handle_open(int tid, int fd, const std::filesystem::path &path, int rank) {
-    START_LOG(gettid(), "call(tid=%d, fd=%d, path_cstr=%s, rank=%d)", tid, fd, path.c_str(), rank);
+inline void handle_open(int tid, int fd, const std::filesystem::path &path) {
+    START_LOG(gettid(), "call(tid=%d, fd=%d, path_cstr=%s)", tid, fd, path.c_str());
 
     // it is important that check_files_location is the last because is the
     // slowest (short circuit evaluation)
     if (get_file_location_opt(path) || metadata_conf.find(path) != metadata_conf.end() ||
         match_globs(path) != -1 || load_file_location(path)) {
-        update_file_metadata(path, tid, fd, rank, false);
+        update_file_metadata(path, tid, fd, false);
     } else {
         write_response(tid, 1);
     }
     write_response(tid, 0);
 }
 
-void create_handler(const char *const str, int rank) {
+void create_handler(const char *const str) {
     int tid, fd;
     char path[PATH_MAX];
     sscanf(str, "%d %d %s", &tid, &fd, path);
-    handle_create(tid, fd, path, rank);
+    handle_create(tid, fd, path);
 }
 
-void create_exclusive_handler(const char *const str, int rank) {
+void create_exclusive_handler(const char *const str) {
     int tid, fd;
     char path[PATH_MAX];
     sscanf(str, "%d %d %s", &tid, &fd, path);
-    handle_create_exclusive(tid, fd, path, rank);
+    handle_create_exclusive(tid, fd, path);
 }
 
-void open_handler(const char *const str, int rank) {
+void open_handler(const char *const str) {
     int tid, fd;
     char path[PATH_MAX];
     sscanf(str, "%d %d %s", &tid, &fd, path);
-    handle_open(tid, fd, path, rank);
+    handle_open(tid, fd, path);
 }
 
 #endif // CAPIO_SERVER_HANDLERS_OPEN_HPP

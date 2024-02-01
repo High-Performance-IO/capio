@@ -9,7 +9,7 @@ inline void handle_access(long tid, char *path) {
     write_response(tid, get_file_location_opt(path) ? 0 : -1);
 }
 
-void access_handler(const char *const str, int rank) {
+void access_handler(const char *const str) {
     long tid;
     char path[PATH_MAX];
     sscanf(str, "%ld %s", &tid, path);

@@ -256,7 +256,10 @@ class CapioFile {
         }
     }
 
-    [[nodiscard]] inline const std::string_view &get_mode() const { return _mode; }
+    [[nodiscard]] inline const std::string_view &get_mode() const {
+        START_LOG(gettid(), "call()");
+        return _mode;
+    }
 
     /*
      * Returns the offset to the end of the sector
@@ -467,7 +470,7 @@ class CapioFile {
      * @param buffer
      * @return
      */
-    inline void read_from_node(int dest, off64_t offset, off64_t buffer_size) {
+    inline void read_from_node(const std::string &dest, off64_t offset, off64_t buffer_size) {
         std::unique_lock<std::mutex> lock(_mutex);
         backend->recv_file(_buf + offset, dest, buffer_size);
         _data_avail_cv.notify_all();

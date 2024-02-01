@@ -230,7 +230,7 @@ int delete_from_files_location(const std::filesystem::path &path) {
 }
 
 void loop_load_file_location(const std::filesystem::path &path_to_load) {
-    START_LOG(gettid(), "call(path_to_load=%s, rank=%d)", path_to_load.c_str());
+    START_LOG(gettid(), "call(path_to_load=%s)", path_to_load.c_str());
 
     while (!load_file_location(path_to_load)) {
         std::this_thread::sleep_for(std::chrono::microseconds(200));

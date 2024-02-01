@@ -4,7 +4,7 @@
 #include "capio/logger.hpp"
 
 #include "backend.hpp"
-#include "backend/mpi.hpp"
+#include "backend/backends.hpp"
 
 #include "handlers.hpp"
 
@@ -25,11 +25,11 @@ build_server_request_handlers_table() {
     return _server_request_handlers;
 }
 
-[[noreturn]] void capio_remote_listener(int rank) {
+[[noreturn]] void capio_remote_listener() {
     static const std::array<CComsHandler_t, CAPIO_SERVER_NR_REQUEST> server_request_handlers =
         build_server_request_handlers_table();
 
-    START_LOG(gettid(), "call(rank=%d)", rank);
+    START_LOG(gettid(), "call()");
 
     sem_wait(&internal_server_sem);
     while (true) {

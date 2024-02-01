@@ -28,7 +28,6 @@ set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -O3")
 #####################################
 option(CAPIO_BUILD_TESTS "Build CAPIO test suite" FALSE)
 option(CAPIO_LOG "Enable capio debug logging" FALSE)
-option(CAPIO_SYNC "Use sync MPI primitives" FALSE)
 
 #####################################
 # CMake module imports

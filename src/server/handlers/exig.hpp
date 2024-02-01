@@ -40,7 +40,7 @@ inline void handle_exit_group(int tid) {
     free_resources(tid);
 }
 
-void exit_group_handler(const char *const str, int rank) {
+void exit_group_handler(const char *const str) {
     int tid;
     sscanf(str, "%d", &tid);
     handle_exit_group(tid);

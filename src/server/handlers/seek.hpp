@@ -17,11 +17,11 @@ void handle_seek_data(int tid, int fd, size_t offset) {
     write_response(tid, c_file.seek_data(offset));
 }
 
-inline void handle_seek_end(int tid, int fd, int rank) {
-    START_LOG(gettid(), "call(tid=%d, fd=%d, rank=%d)", tid, fd, rank);
+inline void handle_seek_end(int tid, int fd) {
+    START_LOG(gettid(), "call(tid=%d, fd=%d)", tid, fd);
 
     // seek_end here behaves as stat because we want the file size
-    reply_stat(tid, get_capio_file_path(tid, fd), rank);
+    reply_stat(tid, get_capio_file_path(tid, fd));
 }
 
 inline void handle_seek_hole(int tid, int fd, size_t offset) {
@@ -31,27 +31,27 @@ inline void handle_seek_hole(int tid, int fd, size_t offset) {
     write_response(tid, c_file.seek_hole(offset));
 }
 
-void lseek_handler(const char *const str, int rank) {
+void lseek_handler(const char *const str) {
     int tid, fd;
     size_t offset;
     sscanf(str, "%d %d %zu", &tid, &fd, &offset);
     handle_lseek(tid, fd, offset);
 }
 
-void seek_data_handler(const char *const str, int rank) {
+void seek_data_handler(const char *const str) {
     int tid, fd;
     size_t offset;
     sscanf(str, "%d %d %zu", &tid, &fd, &offset);
     handle_seek_data(tid, fd, offset);
 }
 
-void seek_end_handler(const char *const str, int rank) {
+void seek_end_handler(const char *const str) {
     int tid, fd;
     sscanf(str, "%d %d", &tid, &fd);
-    handle_seek_end(tid, fd, rank);
+    handle_seek_end(tid, fd);
 }
 
-void seek_hole_handler(const char *const str, int rank) {
+void seek_hole_handler(const char *const str) {
     int tid, fd;
     size_t offset;
     sscanf(str, "%d %d %zu", &tid, &fd, &offset);

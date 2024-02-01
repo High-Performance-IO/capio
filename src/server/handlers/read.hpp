@@ -5,6 +5,8 @@
 #include <thread>
 
 #include "remote/backend.hpp"
+#include "remote/requests.hpp"
+
 #include "utils/location.hpp"
 #include "utils/metadata.hpp"
 #include "utils/producer.hpp"
@@ -139,7 +141,7 @@ inline void request_remote_read(int tid, int fd, off64_t count, bool is_dir, boo
         send_data_to_client(tid, p + offset, count);
     } else {
         LOG("Delegating to backend remote read");
-        backend->handle_remote_read(tid, fd, count, is_getdents);
+        handle_remote_read_request(tid, fd, count, is_getdents);
     }
 }
 
@@ -163,8 +165,8 @@ void wait_for_file_creation(int tid, int fd, off64_t count, bool dir, bool is_ge
                 std::string prefix                 = std::get<0>(metadata_conf_globs[pos]);
                 off64_t batch_size                 = std::get<5>(metadata_conf_globs[pos]);
                 if (batch_size > 0) {
-                    backend->handle_remote_read_batch(tid, fd, count, remote_app_name, prefix,
-                                                      batch_size, is_getdents);
+                    handle_remote_read_batch_request(tid, fd, count, remote_app_name, prefix,
+                                                     batch_size, is_getdents);
                     return;
                 }
             }
@@ -204,8 +206,8 @@ inline void handle_read(int tid, int fd, off64_t count, bool dir, bool is_getden
                 off64_t batch_size = std::get<5>(metadata_conf_globs[pos]);
                 if (batch_size > 0) {
                     LOG("Handling batch file");
-                    backend->handle_remote_read_batch(tid, fd, count, app_name, prefix, batch_size,
-                                                      is_getdents);
+                    handle_remote_read_batch_request(tid, fd, count, app_name, prefix, batch_size,
+                                                     is_getdents);
                     return;
                 }
             }
@@ -215,21 +217,21 @@ inline void handle_read(int tid, int fd, off64_t count, bool dir, bool is_getden
     }
 }
 
-void getdents_handler(const char *const str, int rank) {
+void getdents_handler(const char *const str) {
     int tid, fd;
     off64_t count;
     sscanf(str, "%d %d %ld", &tid, &fd, &count);
     handle_read(tid, fd, count, true, true);
 }
 
-void getdents64_handler(const char *const str, int rank) {
+void getdents64_handler(const char *const str) {
     int tid, fd;
     off64_t count;
     sscanf(str, "%d %d %ld", &tid, &fd, &count);
     handle_read(tid, fd, count, true, false);
 }
 
-void read_handler(const char *const str, int rank) {
+void read_handler(const char *const str) {
     int tid, fd;
     off64_t count;
     sscanf(str, "%d %d %ld", &tid, &fd, &count);

@@ -5,11 +5,14 @@
 #include <thread>
 
 #include "remote/backend.hpp"
+
+#include "remote/requests.hpp"
+
 #include "utils/location.hpp"
 #include "utils/producer.hpp"
 #include "utils/types.hpp"
 
-void wait_for_file_completion(int tid, const std::filesystem::path &path, int rank) {
+void wait_for_file_completion(int tid, const std::filesystem::path &path) {
     START_LOG(gettid(), "call(tid=%d, path=%s)", tid, path.c_str());
 
     loop_load_file_location(path);
@@ -24,12 +27,12 @@ void wait_for_file_completion(int tid, const std::filesystem::path &path, int ra
         write_response(tid, static_cast<int>(c_file.is_dir() ? 1 : 0));
 
     } else {
-        backend->handle_remote_stat(tid, path, rank);
+        handle_remote_stat_request(tid, path);
     }
 }
 
-inline void reply_stat(int tid, const std::filesystem::path &path, int rank) {
-    START_LOG(gettid(), "call(tid=%d, path=%s, rank=%d)", tid, path.c_str(), rank);
+inline void reply_stat(int tid, const std::filesystem::path &path) {
+    START_LOG(gettid(), "call(tid=%d, path=%s)", tid, path.c_str());
 
     auto file_location_opt = get_file_location_opt(path);
     LOG("File %s is local? %s", path.c_str(), file_location_opt ? "True" : "False");
@@ -41,7 +44,7 @@ inline void reply_stat(int tid, const std::filesystem::path &path, int rank) {
             if ((metadata_conf.find(path) != metadata_conf.end() || match_globs(path) != -1) &&
                 !is_producer(tid, path)) {
                 LOG("File not ready yet. Starting a thread to wait for file.");
-                std::thread t(wait_for_file_completion, tid, std::filesystem::path(path), rank);
+                std::thread t(wait_for_file_completion, tid, std::filesystem::path(path));
                 t.detach();
             } else {
                 LOG("Metadata do not contains file or globs did not contain file or app is "
@@ -71,21 +74,21 @@ inline void reply_stat(int tid, const std::filesystem::path &path, int rank) {
         LOG("Delegating backend to reply to remote stats");
         // send a request for file. then start a thread to wait for the request completion
         c_file.create_buffer_if_needed(path, false);
-        backend->handle_remote_stat(tid, path, rank);
+        handle_remote_stat_request(tid, path);
     }
 }
 
-void fstat_handler(const char *const str, int rank) {
+void fstat_handler(const char *const str) {
     int tid, fd;
     sscanf(str, "%d %d", &tid, &fd);
-    reply_stat(tid, get_capio_file_path(tid, fd), rank);
+    reply_stat(tid, get_capio_file_path(tid, fd));
 }
 
-void stat_handler(const char *const str, int rank) {
+void stat_handler(const char *const str) {
     char path[2048];
     int tid;
     sscanf(str, "%d %s", &tid, path);
-    reply_stat(tid, path, rank);
+    reply_stat(tid, path);
 }
 
 #endif // CAPIO_SERVER_HANDLERS_STAT_HPP

@@ -14,13 +14,13 @@ inline void handle_handshake_named(int tid, int pid, const char *app_name) {
     init_process(tid);
 }
 
-void handshake_anonymous_handler(const char *const str, int rank) {
+void handshake_anonymous_handler(const char *const str) {
     int tid, pid;
     sscanf(str, "%d %d", &tid, &pid);
     handle_handshake_anonymous(tid, pid);
 }
 
-void handshake_named_handler(const char *const str, int rank) {
+void handshake_named_handler(const char *const str) {
     int tid, pid;
     char app_name[1024];
     sscanf(str, "%d %d %s", &tid, &pid, app_name);

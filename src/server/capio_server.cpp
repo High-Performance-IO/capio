@@ -56,12 +56,6 @@ CSDataBufferMap_t data_buffers;
  */
 CSWritersMap_t writers;
 
-// node -> rank
-CSNodesHelperRankMap_t nodes_helper_rank;
-
-// rank -> node
-CSRankToNodeMap_t rank_to_node;
-
 CSClientsRemotePendingNFilesMap_t clients_remote_pending_nfiles;
 
 sem_t internal_server_sem;
@@ -105,15 +99,15 @@ static constexpr std::array<CSHandler_t, CAPIO_NR_REQUESTS> build_request_handle
     return _request_handlers;
 }
 
-[[noreturn]] void capio_server(int rank) {
+[[noreturn]] void capio_server() {
     static const std::array<CSHandler_t, CAPIO_NR_REQUESTS> request_handlers =
         build_request_handlers_table();
 
-    START_LOG(gettid(), "call(rank=%d)", rank);
+    START_LOG(gettid(), "call()");
 
     MPI_Comm_size(MPI_COMM_WORLD, &n_servers);
     setup_signal_handlers();
-    backend->handshake_servers(rank);
+    backend->handshake_servers();
     create_dir(getpid(), get_capio_dir());
 
     init_server();
@@ -129,12 +123,12 @@ static constexpr std::array<CSHandler_t, CAPIO_NR_REQUESTS> build_request_handle
         if (code < 0 || code > CAPIO_NR_REQUESTS) {
             ERR_EXIT("Received an invalid request code %d", code);
         }
-        request_handlers[code](str.get(), rank);
+        request_handlers[code](str.get());
         LOG(CAPIO_LOG_SERVER_REQUEST_END);
     }
 }
 
-int parseCLI(int argc, char **argv, int rank) {
+int parseCLI(int argc, char **argv) {
     Logger *log;
 
     args::ArgumentParser parser(CAPIO_SERVER_ARG_PARSER_PRE, CAPIO_SERVER_ARG_PARSER_EPILOGUE);
@@ -241,17 +235,15 @@ int parseCLI(int argc, char **argv, int rank) {
 }
 
 int main(int argc, char **argv) {
-    int rank = 0, provided = 0;
 
     std::cout << CAPIO_LOG_SERVER_BANNER;
-    backend = new MPIBackend();
 
-    parseCLI(argc, argv, rank);
+    parseCLI(argc, argv);
 
     START_LOG(gettid(), "call()");
 
     open_files_location();
-    backend->initialize(argc, argv, &rank, &provided);
+    backend = new MPIBackend(argc, argv);
 
     int res = sem_init(&internal_server_sem, 0, 0);
     if (res != 0) {
@@ -260,15 +252,15 @@ int main(int argc, char **argv) {
     if (sem_init(&clients_remote_pending_nfiles_sem, 0, 1) == -1) {
         ERR_EXIT("sem_init clients_remote_pending_nfiles_sem in main");
     }
-    std::thread server_thread(capio_server, rank);
+    std::thread server_thread(capio_server);
     LOG("capio_server thread started");
-    std::thread remote_listener_thread(capio_remote_listener, rank);
+    std::thread remote_listener_thread(capio_remote_listener);
     LOG("capio_remote_listener thread started.");
     server_thread.join();
     remote_listener_thread.join();
 
-    SEM_DESTROY_CHECK(&internal_server_sem, "sem_destroy", backend->destroy());
-    backend->destroy();
+    SEM_DESTROY_CHECK(&internal_server_sem, "sem_destroy", delete backend;);
 
+    delete backend;
     return 0;
 }
