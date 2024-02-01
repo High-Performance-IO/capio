@@ -17,7 +17,8 @@ inline void serve_remote_stat(const std::filesystem::path &path, const std::stri
 
 void wait_for_completion(const std::filesystem::path &path, int source_tid,
                          const std::string &dest) {
-    START_LOG(gettid(), "call(path=%s, dest=%s)", path.c_str(), dest.c_str());
+    START_LOG(gettid(), "call(path=%s, source_tid=%d, dest=%s)", path.c_str(), source_tid,
+              dest.c_str());
 
     const CapioFile &c_file = get_capio_file(path);
     c_file.wait_for_completion();
@@ -67,11 +68,9 @@ inline void handle_remote_stat_reply(const std::filesystem::path &path, int sour
 }
 
 void remote_stat_handler(const RemoteRequest &request) {
-    char path[PATH_MAX];
+    char path[PATH_MAX], dest[HOST_NAME_MAX];
     int tid;
-    std::string dest;
-    dest.reserve(1024);
-    sscanf(request.get_content(), "%d %s %s", &tid, dest.data(), path);
+    sscanf(request.get_content(), "%d %s %s", &tid, dest, path);
     handle_remote_stat(tid, path, dest);
 }
 

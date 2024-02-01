@@ -45,19 +45,18 @@ class MPIBackend : public Backend {
     inline void handshake_servers() override {
         START_LOG(gettid(), "call()");
 
-        auto buf = new char[MPI_MAX_PROCESSOR_NAME];
+        auto buf = std::unique_ptr<char[]>(new char[MPI_MAX_PROCESSOR_NAME]);
         for (int i = 0; i < n_servers; i += 1) {
             if (i != rank) {
                 // TODO: possible deadlock
                 MPI_Send(node_name, strlen(node_name), MPI_CHAR, i, 0, MPI_COMM_WORLD);
-                std::fill(buf, buf + MPI_MAX_PROCESSOR_NAME, 0);
-                MPI_Recv(buf, MPI_MAX_PROCESSOR_NAME, MPI_CHAR, i, 0, MPI_COMM_WORLD,
+                std::fill(buf.get(), buf.get() + MPI_MAX_PROCESSOR_NAME, 0);
+                MPI_Recv(buf.get(), MPI_MAX_PROCESSOR_NAME, MPI_CHAR, i, 0, MPI_COMM_WORLD,
                          MPI_STATUS_IGNORE);
-                rank_nodes_equivalence[std::to_string(i)] = buf;
-                rank_nodes_equivalence[buf]               = std::to_string(i);
+                rank_nodes_equivalence.emplace(buf.get(), std::to_string(i));
+                rank_nodes_equivalence.emplace(std::to_string(i), buf.get());
             }
         }
-        delete[] buf;
     }
 
     RemoteRequest read_next_request() override {
@@ -105,14 +104,14 @@ class MPIBackend : public Backend {
     void send_request(const char *message, int message_len, const std::string &target) override {
         START_LOG(gettid(), "call(message=%s, message_len=%d, target=%s)", message, message_len,
                   target.c_str());
-        auto mpi_target = rank_nodes_equivalence[target];
+        const std::string &mpi_target = rank_nodes_equivalence[target];
         LOG("MPI_rank for target %s is %s", target.c_str(), mpi_target.c_str());
 
         MPI_Send(message, message_len + 1, MPI_CHAR, std::stoi(mpi_target), 0, MPI_COMM_WORLD);
     }
 
     inline void recv_file(char *shm, const std::string &source, long int bytes_expected) override {
-        START_LOG(gettid(), "call(shm=%ld, source=%d, length=%ld)", shm, source.c_str(),
+        START_LOG(gettid(), "call(shm=%ld, source=%s, bytes_expected=%ld)", shm, source.c_str(),
                   bytes_expected);
         MPI_Status status;
         int bytes_received = 0, count = 0, source_rank = std::stoi(rank_nodes_equivalence[source]);

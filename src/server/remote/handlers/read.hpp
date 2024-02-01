@@ -258,7 +258,7 @@ inline void handle_remote_read_reply(const std::string &source, int tid, int fd,
 }
 
 void remote_read_batch_handler(const RemoteRequest &request) {
-    std::string dest = request.get_source();
+    const std::string &dest = request.get_source();
     int tid, fd, is_getdents;
     off64_t count, batch_size;
     char path[PATH_MAX], app_name[512], prefix[PATH_MAX];
@@ -294,7 +294,7 @@ void remote_read_batch_reply_handler(const RemoteRequest &request) {
 }
 
 void remote_read_handler(const RemoteRequest &request) {
-    std::string dest = request.get_source();
+    const std::string &dest = request.get_source();
     char path[PATH_MAX];
     int tid, fd, is_getdents;
     off64_t count, offset;
@@ -304,7 +304,7 @@ void remote_read_handler(const RemoteRequest &request) {
 }
 
 void remote_read_reply_handler(const RemoteRequest &request) {
-    std::string dest = request.get_source();
+    const std::string &dest = request.get_source();
     off64_t count, nbytes, file_size;
     int tid, fd, complete, is_getdents;
     sscanf(request.get_content(), "%d %d %ld %ld %ld %d %d", &tid, &fd, &count, &nbytes, &file_size,
