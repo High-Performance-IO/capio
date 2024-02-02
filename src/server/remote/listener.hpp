@@ -4,7 +4,7 @@
 #include "capio/logger.hpp"
 
 #include "backend.hpp"
-#include "backend/backends.hpp"
+#include "backend/include.hpp"
 
 #include "handlers.hpp"
 
@@ -23,6 +23,27 @@ build_server_request_handlers_table() {
     _server_request_handlers[CAPIO_SERVER_REQUEST_STAT_REPLY] = remote_stat_reply_handler;
 
     return _server_request_handlers;
+}
+
+inline Backend *select_backend(const std::string &backend_name, int argc, char *argv[]) {
+    START_LOG(gettid(), "call(backend_name=%s)", backend_name.c_str());
+    if (backend_name == "mpi") {
+        LOG("backend selected: mpi");
+        std::cout << CAPIO_SERVER_CLI_LOG_SERVER << " Starting capio with MPI backend" << std::endl;
+        return new MPIBackend(argc, argv);
+    }
+
+    if (backend_name == "mpisync") {
+        LOG("backend selected: mpisync");
+        std::cout << CAPIO_SERVER_CLI_LOG_SERVER << " Starting capio with MPI (SYNC) backend"
+                  << std::endl;
+        return new MPISYNCBackend(argc, argv);
+    }
+    LOG("Backend %s does not exists in CAPIO. reverting back to default (MPI)",
+        backend_name.c_str());
+    std::cout << CAPIO_SERVER_CLI_LOG_SERVER_WARNING << " Backend " << backend_name
+              << " does not exists. reverting to default MPI backend" << std::endl;
+    return new MPIBackend(argc, argv);
 }
 
 [[noreturn]] void capio_remote_listener() {

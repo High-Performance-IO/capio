@@ -1,5 +1,5 @@
-#ifndef CAPIO_BACKENDS_HPP
-#define CAPIO_BACKENDS_HPP
+#ifndef CAPIO_INCLUDE_HPP
+#define CAPIO_INCLUDE_HPP
 /*
  * Include here all backends class
  */

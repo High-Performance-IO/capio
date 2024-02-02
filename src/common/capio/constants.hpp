@@ -116,4 +116,9 @@ constexpr char CAPIO_SERVER_ARG_PARSER_CONFIG_OPT_HELP[] =
     "JSON Configuration file for capio_server";
 constexpr char CAPIO_SERVER_ARG_PARSER_CONFIG_NO_CONF_FILE_HELP[] =
     "If specified, server application will start without a config file, using default settings.";
+
+constexpr char CAPIO_SERVER_ARG_PARSER_CONFIG_BACKEND_HELP[] =
+    "Backend used in capio. The value [backend] can be one of the following implemented backends: "
+    "\n\t> mpi (default)\n\t> mpisync";
+
 #endif // CAPIO_COMMON_CONSTANTS_HPP
