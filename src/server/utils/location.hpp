@@ -205,13 +205,13 @@ int delete_from_files_location(const std::filesystem::path &path) {
             if (fseek(descriptor, 0, SEEK_SET) == -1) {
                 ERR_EXIT("fseek in load_file_location");
             }
-            LOG("%s offset has been moved to the beginning of the file", file_location_name);
+            LOG("%s offset has been moved to the beginning of the file", name.c_str());
             auto line =
                 reinterpret_cast<char *>(malloc((PATH_MAX + HOST_NAME_MAX + 10) * sizeof(char)));
             size_t len = 0;
             offset     = old_offset;
             int result = 2;
-            while (getline(&line, &len, files_location_fp) != -1) {
+            while (getline(&line, &len, descriptor) != -1) {
                 if (line[0] == CAPIO_SERVER_INVALIDATE_FILE_PATH_CHAR) {
                     continue;
                 }
