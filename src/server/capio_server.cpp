@@ -108,6 +108,7 @@ static constexpr std::array<CSHandler_t, CAPIO_NR_REQUESTS> build_request_handle
     MPI_Comm_size(MPI_COMM_WORLD, &n_servers);
     setup_signal_handlers();
     backend->handshake_servers();
+    load_created_files_locations();
     create_dir(getpid(), get_capio_dir());
 
     init_server();
@@ -243,8 +244,8 @@ int main(int argc, char **argv) {
     START_LOG(gettid(), "call()");
 
     backend = new MPIBackend(argc, argv);
-    //required to invoke open_files_location() after initialization of backend,
-    //it is the backend that fills the variable node_name
+    // required to invoke open_files_location() after initialization of backend,
+    // it is the backend that fills the variable node_name
     open_files_location();
 
     int res = sem_init(&internal_server_sem, 0, 0);
