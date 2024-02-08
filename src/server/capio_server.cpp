@@ -242,8 +242,10 @@ int main(int argc, char **argv) {
 
     START_LOG(gettid(), "call()");
 
-    open_files_location();
     backend = new MPIBackend(argc, argv);
+    //required to invoke open_files_location() after initialization of backend,
+    //it is the backend that fills the variable node_name
+    open_files_location();
 
     int res = sem_init(&internal_server_sem, 0, 0);
     if (res != 0) {
