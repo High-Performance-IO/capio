@@ -205,13 +205,13 @@ int delete_from_files_location(const std::filesystem::path &path) {
             if (fseek(descriptor, 0, SEEK_SET) == -1) {
                 ERR_EXIT("fseek in load_file_location");
             }
-            LOG("%s offset has been moved to the beginning of the file", name.c_str());
+            LOG("%s offset has been moved to the beginning of the file", file_location_name);
             auto line =
                 reinterpret_cast<char *>(malloc((PATH_MAX + HOST_NAME_MAX + 10) * sizeof(char)));
             size_t len = 0;
             offset     = old_offset;
             int result = 2;
-            while (getline(&line, &len, descriptor) != -1) {
+            while (getline(&line, &len, files_location_fp) != -1) {
                 if (line[0] == CAPIO_SERVER_INVALIDATE_FILE_PATH_CHAR) {
                     continue;
                 }
@@ -220,16 +220,18 @@ int delete_from_files_location(const std::filesystem::path &path) {
                 const std::filesystem::path current_path(line_str.substr(0, separator));
                 if (is_prefix(path, current_path)) {
                     result = 1;
-                    LOG("Path %s should be deleted from %s", current_path.c_str(), name.c_str());
-                    if (lseek(fileno(descriptor), offset, SEEK_SET) == -1) {
+                    LOG("Path %s should be deleted from %s", current_path.c_str(),
+                        file_location_name);
+                    if (lseek(files_location_fd, offset, SEEK_SET) == -1) {
                         ERR_EXIT("fseek delete_from_file_location");
                     }
-                    if (write(fileno(descriptor), &CAPIO_SERVER_INVALIDATE_FILE_PATH_CHAR,
+                    if (write(files_location_fd, &CAPIO_SERVER_INVALIDATE_FILE_PATH_CHAR,
                               sizeof(char)) != 1) {
                         ERR_EXIT("fwrite unable to invalidate file %s in %s", current_path.c_str(),
-                                 name.c_str());
+                                 file_location_name);
                     }
-                    LOG("Path %s has been deleted from %s", current_path.c_str(), name.c_str());
+                    LOG("Path %s has been deleted from %s", current_path.c_str(),
+                        file_location_name);
                 }
                 offset = lseek(fileno(descriptor), 0, SEEK_CUR);
             }

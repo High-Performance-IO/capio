@@ -259,7 +259,7 @@ int main(int argc, char **argv) {
     parseCLI(argc, argv);
 
     START_LOG(gettid(), "call()");
-    
+
     open_files_location();
 
     shm_canary = new CapioShmCanary(workflow_name);
