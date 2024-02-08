@@ -6,11 +6,14 @@
 
 #include "utils/types.hpp"
 
-constexpr char CAPIO_SERVER_FILES_LOCATION_NAME[]     = "files_location.txt";
+constexpr char CAPIO_SERVER_FILES_LOCATION_NAME[]     = "files_location_%s.txt";
 constexpr char CAPIO_SERVER_INVALIDATE_FILE_PATH_CHAR = '#';
 
+// unordered map indexed by path file containing {node_name, offset_in_memory}
 CSFilesLocationMap_t files_location;
 std::mutex files_location_mutex;
+
+char file_location_name[HOST_NAME_MAX + 20];
 
 int files_location_fd;
 FILE *files_location_fp;
@@ -50,6 +53,24 @@ class FlockGuard {
         }
     }
 };
+
+std::vector<std::string> *get_created_files_locations() {
+    START_LOG(gettid(), "call()");
+    static std::vector<std::string> *_present_files_locations = nullptr;
+    if (_present_files_locations == nullptr) {
+        LOG("Loading file from current working directory");
+        for (const auto &entry :
+             std::filesystem::directory_iterator(std::filesystem::current_path())) {
+            std::string entry_str = entry.path();
+            if (entry_str.find("files_location_") != std::string::npos) {
+                LOG("Found file %s", entry.path().c_str());
+                _present_files_locations->emplace_back(entry.path().c_str());
+            }
+        }
+    }
+
+    return _present_files_locations;
+}
 
 inline std::optional<std::reference_wrapper<std::pair<const char *const, long int>>>
 get_file_location_opt(const std::filesystem::path &path) {
@@ -113,11 +134,11 @@ bool load_file_location(const std::filesystem::path &path_to_load) {
     if (old_offset == -1) {
         ERR_EXIT("lseek 1 delete_from_files_location");
     }
-    LOG("Current %s offset is %ld", CAPIO_SERVER_FILES_LOCATION_NAME, old_offset);
+    LOG("Current %s offset is %ld", file_location_name, old_offset);
     if (fseek(files_location_fp, 0, SEEK_SET) == -1) {
         ERR_EXIT("fseek in load_file_location");
     }
-    LOG("%s offset has been moved to the beginning of the file", CAPIO_SERVER_FILES_LOCATION_NAME);
+    LOG("%s offset has been moved to the beginning of the file", file_location_name);
     size_t len = 0;
     bool found = false;
     while (getline(&line, &len, files_location_fp) != -1) {
@@ -145,7 +166,7 @@ bool load_file_location(const std::filesystem::path &path_to_load) {
     if (lseek(files_location_fd, old_offset, SEEK_SET) == -1) {
         ERR_EXIT("lseek 3 delete_from_files_location");
     }
-    LOG("%s offset has been restored to %ld", CAPIO_SERVER_FILES_LOCATION_NAME, old_offset);
+    LOG("%s offset has been restored to %ld", file_location_name, old_offset);
     free(line);
     return found;
 }
@@ -168,12 +189,11 @@ int delete_from_files_location(const std::filesystem::path &path) {
         if (old_offset == -1) {
             ERR_EXIT("lseek 1 delete_from_files_location");
         }
-        LOG("Current %s offset is %ld", CAPIO_SERVER_FILES_LOCATION_NAME, old_offset);
+        LOG("Current %s offset is %ld", file_location_name, old_offset);
         if (fseek(files_location_fp, 0, SEEK_SET) == -1) {
             ERR_EXIT("fseek in load_file_location");
         }
-        LOG("%s offset has been moved to the beginning of the file",
-            CAPIO_SERVER_FILES_LOCATION_NAME);
+        LOG("%s offset has been moved to the beginning of the file", file_location_name);
         auto line =
             reinterpret_cast<char *>(malloc((PATH_MAX + HOST_NAME_MAX + 10) * sizeof(char)));
         size_t len = 0;
@@ -188,25 +208,23 @@ int delete_from_files_location(const std::filesystem::path &path) {
             const std::filesystem::path current_path(line_str.substr(0, separator));
             if (is_prefix(path, current_path)) {
                 result = 1;
-                LOG("Path %s should be deleted from %s", current_path.c_str(),
-                    CAPIO_SERVER_FILES_LOCATION_NAME);
+                LOG("Path %s should be deleted from %s", current_path.c_str(), file_location_name);
                 if (lseek(files_location_fd, offset, SEEK_SET) == -1) {
                     ERR_EXIT("fseek delete_from_file_location");
                 }
                 if (write(files_location_fd, &CAPIO_SERVER_INVALIDATE_FILE_PATH_CHAR,
                           sizeof(char)) != 1) {
                     ERR_EXIT("fwrite unable to invalidate file %s in %s", current_path.c_str(),
-                             CAPIO_SERVER_FILES_LOCATION_NAME);
+                             file_location_name);
                 }
-                LOG("Path %s has been deleted from %s", current_path.c_str(),
-                    CAPIO_SERVER_FILES_LOCATION_NAME);
+                LOG("Path %s has been deleted from %s", current_path.c_str(), file_location_name);
             }
             offset = lseek(files_location_fd, 0, SEEK_CUR);
         }
         if (lseek(files_location_fd, old_offset, SEEK_SET) == -1) {
             ERR_EXIT("lseek 3 delete_from_files_location");
         }
-        LOG("%s offset has been restored to %ld", CAPIO_SERVER_FILES_LOCATION_NAME, old_offset);
+        LOG("%s offset has been restored to %ld", file_location_name, old_offset);
         free(line);
         return result;
     } else {
@@ -239,18 +257,18 @@ void loop_load_file_location(const std::filesystem::path &path_to_load) {
 
 void open_files_location() {
     START_LOG(gettid(), "call()");
+    sprintf(file_location_name, CAPIO_SERVER_FILES_LOCATION_NAME, node_name);
 
-    if ((files_location_fp = fopen(CAPIO_SERVER_FILES_LOCATION_NAME, "w+")) == nullptr) {
-        ERR_EXIT("Error opening %s file: %d (%s)", CAPIO_SERVER_FILES_LOCATION_NAME, errno,
+    if ((files_location_fp = fopen(file_location_name, "w+")) == nullptr) {
+        ERR_EXIT("Error opening %s file: %d (%s)", file_location_name, errno, strerror(errno));
+    }
+    if (chmod(file_location_name, S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH) == -1) {
+        ERR_EXIT("Error changing permissions for %s file: %d (%s)", file_location_name, errno,
                  strerror(errno));
     }
-    if (chmod(CAPIO_SERVER_FILES_LOCATION_NAME, S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH) == -1) {
-        ERR_EXIT("Error changing permissions for %s file: %d (%s)",
-                 CAPIO_SERVER_FILES_LOCATION_NAME, errno, strerror(errno));
-    }
     if ((files_location_fd = fileno(files_location_fp)) == -1) {
-        ERR_EXIT("Error obtaining file descriptor for %s file: %d (%s)",
-                 CAPIO_SERVER_FILES_LOCATION_NAME, errno, strerror(errno));
+        ERR_EXIT("Error obtaining file descriptor for %s file: %d (%s)", file_location_name, errno,
+                 strerror(errno));
     }
 }
 
