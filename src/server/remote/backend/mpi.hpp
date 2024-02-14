@@ -20,6 +20,7 @@ class MPIBackend : public Backend {
     MPIBackend(int argc, char **argv) {
         int node_name_len, provided;
         START_LOG(gettid(), "call()");
+        LOG("Created a MPI backend");
         MPI_Init_thread(&argc, &argv, MPI_THREAD_MULTIPLE, &provided);
         LOG("Mpi has multithreading support? %s (%d)",
             provided == MPI_THREAD_MULTIPLE ? "yes" : "no", provided);
@@ -133,6 +134,17 @@ class MPIBackend : public Backend {
 };
 
 class MPISYNCBackend : public MPIBackend {
+  public:
+    MPISYNCBackend(int argc, char *argv[]) : MPIBackend(argc, argv) {
+        START_LOG(gettid(), "call()");
+        LOG("Wrapped MPI backend with MPISYC backend");
+    }
+
+    ~MPISYNCBackend() override {
+        START_LOG(gettid(), "Call()");
+        MPI_Finalize();
+    }
+
     RemoteRequest read_next_request() override {
         START_LOG(gettid(), "call()");
         MPI_Status status;

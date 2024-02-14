@@ -146,6 +146,8 @@ int parseCLI(int argc, char **argv) {
                                         CAPIO_SERVER_ARG_PARSER_CONFIG_OPT_HELP, {'c', "config"});
     args::Flag noConfigFile(arguments, "no-config",
                             CAPIO_SERVER_ARG_PARSER_CONFIG_NO_CONF_FILE_HELP, {"no-config"});
+    args::ValueFlag<std::string> backend_flag(
+        arguments, "backend", CAPIO_SERVER_ARG_PARSER_CONFIG_BACKEND_HELP, {'b', "backend"});
 
     try {
         parser.ParseCLI(argc, argv);
@@ -229,6 +231,13 @@ int parseCLI(int argc, char **argv) {
     }
 #endif
 
+    // Backend selection phase
+    std::string backend_name_str;
+    if (backend_flag) {
+        backend_name_str = args::get(backend_flag);
+    }
+    backend = select_backend(backend_name_str, argc, argv);
+
     std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_INFO << "server initialization completed!"
               << std::flush;
     return 0;
@@ -243,7 +252,6 @@ int main(int argc, char **argv) {
     START_LOG(gettid(), "call()");
 
     open_files_location();
-    backend = new MPIBackend(argc, argv);
 
     int res = sem_init(&internal_server_sem, 0, 0);
     if (res != 0) {
