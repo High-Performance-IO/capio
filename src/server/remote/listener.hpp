@@ -29,20 +29,20 @@ inline Backend *select_backend(const std::string &backend_name, int argc, char *
     START_LOG(gettid(), "call(backend_name=%s)", backend_name.c_str());
     if (backend_name == "mpi") {
         LOG("backend selected: mpi");
-        std::cout << CAPIO_SERVER_CLI_LOG_SERVER << " Starting capio with MPI backend" << std::endl;
+        std::cout << CAPIO_SERVER_CLI_LOG_SERVER << " Starting CAPIO with MPI backend" << std::endl;
         return new MPIBackend(argc, argv);
     }
 
     if (backend_name == "mpisync") {
         LOG("backend selected: mpisync");
-        std::cout << CAPIO_SERVER_CLI_LOG_SERVER << " Starting capio with MPI (SYNC) backend"
+        std::cout << CAPIO_SERVER_CLI_LOG_SERVER << " Starting CAPIO with MPI (SYNC) backend"
                   << std::endl;
         return new MPISYNCBackend(argc, argv);
     }
-    LOG("Backend %s does not exists in CAPIO. reverting back to default (MPI)",
+    LOG("Backend %s does not exist in CAPIO. Reverting back to the default MPI backend",
         backend_name.c_str());
     std::cout << CAPIO_SERVER_CLI_LOG_SERVER_WARNING << " Backend " << backend_name
-              << " does not exists. reverting to default MPI backend" << std::endl;
+              << " does not exist. Reverting to the default MPI backend" << std::endl;
     return new MPIBackend(argc, argv);
 }
 

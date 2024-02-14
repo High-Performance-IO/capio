@@ -109,7 +109,7 @@ constexpr char CAPIO_SERVER_ARG_PARSER_EPILOGUE[] =
     "https://github.com/High-Performance-IO/capio";
 constexpr char CAPIO_SERVER_ARG_PARSER_PRE_COMMAND[] = "{ENVIRONMENT_VARS}  mpirun -n 1";
 constexpr char CAPIO_SERVER_ARG_PARSER_LOGILE_DIR_OPT_HELP[] =
-    "Name of the folder to which capio server will put log files into";
+    "Name of the folder to which CAPIO server will put log files into";
 constexpr char CAPIO_SERVER_ARG_PARSER_LOGILE_OPT_HELP[] =
     "Filename to which capio_server will log to, without extension";
 constexpr char CAPIO_SERVER_ARG_PARSER_CONFIG_OPT_HELP[] =
@@ -118,7 +118,7 @@ constexpr char CAPIO_SERVER_ARG_PARSER_CONFIG_NO_CONF_FILE_HELP[] =
     "If specified, server application will start without a config file, using default settings.";
 
 constexpr char CAPIO_SERVER_ARG_PARSER_CONFIG_BACKEND_HELP[] =
-    "Backend used in capio. The value [backend] can be one of the following implemented backends: "
+    "Backend used in CAPIO. The value [backend] can be one of the following implemented backends: "
     "\n\t> mpi (default)\n\t> mpisync";
 
 #endif // CAPIO_COMMON_CONSTANTS_HPP
