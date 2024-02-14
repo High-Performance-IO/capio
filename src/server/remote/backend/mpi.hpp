@@ -36,12 +36,12 @@ class MPIBackend : public Backend {
         LOG("Node name = %s, length=%d", node_name, node_name_len);
         rank_nodes_equivalence[std::to_string(rank)] = node_name;
         rank_nodes_equivalence[node_name]            = std::to_string(rank);
-    };
+    }
 
     ~MPIBackend() override {
         START_LOG(gettid(), "Call()");
         MPI_Finalize();
-    };
+    }
 
     inline void handshake_servers() override {
         START_LOG(gettid(), "call()");
@@ -58,7 +58,7 @@ class MPIBackend : public Backend {
                 rank_nodes_equivalence.emplace(std::to_string(i), buf.get());
             }
         }
-    };
+    }
 
     RemoteRequest read_next_request() override {
         START_LOG(gettid(), "call()");
@@ -85,7 +85,7 @@ class MPIBackend : public Backend {
 
         LOG("receive completed!");
         return {buff, rank_nodes_equivalence[std::to_string(status.MPI_SOURCE)]};
-    };
+    }
 
     void send_file(char *shm, long int nbytes, const std::string &target) override {
         START_LOG(gettid(), "call(%.50s, %ld, %s)", shm, nbytes, target.c_str());
@@ -100,7 +100,7 @@ class MPIBackend : public Backend {
             MPI_Isend(shm + k, elem_to_snd, MPI_BYTE, dest, 0, MPI_COMM_WORLD, &req);
             LOG("Sent chunk of %d bytes", elem_to_snd);
         }
-    };
+    }
 
     void send_request(const char *message, int message_len, const std::string &target) override {
         START_LOG(gettid(), "call(message=%s, message_len=%d, target=%s)", message, message_len,
@@ -109,7 +109,7 @@ class MPIBackend : public Backend {
         LOG("MPI_rank for target %s is %s", target.c_str(), mpi_target.c_str());
 
         MPI_Send(message, message_len + 1, MPI_CHAR, std::stoi(mpi_target), 0, MPI_COMM_WORLD);
-    };
+    }
 
     inline void recv_file(char *shm, const std::string &source, long int bytes_expected) override {
         START_LOG(gettid(), "call(shm=%ld, source=%s, bytes_expected=%ld)", shm, source.c_str(),
@@ -130,7 +130,7 @@ class MPIBackend : public Backend {
             MPI_Get_count(&status, MPI_BYTE, &bytes_received);
             LOG("Chunk size is %ld bytes", bytes_received);
         }
-    };
+    }
 };
 
 class MPISYNCBackend : public MPIBackend {
@@ -138,7 +138,7 @@ class MPISYNCBackend : public MPIBackend {
     MPISYNCBackend(int argc, char *argv[]) : MPIBackend(argc, argv) {
         START_LOG(gettid(), "call()");
         LOG("Wrapped MPI backend with MPISYC backend");
-    };
+    }
 
     ~MPISYNCBackend() override {
         START_LOG(gettid(), "Call()");
@@ -155,7 +155,7 @@ class MPISYNCBackend : public MPIBackend {
 
         LOG("receive completed!");
         return {buff, rank_nodes_equivalence[std::to_string(status.MPI_SOURCE)]};
-    };
+    }
 };
 
 #endif // CAPIO_SERVER_REMOTE_BACKEND_MPI_HPP
