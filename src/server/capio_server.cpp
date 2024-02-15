@@ -251,7 +251,7 @@ int main(int argc, char **argv) {
     parseCLI(argc, argv);
 
     START_LOG(gettid(), "call()");
-    
+
     open_files_location();
 
     int res = sem_init(&internal_server_sem, 0, 0);
