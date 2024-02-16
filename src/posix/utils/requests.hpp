@@ -253,4 +253,11 @@ inline void write_request(const int fd, const off64_t count, const long tid) {
     }
 }
 
+void cached_write_request(long int my_tid, int fd, off64_t count, off64_t old_offset) {
+    // NEEDS TO BE CHANGED WITH CAPIO FILE FOR BOTH NORMAL WRITE AND BATCH WRITE
+    char req[CAPIO_REQUEST_MAX_SIZE];
+    sprintf(req, "%04d %ld %d %ld %ld", CAPIO_REQUEST_CACHED_WRITE, my_tid, fd, old_offset, count);
+    buf_requests->write(req, CAPIO_REQUEST_MAX_SIZE);
+}
+
 #endif // CAPIO_POSIX_UTILS_REQUESTS_HPP

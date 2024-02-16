@@ -53,6 +53,32 @@ const std::filesystem::path &get_capio_dir() {
     return capio_dir;
 }
 
+inline long get_caching_data_buf_size() {
+    static long data_bufs_size = -1;
+    if (data_bufs_size == -1) {
+        char *value = std::getenv("CAPIO_CACHING_SIZE");
+        if (value) {
+            data_bufs_size = strtol(value, nullptr, 10);
+        } else {
+            data_bufs_size = CAPIO_CACHE_WINDOW_DATA_BUFS_SIZE_DEFAULT;
+        }
+    }
+    return data_bufs_size;
+}
+
+inline long get_caching_data_buf_elem() {
+    static long data_bufs_count = -1;
+    if (data_bufs_count == -1) {
+        char *value = std::getenv("CAPIO_CACHING_COUNT");
+        if (value) {
+            data_bufs_count = strtol(value, nullptr, 10);
+        } else {
+            data_bufs_count = CAPIO_CACHE_WINDOW_DATA_COUNT_DEFAULT;
+        }
+    }
+    return data_bufs_count;
+}
+
 inline int get_capio_log_level() {
     static int level = -2;
     if (level == -2) {
