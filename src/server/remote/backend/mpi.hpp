@@ -10,7 +10,6 @@ class MPIBackend : public Backend {
   protected:
     MPI_Request req{};
     int rank = -1;
-
     /*
      * This structure holds inside the information to convert from hostname to MPI rank*/
     std::unordered_map<std::string, std::string> rank_nodes_equivalence;
