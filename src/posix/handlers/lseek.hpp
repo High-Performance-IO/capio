@@ -10,6 +10,8 @@ inline off64_t capio_lseek(int fd, off64_t offset, int whence, long tid) {
     START_LOG(tid, "call(fd=%d, offset=%ld, whence=%d)", fd, offset, whence);
 
     if (exists_capio_fd(fd)) {
+        get_read_cache(tid).flush();
+        get_write_cache(tid).flush();
         off64_t file_offset = get_capio_fd_offset(fd);
         if (whence == SEEK_SET) {
             LOG("whence %d is SEEK_SET", whence);

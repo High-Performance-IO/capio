@@ -47,6 +47,7 @@ inline int capio_fstat(int fd, struct stat *statbuf, long tid) {
     START_LOG(tid, "call(fd=%d, statbuf=0x%08x)", fd, statbuf);
 
     if (exists_capio_fd(fd)) {
+        get_write_cache(tid).flush();
         auto [file_size, is_dir] = fstat_request(fd, tid);
         if (file_size == -1) {
             errno = ENOENT;
@@ -69,6 +70,7 @@ inline int capio_lstat(const std::string_view &pathname, struct stat *statbuf, l
 
     const std::filesystem::path absolute_path(pathname);
     if (is_capio_path(absolute_path)) {
+        get_write_cache(tid).flush();
         auto [file_size, is_dir] = stat_request(absolute_path, tid);
         if (file_size == -1) {
             errno = ENOENT;

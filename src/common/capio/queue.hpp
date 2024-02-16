@@ -79,10 +79,25 @@ template <class T, class Mutex> class Queue {
         SHM_DESTROY_CHECK(_last_elem_name.c_str());
     }
 
+    inline T *fetch() {
+        START_LOG(capio_syscall(SYS_gettid), "call()");
+
+        _sem_num_elems.lock();
+
+        std::lock_guard<Mutex> lg(_mutex);
+        T *segment   = reinterpret_cast<char *>(_shm) + *_first_elem;
+        *_first_elem = (*_first_elem + _elem_size) % _buff_size;
+
+        _sem_num_empty.unlock();
+
+        return segment;
+    }
+
     inline auto get_name() { return this->_shm_name; }
 
     inline void read(T *buff_rcv, long int num_bytes) {
-        START_LOG(capio_syscall(SYS_gettid), "call(buff_rcv=0x%08x)", buff_rcv);
+        START_LOG(capio_syscall(SYS_gettid), "call(buff_rcv=0x%08x, num_bytes=%ld)", buff_rcv,
+                  num_bytes);
 
         off64_t n_reads = num_bytes / _elem_size;
         size_t r        = num_bytes % _elem_size;
@@ -100,8 +115,22 @@ template <class T, class Mutex> class Queue {
         this->read(buf_rcv, _elem_size);
     }
 
+    inline T *reserve() {
+        START_LOG(capio_syscall(SYS_gettid), "call()");
+
+        _sem_num_empty.lock();
+
+        std::lock_guard<Mutex> lg(_mutex);
+        T *segment  = reinterpret_cast<char *>(_shm) + *_last_elem;
+        *_last_elem = (*_last_elem + _elem_size) % _buff_size;
+
+        _sem_num_elems.unlock();
+
+        return segment;
+    }
+
     inline void write(const T *data, long int num_bytes) {
-        START_LOG(capio_syscall(SYS_gettid), "call(data=0x%08x)", data);
+        START_LOG(capio_syscall(SYS_gettid), "call(data=0x%08x, num_bytes=%ld)", data, num_bytes);
 
         off64_t n_writes = num_bytes / _elem_size;
         size_t r         = num_bytes % _elem_size;

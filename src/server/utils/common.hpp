@@ -4,7 +4,7 @@
 #include <string>
 
 #include "capio/constants.hpp"
-#include "capio/data_structure.hpp"
+#include "capio/dirent.hpp"
 
 #include "capio_file.hpp"
 #include "metadata.hpp"

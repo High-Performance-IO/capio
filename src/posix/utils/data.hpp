@@ -1,16 +1,29 @@
 #ifndef CAPIO_POSIX_UTILS_DATA_HPP
 #define CAPIO_POSIX_UTILS_DATA_HPP
 
-#include "requests.hpp"
-#include "types.hpp"
+#include "cache.hpp"
 
-CPThreadDataBufs_t *threads_data_bufs;
+CPThreadDataCache_t *threads_data_cache;
+
+/**
+ * Get read cache for thread @param tid
+ * @param tid
+ * @return the thread read cache
+ */
+inline ReadCache &get_read_cache(long tid) { return *threads_data_cache->at(tid).second; }
+
+/**
+ * Get write cache for thread @param tid
+ * @param tid
+ * @return the thread write cache
+ */
+inline WriteCache &get_write_cache(long tid) { return *threads_data_cache->at(tid).first; }
 
 /**
  * Initialize data buffers
  * @return
  */
-inline void init_data_plane() { threads_data_bufs = new CPThreadDataBufs_t; }
+inline void init_data_plane() { threads_data_cache = new CPThreadDataCache_t; }
 
 /**
  * Add a new response buffer for thread @param tid
@@ -18,44 +31,11 @@ inline void init_data_plane() { threads_data_bufs = new CPThreadDataBufs_t; }
  * @return
  */
 inline void register_data_listener(long tid) {
-    auto *write_queue =
-        new SPSCQueue(SHM_SPSC_PREFIX_WRITE + std::to_string(tid), CAPIO_DATA_BUFFER_LENGTH,
-                      CAPIO_DATA_BUFFER_ELEMENT_SIZE, get_capio_workflow_name());
-    auto *read_queue =
-        new SPSCQueue(SHM_SPSC_PREFIX_READ + std::to_string(tid), CAPIO_DATA_BUFFER_LENGTH,
-                      CAPIO_DATA_BUFFER_ELEMENT_SIZE, get_capio_workflow_name());
-    threads_data_bufs->insert({static_cast<int>(tid), {write_queue, read_queue}});
-}
-
-/**
- * Receives @count bytes for thread @tid and writes them into @buf
- * @param tid
- * @param fd
- * @param buffer
- * @param offset
- * @param count
- * @return
- */
-inline void read_data(long tid, int fd, void *buffer, off64_t count) {
-    START_LOG(tid, "call(fd=%d, buffer=0x%08x, count=%ld)", fd, buffer, count);
-
-    threads_data_bufs->at(tid).second->read(reinterpret_cast<char *>(buffer), count);
-    set_capio_fd_offset(fd, get_capio_fd_offset(fd) + count);
-}
-
-/**
- * Reads @count bytes from @buf and sends them for thread @tid
- * @param tid
- * @param buffer
- * @param count
- * @return
- */
-inline void write_data(long tid, int fd, const void *buffer, off64_t count) {
-    START_LOG(tid, "call(fd=%d, buffer=0x%08x, count=%ld)", fd, buffer, count);
-
-    write_request(fd, count, tid);
-    threads_data_bufs->at(tid).first->write(reinterpret_cast<const char *>(buffer), count);
-    set_capio_fd_offset(fd, get_capio_fd_offset(fd) + count);
+    threads_data_cache->insert(
+        {static_cast<int>(tid),
+         {new WriteCache(tid, get_cache_lines(), get_cache_line_size(), get_capio_workflow_name()),
+          new ReadCache(tid, get_cache_lines(), get_cache_line_size(),
+                        get_capio_workflow_name())}});
 }
 
 #endif // CAPIO_POSIX_UTILS_DATA_HPP
