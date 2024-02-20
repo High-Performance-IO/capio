@@ -7,13 +7,14 @@ inline void init_process(int tid) {
     if (data_buffers.find(tid) == data_buffers.end()) {
         register_listener(tid);
 
-        auto *write_data_cb = new SPSCQueue<char>(
-            "capio_write_data_buffer_tid_" + std::to_string(tid), get_caching_data_buf_elem(),
-            get_caching_data_buf_size(), CAPIO_SEM_TIMEOUT_NANOSEC, CAPIO_SEM_MAX_RETRIES);
-        auto *read_data_cb = new SPSCQueue<char>(
-            "capio_read_data_buffer_tid_" + std::to_string(tid), get_caching_data_buf_elem(),
-            get_caching_data_buf_size(), CAPIO_SEM_TIMEOUT_NANOSEC, CAPIO_SEM_MAX_RETRIES);
-        data_buffers.insert({tid, {write_data_cb, read_data_cb}});
+        data_buffers.insert(
+            {tid,
+             {new SPSCQueue<char>("capio_write_data_buffer_tid_" + std::to_string(tid),
+                                  get_caching_data_buf_elem(), get_caching_data_buf_size(),
+                                  CAPIO_SEM_TIMEOUT_NANOSEC, CAPIO_SEM_MAX_RETRIES),
+              new SPSCQueue<char>("capio_read_data_buffer_tid_" + std::to_string(tid),
+                                  get_caching_data_buf_elem(), get_caching_data_buf_size(),
+                                  CAPIO_SEM_TIMEOUT_NANOSEC, CAPIO_SEM_MAX_RETRIES)}});
     }
 }
 
