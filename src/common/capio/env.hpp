@@ -54,28 +54,38 @@ const std::filesystem::path &get_capio_dir() {
 }
 
 inline long get_caching_data_buf_size() {
+    START_LOG(capio_syscall(SYS_gettid), "call()");
     static long data_bufs_size = -1;
     if (data_bufs_size == -1) {
+        LOG("Value not set. getting value");
         std::unique_ptr<char> value(std::getenv("CAPIO_CACHING_SIZE"));
         if (value != nullptr) {
+            LOG("Getting value from environment variable");
             data_bufs_size = strtol(value.get(), nullptr, 10);
         } else {
+            LOG("Getting default value");
             data_bufs_size = CAPIO_CACHE_WINDOW_DATA_BUFS_SIZE_DEFAULT;
         }
     }
+    LOG("data_bufs_size=%ld", data_bufs_size);
     return data_bufs_size;
 }
 
 inline long get_caching_data_buf_elem() {
+    START_LOG(capio_syscall(SYS_gettid), "call()");
     static long data_bufs_count = -1;
     if (data_bufs_count == -1) {
+        LOG("Value not set. getting value");
         std::unique_ptr<char> value(std::getenv("CAPIO_CACHING_COUNT"));
         if (value != nullptr) {
+            LOG("Getting value from environment variable");
             data_bufs_count = strtol(value.get(), nullptr, 10);
         } else {
+            LOG("Getting default value");
             data_bufs_count = CAPIO_CACHE_WINDOW_DATA_COUNT_DEFAULT;
         }
     }
+    LOG("data_bufs_count=%ld", data_bufs_count);
     return data_bufs_count;
 }
 
