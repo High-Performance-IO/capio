@@ -3,6 +3,7 @@
 
 #include "capio/circular_buffer.hpp"
 #include "capio/spsc_queue.hpp"
+
 #include "requests.hpp"
 
 inline void read_shm(SPSCQueue<char> *data_buf, void *buffer, off64_t count) {
@@ -10,7 +11,7 @@ inline void read_shm(SPSCQueue<char> *data_buf, void *buffer, off64_t count) {
     size_t n_reads = count / get_caching_data_buf_size();
 
     LOG("read shm %ld", n_reads);
-    size_t i = 0;
+    size_t i;
     for (i = 0; i < n_reads; i++) {
         LOG("Reading chunk of size %ld of data", get_caching_data_buf_size());
         data_buf->read((char *) buffer + i * get_caching_data_buf_size());
@@ -26,7 +27,7 @@ inline void write_shm(SPSCQueue<char> *data_buf, const void *buffer, off64_t cou
     size_t n_writes = count / get_caching_data_buf_size();
 
     LOG("write shm %ld", n_writes);
-    size_t i = 0;
+    size_t i;
     for (i = 0; i < n_writes; i++) {
         LOG("Writing chunk of size %ld", get_caching_data_buf_size());
         data_buf->write((char *) buffer + i * get_caching_data_buf_size());
@@ -37,17 +38,17 @@ inline void write_shm(SPSCQueue<char> *data_buf, const void *buffer, off64_t cou
                     count % get_caching_data_buf_size());
 }
 
-class ReaderCache {
+class ReadCache {
   private:
-    char *_cache;
+    std::unique_ptr<char> _cache;
+    long _tid;
     size_t _cache_size, _actual_size, _cache_offset;
-    SPSCQueue<char> *_shm_data_queue;
-    int _tid;
+    SPSCQueue<char> *_queue;
 
     void _read_from_cache(void *buffer, size_t count) {
         START_LOG(capio_syscall(SYS_gettid), "call(count=%ld)", count);
 
-        memcpy(buffer, _cache + _cache_offset, count);
+        memcpy(buffer, _cache.get() + _cache_offset, count);
         _cache_offset += count;
     }
 
@@ -66,7 +67,7 @@ class ReaderCache {
         }
 
         if (cached_data > 0) {
-            read_shm(_shm_data_queue, _cache, cached_data);
+            read_shm(_queue, _cache.get(), cached_data);
             _read_from_cache(buffer, count);
             _actual_size += cached_data;
             if (_cache_offset == _cache_size) {
@@ -93,22 +94,18 @@ class ReaderCache {
         LOG("before read shm bytes_read %ld end_of_read %ld offset %ld\n", bytes_read, end_of_read,
             *offset);
         if (bytes_read > 0) {
-            read_shm(_shm_data_queue, buffer, bytes_read);
+            read_shm(_queue, buffer, bytes_read);
             *offset = *offset + bytes_read;
         }
         return bytes_read;
     }
 
   public:
-    ReaderCache(int tid, std::size_t cache_size, SPSCQueue<char> *data_queue)
-        : _cache_size(cache_size), _actual_size(0), _cache_offset(0), _shm_data_queue(data_queue),
-          _tid(tid) {
-        _cache = new char[cache_size];
-    }
+    ReadCache(SPSCQueue<char> *data_queue, int tid, std::size_t size)
+        : _cache(new char[size]), _tid(tid), _cache_size(size), _actual_size(0),
+          _cache_offset(0), _queue(data_queue) {}
 
-    ~ReaderCache() { delete[] _cache; }
-
-    size_t read_from_server(int fd, void *buffer, off64_t *offset, size_t count) {
+    size_t read(int fd, void *buffer, off64_t *offset, size_t count) {
         START_LOG(capio_syscall(SYS_gettid), "call(fd=%d, offset=%ld, count=%ld)", fd, offset,
                   count);
         size_t remnant_bytes = _actual_size - _cache_offset;
@@ -147,54 +144,61 @@ class ReaderCache {
     }
 };
 
-class WriterCache {
+class WriteCache {
   private:
-    char *_cache;
+    std::unique_ptr<char> _cache;
+    long _tid;
     std::size_t _cache_size;
     std::size_t _actual_size;
-    SPSCQueue<char> *_shm_data_queue;
+    SPSCQueue<char> *_queue;
 
-    inline void send_data_to_server(int fd, off64_t *offset, std::size_t count,
-                                    const void *buffer) {
-        START_LOG(capio_syscall(SYS_gettid), "call(fd=%ld, offset=%ld, count=%ld)", fd, offset,
-                  count);
-        LOG("sending data to server");
-        long int old_offset = *offset;
-        *offset += count; // works only if there is only one writer at time for each file
-        int tid = capio_syscall(SYS_gettid);
-        cached_write_request(tid, fd, count, old_offset);
-        write_shm(_shm_data_queue, buffer, count);
+    inline void send_data_to_server(int fd, std::size_t count, const void *buffer) {
+        START_LOG(capio_syscall(SYS_gettid), "call(fd=%ld, count=%ld)", fd, count);
+
+        write_request(fd, count, _tid);
+        size_t n_writes = count / CAPIO_DATA_BUFFER_ELEMENT_SIZE;
+        size_t r        = count % CAPIO_DATA_BUFFER_ELEMENT_SIZE;
+
+        size_t i = 0;
+        while (i < n_writes) {
+            _queue->write((char *) buffer + i * CAPIO_DATA_BUFFER_ELEMENT_SIZE);
+            ++i;
+        }
+        if (r) {
+            _queue->write((char *) buffer + i * CAPIO_DATA_BUFFER_ELEMENT_SIZE, r);
+        }
     }
 
   public:
-    WriterCache(std::size_t cache_size, SPSCQueue<char> *data_queue)
-        : _cache_size(cache_size), _actual_size(0), _shm_data_queue(data_queue) {
-        _cache = new char[cache_size];
-    }
+    WriteCache(SPSCQueue<char> *data_queue, int tid, std::size_t size)
+        : _cache(new char[size]), _tid(tid), _cache_size(size), _actual_size(0),
+          _queue(data_queue) {}
 
-    ~WriterCache() { delete[] _cache; }
-
-    void write(int fd, off64_t *offset, const void *buffer, std::size_t count) {
-        START_LOG(capio_syscall(SYS_gettid), "call(fd=%ld, offset=%ld, count=%ld)", fd, offset,
+    void write(int fd, const void *buffer, std::size_t count) {
+        START_LOG(capio_syscall(SYS_gettid), "call(fd=%ld, buffer=%0x%08x, count=%ld)", fd, buffer,
                   count);
+
         LOG("writing %ld bytes of cache", _actual_size);
         if (count > _cache_size - _actual_size) {
             // this code is the result of what used to be called flush
             if (_actual_size != 0) {
-                send_data_to_server(fd, offset, _actual_size, _cache);
+                send_data_to_server(fd, _actual_size, _cache.get());
             }
             if (count > _cache_size) {
-                LOG("count %ld > _cache_size %ld\n", count, _cache);
-                send_data_to_server(fd, offset, count, buffer);
+                LOG("count %ld > _cache_size %ld\n", count, _cache.get());
+                send_data_to_server(fd, count, buffer);
                 return;
             }
         }
-        memcpy((char *) _cache + _actual_size, buffer, count);
+        memcpy(_cache.get() + _actual_size, buffer, count);
         _actual_size += count;
         if (_actual_size == _cache_size) {
-            send_data_to_server(fd, offset, _cache_size, _cache);
+            send_data_to_server(fd, _cache_size, _cache.get());
             _actual_size = 0;
         }
     }
 };
+
+typedef std::unordered_map<int, std::pair<WriteCache *, ReadCache *>> CPThreadDataCache_t;
+
 #endif // CAPIO_SERVER_UTILS_CACHE
