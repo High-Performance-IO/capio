@@ -148,6 +148,11 @@ template <class T> class SPSCQueue {
         START_LOG(capio_syscall(SYS_gettid), "call(buff_rcv=0x%08x, num_bytes=%ld)", buff_rcv,
                   num_bytes);
 
+        if (num_bytes == 0) {
+            LOG("Reading size 0. Returning");
+            return;
+        }
+
         if (num_bytes > _elem_size) {
             ERR_EXIT("circular buffer %s read error: num_bytes > _elem_size", _shm_name.c_str());
         }

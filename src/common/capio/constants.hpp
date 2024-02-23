@@ -32,13 +32,13 @@ constexpr char LOG_CAPIO_START_REQUEST[]             = "\n+++++++++++ SYSCALL %s
 constexpr char LOG_CAPIO_END_REQUEST[]               = "----------- END SYSCALL ----------\n";
 constexpr char CAPIO_SERVER_LOG_START_REQUEST_MSG[]  = "+++++++++++++++++REQUEST+++++++++++++++++";
 constexpr char CAPIO_SERVER_LOG_END_REQUEST_MSG[]    = "~~~~~~~~~~~~~~~END REQUEST~~~~~~~~~~~~~~~";
-constexpr int N_ELEMS_DATA_BUFS                      = 10;
-constexpr int WINDOW_DATA_BUFS                       = 256 * 1024;
 constexpr int CAPIO_LOG_MAX_MSG_LEN                  = 2048;
 constexpr int CAPIO_SEM_RETRIES                      = 100;
 constexpr int THEORETICAL_SIZE_DIRENT64              = sizeof(ino64_t) + sizeof(off64_t) +
                                           sizeof(unsigned short) + sizeof(unsigned char) +
                                           sizeof(char) * NAME_MAX;
+constexpr int CAPIO_CACHE_WINDOW_DATA_BUFS_SIZE_DEFAULT = 256 * 1024;
+constexpr int CAPIO_CACHE_WINDOW_DATA_COUNT_DEFAULT     = 10;
 
 // CAPIO streaming semantics
 constexpr char CAPIO_FILE_MODE_NO_UPDATE[]           = "no_update";

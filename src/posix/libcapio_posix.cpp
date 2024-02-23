@@ -5,12 +5,12 @@
  */
 
 #include <array>
-#include <string>
-
 #include <asm-generic/unistd.h>
+#include <string>
 
 #include "capio/syscall.hpp"
 
+#include "utils/cache.hpp"
 #include "utils/clone.hpp"
 #include "utils/filesystem.hpp"
 #include "utils/snapshot.hpp"

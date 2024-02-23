@@ -7,29 +7,28 @@ inline void init_process(int tid) {
     if (data_buffers.find(tid) == data_buffers.end()) {
         register_listener(tid);
 
-        auto *write_data_cb = new SPSCQueue<char>(
-            "capio_write_data_buffer_tid_" + std::to_string(tid), CAPIO_DATA_BUFFER_LENGTH,
-            CAPIO_DATA_BUFFER_ELEMENT_SIZE, CAPIO_SEM_TIMEOUT_NANOSEC, CAPIO_SEM_MAX_RETRIES);
-        auto *read_data_cb = new SPSCQueue<char>(
-            "capio_read_data_buffer_tid_" + std::to_string(tid), CAPIO_DATA_BUFFER_LENGTH,
-            CAPIO_DATA_BUFFER_ELEMENT_SIZE, CAPIO_SEM_TIMEOUT_NANOSEC, CAPIO_SEM_MAX_RETRIES);
-        data_buffers.insert({tid, {write_data_cb, read_data_cb}});
+        data_buffers.insert(
+            {tid,
+             {new SPSCQueue<char>("capio_write_data_buffer_tid_" + std::to_string(tid),
+                                  get_caching_data_buf_elem(), get_caching_data_buf_size(),
+                                  CAPIO_SEM_TIMEOUT_NANOSEC, CAPIO_SEM_MAX_RETRIES),
+              new SPSCQueue<char>("capio_read_data_buffer_tid_" + std::to_string(tid),
+                                  get_caching_data_buf_elem(), get_caching_data_buf_size(),
+                                  CAPIO_SEM_TIMEOUT_NANOSEC, CAPIO_SEM_MAX_RETRIES)}});
     }
 }
 
 void send_data_to_client(int tid, char *buf, long int count) {
     START_LOG(gettid(), "call(%d,%.10s, %ld)", tid, buf, count);
     auto *data_buf  = data_buffers[tid].second;
-    size_t n_writes = count / CAPIO_DATA_BUFFER_ELEMENT_SIZE;
-    size_t r        = count % CAPIO_DATA_BUFFER_ELEMENT_SIZE;
+    size_t n_writes = count / get_caching_data_buf_size();
     size_t i        = 0;
     while (i < n_writes) {
-        data_buf->write(buf + i * CAPIO_DATA_BUFFER_ELEMENT_SIZE);
+        data_buf->write(buf + i * get_caching_data_buf_size());
         ++i;
     }
-    if (r) {
-        data_buf->write(buf + i * CAPIO_DATA_BUFFER_ELEMENT_SIZE, r);
-    }
+
+    data_buf->write(buf + i * get_caching_data_buf_size(), count % get_caching_data_buf_size());
 }
 
 /*
