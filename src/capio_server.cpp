@@ -545,7 +545,7 @@ void create_file(std::string path, bool is_dir, off64_t init_size) {
 		n_files = std::get<3>(it->second);
         #ifdef CAPIOLOG
 		logfile << "creating file " << path << std::endl;
-		logfile << "committed " << committed << " mode " << mode << std::endl;
+		logfile << "committed " << committed << " mode " << mode << " n_files " << n_files << std::endl;
 		#endif
 		if (n_files > 0) {
 			is_dir = true;
@@ -723,7 +723,7 @@ void handle_pending_local_reads(std::string path, bool wait_for_data) {
 			size_t file_size = files_metadata[path]->get_stored_size();
 			sem_post(&files_metadata_sem);
 			#ifdef CAPIOLOG
-			logfile << "pending read offset " << process_offset << " count " << count << " file_size " << file_size << std::endl;
+			logfile << "pending read offset " << process_offset << " count " << count << " file_size " << file_size << " wait_for_data " << wait_for_data << std::endl;
 			#endif
 			if (!wait_for_data || (process_offset + count <= file_size)) {
 				#ifdef CAPIOLOG
@@ -828,7 +828,7 @@ void write_entry_dir(int tid, std::string file_path, std::string dir, int type) 
 	}
 
 	std::string mode = c_file->get_mode();	
-	if (mode == "append") {
+	if (mode == "no_update") {
         #ifdef CAPIOLOG
         logfile << "write entry serving remote reads" << std::endl;
         #endif
@@ -1062,7 +1062,7 @@ void handle_write(const char* str, int rank) {
         logfile << "mode is " << mode << std::endl;
         #endif
 
-	if (mode == "append") {
+	if (mode == "no_update") {
         #ifdef CAPIOLOG
         logfile << "handle write serving remote pending reads" << std::endl;
         #endif
@@ -1104,7 +1104,7 @@ void handle_local_read(int tid, int fd, off64_t count, bool dir, bool is_getdent
 		off64_t nreads;
 		std::string committed = c_file.get_committed();
 		std::string mode = c_file.get_mode();
-		if (mode != "append" && !c_file.complete && !writer && !is_prod) {
+		if (mode != "no_update" && !c_file.complete && !writer && !is_prod) {
 			#ifdef CAPIOLOG
 			logfile << "add pending reads 1" << std::endl;
 			logfile << "mode " << mode << std::endl;
@@ -1261,7 +1261,7 @@ void handle_remote_read(int tid, int fd, off64_t count, int rank, bool dir, bool
 
 			return;
 		}
-		bool res = read_from_local_mem(tid, process_offset, end_of_read, end_of_sector, count, path); //when is not complete but mode = append
+		bool res = read_from_local_mem(tid, process_offset, end_of_read, end_of_sector, count, path); //when is not complete but mode = no_update
 		if (res) { // it means end_of_read < end_of_sector
 			if (sem_post(&handle_remote_read_sem) == -1)
 				err_exit("sem_post handle_remote_read_sem in handle_remote_read", logfile);
@@ -1991,7 +1991,7 @@ void* wait_for_stat(void* pthread_arg) {
 	sem_post(&files_metadata_sem);
 	std::string mode = c_file.get_mode();
 	bool complete = c_file.complete;
-	if (complete || strcmp(std::get<0>(files_location[path_to_check]), node_name) == 0 || mode == "append") {
+	if (complete || strcmp(std::get<0>(files_location[path_to_check]), node_name) == 0 || mode == "no_update") {
 		handle_local_stat(tid, path);
 	}
 	else {
@@ -2049,7 +2049,7 @@ void reply_stat(int tid, std::string path, int rank) {
 		logfile << "node_name : " << node_name << std::endl;
 		logfile << " files_location[path]: " << std::get<0>(files_location[path]) << std::endl;
 	#endif
-	if (complete || strcmp(std::get<0>(files_location[path]), node_name) == 0 || mode == "append" || *capio_dir == path) {
+	if (complete || strcmp(std::get<0>(files_location[path]), node_name) == 0 || mode == "no_update" || *capio_dir == path) {
 		handle_local_stat(tid, path);
 	}
 	else {
@@ -3172,7 +3172,7 @@ void* capio_helper(void* pthread_arg) {
 			long int file_size = c_file.get_stored_size();
 			sem_post(&files_metadata_sem);
 			bool complete = c_file.complete; 
-			if (complete || (c_file.get_mode() == "append" && data_avaiable(path_c, offset, nbytes, file_size))) {
+			if (complete || (c_file.get_mode() == "no_update" && data_avaiable(path_c, offset, nbytes, file_size))) {
 				#ifdef CAPIOLOG
 					logfile << "helper data avaiable" << std::endl;
 				#endif
@@ -3291,7 +3291,7 @@ const std::string& mode, const std::string& app_name, bool permanent, long int n
 	if (pos == std::string::npos && n_files == -1) {
 		metadata_conf[path] = std::make_tuple(committed, mode, app_name, n_files, permanent, n_close);
 		#ifdef CAPIOLOG
-		logfile << "path " << path << " app name " << app_name << std::endl;
+		logfile << "path " << path << " app name " << app_name << " n_files " << n_files << std::endl;
 		#endif
 	}
 	else {
