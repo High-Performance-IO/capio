@@ -1018,9 +1018,6 @@ void handle_write(const char* str, int rank) {
 		logfile << "debug handle_write 0 " << std::endl;
         #endif
 		while (i < n_reads) {
-        #ifdef CAPIOLOG
-		logfile << "debug handle_write 2 " << std::endl;
-        #endif
 			data_buf->read(p + i * *WINDOW_DATA_BUFS);
 			++i;
 		}
@@ -2128,10 +2125,18 @@ void handle_exig(char* str, int rank) {
 		std::string path = pair.first;	
    	if (pair.second) {
 		auto it_conf = metadata_conf.find(path);
+		auto it_app_name = apps.find(tid);
 		#ifdef CAPIOLOG
 		logfile << "path: " << path << std::endl;
+		logfile << "appname exiting " << std::endl;
+		if (it_app_name != apps.end()) {
+			logfile << it_app_name->second << std::endl;		
+		}
+		if (it_conf !=metadata_conf.end()) {
+			logfile << "appname conf" << std::get<2>(it_conf->second) << std::endl;
+		}
 		#endif
-		if (it_conf == metadata_conf.end() || std::get<0>(it_conf->second) == "on_termination" || std::get<0>(it_conf->second).length() == 0) { 
+		if (it_conf == metadata_conf.end() || (std::get<0>(it_conf->second) == "on_termination" && it_app_name != apps.end() && it_app_name->second == std::get<2>(it_conf->second)) || std::get<0>(it_conf->second).length() == 0) { 
 			sem_wait(&files_metadata_sem);
 			Capio_file& c_file = *files_metadata[path];
 			sem_post(&files_metadata_sem);
