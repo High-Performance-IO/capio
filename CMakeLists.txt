@@ -72,7 +72,9 @@ ENDIF (CAPIO_LOG)
 #####################################
 # Targets
 #####################################
-add_subdirectory(src/posix)
+if (${CMAKE_SYSTEM_NAME} MATCHES "Linux")
+    add_subdirectory(src/posix)
+endif ()
 add_subdirectory(src/server)
 
 IF (CAPIO_BUILD_TESTS)

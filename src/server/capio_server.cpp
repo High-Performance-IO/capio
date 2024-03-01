@@ -1,3 +1,8 @@
+#ifdef __APPLE__
+typedef long long off64_t;
+#define HOST_NAME_MAX 128
+#endif
+
 #include <dirent.h>
 #include <fcntl.h>
 #include <semaphore.h>

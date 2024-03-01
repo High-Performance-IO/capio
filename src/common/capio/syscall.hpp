@@ -1,6 +1,14 @@
 #ifndef CAPIO_COMMON_SYSCALL_HPP
 #define CAPIO_COMMON_SYSCALL_HPP
 
+#ifdef __APPLE__
+#include <sys/syscall.h>
+#include <unistd.h>
+#define capio_syscall(sysno, ...) syscall(sysno, ##__VA_ARGS__)
+#define capio_realpath(path, resolved) realpath(path, resolved)
+
+#else
+
 #include <syscall.h>
 
 #ifdef __CAPIO_POSIX
@@ -28,6 +36,8 @@ inline char *syscall_no_intercept_realpath(const char *path, char *resolved) {
 // The gettid function has been introduced in glibc v2.30
 #if __GLIBC__ == 2 && __GLIBC_MINOR__ < 30
 #define gettid() capio_syscall(SYS_gettid)
+#endif
+
 #endif
 
 #endif // CAPIO_COMMON_SYSCALL_HPP

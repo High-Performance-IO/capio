@@ -82,7 +82,8 @@ void parse_conf_file(const std::string &conf_file, const std::filesystem::path &
             for (auto file : streaming) {
                 std::string_view name, committed, mode, commit_rule;
                 long int n_close = -1;
-                long n_files, batch_size;
+                long long int batch_size;
+                long long int n_files;
 
                 error = file["name"].get_string().get(name);
                 if (error) {

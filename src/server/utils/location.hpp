@@ -51,7 +51,7 @@ class FlockGuard {
     }
 };
 
-inline std::optional<std::reference_wrapper<std::pair<const char *const, long int>>>
+inline std::optional<std::reference_wrapper<std::pair<const char *const, off64_t>>>
 get_file_location_opt(const std::filesystem::path &path) {
     START_LOG(gettid(), "path=%s", path.c_str());
 
@@ -66,7 +66,7 @@ get_file_location_opt(const std::filesystem::path &path) {
     }
 }
 
-inline std::pair<const char *const, long int> &
+inline std::pair<const char *const, off64_t> &
 get_file_location(const std::filesystem::path &path) {
     START_LOG(gettid(), "path=%s", path.c_str());
 

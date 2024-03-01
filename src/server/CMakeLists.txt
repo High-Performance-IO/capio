@@ -56,8 +56,13 @@ ENDIF (MPI_LINK_FLAGS)
 #####################################
 # Link libraries
 #####################################
-target_link_libraries(${TARGET_NAME} PRIVATE ${MPI_LIBRARIES} rt stdc++fs)
-
+if (${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
+    target_link_libraries(${TARGET_NAME} PRIVATE ${MPI_LIBRARIES})
+endif ()
+if (${CMAKE_SYSTEM_NAME} MATCHES "Linux")
+    target_link_libraries(${TARGET_NAME} PRIVATE ${MPI_LIBRARIES} rt stdc++fs)
+endif (
+)
 #####################################
 # Install rules
 #####################################
