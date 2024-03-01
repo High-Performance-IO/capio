@@ -13,6 +13,7 @@ class MPIBackend : public Backend {
 
     /*
      * This structure holds inside the information to convert from hostname to MPI rank*/
+    std::set<std::string> nodes;
     std::unordered_map<std::string, std::string> rank_nodes_equivalence;
     static constexpr long MPI_MAX_ELEM_COUNT = 1024L * 1024 * 1024;
 
@@ -34,6 +35,7 @@ class MPIBackend : public Backend {
         node_name = new char[MPI_MAX_PROCESSOR_NAME];
         MPI_Get_processor_name(node_name, &node_name_len);
         LOG("Node name = %s, length=%d", node_name, node_name_len);
+        nodes.emplace(node_name);
         rank_nodes_equivalence[std::to_string(rank)] = node_name;
         rank_nodes_equivalence[node_name]            = std::to_string(rank);
     }
@@ -42,6 +44,8 @@ class MPIBackend : public Backend {
         START_LOG(gettid(), "Call()");
         MPI_Finalize();
     }
+
+    inline const std::set<std::string> get_nodes() override { return nodes; }
 
     inline void handshake_servers() override {
         START_LOG(gettid(), "call()");
@@ -54,6 +58,7 @@ class MPIBackend : public Backend {
                 std::fill(buf.get(), buf.get() + MPI_MAX_PROCESSOR_NAME, 0);
                 MPI_Recv(buf.get(), MPI_MAX_PROCESSOR_NAME, MPI_CHAR, i, 0, MPI_COMM_WORLD,
                          MPI_STATUS_IGNORE);
+                nodes.emplace(buf.get());
                 rank_nodes_equivalence.emplace(buf.get(), std::to_string(i));
                 rank_nodes_equivalence.emplace(std::to_string(i), buf.get());
             }

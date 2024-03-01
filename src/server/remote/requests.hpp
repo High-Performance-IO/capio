@@ -18,7 +18,7 @@ inline void serve_remote_read_request(int tid, int fd, int count, long int nbyte
                                       const off64_t file_size, bool complete, bool is_getdents,
                                       const std::string &dest) {
     START_LOG(gettid(), "call()");
-    const char *const format = "%04d %d %d %ld %ld %ld %d %d";
+    const char *const format = "%04d %d %d %d %ld %ld %d %d";
     const int size = snprintf(nullptr, 0, format, CAPIO_SERVER_REQUEST_READ_REPLY, tid, fd, count,
                               nbytes, file_size, complete, is_getdents);
     const std::unique_ptr<char[]> message(new char[size + 1]);
@@ -34,7 +34,7 @@ inline void send_files_batch_request(const std::string &prefix, int tid, int fd,
                                      bool is_getdents, const std::string &dest,
                                      const std::vector<std::string> *files_to_send) {
     START_LOG(gettid(), "call()");
-    const char *const format = "%04d %s %d %d %ld %d";
+    const char *const format = "%04d %s %d %d %d %d";
     const int size           = snprintf(nullptr, 0, format, CAPIO_SERVER_REQUEST_READ_BATCH_REPLY,
                                         prefix.c_str(), tid, fd, count, is_getdents);
     const std::unique_ptr<char[]> header(new char[size + 1]);

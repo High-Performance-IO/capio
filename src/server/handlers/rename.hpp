@@ -8,7 +8,8 @@ void handle_rename(int tid, const std::filesystem::path &oldpath,
     START_LOG(gettid(), "call(tid=%d, oldpath=%s, newpath=%s)", tid, oldpath.c_str(),
               newpath.c_str());
 
-    if (get_capio_file_opt(oldpath)) {
+    // FIXME: this doesn't work if a node renames a file handled by another node
+    if (auto c_file_opt = get_capio_file_opt(oldpath)) {
         rename_capio_file(oldpath, newpath);
         for (auto &pair : writers) {
             auto node = pair.second.extract(oldpath);
@@ -17,15 +18,15 @@ void handle_rename(int tid, const std::filesystem::path &oldpath,
                 pair.second.insert(std::move(node));
             }
         }
-    }
-    int res = delete_from_files_location(oldpath);
-    if (res != 1) {
+        delete_from_files_location(oldpath);
+        if (!get_file_location_opt(newpath)) {
+            write_file_location(newpath);
+        }
+        rename_file_location(oldpath, newpath);
+        write_response(tid, 0);
+    } else {
         write_response(tid, 1);
-        return;
     }
-    rename_file_location(oldpath, newpath);
-    write_file_location(newpath);
-    write_response(tid, 0);
 }
 
 void rename_handler(const char *const str) {
