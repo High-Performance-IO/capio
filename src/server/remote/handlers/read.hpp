@@ -193,7 +193,7 @@ handle_remote_read_batch_reply(const std::string &source, int tid, int fd, off64
     for (const auto &[path, nbytes] : files) {
         auto c_file_opt = get_capio_file_opt(path);
         if (c_file_opt) {
-            CapioFile &c_file = get_capio_file(path);
+            CapioFile &c_file = c_file_opt->get();
             c_file.create_buffer_if_needed(path, false);
             size_t file_shm_size = c_file.get_buf_size();
             if (nbytes > file_shm_size) {

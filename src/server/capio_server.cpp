@@ -108,7 +108,7 @@ static constexpr std::array<CSHandler_t, CAPIO_NR_REQUESTS> build_request_handle
     MPI_Comm_size(MPI_COMM_WORLD, &n_servers);
     setup_signal_handlers();
     backend->handshake_servers();
-    load_created_files_locations();
+
     create_dir(getpid(), get_capio_dir());
 
     init_server();
