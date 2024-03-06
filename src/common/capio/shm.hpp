@@ -8,6 +8,8 @@
 #include <sys/stat.h>
 #include <unistd.h>
 
+#include "capio/logger.hpp"
+
 void *create_shm(const std::string &shm_name, const long int size) {
     START_LOG(capio_syscall(SYS_gettid), "call(shm_name=%s, size=%ld)", shm_name.c_str(), size);
 
@@ -15,16 +17,20 @@ void *create_shm(const std::string &shm_name, const long int size) {
     int fd = shm_open(shm_name.c_str(), O_CREAT | O_RDWR,
                       S_IRUSR | S_IWUSR); // to be closed
     if (fd == -1) {
+        __SHM_CHECK_CLI_MSG;
         ERR_EXIT("create_shm shm_open %s", shm_name.c_str());
     }
     if (ftruncate(fd, size) == -1) {
+        __SHM_CHECK_CLI_MSG;
         ERR_EXIT("ftruncate create_shm %s", shm_name.c_str());
     }
     void *p = mmap(nullptr, size, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
     if (p == MAP_FAILED) {
+        __SHM_CHECK_CLI_MSG;
         ERR_EXIT("mmap create_shm %s", shm_name.c_str());
     }
     if (close(fd) == -1) {
+        __SHM_CHECK_CLI_MSG;
         ERR_EXIT("close");
     }
     return p;

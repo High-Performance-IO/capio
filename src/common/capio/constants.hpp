@@ -59,6 +59,11 @@ constexpr int CAPIO_POSIX_SYSCALL_SUCCESS      = 0;
 constexpr char CAPIO_LOG_PRE_MSG[]        = "at[%s]: ";
 constexpr char CAPIO_DEFAULT_LOG_FOLDER[] = "capio_logs\0";
 
+// CAPIO logger - shm errors
+constexpr char CAPIO_SHM_OPEN_ERROR[] =
+    "Unable to open shared memory segment. can it be that another instance of capio server is "
+    "running with the same WORKFLOW_NAME?";
+
 // CAPIO logger - POSIX
 constexpr char CAPIO_LOG_POSIX_DEFAULT_LOG_FILE_PREFIX[] = "posix_thread_\0";
 constexpr char CAPIO_LOG_POSIX_SYSCALL_START[]           = "\n+++++++++ SYSCALL %s (%d) +++++++++";

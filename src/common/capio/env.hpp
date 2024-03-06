@@ -71,14 +71,14 @@ inline int get_capio_log_level() {
     return level;
 }
 
-inline char* get_capio_workflow_name(){
-    static char* name = nullptr;
-    if(name == nullptr){
-        name = std::getenv("CAPIO_WORKFLOW_NAME");
-
-        if(name == nullptr){
-            name = new char[strlen(CAPIO_DEFAULT_WORKFLOW_NAME)];
-            strcpy(name, CAPIO_DEFAULT_WORKFLOW_NAME);
+inline std::string get_capio_workflow_name() {
+    static std::string name;
+    if (name.empty()) {
+        auto tmp = std::getenv("CAPIO_WORKFLOW_NAME");
+        if (tmp != nullptr) {
+            name = tmp;
+        } else {
+            name = CAPIO_DEFAULT_WORKFLOW_NAME;
         }
     }
     return name;
