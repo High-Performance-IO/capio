@@ -20,6 +20,9 @@ constexpr int CAPIO_THEORETICAL_SIZE_DIRENT64     = sizeof(ino64_t) + sizeof(off
 constexpr int CAPIO_SEM_MAX_RETRIES          = 100;
 constexpr long int CAPIO_SEM_TIMEOUT_NANOSEC = 10e5;
 
+// CAPIO default values for shared memory
+constexpr char CAPIO_DEFAULT_WORKFLOW_NAME[] = "CAPIO";
+
 // CAPIO communication constants
 constexpr int CAPIO_DATA_BUFFER_LENGTH               = 10;
 constexpr int CAPIO_DATA_BUFFER_ELEMENT_SIZE         = 256 * 1024;
