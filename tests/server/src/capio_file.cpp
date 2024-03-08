@@ -2,6 +2,7 @@
 
 #include <iostream>
 
+#include "capio/env.hpp"
 #include "utils/capio_file.hpp"
 
 TEST_CASE("Test inserting a single sector", "[server]") {

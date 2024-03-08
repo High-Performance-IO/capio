@@ -203,7 +203,20 @@ int parseCLI(int argc, char **argv) {
                   << std::endl;
         parse_conf_file(token, capio_dir);
     } else if (noConfigFile) {
-        std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_INFO << "skipping config file parsing" << std::endl;
+        workflow_name = std::string_view(get_capio_workflow_name());
+        std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_WARNING << "skipping config file parsing."
+                  << std::endl;
+        if (workflow_name.empty()) {
+            workflow_name = CAPIO_DEFAULT_WORKFLOW_NAME;
+            std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_WARNING
+                      << "Using default workflow name: " << workflow_name << std::endl;
+
+        } else {
+            std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_WARNING
+                      << "Obtained from environment variable current workflow name: "
+                      << workflow_name.data() << std::endl;
+        }
+
     } else {
         std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_ERROR
                   << "Error: no config file provided. To skip config file use --no-config option!"
@@ -238,7 +251,7 @@ int parseCLI(int argc, char **argv) {
     }
     backend = select_backend(backend_name_str, argc, argv);
 
-    std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_INFO << "server initialization completed!"
+    std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_INFO << "server initialization completed!" << std::endl
               << std::flush;
     return 0;
 }
@@ -252,6 +265,8 @@ int main(int argc, char **argv) {
     START_LOG(gettid(), "call()");
 
     open_files_location();
+
+    shm_canary = new CapioSHmCanary(workflow_name.data());
 
     int res = sem_init(&internal_server_sem, 0, 0);
     if (res != 0) {

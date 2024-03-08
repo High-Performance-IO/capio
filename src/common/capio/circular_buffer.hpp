@@ -60,8 +60,9 @@ template <class T> class CircularBuffer {
           _sem_num_empty_name(workflow_name + "_sem_num_empty_" + shm_name) {
         START_LOG(capio_syscall(SYS_gettid),
                   "call(shm_name=%s, _max_num_elems=%ld, elem_size=%ld, "
-                  "sem_timeout=%d, sem_retries=%d)",
-                  shm_name.c_str(), _max_num_elems, elem_size, sem_timeout, sem_retries);
+                  "sem_timeout=%d, sem_retries=%d, workflow_name=%s)",
+                  _shm_name.data(), _max_num_elems, elem_size, sem_timeout, sem_retries,
+                  workflow_name.data());
         _sem_retries               = sem_retries;
         sem_timeout_struct.tv_nsec = sem_timeout;
         sem_timeout_struct.tv_sec  = 1;
