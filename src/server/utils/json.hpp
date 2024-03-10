@@ -26,13 +26,12 @@ void parse_conf_file(const std::string &conf_file, const std::filesystem::path &
     }
 
     entries = parser.iterate(json);
-
-    std::string_view workflow_name;
-    error = entries["name"].get_string().get(workflow_name);
+    std::string_view wf_name;
+    error = entries["name"].get_string().get(wf_name);
     if (error) {
         ERR_EXIT("Error: workflow name is mandatory");
     }
-
+    workflow_name = std::string(wf_name);
     std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_INFO
               << "Parsing configuration for workflow: " << workflow_name << std::endl;
     LOG("Parsing configuration for workflow: %s", std::string(workflow_name).c_str());

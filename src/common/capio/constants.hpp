@@ -20,6 +20,15 @@ constexpr int CAPIO_THEORETICAL_SIZE_DIRENT64     = sizeof(ino64_t) + sizeof(off
 constexpr int CAPIO_SEM_MAX_RETRIES          = 100;
 constexpr long int CAPIO_SEM_TIMEOUT_NANOSEC = 10e5;
 
+// CAPIO default values for shared memory
+constexpr char CAPIO_DEFAULT_WORKFLOW_NAME[] = "CAPIO";
+constexpr char CAPIO_SHM_CANARY_ERROR[] =
+    "FATAL ERROR:  Shared memories for workflow %s already "
+    "exists. One of two (or both) reasons are to blame: \n             "
+    "either a previous run of CAPIO terminated without "
+    "cleaning up memory, or another instance of CAPIO\n             "
+    "is already running. Clean shared memory and then retry";
+
 // CAPIO communication constants
 constexpr int CAPIO_DATA_BUFFER_LENGTH               = 10;
 constexpr int CAPIO_DATA_BUFFER_ELEMENT_SIZE         = 256 * 1024;
@@ -55,6 +64,11 @@ constexpr int CAPIO_POSIX_SYSCALL_SUCCESS      = 0;
 // CAPIO logger - common
 constexpr char CAPIO_LOG_PRE_MSG[]        = "at[%s]: ";
 constexpr char CAPIO_DEFAULT_LOG_FOLDER[] = "capio_logs\0";
+
+// CAPIO logger - shm errors
+constexpr char CAPIO_SHM_OPEN_ERROR[] =
+    "Unable to open shared memory segment. Could it be that another instance of capio server is "
+    "running with the same WORKFLOW_NAME?";
 
 // CAPIO logger - POSIX
 constexpr char CAPIO_LOG_POSIX_DEFAULT_LOG_FILE_PREFIX[] = "posix_thread_\0";

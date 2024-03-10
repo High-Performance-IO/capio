@@ -20,6 +20,8 @@
 #include <unordered_set>
 #include <vector>
 
+std::string workflow_name;
+
 #include "capio/env.hpp"
 #include "capio/logger.hpp"
 #include "capio/semaphore.hpp"
@@ -57,8 +59,6 @@ CSDataBufferMap_t data_buffers;
 CSWritersMap_t writers;
 
 CSClientsRemotePendingNFilesMap_t clients_remote_pending_nfiles;
-
-sem_t internal_server_sem;
 
 sem_t clients_remote_pending_nfiles_sem;
 
@@ -99,7 +99,7 @@ static constexpr std::array<CSHandler_t, CAPIO_NR_REQUESTS> build_request_handle
     return _request_handlers;
 }
 
-[[noreturn]] void capio_server() {
+[[noreturn]] void capio_server(sem_t *internal_server_sem) {
     static const std::array<CSHandler_t, CAPIO_NR_REQUESTS> request_handlers =
         build_request_handlers_table();
 
@@ -112,7 +112,7 @@ static constexpr std::array<CSHandler_t, CAPIO_NR_REQUESTS> build_request_handle
 
     init_server();
 
-    if (sem_post(&internal_server_sem) == -1) {
+    if (sem_post(internal_server_sem) == -1) {
         ERR_EXIT("sem_post internal_server_sem in capio_server");
     }
 
@@ -203,7 +203,13 @@ int parseCLI(int argc, char **argv) {
                   << std::endl;
         parse_conf_file(token, capio_dir);
     } else if (noConfigFile) {
-        std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_INFO << "skipping config file parsing" << std::endl;
+        workflow_name = std::string_view(get_capio_workflow_name());
+        std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_WARNING << "skipping config file parsing."
+                  << std::endl
+                  << CAPIO_LOG_SERVER_CLI_LEVEL_WARNING
+                  << "Obtained from environment variable current workflow name: "
+                  << workflow_name.data() << std::endl;
+
     } else {
         std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_ERROR
                   << "Error: no config file provided. To skip config file use --no-config option!"
@@ -238,12 +244,14 @@ int parseCLI(int argc, char **argv) {
     }
     backend = select_backend(backend_name_str, argc, argv);
 
-    std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_INFO << "server initialization completed!"
+    std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_INFO << "server initialization completed!" << std::endl
               << std::flush;
     return 0;
 }
 
 int main(int argc, char **argv) {
+
+    sem_t internal_server_sem;
 
     std::cout << CAPIO_LOG_SERVER_BANNER;
 
@@ -253,6 +261,8 @@ int main(int argc, char **argv) {
 
     open_files_location();
 
+    shm_canary = new CapioShmCanary(workflow_name);
+
     int res = sem_init(&internal_server_sem, 0, 0);
     if (res != 0) {
         ERR_EXIT("sem_init internal_server_sem failed with status %d", res);
@@ -260,9 +270,9 @@ int main(int argc, char **argv) {
     if (sem_init(&clients_remote_pending_nfiles_sem, 0, 1) == -1) {
         ERR_EXIT("sem_init clients_remote_pending_nfiles_sem in main");
     }
-    std::thread server_thread(capio_server);
+    std::thread server_thread(capio_server, &internal_server_sem);
     LOG("capio_server thread started");
-    std::thread remote_listener_thread(capio_remote_listener);
+    std::thread remote_listener_thread(capio_remote_listener, &internal_server_sem);
     LOG("capio_remote_listener thread started.");
     server_thread.join();
     remote_listener_thread.join();

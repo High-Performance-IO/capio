@@ -27,15 +27,24 @@ build_server_request_handlers_table() {
 
 inline Backend *select_backend(const std::string &backend_name, int argc, char *argv[]) {
     START_LOG(gettid(), "call(backend_name=%s)", backend_name.c_str());
+
+    if (backend_name.empty()) {
+        LOG("backend selected: none");
+        std::cout << CAPIO_SERVER_CLI_LOG_SERVER
+                  << "Starting CAPIO with default backend (MPI) as no preferred backend was chosen"
+                  << std::endl;
+        return new MPIBackend(argc, argv);
+    }
+
     if (backend_name == "mpi") {
         LOG("backend selected: mpi");
-        std::cout << CAPIO_SERVER_CLI_LOG_SERVER << " Starting CAPIO with MPI backend" << std::endl;
+        std::cout << CAPIO_SERVER_CLI_LOG_SERVER << "Starting CAPIO with MPI backend" << std::endl;
         return new MPIBackend(argc, argv);
     }
 
     if (backend_name == "mpisync") {
         LOG("backend selected: mpisync");
-        std::cout << CAPIO_SERVER_CLI_LOG_SERVER << " Starting CAPIO with MPI (SYNC) backend"
+        std::cout << CAPIO_SERVER_CLI_LOG_SERVER << "Starting CAPIO with MPI (SYNC) backend"
                   << std::endl;
         return new MPISYNCBackend(argc, argv);
     }
@@ -46,13 +55,13 @@ inline Backend *select_backend(const std::string &backend_name, int argc, char *
     return new MPIBackend(argc, argv);
 }
 
-[[noreturn]] void capio_remote_listener() {
+[[noreturn]] void capio_remote_listener(sem_t *internal_server_sem) {
     static const std::array<CComsHandler_t, CAPIO_SERVER_NR_REQUEST> server_request_handlers =
         build_server_request_handlers_table();
 
     START_LOG(gettid(), "call()");
 
-    sem_wait(&internal_server_sem);
+    sem_wait(internal_server_sem);
     while (true) {
         auto request = backend->read_next_request();
 

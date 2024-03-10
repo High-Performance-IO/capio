@@ -71,4 +71,17 @@ inline int get_capio_log_level() {
     return level;
 }
 
+inline std::string get_capio_workflow_name() {
+    static std::string name;
+    if (name.empty()) {
+        auto tmp = std::getenv("CAPIO_WORKFLOW_NAME");
+        if (tmp != nullptr) {
+            name = tmp;
+        } else {
+            name = CAPIO_DEFAULT_WORKFLOW_NAME;
+        }
+    }
+    return name;
+}
+
 #endif // CAPIO_COMMON_ENV_HPP
