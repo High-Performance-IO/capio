@@ -26,13 +26,7 @@ std::string workflow_name;
 #include "capio/logger.hpp"
 #include "capio/semaphore.hpp"
 #include "utils/capio_file.hpp"
-#include "utils/common.hpp"
-#include "utils/env.hpp"
-#include "utils/json.hpp"
-#include "utils/metadata.hpp"
-#include "utils/requests.hpp"
-
-using namespace simdjson;
+#include "utils/types.hpp"
 
 int n_servers;
 // name of the node
@@ -61,6 +55,19 @@ CSWritersMap_t writers;
 CSClientsRemotePendingNFilesMap_t clients_remote_pending_nfiles;
 
 sem_t clients_remote_pending_nfiles_sem;
+
+using namespace simdjson;
+
+#include "capio/env.hpp"
+#include "capio/logger.hpp"
+#include "capio/semaphore.hpp"
+
+#include "utils/common.hpp"
+#include "utils/env.hpp"
+#include "utils/json.hpp"
+#include "utils/metadata.hpp"
+#include "utils/requests.hpp"
+
 
 #include "handlers.hpp"
 #include "utils/location.hpp"
@@ -201,6 +208,7 @@ int parseCLI(int argc, char **argv) {
         const std::filesystem::path &capio_dir = get_capio_dir();
         std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_INFO << "parsing config file: " << token
                   << std::endl;
+        load_configuration(token, capio_dir);
         parse_conf_file(token, capio_dir);
     } else if (noConfigFile) {
         workflow_name = std::string_view(get_capio_workflow_name());
@@ -256,6 +264,7 @@ int main(int argc, char **argv) {
     std::cout << CAPIO_LOG_SERVER_BANNER;
 
     parseCLI(argc, argv);
+
 
     START_LOG(gettid(), "call()");
 

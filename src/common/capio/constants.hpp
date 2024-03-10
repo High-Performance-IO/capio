@@ -94,6 +94,7 @@ constexpr char CAPIO_LOG_SERVER_BANNER[] =
 constexpr char CAPIO_LOG_SERVER_CLI_LEVEL_INFO[]    = "[ \033[1;32m SERVER \033[0m ] ";
 constexpr char CAPIO_LOG_SERVER_CLI_LEVEL_WARNING[] = "[ \033[1;33m SERVER \033[0m ] ";
 constexpr char CAPIO_LOG_SERVER_CLI_LEVEL_ERROR[]   = "[ \033[1;31m SERVER \033[0m ] ";
+constexpr char CAPIO_LOG_SERVER_CLI_LEVEL_JSON[]    = "[ \033[1;34m SERVER \033[0m ] ";
 constexpr char CAPIO_LOG_SERVER_CLI_LOGGING_ENABLED_WARNING[] =
     "[ \033[1;33m SERVER \033[0m ] "
     "|==================================================================|\n"

@@ -3,6 +3,7 @@
 
 #include <singleheader/simdjson.h>
 
+#include "utils/location.hpp"
 #include "utils/metadata.hpp"
 #include "utils/types.hpp"
 
@@ -210,6 +211,97 @@ void parse_conf_file(const std::string &conf_file, const std::filesystem::path &
 
     std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_INFO << "Completed parsing of io_graph" << std::endl;
     LOG("Completed parsing of io_graph");
+}
+
+inline void load_configuration(const std::string &conf_file,
+                               const std::filesystem::path &capio_dir) {
+    CapioFileLocations file_locations;
+    simdjson::ondemand::parser parser;
+    simdjson::padded_string json;
+
+    std::unordered_map<std::string, std::vector<std::string_view>> alias_map;
+
+    std::string_view workflow_name;
+    START_LOG(gettid(), "call(config_file='%s', capio_dir='%s')", conf_file.c_str(),
+              capio_dir.c_str());
+
+    try {
+        json = simdjson::padded_string::load(conf_file);
+    } catch (const simdjson::simdjson_error &e) {
+        std::cerr << CAPIO_LOG_SERVER_CLI_LEVEL_ERROR
+                  << "Exception thrown while opening config file: " << e.what() << std::endl;
+        LOG("Exception thrown while opening config file: %s", e.what());
+        ERR_EXIT("Exception thrown while opening config file: %s", e.what());
+    }
+
+    auto doc                           = parser.iterate(json);
+    simdjson::ondemand::object objects = doc.get_object();
+
+    try {
+        workflow_name = objects["name"].get_string();
+    } catch (simdjson::simdjson_error &e) {
+        std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_ERROR << "Current configuration file does not provide required section name" <<  std::endl;
+        ERR_EXIT("Current configuration file does not provide required section name");
+    }
+    std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_JSON << "Workflow name: " << workflow_name << std::endl;
+
+    auto aliases = objects["alias"].get_object();
+    for (auto alias : aliases) {
+        std::string_view alias_name = alias.unescaped_key();
+        std::vector<std::string_view> resolved_alias;
+        for (auto t : alias.value().get_array().value()) {
+            std::string_view tmp_str;
+            t.get(tmp_str);
+            resolved_alias.emplace_back(tmp_str);
+        }
+        alias_map.emplace(alias_name, resolved_alias);
+        std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_JSON << "Alias: " << alias_name << " = [";
+        for (auto str : resolved_alias) {
+            std::cout << " " << str;
+        }
+        std::cout << " ]" << std::endl;
+    }
+
+    simdjson::simdjson_result<simdjson::ondemand::object> io_graph;
+
+    try{
+        io_graph = objects["io_graph"].get_object();
+    } catch (simdjson::simdjson_error& e){
+        std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_ERROR << "Current configuration file does not provide required section io_graph" <<  std::endl;
+        ERR_EXIT("Current configuration file does not provide required section io_graph");
+    }
+
+    for (auto application : io_graph) {
+        auto application_name = std::string(application.unescaped_key().value());
+        std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_JSON
+                  << "Parsing configuration for: " << application_name << std::endl;
+
+        try {
+            auto output = application.value()["output"].get_object();
+            for (auto output_file : output) {
+                std::string file_name = std::string(output_file.unescaped_key().value());
+                file_locations.newFile(file_name);
+                file_locations.addProducer(file_name, application_name);
+            }
+        } catch (simdjson::simdjson_error &e) {
+            std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_JSON << "No output files for app "
+                      << application_name << std::endl;
+        }
+
+        try {
+            auto input = application.value()["input"].get_object();
+            for (auto input_file : input) {
+                std::string file_name = std::string(input_file.unescaped_key().value());
+                file_locations.newFile(file_name);
+                file_locations.addConsumer(file_name, application_name);
+            }
+        } catch (simdjson::simdjson_error &e) {
+            std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_JSON << "No input files for app "
+                      << application_name << std::endl;
+        }
+    }
+
+    file_locations.print();
 }
 
 #endif // CAPIO_SERVER_UTILS_JSON_HPP
