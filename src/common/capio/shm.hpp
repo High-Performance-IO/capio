@@ -11,19 +11,15 @@
 
 #include "capio/logger.hpp"
 
-class CapioSHmCanary {
+class CapioShmCanary {
     int _shm_id;
     std::string _canary_name;
 
   public:
-    explicit CapioSHmCanary(std::string capio_workflow_name = get_capio_workflow_name())
-        : _canary_name(capio_workflow_name) {
+    explicit CapioShmCanary(std::string capio_workflow_name) : _canary_name(capio_workflow_name) {
         START_LOG(capio_syscall(SYS_gettid), "call(capio_workflow_name: %s)", _canary_name.data());
         if (_canary_name.empty()) {
             _canary_name = get_capio_workflow_name();
-            if (_canary_name.empty()) {
-                _canary_name = CAPIO_DEFAULT_WORKFLOW_NAME;
-            }
         }
         _shm_id = shm_open(_canary_name.data(), O_CREAT | O_EXCL, S_IRUSR | S_IWUSR);
         if (_shm_id == -1) {
@@ -38,7 +34,7 @@ class CapioSHmCanary {
         }
     };
 
-    ~CapioSHmCanary() {
+    ~CapioShmCanary() {
         START_LOG(capio_syscall(SYS_gettid), "call()");
 #ifndef __CAPIO_POSIx
         std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_WARNING << "Removing shared memory canary flag"
@@ -56,7 +52,7 @@ class CapioSHmCanary {
     }
 };
 
-CapioSHmCanary *shm_canary;
+CapioShmCanary *shm_canary;
 
 void *create_shm(const std::string &shm_name, const long int size) {
     START_LOG(capio_syscall(SYS_gettid), "call(shm_name=%s, size=%ld)", shm_name.c_str(), size);

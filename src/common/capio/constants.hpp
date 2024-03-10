@@ -25,9 +25,9 @@ constexpr char CAPIO_DEFAULT_WORKFLOW_NAME[] = "CAPIO";
 constexpr char CAPIO_SHM_CANARY_ERROR[] =
     "FATAL ERROR:  Shared memories for workflow %s already "
     "exists. One of two (or both) reasons are to blame: \n             "
-    "Either a previous run of CAPIO terminated without "
+    "either a previous run of CAPIO terminated without "
     "cleaning up memory, or another instance of CAPIO\n             "
-    "is already running . Clean shared memory and then retry";
+    "is already running. Clean shared memory and then retry";
 
 // CAPIO communication constants
 constexpr int CAPIO_DATA_BUFFER_LENGTH               = 10;
@@ -67,7 +67,7 @@ constexpr char CAPIO_DEFAULT_LOG_FOLDER[] = "capio_logs\0";
 
 // CAPIO logger - shm errors
 constexpr char CAPIO_SHM_OPEN_ERROR[] =
-    "Unable to open shared memory segment. can it be that another instance of capio server is "
+    "Unable to open shared memory segment. Could it be that another instance of capio server is "
     "running with the same WORKFLOW_NAME?";
 
 // CAPIO logger - POSIX

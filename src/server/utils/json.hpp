@@ -6,8 +6,6 @@
 #include "utils/metadata.hpp"
 #include "utils/types.hpp"
 
-std::string workflow_name;
-
 void parse_conf_file(const std::string &conf_file, const std::filesystem::path &capio_dir) {
     START_LOG(gettid(), "call(config_file='%s', capio_dir='%s')", conf_file.c_str(),
               capio_dir.c_str());

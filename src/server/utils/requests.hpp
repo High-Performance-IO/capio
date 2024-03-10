@@ -47,7 +47,7 @@ inline void register_listener(long tid) {
     // TODO: replace numbers with constexpr
     auto *p_buf_response = new CircularBuffer<off_t>(
         "buf_response_" + std::to_string(tid), 8 * 1024 * 1024, sizeof(off_t),
-        CAPIO_SEM_TIMEOUT_NANOSEC, CAPIO_SEM_MAX_RETRIES, std::string(workflow_name));
+        CAPIO_SEM_TIMEOUT_NANOSEC, CAPIO_SEM_MAX_RETRIES, workflow_name);
     bufs_response->insert(std::make_pair(tid, p_buf_response));
 }
 
