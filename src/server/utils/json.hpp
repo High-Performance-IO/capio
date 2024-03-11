@@ -7,18 +7,16 @@
 #include "utils/metadata.hpp"
 #include "utils/types.hpp"
 
-inline void load_configuration(const std::string &conf_file,
-                               const std::filesystem::path &capio_dir, simdjson::padded_string& json) {
+inline void load_configuration(const std::string &conf_file, const std::filesystem::path &capio_dir,
+                               simdjson::padded_string &json) {
     CapioFileLocations file_locations;
     simdjson::ondemand::parser parser;
-
 
     std::unordered_map<std::string, std::vector<std::string_view>> alias_map;
 
     std::string_view workflow_name;
     START_LOG(gettid(), "call(config_file='%s', capio_dir='%s')", conf_file.c_str(),
               capio_dir.c_str());
-
 
     auto doc                           = parser.iterate(json);
     simdjson::ondemand::object objects = doc.get_object();
@@ -75,6 +73,20 @@ inline void load_configuration(const std::string &conf_file,
                 std::string file_name = std::string(output_file.unescaped_key().value());
                 file_locations.newFile(file_name);
                 file_locations.addProducer(file_name, application_name);
+
+                try {
+                    auto commit_rule =
+                        output_file.value()["committed"].value().get_string().value();
+                    file_locations.setCommitRule(file_name, std::string(commit_rule));
+                } catch (simdjson::simdjson_error &e) {
+                    std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_JSON << "No committed rule for file " << file_name << std::endl;
+                }
+                try {
+                    auto fire_rule = output_file.value()["mode"].value().get_string().value();
+                    file_locations.setFireRule(file_name, std::string(fire_rule));
+                } catch (simdjson::simdjson_error &e) {
+                    std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_JSON << "No fire rule for file " << file_name << std::endl;
+                }
             }
         } catch (simdjson::simdjson_error &e) {
             std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_JSON << "No output files for app "
@@ -122,13 +134,14 @@ void parse_conf_file(const std::string &conf_file, const std::filesystem::path &
     try {
         auto version = entries["version"].get_int64();
         if (version.value() > 1) {
-            std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_JSON << "Found version " << version
+            std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_JSON << "Version of CLIO is " << version
                       << std::endl;
             load_configuration(conf_file, capio_dir, json);
             return;
         }
-    }catch (simdjson::simdjson_error& e){}
-
+    } catch (simdjson::simdjson_error &e) {
+        std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_INFO << "Version of CLIO is 1" << std::endl;
+    }
 
     std::string_view wf_name;
     error = entries["name"].get_string().get(wf_name);

@@ -10,21 +10,23 @@
 
 class CapioFileLocations {
   private:
-    // pathname => vector of producers, vector of consumers
-    std::unordered_map<std::string, std::tuple<std::vector<std::string>, std::vector<std::string>>>
+    // pathname => <vector of producers, vector of consumers, commit_rule, fire_rule>
+    std::unordered_map<std::string, std::tuple<std::vector<std::string>, std::vector<std::string>,
+                                               std::string, std::string>>
         _locations;
 
-    inline std::string truncate_last_n(const std::string& str, int n){
+    inline std::string truncate_last_n(const std::string &str, int n) {
         return str.length() > n ? "[..] " + str.substr(str.length() - n) : str;
     }
 
   public:
     void print() {
-        std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_JSON << "Printing File locations: " << std::endl
+        std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_JSON << "Composition of expected CAPIO FS: " << std::endl
                   << std::endl
-                  << "|===================|===================|====================|" << std::endl
-                  << "| Filename          | Producer step     | Consumer step      |" << std::endl
-                  << "|===================|===================|====================|" << std::endl;
+                  << "|===================|===================|====================|====================|===================|"<< std::endl
+                  << "| Filename          | Producer step     | Consumer step      |  Commit Rule       |  Firing Rule      |" << std::endl
+                  << "|===================|===================|====================|====================|===================|"
+                  << std::endl;
         for (auto itm : _locations) {
             std::string name_trunc = truncate_last_n(itm.first, 12);
 
@@ -44,35 +46,49 @@ class CapioFileLocations {
 
                 if (i < producers.size()) {
                     auto prod1 = truncate_last_n(producers.at(i), 12);
-                    std::cout << prod1 << std::setfill(' ') << std::setw(19 - prod1.length())
-                              << "|";
+                    std::cout << prod1 << std::setfill(' ') << std::setw(20 - prod1.length())
+                              << " | ";
                 } else {
                     std::cout << std::setfill(' ') << std::setw(20) << " | ";
                 }
 
                 if (i < consumers.size()) {
                     auto cons1 = truncate_last_n(consumers.at(i), 12);
-                    std::cout << cons1 << std::setfill(' ') << std::setw(20 - cons1.length()) << "|"
-                              << std::endl;
+                    std::cout << " " << cons1 << std::setfill(' ') << std::setw(20 - cons1.length())
+                              << " | ";
                 } else {
-                    std::cout << std::setfill(' ') << std::setw(21) << "|" << std::endl;
+                    std::cout << std::setfill(' ') << std::setw(21) << " | ";
+                }
+
+                if (i == 0) {
+                    std::string commit_rule = std::get<2>(itm.second),
+                                fire_rule   = std::get<3>(itm.second);
+                    std::cout << " " << commit_rule << std::setfill(' ') << std::setw(20 - commit_rule.length())
+                              << " | "<< fire_rule << std::setfill(' ') << std::setw(20 - fire_rule.length())
+                              << " | "<<std::endl;
+                } else {
+                    std::cout << std::setfill(' ') << std::setw(20) << "|" << std::setfill(' ')
+                              << std::setw(20) << "|" << std::endl;
                 }
             }
-            std::cout << "*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*"
+            std::cout << "*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~"
+                         "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*"
                       << std::endl;
         }
         std::cout << std::endl;
     };
 
     inline void add(std::string &path, std::vector<std::string> &producers,
-                    std::vector<std::string> &consumers) {
-        _locations.emplace(path, std::make_tuple(producers, consumers));
+                    std::vector<std::string> &consumers, const std::string &commit_rule,
+                    const std::string &fire_rule) {
+        _locations.emplace(path, std::make_tuple(producers, consumers, commit_rule, fire_rule));
     }
 
     inline void newFile(const std::string &path) {
         if (_locations.find(path) == _locations.end()) {
             _locations.emplace(
-                path, std::make_tuple(std::vector<std::string>(), std::vector<std::string>()));
+                path, std::make_tuple(std::vector<std::string>(), std::vector<std::string>(),
+                                      CAPIO_FILE_COMMITTED_ON_TERMINATION, CAPIO_FILE_MODE_UPDATE));
         }
     }
 
@@ -84,6 +100,14 @@ class CapioFileLocations {
     inline void addConsumer(const std::string &path, std::string &consumer) {
         consumer.erase(remove_if(consumer.begin(), consumer.end(), isspace), consumer.end());
         std::get<1>(_locations.at(path)).emplace_back(consumer);
+    }
+
+    inline void setCommitRule(const std::string &path, const std::string &commit_rule) {
+        std::get<2>(_locations.at(path)) = commit_rule;
+    }
+
+    inline void setFireRule(const std::string &path, const std::string &fire_rule) {
+        std::get<3>(_locations.at(path)) = fire_rule;
     }
 
     inline void remove(const std::string &path) { _locations.erase(path); }

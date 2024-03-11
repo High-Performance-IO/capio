@@ -1,0 +1,73 @@
+{
+   "$schema" : "https://clio.hpc4ai.it/schema/clio.json",
+   "version" : 2,
+   "name":"1000-genome-new",
+   "alias":{
+      "mutation_frequency_in" : ["sifted.SIFT.chr1.txt", "chr1n", "data/populations/ALL", "data/20130502/columns.txt"]
+   },
+   "io_graph" : {
+      "download" :{
+         "output" : {
+            "data*" : {
+               "committed" : "on_close",
+				   "mode" : "append"
+            }
+         }
+      },
+      "individuals":{
+         "input" : {
+            "data/20130502/ALL.chr1.250000.vcf" : {}
+         },
+         "output" : {
+            "chr1n-*" : {
+               "committed" : "on_close",
+				   "mode" : "append",
+				   "n_files" : 2504
+            }
+         }
+      },
+      "individuals_merge" :{
+         "input" : {
+            "chr1n-*" : {}
+         },
+         "output" : {
+            "chr1n" :{
+               "committed" : "on_close",
+				   "mode" : "append",
+				   "n_files" : 2504
+            }
+         }
+      },
+      "sifting" :{
+         "input" : {
+            "data/20130502/sifting/ALL.chr1.phase3_shapeit2_mvncall_integrated_v5.20130502.sites.annotation.vcf" : {}
+         },
+         "output" : {
+            "sifted.SIFT.chr1.txt":{
+               "committed" : "on_close",
+				   "mode" : "append"
+            }
+         }
+      },
+      "mutations_overlap" :{
+         "input" :{
+            "mutation_frequency_in" : {}
+         },
+         "output" : {
+            "chr1-ALL.tar.gz" : {},
+            "output_no_sift/total_mutations_individual1_sNO-SIFT_ALL.txt" : {
+               "committed" : "on_close"
+            }
+         }
+      },
+      "frequency" : {
+         "input" : {
+            "mutation_frequency_in" : {}
+         },
+         "output":{
+            "chr1-ALL-freq.tar.gz" : {}
+         }
+      }
+   }
+}
+
