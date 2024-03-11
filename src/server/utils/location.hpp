@@ -2,8 +2,8 @@
 #define CAPIO_SERVER_UTILS_LOCATIONS_HPP
 
 #include <mutex>
-#include <thread>
 #include <optional>
+#include <thread>
 
 #include "metadata.hpp"
 #include "utils/types.hpp"
@@ -14,32 +14,53 @@ class CapioFileLocations {
     std::unordered_map<std::string, std::tuple<std::vector<std::string>, std::vector<std::string>>>
         _locations;
 
+    inline std::string truncate_last_n(const std::string& str, int n){
+        return str.length() > n ? "[..] " + str.substr(str.length() - n) : str;
+    }
+
   public:
-    void print(){
-        std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_JSON << "Printing File locations: " << std::endl << std::endl
+    void print() {
+        std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_JSON << "Printing File locations: " << std::endl
+                  << std::endl
                   << "|===================|===================|====================|" << std::endl
                   << "| Filename          | Producer step     | Consumer step      |" << std::endl
                   << "|===================|===================|====================|" << std::endl;
-        for (auto itm : _locations){
-            std::cout << "| " << itm.first << std::setfill(' ') << std::setw(20-itm.first.length()) << "| ";
-            for(auto itm2 : std::get<0>(itm.second)){
-                std::cout << itm2 << std::setfill(' ') << std::setw(20-itm2.length());
-            }
-            if(std::get<0>(itm.second).empty()){
-                std::cout << std::setfill(' ') << std::setw(20);
-            }
-            std::cout << " | ";
+        for (auto itm : _locations) {
+            std::string name_trunc = truncate_last_n(itm.first, 12);
 
-            for(auto itm2 : std::get<1>(itm.second)){
-                std::cout << itm2 << std::setfill(' ') << std::setw(20-itm2.length());;
-            }
-            if(std::get<1>(itm.second).empty()){
-                std::cout << std::setfill(' ') << std::setw(20);
-            }
-            std::cout << "  |" << std::endl;
+            std::cout << "| " << name_trunc << std::setfill(' ')
+                      << std::setw(20 - name_trunc.length()) << "| ";
 
+            auto producers = std::get<0>(itm.second);
+            auto consumers = std::get<1>(itm.second);
+            auto rowCount =
+                producers.size() > consumers.size() ? producers.size() : consumers.size();
+
+            for (int i = 0; i < rowCount; i++) {
+                std::string prod, cons;
+                if (i > 0) {
+                    std::cout << "|                   | ";
+                }
+
+                if (i < producers.size()) {
+                    auto prod1 = truncate_last_n(producers.at(i), 12);
+                    std::cout << prod1 << std::setfill(' ') << std::setw(19 - prod1.length())
+                              << "|";
+                } else {
+                    std::cout << std::setfill(' ') << std::setw(20) << " | ";
+                }
+
+                if (i < consumers.size()) {
+                    auto cons1 = truncate_last_n(consumers.at(i), 12);
+                    std::cout << cons1 << std::setfill(' ') << std::setw(20 - cons1.length()) << "|"
+                              << std::endl;
+                } else {
+                    std::cout << std::setfill(' ') << std::setw(21) << "|" << std::endl;
+                }
+            }
+            std::cout << "*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*"
+                      << std::endl;
         }
-        std::cout << "|===================|===================|====================|" << std::endl;
         std::cout << std::endl;
     };
 
@@ -49,16 +70,19 @@ class CapioFileLocations {
     }
 
     inline void newFile(const std::string &path) {
-        if(_locations.find(path) == _locations.end())
-            _locations.emplace(path,
-                           std::make_tuple(std::vector<std::string>(), std::vector<std::string>()));
+        if (_locations.find(path) == _locations.end()) {
+            _locations.emplace(
+                path, std::make_tuple(std::vector<std::string>(), std::vector<std::string>()));
+        }
     }
 
-    inline void addProducer(const std::string &path, const std::string &producer) {
+    inline void addProducer(const std::string &path, std::string &producer) {
+        producer.erase(remove_if(producer.begin(), producer.end(), isspace), producer.end());
         std::get<0>(_locations.at(path)).emplace_back(producer);
     }
 
-    inline void addConsumer(const std::string &path, const std::string &consumer) {
+    inline void addConsumer(const std::string &path, std::string &consumer) {
+        consumer.erase(remove_if(consumer.begin(), consumer.end(), isspace), consumer.end());
         std::get<1>(_locations.at(path)).emplace_back(consumer);
     }
 

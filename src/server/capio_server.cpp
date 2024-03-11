@@ -208,7 +208,6 @@ int parseCLI(int argc, char **argv) {
         const std::filesystem::path &capio_dir = get_capio_dir();
         std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_INFO << "parsing config file: " << token
                   << std::endl;
-        load_configuration(token, capio_dir);
         parse_conf_file(token, capio_dir);
     } else if (noConfigFile) {
         workflow_name = std::string_view(get_capio_workflow_name());
