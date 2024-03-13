@@ -40,6 +40,7 @@ inline void load_configuration(const std::string &conf_file, const std::filesyst
                 std::string_view tmp_str;
                 t.get(tmp_str);
                 resolved_alias.emplace_back(tmp_str);
+                file_locations.newFile(std::string(tmp_str));
             }
             alias_map.emplace(alias_name, resolved_alias);
             std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_JSON << "Alias: " << alias_name << " = [";
@@ -64,6 +65,7 @@ inline void load_configuration(const std::string &conf_file, const std::filesyst
 
     for (auto application : io_graph) {
         auto application_name = std::string(application.unescaped_key().value());
+
         std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_JSON
                   << "Parsing configuration for: " << application_name << std::endl;
 
@@ -71,21 +73,86 @@ inline void load_configuration(const std::string &conf_file, const std::filesyst
             auto output = application.value()["output"].get_object();
             for (auto output_file : output) {
                 std::string file_name = std::string(output_file.unescaped_key().value());
+
+                bool isAlias = (alias_map.find(file_name) != alias_map.end());
+
                 file_locations.newFile(file_name);
-                file_locations.addProducer(file_name, application_name);
+
+                if(isAlias){
+                    for(auto name : alias_map.at(file_name)){
+                        std::string producer_name = std::string(name);
+                        file_locations.addProducer(application_name, producer_name);
+                    }
+                }else{
+                    file_locations.addProducer(file_name, application_name);
+                }
 
                 try {
                     auto commit_rule =
                         output_file.value()["committed"].value().get_string().value();
-                    file_locations.setCommitRule(file_name, std::string(commit_rule));
+
+                    if(isAlias){
+                        for(auto name : alias_map.at(file_name)){
+                            std::string name_str = std::string(name);
+                            file_locations.setCommitRule(name_str, std::string(commit_rule));
+                        }
+                    }else{
+                        file_locations.setCommitRule(file_name, std::string(commit_rule));
+                    }
+
+
                 } catch (simdjson::simdjson_error &e) {
-                    std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_JSON << "No committed rule for file " << file_name << std::endl;
+                    std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_JSON << "No committed rule for file "
+                              << file_name << std::endl;
                 }
                 try {
                     auto fire_rule = output_file.value()["mode"].value().get_string().value();
-                    file_locations.setFireRule(file_name, std::string(fire_rule));
+
+                    if(isAlias){
+                        for(auto name : alias_map.at(file_name)){
+                            std::string name_str = std::string(name);
+                            file_locations.setFireRule(name_str, std::string(fire_rule));
+                        }
+                    }else{
+                        file_locations.setFireRule(file_name, std::string(fire_rule));
+                    }
+
                 } catch (simdjson::simdjson_error &e) {
-                    std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_JSON << "No fire rule for file " << file_name << std::endl;
+                    std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_JSON << "No fire rule for file "
+                              << file_name << std::endl;
+                }
+
+                try {
+                    auto permanent = output_file.value()["permanent"].value().get_bool().value();
+
+                    if(isAlias){
+                        for(auto name : alias_map.at(file_name)){
+                            std::string name_str = std::string(name);
+                            file_locations.setPermanent(name_str, permanent);
+                        }
+                    }else{
+                        file_locations.setPermanent(file_name, permanent);
+                    }
+
+                } catch (simdjson::simdjson_error &e) {
+                    std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_JSON << "No permanent rule for file "
+                              << file_name << std::endl;
+                }
+
+                try {
+                    auto exclude = output_file.value()["exclude"].value().get_bool().value();
+
+                    if(isAlias){
+                        for(auto name : alias_map.at(file_name)){
+                            std::string name_str = std::string(name);
+                            file_locations.setExclude(name_str, exclude);
+                        }
+                    }else{
+                        file_locations.setExclude(file_name, exclude);
+                    }
+                } catch (simdjson::simdjson_error &e) {
+                    std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_JSON << "No exclude rule for file "
+                              << file_name << std::endl;
                 }
             }
         } catch (simdjson::simdjson_error &e) {
@@ -93,12 +160,25 @@ inline void load_configuration(const std::string &conf_file, const std::filesyst
                       << application_name << std::endl;
         }
 
+        /**
+         * TODO: AS OF NOW COMMIT, FIRE AND OTHER FIELDS ARE IGNORED IN INPUT STREAM SECTION!
+         */
         try {
             auto input = application.value()["input"].get_object();
             for (auto input_file : input) {
                 std::string file_name = std::string(input_file.unescaped_key().value());
-                file_locations.newFile(file_name);
-                file_locations.addConsumer(file_name, application_name);
+
+                bool isAlias = (alias_map.find(file_name) != alias_map.end());
+
+                if(isAlias){
+                    for(auto name : alias_map.at(file_name)){
+                        std::string name_str = std::string(name);
+                        file_locations.addConsumer(name_str, application_name);
+                    }
+                }else{
+                    file_locations.newFile(file_name);
+                    file_locations.addConsumer(file_name, application_name);
+                }
             }
         } catch (simdjson::simdjson_error &e) {
             std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_JSON << "No input files for app "
@@ -132,8 +212,8 @@ void parse_conf_file(const std::string &conf_file, const std::filesystem::path &
     entries = parser.iterate(json);
 
     try {
-        auto version = entries["version"].get_int64();
-        if (version.value() > 1) {
+        auto version = entries["version"].get_double().value();
+        if (version > 1.0f) {
             std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_JSON << "Version of CLIO is " << version
                       << std::endl;
             load_configuration(conf_file, capio_dir, json);

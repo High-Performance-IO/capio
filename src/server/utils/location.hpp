@@ -10,9 +10,15 @@
 
 class CapioFileLocations {
   private:
-    // pathname => <vector of producers, vector of consumers, commit_rule, fire_rule>
-    std::unordered_map<std::string, std::tuple<std::vector<std::string>, std::vector<std::string>,
-                                               std::string, std::string>>
+    // pathname => <vector of producers, vector of consumers, commit_rule, fire_rule, permanent,
+    // exclude>
+    std::unordered_map<std::string, std::tuple<
+                                        std::vector<std::string>,
+                                        std::vector<std::string>,
+                                        std::string,
+                                        std::string,
+                                        bool,
+                                        bool>>
         _locations;
 
     inline std::string truncate_last_n(const std::string &str, int n) {
@@ -21,12 +27,11 @@ class CapioFileLocations {
 
   public:
     void print() {
-        std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_JSON << "Composition of expected CAPIO FS: " << std::endl
-                  << std::endl
-                  << "|===================|===================|====================|====================|===================|"<< std::endl
-                  << "| Filename          | Producer step     | Consumer step      |  Commit Rule       |  Firing Rule      |" << std::endl
-                  << "|===================|===================|====================|====================|===================|"
-                  << std::endl;
+        std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_JSON
+                  << "Composition of expected CAPIO FS: " << std::endl<< std::endl
+                  << "|===================|===================|====================|====================|============|===========|=========|"<< std::endl
+                  << "| Filename          | Producer step     | Consumer step      |  Commit Rule       |  Fire Rule | Permanent | Exclude |"<< std::endl
+                  << "|===================|===================|====================|====================|============|===========|=========|"<< std::endl;
         for (auto itm : _locations) {
             std::string name_trunc = truncate_last_n(itm.first, 12);
 
@@ -38,7 +43,7 @@ class CapioFileLocations {
             auto rowCount =
                 producers.size() > consumers.size() ? producers.size() : consumers.size();
 
-            for (int i = 0; i < rowCount; i++) {
+            for (int i = 0; i <= rowCount; i++) {
                 std::string prod, cons;
                 if (i > 0) {
                     std::cout << "|                   | ";
@@ -63,16 +68,22 @@ class CapioFileLocations {
                 if (i == 0) {
                     std::string commit_rule = std::get<2>(itm.second),
                                 fire_rule   = std::get<3>(itm.second);
-                    std::cout << " " << commit_rule << std::setfill(' ') << std::setw(20 - commit_rule.length())
-                              << " | "<< fire_rule << std::setfill(' ') << std::setw(20 - fire_rule.length())
-                              << " | "<<std::endl;
+                    bool exclude = std::get<4>(itm.second),
+                        permanent = std::get<5>(itm.second);
+
+                    std::cout << " " << commit_rule << std::setfill(' ')
+                              << std::setw(20 - commit_rule.length()) << " | " << fire_rule
+                              << std::setfill(' ') << std::setw(13 - fire_rule.length()) << " | "
+                              << "    " << (permanent ? "YES" : "NO " )<< "   |   " << (exclude ? "YES" : "NO " )
+                              << "   |" << std::endl;
                 } else {
                     std::cout << std::setfill(' ') << std::setw(20) << "|" << std::setfill(' ')
-                              << std::setw(20) << "|" << std::endl;
+                              << std::setw(13) << "|" << std::setfill(' ') << std::setw(12) << "|"
+                              <<std::setfill(' ') << std::setw(10) << "|" << std::endl;
                 }
             }
             std::cout << "*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~"
-                         "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*"
+                         "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*"
                       << std::endl;
         }
         std::cout << std::endl;
@@ -80,15 +91,17 @@ class CapioFileLocations {
 
     inline void add(std::string &path, std::vector<std::string> &producers,
                     std::vector<std::string> &consumers, const std::string &commit_rule,
-                    const std::string &fire_rule) {
-        _locations.emplace(path, std::make_tuple(producers, consumers, commit_rule, fire_rule));
+                    const std::string &fire_rule, bool permanent, bool exclude) {
+        _locations.emplace(path, std::make_tuple(producers, consumers, commit_rule, fire_rule,
+                                                 permanent, exclude));
     }
 
     inline void newFile(const std::string &path) {
         if (_locations.find(path) == _locations.end()) {
-            _locations.emplace(
-                path, std::make_tuple(std::vector<std::string>(), std::vector<std::string>(),
-                                      CAPIO_FILE_COMMITTED_ON_TERMINATION, CAPIO_FILE_MODE_UPDATE));
+            _locations.emplace(path, std::make_tuple(std::vector<std::string>(),
+                                                     std::vector<std::string>(),
+                                                     CAPIO_FILE_COMMITTED_ON_TERMINATION,
+                                                     CAPIO_FILE_MODE_UPDATE, false, false));
         }
     }
 
@@ -108,6 +121,14 @@ class CapioFileLocations {
 
     inline void setFireRule(const std::string &path, const std::string &fire_rule) {
         std::get<3>(_locations.at(path)) = fire_rule;
+    }
+
+    inline void setPermanent(const std::string& path, bool value){
+        std::get<5>(_locations.at(path)) = value;
+    }
+
+    inline void setExclude(const std::string& path, bool value){
+        std::get<4>(_locations.at(path)) = value;
     }
 
     inline void remove(const std::string &path) { _locations.erase(path); }
