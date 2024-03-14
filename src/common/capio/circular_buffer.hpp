@@ -75,66 +75,44 @@ template <class T> class CircularBuffer {
     ~CircularBuffer() {
         START_LOG(capio_syscall(SYS_gettid), "[circular_buffer] call()");
 
-        SHM_DESTROY_CHECK(_shm_name.c_str());
-        SHM_DESTROY_CHECK(_first_elem_name.c_str());
-        SHM_DESTROY_CHECK(_last_elem_name.c_str());
-
-        SEM_NAMED_DESTROY_CHECK(_mutex_name.c_str());
-        SEM_NAMED_DESTROY_CHECK(_sem_num_elem_names.c_str());
-        SEM_NAMED_DESTROY_CHECK(_sem_num_empty_name.c_str());
-
         sem_close(_mutex);
         sem_close(_sem_num_elems);
         sem_close(_sem_num_empty);
-    }
 
-    void write(const T *data, long int num_bytes) {
-        START_LOG(capio_syscall(SYS_gettid), "[circular_buffer] call(data=0x%08x, num_bytes=%ld)",
-                  data, num_bytes);
-
-        if (*_last_elem + num_bytes > _buff_size) {
-            ERR_EXIT("Error: out of bounds write on shm %s: try to write less data",
-                     _shm_name.c_str());
-        }
-
-        SEM_WAIT_CHECK(_sem_num_empty, _sem_num_empty_name.c_str());
-        SEM_WAIT_CHECK(_mutex, _mutex_name.c_str());
-
-        memcpy((T *) _shm + *_last_elem, data, num_bytes);
-        *_last_elem = (*_last_elem + _elem_size) % _buff_size;
-        LOG("[circular_buffer] Wrote '%s' on %s", data, this->_shm_name.c_str());
-
-     //   SEM_POST_CHECK(_mutex, _mutex_name.c_str());
-        SEM_POST_CHECK(_sem_num_elems, _sem_num_elem_names.c_str());
+        SHM_DESTROY_CHECK(_shm_name.c_str());
+        SHM_DESTROY_CHECK(_first_elem_name.c_str());
+        SHM_DESTROY_CHECK(_last_elem_name.c_str());
+        SHM_DESTROY_CHECK(_mutex_name.c_str());
+        SHM_DESTROY_CHECK(_sem_num_elem_names.c_str());
+        SHM_DESTROY_CHECK(_sem_num_empty_name.c_str());
     }
 
     inline void write(const T *data) {
         START_LOG(capio_syscall(SYS_gettid), "[circular_buffer] call(data=0x%08x)", data);
-        write(data, _elem_size);
+
+        SEM_WAIT_CHECK(_sem_num_empty, _sem_num_empty_name.c_str());
+        SEM_WAIT_CHECK(_mutex, _mutex_name.c_str());
+
+        memcpy((T *) _shm + *_last_elem, data, _elem_size);
+        *_last_elem = (*_last_elem + _elem_size) % _buff_size;
+        LOG("[circular_buffer] Wrote '%s' on %s", data, this->_shm_name.c_str());
+
+        SEM_POST_CHECK(_mutex, _mutex_name.c_str());
+        SEM_POST_CHECK(_sem_num_elems, _sem_num_elem_names.c_str());
     }
 
-    void read(T *buff_rcv, long int num_bytes) {
-        START_LOG(capio_syscall(SYS_gettid),
-                  "[circular_buffer] call(buff_rcv=0x%08x, num_bytes=%ld)", buff_rcv, num_bytes);
-
-        if (num_bytes > _elem_size) {
-            ERR_EXIT("circular buffer %s read error: num_bytes > _elem_size", _shm_name.c_str());
-        }
+    inline void read(T *buff_rcv) {
+        START_LOG(capio_syscall(SYS_gettid), "[circular_buffer] call(buff_rcv=0x%08x)", buff_rcv);
 
         SEM_WAIT_CHECK(_sem_num_elems, _sem_num_elem_names.c_str());
-     //   SEM_WAIT_CHECK(_mutex, _mutex_name.c_str());
+        SEM_WAIT_CHECK(_mutex, _mutex_name.c_str());
 
-        memcpy((T *) buff_rcv, ((T *) _shm) + *_first_elem, num_bytes);
+        memcpy((T *) buff_rcv, ((T *) _shm) + *_first_elem, _elem_size);
         *_first_elem = (*_first_elem + _elem_size) % _buff_size;
         LOG("[circular_buffer] Received '%s' on %s", buff_rcv, this->_shm_name.c_str());
 
         SEM_POST_CHECK(_mutex, _mutex_name.c_str());
         SEM_POST_CHECK(_sem_num_empty, _sem_num_empty_name.c_str());
-    }
-
-    inline void read(T *buff_rcv) {
-        START_LOG(capio_syscall(SYS_gettid), "[circular_buffer] call(buff_rcv=0x%08x)", buff_rcv);
-        read(buff_rcv, _elem_size);
     }
 };
 

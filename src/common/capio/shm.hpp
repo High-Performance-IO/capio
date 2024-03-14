@@ -27,8 +27,8 @@
 
 #define SHM_DESTROY_CHECK(source_name)                                                             \
     if (shm_unlink(source_name) == -1) {                                                           \
-        std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_ERROR << "Unable to destroy shared mem:  '"        \
-                  << source_name << "'" << std::endl;                                              \
+        std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_WARNING << "Unable to destroy shared mem: '"       \
+                  << source_name << "' (" << strerror(errno) << ")" << std::endl;                  \
     };
 
 #define SHM_CREATE_CHECK(condition, source)                                                        \
@@ -72,7 +72,6 @@ class CapioShmCanary {
 #endif
         close(_shm_id);
         SHM_DESTROY_CHECK(_canary_name.c_str());
-
     }
 };
 
