@@ -14,6 +14,8 @@
 #include "constants.hpp"
 #include "syscall.hpp"
 
+bool continue_on_error = false; // change behaviour of ERR_EXIT to continue if set to true
+
 #if defined(CAPIOLOG) && defined(__CAPIO_POSIX)
 #include "syscallnames.h"
 #endif
@@ -275,28 +277,17 @@ class Logger {
     }
 };
 
-// Checks for trailing share memories from other capio server executions
-#ifndef __CAPIO_POSIX
-#define __SHM_CHECK_CLI_MSG                                                                        \
-    std::cout << CAPIO_SERVER_CLI_LOG_SERVER_ERROR << CAPIO_SHM_OPEN_ERROR << std::endl
-#else
-#define __SHM_CHECK_CLI_MSG
-#endif
-
 #ifdef CAPIOLOG
-#define ERR_EXIT(message, ...) (log.log(message, ##__VA_ARGS__), exit(EXIT_FAILURE))
+#define ERR_EXIT(message, ...)                                                                     \
+    log.log(message, ##__VA_ARGS__);                                                               \
+    if (!continue_on_error) {                                                                      \
+        exit(EXIT_FAILURE);                                                                        \
+    }
 #define LOG(message, ...) log.log(message, ##__VA_ARGS__)
 #define START_LOG(tid, message, ...)                                                               \
     Logger log(__func__, __FILE__, __LINE__, tid, message, ##__VA_ARGS__)
 #define START_SYSCALL_LOGGING() logging_syscall = true
 #define SUSPEND_SYSCALL_LOGGING() SyscallLoggingSuspender sls{};
-#define SEM_CREATE_CHECK(sem, source)                                                              \
-    if (sem == SEM_FAILED) {                                                                       \
-        LOG(CAPIO_SHM_OPEN_ERROR);                                                                 \
-        LOG("error while opening %s", _shm_name.c_str());                                          \
-        __SHM_CHECK_CLI_MSG;                                                                       \
-    }
-
 /**
  * This macro is used to inject code into debug mode. It needs a self calling lambda function,
  * that is a lambda in the following form:
@@ -322,9 +313,12 @@ class Logger {
         lambda;                                                                                    \
         LOG("[  DBG  ]~~~~~~~~~~~~ END  ~~~~~~~~~~~~~~[  DBG  ]");                                 \
     }
+
 #else
 
-#define ERR_EXIT(message, ...) exit(EXIT_FAILURE)
+#define ERR_EXIT(message, ...)                                                                     \
+    if (!continue_on_error)                                                                        \
+    exit(EXIT_FAILURE)
 #define LOG(message, ...)
 #define START_LOG(tid, message, ...)
 #define START_SYSCALL_LOGGING()
