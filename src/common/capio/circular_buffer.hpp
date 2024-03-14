@@ -7,6 +7,7 @@
 
 #include "capio/env.hpp"
 #include "capio/logger.hpp"
+#include "capio/semaphore.hpp"
 #include "capio/shm.hpp"
 
 /*
@@ -20,56 +21,33 @@ template <class T> class CircularBuffer {
     const long int _max_num_elems;
     const long int _elem_size; // elements size in bytes
     long int _buff_size;       // buffer size in bytes
-    long int *_first_elem;
-    long int *_last_elem;
+    long int *_first_elem = nullptr;
+    long int *_last_elem  = nullptr;
     const std::string _shm_name, _mutex_name, _first_elem_name, _last_elem_name,
         _sem_num_elem_names, _sem_num_empty_name;
     sem_t *_mutex;
     sem_t *_sem_num_elems;
     sem_t *_sem_num_empty;
-    struct timespec sem_timeout_struct;
-    int _sem_retries;
-
-    // TODO: find length required to wait for semaphores!
-    inline int sem_wait_for(sem_t *sem) {
-        START_LOG(capio_syscall(SYS_gettid), "call(data=0x%08x)", sem);
-
-        int retries = 0;
-        int retval;
-        while (retries < _sem_retries && (retval = sem_timedwait(sem, &sem_timeout_struct)) != 0) {
-            retries++;
-        }
-
-        if (retries < _sem_retries) {
-            return retval;
-        }
-
-        ERR_EXIT("FATAL: semaphore timeout reached from circular_buffer. EXIT APP");
-    }
 
   public:
     CircularBuffer(const std::string &shm_name, const long int max_num_elems,
-                   const long int elem_size, long int sem_timeout, int sem_retries,
+                   const long int elem_size,
                    const std::string &workflow_name = get_capio_workflow_name())
         : _max_num_elems(max_num_elems), _elem_size(elem_size),
-          _shm_name(workflow_name + "_" + shm_name),
-          _first_elem_name(workflow_name + "_first_elem_" + shm_name),
-          _last_elem_name(workflow_name + "_last_elem_" + shm_name),
-          _mutex_name(workflow_name + "_mutex_" + shm_name),
-          _sem_num_elem_names(workflow_name + "_sem_num_elems_" + shm_name),
-          _sem_num_empty_name(workflow_name + "_sem_num_empty_" + shm_name) {
+          _buff_size(_max_num_elems * _elem_size), _shm_name(workflow_name + "_" + shm_name),
+          _mutex_name(workflow_name + SHM_MUTEX_PREFIX + shm_name),
+          _first_elem_name(workflow_name + SHM_FIRST_ELEM + shm_name),
+          _last_elem_name(workflow_name + SHM_LAST_ELEM + shm_name),
+          _sem_num_elem_names(workflow_name + SHM_SEM_ELEMS + shm_name),
+          _sem_num_empty_name(workflow_name + SHM_SEM_EMPTY + shm_name) {
         START_LOG(capio_syscall(SYS_gettid),
-                  "call(shm_name=%s, _max_num_elems=%ld, elem_size=%ld, "
-                  "sem_timeout=%d, sem_retries=%d, workflow_name=%s)",
-                  _shm_name.data(), _max_num_elems, elem_size, sem_timeout, sem_retries,
-                  workflow_name.data());
-        _sem_retries               = sem_retries;
-        sem_timeout_struct.tv_nsec = sem_timeout;
-        sem_timeout_struct.tv_sec  = 1;
-        _buff_size                 = _max_num_elems * _elem_size;
-        _first_elem                = (long int *) create_shm(_first_elem_name, sizeof(long int));
-        _last_elem                 = (long int *) create_shm(_last_elem_name, sizeof(long int));
-        _shm                       = get_shm_if_exist(_shm_name);
+                  "[circular_buffer] call(shm_name=%s, _max_num_elems=%ld, elem_size=%ld, "
+                  "workflow_name=%s)",
+                  shm_name.data(), max_num_elems, elem_size, workflow_name.data());
+
+        _first_elem = (long int *) create_shm(_first_elem_name, sizeof(long int));
+        _last_elem  = (long int *) create_shm(_last_elem_name, sizeof(long int));
+        _shm        = get_shm_if_exist(_shm_name);
         if (_shm == nullptr) {
             *_first_elem = 0;
             *_last_elem  = 0;
@@ -95,142 +73,68 @@ template <class T> class CircularBuffer {
     CircularBuffer &operator=(const CircularBuffer &) = delete;
 
     ~CircularBuffer() {
+        START_LOG(capio_syscall(SYS_gettid), "[circular_buffer] call()");
+
+        SHM_DESTROY_CHECK(_shm_name.c_str());
+        SHM_DESTROY_CHECK(_first_elem_name.c_str());
+        SHM_DESTROY_CHECK(_last_elem_name.c_str());
+
+        SEM_NAMED_DESTROY_CHECK(_mutex_name.c_str());
+        SEM_NAMED_DESTROY_CHECK(_sem_num_elem_names.c_str());
+        SEM_NAMED_DESTROY_CHECK(_sem_num_empty_name.c_str());
+
         sem_close(_mutex);
         sem_close(_sem_num_elems);
         sem_close(_sem_num_empty);
     }
 
-    void free_shm() {
-        START_LOG(capio_syscall(SYS_gettid), "call()");
-
-        if (shm_unlink(_shm_name.c_str()) == -1) {
-            ERR_EXIT("shm_unlink %s in circular_buffer free_shm", _shm_name.c_str());
-        }
-
-        if (shm_unlink(_first_elem_name.c_str()) == -1) {
-            ERR_EXIT("shm_unlink %s in circular_buffer free_shm", _first_elem_name.c_str());
-        }
-
-        if (shm_unlink(_last_elem_name.c_str()) == -1) {
-            ERR_EXIT("shm_unlink %s in circular_buffer free_shm", _last_elem_name.c_str());
-        }
-
-        if (sem_unlink(_mutex_name.c_str()) == -1) {
-            ERR_EXIT("sem_unlink %s in circular_buffer free_shm", _mutex_name.c_str());
-        }
-
-        if (sem_unlink(_sem_num_elem_names.c_str()) == -1) {
-            ERR_EXIT("sem_unlink %s in circular_buffer free_shm", _sem_num_elem_names.c_str());
-        }
-
-        if (sem_unlink(_sem_num_empty_name.c_str()) == -1) {
-            ERR_EXIT("sem_unlink %s in circular_buffer free_shm", _sem_num_empty_name.c_str());
-        }
-    }
-
-    void write(const T *data) {
-        START_LOG(capio_syscall(SYS_gettid), "call(data=0x%08x)", data);
-
-        if (sem_wait(_sem_num_empty) == -1) {
-            ERR_EXIT("sem_wait _sem_num_empty in write");
-        }
-
-        if (sem_wait(_mutex) == -1) {
-            ERR_EXIT("sem_wait _mutex in write");
-        }
-
-        memcpy((char *) _shm + *_last_elem, data, _elem_size);
-        *_last_elem = (*_last_elem + _elem_size) % _buff_size;
-
-        if (sem_post(_mutex) == -1) {
-            ERR_EXIT("sem_post _mutex in write");
-        }
-
-        if (sem_post(_sem_num_elems) == -1) {
-            ERR_EXIT("sem_post _sem_num_elems in write");
-        }
-    }
-
     void write(const T *data, long int num_bytes) {
-        START_LOG(capio_syscall(SYS_gettid), "call(data=0x%08x, num_bytes=%ld)", data, num_bytes);
-
-        if (sem_wait(_sem_num_empty) == -1) {
-            ERR_EXIT("sem_wait _sem_num_empty in write");
-        }
-
-        if (sem_wait(_mutex) == -1) {
-            ERR_EXIT("sem_wait _mutex in write");
-        }
+        START_LOG(capio_syscall(SYS_gettid), "[circular_buffer] call(data=0x%08x, num_bytes=%ld)",
+                  data, num_bytes);
 
         if (*_last_elem + num_bytes > _buff_size) {
-            std::cout << "_last_elem " << *_last_elem << std::endl;
-            std::cout << "num_bytes" << num_bytes << std::endl;
-            std::cout << "buff_size" << _buff_size << std::endl;
-            std::cout << "out of bound write" << std::endl;
+            ERR_EXIT("Error: out of bounds write on shm %s: try to write less data",
+                     _shm_name.c_str());
         }
 
-        memcpy((char *) _shm + *_last_elem, data, num_bytes);
-        // TODO: dangerous consider remove this function
+        SEM_WAIT_CHECK(_sem_num_empty, _sem_num_empty_name.c_str());
+        SEM_WAIT_CHECK(_mutex, _mutex_name.c_str());
+
+        memcpy((T *) _shm + *_last_elem, data, num_bytes);
         *_last_elem = (*_last_elem + _elem_size) % _buff_size;
+        LOG("[circular_buffer] Wrote '%s' on %s", data, this->_shm_name.c_str());
 
-        if (sem_post(_mutex) == -1) {
-            ERR_EXIT("sem_post _mutex in write");
-        }
-
-        if (sem_post(_sem_num_elems) == -1) {
-            ERR_EXIT("sem_post _sem_num_elems in write");
-        }
+     //   SEM_POST_CHECK(_mutex, _mutex_name.c_str());
+        SEM_POST_CHECK(_sem_num_elems, _sem_num_elem_names.c_str());
     }
 
-    void read(T *buff_rcv) {
-        START_LOG(capio_syscall(SYS_gettid), "call(buff_rcv=0x%08x)", buff_rcv);
-
-        if (sem_wait(_sem_num_elems) ==
-            -1) { // wait for incoming message, without using the sem_wait_for
-            ERR_EXIT("sem_wait _sem_num_elems in read");
-        }
-
-        if (sem_wait(_mutex) == -1) {
-            ERR_EXIT("sem_wait _mutex in read");
-        }
-
-        memcpy((char *) buff_rcv, ((char *) _shm) + *_first_elem, _elem_size);
-        LOG("Received %d on %s", *buff_rcv, this->_shm_name.c_str());
-        *_first_elem = (*_first_elem + _elem_size) % _buff_size;
-
-        if (sem_post(_mutex) == -1) {
-            ERR_EXIT("sem_wait _mutex in read");
-        }
-
-        if (sem_post(_sem_num_empty) == -1) {
-            ERR_EXIT("sem_post _sem_num_empty in read");
-        }
+    inline void write(const T *data) {
+        START_LOG(capio_syscall(SYS_gettid), "[circular_buffer] call(data=0x%08x)", data);
+        write(data, _elem_size);
     }
 
     void read(T *buff_rcv, long int num_bytes) {
-        START_LOG(capio_syscall(SYS_gettid), "call(buff_rcv=0x%08x, num_bytes=%ld)", buff_rcv,
-                  num_bytes);
+        START_LOG(capio_syscall(SYS_gettid),
+                  "[circular_buffer] call(buff_rcv=0x%08x, num_bytes=%ld)", buff_rcv, num_bytes);
 
         if (num_bytes > _elem_size) {
             ERR_EXIT("circular buffer %s read error: num_bytes > _elem_size", _shm_name.c_str());
         }
 
-        if (sem_wait(_sem_num_elems) ==
-            -1) { // wait for incoming message, without using the sem_wait_for
-            ERR_EXIT("sem_wait _sem_num_elems in read");
-        }
+        SEM_WAIT_CHECK(_sem_num_elems, _sem_num_elem_names.c_str());
+     //   SEM_WAIT_CHECK(_mutex, _mutex_name.c_str());
 
-        memcpy((char *) buff_rcv, ((char *) _shm) + *_first_elem, num_bytes);
-        LOG("Received %d on %s", *buff_rcv, this->_shm_name.c_str());
+        memcpy((T *) buff_rcv, ((T *) _shm) + *_first_elem, num_bytes);
         *_first_elem = (*_first_elem + _elem_size) % _buff_size;
+        LOG("[circular_buffer] Received '%s' on %s", buff_rcv, this->_shm_name.c_str());
 
-        if (sem_post(_mutex) == -1) {
-            ERR_EXIT("sem_post _mutex in read");
-        }
+        SEM_POST_CHECK(_mutex, _mutex_name.c_str());
+        SEM_POST_CHECK(_sem_num_empty, _sem_num_empty_name.c_str());
+    }
 
-        if (sem_post(_sem_num_empty) == -1) {
-            ERR_EXIT("sem_post _sem_num_empty in read");
-        }
+    inline void read(T *buff_rcv) {
+        START_LOG(capio_syscall(SYS_gettid), "[circular_buffer] call(buff_rcv=0x%08x)", buff_rcv);
+        read(buff_rcv, _elem_size);
     }
 };
 

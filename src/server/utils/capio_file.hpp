@@ -476,7 +476,7 @@ class CapioFile {
         _data_avail_cv.notify_all();
     }
 
-    inline void read_from_queue(SPSCQueue<char> &queue, size_t offset) {
+    inline void read_from_queue(SPSCQueue &queue, size_t offset) {
         START_LOG(gettid(), "call()");
 
         std::unique_lock<std::mutex> lock(_mutex);
@@ -484,7 +484,7 @@ class CapioFile {
         _data_avail_cv.notify_all();
     }
 
-    inline void read_from_queue(SPSCQueue<char> &queue, size_t offset, long int num_bytes) {
+    inline void read_from_queue(SPSCQueue &queue, size_t offset, long int num_bytes) {
         START_LOG(gettid(), "call()");
 
         std::unique_lock<std::mutex> lock(_mutex);

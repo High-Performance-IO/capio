@@ -16,7 +16,7 @@ typedef std::unordered_map<int, std::unordered_map<int, std::pair<CapioFile *, o
     CSProcessFileMap_t;
 typedef std::unordered_map<int, std::unordered_map<int, std::filesystem::path>>
     CSProcessFileMetadataMap_t;
-typedef std::unordered_map<int, std::pair<SPSCQueue<char> *, SPSCQueue<char> *>> CSDataBufferMap_t;
+typedef std::unordered_map<int, std::pair<SPSCQueue *, SPSCQueue *>> CSDataBufferMap_t;
 typedef std::unordered_map<std::string, CapioFile *> CSFilesMetadata_t;
 typedef std::unordered_map<
     std::string, std::tuple<std::string, std::string, std::string, long int, bool, long int>>

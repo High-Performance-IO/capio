@@ -18,8 +18,7 @@ CPBufResponse_t *bufs_response;
  */
 inline void init_client() {
     // TODO: replace number with constexpr
-    buf_requests  = new CPBufRequest_t("circular_buffer", 1024 * 1024, CAPIO_REQUEST_MAX_SIZE,
-                                       CAPIO_SEM_TIMEOUT_NANOSEC, CAPIO_SEM_MAX_RETRIES);
+    buf_requests  = new CPBufRequest_t("circular_buffer", 1024 * 1024, CAPIO_REQUEST_MAX_SIZE);
     bufs_response = new CPBufResponse_t();
 }
 
@@ -30,9 +29,8 @@ inline void init_client() {
  */
 inline void register_listener(long tid) {
     // TODO: replace numbers with constexpr
-    auto *p_buf_response =
-        new CircularBuffer<off_t>("buf_response_" + std::to_string(tid), 8 * 1024 * 1024,
-                                  sizeof(off_t), CAPIO_SEM_TIMEOUT_NANOSEC, CAPIO_SEM_MAX_RETRIES);
+    auto *p_buf_response = new CircularBuffer<off_t>("buf_response_" + std::to_string(tid),
+                                                     8 * 1024 * 1024, sizeof(off_t));
     bufs_response->insert(std::make_pair(tid, p_buf_response));
 }
 

@@ -7,14 +7,12 @@ inline void init_process(int tid) {
     if (data_buffers.find(tid) == data_buffers.end()) {
         register_listener(tid);
 
-        auto *write_data_cb = new SPSCQueue<char>(
-            "capio_write_data_buffer_tid_" + std::to_string(tid), CAPIO_DATA_BUFFER_LENGTH,
-            CAPIO_DATA_BUFFER_ELEMENT_SIZE, CAPIO_SEM_TIMEOUT_NANOSEC, CAPIO_SEM_MAX_RETRIES,
-            workflow_name.data());
-        auto *read_data_cb = new SPSCQueue<char>(
-            "capio_read_data_buffer_tid_" + std::to_string(tid), CAPIO_DATA_BUFFER_LENGTH,
-            CAPIO_DATA_BUFFER_ELEMENT_SIZE, CAPIO_SEM_TIMEOUT_NANOSEC, CAPIO_SEM_MAX_RETRIES,
-            workflow_name.data());
+        auto *write_data_cb =
+            new SPSCQueue(SHM_SPSC_PREFIX_WRITE + std::to_string(tid), CAPIO_DATA_BUFFER_LENGTH,
+                          CAPIO_DATA_BUFFER_ELEMENT_SIZE, workflow_name);
+        auto *read_data_cb =
+            new SPSCQueue(SHM_SPSC_PREFIX_READ + std::to_string(tid), CAPIO_DATA_BUFFER_LENGTH,
+                          CAPIO_DATA_BUFFER_ELEMENT_SIZE, workflow_name);
         data_buffers.insert({tid, {write_data_cb, read_data_cb}});
     }
 }
@@ -46,8 +44,6 @@ void free_resources(int tid) {
 
     auto it = data_buffers.find(tid);
     if (it != data_buffers.end()) {
-        it->second.first->free_shm();
-        it->second.second->free_shm();
         data_buffers.erase(it);
     }
 }

@@ -112,16 +112,17 @@ static constexpr std::array<CSHandler_t, CAPIO_NR_REQUESTS> build_request_handle
 
     init_server();
 
-    if (sem_post(internal_server_sem) == -1) {
-        ERR_EXIT("sem_post internal_server_sem in capio_server");
-    }
+    SEM_POST_CHECK(internal_server_sem, "internal_server_sem");
 
     auto str = std::unique_ptr<char[]>(new char[CAPIO_REQUEST_MAX_SIZE]);
     while (true) {
         LOG(CAPIO_LOG_SERVER_REQUEST_START);
         int code = read_next_request(str.get());
         if (code < 0 || code > CAPIO_NR_REQUESTS) {
-            ERR_EXIT("Received an invalid request code %d", code);
+            std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_ERROR << "Received invalid code: " << code
+                      << std::endl;
+
+            ERR_EXIT("Error: recived invalid request code");
         }
         request_handlers[code](str.get());
         LOG(CAPIO_LOG_SERVER_REQUEST_END);
@@ -149,6 +150,10 @@ int parseCLI(int argc, char **argv) {
     args::ValueFlag<std::string> backend_flag(
         arguments, "backend", CAPIO_SERVER_ARG_PARSER_CONFIG_BACKEND_HELP, {'b', "backend"});
 
+    args::Flag continueOnErrorFlag(arguments, "continue-on-error",
+                                   CAPIO_SERVER_ARG_PARSER_CONFIG_NCONTINUE_ON_ERROR_HELP,
+                                   {"continue-on-error"});
+
     try {
         parser.ParseCLI(argc, argv);
     } catch (args::Help &) {
@@ -162,6 +167,11 @@ int parseCLI(int argc, char **argv) {
         std::cerr << e.what() << std::endl;
         std::cerr << parser;
         exit(EXIT_FAILURE);
+    }
+
+    if (continueOnErrorFlag) {
+        continue_on_error = true;
+        std::cout << CAPIO_LOG_SERVER_CLI_CONT_ON_ERR_WARNING << std::endl;
     }
 
     if (logfile_folder) {
@@ -263,9 +273,8 @@ int main(int argc, char **argv) {
 
     shm_canary = new CapioShmCanary(workflow_name);
 
-    int res = sem_init(&internal_server_sem, 0, 0);
-    if (res != 0) {
-        ERR_EXIT("sem_init internal_server_sem failed with status %d", res);
+    if (sem_init(&internal_server_sem, 0, 0) != 0) {
+        ERR_EXIT("sem_init internal_server_sem failed ");
     }
     if (sem_init(&clients_remote_pending_nfiles_sem, 0, 1) == -1) {
         ERR_EXIT("sem_init clients_remote_pending_nfiles_sem in main");
