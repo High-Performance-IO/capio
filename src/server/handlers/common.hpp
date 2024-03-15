@@ -51,10 +51,8 @@ void free_resources(int tid) {
 void handle_pending_remote_nfiles(const std::filesystem::path &path) {
     START_LOG(gettid(), "call(%s)", path.c_str());
 
-    if (sem_wait(&clients_remote_pending_nfiles_sem) == -1) {
-        ERR_EXIT("sem_wait clients_remote_pending_nfiles_sem in "
-                 "handle_pending_remote_nfiles");
-    }
+    std::lock_guard<std::mutex> lg(nfiles_mutex);
+
     for (auto &p : clients_remote_pending_nfiles) {
         std::string app          = p.first;
         auto &app_pending_nfiles = p.second;
@@ -71,19 +69,11 @@ void handle_pending_remote_nfiles(const std::filesystem::path &path) {
                 files.insert(path);
                 if (files_path->size() == batch_size) {
                     app_pending_nfiles.erase(it);
-                    // wake wait_for_nfiles
-                    if (sem_post(sem) == -1) {
-                        ERR_EXIT("sem_post sem in "
-                                 "handle_pending_remote_nfiles");
-                    }
+                    sem->unlock();
                 }
             }
             it = next_it;
         }
-    }
-    if (sem_post(&clients_remote_pending_nfiles_sem) == -1) {
-        ERR_EXIT("sem_post clients_remote_pending_nfiles_sem in "
-                 "handle_pending_remote_nfiles");
     }
 }
 

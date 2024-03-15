@@ -60,7 +60,7 @@ CSWritersMap_t writers;
 
 CSClientsRemotePendingNFilesMap_t clients_remote_pending_nfiles;
 
-sem_t clients_remote_pending_nfiles_sem;
+std::mutex nfiles_mutex;
 
 #include "handlers.hpp"
 #include "utils/location.hpp"
@@ -99,7 +99,7 @@ static constexpr std::array<CSHandler_t, CAPIO_NR_REQUESTS> build_request_handle
     return _request_handlers;
 }
 
-[[noreturn]] void capio_server(sem_t *internal_server_sem) {
+[[noreturn]] void capio_server(Semaphore &internal_server_sem) {
     static const std::array<CSHandler_t, CAPIO_NR_REQUESTS> request_handlers =
         build_request_handlers_table();
 
@@ -112,7 +112,7 @@ static constexpr std::array<CSHandler_t, CAPIO_NR_REQUESTS> build_request_handle
 
     init_server();
 
-    SEM_POST_CHECK(internal_server_sem, "internal_server_sem");
+    internal_server_sem.unlock();
 
     auto str = std::unique_ptr<char[]>(new char[CAPIO_REQUEST_MAX_SIZE]);
     while (true) {
@@ -268,7 +268,7 @@ int parseCLI(int argc, char **argv) {
 
 int main(int argc, char **argv) {
 
-    sem_t internal_server_sem;
+    Semaphore internal_server_sem(0);
 
     std::cout << CAPIO_LOG_SERVER_BANNER;
 
@@ -280,20 +280,12 @@ int main(int argc, char **argv) {
 
     shm_canary = new CapioShmCanary(workflow_name);
 
-    if (sem_init(&internal_server_sem, 0, 0) != 0) {
-        ERR_EXIT("sem_init internal_server_sem failed ");
-    }
-    if (sem_init(&clients_remote_pending_nfiles_sem, 0, 1) == -1) {
-        ERR_EXIT("sem_init clients_remote_pending_nfiles_sem in main");
-    }
-    std::thread server_thread(capio_server, &internal_server_sem);
+    std::thread server_thread(capio_server, std::ref(internal_server_sem));
     LOG("capio_server thread started");
-    std::thread remote_listener_thread(capio_remote_listener, &internal_server_sem);
+    std::thread remote_listener_thread(capio_remote_listener, std::ref(internal_server_sem));
     LOG("capio_remote_listener thread started.");
     server_thread.join();
     remote_listener_thread.join();
-
-    SEM_DESTROY_CHECK(&internal_server_sem, "sem_destroy", delete backend;);
 
     delete backend;
     return 0;

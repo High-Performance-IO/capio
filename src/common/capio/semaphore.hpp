@@ -8,12 +8,9 @@
 #include "capio/logger.hpp"
 
 class NoLock {
-  private:
-    const std::string _name;
-
   public:
-    NoLock(std::string name, unsigned int init_value) : _name(std::move(name)) {
-        START_LOG(capio_syscall(SYS_gettid), "call(name=%s, initial_value=%d)", _name.c_str(),
+    NoLock(const std::string &name, unsigned int init_value) {
+        START_LOG(capio_syscall(SYS_gettid), "call(name=%s, initial_value=%d)", name.c_str(),
                   init_value);
     }
 
@@ -25,14 +22,14 @@ class NoLock {
     inline void unlock(){};
 };
 
-class Semaphore {
+class NamedSemaphore {
   private:
     const std::string _name;
     sem_t *_sem;
 
   public:
-    Semaphore(std::string name, unsigned int init_value) : _name(std::move(name)) {
-        START_LOG(capio_syscall(SYS_gettid), "call(name=%s, initial_value=%d)", _name.c_str(),
+    NamedSemaphore(std::string name, unsigned int init_value) : _name(std::move(name)) {
+        START_LOG(capio_syscall(SYS_gettid), "call(name=%s, init_value=%d)", _name.c_str(),
                   init_value);
 
         _sem = sem_open(_name.c_str(), O_CREAT | O_RDWR, S_IRUSR | S_IWUSR, init_value);
@@ -41,104 +38,77 @@ class Semaphore {
         }
     }
 
-    Semaphore(const Semaphore &)            = delete;
-    Semaphore &operator=(const Semaphore &) = delete;
+    NamedSemaphore(const NamedSemaphore &)            = delete;
+    NamedSemaphore &operator=(const NamedSemaphore &) = delete;
 
-    ~Semaphore() {
+    ~NamedSemaphore() {
         START_LOG(capio_syscall(SYS_gettid), "call()");
         if (sem_destroy(_sem) != 0) {
             ERR_EXIT("destruction of semaphore %s failed", _name.c_str());
         }
     }
 
-    void lock() {
+    inline void lock() {
         START_LOG(capio_syscall(SYS_gettid), "call()");
+
+        LOG("Acquiring lock on %s", _name.c_str());
+
         if (sem_wait(_sem) == -1) {
             ERR_EXIT("unable to acquire %s", _name.c_str());
         }
+
+        LOG("Acquired lock on %s", _name.c_str());
     }
 
-    void unlock() {
+    inline void unlock() {
         START_LOG(capio_syscall(SYS_gettid), "call()");
+
+        LOG("Releasing lock on %s", _name.c_str());
+
         if (sem_post(_sem) == -1) {
             ERR_EXIT("unable to release %s", _name.c_str());
         }
+
+        LOG("Released lock on %s", _name.c_str());
     }
 };
 
-#ifdef __CAPIO_POSIX
+class Semaphore {
+  private:
+    sem_t _sem{};
 
-#define SEM_WAIT_CHECK(sem, sem_name)                                                              \
-    if (sem_wait(sem) == -1) {                                                                     \
-        char message[1024];                                                                        \
-        sprintf(message, "unable to wait on %s", sem_name);                                        \
-        ERR_EXIT(message);                                                                         \
-    };
+  public:
+    explicit Semaphore(unsigned int init_value) {
+        START_LOG(capio_syscall(SYS_gettid), "call(init_value=%d)", init_value);
 
-#define SEM_POST_CHECK(sem, sem_name)                                                              \
-    if (sem_post(sem) == -1) {                                                                     \
-        char message[1024];                                                                        \
-        sprintf(message, "unable to post on %s", sem_name);                                        \
-        ERR_EXIT(message);                                                                         \
-    };
-
-#define SEM_DESTROY_CHECK(sem, sem_name, action)                                                   \
-    if (sem_destroy(sem) != 0) {                                                                   \
-        action;                                                                                    \
-        ERR_EXIT("destruction of semaphore %s failed", sem_name);                                  \
-    };
-
-#define SEM_NAMED_DESTROY_CHECK(sem)                                                               \
-    if (sem_unlink(sem) != 0) {                                                                    \
-        ERR_EXIT("destruction of semaphore %s failed", sem);                                       \
-    };
-
-#define SEM_CREATE_CHECK(sem, source)                                                              \
-    if (sem == SEM_FAILED) {                                                                       \
-        LOG(CAPIO_SHM_OPEN_ERROR);                                                                 \
-        LOG("error creating opening %s", _shm_name);                                               \
-    };
-
-#else
-
-#define SEM_WAIT_CHECK(sem, sem_name)                                                              \
-    if (sem_wait(sem) == -1) {                                                                     \
-        std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_ERROR                                              \
-                  << "Unable to wait on semaphore:  " << sem_name << std::endl;                    \
-        ERR_EXIT("Unable to wait on semaphore:  %s", sem_name);                                    \
-    };
-
-#define SEM_POST_CHECK(sem, sem_name)                                                              \
-    if (sem_post(sem) == -1) {                                                                     \
-        std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_ERROR                                              \
-                  << "Unable to post on semaphore:  " << sem_name << std::endl;                    \
-        ERR_EXIT("Unable to post on semaphore:  %s", sem_name);                                    \
-    };
-
-#define SEM_DESTROY_CHECK(sem, sem_name, action)                                                   \
-    if (sem_destroy(sem) != 0) {                                                                   \
-        action;                                                                                    \
-        std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_ERROR                                              \
-                  << "Unable to destroy semaphore:  " << sem_name << std::endl;                    \
-        ERR_EXIT("Unable to destroy semaphore:  ", sem_name);                                      \
-    };
-
-#define SEM_NAMED_DESTROY_CHECK(sem_name)                                                          \
-    if (sem_unlink(sem_name) == -1) {                                                              \
-        std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_ERROR                                              \
-                  << "Unable to destroy semaphore:  " << sem_name << std::endl;                    \
-        ERR_EXIT("Unable to destroy semaphore:  ", sem_name);                                      \
+        if (sem_init(&_sem, 0, init_value) != 0) {
+            ERR_EXIT("initialization of unnamed semaphore failed");
+        }
     }
 
-#define SEM_CREATE_CHECK(sem, source)                                                              \
-    if (sem == SEM_FAILED) {                                                                       \
-        LOG(CAPIO_SHM_OPEN_ERROR);                                                                 \
-        LOG("error while opening %s", source);                                                     \
-        std::cout << CAPIO_SERVER_CLI_LOG_SERVER_ERROR << "Unable to open shm: " << source         \
-                  << std::endl;                                                                    \
-        ERR_EXIT("Unable to open shm: %s", source);                                                \
-    };
+    Semaphore(const Semaphore &)            = delete;
+    Semaphore &operator=(const Semaphore &) = delete;
 
-#endif
+    ~Semaphore() {
+        START_LOG(capio_syscall(SYS_gettid), "call()");
+        if (sem_destroy(&_sem) != 0) {
+            ERR_EXIT("destruction of unnamed semaphore failed");
+        }
+    }
+
+    inline void lock() {
+        START_LOG(capio_syscall(SYS_gettid), "call()");
+        if (sem_wait(&_sem) == -1) {
+            ERR_EXIT("unable to acquire unnamed semaphore");
+        }
+    }
+
+    inline void unlock() {
+        START_LOG(capio_syscall(SYS_gettid), "call()");
+        if (sem_post(&_sem) == -1) {
+            ERR_EXIT("unable to release unnamed semaphore");
+        }
+    }
+};
 
 #endif // CAPIO_SEMS_HPP

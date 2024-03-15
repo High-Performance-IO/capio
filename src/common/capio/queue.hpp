@@ -19,7 +19,7 @@ template <class T, class Mutex> class Queue {
     long int *_first_elem = nullptr, *_last_elem = nullptr;
     const std::string _shm_name, _first_elem_name, _last_elem_name;
     Mutex _mutex;
-    Semaphore _sem_num_elems, _sem_num_empty;
+    NamedSemaphore _sem_num_elems, _sem_num_empty;
 
   public:
     Queue(const std::string &shm_name, const long int max_num_elems, const long int elem_size,
@@ -32,7 +32,7 @@ template <class T, class Mutex> class Queue {
           _sem_num_elems(workflow_name + SHM_SEM_ELEMS + shm_name, 0),
           _sem_num_empty(workflow_name + SHM_SEM_EMPTY + shm_name, max_num_elems) {
         START_LOG(capio_syscall(SYS_gettid),
-                  "[circular_buffer] call(shm_name=%s, _max_num_elems=%ld, elem_size=%ld, "
+                  "call(shm_name=%s, _max_num_elems=%ld, elem_size=%ld, "
                   "workflow_name=%s)",
                   shm_name.data(), max_num_elems, elem_size, workflow_name.data());
 
@@ -50,7 +50,7 @@ template <class T, class Mutex> class Queue {
     Queue &operator=(const Queue &) = delete;
 
     ~Queue() {
-        START_LOG(capio_syscall(SYS_gettid), "[circular_buffer] call()");
+        START_LOG(capio_syscall(SYS_gettid), "call()");
         SHM_DESTROY_CHECK(_shm_name.c_str());
         SHM_DESTROY_CHECK(_first_elem_name.c_str());
         SHM_DESTROY_CHECK(_last_elem_name.c_str());
@@ -68,7 +68,7 @@ template <class T, class Mutex> class Queue {
 
         memcpy((T *) _shm + *_last_elem, data, num_bytes);
         *_last_elem = (*_last_elem + num_bytes) % _buff_size;
-        LOG("[circular_buffer] Wrote '%s' on %s", data, this->_shm_name.c_str());
+        LOG("Wrote '%s' on %s", data, this->_shm_name.c_str());
 
         _sem_num_elems.unlock();
     }
@@ -90,7 +90,7 @@ template <class T, class Mutex> class Queue {
 
         memcpy((T *) buff_rcv, ((T *) _shm) + *_first_elem, num_bytes);
         *_first_elem = (*_first_elem + num_bytes) % _buff_size;
-        LOG("[circular_buffer] Received '%s' on %s", buff_rcv, this->_shm_name.c_str());
+        LOG("Received '%s' on %s", buff_rcv, this->_shm_name.c_str());
 
         _sem_num_empty.unlock();
     }
@@ -102,7 +102,7 @@ template <class T, class Mutex> class Queue {
 };
 
 // Circular Buffer queue for requests
-template <class T> using CircularBuffer = Queue<T, Semaphore>;
+template <class T> using CircularBuffer = Queue<T, NamedSemaphore>;
 
 // Single Producer Single Consumer queue
 using SPSCQueue = Queue<char, NoLock>;
