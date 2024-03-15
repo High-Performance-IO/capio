@@ -12,7 +12,7 @@
 #include <unistd.h>
 
 #include "capio/logger.hpp"
-#include "capio/spsc_queue.hpp"
+#include "capio/queue.hpp"
 
 #include "remote/backend.hpp"
 

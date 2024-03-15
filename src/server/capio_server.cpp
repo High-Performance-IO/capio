@@ -122,7 +122,7 @@ static constexpr std::array<CSHandler_t, CAPIO_NR_REQUESTS> build_request_handle
             std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_ERROR << "Received invalid code: " << code
                       << std::endl;
 
-            ERR_EXIT("Error: recived invalid request code");
+            ERR_EXIT("Error: received invalid request code");
         }
         request_handlers[code](str.get());
         LOG(CAPIO_LOG_SERVER_REQUEST_END);
@@ -170,8 +170,15 @@ int parseCLI(int argc, char **argv) {
     }
 
     if (continueOnErrorFlag) {
+#ifdef CAPIOLOG
         continue_on_error = true;
         std::cout << CAPIO_LOG_SERVER_CLI_CONT_ON_ERR_WARNING << std::endl;
+#else
+        std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_WARNING
+                  << "--continue-on-error flag given, but logger is not compiled into CAPIO. Flag "
+                     "is ignored."
+                  << std::endl;
+#endif
     }
 
     if (logfile_folder) {

@@ -19,10 +19,10 @@ inline void init_data_plane() { threads_data_bufs = new CPThreadDataBufs_t; }
 inline void register_data_listener(long tid) {
     auto *write_queue =
         new SPSCQueue(SHM_SPSC_PREFIX_WRITE + std::to_string(tid), CAPIO_DATA_BUFFER_LENGTH,
-                            CAPIO_DATA_BUFFER_ELEMENT_SIZE, get_capio_workflow_name());
+                      CAPIO_DATA_BUFFER_ELEMENT_SIZE, get_capio_workflow_name());
     auto *read_queue =
         new SPSCQueue(SHM_SPSC_PREFIX_READ + std::to_string(tid), CAPIO_DATA_BUFFER_LENGTH,
-                            CAPIO_DATA_BUFFER_ELEMENT_SIZE, get_capio_workflow_name());
+                      CAPIO_DATA_BUFFER_ELEMENT_SIZE, get_capio_workflow_name());
     threads_data_bufs->insert({static_cast<int>(tid), {write_queue, read_queue}});
 }
 

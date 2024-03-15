@@ -7,6 +7,24 @@
 
 #include "capio/logger.hpp"
 
+class NoLock {
+  private:
+    const std::string _name;
+
+  public:
+    NoLock(std::string name, unsigned int init_value) : _name(std::move(name)) {
+        START_LOG(capio_syscall(SYS_gettid), "call(name=%s, initial_value=%d)", _name.c_str(),
+                  init_value);
+    }
+
+    NoLock(const NoLock &)            = delete;
+    NoLock &operator=(const NoLock &) = delete;
+    ~NoLock()                         = default;
+
+    inline void lock(){};
+    inline void unlock(){};
+};
+
 class Semaphore {
   private:
     const std::string _name;
@@ -47,8 +65,6 @@ class Semaphore {
         }
     }
 };
-
-
 
 #ifdef __CAPIO_POSIX
 

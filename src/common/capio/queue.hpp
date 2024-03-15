@@ -1,5 +1,5 @@
-#ifndef CAPIO_COMMON_CIRCULAR_BUFFER_HPP
-#define CAPIO_COMMON_CIRCULAR_BUFFER_HPP
+#ifndef CAPIO_COMMON_QUEUE_HPP
+#define CAPIO_COMMON_QUEUE_HPP
 
 #include <iostream>
 #include <mutex>
@@ -11,28 +11,19 @@
 #include "capio/semaphore.hpp"
 #include "capio/shm.hpp"
 
-/*
- * Multi-producer and multi-consumer circular buffer.
- * Each element of the circular buffer has the same size.
- */
-
-template <class T, typename S> class CircularBuffer {
-  //  static_assert(std::is_base_of<Semaphore, S>::value_type == true ||
- //                     std::is_base_of<Semaphore, S>::value_type == true,
-//                  "Error: class must be either Semaphore or SPSCQueue");
-
+template <class T, class Mutex> class Queue {
   private:
     void *_shm;
     const long int _max_num_elems, _elem_size; // elements size in bytes
     long int _buff_size;                       // buffer size in bytes
     long int *_first_elem = nullptr, *_last_elem = nullptr;
     const std::string _shm_name, _first_elem_name, _last_elem_name;
-    Semaphore _mutex, _sem_num_elems, _sem_num_empty;
+    Mutex _mutex;
+    Semaphore _sem_num_elems, _sem_num_empty;
 
   public:
-    CircularBuffer(const std::string &shm_name, const long int max_num_elems,
-                   const long int elem_size,
-                   const std::string &workflow_name = get_capio_workflow_name())
+    Queue(const std::string &shm_name, const long int max_num_elems, const long int elem_size,
+          const std::string &workflow_name = get_capio_workflow_name())
         : _max_num_elems(max_num_elems), _elem_size(elem_size),
           _buff_size(_max_num_elems * _elem_size), _shm_name(workflow_name + "_" + shm_name),
           _first_elem_name(workflow_name + SHM_FIRST_ELEM + shm_name),
@@ -55,43 +46,65 @@ template <class T, typename S> class CircularBuffer {
         }
     }
 
-    CircularBuffer(const CircularBuffer &)            = delete;
-    CircularBuffer &operator=(const CircularBuffer &) = delete;
+    Queue(const Queue &)            = delete;
+    Queue &operator=(const Queue &) = delete;
 
-    ~CircularBuffer() {
+    ~Queue() {
         START_LOG(capio_syscall(SYS_gettid), "[circular_buffer] call()");
         SHM_DESTROY_CHECK(_shm_name.c_str());
         SHM_DESTROY_CHECK(_first_elem_name.c_str());
         SHM_DESTROY_CHECK(_last_elem_name.c_str());
     }
 
-    inline void write(const T *data) {
-        START_LOG(capio_syscall(SYS_gettid), "[circular_buffer] call(data=0x%08x)", data);
+    inline void write(const T *data, long int num_bytes) {
+        START_LOG(capio_syscall(SYS_gettid), "call(data=0x%08x)", data);
 
-        std::lock_guard<S> lg(_mutex);
+        if (num_bytes > _elem_size) {
+            ERR_EXIT("Queue %s write error: num_bytes > _elem_size", _shm_name.c_str());
+        }
 
         _sem_num_empty.lock();
+        std::lock_guard<Mutex> lg(_mutex);
 
-        memcpy((T *) _shm + *_last_elem, data, _elem_size);
-        *_last_elem = (*_last_elem + _elem_size) % _buff_size;
+        memcpy((T *) _shm + *_last_elem, data, num_bytes);
+        *_last_elem = (*_last_elem + num_bytes) % _buff_size;
         LOG("[circular_buffer] Wrote '%s' on %s", data, this->_shm_name.c_str());
 
         _sem_num_elems.unlock();
     }
 
-    inline void read(T *buff_rcv) {
-        START_LOG(capio_syscall(SYS_gettid), "[circular_buffer] call(buff_rcv=0x%08x)", buff_rcv);
+    inline void write(const T *data) {
+        START_LOG(capio_syscall(SYS_gettid), "call()");
+        write(data, _elem_size);
+    }
 
-        std::lock_guard<S> lg(_mutex);
+    inline void read(T *buff_rcv, long int num_bytes) {
+        START_LOG(capio_syscall(SYS_gettid), "call(buff_rcv=0x%08x)", buff_rcv);
+
+        if (num_bytes > _elem_size) {
+            ERR_EXIT("Queue %s read error: num_bytes > _elem_size", _shm_name.c_str());
+        }
 
         _sem_num_elems.lock();
+        std::lock_guard<Mutex> lg(_mutex);
 
-        memcpy((T *) buff_rcv, ((T *) _shm) + *_first_elem, _elem_size);
-        *_first_elem = (*_first_elem + _elem_size) % _buff_size;
+        memcpy((T *) buff_rcv, ((T *) _shm) + *_first_elem, num_bytes);
+        *_first_elem = (*_first_elem + num_bytes) % _buff_size;
         LOG("[circular_buffer] Received '%s' on %s", buff_rcv, this->_shm_name.c_str());
 
         _sem_num_empty.unlock();
     }
+
+    inline void read(T *buf_rcv) {
+        START_LOG(capio_syscall(SYS_gettid), "call()");
+        read(buf_rcv, _elem_size);
+    }
 };
 
-#endif // CAPIO_COMMON_CIRCULAR_BUFFER_HPP
+// Circular Buffer queue for requests
+template <class T> using CircularBuffer = Queue<T, Semaphore>;
+
+// Single Producer Single Consumer queue
+using SPSCQueue = Queue<char, NoLock>;
+
+#endif // CAPIO_COMMON_QUEUE_HPP
