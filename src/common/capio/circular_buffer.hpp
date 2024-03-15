@@ -2,6 +2,7 @@
 #define CAPIO_COMMON_CIRCULAR_BUFFER_HPP
 
 #include <iostream>
+#include <mutex>
 
 #include <semaphore.h>
 
@@ -15,19 +16,18 @@
  * Each element of the circular buffer has the same size.
  */
 
-template <class T> class CircularBuffer {
+template <class T, typename S> class CircularBuffer {
+  //  static_assert(std::is_base_of<Semaphore, S>::value_type == true ||
+ //                     std::is_base_of<Semaphore, S>::value_type == true,
+//                  "Error: class must be either Semaphore or SPSCQueue");
+
   private:
     void *_shm;
-    const long int _max_num_elems;
-    const long int _elem_size; // elements size in bytes
-    long int _buff_size;       // buffer size in bytes
-    long int *_first_elem = nullptr;
-    long int *_last_elem  = nullptr;
-    const std::string _shm_name, _mutex_name, _first_elem_name, _last_elem_name,
-        _sem_num_elem_names, _sem_num_empty_name;
-    sem_t *_mutex;
-    sem_t *_sem_num_elems;
-    sem_t *_sem_num_empty;
+    const long int _max_num_elems, _elem_size; // elements size in bytes
+    long int _buff_size;                       // buffer size in bytes
+    long int *_first_elem = nullptr, *_last_elem = nullptr;
+    const std::string _shm_name, _first_elem_name, _last_elem_name;
+    Semaphore _mutex, _sem_num_elems, _sem_num_empty;
 
   public:
     CircularBuffer(const std::string &shm_name, const long int max_num_elems,
@@ -35,11 +35,11 @@ template <class T> class CircularBuffer {
                    const std::string &workflow_name = get_capio_workflow_name())
         : _max_num_elems(max_num_elems), _elem_size(elem_size),
           _buff_size(_max_num_elems * _elem_size), _shm_name(workflow_name + "_" + shm_name),
-          _mutex_name(workflow_name + SHM_MUTEX_PREFIX + shm_name),
           _first_elem_name(workflow_name + SHM_FIRST_ELEM + shm_name),
           _last_elem_name(workflow_name + SHM_LAST_ELEM + shm_name),
-          _sem_num_elem_names(workflow_name + SHM_SEM_ELEMS + shm_name),
-          _sem_num_empty_name(workflow_name + SHM_SEM_EMPTY + shm_name) {
+          _mutex(workflow_name + SHM_MUTEX_PREFIX + shm_name, 1),
+          _sem_num_elems(workflow_name + SHM_SEM_ELEMS + shm_name, 0),
+          _sem_num_empty(workflow_name + SHM_SEM_EMPTY + shm_name, max_num_elems) {
         START_LOG(capio_syscall(SYS_gettid),
                   "[circular_buffer] call(shm_name=%s, _max_num_elems=%ld, elem_size=%ld, "
                   "workflow_name=%s)",
@@ -53,20 +53,6 @@ template <class T> class CircularBuffer {
             *_last_elem  = 0;
             _shm         = create_shm(_shm_name, _buff_size);
         }
-
-        // check the flags
-        _mutex = sem_open(_mutex_name.c_str(), O_CREAT | O_RDWR, S_IRUSR | S_IWUSR, 1);
-        SEM_CREATE_CHECK(_mutex, _shm_name.c_str());
-
-        // check the flags
-        _sem_num_elems =
-            sem_open(_sem_num_elem_names.c_str(), O_CREAT | O_RDWR, S_IRUSR | S_IWUSR, 0);
-        SEM_CREATE_CHECK(_sem_num_elems, _shm_name.c_str());
-
-        // check the flags
-        _sem_num_empty = sem_open(_sem_num_empty_name.c_str(), O_CREAT | O_RDWR, S_IRUSR | S_IWUSR,
-                                  _max_num_elems);
-        SEM_CREATE_CHECK(_sem_num_empty, _sem_num_empty_name.c_str());
     }
 
     CircularBuffer(const CircularBuffer &)            = delete;
@@ -74,45 +60,37 @@ template <class T> class CircularBuffer {
 
     ~CircularBuffer() {
         START_LOG(capio_syscall(SYS_gettid), "[circular_buffer] call()");
-
-        sem_close(_mutex);
-        sem_close(_sem_num_elems);
-        sem_close(_sem_num_empty);
-
         SHM_DESTROY_CHECK(_shm_name.c_str());
         SHM_DESTROY_CHECK(_first_elem_name.c_str());
         SHM_DESTROY_CHECK(_last_elem_name.c_str());
-        SHM_DESTROY_CHECK(_mutex_name.c_str());
-        SHM_DESTROY_CHECK(_sem_num_elem_names.c_str());
-        SHM_DESTROY_CHECK(_sem_num_empty_name.c_str());
     }
 
     inline void write(const T *data) {
         START_LOG(capio_syscall(SYS_gettid), "[circular_buffer] call(data=0x%08x)", data);
 
-        SEM_WAIT_CHECK(_sem_num_empty, _sem_num_empty_name.c_str());
-        SEM_WAIT_CHECK(_mutex, _mutex_name.c_str());
+        std::lock_guard<S> lg(_mutex);
+
+        _sem_num_empty.lock();
 
         memcpy((T *) _shm + *_last_elem, data, _elem_size);
         *_last_elem = (*_last_elem + _elem_size) % _buff_size;
         LOG("[circular_buffer] Wrote '%s' on %s", data, this->_shm_name.c_str());
 
-        SEM_POST_CHECK(_mutex, _mutex_name.c_str());
-        SEM_POST_CHECK(_sem_num_elems, _sem_num_elem_names.c_str());
+        _sem_num_elems.unlock();
     }
 
     inline void read(T *buff_rcv) {
         START_LOG(capio_syscall(SYS_gettid), "[circular_buffer] call(buff_rcv=0x%08x)", buff_rcv);
 
-        SEM_WAIT_CHECK(_sem_num_elems, _sem_num_elem_names.c_str());
-        SEM_WAIT_CHECK(_mutex, _mutex_name.c_str());
+        std::lock_guard<S> lg(_mutex);
+
+        _sem_num_elems.lock();
 
         memcpy((T *) buff_rcv, ((T *) _shm) + *_first_elem, _elem_size);
         *_first_elem = (*_first_elem + _elem_size) % _buff_size;
         LOG("[circular_buffer] Received '%s' on %s", buff_rcv, this->_shm_name.c_str());
 
-        SEM_POST_CHECK(_mutex, _mutex_name.c_str());
-        SEM_POST_CHECK(_sem_num_empty, _sem_num_empty_name.c_str());
+        _sem_num_empty.unlock();
     }
 };
 

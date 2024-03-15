@@ -11,6 +11,17 @@
  * The items written to the SPSCqueue are only char (bytes)
  */
 
+class _SPSCQueue {
+  public:
+    _SPSCQueue(std::string name, unsigned int init_value) {
+        START_LOG(capio_syscall(SYS_gettid), "call(name=%s, initial_value=%d)", name.c_str(),
+                  init_value);
+    }
+    ~_SPSCQueue() {}
+    void lock() {}
+    void unlock() {}
+};
+
 class SPSCQueue {
   private:
     void *_shm;
@@ -82,7 +93,8 @@ class SPSCQueue {
                   num_bytes);
 
         if (num_bytes > _elem_size) {
-            ERR_EXIT("[SPSCqueue] circular buffer %s write error: num_bytes > _elem_size", _shm_name.c_str());
+            ERR_EXIT("[SPSCqueue] circular buffer %s write error: num_bytes > _elem_size",
+                     _shm_name.c_str());
         }
 
         SEM_WAIT_CHECK(_sem_num_empty, _sem_num_empty_name.c_str());

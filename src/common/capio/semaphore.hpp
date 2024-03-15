@@ -1,7 +1,54 @@
-#include <semaphore.h>
-
 #ifndef CAPIO_SEMS_HPP
 #define CAPIO_SEMS_HPP
+
+#include <semaphore.h>
+
+#include <utility>
+
+#include "capio/logger.hpp"
+
+class Semaphore {
+  private:
+    const std::string _name;
+    sem_t *_sem;
+
+  public:
+    Semaphore(std::string name, unsigned int init_value) : _name(std::move(name)) {
+        START_LOG(capio_syscall(SYS_gettid), "call(name=%s, initial_value=%d)", _name.c_str(),
+                  init_value);
+
+        _sem = sem_open(_name.c_str(), O_CREAT | O_RDWR, S_IRUSR | S_IWUSR, init_value);
+        if (_sem == SEM_FAILED) {
+            ERR_EXIT("sem_open %s failed", _name.c_str());
+        }
+    }
+
+    Semaphore(const Semaphore &)            = delete;
+    Semaphore &operator=(const Semaphore &) = delete;
+
+    ~Semaphore() {
+        START_LOG(capio_syscall(SYS_gettid), "call()");
+        if (sem_destroy(_sem) != 0) {
+            ERR_EXIT("destruction of semaphore %s failed", _name.c_str());
+        }
+    }
+
+    void lock() {
+        START_LOG(capio_syscall(SYS_gettid), "call()");
+        if (sem_wait(_sem) == -1) {
+            ERR_EXIT("unable to acquire %s", _name.c_str());
+        }
+    }
+
+    void unlock() {
+        START_LOG(capio_syscall(SYS_gettid), "call()");
+        if (sem_post(_sem) == -1) {
+            ERR_EXIT("unable to release %s", _name.c_str());
+        }
+    }
+};
+
+
 
 #ifdef __CAPIO_POSIX
 

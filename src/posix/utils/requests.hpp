@@ -30,7 +30,7 @@ inline void init_client() {
 inline void register_listener(long tid) {
     // TODO: replace numbers with constexpr
     auto *p_buf_response =
-        new CircularBuffer<off_t>(SHM_COMM_CHAN_NAME_RESP + std::to_string(tid), 8 * 1024 * 1024, sizeof(off_t));
+        new CircularBuffer<off_t, Semaphore>(SHM_COMM_CHAN_NAME_RESP + std::to_string(tid), 8 * 1024 * 1024, sizeof(off_t));
     bufs_response->insert(std::make_pair(tid, p_buf_response));
 }
 

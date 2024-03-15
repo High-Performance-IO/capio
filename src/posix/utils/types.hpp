@@ -9,8 +9,8 @@
 
 typedef std::unordered_map<int, std::tuple<off64_t *, off64_t, int, bool>> CPFiles_t;
 typedef std::pair<off64_t, off64_t> CPStatResponse_t;
-typedef CircularBuffer<char> CPBufRequest_t;
-typedef std::unordered_map<long, CircularBuffer<off_t> *> CPBufResponse_t;
+typedef CircularBuffer<char, Semaphore> CPBufRequest_t;
+typedef std::unordered_map<long, CircularBuffer<off_t, Semaphore> *> CPBufResponse_t;
 typedef std::unordered_map<int, std::string> CPFileDescriptors_t;
 typedef std::unordered_map<std::string, std::unordered_set<int>> CPFilesPaths_t;
 typedef std::unordered_map<int, std::pair<SPSCQueue *, SPSCQueue *>> CPThreadDataBufs_t;
