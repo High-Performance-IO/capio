@@ -178,8 +178,15 @@ static int hook(long syscall_number, long arg0, long arg1, long arg2, long arg3,
     static const std::array<CPHandler_t, __NR_syscalls> syscallTable = build_syscall_table();
     static const char *capio_dir                                     = std::getenv("CAPIO_DIR");
 
-#ifdef CAPIOLOG
-    CAPIO_LOG_LEVEL = get_capio_log_level();
+#ifdef SYS_futex
+    /**
+     * Old glibc versions call the SYS_futex syscall when accessing a thread_local
+     * variable. This behaviour causes an infinite recursion when checking the
+     * syscall_no_intercept_flag.
+     */
+    if (syscall_number == SYS_futex) {
+        return 1;
+    }
 #endif
 
     // If the flag is set to true, CAPIO will not
@@ -187,6 +194,10 @@ static int hook(long syscall_number, long arg0, long arg1, long arg2, long arg3,
     if (syscall_no_intercept_flag) {
         return 1;
     }
+
+#ifdef CAPIOLOG
+    CAPIO_LOG_LEVEL = get_capio_log_level();
+#endif
 
     START_LOG(syscall_no_intercept(SYS_gettid), "call(syscall_number=%ld)", syscall_number);
 
