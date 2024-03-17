@@ -16,18 +16,11 @@ inline void handle_getdents_impl(int tid, int fd, long int count) {
     const std::filesystem::path &path = get_capio_file_path(tid, fd);
     CapioFile &c_file                 = get_capio_file(path);
     off64_t process_offset            = get_capio_file_offset(tid, fd);
-    off64_t end_of_sector             = c_file.get_sector_end(process_offset);
-    off64_t end_of_read               = process_offset + count;
-    int pid                           = pids[tid];
-    bool writer                       = writers[pid][path];
+    off64_t dir_size      = c_file.get_stored_size();
+    off64_t n_entries     = dir_size / CAPIO_THEORETICAL_SIZE_DIRENT64;
+    char *p_getdents      = (char *) malloc(n_entries * sizeof(char) * dir_size);
+    off64_t end_of_sector = store_dirent(c_file.get_buffer(), p_getdents, dir_size);
 
-    if (end_of_sector > end_of_read) {
-        end_of_sector = end_of_read;
-    }
-    off64_t dir_size  = c_file.get_stored_size();
-    off64_t n_entries = dir_size / CAPIO_THEORETICAL_SIZE_DIRENT64;
-    char *p_getdents  = (char *) malloc(n_entries * sizeof(char) * dir_size);
-    end_of_sector     = store_dirent(c_file.get_buffer(), p_getdents, dir_size);
     write_response(tid, end_of_sector);
     send_data_to_client(tid, p_getdents + process_offset, end_of_sector - process_offset);
     free(p_getdents);
