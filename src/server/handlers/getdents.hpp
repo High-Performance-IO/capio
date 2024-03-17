@@ -20,7 +20,6 @@ inline void handle_getdents_impl(int tid, int fd, long int count) {
     off64_t n_entries     = dir_size / CAPIO_THEORETICAL_SIZE_DIRENT64;
     char *p_getdents      = (char *) malloc(n_entries * sizeof(char) * dir_size);
     off64_t end_of_sector = store_dirent(c_file.get_buffer(), p_getdents, dir_size);
-
     write_response(tid, end_of_sector);
     send_data_to_client(tid, p_getdents + process_offset, end_of_sector - process_offset);
     free(p_getdents);
