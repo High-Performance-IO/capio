@@ -84,7 +84,8 @@ template <class T> class SPSCQueue {
         }
     }
 
-    SPSCQueue(const SPSCQueue &)            = delete;
+    SPSCQueue(const SPSCQueue &) = delete;
+
     SPSCQueue &operator=(const SPSCQueue &) = delete;
 
     ~SPSCQueue() {

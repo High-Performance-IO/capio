@@ -14,7 +14,7 @@
     "download": {
       "output": {
         "data*": {
-          "committed": "on_close",
+          "committed": "on_close:10",
           "mode": "append",
           "permanent" : true,
           "exclude" : false

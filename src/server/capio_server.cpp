@@ -68,7 +68,6 @@ using namespace simdjson;
 #include "utils/metadata.hpp"
 #include "utils/requests.hpp"
 
-
 #include "handlers.hpp"
 #include "utils/location.hpp"
 #include "utils/signals.hpp"
@@ -263,7 +262,6 @@ int main(int argc, char **argv) {
     std::cout << CAPIO_LOG_SERVER_BANNER;
 
     parseCLI(argc, argv);
-
 
     START_LOG(gettid(), "call()");
 

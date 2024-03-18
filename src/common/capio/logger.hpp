@@ -19,7 +19,9 @@
 #endif
 
 #ifndef __CAPIO_POSIX
+
 #include <filesystem>
+
 thread_local std::ofstream logfile; // if building for server, self contained logfile
 std::string log_master_dir_name = CAPIO_DEFAULT_LOG_FOLDER;
 std::string logfile_prefix      = CAPIO_SERVER_DEFAULT_LOG_FILE_PREFIX;
@@ -31,7 +33,7 @@ thread_local char logfile_path[PATH_MAX]{'\0'};
 
 thread_local int current_log_level = 0;
 thread_local bool logging_syscall  = false; // this variable tells the logger that syscall logging
-                                            // has started and we are not in setup phase
+// has started and we are not in setup phase
 
 #ifndef CAPIO_MAX_LOG_LEVEL // capio max log level. defaults to -1, where everything is logged
 #define CAPIO_MAX_LOG_LEVEL -1
@@ -40,6 +42,7 @@ thread_local bool logging_syscall  = false; // this variable tells the logger th
 int CAPIO_LOG_LEVEL = CAPIO_MAX_LOG_LEVEL;
 
 #ifndef __CAPIO_POSIX
+
 inline auto open_server_logfile() {
     auto hostname = new char[HOST_NAME_MAX];
     gethostname(hostname, HOST_NAME_MAX);
@@ -57,6 +60,7 @@ inline auto open_server_logfile() {
 
     return logfile_name;
 }
+
 #else
 
 inline auto get_hostname() {
@@ -144,6 +148,7 @@ void log_write_to(char *buffer, size_t bufflen) {
 class SyscallLoggingSuspender {
   public:
     SyscallLoggingSuspender() { logging_syscall = false; }
+
     ~SyscallLoggingSuspender() { logging_syscall = true; }
 };
 
@@ -223,7 +228,8 @@ class Logger {
         current_log_level++;
     }
 
-    Logger(const Logger &)            = delete;
+    Logger(const Logger &) = delete;
+
     Logger &operator=(const Logger &) = delete;
 
     inline ~Logger() {
