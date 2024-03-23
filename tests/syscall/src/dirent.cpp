@@ -1,7 +1,6 @@
-#include <catch2/catch_test_macros.hpp>
+#include <gtest/gtest.h>
 
 #include <algorithm>
-#include <cerrno>
 #include <dirent.h>
 #include <fcntl.h>
 #include <filesystem>
@@ -18,12 +17,7 @@ struct linux_dirent64 {
     char d_name[NAME_MAX];   /* Filename (null-terminated) */
 };
 
-bool namesAreOk(const std::string &check, const std::vector<std::string> &options) {
-    printf("checking %s\n", check.c_str());
-    return std::find(options.begin(), options.end(), check) != options.end();
-}
-
-TEST_CASE("Test dirents on capio dir", "[syscall]") {
+TEST(SystemCallTest, TestDirentsOnCapioDir) {
     const std::filesystem::path PATHNAME = "test";
     constexpr const char *BUFFER =
         "QWERTYUIOPASDFGHJKLZXCVBNM1234567890qwertyuiopasdfghjklzxcvbnm\0";
@@ -31,8 +25,8 @@ TEST_CASE("Test dirents on capio dir", "[syscall]") {
     const std::filesystem::path path2 = PATHNAME / "file2.txt";
     const std::filesystem::path path3 = PATHNAME / "file3.txt";
 
-    REQUIRE(mkdir(PATHNAME.c_str(), S_IRWXU) != -1);
-    REQUIRE(access(PATHNAME.c_str(), F_OK) == 0);
+    EXPECT_NE(mkdir(PATHNAME.c_str(), S_IRWXU), -1);
+    EXPECT_EQ(access(PATHNAME.c_str(), F_OK), 0);
 
     std::vector<std::string> expectedNames{5};
     expectedNames[0] = ".";
@@ -43,26 +37,26 @@ TEST_CASE("Test dirents on capio dir", "[syscall]") {
 
     // Setup of files in capio dir
     int file1 = open(path1.c_str(), O_CREAT | O_WRONLY | O_TRUNC, S_IRUSR | S_IWUSR);
-    REQUIRE(file1 != -1);
-    REQUIRE(access(path1.c_str(), F_OK) == 0);
-    REQUIRE(write(file1, BUFFER, strlen(BUFFER)) == strlen(BUFFER));
-    REQUIRE(close(file1) != -1);
+    EXPECT_NE(file1, -1);
+    EXPECT_EQ(access(path1.c_str(), F_OK), 0);
+    EXPECT_EQ(write(file1, BUFFER, strlen(BUFFER)), strlen(BUFFER));
+    EXPECT_NE(close(file1), -1);
 
     int file2 = open(path2.c_str(), O_CREAT | O_WRONLY | O_TRUNC, S_IRUSR | S_IWUSR);
-    REQUIRE(file2 != -1);
-    REQUIRE(access(path2.c_str(), F_OK) == 0);
-    REQUIRE(write(file2, BUFFER, strlen(BUFFER)) == strlen(BUFFER));
-    REQUIRE(close(file2) != -1);
+    EXPECT_NE(file2, -1);
+    EXPECT_EQ(access(path2.c_str(), F_OK), 0);
+    EXPECT_EQ(write(file2, BUFFER, strlen(BUFFER)), strlen(BUFFER));
+    EXPECT_NE(close(file2), -1);
 
     int file3 = open(path3.c_str(), O_CREAT | O_WRONLY | O_TRUNC, S_IRUSR | S_IWUSR);
-    REQUIRE(file3 != -1);
-    REQUIRE(access(path3.c_str(), F_OK) == 0);
-    REQUIRE(write(file3, BUFFER, strlen(BUFFER)) == strlen(BUFFER));
-    REQUIRE(close(file3) != -1);
+    EXPECT_NE(file3, -1);
+    EXPECT_EQ(access(path3.c_str(), F_OK), 0);
+    EXPECT_EQ(write(file3, BUFFER, strlen(BUFFER)), strlen(BUFFER));
+    EXPECT_NE(close(file3), -1);
 
     // Test of dirents now
     int curr_dir_fd = open(PATHNAME.c_str(), O_RDONLY | O_DIRECTORY);
-    REQUIRE(curr_dir_fd != -1);
+    EXPECT_NE(curr_dir_fd, -1);
 
     long nread = 0;
     char buf[1024]; // byte buffer for getdents64 output data
@@ -71,7 +65,7 @@ TEST_CASE("Test dirents on capio dir", "[syscall]") {
         nread = syscall(SYS_getdents64, curr_dir_fd, buf, 1024);
         // on fail sys_getdents returns -1
 
-        REQUIRE(nread != -1);
+        EXPECT_NE(nread, -1);
         if (nread == 0) {
             break;
         }
@@ -91,15 +85,16 @@ TEST_CASE("Test dirents on capio dir", "[syscall]") {
                                                      : "???",
                                d_type); */
 
-            REQUIRE(namesAreOk(d->d_name, expectedNames));
+            EXPECT_NE(std::find(expectedNames.begin(), expectedNames.end(), d->d_name),
+                      expectedNames.end());
 
             // printf("%4d %10lld  %s\n", d->d_reclen, (long long) d->d_off, d->d_name);
             bpos += d->d_reclen;
         }
     }
-    REQUIRE(unlink(path1.c_str()) != -1);
-    REQUIRE(unlink(path2.c_str()) != -1);
-    REQUIRE(unlink(path3.c_str()) != -1);
-    REQUIRE(unlinkat(AT_FDCWD, PATHNAME.c_str(), AT_REMOVEDIR) != -1);
-    REQUIRE(access(PATHNAME.c_str(), F_OK) != 0);
+    EXPECT_NE(unlink(path1.c_str()), -1);
+    EXPECT_NE(unlink(path2.c_str()), -1);
+    EXPECT_NE(unlink(path3.c_str()), -1);
+    EXPECT_NE(unlinkat(AT_FDCWD, PATHNAME.c_str(), AT_REMOVEDIR), -1);
+    EXPECT_NE(access(PATHNAME.c_str(), F_OK), 0);
 }

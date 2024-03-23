@@ -1,4 +1,4 @@
-#include <catch2/catch_test_macros.hpp>
+#include <gtest/gtest.h>
 
 #include <cerrno>
 #include <climits>
@@ -8,98 +8,92 @@
 #include <sys/stat.h>
 #include <unistd.h>
 
-TEST_CASE("Test directory creation, reopening and close", "[syscall]") {
+TEST(SystemCallTest, TestDirectoryCreateReopenClose) {
     constexpr const char *PATHNAME = "test";
-    REQUIRE(mkdir(PATHNAME, S_IRWXU) != -1);
-    REQUIRE(access(PATHNAME, F_OK) == 0);
+    EXPECT_NE(mkdir(PATHNAME, S_IRWXU), -1);
+    EXPECT_EQ(access(PATHNAME, F_OK), 0);
     int flags = O_RDONLY | O_DIRECTORY;
     int fd    = open(PATHNAME, flags, S_IRUSR | S_IWUSR);
-    REQUIRE(fd != -1);
-    REQUIRE(close(fd) != -1);
+    EXPECT_NE(fd, -1);
+    EXPECT_NE(close(fd), -1);
     fd = open(PATHNAME, flags, S_IRUSR | S_IWUSR);
-    REQUIRE(fd != -1);
-    REQUIRE(close(fd) != -1);
-    REQUIRE(rmdir(PATHNAME) != -1);
-    REQUIRE(access(PATHNAME, F_OK) != 0);
+    EXPECT_NE(fd, -1);
+    EXPECT_NE(close(fd), -1);
+    EXPECT_NE(rmdir(PATHNAME), -1);
+    EXPECT_NE(access(PATHNAME, F_OK), 0);
 }
 
-TEST_CASE("Test directory creation, reopening, and close using mkdirat with AT_FDCWD",
-          "[syscall]") {
+TEST(SystemCallTest, TestDirectoryCreateReopenCloseWithMkdiratAtFdcwd) {
     constexpr const char *PATHNAME = "test";
-    REQUIRE(mkdirat(AT_FDCWD, PATHNAME, S_IRWXU) != -1);
-    REQUIRE(faccessat(AT_FDCWD, PATHNAME, F_OK, 0) == 0);
+    EXPECT_NE(mkdirat(AT_FDCWD, PATHNAME, S_IRWXU), -1);
+    EXPECT_EQ(faccessat(AT_FDCWD, PATHNAME, F_OK, 0), 0);
     int flags = O_RDONLY | O_DIRECTORY;
     int fd    = openat(AT_FDCWD, PATHNAME, flags, S_IRUSR | S_IWUSR);
-    REQUIRE(fd != -1);
-    REQUIRE(close(fd) != -1);
+    EXPECT_NE(fd, -1);
+    EXPECT_NE(close(fd), -1);
     fd = openat(AT_FDCWD, PATHNAME, flags, S_IRUSR | S_IWUSR);
-    REQUIRE(fd != -1);
-    REQUIRE(close(fd) != -1);
-    REQUIRE(unlinkat(AT_FDCWD, PATHNAME, AT_REMOVEDIR) != -1);
-    REQUIRE(faccessat(AT_FDCWD, PATHNAME, F_OK, 0) != 0);
+    EXPECT_NE(fd, -1);
+    EXPECT_NE(close(fd), -1);
+    EXPECT_NE(unlinkat(AT_FDCWD, PATHNAME, AT_REMOVEDIR), -1);
+    EXPECT_NE(faccessat(AT_FDCWD, PATHNAME, F_OK, 0), 0);
 }
 
-TEST_CASE("Test that mkdir fails if directory already exists", "[syscall]") {
+TEST(SystemCallTest, TestMkdirFailsIfDirectoryAlreadyExists) {
     constexpr const char *PATHNAME = "test";
-    REQUIRE(mkdir(PATHNAME, S_IRWXU) != -1);
-    REQUIRE(faccessat(AT_FDCWD, PATHNAME, F_OK, 0) == 0);
-    REQUIRE(mkdir(PATHNAME, S_IRWXU) == -1);
-    REQUIRE(errno == EEXIST);
-    REQUIRE(rmdir(PATHNAME) != -1);
-    REQUIRE(faccessat(AT_FDCWD, PATHNAME, F_OK, 0) != 0);
+    EXPECT_NE(mkdir(PATHNAME, S_IRWXU), -1);
+    EXPECT_EQ(faccessat(AT_FDCWD, PATHNAME, F_OK, 0), 0);
+    EXPECT_EQ(mkdir(PATHNAME, S_IRWXU), -1);
+    EXPECT_EQ(errno, EEXIST);
+    EXPECT_NE(rmdir(PATHNAME), -1);
+    EXPECT_NE(faccessat(AT_FDCWD, PATHNAME, F_OK, 0), 0);
 }
 
-TEST_CASE("Test directory creation, reopening, and close in a different directory using openat "
-          "with absolute path",
-          "[syscall]") {
+TEST(SystemCallTest, TestDirectoryCreateReopenCloseInDifferentDirectoryWithOpenatAbsolutePath) {
     const auto path_fs = std::filesystem::path(std::getenv("PWD")) / std::filesystem::path("test");
     const char *PATHNAME = path_fs.c_str();
-    REQUIRE(mkdirat(0, PATHNAME, S_IRWXU) != -1);
-    REQUIRE(faccessat(0, PATHNAME, F_OK, 0) == 0);
+    EXPECT_NE(mkdirat(0, PATHNAME, S_IRWXU), -1);
+    EXPECT_EQ(faccessat(0, PATHNAME, F_OK, 0), 0);
     int flags = O_RDONLY | O_DIRECTORY;
     int fd    = openat(0, PATHNAME, flags, S_IRUSR | S_IWUSR);
-    REQUIRE(fd != -1);
-    REQUIRE(close(fd) != -1);
+    EXPECT_NE(fd, -1);
+    EXPECT_NE(close(fd), -1);
     fd = openat(0, PATHNAME, flags, S_IRUSR | S_IWUSR);
-    REQUIRE(fd != -1);
-    REQUIRE(close(fd) != -1);
-    REQUIRE(unlinkat(0, PATHNAME, AT_REMOVEDIR) != -1);
-    REQUIRE(faccessat(0, PATHNAME, F_OK, 0) != 0);
+    EXPECT_NE(fd, -1);
+    EXPECT_NE(close(fd), -1);
+    EXPECT_NE(unlinkat(0, PATHNAME, AT_REMOVEDIR), -1);
+    EXPECT_NE(faccessat(0, PATHNAME, F_OK, 0), 0);
 }
 
-TEST_CASE("Test directory creation, reopening, and close in a different directory using mkdirat "
-          "with dirfd",
-          "[syscall]") {
+TEST(SystemCallTest, TestDirectoryCreateReopenCloseInDifferentDirectoryWithMkdiratDirfd) {
     constexpr const char *PATHNAME = "test";
     const char *DIRPATH            = std::getenv("PWD");
     int flags                      = O_RDONLY | O_DIRECTORY;
     int dirfd                      = open(DIRPATH, flags);
-    REQUIRE(dirfd != -1);
-    REQUIRE(mkdirat(dirfd, PATHNAME, S_IRWXU) != -1);
-    REQUIRE(faccessat(dirfd, PATHNAME, F_OK, 0) == 0);
+    EXPECT_NE(dirfd, -1);
+    EXPECT_NE(mkdirat(dirfd, PATHNAME, S_IRWXU), -1);
+    EXPECT_EQ(faccessat(dirfd, PATHNAME, F_OK, 0), 0);
     int fd = openat(dirfd, PATHNAME, flags, S_IRUSR | S_IWUSR);
-    REQUIRE(fd != -1);
-    REQUIRE(close(fd) != -1);
+    EXPECT_NE(fd, -1);
+    EXPECT_NE(close(fd), -1);
     fd = openat(dirfd, PATHNAME, flags, S_IRUSR | S_IWUSR);
-    REQUIRE(fd != -1);
-    REQUIRE(close(fd) != -1);
-    REQUIRE(unlinkat(dirfd, PATHNAME, AT_REMOVEDIR) != -1);
-    REQUIRE(faccessat(dirfd, PATHNAME, F_OK, 0) != 0);
-    REQUIRE(close(dirfd) != -1);
+    EXPECT_NE(fd, -1);
+    EXPECT_NE(close(fd), -1);
+    EXPECT_NE(unlinkat(dirfd, PATHNAME, AT_REMOVEDIR), -1);
+    EXPECT_NE(faccessat(dirfd, PATHNAME, F_OK, 0), 0);
+    EXPECT_NE(close(dirfd), -1);
 }
 
-TEST_CASE("Test obtaining the current directory with getcwd system call", "[syscall]") {
+TEST(SystemCallTest, TestGetcwd) {
     auto expected_path = std::string(std::getenv("PWD"));
     char obtained_path[PATH_MAX];
-    char *result = getcwd(obtained_path, PATH_MAX);
-    REQUIRE(expected_path == std::string(obtained_path));
-    REQUIRE(result != nullptr);
+    EXPECT_NE(getcwd(obtained_path, PATH_MAX), nullptr);
+    EXPECT_EQ(expected_path, std::string(obtained_path));
 }
 
-TEST_CASE("Test getcwd system call when path is longer than size", "[syscall]") {
+TEST(SystemCallTest, TestGetcwdWithPathLongerThanSize) {
     auto expected_path = std::string(std::getenv("PWD"));
-    REQUIRE(expected_path.size() > 1);
+    EXPECT_GT(expected_path.size(), 1);
     char obtained_path[1];
-    REQUIRE(getcwd(obtained_path, 1) == nullptr);
-    REQUIRE(errno == ERANGE);
+    EXPECT_EQ(getcwd(obtained_path, 1), nullptr);
+    EXPECT_EQ(errno, ERANGE);
 }

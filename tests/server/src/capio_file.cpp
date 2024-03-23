@@ -1,38 +1,45 @@
-#include <catch2/catch_test_macros.hpp>
+#include <gtest/gtest.h>
 
 #include <iostream>
 
 #include "capio/env.hpp"
 #include "utils/capio_file.hpp"
 
-TEST_CASE("Test inserting a single sector", "[server]") {
+TEST(ServerTest, TestInsertSingleSector) {
     CapioFile c_file;
     c_file.insert_sector(1, 3);
     c_file.print(std::cout);
 }
 
-TEST_CASE("Test inserting two non-overlapping sectors", "[server]") {
+TEST(ServerTest, TestInsertTwoNonOverlappingSectors) {
     CapioFile c_file;
     c_file.insert_sector(5, 7);
     c_file.insert_sector(1, 3);
     c_file.print(std::cout);
 }
 
-TEST_CASE("Test inserting two overlapping sectors starting at the same offset", "[server]") {
+TEST(ServerTest, TestInsertTwoOverlappingSectors) {
+    CapioFile c_file;
+    c_file.insert_sector(2, 4);
+    c_file.insert_sector(1, 3);
+    c_file.print(std::cout);
+}
+
+TEST(ServerTest, TestInsertTwoOverlappingSectorsSameStart) {
     CapioFile c_file;
     c_file.insert_sector(1, 4);
     c_file.insert_sector(1, 3);
     c_file.print(std::cout);
 }
 
-TEST_CASE("Test inserting two overlapping sectors ending at the same offset", "[server]") {
+TEST(ServerTest, TestInsertTwoOverlappingSectorsSameEnd) {
     CapioFile c_file;
     c_file.insert_sector(1, 4);
     c_file.insert_sector(2, 4);
     c_file.print(std::cout);
 }
 
-TEST_CASE("Test inserting two overlapping sectors with one nested in the other", "[server]") {
+TEST(ServerTest, TestInsertTwoOverlappingSectorsNested) {
     CapioFile c_file;
     c_file.insert_sector(1, 4);
     c_file.insert_sector(2, 3);

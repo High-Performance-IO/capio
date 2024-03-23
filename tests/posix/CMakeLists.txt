@@ -34,6 +34,7 @@ file(GLOB_RECURSE SYSCALL_INTERCEPT_HEADERS "${SYSCALL_INTERCEPT_INCLUDE_FOLDER}
 target_sources(${TARGET_NAME} PRIVATE
         "${CAPIO_COMMON_HEADERS}"
         "${CAPIO_POSIX_HEADERS}"
+        "${GTEST_CONFIG_HEADERS}"
         "${SYSCALL_INTERCEPT_HEADERS}"
 )
 target_include_directories(${TARGET_NAME} PRIVATE
@@ -45,12 +46,11 @@ target_include_directories(${TARGET_NAME} PRIVATE
 # Link libraries
 #####################################
 target_link_directories(${TARGET_NAME} PRIVATE ${SYSCALL_INTERCEPT_LIB_FOLDER})
-target_link_libraries(${TARGET_NAME} PRIVATE rt syscall_intercept Catch2::Catch2WithMain)
+target_link_libraries(${TARGET_NAME} PRIVATE rt syscall_intercept GTest::gtest_main)
 
 #####################################
 # Configure tests
 #####################################
-catch_discover_tests(${TARGET_NAME}
-        PROPERTIES
+gtest_discover_tests(${TARGET_NAME}
         WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}
 )

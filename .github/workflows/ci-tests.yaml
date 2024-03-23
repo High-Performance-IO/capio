@@ -124,22 +124,28 @@ jobs:
                 -S ${GITHUB_WORKSPACE}
           cmake --build build -j $(nproc)
           sudo cmake --install build --prefix /usr/local
-      - name: "Run CAPIO server"
-        env:
-          CAPIO_DIR: ${{ github.workspace }}
-          CAPIO_LOG_LEVEL: -1
-        run: mpirun -n 1 capio_server --no-config &
       - name: "Run tests"
         id: run-tests
         timeout-minutes: 2
         env:
           CAPIO_DIR: ${{ github.workspace }}
+          CAPIO_LOG_LEVEL: -1
         run: |
-          ctest \
-            --build-config ${{ matrix.build_type }} \
-            --output-on-failure \
-            --stop-on-failure \
-            --test-dir build/tests
+          export LD_LIBRARY_PATH="build/src/posix:${LD_LIBRARY_PATH}"
+          export LD_LIBRARY_PATH="build/src/posix/syscall_intercept/lib:${LD_LIBRARY_PATH}"
+          
+          build/tests/posix/capio_posix_tests \
+            --gtest_break_on_failure \
+            --gtest_print_time=1
+          
+          build/tests/server/capio_server_tests \
+            --gtest_break_on_failure \
+            --gtest_print_time=1
+          
+          LD_PRELOAD=libcapio_posix.so \
+          build/tests/syscall/capio_syscall_tests \
+            --gtest_break_on_failure \
+            --gtest_print_time=1
       - name: "Show client logs on failure"
         if: ${{ always() && steps.run-tests.outcome == 'failure' && matrix.build_type == 'Debug' }}
         run: tail -v -n +1 capio_logs/posix/$(hostname)/posix_thread_*.log
