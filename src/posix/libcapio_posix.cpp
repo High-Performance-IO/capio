@@ -136,6 +136,9 @@ static constexpr std::array<CPHandler_t, __NR_syscalls> build_syscall_table() {
 #ifdef SYS_newfstatat
     _syscallTable[SYS_newfstatat] = fstatat_handler;
 #endif
+#ifdef SYS_open
+    _syscallTable[SYS_open] = open_handler;
+#endif
 #ifdef SYS_openat
     _syscallTable[SYS_openat] = openat_handler;
 #endif
