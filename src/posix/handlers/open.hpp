@@ -96,4 +96,12 @@ int openat_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long a
     return posix_return_value(capio_openat(dirfd, pathname, flags, tid), result);
 }
 
+int open_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg5, long *result) {
+    const std::string_view pathname(reinterpret_cast<const char *>(arg0));
+    int flags = static_cast<int>(arg1);
+    long tid  = syscall_no_intercept(SYS_gettid);
+
+    return posix_return_value(capio_openat(AT_FDCWD, pathname, flags, tid), result);
+}
+
 #endif // CAPIO_POSIX_HANDLERS_OPENAT_HPP
