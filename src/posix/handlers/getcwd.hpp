@@ -1,5 +1,6 @@
 #ifndef CAPIO_POSIX_HANDLERS_GETCWD_HPP
 #define CAPIO_POSIX_HANDLERS_GETCWD_HPP
+
 int getcwd_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg5, long *result) {
     auto buf  = reinterpret_cast<char *>(arg0);
     auto size = static_cast<size_t>(arg1);
@@ -25,6 +26,7 @@ int getcwd_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long a
         LOG("CWD: %s", cwd.c_str());
         cwd.native().copy(buf, size);
         buf[length] = '\0';
+        *result     = static_cast<int>(length) + 1;
     }
     return CAPIO_POSIX_SYSCALL_SUCCESS;
 }

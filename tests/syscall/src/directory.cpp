@@ -91,8 +91,9 @@ TEST_CASE("Test directory creation, reopening, and close in a different director
 TEST_CASE("Test obtaining the current directory with getcwd system call", "[syscall]") {
     auto expected_path = std::string(std::getenv("PWD"));
     char obtained_path[PATH_MAX];
-    getcwd(obtained_path, PATH_MAX);
+    char *result = getcwd(obtained_path, PATH_MAX);
     REQUIRE(expected_path == std::string(obtained_path));
+    REQUIRE(result != nullptr);
 }
 
 TEST_CASE("Test getcwd system call when path is longer than size", "[syscall]") {
