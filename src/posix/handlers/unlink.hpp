@@ -13,6 +13,9 @@ off64_t capio_unlink_abs(const std::filesystem::path &abs_path, long tid, bool i
             off64_t res = is_dir ? rmdir_request(abs_path, tid) : unlink_request(abs_path, tid);
             if (res == -1) {
                 errno = ENOENT;
+            } else {
+                LOG("Removing %s from capio_files_path", abs_path.c_str());
+                delete_capio_path(abs_path);
             }
             return res;
         }

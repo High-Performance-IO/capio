@@ -134,8 +134,9 @@ inline void delete_capio_fd(int fd) {
  * @return
  */
 inline void delete_capio_path(const std::string &path) {
-    for (auto fd : capio_files_paths->at(path)) {
-        delete_capio_fd(fd);
+    auto it = capio_files_paths->at(path).begin();
+    while (it != capio_files_paths->at(path).end()) {
+        delete_capio_fd(*it++);
     }
     capio_files_paths->erase(path);
 }
