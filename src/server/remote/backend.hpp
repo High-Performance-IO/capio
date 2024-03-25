@@ -1,5 +1,6 @@
 #ifndef CAPIO_SERVER_REMOTE_BACKEND_HPP
 #define CAPIO_SERVER_REMOTE_BACKEND_HPP
+
 #include "capio/logger.hpp"
 #include <charconv>
 
@@ -25,13 +26,16 @@ class RemoteRequest {
         }
     };
 
-    RemoteRequest(const RemoteRequest &)            = delete;
+    RemoteRequest(const RemoteRequest &) = delete;
+
     RemoteRequest &operator=(const RemoteRequest &) = delete;
 
     ~RemoteRequest() { delete[] _buf_recv; }
 
     [[nodiscard]] auto get_source() const { return this->_source; }
+
     [[nodiscard]] auto get_content() const { return this->_buf_recv; }
+
     [[nodiscard]] auto get_code() const { return this->_code; }
 };
 

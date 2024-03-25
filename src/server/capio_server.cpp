@@ -26,13 +26,7 @@ std::string workflow_name;
 #include "capio/logger.hpp"
 #include "capio/semaphore.hpp"
 #include "utils/capio_file.hpp"
-#include "utils/common.hpp"
-#include "utils/env.hpp"
-#include "utils/json.hpp"
-#include "utils/metadata.hpp"
-#include "utils/requests.hpp"
-
-using namespace simdjson;
+#include "utils/types.hpp"
 
 int n_servers;
 // name of the node
@@ -61,6 +55,18 @@ CSWritersMap_t writers;
 CSClientsRemotePendingNFilesMap_t clients_remote_pending_nfiles;
 
 sem_t clients_remote_pending_nfiles_sem;
+
+using namespace simdjson;
+
+#include "capio/env.hpp"
+#include "capio/logger.hpp"
+#include "capio/semaphore.hpp"
+
+#include "utils/common.hpp"
+#include "utils/env.hpp"
+#include "utils/json.hpp"
+#include "utils/metadata.hpp"
+#include "utils/requests.hpp"
 
 #include "handlers.hpp"
 #include "utils/location.hpp"

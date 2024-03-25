@@ -90,7 +90,8 @@ class CapioFile {
         : _buf_size(init_size), _committed(CAPIO_FILE_COMMITTED_ON_TERMINATION),
           _directory(directory), _n_close_expected(n_close_expected), _permanent(permanent) {}
 
-    CapioFile(const CapioFile &)            = delete;
+    CapioFile(const CapioFile &) = delete;
+
     CapioFile &operator=(const CapioFile &) = delete;
 
     ~CapioFile() {

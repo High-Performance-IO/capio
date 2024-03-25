@@ -91,7 +91,8 @@ template <class T> class CircularBuffer {
         SEM_CREATE_CHECK(_sem_num_empty, _sem_num_empty_name.c_str());
     }
 
-    CircularBuffer(const CircularBuffer &)            = delete;
+    CircularBuffer(const CircularBuffer &) = delete;
+
     CircularBuffer &operator=(const CircularBuffer &) = delete;
 
     ~CircularBuffer() {
