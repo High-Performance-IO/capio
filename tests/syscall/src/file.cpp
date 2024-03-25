@@ -1,4 +1,4 @@
-#include <catch2/catch_test_macros.hpp>
+#include <gtest/gtest.h>
 
 #include <cerrno>
 #include <filesystem>
@@ -7,92 +7,89 @@
 #include <fcntl.h>
 #include <unistd.h>
 
-TEST_CASE("Test file creation, reopening, and close", "[syscall]") {
+TEST(SystemCallTest, TestFileCreateReopenClose) {
     constexpr const char *PATHNAME = "test_file.txt";
     int flags                      = O_CREAT | O_WRONLY | O_TRUNC;
     int fd                         = open(PATHNAME, flags, S_IRUSR | S_IWUSR);
-    REQUIRE(fd != -1);
-    REQUIRE(close(fd) != -1);
-    REQUIRE(access(PATHNAME, F_OK) == 0);
+    EXPECT_NE(fd, -1);
+    EXPECT_NE(close(fd), -1);
+    EXPECT_EQ(access(PATHNAME, F_OK), 0);
     fd = open(PATHNAME, flags, S_IRUSR | S_IWUSR);
-    REQUIRE(fd != -1);
-    REQUIRE(close(fd) != -1);
-    REQUIRE(unlink(PATHNAME) != -1);
-    REQUIRE(access(PATHNAME, F_OK) != 0);
+    EXPECT_NE(fd, -1);
+    EXPECT_NE(close(fd), -1);
+    EXPECT_NE(unlink(PATHNAME), -1);
+    EXPECT_NE(access(PATHNAME, F_OK), 0);
 }
 
-TEST_CASE("Test file creation using creat system call", "[syscall]") {
+TEST(SystemCallTest, TestCreat) {
     constexpr const char *PATHNAME = "test_file.txt";
     int fd                         = creat(PATHNAME, S_IRUSR | S_IWUSR);
-    REQUIRE(fd != -1);
-    REQUIRE(close(fd) != -1);
-    REQUIRE(access(PATHNAME, F_OK) == 0);
-    REQUIRE(unlink(PATHNAME) != -1);
-    REQUIRE(access(PATHNAME, F_OK) != 0);
+    EXPECT_NE(fd, -1);
+    EXPECT_NE(close(fd), -1);
+    EXPECT_EQ(access(PATHNAME, F_OK), 0);
+    EXPECT_NE(unlink(PATHNAME), -1);
+    EXPECT_NE(access(PATHNAME, F_OK), 0);
 }
 
-TEST_CASE("Test file creation, reopening, and close using openat with AT_FDCWD", "[syscall]") {
+TEST(SystemCallTest, TestFileCreateReopenCloseWithOpenatAtFdcwd) {
     constexpr const char *PATHNAME = "test_file.txt";
     int flags                      = O_CREAT | O_WRONLY | O_TRUNC;
     int fd                         = openat(AT_FDCWD, PATHNAME, flags, S_IRUSR | S_IWUSR);
-    REQUIRE(fd != -1);
-    REQUIRE(close(fd) != -1);
-    REQUIRE(faccessat(AT_FDCWD, PATHNAME, F_OK, 0) == 0);
+    EXPECT_NE(fd, -1);
+    EXPECT_NE(close(fd), -1);
+    EXPECT_EQ(faccessat(AT_FDCWD, PATHNAME, F_OK, 0), 0);
     fd = openat(AT_FDCWD, PATHNAME, flags, S_IRUSR | S_IWUSR);
-    REQUIRE(fd != -1);
-    REQUIRE(close(fd) != -1);
-    REQUIRE(unlinkat(AT_FDCWD, PATHNAME, 0) != -1);
-    REQUIRE(faccessat(AT_FDCWD, PATHNAME, F_OK, 0) != 0);
+    EXPECT_NE(fd, -1);
+    EXPECT_NE(close(fd), -1);
+    EXPECT_NE(unlinkat(AT_FDCWD, PATHNAME, 0), -1);
+    EXPECT_NE(faccessat(AT_FDCWD, PATHNAME, F_OK, 0), 0);
 }
 
-TEST_CASE("Test that open O_EXCL fails if file already exists", "[syscall]") {
+TEST(SystemCallTest, TestOpenFailsWithOExclIfFileAlreadyExists) {
     constexpr const char *PATHNAME = "test_file.txt";
     int flags                      = O_CREAT | O_WRONLY | O_TRUNC | O_EXCL;
     int fd                         = open(PATHNAME, flags, S_IRUSR | S_IWUSR);
-    REQUIRE(fd != -1);
-    REQUIRE(close(fd) != -1);
-    REQUIRE(access(PATHNAME, F_OK) == 0);
+    EXPECT_NE(fd, -1);
+    EXPECT_NE(close(fd), -1);
+    EXPECT_EQ(access(PATHNAME, F_OK), 0);
     fd = open(PATHNAME, flags, S_IRUSR | S_IWUSR);
-    REQUIRE(fd == -1);
-    REQUIRE(errno == EEXIST);
-    REQUIRE(unlink(PATHNAME) != -1);
-    REQUIRE(access(PATHNAME, F_OK) != 0);
+    EXPECT_EQ(fd, -1);
+    EXPECT_EQ(errno, EEXIST);
+    EXPECT_NE(unlink(PATHNAME), -1);
+    EXPECT_NE(access(PATHNAME, F_OK), 0);
 }
 
-TEST_CASE(
-    "Test file creation, reopen and close in a different directory using openat with absolute path",
-    "[syscall]") {
+TEST(SystemCallTest, TestFileCreateReopenCloseInDifferentDirectoryWithOpenatAbsolutePath) {
     const auto path_fs =
         std::filesystem::path(std::getenv("PWD")) / std::filesystem::path("test_file.txt");
     const char *PATHNAME = path_fs.c_str();
     int flags            = O_CREAT | O_WRONLY | O_TRUNC;
     int fd               = openat(0, PATHNAME, flags, S_IRUSR | S_IWUSR);
-    REQUIRE(fd != -1);
-    REQUIRE(close(fd) != -1);
-    REQUIRE(faccessat(0, PATHNAME, F_OK, 0) == 0);
+    EXPECT_NE(fd, -1);
+    EXPECT_NE(close(fd), -1);
+    EXPECT_EQ(faccessat(0, PATHNAME, F_OK, 0), 0);
     fd = openat(0, PATHNAME, flags, S_IRUSR | S_IWUSR);
-    REQUIRE(fd != -1);
-    REQUIRE(close(fd) != -1);
-    REQUIRE(unlinkat(0, PATHNAME, 0) != -1);
-    REQUIRE(faccessat(0, PATHNAME, F_OK, 0) != 0);
+    EXPECT_NE(fd, -1);
+    EXPECT_NE(close(fd), -1);
+    EXPECT_NE(unlinkat(0, PATHNAME, 0), -1);
+    EXPECT_NE(faccessat(0, PATHNAME, F_OK, 0), 0);
 }
 
-TEST_CASE("Test file creation, reopen and close in a different directory using openat with dirfd",
-          "[syscall]") {
+TEST(SystemCallTest, TestFileCreateReopenCloseInDifferentDirectoryWithOpenatDirfd) {
     constexpr const char *PATHNAME = "test_file.txt";
     const char *DIRPATH            = std::getenv("PWD");
     int flags                      = O_RDONLY | O_DIRECTORY;
     int dirfd                      = open(DIRPATH, flags);
-    REQUIRE(dirfd != -1);
+    EXPECT_NE(dirfd, -1);
     flags  = O_CREAT | O_WRONLY | O_TRUNC;
     int fd = openat(dirfd, PATHNAME, flags, S_IRUSR | S_IWUSR);
-    REQUIRE(fd != -1);
-    REQUIRE(close(fd) != -1);
-    REQUIRE(faccessat(dirfd, PATHNAME, F_OK, 0) == 0);
+    EXPECT_NE(fd, -1);
+    EXPECT_NE(close(fd), -1);
+    EXPECT_EQ(faccessat(dirfd, PATHNAME, F_OK, 0), 0);
     fd = open(PATHNAME, flags, S_IRUSR | S_IWUSR);
-    REQUIRE(fd != -1);
-    REQUIRE(close(fd) != -1);
-    REQUIRE(unlinkat(dirfd, PATHNAME, 0) != -1);
-    REQUIRE(close(dirfd) != -1);
-    REQUIRE(faccessat(dirfd, PATHNAME, F_OK, 0) != 0);
+    EXPECT_NE(fd, -1);
+    EXPECT_NE(close(fd), -1);
+    EXPECT_NE(unlinkat(dirfd, PATHNAME, 0), -1);
+    EXPECT_NE(close(dirfd), -1);
+    EXPECT_NE(faccessat(dirfd, PATHNAME, F_OK, 0), 0);
 }

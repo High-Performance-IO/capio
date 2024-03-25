@@ -1,6 +1,4 @@
-#include <catch2/catch_test_macros.hpp>
-#include <catch2/reporters/catch_reporter_event_listener.hpp>
-#include <catch2/reporters/catch_reporter_registrars.hpp>
+#include <gtest/gtest.h>
 
 #include <filesystem>
 
@@ -8,63 +6,59 @@
 
 #include "utils/filesystem.hpp"
 
-class FileSystemRegistrar : public Catch::EventListenerBase {
-  public:
-    using Catch::EventListenerBase::EventListenerBase;
+class RealpathPosixTest : public testing::Test {
+  protected:
+    static void SetUpTestSuite() { init_filesystem(); }
 
-    void testCaseStarting(Catch::TestCaseInfo const &testCaseInfo) override { init_filesystem(); }
-
-    void testCaseEnded(Catch::TestCaseStats const &testCaseStats) override { destroy_filesystem(); }
+    static void TearDownTestSuite() { destroy_filesystem(); }
 };
 
-CATCH_REGISTER_LISTENER(FileSystemRegistrar);
-
-TEST_CASE("Test absolute paths inside the CAPIO_DIR when path exists", "[posix]") {
+TEST_F(RealpathPosixTest, TestAbsolutePathsInCapioDirWhenPathExists) {
     const std::filesystem::path PATHNAME = get_capio_dir() / "test";
-    REQUIRE(mkdir(PATHNAME.c_str(), S_IRWXU) != -1);
-    REQUIRE(access(PATHNAME.c_str(), F_OK) == 0);
-    REQUIRE(capio_posix_realpath(PATHNAME) == PATHNAME);
-    REQUIRE(rmdir(PATHNAME.c_str()) != -1);
-    REQUIRE(access(PATHNAME.c_str(), F_OK) != 0);
+    EXPECT_NE(mkdir(PATHNAME.c_str(), S_IRWXU), -1);
+    EXPECT_EQ(access(PATHNAME.c_str(), F_OK), 0);
+    EXPECT_EQ(capio_posix_realpath(PATHNAME), PATHNAME);
+    EXPECT_NE(rmdir(PATHNAME.c_str()), -1);
+    EXPECT_NE(access(PATHNAME.c_str(), F_OK), 0);
 }
 
-TEST_CASE("Test absolute paths inside the CAPIO_DIR when path does not exist", "[posix]") {
+TEST_F(RealpathPosixTest, TestAbsoluePathsInCapioDirWhenPathDoesNotExist) {
     const std::filesystem::path PATHNAME = get_capio_dir() / "test";
-    REQUIRE(capio_posix_realpath(PATHNAME) == PATHNAME);
+    EXPECT_EQ(capio_posix_realpath(PATHNAME), PATHNAME);
 }
 
-TEST_CASE("Test absolute paths outside the CAPIO_DIR when path exists", "[posix]") {
+TEST_F(RealpathPosixTest, TestAbsolutePathsOutsideCapioDirWhenPathExists) {
     const std::filesystem::path PATHNAME = "/tmp/test";
-    REQUIRE(mkdir(PATHNAME.c_str(), S_IRWXU) != -1);
-    REQUIRE(access(PATHNAME.c_str(), F_OK) == 0);
-    REQUIRE(capio_posix_realpath(PATHNAME) == PATHNAME);
-    REQUIRE(rmdir(PATHNAME.c_str()) != -1);
-    REQUIRE(access(PATHNAME.c_str(), F_OK) != 0);
+    EXPECT_NE(mkdir(PATHNAME.c_str(), S_IRWXU), -1);
+    EXPECT_EQ(access(PATHNAME.c_str(), F_OK), 0);
+    EXPECT_EQ(capio_posix_realpath(PATHNAME), PATHNAME);
+    EXPECT_NE(rmdir(PATHNAME.c_str()), -1);
+    EXPECT_NE(access(PATHNAME.c_str(), F_OK), 0);
 }
 
-TEST_CASE("Test absolute paths outside the CAPIO_DIR when path does not exist", "[posix]") {
+TEST_F(RealpathPosixTest, TestAbsoluePathOutsideCapioDirWhenPathDoesNotExist) {
     const std::filesystem::path PATHNAME = "/tmp/test";
-    REQUIRE(capio_posix_realpath(PATHNAME) == PATHNAME);
+    EXPECT_EQ(capio_posix_realpath(PATHNAME), PATHNAME);
 }
 
-TEST_CASE("Test relative paths inside the CAPIO_DIR when cwd is the CAPIO_DIR") {
+TEST_F(RealpathPosixTest, TestRelativePathsInCapioDirWhenCwdIsCapioDir) {
     const std::filesystem::path &capio_dir = get_capio_dir();
     const std::filesystem::path PATHNAME   = capio_dir / "test";
     set_current_dir(capio_dir);
-    REQUIRE(mkdir(PATHNAME.c_str(), S_IRWXU) != -1);
-    REQUIRE(access(PATHNAME.c_str(), F_OK) == 0);
-    REQUIRE(capio_posix_realpath("test") == PATHNAME);
-    REQUIRE(rmdir(PATHNAME.c_str()) != -1);
-    REQUIRE(access(PATHNAME.c_str(), F_OK) != 0);
+    EXPECT_NE(mkdir(PATHNAME.c_str(), S_IRWXU), -1);
+    EXPECT_EQ(access(PATHNAME.c_str(), F_OK), 0);
+    EXPECT_EQ(capio_posix_realpath("test"), PATHNAME);
+    EXPECT_NE(rmdir(PATHNAME.c_str()), -1);
+    EXPECT_NE(access(PATHNAME.c_str(), F_OK), 0);
 }
 
-TEST_CASE("Test relative paths inside the CAPIO_DIR when cwd is a parent of the CAPIO_DIR") {
+TEST_F(RealpathPosixTest, TestRelativePathsInCapioDirWhenCwdIsParentOfCapioDir) {
     const std::filesystem::path &capio_dir = get_capio_dir();
     const std::filesystem::path PATHNAME   = capio_dir / "test";
     set_current_dir(capio_dir.parent_path());
-    REQUIRE(mkdir(PATHNAME.c_str(), S_IRWXU) != -1);
-    REQUIRE(access(PATHNAME.c_str(), F_OK) == 0);
-    REQUIRE(capio_posix_realpath(capio_dir.filename() / "test") == PATHNAME);
-    REQUIRE(rmdir(PATHNAME.c_str()) != -1);
-    REQUIRE(access(PATHNAME.c_str(), F_OK) != 0);
+    EXPECT_NE(mkdir(PATHNAME.c_str(), S_IRWXU), -1);
+    EXPECT_EQ(access(PATHNAME.c_str(), F_OK), 0);
+    EXPECT_EQ(capio_posix_realpath(capio_dir.filename() / "test"), PATHNAME);
+    EXPECT_NE(rmdir(PATHNAME.c_str()), -1);
+    EXPECT_NE(access(PATHNAME.c_str(), F_OK), 0);
 }

@@ -25,12 +25,11 @@ target_include_directories(${TARGET_NAME} PRIVATE ${TARGET_INCLUDE_FOLDER})
 #####################################
 # Link libraries
 #####################################
-target_link_libraries(${TARGET_NAME} PRIVATE Catch2::Catch2WithMain)
+target_link_libraries(${TARGET_NAME} PRIVATE GTest::gtest_main)
 
 #####################################
 # Configure tests
 #####################################
-catch_discover_tests(${TARGET_NAME}
-        PROPERTIES
+gtest_discover_tests(${TARGET_NAME}
         WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}
 )
