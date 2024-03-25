@@ -1,7 +1,7 @@
 #####################################
 # Target information
 #####################################
-set(TARGET_NAME capio_syscall_tests)
+set(TARGET_NAME capio_syscall_unit_tests)
 set(TARGET_SOURCES
         ${CMAKE_CURRENT_SOURCE_DIR}/src/clone.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/src/directory.cpp
@@ -31,4 +31,11 @@ target_link_libraries(${TARGET_NAME} PRIVATE GTest::gtest)
 gtest_discover_tests(${TARGET_NAME}
         WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}
         PROPERTIES ENVIRONMENT LD_PRELOAD=${PROJECT_BINARY_DIR}/src/posix/libcapio_posix.so
+)
+
+#####################################
+# Install rules
+#####################################
+install(TARGETS ${TARGET_NAME}
+        LIBRARY DESTINATION ${CMAKE_INSTALL_BINDIR}
 )

@@ -65,37 +65,51 @@ RUN apt update                                                \
 
 # Include files
 COPY --from=builder                                         \
-    /usr/local/include/libsyscall_intercept_hook_point.h    \
-    /usr/local/include/simdjson.h                           \
+    "/usr/local/include/gmoc[k]"                            \
+    "/usr/local/include/gtes[t]"                            \
+    "/usr/local/include/libsyscall_intercept_hook_point.h"  \
+    "/usr/local/include/simdjson.h"                         \
     /usr/local/include/
 
 # Libraries
 COPY --from=builder                                         \
-    /usr/local/lib/libcapio_posix.so                        \
-    /usr/local/lib/libcapio_posix.so.0                      \
-    /usr/local/lib/libcapio_posix.so.0.0.1                  \
-    /usr/local/lib/libsimdjson.a                            \
-    /usr/local/lib/libsyscall_intercept.a                   \
-    /usr/local/lib/libsyscall_intercept.so                  \
-    /usr/local/lib/libsyscall_intercept.so.0                \
-    /usr/local/lib/libsyscall_intercept.so.0.1.0            \
+    "/usr/local/lib/libcapio_posix.so"                      \
+    "/usr/local/lib/libcapio_posix.so.0"                    \
+    "/usr/local/lib/libcapio_posix.so.0.0.1"                \
+    "/usr/local/lib/libgmock.[a]"                           \
+    "/usr/local/lib/libgmock_main.[a]"                      \
+    "/usr/local/lib/libgtest.[a]"                           \
+    "/usr/local/lib/libgtest_main.[a]"                      \
+    "/usr/local/lib/libsimdjson.a"                          \
+    "/usr/local/lib/libsyscall_intercept.a"                 \
+    "/usr/local/lib/libsyscall_intercept.so"                \
+    "/usr/local/lib/libsyscall_intercept.so.0"              \
+    "/usr/local/lib/libsyscall_intercept.so.0.1.0"          \
     /usr/local/lib/
 
 # Binaries
 COPY --from=builder                                         \
-    /usr/local/bin/capio_server                             \
+    "/usr/local/bin/capio_posix_unit_test[s]"               \
+    "/usr/local/bin/capio_server"                           \
+    "/usr/local/bin/capio_server_unit_test[s]"              \
+    "/usr/local/bin/capio_syscall_unit_test[s]"             \
     /usr/local/bin/
 
 # Pkgconfig
 COPY --from=builder                                         \
-    /usr/local/lib/pkgconfig/args.pc                        \
-    /usr/local/lib/pkgconfig/libsyscall_intercept.pc        \
-    /usr/local/lib/pkgconfig/simdjson.pc                    \
+    "/usr/local/lib/pkgconfig/args.pc"                      \
+    "/usr/local/lib/pkgconfig/gmock.p[c]"                   \
+    "/usr/local/lib/pkgconfig/gmock_main.p[c]"              \
+    "/usr/local/lib/pkgconfig/gtest.p[c]"                   \
+    "/usr/local/lib/pkgconfig/gtest_main.p[c]"              \
+    "/usr/local/lib/pkgconfig/libsyscall_intercept.pc"      \
+    "/usr/local/lib/pkgconfig/simdjson.pc"                  \
     /usr/local/lib/pkgconfig/
 
 # CMake files
 COPY --from=builder                                         \
-    /usr/local/lib/cmake/simdjson/                          \
+    "/usr/local/lib/cmake/GTes[t]"                          \
+    "/usr/local/lib/cmake/simdjson"                         \
     /usr/local/lib/cmake/
 
 # Start SSH server
