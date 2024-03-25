@@ -1,7 +1,7 @@
 #####################################
 # Target information
 #####################################
-set(TARGET_NAME capio_posix_tests)
+set(TARGET_NAME capio_posix_unit_tests)
 set(TARGET_INCLUDE_FOLDER "${PROJECT_SOURCE_DIR}/src/posix")
 set(TARGET_SOURCES
         ${CMAKE_CURRENT_SOURCE_DIR}/src/realpath.cpp
@@ -53,4 +53,11 @@ target_link_libraries(${TARGET_NAME} PRIVATE rt syscall_intercept GTest::gtest_m
 #####################################
 gtest_discover_tests(${TARGET_NAME}
         WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}
+)
+
+#####################################
+# Install rules
+#####################################
+install(TARGETS ${TARGET_NAME}
+        LIBRARY DESTINATION ${CMAKE_INSTALL_BINDIR}
 )

@@ -1,7 +1,7 @@
 #####################################
 # Target information
 #####################################
-set(TARGET_NAME capio_server_tests)
+set(TARGET_NAME capio_server_unit_tests)
 set(TARGET_INCLUDE_FOLDER "${PROJECT_SOURCE_DIR}/src/server")
 set(TARGET_SOURCES
         ${CMAKE_CURRENT_SOURCE_DIR}/src/capio_file.cpp
@@ -32,4 +32,11 @@ target_link_libraries(${TARGET_NAME} PRIVATE GTest::gtest_main)
 #####################################
 gtest_discover_tests(${TARGET_NAME}
         WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}
+)
+
+#####################################
+# Install rules
+#####################################
+install(TARGETS ${TARGET_NAME}
+        LIBRARY DESTINATION ${CMAKE_INSTALL_BINDIR}
 )

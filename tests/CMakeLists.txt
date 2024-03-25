@@ -17,6 +17,6 @@ include(GoogleTest)
 #####################################
 # Targets
 #####################################
-add_subdirectory(posix)
-add_subdirectory(server)
-add_subdirectory(syscall)
+add_subdirectory(unit/posix)
+add_subdirectory(unit/server)
+add_subdirectory(unit/syscall)

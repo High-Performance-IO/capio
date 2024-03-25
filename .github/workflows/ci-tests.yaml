@@ -33,24 +33,43 @@ jobs:
         uses: docker/build-push-action@v5
         with:
           build-args: |
-            CAPIO_BUILD_TESTS=${{ matrix.cmake-build-type == 'Debug' && 'ON' || 'OFF' }}
+            CAPIO_BUILD_TESTS=ON
             CAPIO_LOG=${{ matrix.cmake-build-type == 'Debug' && 'ON' || 'OFF' }}
             CMAKE_BUILD_TYPE=${{ matrix.cmake-build-type }}
           load: true
           tags: hpio/capio:latest
-      - name: "Run test with Docker"
+      - name: "Run unit tests with Docker"
         run: |
-          docker run --detach --rm              \
-            --env CAPIO_DIR=/tmp                \
-            --env CAPIO_LOG_LEVEL=-1            \
-            --name capio-docker                 \
-            hpio/capio:latest                   \
-            capio_server --no-config
-          docker exec                           \
-            --env LD_PRELOAD=libcapio_posix.so  \
-            capio-docker                        \
-            sh -c "mkdir /tmp/test && touch /tmp/test/file1 && ls /tmp/test && rm -rf /tmp/test"
-          docker stop capio-docker
+          echo "Run CAPIO POSIX Unit tests"
+          docker run --rm                         \
+              --env CAPIO_DIR=/tmp                \
+              --env CAPIO_LOG_LEVEL=-1            \
+              --name capio-docker                 \
+              hpio/capio:latest                   \
+            capio_posix_unit_tests                \
+              --gtest_break_on_failure            \
+              --gtest_print_time=1
+          
+          echo "Run CAPIO server Unit tests"
+          docker run --rm                         \
+              --env CAPIO_DIR=/tmp                \
+              --env CAPIO_LOG_LEVEL=-1            \
+              --name capio-docker                 \
+              hpio/capio:latest                   \
+            capio_server_unit_tests               \
+              --gtest_break_on_failure            \
+              --gtest_print_time=1
+          
+          echo "Run CAPIO syscall Unit tests"
+          docker run --rm                         \
+              --env CAPIO_DIR=/tmp                \
+              --env CAPIO_LOG_LEVEL=-1            \
+              --env LD_PRELOAD=libcapio_posix.so  \
+              --name capio-docker                 \
+              hpio/capio:latest                   \
+            capio_server_unit_tests               \
+              --gtest_break_on_failure            \
+              --gtest_print_time=1
   format-check:
     name: "Check ${{ matrix.path }} clang-format conformance"
     runs-on: ubuntu-22.04
@@ -131,19 +150,21 @@ jobs:
           CAPIO_DIR: ${{ github.workspace }}
           CAPIO_LOG_LEVEL: -1
         run: |
-          export LD_LIBRARY_PATH="build/src/posix:${LD_LIBRARY_PATH}"
-          export LD_LIBRARY_PATH="build/src/posix/syscall_intercept/lib:${LD_LIBRARY_PATH}"
+          export LD_LIBRARY_PATH="/usr/local/lib:${LD_LIBRARY_PATH}"
           
-          build/tests/posix/capio_posix_tests \
+          echo "Run CAPIO POSIX Unit tests"
+          capio_posix_unit_tests \
             --gtest_break_on_failure \
             --gtest_print_time=1
           
-          build/tests/server/capio_server_tests \
+          echo "Run CAPIO server Unit tests"
+          capio_server_unit_tests \
             --gtest_break_on_failure \
             --gtest_print_time=1
           
+          echo "Run CAPIO syscall Unit tests"
           LD_PRELOAD=libcapio_posix.so \
-          build/tests/syscall/capio_syscall_tests \
+          capio_syscall_unit_tests \
             --gtest_break_on_failure \
             --gtest_print_time=1
       - name: "Show client logs on failure"
