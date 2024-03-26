@@ -52,6 +52,8 @@ std::vector<std::string> *files_available(const std::string &prefix, const std::
     START_LOG(gettid(), "call(prefix=%s, app_name=%s, path=%s, batch_size=%d)", prefix.c_str(),
               app_name.c_str(), path.c_str(), batch_size);
 
+    std::lock_guard<std::mutex> lg(nfiles_mutex);
+
     auto files_to_send                     = new std::vector<std::string>;
     std::unordered_set<std::string> &files = files_sent[app_name];
     auto capio_file_opt                    = get_capio_file_opt(path);
@@ -136,11 +138,11 @@ void wait_for_data(const std::filesystem::path &path, const std::string &dest, i
 
 void wait_for_files_batch(const std::filesystem::path &prefix, const std::string &dest, int tid,
                           int fd, off64_t count, bool is_getdents,
-                          const std::vector<std::string> *files, sem_t *n_files_ready) {
+                          const std::vector<std::string> *files, Semaphore *n_files_ready) {
     START_LOG(gettid(), "call(prefix=%s, dest=%s, tid=%d, fd=%d, count=%ld, is_getdents=%s)",
               prefix.c_str(), dest.c_str(), tid, fd, count, is_getdents ? "true" : "false");
 
-    SEM_WAIT_CHECK(n_files_ready, "n_files_ready");
+    n_files_ready->lock();
     send_files_batch(prefix, dest, tid, fd, count, is_getdents, files);
 
     delete n_files_ready;
@@ -158,11 +160,8 @@ inline void handle_remote_read_batch(const std::filesystem::path &path, const st
         is_getdents ? "true" : "false");
 
     // FIXME: this assignment always overrides the request parameter, which is never used
-    batch_size = find_batch_size(prefix, metadata_conf_globs);
-
-    SEM_WAIT_CHECK(&clients_remote_pending_nfiles_sem, "clients_remote_pending_nfiles_sem");
+    batch_size                      = find_batch_size(prefix, metadata_conf_globs);
     std::vector<std::string> *files = files_available(prefix, app_name, path, batch_size);
-    SEM_POST_CHECK(&clients_remote_pending_nfiles_sem, "clients_remote_pending_nfiles_sem");
 
     if (files->size() == batch_size) {
         send_files_batch(prefix, dest, tid, fd, count, is_getdents, files);
@@ -171,15 +170,11 @@ inline void handle_remote_read_batch(const std::filesystem::path &path, const st
          * create a thread that waits for the completion of such
          * files and then send those files
          */
-        auto sem = new sem_t;
-        if (sem_init(sem, 0, 0) == -1) {
-            ERR_EXIT("sem_init in remote_listener_nreads_req");
-        }
+        auto *sem = new Semaphore(0);
         std::thread t(wait_for_files_batch, prefix, dest, tid, fd, count, is_getdents, files, sem);
 
-        SEM_WAIT_CHECK(&clients_remote_pending_nfiles_sem, "clients_remote_pending_nfiles_sem");
+        std::lock_guard<std::mutex> lg(nfiles_mutex);
         clients_remote_pending_nfiles[app_name].emplace_back(prefix, batch_size, dest, files, sem);
-        SEM_POST_CHECK(&clients_remote_pending_nfiles_sem, "clients_remote_pending_nfiles_sem");
     }
 }
 

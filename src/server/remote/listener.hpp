@@ -55,13 +55,14 @@ inline Backend *select_backend(const std::string &backend_name, int argc, char *
     return new MPIBackend(argc, argv);
 }
 
-[[noreturn]] void capio_remote_listener(sem_t *internal_server_sem) {
+[[noreturn]] void capio_remote_listener(Semaphore &internal_server_sem) {
     static const std::array<CComsHandler_t, CAPIO_SERVER_NR_REQUEST> server_request_handlers =
         build_server_request_handlers_table();
 
     START_LOG(gettid(), "call()");
 
-    sem_wait(internal_server_sem);
+    internal_server_sem.lock();
+
     while (true) {
         auto request = backend->read_next_request();
 

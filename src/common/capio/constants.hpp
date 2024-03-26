@@ -16,10 +16,6 @@ constexpr int CAPIO_THEORETICAL_SIZE_DIRENT64     = sizeof(ino64_t) + sizeof(off
                                                 sizeof(unsigned short) + sizeof(unsigned char) +
                                                 sizeof(char) * NAME_MAX;
 
-// CAPIO semaphore constants
-constexpr int CAPIO_SEM_MAX_RETRIES          = 100;
-constexpr long int CAPIO_SEM_TIMEOUT_NANOSEC = 10e5;
-
 // CAPIO default values for shared memory
 constexpr char CAPIO_DEFAULT_WORKFLOW_NAME[] = "CAPIO";
 constexpr char CAPIO_SHM_CANARY_ERROR[] =
@@ -64,6 +60,19 @@ constexpr int CAPIO_POSIX_SYSCALL_SUCCESS      = 0;
 // CAPIO logger - common
 constexpr char CAPIO_LOG_PRE_MSG[]        = "at[%s]: ";
 constexpr char CAPIO_DEFAULT_LOG_FOLDER[] = "capio_logs\0";
+
+// CAPIO common - shared memory constant names
+constexpr char SHM_FIRST_ELEM[]        = "_first_elem_";
+constexpr char SHM_LAST_ELEM[]         = "_last_elem_";
+constexpr char SHM_MUTEX_PREFIX[]      = "_mutex_";
+constexpr char SHM_SEM_ELEMS[]         = "_sem_num_elems_";
+constexpr char SHM_SEM_EMPTY[]         = "_sem_num_empty_";
+constexpr char SHM_SPSC_PREFIX_WRITE[] = "capio_write_tid_";
+constexpr char SHM_SPSC_PREFIX_READ[]  = "capio_read_tid_";
+
+// CAPIO common - shared channel by client and server
+constexpr char SHM_COMM_CHAN_NAME_REQ[]  = "request_buffer";
+constexpr char SHM_COMM_CHAN_NAME_RESP[] = "response_buffer_";
 
 // CAPIO logger - shm errors
 constexpr char CAPIO_SHM_OPEN_ERROR[] =
@@ -130,6 +139,29 @@ constexpr char CAPIO_SERVER_ARG_PARSER_CONFIG_OPT_HELP[] =
     "JSON Configuration file for capio_server";
 constexpr char CAPIO_SERVER_ARG_PARSER_CONFIG_NO_CONF_FILE_HELP[] =
     "If specified, server application will start without a config file, using default settings.";
+constexpr char CAPIO_SERVER_ARG_PARSER_CONFIG_NCONTINUE_ON_ERROR_HELP[] =
+    "If specified, Capio will try to continue its execution to continue even if it has reached a "
+    "fatal termination point. This flag should be used only to debug capio. If this flag is "
+    "specified,  and a fatal termination point is reached, the behaviour of capio is undefined and "
+    "should not  be taken as valid";
+
+constexpr char CAPIO_LOG_SERVER_CLI_CONT_ON_ERR_WARNING[] =
+    "[ \033[1;33m SERVER \033[0m ]\033[1;31m "
+    "|==================================================================|\033[0m\n"
+    "[ \033[1;33m SERVER \033[0m ]\033[1;31m |           you are running CAPIO with "
+    "--continue-on-error         |\033[0m\n"
+    "[ \033[1;33m SERVER \033[0m ]\033[1;31m |       This is extremely dangerous as CAPIO server "
+    "will continue  |\033[0m\n"
+    "[ \033[1;33m SERVER \033[0m ]\033[1;31m |              its execution even if it should "
+    "terminate.          |\033[0m\n"
+    "[ \033[1;33m SERVER \033[0m ]\033[1;31m |                                                     "
+    "             |\033[0m\n"
+    "[ \033[1;33m SERVER \033[0m ]\033[1;31m |                     USE IT AT YOUR OWN RISK         "
+    "             |\033[0m\n"
+    "[ \033[1;33m SERVER \033[0m ]\033[1;31m |                                                     "
+    "             |\033[0m\n"
+    "[ \033[1;33m SERVER \033[0m ]\033[1;31m "
+    "|==================================================================|\033[0m\n";
 
 constexpr char CAPIO_SERVER_ARG_PARSER_CONFIG_BACKEND_HELP[] =
     "Backend used in CAPIO. The value [backend] can be one of the following implemented backends: "
