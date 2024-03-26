@@ -72,14 +72,17 @@ void write_entry_dir(int tid, const std::filesystem::path &file_path,
     }
 }
 
+void update_dir(int tid, const std::filesystem::path &file_path);
+off64_t create_dir(int tid, const std::filesystem::path &path);
+
 void update_dir(int tid, const std::filesystem::path &file_path) {
     START_LOG(gettid(), "call(file_path=%s)", file_path.c_str());
     const std::filesystem::path dir = get_parent_dir_path(file_path);
-    CapioFile &c_file               = get_capio_file(dir.c_str());
-    if (c_file.first_write) {
-        c_file.first_write = false;
-        write_file_location(dir);
+
+    if (!get_capio_file_opt(dir.c_str())) {
+        create_dir(tid, dir);
     }
+
     write_entry_dir(tid, file_path, dir, 0);
 }
 
