@@ -15,7 +15,7 @@ merge:mapreduce.h
 
 clean:
 	\rm -rf build
-	\rm -rf capio_logs file_location.txt server.log
+	\rm -rf capio_logs files_location.txt server.log
 cleanall:clean
 	\rm -f *~ infile_?????.dat outfile_?????.dat result.dat
 

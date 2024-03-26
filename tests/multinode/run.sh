@@ -1,6 +1,6 @@
 #!/bin/bash
 
-#run with CAPIO_DIR=blablah CAPIO_BUILD=blahblahblah ./run.sh 23 23 1
+#run with CAPIO_DIR=<> CAPIO_BUILD=<> ./run.sh <thread_count>
 
 rm -rf capio_logs server.log files_location.txt 
 rm -rf /dev/shm/*
@@ -8,10 +8,10 @@ rm -rf $CAPIO_DIR
 mkdir -p $CAPIO_DIR
 datadir="$CAPIO_DIR/data"
 resultdir="$CAPIO_DIR/result"
-lines=100 #number of lines per file
+lines=$1 #number of lines per file
 mapreducers=$1
-files=$(($lines / $1))   # number of per mapper/reducer files
-percent=$2
+files=1   # number of per mapper/reducer files
+percent=0.5
 CAPIO_LD=$CAPIO_BUILD/src/posix/libcapio_posix.so
 export CAPIO_LOG_LEVEL=-1
 
@@ -47,8 +47,8 @@ fi
 
 totalmapfiles=$(($mapreducers * $files))
 
-echo "executing: ./split $lines $totalmapfiles $datadir"
-LD_PRELOAD=$CAPIO_LD ./split $lines $totalmapfiles $datadir
+echo "executing: ./build/split $lines $totalmapfiles $datadir"
+LD_PRELOAD=$CAPIO_LD ./build/split $lines $totalmapfiles $datadir
 if [ $? -ne 0 ]; then
     echo "split failed exit code $?"
     kill -9 $SERVER_PID
@@ -57,8 +57,8 @@ fi
 next=0
 MAPREDUCE_PIDS=""
 for((i=0;i<$mapreducers;++i)); do
-    echo "executing: ./mapreduce $datadir $next $files $datadir $next $files $percent &"
-    LD_PRELOAD=$CAPIO_LD ./mapreduce $datadir $next $files $datadir $next $files $percent &
+    echo "executing: ./build/mapreduce $datadir $next $files $resultdir $next $files $percent &"
+    LD_PRELOAD=$CAPIO_LD ./build/mapreduce $datadir $next $files $resultdir $next $files $percent &
     next=$(($next+$files))
     MAPREDUCE_PIDS="$MAPREDUCE_PIDS $!"
 done
@@ -72,8 +72,8 @@ for job in $MAPREDUCE_PIDS; do
     fi
 done
 
-echo "executing: ./merge $totalmapfiles $datadir $resultdir"
-LD_PRELOAD=$CAPIO_LD ./merge 1 $datadir $resultdir
+echo "executing: ./build/merge $totalmapfiles $resultdir $resultdir"
+LD_PRELOAD=$CAPIO_LD ./build/merge 2 $resultdir $resultdir
 if [ $? -ne 0 ]; then
     echo "merge failed exit code $?"
     kill -9 $SERVER_PID

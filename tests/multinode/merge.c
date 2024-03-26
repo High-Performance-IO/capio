@@ -48,7 +48,6 @@ int main(int argc, char *argv[]) {
   char filepath[strlen(sourcedir)+maxfilename];
   for(int i=0;i<nfiles;++i) {
     sprintf(filepath, fmtout, sourcedir, i); 
-    printf("%s\n",filepath);
     FILE *fp = fopen(filepath, "r");
     if (!fp) {
       perror("fopen");
