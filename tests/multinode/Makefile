@@ -4,7 +4,8 @@ CFLAGS=-Wall -I ./ -O3
 TARGET= split mapreduce merge
 
 %:%.c
-	$(CC) $(CFLAGS) $< -o $@
+	\mkdir -p build
+	$(CC) $(CFLAGS) $< -o build/$@
 
 all: $(TARGET)
 
@@ -13,7 +14,7 @@ mapreduce:mapreduce.h
 merge:mapreduce.h
 
 clean:
-	\rm -f $(TARGET)
+	\rm -rf build
 	\rm -rf capio_logs file_location.txt server.log
 cleanall:clean
 	\rm -f *~ infile_?????.dat outfile_?????.dat result.dat
