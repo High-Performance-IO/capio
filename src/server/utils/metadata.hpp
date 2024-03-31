@@ -25,7 +25,8 @@ long match_globs(const std::filesystem::path &path) {
     for (std::size_t i = 0; i < metadata_conf_globs.size(); i++) {
         std::string prefix_str = std::get<0>(metadata_conf_globs[i]);
         size_t prefix_length   = prefix_str.length();
-        bool path_matches = static_cast<bool>(path.native().compare(0, prefix_length, prefix_str));
+        bool path_matches =
+            static_cast<bool>(path.native().compare(0, prefix_length, prefix_str) == 0);
         LOG("path=%s, prefix_str=%s, path_matches=%s", path.c_str(), prefix_str.c_str(),
             path_matches ? "True" : "False");
         if (path_matches && prefix_length > max_length_prefix) {
