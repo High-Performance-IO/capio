@@ -1,6 +1,8 @@
 #ifndef CAPIO_POSIX_HANDLERS_FCNTL_HPP
 #define CAPIO_POSIX_HANDLERS_FCNTL_HPP
 
+#if defined(SYS_fcntl)
+
 #include "utils/requests.hpp"
 
 int fcntl_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg5, long *result) {
@@ -60,4 +62,5 @@ int fcntl_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long ar
     return CAPIO_POSIX_SYSCALL_SKIP;
 }
 
+#endif // SYS_fcntl
 #endif // CAPIO_POSIX_HANDLERS_FCNTL_HPP

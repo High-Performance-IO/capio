@@ -1,6 +1,8 @@
 #ifndef CAPIO_POSIX_HANDLERS_LSEEK_HPP
 #define CAPIO_POSIX_HANDLERS_LSEEK_HPP
 
+#if defined(SYS_lseek)
+
 #include "utils/common.hpp"
 
 // TODO: EOVERFLOW is not addressed
@@ -59,4 +61,5 @@ int lseek_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long ar
     return posix_return_value(capio_lseek(fd, offset, whence, tid), result);
 }
 
+#endif // SYS_lseek
 #endif // CAPIO_POSIX_HANDLERS_LSEEK_HPP

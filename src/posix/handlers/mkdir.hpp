@@ -1,6 +1,8 @@
 #ifndef CAPIO_POSIX_HANDLERS_MKDIR_HPP
 #define CAPIO_POSIX_HANDLERS_MKDIR_HPP
 
+#if defined(SYS_mkdir) || defined(SYS_mkdirat) || defined(SYS_rmdir)
+
 #include "utils/common.hpp"
 #include "utils/filesystem.hpp"
 
@@ -112,4 +114,5 @@ int rmdir_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long ar
     return posix_return_value(capio_rmdir(pathname, tid), result);
 }
 
+#endif // SYS_mkdir || SYS_mkdirat || SYS_rmdir
 #endif // CAPIO_POSIX_HANDLERS_MKDIR_HPP

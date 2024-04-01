@@ -1,6 +1,8 @@
 #ifndef CAPIO_POSIX_HANDLERS_READ_HPP
 #define CAPIO_POSIX_HANDLERS_READ_HPP
 
+#if defined(SYS_read) || defined(SYS_readv)
+
 #include "utils/data.hpp"
 
 inline ssize_t capio_read(int fd, const void *buffer, off64_t count, long tid) {
@@ -68,4 +70,5 @@ int readv_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long ar
     return posix_return_value(capio_readv(fd, iov, iovcnt, tid), result);
 }
 
+#endif // SYS_read || SYS_readv
 #endif // CAPIO_POSIX_HANDLERS_READ_HPP

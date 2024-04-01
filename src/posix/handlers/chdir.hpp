@@ -1,6 +1,8 @@
 #ifndef CAPIO_POSIX_HANDLERS_CHDIR_HPP
 #define CAPIO_POSIX_HANDLERS_CHDIR_HPP
 
+#if defined(SYS_chdir)
+
 #include "utils/filesystem.hpp"
 
 /*
@@ -39,4 +41,5 @@ int chdir_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long ar
     return CAPIO_POSIX_SYSCALL_SKIP;
 }
 
+#endif // SYS_chdir
 #endif // CAPIO_POSIX_HANDLERS_CHDIR_HPP

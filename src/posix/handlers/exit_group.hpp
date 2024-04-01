@@ -1,6 +1,8 @@
 #ifndef CAPIO_POSIX_HANDLERS_EXIT_GROUP_HPP
 #define CAPIO_POSIX_HANDLERS_EXIT_GROUP_HPP
 
+#if defined(SYS_exit) || defined(SYS_exit_group)
+
 #include "capio/logger.hpp"
 
 #include "utils/requests.hpp"
@@ -25,4 +27,5 @@ int exit_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg
     return CAPIO_POSIX_SYSCALL_SKIP;
 }
 
+#endif // SYS_exit || SYS_exit_group
 #endif // CAPIO_POSIX_HANDLERS_EXIT_GROUP_HPP

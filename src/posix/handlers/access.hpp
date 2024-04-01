@@ -1,6 +1,8 @@
 #ifndef CAPIO_POSIX_HANDLERS_ACCESS_HPP
 #define CAPIO_POSIX_HANDLERS_ACCESS_HPP
 
+#if defined(SYS_access) || defined(SYS_faccessat) || defined(SYS_faccessat2)
+
 #include "utils/common.hpp"
 #include "utils/filesystem.hpp"
 
@@ -62,4 +64,5 @@ int faccessat_handler(long arg0, long arg1, long arg2, long arg3, long arg4, lon
     return posix_return_value(capio_faccessat(dirfd, pathname, mode, flags, tid), result);
 }
 
+#endif // SYS_access || SYS_faccessat || SYS_faccessat2
 #endif // CAPIO_POSIX_HANDLERS_ACCESS_HPP

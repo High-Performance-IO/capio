@@ -56,7 +56,7 @@ ENDIF (MPI_LINK_FLAGS)
 #####################################
 # Link libraries
 #####################################
-target_link_libraries(${TARGET_NAME} PRIVATE ${MPI_LIBRARIES} rt stdc++fs)
+target_link_libraries(${TARGET_NAME} PRIVATE ${MPI_LIBRARIES} pthread rt stdc++fs)
 
 #####################################
 # Install rules

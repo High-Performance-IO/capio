@@ -1,6 +1,8 @@
 #ifndef CAPIO_POSIX_HANDLERS_RENAME_HPP
 #define CAPIO_POSIX_HANDLERS_RENAME_HPP
 
+#if defined(SYS_rename)
+
 #include "utils/filesystem.hpp"
 
 int rename_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg5, long *result) {
@@ -34,4 +36,5 @@ int rename_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long a
     }
 }
 
+#endif // SYS_rename
 #endif // CAPIO_POSIX_HANDLERS_RENAME_HPP
