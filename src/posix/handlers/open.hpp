@@ -1,7 +1,7 @@
 #ifndef CAPIO_POSIX_HANDLERS_OPENAT_HPP
 #define CAPIO_POSIX_HANDLERS_OPENAT_HPP
 
-#include "lseek.hpp"
+#if defined(SYS_creat) || defined(SYS_open) || defined(SYS_openat)
 
 #include "utils/common.hpp"
 #include "utils/filesystem.hpp"
@@ -71,7 +71,7 @@ inline int capio_openat(int dirfd, const std::string_view &pathname, int flags, 
         add_capio_fd(tid, path, fd, 0, CAPIO_DEFAULT_FILE_INITIAL_SIZE, actual_flags,
                      (flags & O_CLOEXEC) == O_CLOEXEC);
         if ((flags & O_APPEND) == O_APPEND) {
-            capio_lseek(fd, 0, SEEK_END, tid);
+            lseek(fd, 0, SEEK_END);
         }
         return fd;
     } else {
@@ -87,6 +87,14 @@ int creat_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long ar
                               result);
 }
 
+int open_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg5, long *result) {
+    const std::string_view pathname(reinterpret_cast<const char *>(arg0));
+    int flags = static_cast<int>(arg1);
+    long tid  = syscall_no_intercept(SYS_gettid);
+
+    return posix_return_value(capio_openat(AT_FDCWD, pathname, flags, tid), result);
+}
+
 int openat_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg5, long *result) {
     int dirfd = static_cast<int>(arg0);
     const std::string_view pathname(reinterpret_cast<const char *>(arg1));
@@ -96,12 +104,5 @@ int openat_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long a
     return posix_return_value(capio_openat(dirfd, pathname, flags, tid), result);
 }
 
-int open_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg5, long *result) {
-    const std::string_view pathname(reinterpret_cast<const char *>(arg0));
-    int flags = static_cast<int>(arg1);
-    long tid  = syscall_no_intercept(SYS_gettid);
-
-    return posix_return_value(capio_openat(AT_FDCWD, pathname, flags, tid), result);
-}
-
+#endif // SYS_creat || SYS_open || SYS_openat
 #endif // CAPIO_POSIX_HANDLERS_OPENAT_HPP

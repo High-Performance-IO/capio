@@ -1,6 +1,8 @@
 #ifndef CAPIO_POSIX_HANDLERS_FGETXATTR_HPP
 #define CAPIO_POSIX_HANDLERS_FGETXATTR_HPP
 
+#if defined(SYS_fgetxattr)
+
 int fgetxattr_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg5,
                       long *result) {
     std::string name(reinterpret_cast<const char *>(arg1));
@@ -22,4 +24,5 @@ int fgetxattr_handler(long arg0, long arg1, long arg2, long arg3, long arg4, lon
     return CAPIO_POSIX_SYSCALL_SKIP;
 }
 
+#endif // SYS_fgetxattr
 #endif // CAPIO_POSIX_HANDLERS_FGETXATTR_HPP

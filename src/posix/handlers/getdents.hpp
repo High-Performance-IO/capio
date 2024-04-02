@@ -1,6 +1,8 @@
 #ifndef CAPIO_POSIX_HANDLERS_GETDENTS_HPP
 #define CAPIO_POSIX_HANDLERS_GETDENTS_HPP
 
+#if defined(SYS_getdents) || defined(SYS_getdents64)
+
 #include "utils/common.hpp"
 #include "utils/data.hpp"
 
@@ -51,4 +53,5 @@ inline int getdents64_handler(long arg0, long arg1, long arg2, long arg3, long a
     return getdents_handler_impl(arg0, arg1, arg2, result, true);
 }
 
+#endif // SYS_getdents || SYS_getdents64
 #endif // CAPIO_POSIX_HANDLERS_GETDENTS_HPP

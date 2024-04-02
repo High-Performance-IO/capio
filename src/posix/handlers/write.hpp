@@ -1,6 +1,8 @@
 #ifndef CAPIO_POSIX_HANDLERS_WRITE_HPP
 #define CAPIO_POSIX_HANDLERS_WRITE_HPP
 
+#if defined(SYS_write) || defined(SYS_writev)
+
 #include "utils/common.hpp"
 #include "utils/requests.hpp"
 
@@ -68,4 +70,5 @@ int writev_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long a
     return posix_return_value(capio_writev(fd, iov, iovcnt, tid), result);
 }
 
+#endif // SYS_write || SYS_writev
 #endif // CAPIO_POSIX_HANDLERS_WRITE_HPP

@@ -1,6 +1,8 @@
 #ifndef CAPIO_POSIX_HANDLERS_UNLINK_HPP
 #define CAPIO_POSIX_HANDLERS_UNLINK_HPP
 
+#if defined(SYS_unlink) || defined(SYS_unlinkat)
+
 #include "utils/common.hpp"
 
 off64_t capio_unlink_abs(const std::filesystem::path &abs_path, long tid, bool is_dir) {
@@ -77,4 +79,5 @@ int unlinkat_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long
     return posix_return_value(capio_unlinkat(dirfd, pathname, flags, tid), result);
 }
 
+#endif // SYS_unlink || SYS_unlinkat
 #endif // CAPIO_POSIX_HANDLERS_UNLINK_HPP

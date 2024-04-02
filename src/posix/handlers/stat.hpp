@@ -1,6 +1,8 @@
 #ifndef CAPIO_POSIX_HANDLERS_STAT_HPP
 #define CAPIO_POSIX_HANDLERS_STAT_HPP
 
+#if defined(SYS_fstat) || defined(SYS_lstat) || defined(SYS_newfstatat) || defined(SYS_stat)
+
 #include <sys/vfs.h>
 
 #include "capio/env.hpp"
@@ -168,4 +170,5 @@ int stat_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg
     return posix_return_value(capio_lstat_wrapper(pathname, buf, tid), result);
 }
 
+#endif // SYS_fstat || SYS_lstat || SYS_newfstatat || SYS_stat
 #endif // CAPIO_POSIX_HANDLERS_STAT_HPP

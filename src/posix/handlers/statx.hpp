@@ -1,6 +1,8 @@
 #ifndef CAPIO_POSIX_HANDLERS_STATX_HPP
 #define CAPIO_POSIX_HANDLERS_STATX_HPP
 
+#if defined(SYS_statx)
+
 #include "utils/common.hpp"
 
 inline void fill_statxbuf(struct statx *statxbuf, off_t file_size, bool is_dir, ino_t inode,
@@ -106,4 +108,5 @@ int statx_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long ar
     return posix_return_value(capio_statx(dirfd, pathname, flags, mask, buf, tid), result);
 }
 
+#endif // SYS_statx
 #endif // CAPIO_POSIX_HANDLERS_STATX_HPP

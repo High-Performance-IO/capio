@@ -1,6 +1,8 @@
 #ifndef CAPIO_POSIX_HANDLERS_CLOSE_HPP
 #define CAPIO_POSIX_HANDLERS_CLOSE_HPP
 
+#if defined(SYS_close)
+
 #include "utils/requests.hpp"
 
 int close_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg5, long *result) {
@@ -16,4 +18,5 @@ int close_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long ar
     return CAPIO_POSIX_SYSCALL_SKIP;
 }
 
+#endif // SYS_close
 #endif // CAPIO_POSIX_HANDLERS_CLOSE_HPP

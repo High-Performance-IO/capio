@@ -7,8 +7,6 @@
 #include <array>
 #include <string>
 
-#include <asm-generic/unistd.h>
-
 #include "capio/syscall.hpp"
 
 #include "utils/clone.hpp"
@@ -36,10 +34,142 @@ static int not_implemented_handler(long arg0, long arg1, long arg2, long arg3, l
     return 0;
 }
 
-static constexpr std::array<CPHandler_t, __NR_syscalls> build_syscall_table() {
-    std::array<CPHandler_t, __NR_syscalls> _syscallTable{0};
+static constexpr size_t CAPIO_NR_SYSCALLS = 1 + std::max({
+#ifdef SYS_access
+                                                    SYS_access,
+#endif
+#ifdef SYS_chdir
+                                                    SYS_chdir,
+#endif
+#ifdef SYS_chmod
+                                                    SYS_chmod,
+#endif
+#ifdef SYS_chown
+                                                    SYS_chown,
+#endif
+#ifdef SYS_close
+                                                    SYS_close,
+#endif
+#ifdef SYS_creat
+                                                    SYS_creat,
+#endif
+#ifdef SYS_dup
+                                                    SYS_dup,
+#endif
+#ifdef SYS_dup2
+                                                    SYS_dup2,
+#endif
+#ifdef SYS_dup3
+                                                    SYS_dup3,
+#endif
+#ifdef SYS_execve
+                                                    SYS_execve,
+#endif
+#ifdef SYS_exit
+                                                    SYS_exit,
+#endif
+#ifdef SYS_exit_group
+                                                    SYS_exit_group,
+#endif
+#ifdef SYS_faccessat
+                                                    SYS_faccessat,
+#endif
+#ifdef SYS_faccessat2
+                                                    SYS_faccessat2,
+#endif
+#ifdef SYS_fcntl
+                                                    SYS_fcntl,
+#endif
+#ifdef SYS_fgetxattr
+                                                    SYS_fgetxattr,
+#endif
+#ifdef SYS_flistxattr
+                                                    SYS_flistxattr,
+#endif
+#ifdef SYS_fork
+                                                    SYS_fork,
+#endif
+#ifdef SYS_fstat
+                                                    SYS_fstat,
+#endif
+#ifdef SYS_fstatfs
+                                                    SYS_fstatfs,
+#endif
+#ifdef SYS_getcwd
+                                                    SYS_getcwd,
+#endif
+#ifdef SYS_getdents
+                                                    SYS_getdents,
+#endif
+#ifdef SYS_getdents64
+                                                    SYS_getdents64,
+#endif
+#ifdef SYS_getxattr
+                                                    SYS_getxattr,
+#endif
+#ifdef SYS_ioctl
+                                                    SYS_ioctl,
+#endif
+#ifdef SYS_lgetxattr
+                                                    SYS_lgetxattr,
+#endif
+#ifdef SYS_lseek
+                                                    SYS_lseek,
+#endif
+#ifdef SYS_lstat
+                                                    SYS_lstat,
+#endif
+#ifdef SYS_mkdir
+                                                    SYS_mkdir,
+#endif
+#ifdef SYS_mkdirat
+                                                    SYS_mkdirat,
+#endif
+#ifdef SYS_newfstatat
+                                                    SYS_newfstatat,
+#endif
+#ifdef SYS_open
+                                                    SYS_open,
+#endif
+#ifdef SYS_openat
+                                                    SYS_openat,
+#endif
+#ifdef SYS_read
+                                                    SYS_read,
+#endif
+#ifdef SYS_readv
+                                                    SYS_readv,
+#endif
+#ifdef SYS_rename
+                                                    SYS_rename,
+#endif
+#ifdef SYS_rmdir
+                                                    SYS_rmdir,
+#endif
+#ifdef SYS_stat
+                                                    SYS_stat,
+#endif
+#ifdef SYS_statx
+                                                    SYS_statx,
+#endif
+#ifdef SYS_unlink
+                                                    SYS_unlink,
+#endif
+#ifdef SYS_unlinkat
+                                                    SYS_unlinkat,
+#endif
+#ifdef SYS_write
+                                                    SYS_write,
+#endif
+#ifdef SYS_writev
+                                                    SYS_writev,
+#endif
+                                                });
 
-    for (int i = 0; i < __NR_syscalls; i++) {
+static constexpr std::array<CPHandler_t, CAPIO_NR_SYSCALLS> build_syscall_table() {
+    std::array<CPHandler_t, CAPIO_NR_SYSCALLS> _syscallTable{0};
+
+    for (int i = 0; i < CAPIO_NR_SYSCALLS; i++) {
         _syscallTable[i] = not_handled_handler;
     }
 
@@ -151,6 +281,9 @@ static constexpr std::array<CPHandler_t, __NR_syscalls> build_syscall_table() {
 #ifdef SYS_rename
     _syscallTable[SYS_rename] = rename_handler;
 #endif
+#ifdef SYS_rmdir
+    _syscallTable[SYS_rmdir] = rmdir_handler;
+#endif
 #ifdef SYS_stat
     _syscallTable[SYS_stat] = stat_handler;
 #endif
@@ -169,17 +302,15 @@ static constexpr std::array<CPHandler_t, __NR_syscalls> build_syscall_table() {
 #ifdef SYS_writev
     _syscallTable[SYS_writev] = writev_handler;
 #endif
-#ifdef SYS_rmdir
-    _syscallTable[SYS_rmdir] = rmdir_handler;
-#endif
 
     return _syscallTable;
 }
 
 static int hook(long syscall_number, long arg0, long arg1, long arg2, long arg3, long arg4,
                 long arg5, long *result) {
-    static const std::array<CPHandler_t, __NR_syscalls> syscallTable = build_syscall_table();
-    static const char *capio_dir                                     = std::getenv("CAPIO_DIR");
+    static constexpr std::array<CPHandler_t, CAPIO_NR_SYSCALLS> syscallTable =
+        build_syscall_table();
+    static const char *capio_dir = std::getenv("CAPIO_DIR");
 
 #ifdef SYS_futex
     /**
@@ -204,7 +335,13 @@ static int hook(long syscall_number, long arg0, long arg1, long arg2, long arg3,
 
     START_LOG(syscall_no_intercept(SYS_gettid), "call(syscall_number=%ld)", syscall_number);
 
-    // NB: if capio dir is not set as environment variable,
+    // If the syscall_number is higher than the maximum
+    // syscall captured by CAPIO, simply return
+    if (syscall_number >= CAPIO_NR_SYSCALLS) {
+        return 1;
+    }
+
+    // If CAPIO_DIR is not set as environment variable,
     // then capio will not intercept the system calls
     if (capio_dir == nullptr) {
         LOG("CAPIO_DIR env var not set. returning control to kernel");
