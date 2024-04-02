@@ -37,218 +37,132 @@ static int not_implemented_handler(long arg0, long arg1, long arg2, long arg3, l
 static constexpr size_t CAPIO_NR_SYSCALLS = 1 + std::max({
 #ifdef SYS_access
                                                     SYS_access,
-#else
-                                                    0,
 #endif
 #ifdef SYS_chdir
                                                     SYS_chdir,
-#else
-                                                    0,
 #endif
 #ifdef SYS_chmod
                                                     SYS_chmod,
-#else
-                                                    0,
 #endif
 #ifdef SYS_chown
                                                     SYS_chown,
-#else
-                                                    0,
 #endif
 #ifdef SYS_close
                                                     SYS_close,
-#else
-                                                    0,
 #endif
 #ifdef SYS_creat
                                                     SYS_creat,
-#else
-                                                    0,
 #endif
 #ifdef SYS_dup
                                                     SYS_dup,
-#else
-                                                    0,
 #endif
 #ifdef SYS_dup2
                                                     SYS_dup2,
-#else
-                                                    0,
 #endif
 #ifdef SYS_dup3
                                                     SYS_dup3,
-#else
-                                                    0,
 #endif
 #ifdef SYS_execve
                                                     SYS_execve,
-#else
-                                                    0,
 #endif
 #ifdef SYS_exit
                                                     SYS_exit,
-#else
-                                                    0,
 #endif
 #ifdef SYS_exit_group
                                                     SYS_exit_group,
-#else
-                                                    0,
 #endif
 #ifdef SYS_faccessat
                                                     SYS_faccessat,
-#else
-                                                    0,
 #endif
 #ifdef SYS_faccessat2
                                                     SYS_faccessat2,
-#else
-                                                    0,
 #endif
 #ifdef SYS_fcntl
                                                     SYS_fcntl,
-#else
-                                                    0,
 #endif
 #ifdef SYS_fgetxattr
                                                     SYS_fgetxattr,
-#else
-                                                    0,
 #endif
 #ifdef SYS_flistxattr
                                                     SYS_flistxattr,
-#else
-                                                    0,
 #endif
 #ifdef SYS_fork
                                                     SYS_fork,
-#else
-                                                    0,
 #endif
 #ifdef SYS_fstat
                                                     SYS_fstat,
-#else
-                                                    0,
 #endif
 #ifdef SYS_fstatfs
                                                     SYS_fstatfs,
-#else
-                                                    0,
 #endif
 #ifdef SYS_getcwd
                                                     SYS_getcwd,
-#else
-                                                    0,
 #endif
 #ifdef SYS_getdents
                                                     SYS_getdents,
-#else
-                                                    0,
 #endif
 #ifdef SYS_getdents64
                                                     SYS_getdents64,
-#else
-                                                    0,
 #endif
 #ifdef SYS_getxattr
                                                     SYS_getxattr,
-#else
-                                                    0,
 #endif
 #ifdef SYS_ioctl
                                                     SYS_ioctl,
-#else
-                                                    0,
 #endif
 #ifdef SYS_lgetxattr
                                                     SYS_lgetxattr,
-#else
-                                                    0,
 #endif
 #ifdef SYS_lseek
                                                     SYS_lseek,
-#else
-                                                    0,
 #endif
 #ifdef SYS_lstat
                                                     SYS_lstat,
-#else
-                                                    0,
 #endif
 #ifdef SYS_mkdir
                                                     SYS_mkdir,
-#else
-                                                    0,
 #endif
 #ifdef SYS_mkdirat
                                                     SYS_mkdirat,
-#else
-                                                    0,
 #endif
 #ifdef SYS_newfstatat
                                                     SYS_newfstatat,
-#else
-                                                    0,
 #endif
 #ifdef SYS_open
                                                     SYS_open,
-#else
-                                                    0,
 #endif
 #ifdef SYS_openat
                                                     SYS_openat,
-#else
-                                                    0,
 #endif
 #ifdef SYS_read
                                                     SYS_read,
-#else
-                                                    0,
 #endif
 #ifdef SYS_readv
                                                     SYS_readv,
-#else
-                                                    0,
 #endif
 #ifdef SYS_rename
                                                     SYS_rename,
-#else
-                                                    0,
 #endif
 #ifdef SYS_rmdir
                                                     SYS_rmdir,
-#else
-                                                    0,
 #endif
 #ifdef SYS_stat
                                                     SYS_stat,
-#else
-                                                    0,
 #endif
 #ifdef SYS_statx
                                                     SYS_statx,
-#else
-                                                    0,
 #endif
 #ifdef SYS_unlink
                                                     SYS_unlink,
-#else
-                                                    0,
 #endif
 #ifdef SYS_unlinkat
                                                     SYS_unlinkat,
-#else
-                                                    0,
 #endif
 #ifdef SYS_write
                                                     SYS_write,
-#else
-                                                    0,
 #endif
 #ifdef SYS_writev
                                                     SYS_writev,
-#else
-                                                    0,
 #endif
                                                 });
 
