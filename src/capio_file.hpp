@@ -3,10 +3,11 @@
 
 #include <iostream>
 #include <set>
+#include <utility>
 #include <vector>
 #include <algorithm>
 #include <cstddef>
-#include <string.h>
+#include <cstring>
 #include <fcntl.h>
 #include <sys/mman.h>
 #include <sys/types.h>
@@ -18,8 +19,8 @@
  * Only the server have all the information
  * A process that only read from a file doesn't have the info on the sectors
  * A process that writes only have info on the sector that he wrote
- * the file size is in shm because all the processes need this info
- * and it's easy to provide it to them using the shm
+ * the file size is in shm because all the processes need this info, and
+ * it's easy to provide it to them using the shm
  */
 
 struct compare {
@@ -35,10 +36,10 @@ class Capio_file {
 		// _fd is useful only when the file is memory-mapped
 		int _fd = -1; 
 		bool _home_node = false;
-		std::string _committed = "";
-		std::string _mode = "";
+		std::string _committed;
+		std::string _mode;
 		char* _buf = nullptr; //buffer containing the data
-		// sectors stored in memory of the files (only the home node is forced to be up to date)
+		// sectors stored in memory of the files (only the home node is forced to be up-to-date)
 		std::set<std::pair<off64_t, off64_t>, compare> sectors;
 		//vector of (tid, fd)
 		std::vector<std::pair<int, int>>* threads_fd = nullptr;
@@ -54,9 +55,9 @@ class Capio_file {
 		long int _n_close_expected = -1;
 		std::size_t _buf_size;
 		/* 
-		 * file size in the home node. In a given moment could not be up to date.
+		 * file size in the home node. In a given moment could not be up-to-date.
 		 * This member is useful because a node different from the home node
-		 * could need to known the size of the file but not its content
+		 * could need to know the size of the file but not its content
 		 */
 		std::size_t real_file_size = 0;
 
@@ -70,8 +71,8 @@ class Capio_file {
 
 		Capio_file(std::string committed, std::string mode,
 				bool directory, long int n_files_expected, bool permanent, std::size_t init_size, std::ostream& logstream, long int n_close_expected) : logfile(logstream) {
-			_committed = committed;
-			_mode = mode;
+			_committed = std::move(committed);
+			_mode = std::move(mode);
 			_directory = directory;
 			_permanent = permanent;
 			this->n_files_expected = (n_files_expected == -1) ? -1 : n_files_expected + 2; // +2 for . and ..
@@ -111,7 +112,7 @@ class Capio_file {
 			return _mode;
 		}
 
-		bool is_dir() {
+		[[nodiscard]] bool is_dir() const {
 			return _directory;
 		}
 
@@ -120,18 +121,18 @@ class Capio_file {
 		}
 
 		off64_t get_file_size() {
-			if (sectors.size() != 0)
-				return sectors.rbegin()->second;	
-			else
+			if (sectors.empty())
 				return 0;
+			else
+                return sectors.rbegin()->second;
 		}
 
 		/*
 		 * To be called when a process
-		 * execute a read or a write syscall
+		 * execute a "read" or a "write" syscall
 		 */
 
-		void create_buffer(std::string path, bool home_node) {
+		void create_buffer(const std::string& path, bool home_node) {
 			#ifdef CAPIOLOG
 			logfile << "creating buf for file " << path << " home node " << home_node << " permanent " << _permanent << " dir " <<  _directory << std::endl;
 			#endif
@@ -197,7 +198,7 @@ class Capio_file {
 				delete [] _buf;
 		}
 
-		std::size_t get_buf_size() {
+		[[nodiscard]] std::size_t get_buf_size() const {
 			return _buf_size;
 		}
 
@@ -231,7 +232,7 @@ class Capio_file {
 		void insert_sector(off64_t new_start, off64_t new_end) {
 			auto p = std::make_pair(new_start, new_end);
 
-			if (sectors.size() == 0) {
+			if (sectors.empty()) {
 				sectors.insert(p);
 				return;
 			}
@@ -291,7 +292,7 @@ class Capio_file {
 		
 		/*
 		 * Returns the offset to the end of the sector 
-		 * if the offset parameter is inside of the
+		 * if the offset parameter is inside the
 		 * sector, -1 otherwise
 		 *
 		 */
@@ -300,7 +301,7 @@ class Capio_file {
 			off64_t sector_end = -1;
 			auto it = sectors.upper_bound(std::make_pair(offset, 0));
 
-			if (sectors.size() != 0 && it != sectors.begin()) {
+			if (!sectors.empty() && it != sectors.begin()) {
 				--it;
 				if (offset <= it->second)
 					sector_end = it->second;
@@ -322,7 +323,7 @@ class Capio_file {
 		 */
 
 		off64_t seek_data(off64_t offset) {
-			if (sectors.size() == 0) {
+			if (sectors.empty()) {
 				if (offset == 0)
 					return 0;
 				else
@@ -362,7 +363,7 @@ class Capio_file {
 		 */
 
 		off64_t seek_hole(off64_t offset) {
-			if (sectors.size() == 0) {
+			if (sectors.empty()) {
 				if (offset == 0)
 					return 0;
 				else
@@ -411,7 +412,7 @@ class Capio_file {
 		}
 		
 		void add_fd(int tid, int fd) {
-			threads_fd->push_back({tid, fd});
+			threads_fd->emplace_back(tid, fd);
 		}
 };
 

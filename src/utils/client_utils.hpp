@@ -3,6 +3,7 @@
 
 #include "../spsc_queue.hpp"
 #include "common.hpp"
+#include <cstdarg>
 FILE* logfile = nullptr;
 
 

@@ -4,13 +4,13 @@
 #include <string>
 #include <iostream>
 
-#include <string.h>
+#include <cstring>
 #include <sys/stat.h>
 #include <sys/mman.h>
 #include <unistd.h>
 #include <fcntl.h>
 #include <semaphore.h>
-#include <limits.h>
+#include <climits>
 
 /*
  * Multi-producer and multi-consumer circular buffer.
@@ -30,20 +30,20 @@ class SPSC_queue {
 		sem_t* _sem_num_elems;
 		sem_t* _sem_num_empty;
 
-		void err_exit(std::string error_msg) {
+		void err_exit(const std::string& error_msg) {
 			std::cerr << "error: " << error_msg << " errno " <<  errno << " strerror(errno): " << strerror(errno) << std::endl;
 			exit(1);
 		}
 		
-		void* create_shm(std::string shm_name, const long int size) {
-			void* p = nullptr;
+		void* create_shm(const std::string& shm_name, const long int size) {
+			void* p;
 			// if we are not creating a new object, mode is equals to 0
 			int fd = shm_open(shm_name.c_str(), O_CREAT | O_RDWR,  S_IRUSR | S_IWUSR); //to be closed
 			if (fd == -1)
 				err_exit("shm_open " + shm_name);
 			if (ftruncate(fd, size) == -1)
 				err_exit("ftruncate " + shm_name);
-			p = mmap(NULL, size, PROT_READ|PROT_WRITE, MAP_SHARED, fd, 0);
+			p = mmap(nullptr, size, PROT_READ|PROT_WRITE, MAP_SHARED, fd, 0);
 			if (p == MAP_FAILED)
 				err_exit("mmap " + shm_name);
 
@@ -63,7 +63,7 @@ class SPSC_queue {
 		and as number of bytes to write() */
 		if (fstat(fd, &sb) == -1)
 			err_exit("fstat " + _shm_name);
-		_shm = mmap(NULL, sb.st_size, PROT_READ|PROT_WRITE, MAP_SHARED, fd, 0);
+		_shm = mmap(nullptr, sb.st_size, PROT_READ|PROT_WRITE, MAP_SHARED, fd, 0);
 		if (_shm == MAP_FAILED)
 			err_exit("mmap " + _shm_name);
 		if (close(fd) == -1)
