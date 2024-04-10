@@ -2,66 +2,71 @@ services:
 
   download:
     env_file: .env
-    image: hpio/capio:latest
+    image: hpio/1000-genome
     networks:
       - capionet
-    volumes:
-      - ${HOST_SRC_DIR}:${GUEST_TARGET_DIR}
-    command: ${GUEST_TARGET_DIR}/download 1
+    hostname: download
+    command:  bash -c "
+                /usr/sbin/sshd -D &
+                echo '${MACHINE}' > machinefile &&
+                mpirun --allow-run-as-root --machinefile machinefile -x CAPIO_DIR=${CAPIO_DIR} -N 1 -np 6 /usr/local/bin/capio_server --no-config & 
+                /home/capio/download 1 &&
+                CAPIO_DIR=${CAPIO_DIR} LD_PRELOAD=/usr/local/lib/libcapio_posix.so cp -r data ${CAPIO_DIR} &&
+                cat file*_location*"
 
   individuals:
     env_file: .env
-    image: hpio/capio:latest
+    image: hpio/1000-genome
     networks:
       - capionet
+    hostname: individuals
     deploy:
       mode: replicated
       replicas: ${REPLICAS}
-    volumes:
-      - ${HOST_SRC_DIR}:${GUEST_TARGET_DIR}
-    command: #${GUEST_TARGET_DIR}/individuals data/20130502/ALL.chr1.250000.vcf 1 1 2000 10000
+    command: #bash -c "echo '${MACHINE}' > machinefile"
+    #${GUEST_TARGET_DIR}/individuals data/20130502/ALL.chr1.250000.vcf 1 1 2000 10000
 
   individuals-merge:
     env_file: .env
-    image: hpio/capio:latest
+    image: hpio/1000-genome
     networks:
       - capionet
-    volumes:
-      - ${HOST_SRC_DIR}:${GUEST_TARGET_DIR}
-    command: #${GUEST_TARGET_DIR}/individuals_merge 1 chr1n-1-2000.tar.gz
+    hostname: individuals-merge
+    command: #bash -c "echo '${MACHINE}' > machinefile"
+    #${GUEST_TARGET_DIR}/individuals_merge 1 chr1n-1-2000.tar.gz
 
   sifting:
     env_file: .env
-    image: hpio/capio:latest
+    image: hpio/1000-genome
     networks:
       - capionet
-    volumes:
-      - ${HOST_SRC_DIR}:${GUEST_TARGET_DIR}
-    command: #${GUEST_TARGET_DIR}/sifting data/20130502/sifting/ALL.chr1.phase3_shapeit2_mvncall_integrated_v5.20130502.sites.annotation.vcf
+    hostname: sifting
+    command: #bash -c "echo '${MACHINE}' > machinefile"
+    #${GUEST_TARGET_DIR}/sifting data/20130502/sifting/ALL.chr1.phase3_shapeit2_mvncall_integrated_v5.20130502.sites.annotation.vcf
 
   mutation-overlap:
     env_file: .env
-    image: hpio/capio:latest
+    image: hpio/1000-genome
     networks:
       - capionet
+    hostname: mutation-overlap
     deploy:
       mode: replicated
       replicas: ${REPLICAS}
-    volumes:
-      - ${HOST_SRC_DIR}:${GUEST_TARGET_DIR}
-    command: #${GUEST_TARGET_DIR}/mutation_overlap --c 1 --pop ALL 2> out.log > out.txt
+    command: #bash -c "echo '${MACHINE}' > machinefile"
+    #${GUEST_TARGET_DIR}/mutation_overlap --c 1 --pop ALL 2> out.log > out.txt
 
   frequency:
     env_file: .env
-    image: hpio/capio:latest
+    image: hpio/1000-genome
     networks:
       - capionet
+    hostname: frequency
     deploy:
       mode: replicated
       replicas: ${REPLICAS}
-    volumes:
-      - ${HOST_SRC_DIR}:${GUEST_TARGET_DIR}
-    command: #${GUEST_TARGET_DIR}/frequency -c 1 -pop ALL
+    command: #bash -c "echo '${MACHINE}' > machinefile"
+    #${GUEST_TARGET_DIR}/frequency -c 1 -pop ALL
 
 networks:
   capionet:

@@ -14,12 +14,7 @@ RUN apt update                              \
         libopenmpi-dev                      \
         ninja-build                         \
         openmpi-bin                         \
-        pkg-config                          \
-        curl                                \
-        libboost-all-dev                    \
-        libcurl4-openssl-dev                \
-        libcurl4                            \
-        libarchive-dev
+        pkg-config
 
 COPY CMakeLists.txt /opt/capio/
 COPY scripts /opt/capio/scripts
@@ -47,12 +42,6 @@ RUN apt update                                                \
         libcapstone4                                          \
         openmpi-bin                                           \
         openssh-server                                        \
-        curl                                                  \
-        libboost-all-dev                                      \
-        libcurl4-openssl-dev                                  \
-        libcurl4                                              \
-        libarchive-dev                                        \
-        libstdc++6                                            \
  && rm -rf /var/lib/apt/lists/*                               \
  && mkdir -p /run/sshd                                        \
  && adduser                                                   \
