@@ -1,0 +1,76 @@
+{
+"name" : "1000_genome",
+"IO_Graph" :
+[
+	{
+		"name" : "download",
+		"output_stream" : ["data"],
+		"streaming" : [
+			{
+				"name" : "data*",
+				"committed" : "on_close",
+				"mode" : "append"
+			}
+		]
+	},
+	{
+		"name" : "individuals",
+		"input_stream" : ["data/20130502/ALL.chr1.250000.vcf"],
+		"output_stream" : ["chr1n-*"], 
+		"streaming" : [
+			{
+				"name" : "chr1n-*",
+				"committed" : "on_close",
+				"mode" : "append",
+				"n_files" : 2504
+			}
+		]
+	},
+
+	{
+		"name" : "individuals_merge",
+		"input_stream" : ["chr1n-*"],
+		"output_stream" : ["chr1n"],
+		"streaming" : [
+			{
+				"name" : "chr1n",
+				"committed" : "on_close",
+				"mode" : "append",
+				"n_files" : 2504
+			}
+		]
+	},
+
+	{
+		"name" : "sifting",
+		"input_stream" : ["data/20130502/sifting/ALL.chr1.phase3_shapeit2_mvncall_integrated_v5.20130502.sites.annotation.vcf"],
+		"output_stream" : ["sifted.SIFT.chr1.txt"],
+		"streaming" : [
+			{
+				"name" : "sifted.SIFT.chr1.txt",
+				"committed" : "on_close",
+				"mode" : "append"
+			}
+		]
+	},
+
+	{
+		"name" : "mutations_overlap",
+		"input_stream" : ["sifted.SIFT.chr1.txt", "chr1n", "data/populations/ALL", "data/20130502/columns.txt"],
+		"output_stream" : ["chr1-ALL.tar.gz", "output_no_sift/total_mutations_individual1_sNO-SIFT_ALL.txt"],
+		"streaming" : [
+			{
+				"name" : "output_no_sift/total_mutations_individual1_sNO-SIFT_ALL.txt",
+				"committed" : "on_close"
+			}
+		]
+
+	},
+
+	{
+		"name" : "frequency",
+		"input_stream" : ["sifted.SIFT.chr1.txt", "chr1n", "data/populations/ALL", "data/20130502/columns.txt"],
+		"output_stream" : ["chr1-ALL-freq.tar.gz"]
+	}
+]
+}
