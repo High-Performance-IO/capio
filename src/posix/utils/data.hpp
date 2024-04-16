@@ -42,10 +42,12 @@ inline void read_data(long tid, const void *buffer, off64_t count) {
     size_t r       = count % CAPIO_DATA_BUFFER_ELEMENT_SIZE;
     size_t i       = 0;
     while (i < n_reads) {
+        LOG("READING %ld bytes from queue", CAPIO_DATA_BUFFER_ELEMENT_SIZE);
         data_buf->read((char *) buffer + i * CAPIO_DATA_BUFFER_ELEMENT_SIZE);
         ++i;
     }
     if (r) {
+        LOG("READING %ld bytes from queue", r);
         data_buf->read((char *) buffer + i * CAPIO_DATA_BUFFER_ELEMENT_SIZE, r);
     }
 }
