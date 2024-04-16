@@ -134,10 +134,10 @@ inline void request_remote_read(int tid, int fd, off64_t count, bool is_dir, boo
         LOG("Handling local read");
         handle_local_read(tid, fd, count, is_dir, is_getdents, true);
     } else if (end_of_read <= end_of_sector) {
-        LOG("Data is present locally and can be served to clien");
+        LOG("Data is present locally and can be served to client");
         c_file.create_buffer_if_needed(path, false);
         char *p = c_file.get_buffer();
-        write_response(tid, end_of_sector);
+        write_response(tid, end_of_read);
         send_data_to_client(tid, p + offset, count);
     } else {
         LOG("Delegating to backend remote read");
@@ -146,8 +146,8 @@ inline void request_remote_read(int tid, int fd, off64_t count, bool is_dir, boo
 }
 
 void wait_for_file_creation(int tid, int fd, off64_t count, bool dir, bool is_getdents) {
-    START_LOG(gettid(), "call(tid=%d, fd=%d, count=%ld, dir=%s, is_getdents=%s)", tid, fd, count,
-              dir ? "true" : "false", is_getdents ? "true" : "false");
+    START_LOG(gettid(), "call(tid=%d, parent_pid=%d,  fd=%d, count=%ld, dir=%s, is_getdents=%s)",
+              tid, getppid(), fd, count, dir ? "true" : "false", is_getdents ? "true" : "false");
 
     const std::filesystem::path &path_to_check = get_capio_file_path(tid, fd);
     loop_load_file_location(path_to_check);
