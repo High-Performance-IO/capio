@@ -43,7 +43,8 @@ inline void reply_stat(int tid, const std::filesystem::path &path) {
             // if it is in configuration file then wait otherwise fail
             if ((metadata_conf.find(path) != metadata_conf.end() || match_globs(path) != -1) &&
                 !is_producer(tid, path)) {
-                LOG("File found but not ready yet. Starting a thread to wait for file %d", path.c_str());
+                LOG("File found but not ready yet. Starting a thread to wait for file %s",
+                    path.c_str());
                 std::thread t(wait_for_file_completion, tid, std::filesystem::path(path));
                 t.detach();
             } else {

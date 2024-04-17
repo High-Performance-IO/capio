@@ -145,21 +145,20 @@ inline void request_remote_read(int tid, int fd, off64_t count, bool is_dir, boo
     }
 }
 
-void wait_for_file_creation(int tid, int fd, off64_t count, bool dir, bool is_getdents) {
+void wait_for_file_creation(const std::filesystem::path &path, int tid, int fd, off64_t count, bool dir, bool is_getdents) {
     START_LOG(gettid(), "call(tid=%d, parent_pid=%d,  fd=%d, count=%ld, dir=%s, is_getdents=%s)",
               tid, getppid(), fd, count, dir ? "true" : "false", is_getdents ? "true" : "false");
 
-    const std::filesystem::path &path_to_check = get_capio_file_path(tid, fd);
-    loop_load_file_location(path_to_check);
+    loop_load_file_location(path);
 
     // check if the file is local or remote
-    if (strcmp(std::get<0>(get_file_location(path_to_check)), node_name) == 0) {
+    if (strcmp(std::get<0>(get_file_location(path)), node_name) == 0) {
         handle_local_read(tid, fd, count, dir, is_getdents, false);
     } else {
-        const CapioFile &c_file = get_capio_file(path_to_check);
+        const CapioFile &c_file = get_capio_file(path);
         auto remote_app         = apps.find(tid);
         if (!c_file.is_complete() && remote_app != apps.end()) {
-            long int pos = match_globs(path_to_check);
+            long int pos = match_globs(path);
             if (pos != -1) {
                 const std::string &remote_app_name = remote_app->second;
                 std::string prefix                 = std::get<0>(metadata_conf_globs[pos]);
@@ -186,7 +185,7 @@ inline void handle_read(int tid, int fd, off64_t count, bool dir, bool is_getden
     if (!file_location_opt && !is_prod) {
         LOG("Starting thread to wait for file creation");
         // launch a thread that checks when the file is created
-        std::thread t(wait_for_file_creation, tid, fd, count, dir, is_getdents);
+        std::thread t(wait_for_file_creation, path, tid, fd, count, dir, is_getdents);
         t.detach();
     } else if (is_prod || strcmp(std::get<0>(file_location_opt->get()), node_name) == 0 ||
                capio_dir == path) {
