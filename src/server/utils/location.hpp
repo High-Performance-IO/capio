@@ -17,20 +17,30 @@ int files_location_fd;
 FILE *files_location_fp;
 std::unordered_map<std::string, FILE *> file_location_fps;
 
-class FlockGuard {
+class Flock {
   private:
     int _fd;
+    short _l_type;
     struct flock _lock;
 
   public:
-    inline explicit FlockGuard(const int fd, const short l_type) : _fd(fd), _lock() {
+    inline explicit Flock(const int fd, const short l_type) : _fd(fd), _l_type(l_type), _lock() {
         START_LOG(gettid(), "call(fd=%d, l_type=%d)", _fd, l_type);
 
-        _lock.l_type   = l_type;
         _lock.l_whence = SEEK_SET;
         _lock.l_start  = 0;
         _lock.l_len    = 0;
         _lock.l_pid    = getpid();
+    }
+
+    Flock(const Flock &)            = delete;
+    Flock &operator=(const Flock &) = delete;
+    inline ~Flock()                 = default;
+
+    inline void lock() {
+        START_LOG(gettid(), "call()");
+
+        _lock.l_type = _l_type;
         if (fcntl(_fd, F_SETLKW, &_lock) < 0) {
             close(_fd);
             ERR_EXIT("CAPIO server failed to lock the file with error %d (%s)", errno,
@@ -38,11 +48,8 @@ class FlockGuard {
         }
     }
 
-    FlockGuard(const FlockGuard &)            = delete;
-    FlockGuard &operator=(const FlockGuard &) = delete;
-
-    inline ~FlockGuard() {
-        START_LOG(gettid(), "call(fd=%d)", _fd);
+    inline void unlock() {
+        START_LOG(gettid(), "call()");
 
         _lock.l_type = F_UNLCK;
         if (fcntl(_fd, F_SETLK, &_lock) < 0) {
@@ -66,8 +73,11 @@ inline FILE *get_file_location_descriptor(const std::string &name) {
 
     if (file_location_fps.find(name) == file_location_fps.end()) {
         FILE *descriptor;
-        if ((descriptor = fopen(name.c_str(), "w+")) == nullptr) {
+        if ((descriptor = fopen(name.c_str(), "a+")) == nullptr) {
             ERR_EXIT("Error opening %s file: %d (%s)", name.c_str(), errno, strerror(errno));
+        }
+        if (lseek(fileno(descriptor), 0, SEEK_SET) == -1) {
+            ERR_EXIT("Error during lseek in file %s", name.c_str());
         }
         file_location_fps.emplace(name, descriptor);
     }
@@ -136,7 +146,10 @@ bool load_file_location(const std::filesystem::path &path_to_load) {
     for (auto &node : backend->get_nodes()) {
         const std::string name = get_file_location_name(node);
         FILE *descriptor       = get_file_location_descriptor(name);
-        const FlockGuard fg(fileno(descriptor), F_RDLCK);
+
+        Flock file_lock(fileno(descriptor), F_RDLCK);
+        const std::lock_guard<Flock> lg(file_lock);
+
         off64_t old_offset = lseek(fileno(descriptor), 0, SEEK_CUR);
         if (old_offset == -1) {
             ERR_EXIT("lseek 1 delete_from_files_location");
@@ -195,7 +208,10 @@ int delete_from_files_location(const std::filesystem::path &path) {
     LOG("Remove %s from node %s at offset %ld", path.c_str(), node, offset);
     const std::string name = get_file_location_name(node);
     FILE *descriptor       = get_file_location_descriptor(name);
-    const FlockGuard fg(fileno(descriptor), F_WRLCK);
+
+    Flock file_lock(fileno(descriptor), F_WRLCK);
+    const std::lock_guard<Flock> lg(file_lock);
+
     long old_offset = lseek(fileno(descriptor), 0, SEEK_CUR);
     if (old_offset == -1) {
         ERR_EXIT("lseek 1 delete_from_files_location");
@@ -287,7 +303,8 @@ void open_files_location() {
 void write_file_location(const std::filesystem::path &path_to_write) {
     START_LOG(gettid(), "call(path_to_write=%s)", path_to_write.c_str());
 
-    const FlockGuard fg(files_location_fd, F_WRLCK);
+    Flock file_lock(files_location_fd, F_WRLCK);
+    const std::lock_guard<Flock> lg(file_lock);
 
     long offset = lseek(files_location_fd, 0, SEEK_CUR);
     if (offset == -1) {
