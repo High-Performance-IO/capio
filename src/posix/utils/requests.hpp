@@ -183,8 +183,9 @@ inline off64_t seek_end_request(const int fd, const long tid) {
     char req[CAPIO_REQUEST_MAX_SIZE];
     sprintf(req, "%04d %ld %d", CAPIO_REQUEST_SEEK_END, tid, fd);
     buf_requests->write(req, CAPIO_REQUEST_MAX_SIZE);
-    off64_t res;
+    off64_t res, is_dir;
     bufs_response->at(tid)->read(&res);
+    bufs_response->at(tid)->read(&is_dir);
     return res;
 }
 
