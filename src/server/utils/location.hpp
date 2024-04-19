@@ -15,7 +15,7 @@ std::mutex files_location_mutex;
 
 int files_location_fd;
 FILE *files_location_fp;
-std::unordered_map<std::string, FILE *> file_location_fps;
+std::unordered_map<std::string, FILE *> files_location_fps;
 
 class Flock {
   private:
@@ -71,7 +71,7 @@ inline std::string get_file_location_name(const std::string &node) {
 inline FILE *get_file_location_descriptor(const std::string &name) {
     START_LOG(gettid(), "name=%s", name.c_str());
 
-    if (file_location_fps.find(name) == file_location_fps.end()) {
+    if (files_location_fps.find(name) == files_location_fps.end()) {
         FILE *descriptor;
         if ((descriptor = fopen(name.c_str(), "a+")) == nullptr) {
             ERR_EXIT("Error opening %s file: %d (%s)", name.c_str(), errno, strerror(errno));
@@ -79,10 +79,10 @@ inline FILE *get_file_location_descriptor(const std::string &name) {
         if (lseek(fileno(descriptor), 0, SEEK_SET) == -1) {
             ERR_EXIT("Error during lseek in file %s", name.c_str());
         }
-        file_location_fps.emplace(name, descriptor);
+        files_location_fps.emplace(name, descriptor);
     }
 
-    return file_location_fps.at(name);
+    return files_location_fps.at(name);
 }
 
 inline std::optional<std::reference_wrapper<std::pair<const char *const, long int>>>
@@ -150,11 +150,6 @@ bool load_file_location(const std::filesystem::path &path_to_load) {
         Flock file_lock(fileno(descriptor), F_RDLCK);
         const std::lock_guard<Flock> lg(file_lock);
 
-        off64_t old_offset = lseek(fileno(descriptor), 0, SEEK_CUR);
-        if (old_offset == -1) {
-            ERR_EXIT("lseek 1 delete_from_files_location");
-        }
-        LOG("Current %s offset is %ld", name.c_str(), old_offset);
         if (fseek(descriptor, 0, SEEK_SET) == -1) {
             ERR_EXIT("fseek in load_file_location");
         }
@@ -184,10 +179,6 @@ bool load_file_location(const std::filesystem::path &path_to_load) {
             }
         }
 
-        if (lseek(fileno(descriptor), old_offset, SEEK_SET) == -1) {
-            ERR_EXIT("lseek 3 delete_from_files_location");
-        }
-        LOG("%s offset has been restored to %ld", name.c_str(), old_offset);
         if (found) {
             break;
         }
@@ -212,11 +203,6 @@ int delete_from_files_location(const std::filesystem::path &path) {
     Flock file_lock(fileno(descriptor), F_WRLCK);
     const std::lock_guard<Flock> lg(file_lock);
 
-    long old_offset = lseek(fileno(descriptor), 0, SEEK_CUR);
-    if (old_offset == -1) {
-        ERR_EXIT("lseek 1 delete_from_files_location");
-    }
-    LOG("Current %s offset is %ld", name.c_str(), old_offset);
     if (offset == -1) {
         if (fseek(descriptor, 0, SEEK_SET) == -1) {
             ERR_EXIT("fseek in load_file_location");
@@ -259,10 +245,6 @@ int delete_from_files_location(const std::filesystem::path &path) {
         }
         LOG("Path %s has been deleted from %s", path.c_str(), name.c_str());
     }
-    if (lseek(fileno(descriptor), old_offset, SEEK_SET) == -1) {
-        ERR_EXIT("lseek 3 delete_from_files_location");
-    }
-    LOG("Current %s offset has been restored to %ld", name.c_str(), old_offset);
 
     // Delete from local data structures
     erase_from_files_location(path);
@@ -297,7 +279,7 @@ void open_files_location() {
         ERR_EXIT("Error obtaining file descriptor for %s file: %d (%s)", file_location_name.c_str(),
                  errno, strerror(errno));
     }
-    file_location_fps.emplace(file_location_name, files_location_fp);
+    files_location_fps.emplace(file_location_name, files_location_fp);
 }
 
 void write_file_location(const std::filesystem::path &path_to_write) {
@@ -306,7 +288,7 @@ void write_file_location(const std::filesystem::path &path_to_write) {
     Flock file_lock(files_location_fd, F_WRLCK);
     const std::lock_guard<Flock> lg(file_lock);
 
-    long offset = lseek(files_location_fd, 0, SEEK_CUR);
+    long offset = lseek(files_location_fd, 0, SEEK_END);
     if (offset == -1) {
         ERR_EXIT("lseek in write_file_location");
     }

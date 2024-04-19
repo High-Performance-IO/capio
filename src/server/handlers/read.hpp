@@ -145,7 +145,8 @@ inline void request_remote_read(int tid, int fd, off64_t count, bool is_dir, boo
     }
 }
 
-void wait_for_file_creation(const std::filesystem::path &path, int tid, int fd, off64_t count, bool dir, bool is_getdents) {
+void wait_for_file_creation(const std::filesystem::path &path, int tid, int fd, off64_t count,
+                            bool dir, bool is_getdents) {
     START_LOG(gettid(), "call(tid=%d, parent_pid=%d,  fd=%d, count=%ld, dir=%s, is_getdents=%s)",
               tid, getppid(), fd, count, dir ? "true" : "false", is_getdents ? "true" : "false");
 
