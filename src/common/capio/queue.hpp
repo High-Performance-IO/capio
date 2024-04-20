@@ -48,12 +48,17 @@ template <class T, class Mutex> class Queue {
 
     Queue(const Queue &)            = delete;
     Queue &operator=(const Queue &) = delete;
-
     ~Queue() {
-        START_LOG(capio_syscall(SYS_gettid), "call()");
+        START_LOG(capio_syscall(SYS_gettid),
+                  "call(_shm_name=%s, _first_elem_name=%s, _last_elem_name=%s)", _shm_name.c_str(),
+                  _first_elem_name.c_str(), _last_elem_name.c_str());
         SHM_DESTROY_CHECK(_shm_name.c_str());
         SHM_DESTROY_CHECK(_first_elem_name.c_str());
         SHM_DESTROY_CHECK(_last_elem_name.c_str());
+    }
+
+    inline auto get_name(){
+        return this->_shm_name;
     }
 
     inline void write(const T *data, long int num_bytes) {

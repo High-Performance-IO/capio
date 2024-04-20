@@ -44,6 +44,8 @@ void free_resources(int tid) {
 
     auto it = data_buffers.find(tid);
     if (it != data_buffers.end()) {
+        delete it->second.first;
+        delete it->second.second;
         data_buffers.erase(it);
     }
 }
