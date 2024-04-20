@@ -22,7 +22,7 @@ TEST_F(RealpathPosixTest, TestAbsolutePathsInCapioDirWhenPathExists) {
     EXPECT_NE(access(PATHNAME.c_str(), F_OK), 0);
 }
 
-TEST_F(RealpathPosixTest, TestAbsoluePathsInCapioDirWhenPathDoesNotExist) {
+TEST_F(RealpathPosixTest, TestAbsolutePathsInCapioDirWhenPathDoesNotExist) {
     const std::filesystem::path PATHNAME = get_capio_dir() / "test";
     EXPECT_EQ(capio_posix_realpath(PATHNAME), PATHNAME);
 }
@@ -36,7 +36,7 @@ TEST_F(RealpathPosixTest, TestAbsolutePathsOutsideCapioDirWhenPathExists) {
     EXPECT_NE(access(PATHNAME.c_str(), F_OK), 0);
 }
 
-TEST_F(RealpathPosixTest, TestAbsoluePathOutsideCapioDirWhenPathDoesNotExist) {
+TEST_F(RealpathPosixTest, TestAbsolutePathOutsideCapioDirWhenPathDoesNotExist) {
     const std::filesystem::path PATHNAME = "/tmp/test";
     EXPECT_EQ(capio_posix_realpath(PATHNAME), PATHNAME);
 }

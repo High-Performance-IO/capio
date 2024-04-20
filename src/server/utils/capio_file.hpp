@@ -263,11 +263,13 @@ class CapioFile {
 
     /*
      * Returns the offset to the end of the sector
-     * if the offset parameter is inside of the
+     * if the offset parameter is inside the
      * sector, -1 otherwise
      *
      */
     [[nodiscard]] off64_t get_sector_end(off64_t offset) const {
+        START_LOG(gettid(), "call(offset=%ld)", offset);
+
         off64_t sector_end = -1;
         auto it            = _sectors.upper_bound(std::make_pair(offset, 0));
 
@@ -279,6 +281,10 @@ class CapioFile {
         }
 
         return sector_end;
+    }
+
+    [[nodiscard]] inline const std::set<std::pair<off64_t, off64_t>, compare> &get_sectors() const {
+        return _sectors;
     }
 
     /*
@@ -299,21 +305,25 @@ class CapioFile {
      * off64_t new_start: the beginning of the sector to insert
      * off64_t new_end: the beginning of the sector to insert
      *
-     * new_srart must be > new_end otherwise the behaviour
+     * new_start must be > new_end otherwise the behaviour
      * in undefined
      *
      */
     void insert_sector(off64_t new_start, off64_t new_end) {
+        START_LOG(gettid(), "call(new_start=%ld, new_end=%ld)", new_start, new_end);
+
         auto p = std::make_pair(new_start, new_end);
         std::lock_guard<std::mutex> lock(_mutex);
 
         if (_sectors.empty()) {
+            LOG("Insert sector <%ld, %ld>", p.first, p.second);
             _sectors.insert(p);
             return;
         }
         auto it_lbound = _sectors.upper_bound(p);
         if (it_lbound == _sectors.begin()) {
             if (new_end < it_lbound->first) {
+                LOG("Insert sector <%ld, %ld>", p.first, p.second);
                 _sectors.insert(p);
             } else {
                 auto it         = it_lbound;
@@ -334,6 +344,7 @@ class CapioFile {
                     ++it;
                 }
                 _sectors.erase(it_lbound, it);
+                LOG("Insert sector <%ld, %ld>", p.first, p.second);
                 _sectors.insert(p);
             }
         } else {
@@ -362,6 +373,7 @@ class CapioFile {
                 ++it;
             }
             _sectors.erase(it_lbound, it);
+            LOG("Insert sector <%ld, %ld>", p.first, p.second);
             _sectors.insert(p);
         }
     }
@@ -375,13 +387,6 @@ class CapioFile {
     [[nodiscard]] inline bool is_dir() const { return _directory; }
 
     inline void open() { _n_opens++; }
-
-    void print(std::ostream &out_stream) const {
-        out_stream << "_sectors" << std::endl;
-        for (auto &sector : _sectors) {
-            out_stream << "<" << sector.first << ", " << sector.second << ">" << std::endl;
-        }
-    }
 
     /*
      * From the manual:
