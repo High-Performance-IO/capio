@@ -18,8 +18,8 @@ class NoLock {
     NoLock &operator=(const NoLock &) = delete;
     ~NoLock()                         = default;
 
-    inline void lock(){};
-    inline void unlock(){};
+    inline void lock() {};
+    inline void unlock() {};
 };
 
 class NamedSemaphore {

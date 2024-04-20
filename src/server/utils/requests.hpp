@@ -89,7 +89,7 @@ inline auto read_next_request(char *str) {
 inline void write_response(int tid, off64_t offset) {
     START_LOG(gettid(), "call(tid=%d, offset=%ld)", tid, offset);
 
-    return bufs_response->at(tid)->write(&offset);
+    return bufs_response->at(tid)->write(&offset, sizeof(off64_t));
 }
 
 #endif // CAPIO_SERVER_REQUESTS_HPP

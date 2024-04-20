@@ -64,11 +64,14 @@ template <class T, class Mutex> class Queue {
         }
 
         _sem_num_empty.lock();
-        std::lock_guard<Mutex> lg(_mutex);
 
-        memcpy((T *) _shm + *_last_elem, data, num_bytes);
-        *_last_elem = (*_last_elem + num_bytes) % _buff_size;
-        LOG("Wrote '%s' on %s", data, this->_shm_name.c_str());
+        {
+            std::lock_guard<Mutex> lg(_mutex);
+
+            memcpy((T *) _shm + *_last_elem, data, num_bytes);
+            *_last_elem = (*_last_elem + num_bytes) % _buff_size;
+            LOG("Wrote '%s' (%d) on %s", data, data, this->_shm_name.c_str());
+        }
 
         _sem_num_elems.unlock();
     }
@@ -86,12 +89,13 @@ template <class T, class Mutex> class Queue {
         }
 
         _sem_num_elems.lock();
-        std::lock_guard<Mutex> lg(_mutex);
 
-        memcpy((T *) buff_rcv, ((T *) _shm) + *_first_elem, num_bytes);
-        *_first_elem = (*_first_elem + num_bytes) % _buff_size;
-        LOG("Received '%s' on %s", buff_rcv, this->_shm_name.c_str());
-
+        {
+            std::lock_guard<Mutex> lg(_mutex);
+            memcpy((T *) buff_rcv, ((T *) _shm) + *_first_elem, num_bytes);
+            *_first_elem = (*_first_elem + num_bytes) % _buff_size;
+            LOG("Received '%s' on %s", buff_rcv, this->_shm_name.c_str());
+        }
         _sem_num_empty.unlock();
     }
 

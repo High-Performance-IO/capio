@@ -52,7 +52,7 @@ std::vector<std::string> *files_available(const std::string &prefix, const std::
     START_LOG(gettid(), "call(prefix=%s, app_name=%s, path=%s, batch_size=%d)", prefix.c_str(),
               app_name.c_str(), path.c_str(), batch_size);
 
-    std::lock_guard<std::mutex> lg(nfiles_mutex);
+    // TODO: here there was a lock guard which is not present in master
 
     auto files_to_send                     = new std::vector<std::string>;
     std::unordered_set<std::string> &files = files_sent[app_name];
