@@ -38,15 +38,6 @@ inline void set_capio_fd_cloexec(int fd, bool is_cloexec) {
  */
 inline const std::filesystem::path &get_current_dir() { return *current_dir; }
 
-auto create_capio_posix_shm(long tid, int fd) {
-    std::string shm_name("offset_" + std::to_string(tid) + "_" + std::to_string(fd));
-    START_LOG(tid, "call(shm_name=%s)", shm_name.c_str());
-    syscall_no_intercept_flag = true;
-    auto *p_offset            = static_cast<off64_t *>(create_shm(shm_name, sizeof(off64_t)));
-    syscall_no_intercept_flag = false;
-    return p_offset;
-}
-
 /**
  * Add a path to metadata structures
  * @param path
@@ -67,10 +58,7 @@ inline void add_capio_fd(long tid, const std::string &path, int fd, off64_t offs
     add_capio_path(path);
     capio_files_paths->at(path).insert(fd);
     capio_files_descriptors->insert({fd, path});
-
-    auto p_offset = create_capio_posix_shm(tid, fd);
-    *p_offset     = offset;
-    files->insert({fd, {p_offset, init_size, flags, is_cloexec}});
+    files->insert({fd, {std::make_shared<off64_t>(offset), init_size, flags, is_cloexec}});
 }
 
 /**
@@ -164,8 +152,6 @@ inline void dup_capio_fd(long tid, int oldfd, int newfd, bool is_cloexec) {
     files->insert({newfd, files->at(oldfd)});
     set_capio_fd_cloexec(newfd, is_cloexec);
     capio_files_descriptors->insert({newfd, capio_files_descriptors->at(oldfd)});
-
-    create_capio_posix_shm(tid, newfd);
 }
 
 /**

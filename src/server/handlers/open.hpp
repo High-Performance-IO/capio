@@ -5,17 +5,17 @@
 #include "utils/location.hpp"
 #include "utils/metadata.hpp"
 
-inline void update_file_metadata(const std::filesystem::path &path, int tid, int fd,
-                                 bool is_creat) {
-    START_LOG(gettid(), "call(path=%s, client_tid=%d fd=%d, is_creat=%s)", path.c_str(), tid, fd,
-              is_creat ? "true" : "false");
+inline void update_file_metadata(const std::filesystem::path &path, int tid, int fd, bool is_creat,
+                                 off64_t offset) {
+    START_LOG(gettid(), "call(path=%s, client_tid=%d fd=%d, is_creat=%s, offset=%ld)", path.c_str(),
+              tid, fd, is_creat ? "true" : "false", offset);
 
     // TODO: check the size that the user wrote in the configuration file
     //*caching_info[tid].second += 2;
     auto c_file_opt = get_capio_file_opt(path);
     CapioFile &c_file =
         (c_file_opt) ? c_file_opt->get() : create_capio_file(path, false, get_file_initial_size());
-    add_capio_file_to_tid(tid, fd, path);
+    add_capio_file_to_tid(tid, fd, path, offset);
     int pid       = pids[tid];
     auto it_files = writers.find(pid);
     if (it_files != writers.end()) {
@@ -38,7 +38,7 @@ inline void handle_create(int tid, int fd, const std::filesystem::path &path) {
     START_LOG(gettid(), "call(tid=%d, fd=%d, path_cstr=%s)", tid, fd, path.c_str());
 
     bool is_creat = !(get_file_location_opt(path) || load_file_location(path));
-    update_file_metadata(path, tid, fd, is_creat);
+    update_file_metadata(path, tid, fd, is_creat, 0);
     write_response(tid, 0);
 }
 
@@ -49,7 +49,7 @@ inline void handle_create_exclusive(int tid, int fd, const std::filesystem::path
         write_response(tid, 1);
     } else {
         write_response(tid, 0);
-        update_file_metadata(path, tid, fd, true);
+        update_file_metadata(path, tid, fd, true, 0);
     }
 }
 
@@ -60,7 +60,7 @@ inline void handle_open(int tid, int fd, const std::filesystem::path &path) {
     // slowest (short circuit evaluation)
     if (get_file_location_opt(path) || metadata_conf.find(path) != metadata_conf.end() ||
         match_globs(path) != -1 || load_file_location(path)) {
-        update_file_metadata(path, tid, fd, false);
+        update_file_metadata(path, tid, fd, false, 0);
     } else {
         write_response(tid, 1);
     }

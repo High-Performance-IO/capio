@@ -9,7 +9,8 @@
 CSFilesMetadata_t files_metadata;
 std::mutex files_metadata_mutex;
 
-CSProcessFileMap_t processes_files;
+std::unordered_map<int, std::unordered_map<int, std::pair<CapioFile *, std::shared_ptr<off64_t>>>>
+    processes_files;
 CSProcessFileMetadataMap_t processes_files_metadata;
 std::mutex processes_files_mutex;
 
@@ -107,26 +108,25 @@ inline void add_capio_file(const std::filesystem::path &path, CapioFile *c_file)
         c_file == nullptr ? "TRUE" : "FALSE");
 }
 
-inline void add_capio_file_to_tid(int tid, int fd, const std::filesystem::path &path) {
-    START_LOG(gettid(), "call(tid=%d, fd=%d, path=%s)", tid, fd, path.c_str());
+inline void add_capio_file_to_tid(int tid, int fd, const std::filesystem::path &path,
+                                  off64_t offset) {
+    START_LOG(gettid(), "call(tid=%d, fd=%d, path=%s, offset=%ld)", tid, fd, path.c_str(), offset);
 
     CapioFile &c_file = get_capio_file(path);
     c_file.open();
     c_file.add_fd(tid, fd);
 
     const std::lock_guard<std::mutex> lg(processes_files_mutex);
-    off64_t *p_offset = (off64_t *) create_shm(
-        "offset_" + std::to_string(tid) + "_" + std::to_string(fd), sizeof(off64_t));
-    // TODO: what happens if a process open the same file twice?
     processes_files_metadata[tid][fd] = path;
-    processes_files[tid][fd]          = std::make_pair(&c_file, p_offset);
+    processes_files[tid][fd]          = std::make_pair(&c_file, std::make_shared<off64_t>(offset));
 }
 
 inline void clone_capio_file(pid_t parent_tid, pid_t child_tid) {
     START_LOG(gettid(), "call(parent_tid=%d, child_tid=%d)", parent_tid, child_tid);
 
     for (auto &fd : get_capio_fds_for_tid(parent_tid)) {
-        add_capio_file_to_tid(child_tid, fd, processes_files_metadata[parent_tid][fd]);
+        add_capio_file_to_tid(child_tid, fd, processes_files_metadata[parent_tid][fd],
+                              get_capio_file_offset(parent_tid, fd));
     }
 }
 
@@ -188,10 +188,6 @@ inline void delete_capio_file_from_tid(int tid, int fd) {
     CapioFile &c_file = get_capio_file(processes_files_metadata[tid][fd]);
     c_file.remove_fd(tid, fd);
     processes_files_metadata[tid].erase(fd);
-    const std::string offset_shm_name = "offset_" + std::to_string(tid) + "_" + std::to_string(fd);
-    if (shm_unlink(offset_shm_name.c_str()) == -1) {
-        ERR_EXIT("ERROR: shm_unlink %s", offset_shm_name.c_str());
-    }
     processes_files[tid].erase(fd);
 }
 
@@ -247,6 +243,13 @@ inline void rename_capio_file(const std::filesystem::path &oldpath,
         node.key() = newpath;
         files_metadata.insert(std::move(node));
     }
+}
+
+inline off64_t set_capio_file_offset(int tid, int fd, off64_t offset) {
+    START_LOG(gettid(), "call(tid=%d, fd=%d, offset=%ld)", tid, fd, offset);
+
+    const std::lock_guard<std::mutex> lg(processes_files_mutex);
+    return *std::get<1>(processes_files[tid][fd]) = offset;
 }
 
 void update_metadata_conf(std::filesystem::path &path, size_t pos, long int n_files,

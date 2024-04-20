@@ -9,8 +9,7 @@
 constexpr char CAPIO_SERVER_FILES_LOCATION_NAME[]     = "files_location_%s.txt";
 constexpr char CAPIO_SERVER_INVALIDATE_FILE_PATH_CHAR = '#';
 
-// unordered map indexed by path file containing {node_name, offset_in_memory}
-CSFilesLocationMap_t files_location;
+std::unordered_map<std::string, std::pair<const char *const, off64_t>> files_location;
 std::mutex files_location_mutex;
 
 int files_location_fd;

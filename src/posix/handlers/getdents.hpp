@@ -11,7 +11,7 @@
 inline int getdents_handler_impl(long arg0, long arg1, long arg2, long *result, bool is64bit) {
     auto fd      = static_cast<int>(arg0);
     auto *buffer = reinterpret_cast<struct linux_dirent64 *>(arg1);
-    auto count   = static_cast<size_t>(arg2);
+    auto count   = static_cast<off64_t>(arg2);
     long tid     = syscall_no_intercept(SYS_gettid);
 
     START_LOG(tid, "call(fd=%d, dirp=0x%08x, count=%ld, is64bit=%s)", fd, buffer, count,
@@ -23,17 +23,15 @@ inline int getdents_handler_impl(long arg0, long arg1, long arg2, long *result, 
         if (count >= SSIZE_MAX) {
             ERR_EXIT("src does not support read bigger than SSIZE_MAX yet");
         }
-        auto count_off      = static_cast<off64_t>(count);
         off64_t offset      = get_capio_fd_offset(fd);
-        off64_t end_of_read = getdents_request(fd, count_off, is64bit, tid);
+        off64_t end_of_read = getdents_request(fd, count, is64bit, tid);
         off64_t bytes_read  = end_of_read - offset;
 
-        if (bytes_read > count_off) {
-            bytes_read = count_off;
+        if (bytes_read > count) {
+            bytes_read = count;
         }
 
-        read_data(tid, buffer, bytes_read);
-        set_capio_fd_offset(fd, offset + bytes_read);
+        read_data(tid, fd, buffer, bytes_read);
 
         *result = bytes_read;
 
@@ -49,7 +47,7 @@ inline int getdents_handler_impl(long arg0, long arg1, long arg2, long *result, 
             struct linux_dirent *d;
             LOG("READ from queue: offset:%ld, count:%ld", offset, count);
             LOG("%19s %12s %13s %15s %s", "INODE", "TYPE", "RECORD_LENGTH", "OFFSET", "NAME");
-            for (size_t bpos = 0, i = 0; bpos < count && i < 10; i++) {
+            for (off64_t bpos = 0, i = 0; bpos < count && i < 10; i++) {
                 d = (struct linux_dirent *) (result + bpos);
                 LOG("%19lu %9s %13ld %15ld %s\n", d->d_ino,
                     (d->d_type == 8)    ? "regular"

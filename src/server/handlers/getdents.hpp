@@ -23,11 +23,11 @@ inline void request_remote_getdents(int tid, int fd, off64_t count) {
         (end_of_read <= end_of_sector ||
          (end_of_sector == -1 ? 0 : end_of_sector) == c_file.real_file_size)) {
         LOG("Handling local read");
-        send_dirent_to_client(tid, c_file, offset, count);
+        send_dirent_to_client(tid, fd, c_file, offset, count);
     } else if (end_of_read <= end_of_sector) {
         LOG("?");
         c_file.create_buffer_if_needed(path, false);
-        send_data_to_client(tid, c_file.get_buffer(), offset, count);
+        send_data_to_client(tid, fd, c_file.get_buffer(), offset, count);
     } else {
         LOG("Delegating to backend remote read");
         handle_remote_read_request(tid, fd, count, true);
@@ -75,7 +75,7 @@ inline void handle_getdents(int tid, int fd, long int count) {
                capio_dir == path) {
         CapioFile &c_file = get_capio_file(path);
         off64_t offset    = get_capio_file_offset(tid, fd);
-        send_dirent_to_client(tid, c_file, offset, count);
+        send_dirent_to_client(tid, fd, c_file, offset, count);
     } else {
         LOG("File is remote");
         CapioFile &c_file = get_capio_file(path);

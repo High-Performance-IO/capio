@@ -4,6 +4,8 @@
 #include <cstdlib>
 #include <iostream>
 
+#include "capio/logger.hpp"
+
 const char *get_capio_app_name() {
     static char *capio_app_name = std::getenv("CAPIO_APP_NAME");
 

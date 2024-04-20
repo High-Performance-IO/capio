@@ -11,10 +11,8 @@ inline void handle_write(int tid, int fd, off64_t base_offset, off64_t count) {
     off64_t end_of_write              = base_offset + count;
     const std::filesystem::path &path = get_capio_file_path(tid, fd);
     CapioFile &c_file                 = get_capio_file(path);
-    size_t file_shm_size              = c_file.get_buf_size();
+    off64_t file_shm_size             = c_file.get_buf_size();
     auto *data_buf                    = data_buffers[tid].first;
-    off64_t n_reads                   = count / CAPIO_DATA_BUFFER_ELEMENT_SIZE;
-    off64_t r                         = count % CAPIO_DATA_BUFFER_ELEMENT_SIZE;
 
     c_file.create_buffer_if_needed(path, true);
     if (end_of_write > file_shm_size) {
@@ -31,6 +29,7 @@ inline void handle_write(int tid, int fd, off64_t base_offset, off64_t count) {
         // TODO: it works only if there is one prod per file
         update_dir(tid, path);
     }
+    set_capio_file_offset(tid, fd, end_of_write);
 }
 
 void write_handler(const char *const str) {
