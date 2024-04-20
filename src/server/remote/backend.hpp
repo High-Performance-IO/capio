@@ -46,6 +46,12 @@ class Backend {
     virtual ~Backend() = default;
 
     /**
+     * Returns the node names of the CAPIO servers
+     * @return A set containing the node names of all CAPIO servers
+     */
+    virtual const std::set<std::string> get_nodes() = 0;
+
+    /**
      * Handshake the server applications
      */
     virtual void handshake_servers() = 0;

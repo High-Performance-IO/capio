@@ -6,29 +6,41 @@
 
 #include "utils/types.hpp"
 
-constexpr char CAPIO_SERVER_FILES_LOCATION_NAME[]     = "files_location.txt";
+constexpr char CAPIO_SERVER_FILES_LOCATION_NAME[]     = "files_location_%s.txt";
 constexpr char CAPIO_SERVER_INVALIDATE_FILE_PATH_CHAR = '#';
 
+// unordered map indexed by path file containing {node_name, offset_in_memory}
 CSFilesLocationMap_t files_location;
 std::mutex files_location_mutex;
 
 int files_location_fd;
 FILE *files_location_fp;
+std::unordered_map<std::string, FILE *> files_location_fps;
 
-class FlockGuard {
+class Flock {
   private:
     int _fd;
+    short _l_type;
     struct flock _lock;
 
   public:
-    inline explicit FlockGuard(const int fd, const short l_type) : _fd(fd), _lock() {
+    inline explicit Flock(const int fd, const short l_type) : _fd(fd), _l_type(l_type), _lock() {
         START_LOG(gettid(), "call(fd=%d, l_type=%d)", _fd, l_type);
 
-        _lock.l_type   = l_type;
         _lock.l_whence = SEEK_SET;
         _lock.l_start  = 0;
         _lock.l_len    = 0;
         _lock.l_pid    = getpid();
+    }
+
+    Flock(const Flock &)            = delete;
+    Flock &operator=(const Flock &) = delete;
+    inline ~Flock()                 = default;
+
+    inline void lock() {
+        START_LOG(gettid(), "call()");
+
+        _lock.l_type = _l_type;
         if (fcntl(_fd, F_SETLKW, &_lock) < 0) {
             close(_fd);
             ERR_EXIT("CAPIO server failed to lock the file with error %d (%s)", errno,
@@ -36,11 +48,8 @@ class FlockGuard {
         }
     }
 
-    FlockGuard(const FlockGuard &)            = delete;
-    FlockGuard &operator=(const FlockGuard &) = delete;
-
-    inline ~FlockGuard() {
-        START_LOG(gettid(), "call(fd=%d)", _fd);
+    inline void unlock() {
+        START_LOG(gettid(), "call()");
 
         _lock.l_type = F_UNLCK;
         if (fcntl(_fd, F_SETLK, &_lock) < 0) {
@@ -50,6 +59,31 @@ class FlockGuard {
         }
     }
 };
+
+inline std::string get_file_location_name(const std::string &node) {
+    START_LOG(gettid(), "node=%s", node.c_str());
+
+    char file_location_name[HOST_NAME_MAX + 20];
+    sprintf(file_location_name, CAPIO_SERVER_FILES_LOCATION_NAME, node.c_str());
+    return {file_location_name};
+}
+
+inline FILE *get_file_location_descriptor(const std::string &name) {
+    START_LOG(gettid(), "name=%s", name.c_str());
+
+    if (files_location_fps.find(name) == files_location_fps.end()) {
+        FILE *descriptor;
+        if ((descriptor = fopen(name.c_str(), "a+")) == nullptr) {
+            ERR_EXIT("Error opening %s file: %d (%s)", name.c_str(), errno, strerror(errno));
+        }
+        if (lseek(fileno(descriptor), 0, SEEK_SET) == -1) {
+            ERR_EXIT("Error during lseek in file %s", name.c_str());
+        }
+        files_location_fps.emplace(name, descriptor);
+    }
+
+    return files_location_fps.at(name);
+}
 
 inline std::optional<std::reference_wrapper<std::pair<const char *const, long int>>>
 get_file_location_opt(const std::filesystem::path &path) {
@@ -106,46 +140,49 @@ void rename_file_location(const std::filesystem::path &oldpath,
  */
 bool load_file_location(const std::filesystem::path &path_to_load) {
     START_LOG(gettid(), "call(path_to_load=%s)", path_to_load.c_str());
-
-    auto line = reinterpret_cast<char *>(malloc((PATH_MAX + HOST_NAME_MAX + 10) * sizeof(char)));
-    const FlockGuard fg(files_location_fd, F_RDLCK);
-    off64_t old_offset = lseek(files_location_fd, 0, SEEK_CUR);
-    if (old_offset == -1) {
-        ERR_EXIT("lseek 1 delete_from_files_location");
-    }
-    LOG("Current %s offset is %ld", CAPIO_SERVER_FILES_LOCATION_NAME, old_offset);
-    if (fseek(files_location_fp, 0, SEEK_SET) == -1) {
-        ERR_EXIT("fseek in load_file_location");
-    }
-    LOG("%s offset has been moved to the beginning of the file", CAPIO_SERVER_FILES_LOCATION_NAME);
-    size_t len = 0;
     bool found = false;
-    while (getline(&line, &len, files_location_fp) != -1) {
-        if (line[0] == CAPIO_SERVER_INVALIDATE_FILE_PATH_CHAR) {
-            continue;
+    auto line  = reinterpret_cast<char *>(malloc((PATH_MAX + HOST_NAME_MAX + 10) * sizeof(char)));
+
+    for (auto &node : backend->get_nodes()) {
+        const std::string name = get_file_location_name(node);
+        FILE *descriptor       = get_file_location_descriptor(name);
+
+        Flock file_lock(fileno(descriptor), F_RDLCK);
+        const std::lock_guard<Flock> lg(file_lock);
+
+        if (fseek(descriptor, 0, SEEK_SET) == -1) {
+            ERR_EXIT("fseek in load_file_location");
         }
-        std::string_view line_str(line);
-        auto separator = line_str.find_first_of(' ');
-        const std::filesystem::path path(line_str.substr(0, separator));
-        std::string node(line_str.substr(separator + 1, line_str.length())); // remove ' '
-        node.pop_back();                             // remove \n from node name
-        auto node_str = new char[node.length() + 1]; // do not call delete[] on this
-        strcpy(node_str, node.c_str());
-        if (path == path_to_load) {
-            LOG("path %s was found on node %s", path_to_load.c_str(), node_str);
-            off64_t offset = lseek(files_location_fd, 0, SEEK_CUR);
-            if (offset == -1) {
-                ERR_EXIT("ftell in load_file_location");
+        LOG("%s offset has been moved to the beginning of the file", name.c_str());
+        size_t len = 0;
+
+        while (getline(&line, &len, descriptor) != -1) {
+            if (line[0] != CAPIO_SERVER_INVALIDATE_FILE_PATH_CHAR) {
+                std::string_view line_str(line);
+                auto separator = line_str.find_first_of(' ');
+                const std::filesystem::path path(line_str.substr(0, separator));
+                if (path.compare(path_to_load) == 0) {
+                    std::string node_str(
+                        line_str.substr(separator + 1, line_str.length())); // remove ' '
+                    node_str.pop_back();                       // remove \n from node name
+                    auto node_c = new char[node.length() + 1]; // do not call delete[] on this
+                    strcpy(node_c, node.c_str());
+                    LOG("path %s was found on node %s", path_to_load.c_str(), node_c);
+                    off64_t offset = lseek(fileno(descriptor), 0, SEEK_CUR);
+                    if (offset == -1) {
+                        ERR_EXIT("ftell in load_file_location");
+                    }
+                    add_file_location(path, node_c, offset);
+                    found = true;
+                    break;
+                }
             }
-            add_file_location(path, node_str, offset);
-            found = true;
+        }
+
+        if (found) {
             break;
         }
     }
-    if (lseek(files_location_fd, old_offset, SEEK_SET) == -1) {
-        ERR_EXIT("lseek 3 delete_from_files_location");
-    }
-    LOG("%s offset has been restored to %ld", CAPIO_SERVER_FILES_LOCATION_NAME, old_offset);
     free(line);
     return found;
 }
@@ -157,76 +194,65 @@ bool load_file_location(const std::filesystem::path &path_to_load) {
 int delete_from_files_location(const std::filesystem::path &path) {
     START_LOG(gettid(), "call(%s)", path.c_str());
 
+    int result           = 2;
     auto &[node, offset] = get_file_location(path);
+    LOG("Remove %s from node %s at offset %ld", path.c_str(), node, offset);
+    const std::string name = get_file_location_name(node);
+    FILE *descriptor       = get_file_location_descriptor(name);
+
+    Flock file_lock(fileno(descriptor), F_WRLCK);
+    const std::lock_guard<Flock> lg(file_lock);
+
+    if (offset == -1) {
+        if (fseek(descriptor, 0, SEEK_SET) == -1) {
+            ERR_EXIT("fseek in load_file_location");
+        }
+        LOG("%s offset has been moved to the beginning of the file", name.c_str());
+        auto line =
+            reinterpret_cast<char *>(malloc((PATH_MAX + HOST_NAME_MAX + 10) * sizeof(char)));
+        size_t len = 0;
+        offset     = 0;
+        while (getline(&line, &len, descriptor) != -1) {
+            if (line[0] != CAPIO_SERVER_INVALIDATE_FILE_PATH_CHAR) {
+                std::string_view line_str(line);
+                auto separator = line_str.find_first_of(' ');
+                const std::filesystem::path current_path(line_str.substr(0, separator));
+                if (path.compare(current_path) == 0) {
+                    LOG("Path %s found on %s", current_path.c_str(), name.c_str());
+                    result = 1;
+                    if (lseek(fileno(descriptor), offset, SEEK_SET) == -1) {
+                        ERR_EXIT("fseek delete_from_file_location");
+                    }
+                    if (write(files_location_fd, &CAPIO_SERVER_INVALIDATE_FILE_PATH_CHAR,
+                              sizeof(char)) != 1) {
+                        ERR_EXIT("fwrite unable to invalidate file %s in %s", current_path.c_str(),
+                                 name.c_str());
+                    }
+                    LOG("Path %s has been deleted from %s", current_path.c_str(), name.c_str());
+                    break;
+                }
+            }
+            offset += static_cast<off_t>(strlen(line));
+        }
+    } else {
+        result = 1;
+        if (lseek(fileno(descriptor), offset, SEEK_SET) == -1) {
+            ERR_EXIT("lseek 2 delete_from_files_location");
+        }
+        LOG("%s offset has been moved to %ld", name.c_str(), offset);
+        if (write(fileno(descriptor), &CAPIO_SERVER_INVALIDATE_FILE_PATH_CHAR, sizeof(char)) != 1) {
+            ERR_EXIT("write delete_from_files_location");
+        }
+        LOG("Path %s has been deleted from %s", path.c_str(), name.c_str());
+    }
+
+    // Delete from local data structures
     erase_from_files_location(path);
     for (auto &pair : writers) {
         pair.second.erase(path);
     }
-    if (offset == -1) {
-        const FlockGuard fg(files_location_fd, F_WRLCK);
-        long old_offset = lseek(files_location_fd, 0, SEEK_CUR);
-        if (old_offset == -1) {
-            ERR_EXIT("lseek 1 delete_from_files_location");
-        }
-        LOG("Current %s offset is %ld", CAPIO_SERVER_FILES_LOCATION_NAME, old_offset);
-        if (fseek(files_location_fp, 0, SEEK_SET) == -1) {
-            ERR_EXIT("fseek in load_file_location");
-        }
-        LOG("%s offset has been moved to the beginning of the file",
-            CAPIO_SERVER_FILES_LOCATION_NAME);
-        auto line =
-            reinterpret_cast<char *>(malloc((PATH_MAX + HOST_NAME_MAX + 10) * sizeof(char)));
-        size_t len = 0;
-        offset     = old_offset;
-        int result = 2;
-        while (getline(&line, &len, files_location_fp) != -1) {
-            if (line[0] == CAPIO_SERVER_INVALIDATE_FILE_PATH_CHAR) {
-                continue;
-            }
-            std::string_view line_str(line);
-            auto separator = line_str.find_first_of(' ');
-            const std::filesystem::path current_path(line_str.substr(0, separator));
-            if (is_prefix(path, current_path)) {
-                result = 1;
-                LOG("Path %s should be deleted from %s", current_path.c_str(),
-                    CAPIO_SERVER_FILES_LOCATION_NAME);
-                if (lseek(files_location_fd, offset, SEEK_SET) == -1) {
-                    ERR_EXIT("fseek delete_from_file_location");
-                }
-                if (write(files_location_fd, &CAPIO_SERVER_INVALIDATE_FILE_PATH_CHAR,
-                          sizeof(char)) != 1) {
-                    ERR_EXIT("fwrite unable to invalidate file %s in %s", current_path.c_str(),
-                             CAPIO_SERVER_FILES_LOCATION_NAME);
-                }
-                LOG("Path %s has been deleted from %s", current_path.c_str(),
-                    CAPIO_SERVER_FILES_LOCATION_NAME);
-            }
-            offset = lseek(files_location_fd, 0, SEEK_CUR);
-        }
-        if (lseek(files_location_fd, old_offset, SEEK_SET) == -1) {
-            ERR_EXIT("lseek 3 delete_from_files_location");
-        }
-        LOG("%s offset has been restored to %ld", CAPIO_SERVER_FILES_LOCATION_NAME, old_offset);
-        free(line);
-        return result;
-    } else {
-        LOG("fast remove offset %ld", offset);
-        const FlockGuard fg(files_location_fd, F_WRLCK);
-        long old_offset = lseek(files_location_fd, 0, SEEK_CUR);
-        if (old_offset == -1) {
-            ERR_EXIT("lseek 1 delete_from_files_location");
-        }
-        if (lseek(files_location_fd, offset, SEEK_SET) == -1) {
-            ERR_EXIT("lseek 2 delete_from_files_location");
-        }
-        if (write(files_location_fd, &CAPIO_SERVER_INVALIDATE_FILE_PATH_CHAR, sizeof(char)) == -1) {
-            ERR_EXIT("write delete_from_files_location");
-        }
-        if (lseek(files_location_fd, old_offset, SEEK_SET) == -1) {
-            ERR_EXIT("lseek 3 delete_from_files_location");
-        }
-        return 1;
-    }
+
+    return result;
 }
 
 void loop_load_file_location(const std::filesystem::path &path_to_load) {
@@ -240,26 +266,29 @@ void loop_load_file_location(const std::filesystem::path &path_to_load) {
 void open_files_location() {
     START_LOG(gettid(), "call()");
 
-    if ((files_location_fp = fopen(CAPIO_SERVER_FILES_LOCATION_NAME, "w+")) == nullptr) {
-        ERR_EXIT("Error opening %s file: %d (%s)", CAPIO_SERVER_FILES_LOCATION_NAME, errno,
+    std::string file_location_name = get_file_location_name(node_name);
+    if ((files_location_fp = fopen(file_location_name.c_str(), "w+")) == nullptr) {
+        ERR_EXIT("Error opening %s file: %d (%s)", file_location_name.c_str(), errno,
                  strerror(errno));
     }
-    if (chmod(CAPIO_SERVER_FILES_LOCATION_NAME, S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH) == -1) {
-        ERR_EXIT("Error changing permissions for %s file: %d (%s)",
-                 CAPIO_SERVER_FILES_LOCATION_NAME, errno, strerror(errno));
+    if (chmod(file_location_name.c_str(), S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH) == -1) {
+        ERR_EXIT("Error changing permissions for %s file: %d (%s)", file_location_name.c_str(),
+                 errno, strerror(errno));
     }
     if ((files_location_fd = fileno(files_location_fp)) == -1) {
-        ERR_EXIT("Error obtaining file descriptor for %s file: %d (%s)",
-                 CAPIO_SERVER_FILES_LOCATION_NAME, errno, strerror(errno));
+        ERR_EXIT("Error obtaining file descriptor for %s file: %d (%s)", file_location_name.c_str(),
+                 errno, strerror(errno));
     }
+    files_location_fps.emplace(file_location_name, files_location_fp);
 }
 
 void write_file_location(const std::filesystem::path &path_to_write) {
     START_LOG(gettid(), "call(path_to_write=%s)", path_to_write.c_str());
 
-    const FlockGuard fg(files_location_fd, F_WRLCK);
+    Flock file_lock(files_location_fd, F_WRLCK);
+    const std::lock_guard<Flock> lg(file_lock);
 
-    long offset = lseek(files_location_fd, 0, SEEK_CUR);
+    long offset = lseek(files_location_fd, 0, SEEK_END);
     if (offset == -1) {
         ERR_EXIT("lseek in write_file_location");
     }
