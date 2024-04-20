@@ -10,7 +10,9 @@
 #include "types.hpp"
 
 inline off64_t store_dirent(char *incoming, char *target_buffer, off64_t incoming_size) {
-    START_LOG(gettid(), "call(%s, %s, %to_store)", incoming, target_buffer, incoming_size);
+    START_LOG(gettid(), "call(incoming=0x%08x, target_buffer=0x%08x, incoming_size=%ld)", incoming,
+              target_buffer, incoming_size);
+
     off64_t stored_size = 0, i = 0;
     struct linux_dirent64 to_store {};
     struct linux_dirent64 *dir_entity;
