@@ -314,14 +314,20 @@ class Logger {
  *
  * Be careful that the code defined inside the DBG macro is not compiled when
  * building in Release.
+ *
+ * Be even MORE CAREFUL to not use any STL code inside the DBG lambda function as it could be
+ * captured by syscall_intercept (ie do not use std::cout unless you are 100% sure of what you are
+ * doing)
  */
 #define DBG(lambda)                                                                                \
     {                                                                                              \
         START_LOG(capio_syscall(SYS_GETTID),                                                       \
-                    "[  DBG  ]~~~~~~~~~~~~ START ~~~~~~~~~~~~~~[  DBG  ]"))                        \
+                  "[  DBG  ]~~~~~~~~~~~~ START ~~~~~~~~~~~~~~[  DBG  ]");                          \
         lambda;                                                                                    \
         LOG("[  DBG  ]~~~~~~~~~~~~ END  ~~~~~~~~~~~~~~[  DBG  ]");                                 \
     }
+
+
 #else
 
 #define ERR_EXIT(message, ...) exit(EXIT_FAILURE)
