@@ -3,6 +3,7 @@
 
 #if defined(SYS_getdents) || defined(SYS_getdents64)
 
+#include "capio/data_structure.hpp"
 #include "utils/common.hpp"
 #include "utils/data.hpp"
 
@@ -36,6 +37,27 @@ inline int getdents_handler_impl(long arg0, long arg1, long arg2, long *result, 
         set_capio_fd_offset(fd, offset + bytes_read);
 
         *result = bytes_read;
+
+        DBG(tid, [](struct linux_dirent64 *result, off64_t count) {
+            struct linux_dirent64 *d;
+            char d_type;
+            count /= sizeof(linux_dirent64);
+            for (size_t bpos = 0; bpos < count; bpos++) {
+                d = (result + bpos);
+                d_type = d->d_type;
+                printf("%8lu %-10s %4d %10jd  %s\n", d->d_ino,
+                       (d_type == 8)    ? "regular"
+                       : (d_type == 4)  ? "directory"
+                       : (d_type == 1)  ? "FIFO"
+                       : (d_type == 12) ? "socket"
+                       : (d_type == 10) ? "symlink"
+                       : (d_type == 6)  ? "block dev"
+                       : (d_type == 2)  ? "char dev"
+                                        : "???",
+                       d->d_reclen, (intmax_t) d->d_off, d->d_name);
+            }
+        }(buffer, bytes_read));
+
         return CAPIO_POSIX_SYSCALL_SUCCESS;
     } else {
         LOG("fd=%d, is not a capio file descriptor", fd);

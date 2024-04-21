@@ -288,6 +288,7 @@ class Logger {
     Logger log(__func__, __FILE__, __LINE__, tid, message, ##__VA_ARGS__)
 #define START_SYSCALL_LOGGING() logging_syscall = true
 #define SUSPEND_SYSCALL_LOGGING() SyscallLoggingSuspender sls{};
+
 /**
  * This macro is used to inject code into debug mode. It needs a self calling lambda function,
  * that is a lambda in the following form:
