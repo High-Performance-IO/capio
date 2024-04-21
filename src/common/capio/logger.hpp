@@ -322,7 +322,6 @@ class Logger {
         lambda;                                                                                    \
         LOG("[  DBG  ]~~~~~~~~~~~~ END  ~~~~~~~~~~~~~~[  DBG  ]");                                 \
     }
-
 #else
 
 #define ERR_EXIT(message, ...) exit(EXIT_FAILURE)
@@ -335,6 +334,7 @@ class Logger {
         __SHM_CHECK_CLI_MSG;                                                                       \
     }
 #define DBG(tid, lambda)
+
 #endif
 
 #endif // CAPIO_COMMON_LOGGER_HPP
