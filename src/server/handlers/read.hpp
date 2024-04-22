@@ -103,7 +103,7 @@ inline void handle_local_read(int tid, int fd, off64_t count, bool dir, bool is_
     } else {
         c_file.create_buffer_if_needed(path, false);
         char *p = c_file.get_buffer();
-        if (dir | is_getdents) {
+        if (is_getdents) {
             off64_t dir_size  = c_file.get_stored_size();
             off64_t n_entries = dir_size / CAPIO_THEORETICAL_SIZE_DIRENT64;
             char *p_getdents  = (char *) malloc(n_entries * sizeof(char) * dir_size);

@@ -57,9 +57,7 @@ template <class T, class Mutex> class Queue {
         SHM_DESTROY_CHECK(_last_elem_name.c_str());
     }
 
-    inline auto get_name(){
-        return this->_shm_name;
-    }
+    inline auto get_name() { return this->_shm_name; }
 
     inline void write(const T *data, long int num_bytes) {
         START_LOG(capio_syscall(SYS_gettid), "call(data=0x%08x)", data);
@@ -70,13 +68,13 @@ template <class T, class Mutex> class Queue {
 
         _sem_num_empty.lock();
 
-        {
-            std::lock_guard<Mutex> lg(_mutex);
+        auto lg = new std::lock_guard<Mutex>(_mutex);
 
-            memcpy((T *) _shm + *_last_elem, data, num_bytes);
-            *_last_elem = (*_last_elem + num_bytes) % _buff_size;
-            LOG("Wrote '%s' (%d) on %s", data, data, this->_shm_name.c_str());
-        }
+        memcpy((T *) _shm + *_last_elem, data, num_bytes);
+        *_last_elem = (*_last_elem + num_bytes) % _buff_size;
+        LOG("Wrote '%s' (%d) on %s", data, data, this->_shm_name.c_str());
+
+        delete lg;
 
         _sem_num_elems.unlock();
     }
@@ -95,12 +93,13 @@ template <class T, class Mutex> class Queue {
 
         _sem_num_elems.lock();
 
-        {
-            std::lock_guard<Mutex> lg(_mutex);
-            memcpy((T *) buff_rcv, ((T *) _shm) + *_first_elem, num_bytes);
-            *_first_elem = (*_first_elem + num_bytes) % _buff_size;
-            LOG("Received '%s' on %s", buff_rcv, this->_shm_name.c_str());
-        }
+        auto lg = new std::lock_guard<Mutex>(_mutex);
+        memcpy((T *) buff_rcv, ((T *) _shm) + *_first_elem, num_bytes);
+        *_first_elem = (*_first_elem + num_bytes) % _buff_size;
+        LOG("Received '%s' on %s", buff_rcv, this->_shm_name.c_str());
+
+        delete lg;
+
         _sem_num_empty.unlock();
     }
 
