@@ -65,6 +65,19 @@ constexpr int CAPIO_POSIX_SYSCALL_SUCCESS      = 0;
 constexpr char CAPIO_LOG_PRE_MSG[]        = "at[%s]: ";
 constexpr char CAPIO_DEFAULT_LOG_FOLDER[] = "capio_logs\0";
 
+// CAPIO common - shared memory constant names
+constexpr char SHM_FIRST_ELEM[]        = "_first_elem_";
+constexpr char SHM_LAST_ELEM[]         = "_last_elem_";
+constexpr char SHM_MUTEX_PREFIX[]      = "_mutex_";
+constexpr char SHM_SEM_ELEMS[]         = "_sem_num_elems_";
+constexpr char SHM_SEM_EMPTY[]         = "_sem_num_empty_";
+constexpr char SHM_SPSC_PREFIX_WRITE[] = "capio_write_tid_";
+constexpr char SHM_SPSC_PREFIX_READ[]  = "capio_read_tid_";
+
+// CAPIO common - shared channel by client and server
+constexpr char SHM_COMM_CHAN_NAME_REQ[]  = "request_buffer";
+constexpr char SHM_COMM_CHAN_NAME_RESP[] = "response_buffer_";
+
 // CAPIO logger - shm errors
 constexpr char CAPIO_SHM_OPEN_ERROR[] =
     "Unable to open shared memory segment. Could it be that another instance of capio server is "

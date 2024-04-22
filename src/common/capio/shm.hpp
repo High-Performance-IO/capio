@@ -11,6 +11,36 @@
 
 #include "capio/logger.hpp"
 
+#ifdef __CAPIO_POSIX
+
+#define SHM_DESTROY_CHECK(source_name)                                                             \
+    if (shm_unlink(source_name) == -1) {                                                           \
+        ERR_EXIT("Unable to destroy shared mem:  ", source_name);                                  \
+    };
+
+#define SHM_CREATE_CHECK(condition, source)                                                        \
+    if (condition) {                                                                               \
+        ERR_EXIT("Unable to open shm: %s", source);                                                \
+    };
+
+#else
+
+#define SHM_DESTROY_CHECK(source_name)                                                             \
+    if (shm_unlink(source_name) == -1) {                                                           \
+        std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_WARNING << "Unable to destroy shared mem: '"       \
+                  << source_name << "' (" << strerror(errno) << ")" << std::endl;                  \
+    };
+
+#define SHM_CREATE_CHECK(condition, source)                                                        \
+    if (condition) {                                                                               \
+        LOG("error while creating %s", source);                                                    \
+        std::cout << CAPIO_SERVER_CLI_LOG_SERVER_ERROR << "Unable to create shm: " << source       \
+                  << std::endl;                                                                    \
+        ERR_EXIT("Unable to open shm: %s", source);                                                \
+    };
+
+#endif
+
 class CapioShmCanary {
     int _shm_id;
     std::string _canary_name;

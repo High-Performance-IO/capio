@@ -6,8 +6,7 @@
 #include <unordered_set>
 #include <vector>
 
-#include "capio/circular_buffer.hpp"
-#include "capio/spsc_queue.hpp"
+#include "capio/queue.hpp"
 
 typedef std::unordered_map<int, int> CSPidsMap_T;
 typedef std::unordered_map<int, std::string> CSAppsMap_t;
@@ -16,7 +15,7 @@ typedef std::unordered_map<int, std::unordered_map<int, std::pair<CapioFile *, o
     CSProcessFileMap_t;
 typedef std::unordered_map<int, std::unordered_map<int, std::filesystem::path>>
     CSProcessFileMetadataMap_t;
-typedef std::unordered_map<int, std::pair<SPSCQueue<char> *, SPSCQueue<char> *>> CSDataBufferMap_t;
+typedef std::unordered_map<int, std::pair<SPSCQueue *, SPSCQueue *>> CSDataBufferMap_t;
 typedef std::unordered_map<std::string, CapioFile *> CSFilesMetadata_t;
 typedef std::unordered_map<
     std::string, std::tuple<std::string, std::string, std::string, long int, bool, long int>>
