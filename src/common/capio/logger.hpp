@@ -319,14 +319,13 @@ class Logger {
  * captured by syscall_intercept (ie do not use std::cout unless you are 100% sure of what you are
  * doing)
  */
-#define DBG(lambda)                                                                                \
+#define DBG(tid, lambda)                                                                           \
     {                                                                                              \
         START_LOG(capio_syscall(SYS_GETTID),                                                       \
                   "[  DBG  ]~~~~~~~~~~~~ START ~~~~~~~~~~~~~~[  DBG  ]");                          \
         lambda;                                                                                    \
         LOG("[  DBG  ]~~~~~~~~~~~~ END  ~~~~~~~~~~~~~~[  DBG  ]");                                 \
     }
-
 
 #else
 
@@ -339,7 +338,7 @@ class Logger {
     if (sem == SEM_FAILED) {                                                                       \
         __SHM_CHECK_CLI_MSG;                                                                       \
     }
-#define DBG(lambda)
+#define DBG(tid,lambda)
 #endif
 
 #endif // CAPIO_COMMON_LOGGER_HPP
