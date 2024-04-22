@@ -38,13 +38,19 @@ inline int getdents_handler_impl(long arg0, long arg1, long arg2, long *result, 
 
         *result = bytes_read;
 
-        DBG(tid, [](struct linux_dirent64 *result, off64_t count) {
-            struct linux_dirent64 *d;
+        DBG(tid, [](char *result, off64_t count) {
+            struct linux_dirent {
+                long           d_ino;
+                off_t          d_off;
+                unsigned short d_reclen;
+                char           d_name[];
+            };
+
+            struct linux_dirent *d;
             char d_type;
-            count /= sizeof(linux_dirent64);
-            for (size_t bpos = 0; bpos < count; bpos++) {
-                d = (result + bpos);
-                d_type = d->d_type;
+            for (size_t bpos = 0, i=0; bpos < count && i < 10; i++) {
+                d = (struct linux_dirent *) (result + bpos);
+                d_type = *(result + bpos + d->d_reclen - 1);
                 printf("%8lu %-10s %4d %10jd  %s\n", d->d_ino,
                        (d_type == 8)    ? "regular"
                        : (d_type == 4)  ? "directory"
@@ -55,8 +61,9 @@ inline int getdents_handler_impl(long arg0, long arg1, long arg2, long *result, 
                        : (d_type == 2)  ? "char dev"
                                         : "???",
                        d->d_reclen, (intmax_t) d->d_off, d->d_name);
+                bpos += d->d_reclen;
             }
-        }(buffer, bytes_read));
+        }((char*)buffer, bytes_read));
 
         return CAPIO_POSIX_SYSCALL_SUCCESS;
     } else {
