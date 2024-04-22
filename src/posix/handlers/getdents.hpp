@@ -48,10 +48,11 @@ inline int getdents_handler_impl(long arg0, long arg1, long arg2, long *result, 
 
             struct linux_dirent *d;
             char d_type;
+            printf("INODE\tTYPE\tRECORD_LENGTH\tOFFSET\tNAME\n");
             for (size_t bpos = 0, i=0; bpos < count && i < 10; i++) {
                 d = (struct linux_dirent *) (result + bpos);
                 d_type = *(result + bpos + d->d_reclen - 1);
-                printf("%8lu %-10s %4d %10jd  %s\n", d->d_ino,
+                printf("%8lu\t%-10s\t%4d\t%10jd\t%s\n", d->d_ino,
                        (d_type == 8)    ? "regular"
                        : (d_type == 4)  ? "directory"
                        : (d_type == 1)  ? "FIFO"
