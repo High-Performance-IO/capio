@@ -298,22 +298,19 @@ class Logger {
     }
 
 /**
- * This macro is used to inject code into debug mode.
- * To use, this macro needs a self calling lambda function, that is a lambda
- * in the following form:
+ * This macro is used to inject code into debug mode. It needs a self calling lambda function,
+ * that is a lambda in the following form:
  *
  * [](){}()
  *
  * For example, a debug code to print a value might be injected in this way:
  *
  * int value = 10;
- * DBG([](int i){printf("%d", i);}(value) );
+ * DBG(tid, [](int i){printf("%d", i);}(value) );
  *
  * This is useful to print or run debug actions with variables defined outside
- * of the scope of the given lambda function
- *
- * Be careful that the code defined inside the DBG macro is not compiled when
- * building in Release.
+ * of the scope of the given lambda function Be careful that the code defined inside the DBG
+ * macro is not compiled when building in Release.
  *
  * Be even MORE CAREFUL to not use any STL code inside the DBG lambda function as it could be
  * captured by syscall_intercept (ie do not use std::cout unless you are 100% sure of what you are
@@ -321,8 +318,7 @@ class Logger {
  */
 #define DBG(tid, lambda)                                                                           \
     {                                                                                              \
-        START_LOG(capio_syscall(SYS_GETTID),                                                       \
-                  "[  DBG  ]~~~~~~~~~~~~ START ~~~~~~~~~~~~~~[  DBG  ]");                          \
+        START_LOG(tid, "[  DBG  ]~~~~~~~~~~~~ START ~~~~~~~~~~~~~~[  DBG  ]");                     \
         lambda;                                                                                    \
         LOG("[  DBG  ]~~~~~~~~~~~~ END  ~~~~~~~~~~~~~~[  DBG  ]");                                 \
     }
@@ -338,7 +334,7 @@ class Logger {
     if (sem == SEM_FAILED) {                                                                       \
         __SHM_CHECK_CLI_MSG;                                                                       \
     }
-#define DBG(tid,lambda)
+#define DBG(tid, lambda)
 #endif
 
 #endif // CAPIO_COMMON_LOGGER_HPP
