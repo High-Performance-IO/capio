@@ -105,7 +105,7 @@ inline off64_t add_getdents_request(const int fd, const off64_t count, bool is64
     buf_requests->write(req, CAPIO_REQUEST_MAX_SIZE);
     off64_t res;
     bufs_response->at(tid)->read(&res);
-    DBG(tid, [](off64_t res) {printf("Result of getends: %ld\n", res); }(res));
+    DBG(tid, [](off64_t res) { printf("Result of getends: %ld\n", res); }(res));
     return res;
 }
 

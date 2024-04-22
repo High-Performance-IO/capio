@@ -32,7 +32,6 @@ inline int getdents_handler_impl(long arg0, long arg1, long arg2, long *result, 
             bytes_read = count_off;
         }
 
-        //TODO: remove dirent_round as it should not be needed
         bytes_read = dirent_round(bytes_read);
         read_data(tid, buffer, bytes_read);
         set_capio_fd_offset(fd, offset + bytes_read);
@@ -47,24 +46,23 @@ inline int getdents_handler_impl(long arg0, long arg1, long arg2, long *result, 
                 unsigned char d_type;
                 char d_name[];
             };
-
+            START_LOG(syscall_no_intercept(SYS_gettid), "call ()");
             struct linux_dirent *d;
-            printf(
-                "READ from "
+            LOG("READ from "
                 "queue:\n\tOFFSET:%ld,\n\tcount:%ld\n\nINODE\tTYPE\tRECORD_LENGTH\tOFFSET\tNAME\n",
                 offset, count);
             for (size_t bpos = 0, i = 0; bpos < count && i < 10; i++) {
                 d = (struct linux_dirent *) (result + bpos);
-                printf("%8lu\t%-10s (%ld)\t%4d\t%10jd\t%s\n", d->d_ino,
-                       (d->d_type == 8)    ? "regular"
-                       : (d->d_type == 4)  ? "directory"
-                       : (d->d_type == 1)  ? "FIFO"
-                       : (d->d_type == 12) ? "socket"
-                       : (d->d_type == 10) ? "symlink"
-                       : (d->d_type == 6)  ? "block dev"
-                       : (d->d_type == 2)  ? "char dev"
-                                           : "???",
-                       d->d_type, d->d_reclen, (intmax_t) d->d_off, d->d_name);
+                LOG("%8lu\t%-10s (%ld)\t%4d\t%10jd\t%s\n", d->d_ino,
+                    (d->d_type == 8)    ? "regular"
+                    : (d->d_type == 4)  ? "directory"
+                    : (d->d_type == 1)  ? "FIFO"
+                    : (d->d_type == 12) ? "socket"
+                    : (d->d_type == 10) ? "symlink"
+                    : (d->d_type == 6)  ? "block dev"
+                    : (d->d_type == 2)  ? "char dev"
+                                        : "???",
+                    d->d_type, d->d_reclen, (intmax_t) d->d_off, d->d_name);
                 bpos += d->d_reclen;
             }
         }((char *) buffer, bytes_read, offset));

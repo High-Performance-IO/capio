@@ -1,5 +1,5 @@
-#ifndef CAPIO_COMMON_QUEUE_HPP
-#define CAPIO_COMMON_QUEUE_HPP
+#ifndef CAPIO_QUEUE_HPP
+#define CAPIO_QUEUE_HPP
 
 #include <iostream>
 #include <mutex>
@@ -68,20 +68,12 @@ template <class T, class Mutex> class Queue {
 
         _sem_num_empty.lock();
 
-        auto lg = new std::lock_guard<Mutex>(_mutex);
-
-        memcpy((T *) _shm + *_last_elem, data, num_bytes);
-        *_last_elem = (*_last_elem + num_bytes) % _buff_size;
+        std::lock_guard<Mutex> lg(_mutex);
+        memcpy((char *) _shm + *_last_elem, data, num_bytes);
+        *_last_elem = (*_last_elem + _elem_size) % _buff_size;
         LOG("Wrote '%s' (%d) on %s", data, data, this->_shm_name.c_str());
 
-        delete lg;
-
         _sem_num_elems.unlock();
-    }
-
-    inline void write(const T *data) {
-        START_LOG(capio_syscall(SYS_gettid), "call()");
-        write(data, _elem_size);
     }
 
     inline void read(T *buff_rcv, long int num_bytes) {
@@ -93,19 +85,21 @@ template <class T, class Mutex> class Queue {
 
         _sem_num_elems.lock();
 
-        auto lg = new std::lock_guard<Mutex>(_mutex);
-        memcpy((T *) buff_rcv, ((T *) _shm) + *_first_elem, num_bytes);
-        *_first_elem = (*_first_elem + num_bytes) % _buff_size;
-        LOG("Received '%s' on %s", buff_rcv, this->_shm_name.c_str());
-
-        delete lg;
+        std::lock_guard<Mutex> lg(_mutex);
+        memcpy((char *) buff_rcv, ((char *) _shm) + *_first_elem, num_bytes);
+        *_first_elem = (*_first_elem + _elem_size) % _buff_size;
 
         _sem_num_empty.unlock();
     }
 
     inline void read(T *buf_rcv) {
+        START_LOG(capio_syscall(SYS_gettid), "call(buff_rcv=0x%08x)", buf_rcv);
+        this->read(buf_rcv, _elem_size);
+    }
+
+    inline void write(const T *data) {
         START_LOG(capio_syscall(SYS_gettid), "call()");
-        read(buf_rcv, _elem_size);
+        this->write(data, _elem_size);
     }
 };
 
@@ -114,5 +108,4 @@ template <class T> using CircularBuffer = Queue<T, NamedSemaphore>;
 
 // Single Producer Single Consumer queue
 using SPSCQueue = Queue<char, NoLock>;
-
-#endif // CAPIO_COMMON_QUEUE_HPP
+#endif // CAPIO_QUEUE_HPP
