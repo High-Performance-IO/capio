@@ -1,8 +1,7 @@
-#include <utility>
+#ifndef CAPIO_CPMA_CHANNEL_HPP
+#define CAPIO_CPMA_CHANNEL_HPP
 
-#ifndef CAPIO_SHM_CHANNELS_HPP
-#define CAPIO_SHM_CHANNELS_HPP
-template <typename T> class SHMChannel {
+template <typename T> class CPMAChannel {
   protected:
     void *_shm;
     long int *_first_elem = nullptr, *_last_elem = nullptr;
@@ -11,8 +10,8 @@ template <typename T> class SHMChannel {
     long int _buff_size;       // buffer size in bytes
 
   public:
-    explicit SHMChannel(long int buff_size, std::string &shm_name, std::string first_elem_name,
-                        std::string last_elem_name, const long int elem_size)
+    explicit CPMAChannel(long int buff_size, std::string &shm_name, std::string first_elem_name,
+                         std::string last_elem_name, const long int elem_size)
         : _shm_name(std::move(shm_name)), _first_elem_name(std::move(first_elem_name)),
           _last_elem_name(std::move(last_elem_name)), _elem_size(elem_size), _buff_size(buff_size) {
         START_LOG(capio_syscall(SYS_gettid), "call()");
@@ -28,7 +27,7 @@ template <typename T> class SHMChannel {
 
     inline auto get_name() { return this->_shm_name; }
 
-    ~SHMChannel() {
+    ~CPMAChannel() {
         START_LOG(capio_syscall(SYS_gettid),
                   "call(_shm_name=%s, _first_elem_name=%s, _last_elem_name=%s)", _shm_name.c_str(),
                   _first_elem_name.c_str(), _last_elem_name.c_str());
@@ -61,4 +60,5 @@ template <typename T> class SHMChannel {
         LOG("Read '%s' (%d) on %s", buff_rcv, buff_rcv, _shm_name.c_str());
     }
 };
-#endif // CAPIO_SHM_CHANNELS_HPP
+
+#endif // CAPIO_CPMA_CHANNEL_HPP

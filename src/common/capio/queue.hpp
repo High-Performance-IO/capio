@@ -11,6 +11,7 @@
 #include "capio/semaphore.hpp"
 #include "capio/shm.hpp"
 
+#include "capio/channels/cpma_channel.hpp"
 #include "capio/channels/shm_channels.hpp"
 
 template <class T, class Mutex, class TransferChannel> class Queue {
@@ -75,7 +76,11 @@ template <class T, class Mutex, class TransferChannel> class Queue {
 };
 
 // Circular Buffer queue for requests
+#ifndef CAPIO_CROSS_PROCESS_MEMORY_ACCESS
 template <class T> using CircularBuffer = Queue<T, NamedSemaphore, SHMChannel<T>>;
+#else
+template <class T> using CircularBuffer = Queue<T, NoLock, CPMAChannel<T>>;
+#endif
 
 // Single Producer Single Consumer queue
 using SPSCQueue = Queue<char, NoLock, SHMChannel<char>>;

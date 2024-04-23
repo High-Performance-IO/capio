@@ -59,6 +59,13 @@ IF (CAPIO_SYNC)
     add_compile_definitions(CAPIOSYNC)
 ENDIF (CAPIO_SYNC)
 
+
+## To use a backend between client and server with
+## process_vm_readv and process_vm_writev. default use SHM
+IF (CAPIO_CPMA)
+    add_compile_definitions(CAPIO_CROSS_PROCESS_MEMORY_ACCESS)
+ENDIF (CAPIO_CPMA)
+
 #####################################
 # Include files and directories
 #####################################
