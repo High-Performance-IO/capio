@@ -51,12 +51,12 @@ template <typename T> class SHMChannel {
 
     inline void read(T *buff_rcv, long int num_bytes) {
         START_LOG(capio_syscall(SYS_gettid), "call()");
-        memcpy((char *) buff_rcv, ((char *) _shm) + *_first_elem, num_bytes);
 
         if (num_bytes > _elem_size) {
             ERR_EXIT("Queue %s read error: num_bytes > _elem_size", _shm_name.c_str());
         }
 
+        memcpy((char *) buff_rcv, ((char *) _shm) + *_first_elem, num_bytes);
         *_first_elem = (*_first_elem + _elem_size) % _buff_size;
         LOG("Read '%s' (%d) on %s", buff_rcv, buff_rcv, _shm_name.c_str());
     }

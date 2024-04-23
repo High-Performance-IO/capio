@@ -76,12 +76,13 @@ template <class T, class Mutex, class TransferChannel> class Queue {
 };
 
 // Circular Buffer queue for requests
+template <class T> using CircularBuffer = Queue<T, NoLock, SHMChannel<T>>;
+
+// Single Producer Single Consumer queue for data transfer
 #ifndef CAPIO_CROSS_PROCESS_MEMORY_ACCESS
-template <class T> using CircularBuffer = Queue<T, NamedSemaphore, SHMChannel<T>>;
+using SPSCQueue = Queue<char, NoLock, SHMChannel<char>>;
 #else
-template <class T> using CircularBuffer = Queue<T, NoLock, CPMAChannel<T>>;
+using SPSCQueue = Queue<char, NoLock, CPMAChannel<char>>;
 #endif
 
-// Single Producer Single Consumer queue
-using SPSCQueue = Queue<char, NoLock, SHMChannel<char>>;
 #endif // CAPIO_QUEUE_HPP

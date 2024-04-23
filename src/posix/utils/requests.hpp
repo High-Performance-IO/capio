@@ -35,6 +35,18 @@ inline void register_listener(long tid) {
     bufs_response->insert(std::make_pair(tid, p_buf_response));
 }
 
+inline void handshake_anonymous_request(const long tid, const long pid) {
+    char req[CAPIO_REQUEST_MAX_SIZE];
+    sprintf(req, "%04d %ld %ld", CAPIO_REQUEST_HANDSHAKE_ANONYMOUS, tid, pid);
+    buf_requests->write(req, CAPIO_REQUEST_MAX_SIZE);
+}
+
+inline void handshake_named_request(const long tid, const long pid, const std::string &app_name) {
+    char req[CAPIO_REQUEST_MAX_SIZE];
+    sprintf(req, "%04d %ld %ld %s", CAPIO_REQUEST_HANDSHAKE_NAMED, tid, pid, app_name.c_str());
+    buf_requests->write(req, CAPIO_REQUEST_MAX_SIZE);
+}
+
 inline off64_t access_request(const std::filesystem::path &path, const long tid) {
     char req[CAPIO_REQUEST_MAX_SIZE];
     sprintf(req, "%04d %ld %s", CAPIO_REQUEST_ACCESS, tid, path.c_str());
@@ -105,20 +117,7 @@ inline off64_t add_getdents_request(const int fd, const off64_t count, bool is64
     buf_requests->write(req, CAPIO_REQUEST_MAX_SIZE);
     off64_t res;
     bufs_response->at(tid)->read(&res);
-    DBG(tid, [](off64_t res) { printf("Result of getends: %ld\n", res); }(res));
     return res;
-}
-
-inline void handshake_anonymous_request(const long tid, const long pid) {
-    char req[CAPIO_REQUEST_MAX_SIZE];
-    sprintf(req, "%04d %ld %ld", CAPIO_REQUEST_HANDSHAKE_ANONYMOUS, tid, pid);
-    buf_requests->write(req, CAPIO_REQUEST_MAX_SIZE);
-}
-
-inline void handshake_named_request(const long tid, const long pid, const std::string &app_name) {
-    char req[CAPIO_REQUEST_MAX_SIZE];
-    sprintf(req, "%04d %ld %ld %s", CAPIO_REQUEST_HANDSHAKE_NAMED, tid, pid, app_name.c_str());
-    buf_requests->write(req, CAPIO_REQUEST_MAX_SIZE);
 }
 
 inline CPStatResponse_t fstat_request(const int fd, const long tid) {
