@@ -11,7 +11,9 @@
 #include "capio/semaphore.hpp"
 #include "capio/shm.hpp"
 
-template <class T, class Mutex> class Queue {
+#include "capio/channels.hpp"
+
+template <class T, class Mutex, class TransferChannel> class Queue {
   private:
     void *_shm;
     const long int _max_num_elems, _elem_size; // elements size in bytes
@@ -20,6 +22,7 @@ template <class T, class Mutex> class Queue {
     const std::string _shm_name, _first_elem_name, _last_elem_name;
     Mutex _mutex;
     NamedSemaphore _sem_num_elems, _sem_num_empty;
+    TransferChannel channel;
 
   public:
     Queue(const std::string &shm_name, const long int max_num_elems, const long int elem_size,
@@ -35,15 +38,8 @@ template <class T, class Mutex> class Queue {
                   "call(shm_name=%s, _max_num_elems=%ld, elem_size=%ld, "
                   "workflow_name=%s)",
                   shm_name.data(), max_num_elems, elem_size, workflow_name.data());
-
-        _first_elem = (long int *) create_shm(_first_elem_name, sizeof(long int));
-        _last_elem  = (long int *) create_shm(_last_elem_name, sizeof(long int));
-        _shm        = get_shm_if_exist(_shm_name);
-        if (_shm == nullptr) {
-            *_first_elem = 0;
-            *_last_elem  = 0;
-            _shm         = create_shm(_shm_name, _buff_size);
-        }
+        channel.init(std::ref(_shm), std::ref(_last_elem), std::ref(_first_elem), _buff_size,
+                     _shm_name, _first_elem_name, _last_elem_name);
     }
 
     Queue(const Queue &)            = delete;
@@ -67,12 +63,8 @@ template <class T, class Mutex> class Queue {
         }
 
         _sem_num_empty.lock();
-
         std::lock_guard<Mutex> lg(_mutex);
-        memcpy((char *) _shm + *_last_elem, data, num_bytes);
-        *_last_elem = (*_last_elem + _elem_size) % _buff_size;
-        LOG("Wrote '%s' (%d) on %s", data, data, this->_shm_name.c_str());
-
+        channel.write(_shm, data, num_bytes, _last_elem, _elem_size, _buff_size, _shm_name);
         _sem_num_elems.unlock();
     }
 
@@ -84,11 +76,8 @@ template <class T, class Mutex> class Queue {
         }
 
         _sem_num_elems.lock();
-
         std::lock_guard<Mutex> lg(_mutex);
-        memcpy((char *) buff_rcv, ((char *) _shm) + *_first_elem, num_bytes);
-        *_first_elem = (*_first_elem + _elem_size) % _buff_size;
-
+        channel.read(buff_rcv, num_bytes, _shm, _first_elem, _elem_size, _buff_size, _shm_name);
         _sem_num_empty.unlock();
     }
 
@@ -104,8 +93,8 @@ template <class T, class Mutex> class Queue {
 };
 
 // Circular Buffer queue for requests
-template <class T> using CircularBuffer = Queue<T, NamedSemaphore>;
+template <class T> using CircularBuffer = Queue<T, NamedSemaphore, SHMChannel<T>>;
 
 // Single Producer Single Consumer queue
-using SPSCQueue = Queue<char, NoLock>;
+using SPSCQueue = Queue<char, NoLock, SHMChannel<char>>;
 #endif // CAPIO_QUEUE_HPP

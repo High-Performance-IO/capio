@@ -3,7 +3,8 @@
 #####################################
 set(TARGET_NAME capio_posix)
 set(TARGET_INCLUDE_FOLDER ${CMAKE_CURRENT_SOURCE_DIR})
-set(TARGET_SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/libcapio_posix.cpp)
+set(TARGET_SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/libcapio_posix.cpp
+        ../common/capio/channels.hpp)
 
 #####################################
 # Target definition
