@@ -60,7 +60,7 @@ CSWritersMap_t writers;
 
 CSClientsRemotePendingNFilesMap_t clients_remote_pending_nfiles;
 
-sem_t clients_remote_pending_nfiles_sem;
+std::mutex nfiles_mutex;
 
 #include "handlers.hpp"
 #include "utils/location.hpp"
@@ -99,7 +99,7 @@ static constexpr std::array<CSHandler_t, CAPIO_NR_REQUESTS> build_request_handle
     return _request_handlers;
 }
 
-[[noreturn]] void capio_server(sem_t *internal_server_sem) {
+[[noreturn]] void capio_server(Semaphore &internal_server_sem) {
     static const std::array<CSHandler_t, CAPIO_NR_REQUESTS> request_handlers =
         build_request_handlers_table();
 
@@ -113,16 +113,17 @@ static constexpr std::array<CSHandler_t, CAPIO_NR_REQUESTS> build_request_handle
 
     init_server();
 
-    if (sem_post(internal_server_sem) == -1) {
-        ERR_EXIT("sem_post internal_server_sem in capio_server");
-    }
+    internal_server_sem.unlock();
 
     auto str = std::unique_ptr<char[]>(new char[CAPIO_REQUEST_MAX_SIZE]);
     while (true) {
         LOG(CAPIO_LOG_SERVER_REQUEST_START);
         int code = read_next_request(str.get());
         if (code < 0 || code > CAPIO_NR_REQUESTS) {
-            ERR_EXIT("Received an invalid request code %d", code);
+            std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_ERROR << "Received invalid code: " << code
+                      << std::endl;
+
+            ERR_EXIT("Error: received invalid request code");
         }
         request_handlers[code](str.get());
         LOG(CAPIO_LOG_SERVER_REQUEST_END);
@@ -150,6 +151,10 @@ int parseCLI(int argc, char **argv) {
     args::ValueFlag<std::string> backend_flag(
         arguments, "backend", CAPIO_SERVER_ARG_PARSER_CONFIG_BACKEND_HELP, {'b', "backend"});
 
+    args::Flag continueOnErrorFlag(arguments, "continue-on-error",
+                                   CAPIO_SERVER_ARG_PARSER_CONFIG_NCONTINUE_ON_ERROR_HELP,
+                                   {"continue-on-error"});
+
     try {
         parser.ParseCLI(argc, argv);
     } catch (args::Help &) {
@@ -163,6 +168,18 @@ int parseCLI(int argc, char **argv) {
         std::cerr << e.what() << std::endl;
         std::cerr << parser;
         exit(EXIT_FAILURE);
+    }
+
+    if (continueOnErrorFlag) {
+#ifdef CAPIOLOG
+        continue_on_error = true;
+        std::cout << CAPIO_LOG_SERVER_CLI_CONT_ON_ERR_WARNING << std::endl;
+#else
+        std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_WARNING
+                  << "--continue-on-error flag given, but logger is not compiled into CAPIO. Flag "
+                     "is ignored."
+                  << std::endl;
+#endif
     }
 
     if (logfile_folder) {
@@ -252,7 +269,7 @@ int parseCLI(int argc, char **argv) {
 
 int main(int argc, char **argv) {
 
-    sem_t internal_server_sem;
+    Semaphore internal_server_sem(0);
 
     std::cout << CAPIO_LOG_SERVER_BANNER;
 
@@ -264,21 +281,12 @@ int main(int argc, char **argv) {
 
     shm_canary = new CapioShmCanary(workflow_name);
 
-    int res = sem_init(&internal_server_sem, 0, 0);
-    if (res != 0) {
-        ERR_EXIT("sem_init internal_server_sem failed with status %d", res);
-    }
-    if (sem_init(&clients_remote_pending_nfiles_sem, 0, 1) == -1) {
-        ERR_EXIT("sem_init clients_remote_pending_nfiles_sem in main");
-    }
-    std::thread server_thread(capio_server, &internal_server_sem);
+    std::thread server_thread(capio_server, std::ref(internal_server_sem));
     LOG("capio_server thread started");
-    std::thread remote_listener_thread(capio_remote_listener, &internal_server_sem);
+    std::thread remote_listener_thread(capio_remote_listener, std::ref(internal_server_sem));
     LOG("capio_remote_listener thread started.");
     server_thread.join();
     remote_listener_thread.join();
-
-    SEM_DESTROY_CHECK(&internal_server_sem, "sem_destroy", delete backend;);
 
     delete backend;
     return 0;

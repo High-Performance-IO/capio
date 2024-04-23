@@ -9,7 +9,7 @@
 
 int actual_num_writes = 1;
 
-CPBufRequest_t *buf_requests;
+CircularBuffer<char> *buf_requests;
 CPBufResponse_t *bufs_response;
 
 /**
@@ -18,8 +18,8 @@ CPBufResponse_t *bufs_response;
  */
 inline void init_client() {
     // TODO: replace number with constexpr
-    buf_requests  = new CPBufRequest_t("circular_buffer", 1024 * 1024, CAPIO_REQUEST_MAX_SIZE,
-                                       CAPIO_SEM_TIMEOUT_NANOSEC, CAPIO_SEM_MAX_RETRIES);
+    buf_requests =
+        new CircularBuffer<char>(SHM_COMM_CHAN_NAME_REQ, 1024 * 1024, CAPIO_REQUEST_MAX_SIZE);
     bufs_response = new CPBufResponse_t();
 }
 
@@ -30,9 +30,8 @@ inline void init_client() {
  */
 inline void register_listener(long tid) {
     // TODO: replace numbers with constexpr
-    auto *p_buf_response =
-        new CircularBuffer<off_t>("buf_response_" + std::to_string(tid), 8 * 1024 * 1024,
-                                  sizeof(off_t), CAPIO_SEM_TIMEOUT_NANOSEC, CAPIO_SEM_MAX_RETRIES);
+    auto *p_buf_response = new CircularBuffer<off_t>(SHM_COMM_CHAN_NAME_RESP + std::to_string(tid),
+                                                     8 * 1024 * 1024, sizeof(off_t));
     bufs_response->insert(std::make_pair(tid, p_buf_response));
 }
 
@@ -106,6 +105,7 @@ inline off64_t add_getdents_request(const int fd, const off64_t count, bool is64
     buf_requests->write(req, CAPIO_REQUEST_MAX_SIZE);
     off64_t res;
     bufs_response->at(tid)->read(&res);
+    DBG(tid, [](off64_t res) { printf("Result of getends: %ld\n", res); }(res));
     return res;
 }
 

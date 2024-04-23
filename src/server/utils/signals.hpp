@@ -7,7 +7,7 @@
 
 void sig_term_handler(int signum, siginfo_t *info, void *ptr) {
     START_LOG(gettid(), "call(signal=[%d] (%s) from process with pid=%ld)", signum,
-              strsignal(signum), info->si_pid);
+              strsignal(signum), info != nullptr ? info->si_pid : -1);
 
     std::cout << std::endl
               << CAPIO_LOG_SERVER_CLI_LEVEL_WARNING << "shutting down server" << std::endl;
@@ -25,8 +25,12 @@ void sig_term_handler(int signum, siginfo_t *info, void *ptr) {
     std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_WARNING << "shm cleanup completed" << std::endl;
 
     for (auto &p : data_buffers) {
-        p.second.first->free_shm();
-        p.second.second->free_shm();
+        std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_WARNING << "Deleting data buffer for "
+                  << p.second.first->get_name() << std::endl;
+        delete p.second.first;
+        std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_WARNING << "Deleting data buffer for "
+                  << p.second.second->get_name() << std::endl;
+        delete p.second.second;
     }
 
     std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_WARNING << "data_buffers cleanup completed"

@@ -11,6 +11,36 @@
 
 #include "capio/logger.hpp"
 
+#ifdef __CAPIO_POSIX
+
+#define SHM_DESTROY_CHECK(source_name)                                                             \
+    if (shm_unlink(source_name) == -1) {                                                           \
+        ERR_EXIT("Unable to destroy shared mem:  ", source_name);                                  \
+    };
+
+#define SHM_CREATE_CHECK(condition, source)                                                        \
+    if (condition) {                                                                               \
+        ERR_EXIT("Unable to open shm: %s", source);                                                \
+    };
+
+#else
+
+#define SHM_DESTROY_CHECK(source_name)                                                             \
+    if (shm_unlink(source_name) == -1) {                                                           \
+        std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_WARNING << "Unable to destroy shared mem: '"       \
+                  << source_name << "' (" << strerror(errno) << ")" << std::endl;                  \
+    };
+
+#define SHM_CREATE_CHECK(condition, source)                                                        \
+    if (condition) {                                                                               \
+        LOG("error while creating %s", source);                                                    \
+        std::cout << CAPIO_SERVER_CLI_LOG_SERVER_ERROR << "Unable to create shm: " << source       \
+                  << std::endl;                                                                    \
+        ERR_EXIT("Unable to open shm: %s", source);                                                \
+    };
+
+#endif
+
 class CapioShmCanary {
     int _shm_id;
     std::string _canary_name;
@@ -41,14 +71,7 @@ class CapioShmCanary {
                   << std::endl;
 #endif
         close(_shm_id);
-        int success = shm_unlink(_canary_name.data());
-        LOG("Removed shm canary? %s (errno: %s)", success == 0 ? "yes" : "no", strerror(errno));
-#ifndef __CAPIO_POSIx
-        if (success != 0) {
-            std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_ERROR << "Unable to remove shm canary "
-                      << _canary_name.data() << " due to: " << strerror(errno) << std::endl;
-        }
-#endif
+        SHM_DESTROY_CHECK(_canary_name.c_str());
     }
 };
 
@@ -60,21 +83,17 @@ void *create_shm(const std::string &shm_name, const long int size) {
     // if we are not creating a new object, mode is equals to 0
     int fd = shm_open(shm_name.c_str(), O_CREAT | O_RDWR,
                       S_IRUSR | S_IWUSR); // to be closed
-    if (fd == -1) {
-        __SHM_CHECK_CLI_MSG;
-        ERR_EXIT("create_shm shm_open %s", shm_name.c_str());
-    }
+    SHM_CREATE_CHECK(fd == -1, shm_name.c_str());
+
     if (ftruncate(fd, size) == -1) {
-        __SHM_CHECK_CLI_MSG;
         ERR_EXIT("ftruncate create_shm %s", shm_name.c_str());
     }
     void *p = mmap(nullptr, size, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
     if (p == MAP_FAILED) {
-        __SHM_CHECK_CLI_MSG;
         ERR_EXIT("mmap create_shm %s", shm_name.c_str());
     }
     if (close(fd) == -1) {
-        __SHM_CHECK_CLI_MSG;
+
         ERR_EXIT("close");
     }
     return p;

@@ -3,6 +3,7 @@
 
 #if defined(SYS_getdents) || defined(SYS_getdents64)
 
+#include "capio/data_structure.hpp"
 #include "utils/common.hpp"
 #include "utils/data.hpp"
 
@@ -31,11 +32,41 @@ inline int getdents_handler_impl(long arg0, long arg1, long arg2, long *result, 
             bytes_read = count_off;
         }
 
-        bytes_read = round(bytes_read, is64bit);
+        bytes_read = dirent_round(bytes_read);
         read_data(tid, buffer, bytes_read);
         set_capio_fd_offset(fd, offset + bytes_read);
 
         *result = bytes_read;
+
+        DBG(tid, [](char *result, off64_t count, off64_t offset) {
+            struct linux_dirent {
+                uint64_t d_ino;
+                off64_t d_off;
+                unsigned short d_reclen;
+                unsigned char d_type;
+                char d_name[];
+            };
+            START_LOG(syscall_no_intercept(SYS_gettid), "call ()");
+            struct linux_dirent *d;
+            LOG("READ from "
+                "queue:\n\tOFFSET:%ld,\n\tcount:%ld\n\nINODE\tTYPE\tRECORD_LENGTH\tOFFSET\tNAME\n",
+                offset, count);
+            for (size_t bpos = 0, i = 0; bpos < count && i < 10; i++) {
+                d = (struct linux_dirent *) (result + bpos);
+                LOG("%8lu\t%-10s (%ld)\t%4d\t%10jd\t%s\n", d->d_ino,
+                    (d->d_type == 8)    ? "regular"
+                    : (d->d_type == 4)  ? "directory"
+                    : (d->d_type == 1)  ? "FIFO"
+                    : (d->d_type == 12) ? "socket"
+                    : (d->d_type == 10) ? "symlink"
+                    : (d->d_type == 6)  ? "block dev"
+                    : (d->d_type == 2)  ? "char dev"
+                                        : "???",
+                    d->d_type, d->d_reclen, (intmax_t) d->d_off, d->d_name);
+                bpos += d->d_reclen;
+            }
+        }((char *) buffer, bytes_read, offset));
+
         return CAPIO_POSIX_SYSCALL_SUCCESS;
     } else {
         LOG("fd=%d, is not a capio file descriptor", fd);

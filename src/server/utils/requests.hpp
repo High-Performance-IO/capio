@@ -15,9 +15,8 @@ CSBufResponse_t *bufs_response;
  */
 inline void init_server() {
     // TODO: replace number with constexpr
-    buf_requests =
-        new CSBufRequest_t("circular_buffer", 1024 * 1024, CAPIO_REQUEST_MAX_SIZE,
-                           CAPIO_SEM_TIMEOUT_NANOSEC, CAPIO_SEM_MAX_RETRIES, workflow_name);
+    buf_requests  = new CSBufRequest_t(SHM_COMM_CHAN_NAME_REQ, 1024 * 1024, CAPIO_REQUEST_MAX_SIZE,
+                                       workflow_name);
     bufs_response = new CSBufResponse_t();
 }
 
@@ -26,14 +25,11 @@ inline void init_server() {
  * @return
  */
 inline void destroy_server() {
-    buf_requests->free_shm();
+    delete buf_requests;
     std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_WARNING << "buf_requests cleanup completed"
               << std::endl;
 
-    for (auto &pair : *bufs_response) {
-        pair.second->free_shm();
-        delete pair.second;
-    }
+    delete bufs_response;
     std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_WARNING << "buf_response cleanup completed"
               << std::endl;
 }
@@ -45,9 +41,8 @@ inline void destroy_server() {
  */
 inline void register_listener(long tid) {
     // TODO: replace numbers with constexpr
-    auto *p_buf_response = new CircularBuffer<off_t>(
-        "buf_response_" + std::to_string(tid), 8 * 1024 * 1024, sizeof(off_t),
-        CAPIO_SEM_TIMEOUT_NANOSEC, CAPIO_SEM_MAX_RETRIES, workflow_name);
+    auto *p_buf_response = new CircularBuffer<off_t>(SHM_COMM_CHAN_NAME_RESP + std::to_string(tid),
+                                                     8 * 1024 * 1024, sizeof(off_t), workflow_name);
     bufs_response->insert(std::make_pair(tid, p_buf_response));
 }
 
@@ -59,7 +54,6 @@ inline void register_listener(long tid) {
 inline void remove_listener(int tid) {
     auto it_resp = bufs_response->find(tid);
     if (it_resp != bufs_response->end()) {
-        it_resp->second->free_shm();
         delete it_resp->second;
         bufs_response->erase(it_resp);
     }
@@ -74,14 +68,16 @@ inline auto read_next_request(char *str) {
     char req[CAPIO_REQUEST_MAX_SIZE];
     buf_requests->read(req);
     START_LOG(gettid(), "call(req=%s)", req);
-    int code;
+    int code       = -1;
     auto [ptr, ec] = std::from_chars(req, req + 4, code);
     if (ec == std::errc()) {
         strcpy(str, ptr + 1);
-        return code;
     } else {
+        std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_ERROR << "Received invalid code: " << code
+                  << std::endl;
         ERR_EXIT("Invalid request %d%s", code, ptr);
     }
+    return code;
 }
 
 /**

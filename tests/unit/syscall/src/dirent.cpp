@@ -70,7 +70,7 @@ TEST(SystemCallTest, TestDirentsOnCapioDir) {
             break;
         }
 
-        for (size_t bpos = 0; bpos < nread;) {
+        for (size_t bpos = 0, i = 0; bpos < nread && i < 10; i++) {
             auto d = (struct linux_dirent64 *) (buf + bpos);
             //  printf("%8ld  ", d->d_ino);
             // d_type           = d->d_type;

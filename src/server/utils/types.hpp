@@ -6,8 +6,7 @@
 #include <unordered_set>
 #include <vector>
 
-#include "capio/circular_buffer.hpp"
-#include "capio/spsc_queue.hpp"
+#include "capio/queue.hpp"
 
 typedef std::unordered_map<int, int> CSPidsMap_T;
 typedef std::unordered_map<int, std::string> CSAppsMap_t;
@@ -16,7 +15,7 @@ typedef std::unordered_map<int, std::unordered_map<int, std::pair<CapioFile *, o
     CSProcessFileMap_t;
 typedef std::unordered_map<int, std::unordered_map<int, std::filesystem::path>>
     CSProcessFileMetadataMap_t;
-typedef std::unordered_map<int, std::pair<SPSCQueue<char> *, SPSCQueue<char> *>> CSDataBufferMap_t;
+typedef std::unordered_map<int, std::pair<SPSCQueue *, SPSCQueue *>> CSDataBufferMap_t;
 typedef std::unordered_map<std::string, CapioFile *> CSFilesMetadata_t;
 typedef std::unordered_map<
     std::string, std::tuple<std::string, std::string, std::string, long int, bool, long int>>
@@ -28,7 +27,7 @@ typedef std::unordered_map<int, std::unordered_map<std::string, bool>> CSWriters
 typedef std::unordered_map<std::string, std::pair<const char *const, off64_t>> CSFilesLocationMap_t;
 typedef std::unordered_map<std::string,
                            std::list<std::tuple<const std::filesystem::path, size_t, std::string,
-                                                std::vector<std::string> *, sem_t *>>>
+                                                std::vector<std::string> *, Semaphore *>>>
     CSClientsRemotePendingNFilesMap_t;
 typedef std::unordered_map<int, CircularBuffer<off_t> *> CSBufResponse_t;
 typedef CircularBuffer<char> CSBufRequest_t;

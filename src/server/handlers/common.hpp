@@ -7,14 +7,12 @@ inline void init_process(int tid) {
     if (data_buffers.find(tid) == data_buffers.end()) {
         register_listener(tid);
 
-        auto *write_data_cb = new SPSCQueue<char>(
-            "capio_write_data_buffer_tid_" + std::to_string(tid), CAPIO_DATA_BUFFER_LENGTH,
-            CAPIO_DATA_BUFFER_ELEMENT_SIZE, CAPIO_SEM_TIMEOUT_NANOSEC, CAPIO_SEM_MAX_RETRIES,
-            workflow_name.data());
-        auto *read_data_cb = new SPSCQueue<char>(
-            "capio_read_data_buffer_tid_" + std::to_string(tid), CAPIO_DATA_BUFFER_LENGTH,
-            CAPIO_DATA_BUFFER_ELEMENT_SIZE, CAPIO_SEM_TIMEOUT_NANOSEC, CAPIO_SEM_MAX_RETRIES,
-            workflow_name.data());
+        auto *write_data_cb =
+            new SPSCQueue(SHM_SPSC_PREFIX_WRITE + std::to_string(tid), CAPIO_DATA_BUFFER_LENGTH,
+                          CAPIO_DATA_BUFFER_ELEMENT_SIZE, workflow_name);
+        auto *read_data_cb =
+            new SPSCQueue(SHM_SPSC_PREFIX_READ + std::to_string(tid), CAPIO_DATA_BUFFER_LENGTH,
+                          CAPIO_DATA_BUFFER_ELEMENT_SIZE, workflow_name);
         data_buffers.insert({tid, {write_data_cb, read_data_cb}});
     }
 }
@@ -46,8 +44,8 @@ void free_resources(int tid) {
 
     auto it = data_buffers.find(tid);
     if (it != data_buffers.end()) {
-        it->second.first->free_shm();
-        it->second.second->free_shm();
+        delete it->second.first;
+        delete it->second.second;
         data_buffers.erase(it);
     }
 }
@@ -55,10 +53,8 @@ void free_resources(int tid) {
 void handle_pending_remote_nfiles(const std::filesystem::path &path) {
     START_LOG(gettid(), "call(%s)", path.c_str());
 
-    if (sem_wait(&clients_remote_pending_nfiles_sem) == -1) {
-        ERR_EXIT("sem_wait clients_remote_pending_nfiles_sem in "
-                 "handle_pending_remote_nfiles");
-    }
+    std::lock_guard<std::mutex> lg(nfiles_mutex);
+
     for (auto &p : clients_remote_pending_nfiles) {
         std::string app          = p.first;
         auto &app_pending_nfiles = p.second;
@@ -75,19 +71,11 @@ void handle_pending_remote_nfiles(const std::filesystem::path &path) {
                 files.insert(path);
                 if (files_path->size() == batch_size) {
                     app_pending_nfiles.erase(it);
-                    // wake wait_for_nfiles
-                    if (sem_post(sem) == -1) {
-                        ERR_EXIT("sem_post sem in "
-                                 "handle_pending_remote_nfiles");
-                    }
+                    sem->unlock();
                 }
             }
             it = next_it;
         }
-    }
-    if (sem_post(&clients_remote_pending_nfiles_sem) == -1) {
-        ERR_EXIT("sem_post clients_remote_pending_nfiles_sem in "
-                 "handle_pending_remote_nfiles");
     }
 }
 
