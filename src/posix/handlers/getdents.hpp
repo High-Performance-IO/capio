@@ -25,7 +25,7 @@ inline int getdents_handler_impl(long arg0, long arg1, long arg2, long *result, 
         }
         auto count_off      = static_cast<off64_t>(count);
         off64_t offset      = get_capio_fd_offset(fd);
-        off64_t end_of_read = add_getdents_request(fd, count_off, is64bit, tid);
+        off64_t end_of_read = getdents_request(fd, count_off, is64bit, tid);
         off64_t bytes_read  = end_of_read - offset;
 
         if (bytes_read > count_off) {
@@ -47,9 +47,8 @@ inline int getdents_handler_impl(long arg0, long arg1, long arg2, long *result, 
             };
             START_LOG(syscall_no_intercept(SYS_gettid), "call ()");
             struct linux_dirent *d;
-            LOG("READ from "
-                "queue:\n\tOFFSET:%ld,\n\tcount:%ld\n\nINODE\tTYPE\tRECORD_LENGTH\tOFFSET\tNAME\n",
-                offset, count);
+            LOG("READ from queue: offset:%ld, count:%ld", offset, count);
+            LOG("INODE\tTYPE\tRECORD_LENGTH\tOFFSET\tNAME");
             for (size_t bpos = 0, i = 0; bpos < count && i < 10; i++) {
                 d = (struct linux_dirent *) (result + bpos);
                 LOG("%8lu\t%-10s (%ld)\t%4d\t%10jd\t%s\n", d->d_ino,

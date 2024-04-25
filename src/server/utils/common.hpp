@@ -30,38 +30,37 @@ inline off64_t send_dirent_to_client(int tid, CapioFile &c_file, off64_t offset,
 
     struct linux_dirent64 *dir_entity;
     struct linux_dirent64 to_store {};
-    to_store.d_reclen = CAPIO_THEORETICAL_SIZE_DIRENT64;
+    to_store.d_reclen = sizeof(linux_dirent64);
 
     char *incoming      = c_file.get_buffer();
-    off64_t n_entries   = c_file.get_stored_size() / CAPIO_THEORETICAL_SIZE_DIRENT64;
-    off64_t actual_size = n_entries * CAPIO_THEORETICAL_SIZE_DIRENT64;
-    char *p_getdents    = (char *) malloc(actual_size * sizeof(char));
+    int first_entry     = static_cast<int>(offset / to_store.d_reclen);
+    off64_t end_of_read = std::min(offset + count, c_file.get_stored_size());
+    int last_entry      = static_cast<int>(end_of_read / to_store.d_reclen);
+    off64_t actual_size = (last_entry - first_entry) * to_store.d_reclen;
 
-    off64_t stored_size = 0;
-    for (int i = 0; i < n_entries; i++) {
-        dir_entity = (struct linux_dirent64 *) (incoming + i * CAPIO_THEORETICAL_SIZE_DIRENT64);
+    if (actual_size > 0) {
+        char *p_getdents = (char *) malloc(actual_size * to_store.d_reclen);
 
-        to_store.d_ino  = dir_entity->d_ino;
-        to_store.d_off  = stored_size + CAPIO_THEORETICAL_SIZE_DIRENT64;
-        to_store.d_type = dir_entity->d_type;
+        for (int i = first_entry; i < last_entry; i++) {
+            dir_entity = (struct linux_dirent64 *) (incoming + i * to_store.d_reclen);
 
-        strcpy(to_store.d_name, dir_entity->d_name);
-        memcpy((char *) p_getdents + stored_size, &to_store, sizeof(to_store));
+            to_store.d_ino  = dir_entity->d_ino;
+            to_store.d_off  = (i + 1) * to_store.d_reclen;
+            to_store.d_type = dir_entity->d_type;
 
-        LOG("DIRENT NAME: %s - TARGET NAME: %s", dir_entity->d_name, to_store.d_name);
+            strcpy(to_store.d_name, dir_entity->d_name);
+            memcpy((char *) p_getdents + ((i - first_entry) * to_store.d_reclen), &to_store,
+                   to_store.d_reclen);
 
-        stored_size += CAPIO_THEORETICAL_SIZE_DIRENT64;
+            LOG("DIRENT NAME: %s - TARGET NAME: %s", dir_entity->d_name, to_store.d_name);
+        }
+
+        write_response(tid, offset + actual_size);
+        send_data_to_client(tid, p_getdents, actual_size);
+        free(p_getdents);
+    } else {
+        write_response(tid, offset);
     }
-
-    int res = 0;
-    while (res + CAPIO_THEORETICAL_SIZE_DIRENT64 <= std::min(actual_size - offset, count)) {
-        res += CAPIO_THEORETICAL_SIZE_DIRENT64;
-    }
-    actual_size = res;
-
-    write_response(tid, offset + actual_size);
-    send_data_to_client(tid, p_getdents + offset, actual_size);
-    free(p_getdents);
 
     return actual_size;
 }

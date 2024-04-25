@@ -72,23 +72,9 @@ TEST(SystemCallTest, TestDirentsOnCapioDir) {
 
         for (size_t bpos = 0, i = 0; bpos < nread && i < 10; i++) {
             auto d = (struct linux_dirent64 *) (buf + bpos);
-            //  printf("%8ld  ", d->d_ino);
-            // d_type           = d->d_type;
-            /* printf("%-10s(%d) ",
-                               (d_type == DT_REG)    ? "regular"
-                               : (d_type == DT_DIR)  ? "directory"
-                               : (d_type == DT_FIFO) ? "FIFO"
-                               : (d_type == DT_SOCK) ? "socket"
-                               : (d_type == DT_LNK)  ? "symlink"
-                               : (d_type == DT_BLK)  ? "block dev"
-                               : (d_type == DT_CHR)  ? "char dev"
-                                                     : "???",
-                               d_type); */
 
             EXPECT_NE(std::find(expectedNames.begin(), expectedNames.end(), d->d_name),
                       expectedNames.end());
-
-            // printf("%4d %10lld  %s\n", d->d_reclen, (long long) d->d_off, d->d_name);
             bpos += d->d_reclen;
         }
     }
