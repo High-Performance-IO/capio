@@ -17,21 +17,6 @@ inline void init_process(int tid) {
     }
 }
 
-void send_data_to_client(int tid, char *buf, long int count) {
-    START_LOG(gettid(), "call(%d,%.10s, %ld)", tid, buf, count);
-    auto *data_buf  = data_buffers[tid].second;
-    size_t n_writes = count / CAPIO_DATA_BUFFER_ELEMENT_SIZE;
-    size_t r        = count % CAPIO_DATA_BUFFER_ELEMENT_SIZE;
-    size_t i        = 0;
-    while (i < n_writes) {
-        data_buf->write(buf + i * CAPIO_DATA_BUFFER_ELEMENT_SIZE);
-        ++i;
-    }
-    if (r) {
-        data_buf->write(buf + i * CAPIO_DATA_BUFFER_ELEMENT_SIZE, r);
-    }
-}
-
 /*
  * Unlink resources in shared memory of the thread with thread id = tid
  * To be called only when the client thread terminates

@@ -22,6 +22,11 @@
 
 std::string workflow_name;
 
+#include "utils/types.hpp"
+
+// tid -> (client_to_server_data_buf, server_to_client_data_buf)
+CSDataBufferMap_t data_buffers;
+
 #include "capio/env.hpp"
 #include "capio/logger.hpp"
 #include "capio/semaphore.hpp"
@@ -48,9 +53,6 @@ CSAppsMap_t apps;
 
 // application name -> set of files already sent
 CSFilesSentMap_t files_sent;
-
-// tid -> (client_to_server_data_buf, server_to_client_data_buf)
-CSDataBufferMap_t data_buffers;
 
 /*
  * pid -> pathname -> bool

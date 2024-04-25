@@ -4,7 +4,7 @@
 #if defined(SYS_getdents) || defined(SYS_getdents64)
 
 #include "capio/data_structure.hpp"
-#include "utils/common.hpp"
+
 #include "utils/data.hpp"
 
 // TODO: too similar to capio_read, refactoring needed
@@ -32,7 +32,6 @@ inline int getdents_handler_impl(long arg0, long arg1, long arg2, long *result, 
             bytes_read = count_off;
         }
 
-        bytes_read = dirent_round(bytes_read);
         read_data(tid, buffer, bytes_read);
         set_capio_fd_offset(fd, offset + bytes_read);
 

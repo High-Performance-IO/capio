@@ -10,22 +10,6 @@
 #include "utils/metadata.hpp"
 #include "utils/producer.hpp"
 
-inline void handle_getdents_impl(int tid, int fd, long int count) {
-    START_LOG(gettid(), "call(tid=%d, fd=%d, count=%ld)", tid, fd, count);
-
-    const std::filesystem::path &path = get_capio_file_path(tid, fd);
-    CapioFile &c_file                 = get_capio_file(path);
-    off64_t process_offset            = get_capio_file_offset(tid, fd);
-    off64_t dir_size      = c_file.get_stored_size();
-    off64_t n_entries     = dir_size / CAPIO_THEORETICAL_SIZE_DIRENT64;
-    char *p_getdents      = (char *) malloc(n_entries * sizeof(char) * dir_size);
-    off64_t end_of_sector = store_dirent(c_file.get_buffer(), p_getdents, dir_size);
-
-    write_response(tid, end_of_sector);
-    send_data_to_client(tid, p_getdents + process_offset, end_of_sector - process_offset);
-    free(p_getdents);
-}
-
 inline void request_remote_getdents(int tid, int fd, off64_t count) {
     START_LOG(gettid(), "call(tid=%d, fd=%d, count=%ld)", tid, fd, count);
 
@@ -39,7 +23,7 @@ inline void request_remote_getdents(int tid, int fd, off64_t count) {
         (end_of_read <= end_of_sector ||
          (end_of_sector == -1 ? 0 : end_of_sector) == c_file.real_file_size)) {
         LOG("Handling local read");
-        handle_getdents_impl(tid, fd, count);
+        send_dirent_to_client(tid, c_file, offset, count);
     } else if (end_of_read <= end_of_sector) {
         LOG("?");
         c_file.create_buffer_if_needed(path, false);
@@ -90,7 +74,9 @@ inline void handle_getdents(int tid, int fd, long int count) {
         t.detach();
     } else if (is_prod || strcmp(std::get<0>(file_location_opt->get()), node_name) == 0 ||
                capio_dir == path) {
-        handle_getdents_impl(tid, fd, count);
+        CapioFile &c_file = get_capio_file(path);
+        off64_t offset    = get_capio_file_offset(tid, fd);
+        send_dirent_to_client(tid, c_file, offset, count);
     } else {
         LOG("File is remote");
         CapioFile &c_file = get_capio_file(path);

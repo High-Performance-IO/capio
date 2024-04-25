@@ -25,7 +25,7 @@ inline void handle_pending_read(int tid, int fd, long int process_offset, long i
     c_file.create_buffer_if_needed(path, false);
     char *p = c_file.get_buffer();
 
-    size_t bytes_read;
+    off64_t bytes_read;
     if (end_of_sector > end_of_read) {
         end_of_sector = end_of_read;
         bytes_read    = count;
