@@ -43,15 +43,15 @@ inline int getdents_handler_impl(long arg0, long arg1, long arg2, long *result, 
                 off64_t d_off;
                 unsigned short d_reclen;
                 unsigned char d_type;
-                char d_name[];
+                char d_name[PATH_MAX];
             };
             START_LOG(syscall_no_intercept(SYS_gettid), "call ()");
             struct linux_dirent *d;
             LOG("READ from queue: offset:%ld, count:%ld", offset, count);
-            LOG("INODE\tTYPE\tRECORD_LENGTH\tOFFSET\tNAME");
+            LOG("%19s %12s %13s %15s %s", "INODE", "TYPE", "RECORD_LENGTH", "OFFSET", "NAME");
             for (size_t bpos = 0, i = 0; bpos < count && i < 10; i++) {
                 d = (struct linux_dirent *) (result + bpos);
-                LOG("%8lu\t%-10s (%ld)\t%4d\t%10jd\t%s\n", d->d_ino,
+                LOG("%19lu %9s %13ld %15ld %s\n", d->d_ino,
                     (d->d_type == 8)    ? "regular"
                     : (d->d_type == 4)  ? "directory"
                     : (d->d_type == 1)  ? "FIFO"
@@ -60,7 +60,7 @@ inline int getdents_handler_impl(long arg0, long arg1, long arg2, long *result, 
                     : (d->d_type == 6)  ? "block dev"
                     : (d->d_type == 2)  ? "char dev"
                                         : "???",
-                    d->d_type, d->d_reclen, (intmax_t) d->d_off, d->d_name);
+                    d->d_reclen, d->d_off, d->d_name);
                 bpos += d->d_reclen;
             }
         }((char *) buffer, bytes_read, offset));

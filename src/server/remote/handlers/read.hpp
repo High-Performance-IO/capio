@@ -110,9 +110,7 @@ inline void handle_read_reply(int tid, int fd, long count, off64_t file_size, of
     if (is_getdents) {
         send_dirent_to_client(tid, c_file, offset, bytes_read);
     } else {
-        char *p = c_file.get_buffer();
-        write_response(tid, end_of_sector);
-        send_data_to_client(tid, p + offset, bytes_read);
+        send_data_to_client(tid, c_file.get_buffer(), offset, bytes_read);
     }
 }
 

@@ -10,18 +10,20 @@
 #include "requests.hpp"
 #include "types.hpp"
 
-void send_data_to_client(int tid, char *buf, long int count) {
-    START_LOG(gettid(), "call(%d,%.10s, %ld)", tid, buf, count);
+void send_data_to_client(int tid, char *buf, off64_t offset, off64_t count) {
+    START_LOG(gettid(), "call(tid=%d,buf=0x%08x, offset=%ld, count=%ld)", tid, buf, offset, count);
+
+    write_response(tid, offset + count);
     auto *data_buf  = data_buffers[tid].second;
     size_t n_writes = count / CAPIO_DATA_BUFFER_ELEMENT_SIZE;
     size_t r        = count % CAPIO_DATA_BUFFER_ELEMENT_SIZE;
     size_t i        = 0;
     while (i < n_writes) {
-        data_buf->write(buf + i * CAPIO_DATA_BUFFER_ELEMENT_SIZE);
+        data_buf->write(buf + offset + i * CAPIO_DATA_BUFFER_ELEMENT_SIZE);
         ++i;
     }
     if (r) {
-        data_buf->write(buf + i * CAPIO_DATA_BUFFER_ELEMENT_SIZE, r);
+        data_buf->write(buf + offset + i * CAPIO_DATA_BUFFER_ELEMENT_SIZE, r);
     }
 }
 
@@ -29,35 +31,31 @@ inline off64_t send_dirent_to_client(int tid, CapioFile &c_file, off64_t offset,
     START_LOG(gettid(), "call(offset=%ld, count=%ld)", offset, count);
 
     struct linux_dirent64 *dir_entity;
-    struct linux_dirent64 to_store {};
-    to_store.d_reclen = sizeof(linux_dirent64);
 
     char *incoming      = c_file.get_buffer();
-    int first_entry     = static_cast<int>(offset / to_store.d_reclen);
+    int first_entry     = static_cast<int>(offset / sizeof(linux_dirent64));
     off64_t end_of_read = std::min(offset + count, c_file.get_stored_size());
-    int last_entry      = static_cast<int>(end_of_read / to_store.d_reclen);
-    off64_t actual_size = (last_entry - first_entry) * to_store.d_reclen;
+    int last_entry      = static_cast<int>(end_of_read / sizeof(linux_dirent64));
+    off64_t actual_size = (last_entry - first_entry) * static_cast<off64_t>(sizeof(linux_dirent64));
 
     if (actual_size > 0) {
-        char *p_getdents = (char *) malloc(actual_size * to_store.d_reclen);
+        auto dirents = std::unique_ptr<linux_dirent64[]>(new linux_dirent64[actual_size]);
 
         for (int i = first_entry; i < last_entry; i++) {
-            dir_entity = (struct linux_dirent64 *) (incoming + i * to_store.d_reclen);
+            dir_entity = (struct linux_dirent64 *) (incoming + i * sizeof(linux_dirent64));
+            auto &current_dirent = dirents[i - first_entry];
 
-            to_store.d_ino  = dir_entity->d_ino;
-            to_store.d_off  = (i + 1) * to_store.d_reclen;
-            to_store.d_type = dir_entity->d_type;
+            current_dirent.d_reclen = sizeof(linux_dirent64);
+            current_dirent.d_ino    = dir_entity->d_ino;
+            current_dirent.d_off    = (i + 1) * current_dirent.d_reclen;
+            current_dirent.d_type   = dir_entity->d_type;
+            strcpy(current_dirent.d_name, dir_entity->d_name);
 
-            strcpy(to_store.d_name, dir_entity->d_name);
-            memcpy((char *) p_getdents + ((i - first_entry) * to_store.d_reclen), &to_store,
-                   to_store.d_reclen);
-
-            LOG("DIRENT NAME: %s - TARGET NAME: %s", dir_entity->d_name, to_store.d_name);
+            LOG("DIRENT NAME: %s - TARGET NAME: %s", dir_entity->d_name, current_dirent.d_name);
         }
 
-        write_response(tid, offset + actual_size);
-        send_data_to_client(tid, p_getdents, actual_size);
-        free(p_getdents);
+        send_data_to_client(tid, reinterpret_cast<char *>(dirents.get()) - offset, offset,
+                            actual_size);
     } else {
         write_response(tid, offset);
     }
