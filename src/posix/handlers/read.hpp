@@ -5,16 +5,15 @@
 
 #include "utils/data.hpp"
 
-inline ssize_t capio_read(int fd, const void *buffer, off64_t count, long tid) {
+inline ssize_t capio_read(int fd, void *buffer, off64_t count, long tid) {
     START_LOG(tid, "call(fd=%d, buf=0x%08x, count=%ld)", fd, buffer, count);
 
     if (exists_capio_fd(fd)) {
         if (count >= SSIZE_MAX) {
             ERR_EXIT("CAPIO does not support read bigger than SSIZE_MAX yet");
         }
-        off64_t count_off   = count;
         off64_t offset      = get_capio_fd_offset(fd);
-        off64_t end_of_read = read_request(fd, count_off, tid);
+        off64_t end_of_read = read_request(fd, count, tid);
         off64_t bytes_read  = end_of_read - offset;
         read_data(tid, buffer, bytes_read);
         set_capio_fd_offset(fd, offset + bytes_read);
