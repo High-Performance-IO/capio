@@ -99,7 +99,6 @@ inline void handle_read_reply(int tid, int fd, long count, off64_t file_size, of
 
     off64_t end_of_sector = c_file.get_sector_end(offset);
     c_file.create_buffer_if_needed(path, false);
-    char *p = c_file.get_buffer();
     off64_t bytes_read;
     off64_t end_of_read = offset + count;
     if (end_of_sector > end_of_read) {
@@ -109,16 +108,9 @@ inline void handle_read_reply(int tid, int fd, long count, off64_t file_size, of
         bytes_read = end_of_sector - offset;
     }
     if (is_getdents) {
-        off64_t dir_size  = c_file.get_stored_size();
-        off64_t n_entries = dir_size / CAPIO_THEORETICAL_SIZE_DIRENT64;
-        char *p_getdents  = (char *) malloc(n_entries * sizeof(char) * dir_size);
-        end_of_sector     = store_dirent(p, p_getdents, dir_size);
-        write_response(tid, end_of_sector);
-        send_data_to_client(tid, p_getdents + offset, bytes_read);
-        free(p_getdents);
+        send_dirent_to_client(tid, c_file, offset, bytes_read);
     } else {
-        write_response(tid, end_of_sector);
-        send_data_to_client(tid, p + offset, bytes_read);
+        send_data_to_client(tid, c_file.get_buffer(), offset, bytes_read);
     }
 }
 

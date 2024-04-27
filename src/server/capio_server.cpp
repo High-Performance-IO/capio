@@ -22,6 +22,11 @@
 
 std::string workflow_name;
 
+#include "utils/types.hpp"
+
+// tid -> (client_to_server_data_buf, server_to_client_data_buf)
+CSDataBufferMap_t data_buffers;
+
 #include "capio/env.hpp"
 #include "capio/logger.hpp"
 #include "capio/semaphore.hpp"
@@ -48,9 +53,6 @@ CSAppsMap_t apps;
 
 // application name -> set of files already sent
 CSFilesSentMap_t files_sent;
-
-// tid -> (client_to_server_data_buf, server_to_client_data_buf)
-CSDataBufferMap_t data_buffers;
 
 /*
  * pid -> pathname -> bool
@@ -80,7 +82,7 @@ static constexpr std::array<CSHandler_t, CAPIO_NR_REQUESTS> build_request_handle
     _request_handlers[CAPIO_REQUEST_EXIT_GROUP]          = exit_group_handler;
     _request_handlers[CAPIO_REQUEST_FSTAT]               = fstat_handler;
     _request_handlers[CAPIO_REQUEST_GETDENTS]            = getdents_handler;
-    _request_handlers[CAPIO_REQUEST_GETDENTS64]          = getdents64_handler;
+    _request_handlers[CAPIO_REQUEST_GETDENTS64]          = getdents_handler;
     _request_handlers[CAPIO_REQUEST_HANDSHAKE_NAMED]     = handshake_named_handler;
     _request_handlers[CAPIO_REQUEST_HANDSHAKE_ANONYMOUS] = handshake_anonymous_handler;
     _request_handlers[CAPIO_REQUEST_MKDIR]               = mkdir_handler;

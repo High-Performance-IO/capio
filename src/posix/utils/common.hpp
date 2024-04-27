@@ -14,14 +14,4 @@ int posix_return_value(long res, long *result) {
     return CAPIO_POSIX_SYSCALL_SKIP;
 }
 
-inline off64_t dirent_round(off64_t bytes) {
-    off64_t res     = 0;
-    off64_t ld_size = CAPIO_THEORETICAL_SIZE_DIRENT64;
-
-    while (res + ld_size <= bytes) {
-        res += ld_size;
-    }
-    return res;
-}
-
 #endif // CAPIO_FUNCTIONS_H

@@ -39,14 +39,13 @@ void write_entry_dir(int tid, const std::filesystem::path &file_path,
 
     strcpy(ld.d_name, file_name.c_str());
     LOG("FILENAME LD: %s", ld.d_name);
-    long int ld_size = CAPIO_THEORETICAL_SIZE_DIRENT64;
-    ld.d_reclen      = ld_size;
+    ld.d_reclen = sizeof(linux_dirent64);
 
     CapioFile &c_file = get_capio_file(dir);
     c_file.create_buffer_if_needed(dir, true);
     void *file_shm       = c_file.get_buffer();
     off64_t file_size    = c_file.get_stored_size();
-    off64_t data_size    = file_size + ld_size; // TODO: check theoreitcal size and sizeof(ld) usage
+    off64_t data_size    = file_size + ld.d_reclen;
     size_t file_shm_size = c_file.get_buf_size();
     ld.d_off             = data_size;
 

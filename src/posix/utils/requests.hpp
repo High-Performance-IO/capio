@@ -97,15 +97,13 @@ inline void exit_group_request(const long tid) {
     buf_requests->write(req, CAPIO_REQUEST_MAX_SIZE);
 }
 
-inline off64_t add_getdents_request(const int fd, const off64_t count, bool is64bit,
-                                    const long tid) {
+inline off64_t getdents_request(const int fd, const off64_t count, bool is64bit, const long tid) {
     char req[CAPIO_REQUEST_MAX_SIZE];
     sprintf(req, "%04d %ld %d %ld", is64bit ? CAPIO_REQUEST_GETDENTS64 : CAPIO_REQUEST_GETDENTS,
             tid, fd, count);
     buf_requests->write(req, CAPIO_REQUEST_MAX_SIZE);
     off64_t res;
     bufs_response->at(tid)->read(&res);
-    DBG(tid, [](off64_t res) { printf("Result of getends: %ld\n", res); }(res));
     return res;
 }
 

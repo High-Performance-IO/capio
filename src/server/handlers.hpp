@@ -10,6 +10,7 @@
 #include "handlers/common.hpp"
 #include "handlers/dup.hpp"
 #include "handlers/exig.hpp"
+#include "handlers/getdents.hpp"
 #include "handlers/handshake.hpp"
 #include "handlers/mkdir.hpp"
 #include "handlers/open.hpp"
