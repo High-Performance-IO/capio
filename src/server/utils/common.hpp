@@ -14,17 +14,7 @@ void send_data_to_client(int tid, char *buf, off64_t offset, off64_t count) {
     START_LOG(gettid(), "call(tid=%d,buf=0x%08x, offset=%ld, count=%ld)", tid, buf, offset, count);
 
     write_response(tid, offset + count);
-    auto *data_buf  = data_buffers[tid].second;
-    size_t n_writes = count / CAPIO_DATA_BUFFER_ELEMENT_SIZE;
-    size_t r        = count % CAPIO_DATA_BUFFER_ELEMENT_SIZE;
-    size_t i        = 0;
-    while (i < n_writes) {
-        data_buf->write(buf + offset + i * CAPIO_DATA_BUFFER_ELEMENT_SIZE);
-        ++i;
-    }
-    if (r) {
-        data_buf->write(buf + offset + i * CAPIO_DATA_BUFFER_ELEMENT_SIZE, r);
-    }
+    data_buffers[tid].second->write(buf + offset, count);
 }
 
 inline off64_t send_dirent_to_client(int tid, CapioFile &c_file, off64_t offset, off64_t count) {

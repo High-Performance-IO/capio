@@ -12,38 +12,49 @@ inline off64_t capio_lseek(int fd, off64_t offset, int whence, long tid) {
     if (exists_capio_fd(fd)) {
         off64_t file_offset = get_capio_fd_offset(fd);
         if (whence == SEEK_SET) {
+            LOG("whence %d is SEEK_SET", whence);
             if (offset >= 0) {
                 set_capio_fd_offset(fd, offset);
                 seek_request(fd, offset, tid);
+                LOG("the new offset of file %d is %ld", fd, offset);
                 return offset;
             } else {
                 errno = EINVAL;
                 return CAPIO_POSIX_SYSCALL_ERRNO;
             }
         } else if (whence == SEEK_CUR) {
+            LOG("whence %d is SEEK_CUR", whence);
             off64_t new_offset = file_offset + offset;
             if (new_offset >= 0) {
                 set_capio_fd_offset(fd, new_offset);
                 seek_request(fd, new_offset, tid);
+                LOG("the new offset of file %d is %ld", fd, new_offset);
                 return new_offset;
             } else {
                 errno = EINVAL;
                 return CAPIO_POSIX_SYSCALL_ERRNO;
             }
         } else if (whence == SEEK_END) {
+            LOG("whence %d is SEEK_END", whence);
             seek_end_request(fd, tid);
             off64_t new_offset = file_offset + offset;
             set_capio_fd_offset(fd, new_offset);
+            LOG("the new offset of file %d is %ld", fd, new_offset);
             return new_offset;
         } else if (whence == SEEK_DATA) {
+            LOG("whence %d is SEEK_DATA", whence);
             off64_t new_offset = seek_data_request(fd, file_offset, tid);
             set_capio_fd_offset(fd, new_offset);
+            LOG("the new offset of file %d is %ld", fd, new_offset);
             return new_offset;
         } else if (whence == SEEK_HOLE) {
+            LOG("whence %d is SEEK_HOLE", whence);
             off64_t new_offset = seek_hole_request(fd, file_offset, tid);
             set_capio_fd_offset(fd, new_offset);
+            LOG("the new offset of file %d is %ld", fd, new_offset);
             return new_offset;
         } else {
+            LOG("whence %d is invalid", whence);
             errno = EINVAL;
             return CAPIO_POSIX_SYSCALL_ERRNO;
         }

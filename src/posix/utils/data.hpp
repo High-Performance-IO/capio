@@ -33,21 +33,10 @@ inline void register_data_listener(long tid) {
  * @param count
  * @return
  */
-inline void read_data(long tid, const void *buffer, off64_t count) {
+inline void read_data(long tid, void *buffer, off64_t count) {
     START_LOG(tid, "call(buffer=0x%08x, count=%ld)", buffer, count);
-    auto data_buf  = threads_data_bufs->at(tid).second;
-    size_t n_reads = count / CAPIO_DATA_BUFFER_ELEMENT_SIZE;
-    size_t r       = count % CAPIO_DATA_BUFFER_ELEMENT_SIZE;
-    size_t i       = 0;
-    while (i < n_reads) {
-        LOG("READING %ld bytes from queue", CAPIO_DATA_BUFFER_ELEMENT_SIZE);
-        data_buf->read((char *) buffer + i * CAPIO_DATA_BUFFER_ELEMENT_SIZE);
-        ++i;
-    }
-    if (r) {
-        LOG("READING %ld bytes from queue", r);
-        data_buf->read((char *) buffer + i * CAPIO_DATA_BUFFER_ELEMENT_SIZE, r);
-    }
+
+    threads_data_bufs->at(tid).second->read(reinterpret_cast<char *>(buffer), count);
 }
 
 /**
@@ -59,18 +48,8 @@ inline void read_data(long tid, const void *buffer, off64_t count) {
  */
 inline void write_data(long tid, const void *buffer, off64_t count) {
     START_LOG(tid, "call(buffer=0x%08x, count=%ld)", buffer, count);
-    auto data_buf   = threads_data_bufs->at(tid).first;
-    size_t n_writes = count / CAPIO_DATA_BUFFER_ELEMENT_SIZE;
-    size_t r        = count % CAPIO_DATA_BUFFER_ELEMENT_SIZE;
 
-    size_t i = 0;
-    while (i < n_writes) {
-        data_buf->write((char *) buffer + i * CAPIO_DATA_BUFFER_ELEMENT_SIZE);
-        ++i;
-    }
-    if (r) {
-        data_buf->write((char *) buffer + i * CAPIO_DATA_BUFFER_ELEMENT_SIZE, r);
-    }
+    threads_data_bufs->at(tid).first->write(reinterpret_cast<const char *>(buffer), count);
 }
 
 #endif // CAPIO_POSIX_UTILS_DATA_HPP

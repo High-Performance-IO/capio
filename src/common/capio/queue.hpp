@@ -21,6 +21,28 @@ template <class T, class Mutex> class Queue {
     Mutex _mutex;
     NamedSemaphore _sem_num_elems, _sem_num_empty;
 
+    inline void _read(T *buff_recv, int num_bytes) {
+        _sem_num_elems.lock();
+
+        std::lock_guard<Mutex> lg(_mutex);
+        memcpy(reinterpret_cast<char *>(buff_recv), reinterpret_cast<char *>(_shm) + *_first_elem,
+               num_bytes);
+        *_first_elem = (*_first_elem + _elem_size) % _buff_size;
+
+        _sem_num_empty.unlock();
+    }
+
+    inline void _write(const T *data, int num_bytes) {
+        _sem_num_empty.lock();
+
+        std::lock_guard<Mutex> lg(_mutex);
+        memcpy(reinterpret_cast<char *>(_shm) + *_last_elem, reinterpret_cast<const char *>(data),
+               num_bytes);
+        *_last_elem = (*_last_elem + _elem_size) % _buff_size;
+
+        _sem_num_elems.unlock();
+    }
+
   public:
     Queue(const std::string &shm_name, const long int max_num_elems, const long int elem_size,
           const std::string &workflow_name = get_capio_workflow_name())
@@ -62,34 +84,29 @@ template <class T, class Mutex> class Queue {
     inline void write(const T *data, long int num_bytes) {
         START_LOG(capio_syscall(SYS_gettid), "call(data=0x%08x)", data);
 
-        if (num_bytes > _elem_size) {
-            ERR_EXIT("Queue %s write error: num_bytes > _elem_size", _shm_name.c_str());
+        off64_t n_writes = num_bytes / _elem_size;
+        size_t r         = num_bytes % _elem_size;
+
+        for (int i = 0; i < n_writes; i++) {
+            _write(data + i * _elem_size, _elem_size);
         }
-
-        _sem_num_empty.lock();
-
-        std::lock_guard<Mutex> lg(_mutex);
-        memcpy((char *) _shm + *_last_elem, data, num_bytes);
-        *_last_elem = (*_last_elem + _elem_size) % _buff_size;
-        LOG("Wrote '%s' (%d) on %s", data, data, this->_shm_name.c_str());
-
-        _sem_num_elems.unlock();
+        if (r) {
+            _write(data + n_writes * _elem_size, r);
+        }
     }
 
     inline void read(T *buff_rcv, long int num_bytes) {
         START_LOG(capio_syscall(SYS_gettid), "call(buff_rcv=0x%08x)", buff_rcv);
 
-        if (num_bytes > _elem_size) {
-            ERR_EXIT("Queue %s read error: num_bytes > _elem_size", _shm_name.c_str());
+        off64_t n_reads = num_bytes / _elem_size;
+        size_t r        = num_bytes % _elem_size;
+
+        for (int i = 0; i < n_reads; i++) {
+            _read(buff_rcv + i * _elem_size, _elem_size);
         }
-
-        _sem_num_elems.lock();
-
-        std::lock_guard<Mutex> lg(_mutex);
-        memcpy((char *) buff_rcv, ((char *) _shm) + *_first_elem, num_bytes);
-        *_first_elem = (*_first_elem + _elem_size) % _buff_size;
-
-        _sem_num_empty.unlock();
+        if (r) {
+            _read(buff_rcv + n_reads * _elem_size, r);
+        }
     }
 
     inline void read(T *buf_rcv) {
