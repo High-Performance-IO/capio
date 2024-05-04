@@ -34,7 +34,7 @@ struct compare {
 class CapioFile {
   private:
     char *_buf = nullptr; // buffer containing the data
-    std::size_t _buf_size;
+    off64_t _buf_size;
     std::string_view _committed = CAPIO_FILE_COMMITTED_ON_TERMINATION;
     bool _directory             = false;
     // _fd is useful only when the file is memory-mapped
@@ -80,13 +80,13 @@ class CapioFile {
           _permanent(false) {}
 
     CapioFile(const std::string_view &committed, const std::string_view &mode, bool directory,
-              long int n_files_expected, bool permanent, std::size_t init_size,
+              long int n_files_expected, bool permanent, off64_t init_size,
               long int n_close_expected)
         : _buf_size(init_size), _committed(committed), _directory(directory), _mode(mode),
           _n_close_expected(n_close_expected), _permanent(permanent),
           n_files_expected(n_files_expected + 2) {}
 
-    CapioFile(bool directory, bool permanent, std::size_t init_size, long int n_close_expected = -1)
+    CapioFile(bool directory, bool permanent, off64_t init_size, long int n_close_expected = -1)
         : _buf_size(init_size), _committed(CAPIO_FILE_COMMITTED_ON_TERMINATION),
           _directory(directory), _n_close_expected(n_close_expected), _permanent(permanent) {}
 
@@ -222,10 +222,10 @@ class CapioFile {
         }
     }
 
-    char *expand_buffer(std::size_t data_size) { // TODO: use realloc
-        size_t double_size = _buf_size * 2;
-        size_t new_size    = data_size > double_size ? data_size : double_size;
-        char *new_buf      = new char[new_size];
+    char *expand_buffer(off64_t data_size) { // TODO: use realloc
+        off64_t double_size = _buf_size * 2;
+        off64_t new_size    = data_size > double_size ? data_size : double_size;
+        char *new_buf       = new char[new_size];
         std::lock_guard<std::mutex> lock(_mutex);
         //	memcpy(new_p, old_p, file_shm_size); //TODO memcpy only the
         // sector
@@ -239,7 +239,7 @@ class CapioFile {
 
     inline char *get_buffer() { return _buf; }
 
-    [[nodiscard]] inline size_t get_buf_size() const { return _buf_size; }
+    [[nodiscard]] inline off64_t get_buf_size() const { return _buf_size; }
 
     [[nodiscard]] inline const std::string_view &get_committed() const { return _committed; }
 
@@ -478,14 +478,6 @@ class CapioFile {
     inline void read_from_node(const std::string &dest, off64_t offset, off64_t buffer_size) {
         std::unique_lock<std::mutex> lock(_mutex);
         backend->recv_file(_buf + offset, dest, buffer_size);
-        _data_avail_cv.notify_all();
-    }
-
-    inline void read_from_queue(SPSCQueue &queue, size_t offset) {
-        START_LOG(gettid(), "call()");
-
-        std::unique_lock<std::mutex> lock(_mutex);
-        queue.read(_buf + offset);
         _data_avail_cv.notify_all();
     }
 

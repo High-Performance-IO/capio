@@ -15,8 +15,7 @@ inline ssize_t capio_read(int fd, void *buffer, off64_t count, long tid) {
         off64_t offset      = get_capio_fd_offset(fd);
         off64_t end_of_read = read_request(fd, count, tid);
         off64_t bytes_read  = end_of_read - offset;
-        read_data(tid, buffer, bytes_read);
-        set_capio_fd_offset(fd, offset + bytes_read);
+        read_data(tid, fd, buffer, bytes_read);
         return bytes_read;
     } else {
         return CAPIO_POSIX_SYSCALL_REQUEST_SKIP;

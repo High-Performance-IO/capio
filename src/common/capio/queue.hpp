@@ -81,20 +81,6 @@ template <class T, class Mutex> class Queue {
 
     inline auto get_name() { return this->_shm_name; }
 
-    inline void write(const T *data, long int num_bytes) {
-        START_LOG(capio_syscall(SYS_gettid), "call(data=0x%08x)", data);
-
-        off64_t n_writes = num_bytes / _elem_size;
-        size_t r         = num_bytes % _elem_size;
-
-        for (int i = 0; i < n_writes; i++) {
-            _write(data + i * _elem_size, _elem_size);
-        }
-        if (r) {
-            _write(data + n_writes * _elem_size, r);
-        }
-    }
-
     inline void read(T *buff_rcv, long int num_bytes) {
         START_LOG(capio_syscall(SYS_gettid), "call(buff_rcv=0x%08x)", buff_rcv);
 
@@ -112,6 +98,20 @@ template <class T, class Mutex> class Queue {
     inline void read(T *buf_rcv) {
         START_LOG(capio_syscall(SYS_gettid), "call(buff_rcv=0x%08x)", buf_rcv);
         this->read(buf_rcv, _elem_size);
+    }
+
+    inline void write(const T *data, long int num_bytes) {
+        START_LOG(capio_syscall(SYS_gettid), "call(data=0x%08x)", data);
+
+        off64_t n_writes = num_bytes / _elem_size;
+        size_t r         = num_bytes % _elem_size;
+
+        for (int i = 0; i < n_writes; i++) {
+            _write(data + i * _elem_size, _elem_size);
+        }
+        if (r) {
+            _write(data + n_writes * _elem_size, r);
+        }
     }
 
     inline void write(const T *data) {

@@ -1,6 +1,7 @@
 #ifndef CAPIO_POSIX_UTILS_DATA_HPP
 #define CAPIO_POSIX_UTILS_DATA_HPP
 
+#include "requests.hpp"
 #include "types.hpp"
 
 CPThreadDataBufs_t *threads_data_bufs;
@@ -29,14 +30,17 @@ inline void register_data_listener(long tid) {
 /**
  * Receives @count bytes for thread @tid and writes them into @buf
  * @param tid
+ * @param fd
  * @param buffer
+ * @param offset
  * @param count
  * @return
  */
-inline void read_data(long tid, void *buffer, off64_t count) {
-    START_LOG(tid, "call(buffer=0x%08x, count=%ld)", buffer, count);
+inline void read_data(long tid, int fd, void *buffer, off64_t count) {
+    START_LOG(tid, "call(fd=%d, buffer=0x%08x, count=%ld)", fd, buffer, count);
 
     threads_data_bufs->at(tid).second->read(reinterpret_cast<char *>(buffer), count);
+    set_capio_fd_offset(fd, get_capio_fd_offset(fd) + count);
 }
 
 /**
@@ -46,10 +50,12 @@ inline void read_data(long tid, void *buffer, off64_t count) {
  * @param count
  * @return
  */
-inline void write_data(long tid, const void *buffer, off64_t count) {
-    START_LOG(tid, "call(buffer=0x%08x, count=%ld)", buffer, count);
+inline void write_data(long tid, int fd, const void *buffer, off64_t count) {
+    START_LOG(tid, "call(fd=%d, buffer=0x%08x, count=%ld)", fd, buffer, count);
 
+    write_request(fd, count, tid);
     threads_data_bufs->at(tid).first->write(reinterpret_cast<const char *>(buffer), count);
+    set_capio_fd_offset(fd, get_capio_fd_offset(fd) + count);
 }
 
 #endif // CAPIO_POSIX_UTILS_DATA_HPP

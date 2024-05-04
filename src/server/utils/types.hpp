@@ -10,11 +10,11 @@
 
 #include "utils/capio_file.hpp"
 
+#include "capio_file.hpp"
+
 typedef std::unordered_map<int, int> CSPidsMap_T;
 typedef std::unordered_map<int, std::string> CSAppsMap_t;
 typedef std::unordered_map<std::string, std::unordered_set<std::string>> CSFilesSentMap_t;
-typedef std::unordered_map<int, std::unordered_map<int, std::pair<CapioFile *, off64_t *>>>
-    CSProcessFileMap_t;
 typedef std::unordered_map<int, std::unordered_map<int, std::filesystem::path>>
     CSProcessFileMetadataMap_t;
 typedef std::unordered_map<int, std::pair<SPSCQueue *, SPSCQueue *>> CSDataBufferMap_t;
@@ -26,7 +26,6 @@ typedef std::vector<std::tuple<std::string, std::string, std::string, std::strin
                                long int, bool, long int>>
     CSMetadataConfGlobs_t;
 typedef std::unordered_map<int, std::unordered_map<std::string, bool>> CSWritersMap_t;
-typedef std::unordered_map<std::string, std::pair<const char *const, off64_t>> CSFilesLocationMap_t;
 typedef std::unordered_map<std::string,
                            std::list<std::tuple<const std::filesystem::path, size_t, std::string,
                                                 std::vector<std::string> *, Semaphore *>>>

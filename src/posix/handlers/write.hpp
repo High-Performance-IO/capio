@@ -14,8 +14,7 @@ inline ssize_t capio_write(int fd, const void *buffer, off64_t count, long tid) 
             ERR_EXIT("Capio does not support writes bigger than "
                      "SSIZE_MAX yet");
         }
-        write_request(fd, count, tid);
-        write_data(tid, buffer, count);
+        write_data(tid, fd, buffer, count);
 
         return count;
     } else {

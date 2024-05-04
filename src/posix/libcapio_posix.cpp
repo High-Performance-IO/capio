@@ -34,137 +34,137 @@ static int not_implemented_handler(long arg0, long arg1, long arg2, long arg3, l
     return 0;
 }
 
-static constexpr size_t CAPIO_NR_SYSCALLS = 1 + std::max({
+static constexpr long CAPIO_NR_SYSCALLS = 1 + std::max({
 #ifdef SYS_access
-                                                    SYS_access,
+                                                  SYS_access,
 #endif
 #ifdef SYS_chdir
-                                                    SYS_chdir,
+                                                  SYS_chdir,
 #endif
 #ifdef SYS_chmod
-                                                    SYS_chmod,
+                                                  SYS_chmod,
 #endif
 #ifdef SYS_chown
-                                                    SYS_chown,
+                                                  SYS_chown,
 #endif
 #ifdef SYS_close
-                                                    SYS_close,
+                                                  SYS_close,
 #endif
 #ifdef SYS_creat
-                                                    SYS_creat,
+                                                  SYS_creat,
 #endif
 #ifdef SYS_dup
-                                                    SYS_dup,
+                                                  SYS_dup,
 #endif
 #ifdef SYS_dup2
-                                                    SYS_dup2,
+                                                  SYS_dup2,
 #endif
 #ifdef SYS_dup3
-                                                    SYS_dup3,
+                                                  SYS_dup3,
 #endif
 #ifdef SYS_execve
-                                                    SYS_execve,
+                                                  SYS_execve,
 #endif
 #ifdef SYS_exit
-                                                    SYS_exit,
+                                                  SYS_exit,
 #endif
 #ifdef SYS_exit_group
-                                                    SYS_exit_group,
+                                                  SYS_exit_group,
 #endif
 #ifdef SYS_faccessat
-                                                    SYS_faccessat,
+                                                  SYS_faccessat,
 #endif
 #ifdef SYS_faccessat2
-                                                    SYS_faccessat2,
+                                                  SYS_faccessat2,
 #endif
 #ifdef SYS_fcntl
-                                                    SYS_fcntl,
+                                                  SYS_fcntl,
 #endif
 #ifdef SYS_fgetxattr
-                                                    SYS_fgetxattr,
+                                                  SYS_fgetxattr,
 #endif
 #ifdef SYS_flistxattr
-                                                    SYS_flistxattr,
+                                                  SYS_flistxattr,
 #endif
 #ifdef SYS_fork
-                                                    SYS_fork,
+                                                  SYS_fork,
 #endif
 #ifdef SYS_fstat
-                                                    SYS_fstat,
+                                                  SYS_fstat,
 #endif
 #ifdef SYS_fstatfs
-                                                    SYS_fstatfs,
+                                                  SYS_fstatfs,
 #endif
 #ifdef SYS_getcwd
-                                                    SYS_getcwd,
+                                                  SYS_getcwd,
 #endif
 #ifdef SYS_getdents
-                                                    SYS_getdents,
+                                                  SYS_getdents,
 #endif
 #ifdef SYS_getdents64
-                                                    SYS_getdents64,
+                                                  SYS_getdents64,
 #endif
 #ifdef SYS_getxattr
-                                                    SYS_getxattr,
+                                                  SYS_getxattr,
 #endif
 #ifdef SYS_ioctl
-                                                    SYS_ioctl,
+                                                  SYS_ioctl,
 #endif
 #ifdef SYS_lgetxattr
-                                                    SYS_lgetxattr,
+                                                  SYS_lgetxattr,
 #endif
 #ifdef SYS_lseek
-                                                    SYS_lseek,
+                                                  SYS_lseek,
 #endif
 #ifdef SYS_lstat
-                                                    SYS_lstat,
+                                                  SYS_lstat,
 #endif
 #ifdef SYS_mkdir
-                                                    SYS_mkdir,
+                                                  SYS_mkdir,
 #endif
 #ifdef SYS_mkdirat
-                                                    SYS_mkdirat,
+                                                  SYS_mkdirat,
 #endif
 #ifdef SYS_newfstatat
-                                                    SYS_newfstatat,
+                                                  SYS_newfstatat,
 #endif
 #ifdef SYS_open
-                                                    SYS_open,
+                                                  SYS_open,
 #endif
 #ifdef SYS_openat
-                                                    SYS_openat,
+                                                  SYS_openat,
 #endif
 #ifdef SYS_read
-                                                    SYS_read,
+                                                  SYS_read,
 #endif
 #ifdef SYS_readv
-                                                    SYS_readv,
+                                                  SYS_readv,
 #endif
 #ifdef SYS_rename
-                                                    SYS_rename,
+                                                  SYS_rename,
 #endif
 #ifdef SYS_rmdir
-                                                    SYS_rmdir,
+                                                  SYS_rmdir,
 #endif
 #ifdef SYS_stat
-                                                    SYS_stat,
+                                                  SYS_stat,
 #endif
 #ifdef SYS_statx
-                                                    SYS_statx,
+                                                  SYS_statx,
 #endif
 #ifdef SYS_unlink
-                                                    SYS_unlink,
+                                                  SYS_unlink,
 #endif
 #ifdef SYS_unlinkat
-                                                    SYS_unlinkat,
+                                                  SYS_unlinkat,
 #endif
 #ifdef SYS_write
-                                                    SYS_write,
+                                                  SYS_write,
 #endif
 #ifdef SYS_writev
-                                                    SYS_writev,
+                                                  SYS_writev,
 #endif
-                                                });
+                                              });
 
 static constexpr std::array<CPHandler_t, CAPIO_NR_SYSCALLS> build_syscall_table() {
     std::array<CPHandler_t, CAPIO_NR_SYSCALLS> _syscallTable{0};

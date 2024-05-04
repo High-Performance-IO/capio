@@ -241,7 +241,6 @@ inline void write_request(const int fd, const off64_t count, const long tid) {
     char req[CAPIO_REQUEST_MAX_SIZE];
     int num_writes_batch = get_num_writes_batch(tid);
     long int offset      = get_capio_fd_offset(fd);
-    set_capio_fd_offset(fd, offset + count);
     // FIXME: works only if there is only one writer at time for each file
     if (actual_num_writes == num_writes_batch) {
         sprintf(req, "%04d %ld %d %ld %ld", CAPIO_REQUEST_WRITE, tid, fd, offset, count);

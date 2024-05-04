@@ -240,6 +240,7 @@ TEST(SystemCallTest, TestFileCreateWriteCloseWithStat) {
     EXPECT_NE(fp, nullptr);
     EXPECT_EQ(access(PATHNAME, F_OK), 0);
     EXPECT_EQ(fwrite(array, sizeof(int), ARRAY_SIZE, fp), ARRAY_SIZE);
+    EXPECT_EQ(ftell(fp), ARRAY_SIZE * sizeof(int));
     EXPECT_NE(fseek(fp, 0, SEEK_SET), -1);
     int num;
     for (int i = 0; i < ARRAY_SIZE; i++) {
