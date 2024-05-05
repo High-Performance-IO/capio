@@ -11,6 +11,7 @@ int close_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long ar
     START_LOG(tid, "call(fd=%ld)", fd);
 
     if (exists_capio_fd(fd)) {
+        get_write_cache(tid).flush();
         close_request(fd, tid);
         delete_capio_fd(fd);
         *result = 0;

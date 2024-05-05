@@ -88,6 +88,7 @@ inline int capio_statx(int dirfd, const std::string_view &pathname, int flags, i
         }
     }
 
+    get_write_cache(tid).flush();
     auto [file_size, is_dir] = stat_request(path, tid);
     if (file_size == -1) {
         errno = ENOENT;

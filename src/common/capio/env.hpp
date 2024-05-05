@@ -53,6 +53,42 @@ const std::filesystem::path &get_capio_dir() {
     return capio_dir;
 }
 
+inline long get_cache_lines() {
+    START_LOG(capio_syscall(SYS_gettid), "call()");
+    static long data_bufs_size = -1;
+    if (data_bufs_size == -1) {
+        LOG("Value not set. getting value");
+        std::unique_ptr<char> value(std::getenv("CAPIO_CACHE_LINES"));
+        if (value != nullptr) {
+            LOG("Getting value from environment variable");
+            data_bufs_size = strtol(value.get(), nullptr, 10);
+        } else {
+            LOG("Getting default value");
+            data_bufs_size = CAPIO_CACHE_LINES_DEFAULT;
+        }
+    }
+    LOG("data_bufs_size=%ld", data_bufs_size);
+    return data_bufs_size;
+}
+
+inline long get_cache_line_size() {
+    START_LOG(capio_syscall(SYS_gettid), "call()");
+    static long data_bufs_count = -1;
+    if (data_bufs_count == -1) {
+        LOG("Value not set. getting value");
+        std::unique_ptr<char> value(std::getenv("CAPIO_CACHE_LINE_SIZE"));
+        if (value != nullptr) {
+            LOG("Getting value from environment variable");
+            data_bufs_count = strtol(value.get(), nullptr, 10);
+        } else {
+            LOG("Getting default value");
+            data_bufs_count = CAPIO_CACHE_LINE_SIZE_DEFAULT;
+        }
+    }
+    LOG("data_bufs_count=%ld", data_bufs_count);
+    return data_bufs_count;
+}
+
 inline int get_capio_log_level() {
     static int level = -2;
     if (level == -2) {

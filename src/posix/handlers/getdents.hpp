@@ -3,7 +3,7 @@
 
 #if defined(SYS_getdents) || defined(SYS_getdents64)
 
-#include "capio/data_structure.hpp"
+#include "capio/dirent.hpp"
 
 #include "utils/data.hpp"
 
@@ -23,33 +23,16 @@ inline int getdents_handler_impl(long arg0, long arg1, long arg2, long *result, 
         if (count >= SSIZE_MAX) {
             ERR_EXIT("src does not support read bigger than SSIZE_MAX yet");
         }
-        off64_t offset      = get_capio_fd_offset(fd);
-        off64_t end_of_read = getdents_request(fd, count, is64bit, tid);
-        off64_t bytes_read  = end_of_read - offset;
+        get_write_cache(tid).flush();
+        *result = get_read_cache(tid).read(fd, buffer, count, true, is64bit);
 
-        if (bytes_read > count) {
-            bytes_read = count;
-        }
-
-        read_data(tid, fd, buffer, bytes_read);
-
-        *result = bytes_read;
-
-        DBG(tid, [](char *result, off64_t count, off64_t offset) {
-            struct linux_dirent {
-                uint64_t d_ino;
-                off64_t d_off;
-                unsigned short d_reclen;
-                unsigned char d_type;
-                char d_name[PATH_MAX];
-            };
-            START_LOG(syscall_no_intercept(SYS_gettid), "call ()");
-            struct linux_dirent *d;
-            LOG("READ from queue: offset:%ld, count:%ld", offset, count);
-            LOG("%19s %12s %13s %15s %s", "INODE", "TYPE", "RECORD_LENGTH", "OFFSET", "NAME");
+        DBG(tid, [](char *buf, off64_t count) {
+            START_LOG(syscall_no_intercept(SYS_gettid), "call (count=%ld)", count);
+            struct linux_dirent64 *d;
+            LOG("%25s %12s %13s %15s   %s", "INODE", "TYPE", "RECORD_LENGTH", "OFFSET", "NAME");
             for (off64_t bpos = 0, i = 0; bpos < count && i < 10; i++) {
-                d = (struct linux_dirent *) (result + bpos);
-                LOG("%19lu %9s %13ld %15ld %s\n", d->d_ino,
+                d = (struct linux_dirent64 *) (buf + bpos);
+                LOG("%25lu %12s %13ld %15ld   %s\n", d->d_ino,
                     (d->d_type == 8)    ? "regular"
                     : (d->d_type == 4)  ? "directory"
                     : (d->d_type == 1)  ? "FIFO"
@@ -61,7 +44,7 @@ inline int getdents_handler_impl(long arg0, long arg1, long arg2, long *result, 
                     d->d_reclen, d->d_off, d->d_name);
                 bpos += d->d_reclen;
             }
-        }((char *) buffer, bytes_read, offset));
+        }(reinterpret_cast<char *>(buffer), *result));
 
         return CAPIO_POSIX_SYSCALL_SUCCESS;
     } else {

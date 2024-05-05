@@ -7,8 +7,6 @@
 #include "filesystem.hpp"
 #include "types.hpp"
 
-int actual_num_writes = 1;
-
 CircularBuffer<char> *buf_requests;
 CPBufResponse_t *bufs_response;
 
@@ -239,16 +237,8 @@ inline off64_t rmdir_request(const std::filesystem::path &dir_path, long tid) {
 
 inline void write_request(const int fd, const off64_t count, const long tid) {
     char req[CAPIO_REQUEST_MAX_SIZE];
-    int num_writes_batch = get_num_writes_batch(tid);
-    long int offset      = get_capio_fd_offset(fd);
-    // FIXME: works only if there is only one writer at time for each file
-    if (actual_num_writes == num_writes_batch) {
-        sprintf(req, "%04d %ld %d %ld %ld", CAPIO_REQUEST_WRITE, tid, fd, offset, count);
-        buf_requests->write(req, CAPIO_REQUEST_MAX_SIZE);
-        actual_num_writes = 1;
-    } else {
-        ++(actual_num_writes);
-    }
+    sprintf(req, "%04d %ld %d %ld", CAPIO_REQUEST_WRITE, tid, fd, count);
+    buf_requests->write(req, CAPIO_REQUEST_MAX_SIZE);
 }
 
 #endif // CAPIO_POSIX_UTILS_REQUESTS_HPP

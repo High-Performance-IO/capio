@@ -6,7 +6,7 @@
 #include "utils/common.hpp"
 #include "utils/requests.hpp"
 
-inline ssize_t capio_write(int fd, const void *buffer, off64_t count, long tid) {
+inline off64_t capio_write(int fd, const void *buffer, off64_t count, long tid) {
     START_LOG(tid, "call(fd=%d, buf=0x%08x, count=%ld)", fd, buffer, count);
 
     if (exists_capio_fd(fd)) {
@@ -14,7 +14,9 @@ inline ssize_t capio_write(int fd, const void *buffer, off64_t count, long tid) 
             ERR_EXIT("Capio does not support writes bigger than "
                      "SSIZE_MAX yet");
         }
-        write_data(tid, fd, buffer, count);
+
+        get_read_cache(tid).flush();
+        get_write_cache(tid).write(fd, buffer, count);
 
         return count;
     } else {
@@ -22,14 +24,14 @@ inline ssize_t capio_write(int fd, const void *buffer, off64_t count, long tid) 
     }
 }
 
-inline ssize_t capio_writev(int fd, const struct iovec *iov, int iovcnt, long tid) {
+inline off64_t capio_writev(int fd, const struct iovec *iov, int iovcnt, long tid) {
     START_LOG(tid, "call(fd=%d, iov.iov_base=0x%08x, iov.iov_len=%ld, iovcnt=%d)", fd,
               iov->iov_base, iov->iov_len, iovcnt);
 
     if (exists_capio_fd(fd)) {
         LOG("fd %d exists and is a capio fd", fd);
-        ssize_t tot_bytes = 0;
-        ssize_t res       = 0;
+        off64_t tot_bytes = 0;
+        off64_t res       = 0;
         int i             = 0;
         LOG("iov setup completed. starting write request loop");
         while (i < iovcnt && res >= 0) {
