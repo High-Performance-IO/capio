@@ -102,6 +102,9 @@ std::unordered_map<int, std::unordered_map<std::string, bool>> writers;
 // pathname -> (node, offset)
 std::unordered_map<std::string, std::pair<char*, long int>> files_location;
 
+// pathname -> node
+std::unordered_map<std::string, std::string> static_home_nodes;
+
 // node -> rank
 std::unordered_map<std::string, int> nodes_helper_rank;
 //rank -> node
@@ -918,6 +921,14 @@ void handle_crax(const char* str, int rank) {
 		response_buffers[tid]->write(&res);
 }
 
+bool open_static_home_node(std::string path, int tid, int fd, int rank, bool is_creat) {
+   auto it = static_home_nodes.find(path);
+   bool res = it != static_home_nodes.end() && it->second == node_name;
+   if (res)
+       update_file_metadata(path, tid, fd, rank, is_creat);
+   return res;
+}
+
 void handle_open(char* str, int rank, bool is_creat) {
 	#ifdef CAPIOLOG
 	logfile << "handle open" << std::endl;
@@ -928,25 +939,131 @@ void handle_open(char* str, int rank, bool is_creat) {
 	if (is_creat) {
 		sscanf(str, "crat %d %d %s", &tid, &fd, path_cstr);
 		init_process(tid);
-		if (files_location.find(path_cstr) != files_location.end() || check_file_location(rank, path_cstr))
-			is_creat = false;
-		update_file_metadata(path_cstr, tid, fd, rank, is_creat);
+        if (!open_static_home_node(path_cstr, tid, fd, rank, is_creat)) {
+            if (files_location.find(path_cstr) != files_location.end() || check_file_location(rank, path_cstr))
+                is_creat = false;
+            update_file_metadata(path_cstr, tid, fd, rank, is_creat);
+        }
+        else {
+            Capio_file& c_file = *files_metadata[path_cstr];
+            c_file.complete = true;
+#ifdef CAPIOLOG
+            logfile << "file size after open-creat in static home node " << c_file.get_file_size() << std::endl;
+#endif
+        }
 	}
 	else {
 		sscanf(str, "open %d %d %s", &tid, &fd, path_cstr);
 		init_process(tid);
-		//it is important that check_files_location is the last because is the slowest (short circuit evaluation)
-		if (files_location.find(path_cstr) != files_location.end() || metadata_conf.find(path_cstr) != metadata_conf.end() || match_globs(path_cstr) != -1 || check_file_location(rank, path_cstr)) {
-			update_file_metadata(path_cstr, tid, fd, rank, is_creat);
-			#ifdef CAPIOLOG
-			logfile << "file found" << std::endl;
-			#endif
+        if (!open_static_home_node(path_cstr, tid, fd, rank, is_creat)) {
+        //it is important that check_files_location is the last because is the slowest (short circuit evaluation)
+		    if (files_location.find(path_cstr) != files_location.end() || metadata_conf.find(path_cstr) != metadata_conf.end() || match_globs(path_cstr) != -1 || check_file_location(rank, path_cstr)) {
+			    update_file_metadata(path_cstr, tid, fd, rank, is_creat);
+			    #ifdef CAPIOLOG
+			    logfile << "file found" << std::endl;
+			    #endif
+	    	}
+		    else
+			    res = 1;
 		}
-		else
-			res = 1;
-		
+        else {
+            Capio_file& c_file = *files_metadata[path_cstr];
+            c_file.complete = true;
+#ifdef CAPIOLOG
+            logfile << "file size after open in static home node " << c_file.get_file_size() << std::endl;
+#endif
+        }
 	}
 	response_buffers[tid]->write(&res);
+}
+
+void send_file(char* shm, long int nbytes, int dest) {
+    if (nbytes == 0) {
+#ifdef CAPIOLOG
+        logfile << "returning without sending file" << std::endl;
+#endif
+        return;
+    }
+    long int num_elements_to_send = 0;
+    //MPI_Request req;
+    for (long int k = 0; k < nbytes; k += num_elements_to_send) {
+        if (nbytes - k > 1024L * 1024 * 1024)
+            num_elements_to_send = 1024L * 1024 * 1024;
+        else
+            num_elements_to_send = nbytes - k;
+#ifdef CAPIOLOG
+        logfile << "before sending file k " << k << " num elem to send " << num_elements_to_send << std::endl;
+#endif
+        //MPI_Send(shm + k, num_elements_to_send, MPI_BYTE, dest, 0, MPI_COMM_WORLD);
+        MPI_Isend(shm + k, num_elements_to_send, MPI_BYTE, dest, 0, MPI_COMM_WORLD, &req);
+#ifdef CAPIOLOG
+        logfile << "after sending file" << std::endl;
+#endif
+    }
+}
+
+//TODO: refactor offset_str and offset
+
+void serve_remote_read(const char* path_c, int dest, long int offset, long int nbytes, int complete) {
+    if (sem_wait(&remote_read_sem) == -1)
+        err_exit("sem_wait remote_read_sem in serve_remote_read", logfile);
+
+    char* buf_send;
+    // Send all the rest of the file not only the number of bytes requested
+    // Useful for caching
+    void* file_shm;
+    size_t file_size;
+    sem_wait(&files_metadata_sem);
+    if (files_metadata.find(path_c) != files_metadata.end()) {
+        Capio_file& c_file = *files_metadata[path_c];
+        file_shm = c_file.get_buffer();
+        file_size = c_file.get_stored_size();
+        sem_post(&files_metadata_sem);
+    }
+    else {
+        sem_post(&files_metadata_sem);
+        logfile << "error capio_helper file " << path_c << " not in shared memory" << std::endl;
+        exit(1);
+    }
+    nbytes = file_size - offset;
+
+    if (PREFETCH_DATA_SIZE != 0 && nbytes > PREFETCH_DATA_SIZE)
+        nbytes = PREFETCH_DATA_SIZE;
+
+    std::string nbytes_str = std::to_string(nbytes);
+    const char* nbytes_cstr = nbytes_str.c_str();
+    std::string offset_str = std::to_string(offset);
+    const char* offset_cstr = offset_str.c_str();
+    std::string complete_str = std::to_string(complete);
+    const char* complete_cstr = complete_str.c_str();
+    std::string file_size_str = std::to_string(file_size);
+    const char* file_size_cstr = file_size_str.c_str();
+    const char* s1 = "sending";
+    const size_t len1 = strlen(s1);
+    const size_t len2 = strlen(path_c);
+    const size_t len3 = strlen(offset_cstr);
+    const size_t len4 = strlen(nbytes_cstr);
+    const size_t len5 = strlen(complete_cstr);
+    const size_t len6 = strlen(file_size_cstr);
+    buf_send = (char*) malloc((len1 + len2 + len3 + len4 + len5 + len6 + 6) * sizeof(char));//TODO:add malloc check
+    sprintf(buf_send, "%s %s %s %s %s %s", s1, path_c, offset_cstr, nbytes_cstr, complete_cstr, file_size_cstr);
+#ifdef CAPIOLOG
+    logfile << "helper serve remote read msg sent: " << buf_send << " to " << dest << std::endl;
+#endif
+    //send warning
+    MPI_Send(buf_send, strlen(buf_send) + 1, MPI_CHAR, dest, 0, MPI_COMM_WORLD);
+    free(buf_send);
+    //send data
+#ifdef CAPIOLOG
+    logfile << "before sending part of the file to : " << dest << " with offset " << offset << " nbytes" << nbytes << std::endl;
+#endif
+    send_file(((char*) file_shm) + offset, nbytes, dest);
+#ifdef CAPIOLOG
+    logfile << "after sending part of the file to : " << dest << std::endl;
+#endif
+    if (sem_post(&remote_read_sem) == -1) {
+        err_exit("sem_post remote_read_sem in serve_remote_read", logfile);
+    }
 }
 
 void handle_write(const char* str, int rank) {
@@ -1036,6 +1153,18 @@ void handle_write(const char* str, int rank) {
 		handle_pending_local_reads(path, true);
 		handle_pending_remote_reads(path, data_size, false);
 	}
+
+    auto it = static_home_nodes.find(path);
+    if (it != static_home_nodes.end()) {
+        std::string node = it->second;
+        if (node != node_name) {
+            int node_rank = nodes_helper_rank[node];
+#ifdef CAPIOLOG
+            logfile << "sending write to remote node " << node << std::endl;
+#endif
+            serve_remote_read(path.c_str(), node_rank, base_offset, count, false);
+        }
+    }
 	
 
 }
@@ -1151,7 +1280,13 @@ void handle_local_read(int tid, int fd, off64_t count, bool dir, bool is_getdent
 			}
 			else {
 				sem_post(&files_metadata_sem);
+#ifdef CAPIOLOG
+                logfile << "read responding " << end_of_read << std::endl;
+#endif
 				response_buffers[tid]->write(&end_of_read);
+#ifdef CAPIOLOG
+                logfile << "read giving data " << bytes_read << std::endl;
+#endif
 				send_data_to_client(tid, p + process_offset, bytes_read);
 			}
 		}
@@ -1406,6 +1541,18 @@ void handle_read(const char* str, int rank, bool dir, bool is_getdents) {
 	stream >> request >> tid >> fd >> count;
 	std::string path = processes_files_metadata[tid][fd];
 	bool is_prod = is_producer(tid, path);
+
+    auto it = static_home_nodes.find(path);
+    if (it != static_home_nodes.end()) {
+        std::string node = it->second;
+        if (node != node_name) {
+            logfile << "error static home node read" << std::endl;
+            exit(EXIT_FAILURE);
+        }
+        handle_local_read(tid, fd, count, dir, is_getdents, is_prod);
+        return;
+    }
+
 	if (files_location.find(path) == files_location.end() && !is_prod) {
 		bool found = check_file_location(rank, processes_files_metadata[tid][fd]);
 		if (!found) {
@@ -1964,6 +2111,17 @@ void* wait_for_stat(void* pthread_arg) {
 }
 
 void reply_stat(int tid, const std::string& path, int rank) {
+    auto it = static_home_nodes.find(path);
+    if (it != static_home_nodes.end()) {
+        std::string node = it->second;
+        if (node == node_name) {
+#ifdef CAPIOLOG
+            logfile << "local stat static home node" << std::endl;
+#endif
+            handle_local_stat(tid, path);
+            return;
+        }
+    }
 	if (files_location.find(path) == files_location.end()) {
 		check_file_location(rank, path);
 		if (files_location.find(path) == files_location.end()) {
@@ -2536,95 +2694,6 @@ struct remote_read_metadata {
 	sem_t* sem;
 };
 
-void send_file(char* shm, long int nbytes, int dest) {
-	if (nbytes == 0) {
-		#ifdef CAPIOLOG
-		logfile << "returning without sending file" << std::endl;
-		#endif
-		return;
-	}
-	long int num_elements_to_send = 0;
-	//MPI_Request req;
-	for (long int k = 0; k < nbytes; k += num_elements_to_send) {
-			if (nbytes - k > 1024L * 1024 * 1024)
-				num_elements_to_send = 1024L * 1024 * 1024;
-			else
-				num_elements_to_send = nbytes - k; 
-		#ifdef CAPIOLOG
-			logfile << "before sending file k " << k << " num elem to send " << num_elements_to_send << std::endl;
-	#endif
-			//MPI_Send(shm + k, num_elements_to_send, MPI_BYTE, dest, 0, MPI_COMM_WORLD); 
-			MPI_Isend(shm + k, num_elements_to_send, MPI_BYTE, dest, 0, MPI_COMM_WORLD, &req); 
-		#ifdef CAPIOLOG
-			logfile << "after sending file" << std::endl;
-#endif
-	}
-}
-
-//TODO: refactor offset_str and offset
-
-void serve_remote_read(const char* path_c, int dest, long int offset, long int nbytes, int complete) {
-	if (sem_wait(&remote_read_sem) == -1)
-		err_exit("sem_wait remote_read_sem in serve_remote_read", logfile);
-	
-	char* buf_send;
-	// Send all the rest of the file not only the number of bytes requested
-	// Useful for caching
-	void* file_shm;
-	size_t file_size;
-	sem_wait(&files_metadata_sem);
-	if (files_metadata.find(path_c) != files_metadata.end()) {
-		Capio_file& c_file = *files_metadata[path_c];
-		file_shm = c_file.get_buffer();
-		file_size = c_file.get_stored_size();
-		sem_post(&files_metadata_sem);
-	}
-	else {
-		sem_post(&files_metadata_sem);
-		logfile << "error capio_helper file " << path_c << " not in shared memory" << std::endl;
-		exit(1);
-	}
-	nbytes = file_size - offset;
-
-	if (PREFETCH_DATA_SIZE != 0 && nbytes > PREFETCH_DATA_SIZE)
-		nbytes = PREFETCH_DATA_SIZE;
-
-	std::string nbytes_str = std::to_string(nbytes);
-	const char* nbytes_cstr = nbytes_str.c_str();
-	std::string offset_str = std::to_string(offset);
-	const char* offset_cstr = offset_str.c_str();
-	std::string complete_str = std::to_string(complete);
-	const char* complete_cstr = complete_str.c_str();
-	std::string file_size_str = std::to_string(file_size);
-	const char* file_size_cstr = file_size_str.c_str();
-	const char* s1 = "sending";
-	const size_t len1 = strlen(s1);
-	const size_t len2 = strlen(path_c);
-	const size_t len3 = strlen(offset_cstr);
-	const size_t len4 = strlen(nbytes_cstr);
-	const size_t len5 = strlen(complete_cstr);
-	const size_t len6 = strlen(file_size_cstr);
-	buf_send = (char*) malloc((len1 + len2 + len3 + len4 + len5 + len6 + 6) * sizeof(char));//TODO:add malloc check
-	sprintf(buf_send, "%s %s %s %s %s %s", s1, path_c, offset_cstr, nbytes_cstr, complete_cstr, file_size_cstr);
-	#ifdef CAPIOLOG
-		logfile << "helper serve remote read msg sent: " << buf_send << " to " << dest << std::endl;
-	#endif
-	//send warning
-	MPI_Send(buf_send, strlen(buf_send) + 1, MPI_CHAR, dest, 0, MPI_COMM_WORLD);
-	free(buf_send);
-	//send data
-	#ifdef CAPIOLOG
-		logfile << "before sending part of the file to : " << dest << " with offset " << offset << " nbytes" << nbytes << std::endl;
-	#endif
-	send_file(((char*) file_shm) + offset, nbytes, dest);
-	#ifdef CAPIOLOG
-		logfile << "after sending part of the file to : " << dest << std::endl;
-	#endif
-	if (sem_post(&remote_read_sem) == -1) {
-		err_exit("sem_post remote_read_sem in serve_remote_read", logfile);
-	}
-}
-
 void* wait_for_data(void* pthread_arg) {
 	auto* rr_metadata = (struct remote_read_metadata*) pthread_arg;
 	const char* path = rr_metadata->path;
@@ -3188,22 +3257,23 @@ void* capio_helper(void* pthread_arg) {
 			void* file_shm; 
 			sem_wait(&files_metadata_sem);
 			auto it = files_metadata.find(path);
-			if (it != files_metadata.end()) {
-				Capio_file& c_file = *(it->second);
-				if (c_file.buf_to_allocate()) {
+            if (it == files_metadata.end()) {
+                sem_post(&files_metadata_sem);
+                create_file(path, false, file_initial_size);
+                sem_wait(&files_metadata_sem);
+                it = files_metadata.find(path);
+            }
+            Capio_file &c_file = *(it->second);
+            if (c_file.buf_to_allocate()) {
 
-        #ifdef CAPIOLOG
-        logfile << "allocating file " << path << std::endl;
-        #endif
-					c_file.create_buffer(path, false);
-					}
-				file_shm = c_file.get_buffer();
-				sem_post(&files_metadata_sem);
-			}
-			else {
-				logfile << "error capio_helper file " << path << " not in shared memory" << std::endl;
-				exit(1);
-			}
+#ifdef CAPIOLOG
+                logfile << "allocating file " << path << std::endl;
+#endif
+                c_file.create_buffer(path, false);
+            }
+            file_shm = c_file.get_buffer();
+            c_file.complete = true;
+            sem_post(&files_metadata_sem);
 			#ifdef CAPIOLOG
 				logfile << "helper before received part of the file from process " << source << std::endl;
 				logfile << "offset " << offset << std::endl;
@@ -3576,6 +3646,20 @@ int main(int argc, char** argv) {
 		logfile << __FILE__ << ":" << __LINE__ << " - " << std::flush;
 		perror("sem_init failed"); exit(res);
 	}
+
+    static_home_nodes.emplace("/beegfs/home/albemart/capio_broadwell/motexample/file0.dat", "broadwell-003");
+
+    static_home_nodes.emplace("/beegfs/home/albemart/capio_broadwell/motexample/file1.dat", "broadwell-004");
+    static_home_nodes.emplace("/beegfs/home/albemart/capio_broadwell/motexample/file3.dat", "broadwell-004");
+    static_home_nodes.emplace("/beegfs/home/albemart/capio_broadwell/motexample/file4.dat", "broadwell-004");
+
+    static_home_nodes.emplace("/beegfs/home/albemart/capio_broadwell/motexample/file2.dat", "broadwell-005");
+    static_home_nodes.emplace("/beegfs/home/albemart/capio_broadwell/motexample/file5.dat", "broadwell-005");
+    static_home_nodes.emplace("/beegfs/home/albemart/capio_broadwell/motexample/output_W0.dat", "broadwell-005");
+    static_home_nodes.emplace("/beegfs/home/albemart/capio_broadwell/motexample/output_W1.dat", "broadwell-005");
+    static_home_nodes.emplace("/beegfs/home/albemart/capio_broadwell/motexample/output_X.dat", "broadwell-005");
+    static_home_nodes.emplace("/beegfs/home/albemart/capio_broadwell/motexample/output_X.dat", "broadwell-005");
+
 	res = pthread_create(&server_thread, nullptr, capio_server, &rank);
 	if (res != 0) {
 		logfile << "error creation of capio server main thread" << std::endl;
