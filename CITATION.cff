@@ -1,0 +1,52 @@
+cff-version: 1.2.0
+message: "If you want to cite CAPIO, please refer to the article below."
+authors:
+  - family-names: "Martinelli"
+    given-names: "Alberto Riccardo"
+    orcid: "https://orcid.org/0000-0002-3707-7015"
+  - family-names: "Santimaria"
+    given-names: "Marco Edoardo"
+    orcid: "https://orcid.org/0009-0003-9886-4500"
+  - family-names: "Colonnelli"
+    given-names: "Iacopo"
+    orcid: "https://orcid.org/0000-0001-9290-2017"
+  - family-names: "Torquati"
+    given-names: "Massimo"
+    orcid: "https://orcid.org/0000-0001-6323-3459"
+title: "CAPIO"
+url: "https://github.com/High-Performance-IO/capio"
+version: 0.1
+preferred-citation:
+  type: conference-paper
+  authors:
+    - family-names: "Martinelli"
+      given-names: "Alberto Riccardo"
+      orcid: "https://orcid.org/0000-0002-3707-7015"
+    - family-names: "Torquati"
+      given-names: "Massimo"
+      orcid: "https://orcid.org/0000-0001-6323-3459"
+    - family-names: "Aldinucci"
+      given-names: "Marco"
+      orcid: "https://orcid.org/0000-0001-8788-0829"
+    - family-names: "Colonnelli"
+      given-names: "Iacopo"
+      orcid: "https://orcid.org/0000-0001-9290-2017"
+    - family-names: "Cantalupo"
+      given-names: "Barbara"
+      orcid: "https://orcid.org/0000-0001-7575-3902"
+  doi: 10.1109/HiPC58850.2023.00031
+  collection-title: "2023 IEEE 30th International Conference on High Performance Computing, Data, and Analytics, HiPC 2023"
+  conference:
+    name: "International Conference on High Performance Computing"
+    city: "Goa"
+    country: "IN"
+    date-start: "2023-12-18"
+    date-end: "2023-12-21"
+  publisher:
+    name: "IEEE Computer Society"
+    city: "Los Alamitos, California"
+    country: "US"
+  start: 153
+  end: 163
+  title: "CAPIO: a Middleware for Transparent I/O Streaming in Data-Intensive Workflows"
+  year: 2023
