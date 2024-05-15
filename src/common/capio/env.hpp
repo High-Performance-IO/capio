@@ -58,10 +58,11 @@ inline long get_cache_lines() {
     static long data_bufs_size = -1;
     if (data_bufs_size == -1) {
         LOG("Value not set. getting value");
-        std::unique_ptr<char> value(std::getenv("CAPIO_CACHE_LINES"));
+        char *value = std::getenv("CAPIO_CACHE_LINES");
         if (value != nullptr) {
             LOG("Getting value from environment variable");
-            data_bufs_size = strtol(value.get(), nullptr, 10);
+            data_bufs_size = strtol(value, nullptr, 10);
+            free(value);
         } else {
             LOG("Getting default value");
             data_bufs_size = CAPIO_CACHE_LINES_DEFAULT;
@@ -76,10 +77,11 @@ inline long get_cache_line_size() {
     static long data_bufs_count = -1;
     if (data_bufs_count == -1) {
         LOG("Value not set. getting value");
-        std::unique_ptr<char> value(std::getenv("CAPIO_CACHE_LINE_SIZE"));
+        char *value = std::getenv("CAPIO_CACHE_LINE_SIZE");
         if (value != nullptr) {
             LOG("Getting value from environment variable");
-            data_bufs_count = strtol(value.get(), nullptr, 10);
+            data_bufs_count = strtol(value, nullptr, 10);
+            free(value);
         } else {
             LOG("Getting default value");
             data_bufs_count = CAPIO_CACHE_LINE_SIZE_DEFAULT;
