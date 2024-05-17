@@ -12,14 +12,14 @@ concurrency:
 jobs:
   codespell-check:
     name: "Check codespell conformance"
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
       - name: "Run codespell"
         uses: codespell-project/actions-codespell@v2
   docker-check:
     name: "Check Docker image"
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     strategy:
       matrix:
         cmake-build-type:
@@ -72,7 +72,7 @@ jobs:
               --gtest_print_time=1
   format-check:
     name: "Check ${{ matrix.path }} clang-format conformance"
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     strategy:
       matrix:
         path:
@@ -87,7 +87,7 @@ jobs:
           check-path: "${{ matrix.path }}"
   unit-tests:
     name: "Build ${{ matrix.build_type }} with ${{ matrix.cxx }}"
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     strategy:
       matrix:
         build_type:
