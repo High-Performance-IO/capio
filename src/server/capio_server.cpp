@@ -117,7 +117,7 @@ static constexpr std::array<CSHandler_t, CAPIO_NR_REQUESTS> build_request_handle
 
     internal_server_sem.unlock();
 
-    auto str = std::unique_ptr<char[]>(new char[CAPIO_REQUEST_MAX_SIZE]);
+    auto str = std::unique_ptr<char[]>(new char[CAPIO_REQ_MAX_SIZE]);
     while (true) {
         LOG(CAPIO_LOG_SERVER_REQUEST_START);
         int code = read_next_request(str.get());

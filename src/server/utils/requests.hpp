@@ -14,8 +14,7 @@ CSBufResponse_t *bufs_response;
  * @return
  */
 inline void init_server() {
-    // TODO: replace number with constexpr
-    buf_requests  = new CSBufRequest_t(SHM_COMM_CHAN_NAME_REQ, 1024 * 1024, CAPIO_REQUEST_MAX_SIZE,
+    buf_requests  = new CSBufRequest_t(SHM_COMM_CHAN_NAME, CAPIO_REQ_BUFF_CNT, CAPIO_REQ_MAX_SIZE,
                                        workflow_name);
     bufs_response = new CSBufResponse_t();
 }
@@ -41,8 +40,9 @@ inline void destroy_server() {
  */
 inline void register_listener(long tid) {
     // TODO: replace numbers with constexpr
-    auto *p_buf_response = new CircularBuffer<off_t>(SHM_COMM_CHAN_NAME_RESP + std::to_string(tid),
-                                                     8 * 1024 * 1024, sizeof(off_t), workflow_name);
+    auto *p_buf_response =
+        new CircularBuffer<off_t>(SHM_COMM_CHAN_NAME_RESP + std::to_string(tid), CAPIO_REQ_BUFF_CNT,
+                                  sizeof(off_t), workflow_name);
     bufs_response->insert(std::make_pair(tid, p_buf_response));
 }
 
@@ -65,7 +65,7 @@ inline void remove_listener(int tid) {
  * @return request code
  */
 inline auto read_next_request(char *str) {
-    char req[CAPIO_REQUEST_MAX_SIZE];
+    char req[CAPIO_REQ_MAX_SIZE];
     buf_requests->read(req);
     START_LOG(gettid(), "call(req=%s)", req);
     int code       = -1;

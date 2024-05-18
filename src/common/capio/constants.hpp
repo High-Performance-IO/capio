@@ -23,10 +23,11 @@ constexpr char CAPIO_SHM_CANARY_ERROR[] =
     "is already running. Clean shared memory and then retry";
 
 // CAPIO communication constants
+constexpr int CAPIO_REQ_BUFF_CNT                     = 512; // Max number of elements inside buffers
 constexpr int CAPIO_CACHE_LINES_DEFAULT              = 10;
 constexpr int CAPIO_CACHE_LINE_SIZE_DEFAULT          = 256 * 1024;
 constexpr size_t CAPIO_SERVER_REQUEST_MAX_SIZE       = sizeof(char) * (PATH_MAX + 81920);
-constexpr size_t CAPIO_REQUEST_MAX_SIZE              = 256 * sizeof(char);
+constexpr size_t CAPIO_REQ_MAX_SIZE                  = 256 * sizeof(char);
 constexpr char CAPIO_SERVER_CLI_LOG_SERVER[]         = "[ \033[1;32m SERVER \033[0m ] ";
 constexpr char CAPIO_SERVER_CLI_LOG_SERVER_WARNING[] = "[ \033[1;33m SERVER \033[0m ] ";
 constexpr char CAPIO_SERVER_CLI_LOG_SERVER_ERROR[]   = "[ \033[1;31m SERVER \033[0m ] ";
@@ -66,7 +67,7 @@ constexpr char SHM_SPSC_PREFIX_WRITE[] = "capio_write_tid_";
 constexpr char SHM_SPSC_PREFIX_READ[]  = "capio_read_tid_";
 
 // CAPIO common - shared channel by client and server
-constexpr char SHM_COMM_CHAN_NAME_REQ[]  = "request_buffer";
+constexpr char SHM_COMM_CHAN_NAME[]      = "request_buffer";
 constexpr char SHM_COMM_CHAN_NAME_RESP[] = "response_buffer_";
 
 // CAPIO logger - shm errors
