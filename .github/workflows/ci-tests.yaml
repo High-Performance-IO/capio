@@ -128,7 +128,7 @@ jobs:
       - name: "Install GCC"
         if: ${{ startsWith(matrix.cxx, 'g++-') }}
         run: |
-          sudo add-apt-repository ppa:ubuntu-toolchain-r/ppa
+          sudo add-apt-repository ppa:ubuntu-toolchain-r/test
           sudo apt update
           sudo apt install -y ${{ matrix.cxx }}
       - name: "Run CMake"
