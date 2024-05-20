@@ -34,33 +34,4 @@ void free_resources(int tid) {
     }
 }
 
-void handle_pending_remote_nfiles(const std::filesystem::path &path) {
-    START_LOG(gettid(), "call(%s)", path.c_str());
-
-    std::lock_guard<std::mutex> lg(nfiles_mutex);
-
-    for (auto &p : clients_remote_pending_nfiles) {
-        std::string app          = p.first;
-        auto &app_pending_nfiles = p.second;
-        auto it                  = app_pending_nfiles.begin();
-        while (it != app_pending_nfiles.end()) {
-            auto &[prefix, batch_size, dest, files_path, sem] = *it;
-            std::unordered_set<std::string> &files            = files_sent[app];
-            auto file_location_opt                            = get_file_location_opt(path);
-            auto next_it                                      = std::next(it);
-            if (files.find(path) == files.end() && file_location_opt &&
-                strcmp(std::get<0>(file_location_opt->get()), node_name) == 0 &&
-                path.native().compare(0, prefix.native().length(), prefix) == 0) {
-                files_path->push_back(path);
-                files.insert(path);
-                if (files_path->size() == batch_size) {
-                    app_pending_nfiles.erase(it);
-                    sem->unlock();
-                }
-            }
-            it = next_it;
-        }
-    }
-}
-
 #endif // CAPIO_SERVER_HANDLERS_COMMON_HPP

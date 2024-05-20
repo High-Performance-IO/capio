@@ -30,12 +30,12 @@ class NamedSemaphore {
 
   public:
     NamedSemaphore(std::string name, unsigned int init_value) : _name(std::move(name)) {
-        START_LOG(capio_syscall(SYS_gettid), "[  NamedSemaphore  ] call(name=%s, init_value=%d)",
-                  _name.c_str(), init_value);
+        START_LOG(capio_syscall(SYS_gettid), " call(name=%s, init_value=%d)", _name.c_str(),
+                  init_value);
 
         _sem = sem_open(_name.c_str(), O_CREAT | O_RDWR, S_IRUSR | S_IWUSR, init_value);
         if (_sem == SEM_FAILED) {
-            ERR_EXIT("[  NamedSemaphore  ] sem_open %s failed", _name.c_str());
+            ERR_EXIT(" sem_open %s failed", _name.c_str());
         }
     }
 
@@ -44,37 +44,37 @@ class NamedSemaphore {
     ~NamedSemaphore() {
         START_LOG(capio_syscall(SYS_gettid), "call()");
         if (sem_destroy(_sem) != 0) {
-            ERR_EXIT("[  NamedSemaphore  ] destruction of semaphore %s failed", _name.c_str());
+            ERR_EXIT(" destruction of semaphore %s failed", _name.c_str());
         }
-        LOG("[  NamedSemaphore  ] Destroyed shared semaphore %s", _name.c_str());
+        LOG(" Destroyed shared semaphore %s", _name.c_str());
         if (sem_unlink(_name.c_str()) != 0) {
-            ERR_EXIT("[  NamedSemaphore  ] destruction of semaphore %s failed", _name.c_str());
+            ERR_EXIT(" destruction of semaphore %s failed", _name.c_str());
         }
-        LOG("[  NamedSemaphore  ] Unlinked shared semaphore %s", _name.c_str());
+        LOG(" Unlinked shared semaphore %s", _name.c_str());
     }
 
     inline void lock() {
         START_LOG(capio_syscall(SYS_gettid), "call()");
 
-        LOG("[  NamedSemaphore  ] Acquiring lock on %s", _name.c_str());
+        LOG(" Acquiring lock on %s", _name.c_str());
 
         if (sem_wait(_sem) == -1) {
-            ERR_EXIT("[  NamedSemaphore  ] unable to acquire %s", _name.c_str());
+            ERR_EXIT(" unable to acquire %s", _name.c_str());
         }
 
-        LOG("[  NamedSemaphore  ] Acquired lock on %s", _name.c_str());
+        LOG(" Acquired lock on %s", _name.c_str());
     }
 
     inline void unlock() {
         START_LOG(capio_syscall(SYS_gettid), "call()");
 
-        LOG("[  NamedSemaphore  ] Releasing lock on %s", _name.c_str());
+        LOG(" Releasing lock on %s", _name.c_str());
 
         if (sem_post(_sem) == -1) {
-            ERR_EXIT("[  NamedSemaphore  ] unable to release %s", _name.c_str());
+            ERR_EXIT(" unable to release %s", _name.c_str());
         }
 
-        LOG("[  NamedSemaphore  ] Released lock on %s", _name.c_str());
+        LOG(" Released lock on %s", _name.c_str());
     }
 };
 
@@ -84,10 +84,10 @@ class Semaphore {
 
   public:
     explicit Semaphore(unsigned int init_value) {
-        START_LOG(capio_syscall(SYS_gettid), "[  Semaphore  ] call(init_value=%d)", init_value);
+        START_LOG(capio_syscall(SYS_gettid), "call(init_value=%d)", init_value);
 
         if (sem_init(&_sem, 0, init_value) != 0) {
-            ERR_EXIT("[  Semaphore  ] initialization of unnamed semaphore failed");
+            ERR_EXIT("initialization of unnamed semaphore failed");
         }
     }
 
@@ -96,21 +96,21 @@ class Semaphore {
     ~Semaphore() {
         START_LOG(capio_syscall(SYS_gettid), "call()");
         if (sem_destroy(&_sem) != 0) {
-            ERR_EXIT("[  Semaphore  ] destruction of unnamed semaphore failed");
+            ERR_EXIT("destruction of unnamed semaphore failed");
         }
     }
 
     inline void lock() {
         START_LOG(capio_syscall(SYS_gettid), "call()");
         if (sem_wait(&_sem) == -1) {
-            ERR_EXIT("[  Semaphore  ] unable to acquire unnamed semaphore");
+            ERR_EXIT("unable to acquire unnamed semaphore");
         }
     }
 
     inline void unlock() {
         START_LOG(capio_syscall(SYS_gettid), "call()");
         if (sem_post(&_sem) == -1) {
-            ERR_EXIT("[  Semaphore  ] unable to release unnamed semaphore");
+            ERR_EXIT("unable to release unnamed semaphore");
         }
     }
 };
