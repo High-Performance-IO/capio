@@ -50,6 +50,7 @@ inline void handle_local_read(int tid, int fd, off64_t count, bool is_prod) {
     std::string_view mode             = c_file.get_mode();
     if (mode == CAPIO_FILE_MODE_UPDATE && !c_file.is_complete() && !writer && !is_prod) {
         // wait for file to be completed and then do what is done inside handle pending read
+        LOG("Starting async thread to wait for file availability");
         std::thread t([&c_file, tid, fd, count, process_offset] {
             c_file.wait_for_completion();
             handle_pending_read(tid, fd, process_offset, count);
@@ -57,6 +58,8 @@ inline void handle_local_read(int tid, int fd, off64_t count, bool is_prod) {
         t.detach();
     } else if (end_of_read > end_of_sector) {
         if (!is_prod && !writer && !c_file.is_complete()) {
+            LOG("Mode is NO_UPDATE. awaiting for data on separate thread before sending it to "
+                "client");
             // here if mode is NO_UPDATE, wait for data and then send it
             std::thread t([&c_file, tid, fd, count, process_offset] {
                 c_file.wait_for_data(process_offset + count);
@@ -65,8 +68,10 @@ inline void handle_local_read(int tid, int fd, off64_t count, bool is_prod) {
             t.detach();
 
         } else {
+            LOG("Data is available.");
             if (end_of_sector == -1) {
-                write_response(tid, 0);
+                LOG("End of sector is -1. returning process_offset without serving data");
+                write_response(tid, process_offset);
                 return;
             }
             c_file.create_buffer_if_needed(path, false);

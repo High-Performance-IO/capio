@@ -19,6 +19,7 @@ class ReadCache {
 
         if (count > 0) {
             memcpy(buffer, _cache + _cache_offset, count);
+            LOG("Read %ld. adding it to _cache_offset of value %ld", count, _cache_offset);
             _cache_offset += count;
         }
     }
@@ -57,6 +58,9 @@ class ReadCache {
             count            = (count / dirent_size) * dirent_size;
         }
 
+        auto read_size = count - remaining_bytes;
+        LOG("Read() will need to read %ld bytes", read_size);
+
         if (count <= remaining_bytes) {
             LOG("count %ld <= remaining_bytes %ld", count, remaining_bytes);
             _read(buffer, count);
@@ -65,39 +69,41 @@ class ReadCache {
             LOG("count %ld > remaining_bytes %ld", count, remaining_bytes);
             _read(buffer, remaining_bytes);
             buffer = reinterpret_cast<char *>(buffer) + remaining_bytes;
-            if (count - remaining_bytes > _max_line_size) {
-                LOG("count - remaining_bytes %ld > _max_line_size %ld", count - remaining_bytes,
-                    _max_line_size);
-                off64_t end_of_read =
-                    is_getdents ? getdents_request(fd, count - remaining_bytes, is64bit, _tid)
-                                : read_request(fd, count - remaining_bytes, _tid);
-                bytes_read = end_of_read - file_offset;
+
+            if (read_size > _max_line_size) {
+                LOG("count - remaining_bytes %ld > _max_line_size %ld", read_size, _max_line_size);
+                LOG("Reading exactly requested size");
+                off64_t end_of_read = is_getdents ? getdents_request(fd, read_size, is64bit, _tid)
+                                                  : read_request(fd, read_size, _tid);
+                bytes_read          = end_of_read - file_offset;
                 _queue.read(reinterpret_cast<char *>(buffer), bytes_read);
             } else {
-                LOG("count - remaining_bytes %ld <= _max_line_size %ld", count - remaining_bytes,
-                    _max_line_size);
+                LOG("count - remaining_bytes %ld <= _max_line_size %ld", read_size, _max_line_size);
+                LOG("Reading more to use pre fetching and caching");
                 off64_t end_of_read = is_getdents
                                           ? getdents_request(fd, _max_line_size, is64bit, _tid)
                                           : read_request(fd, _max_line_size, _tid);
-                _actual_size        = end_of_read - file_offset - remaining_bytes;
-                _cache_offset       = 0;
+                LOG("request return value is %ld", end_of_read);
+                _actual_size = end_of_read - file_offset - remaining_bytes;
+                LOG("ReaderCache actual size, after requested read is: %ld bytes", _actual_size);
+                _cache_offset = 0;
                 if (_actual_size > 0) {
+                    LOG("Fetching data from shm _queue");
                     _cache = _queue.fetch();
                 }
-                if (count - remaining_bytes < _actual_size) {
-                    LOG("count - remaining_bytes %ld < _actual_size %ld", count - remaining_bytes,
-                        _actual_size);
-                    _read(buffer, count - remaining_bytes);
+                if (read_size < _actual_size) {
+                    LOG("count - remaining_bytes %ld < _actual_size %ld", read_size, _actual_size);
+                    _read(buffer, read_size);
                     bytes_read = count;
                 } else {
-                    LOG("count - remaining_bytes %ld >= _actual_size %ld", count - remaining_bytes,
-                        _actual_size);
+                    LOG("count - remaining_bytes %ld >= _actual_size %ld", read_size, _actual_size);
                     _read(buffer, _actual_size);
                     bytes_read = remaining_bytes + _actual_size;
                 }
             }
         }
-
+        LOG("%ld bytes have been read. setting fd offset to %ld", bytes_read,
+            file_offset + bytes_read);
         set_capio_fd_offset(fd, file_offset + bytes_read);
         return bytes_read;
     }
