@@ -54,27 +54,19 @@ class NamedSemaphore {
     }
 
     inline void lock() {
-        START_LOG(capio_syscall(SYS_gettid), "call()");
-
-        LOG(" Acquiring lock on %s", _name.c_str());
+        START_LOG(capio_syscall(SYS_gettid), "call(name=%s)", _name.c_str());
 
         if (sem_wait(_sem) == -1) {
             ERR_EXIT(" unable to acquire %s", _name.c_str());
         }
-
-        LOG(" Acquired lock on %s", _name.c_str());
     }
 
     inline void unlock() {
-        START_LOG(capio_syscall(SYS_gettid), "call()");
-
-        LOG(" Releasing lock on %s", _name.c_str());
+        START_LOG(capio_syscall(SYS_gettid), "call(name=%s)", _name.c_str());
 
         if (sem_post(_sem) == -1) {
             ERR_EXIT(" unable to release %s", _name.c_str());
         }
-
-        LOG(" Released lock on %s", _name.c_str());
     }
 };
 
