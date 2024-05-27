@@ -18,7 +18,8 @@ struct linux_dirent64 {
 };
 
 TEST(SystemCallTest, TestDirentsOnCapioDir) {
-    const std::filesystem::path PATHNAME = "test";
+    const std::filesystem::path PATHNAME  = "test";
+    const std::filesystem::path PATHNAME1 = "test_rmdir";
     constexpr const char *BUFFER =
         "QWERTYUIOPASDFGHJKLZXCVBNM1234567890qwertyuiopasdfghjklzxcvbnm\0";
     const std::filesystem::path path1 = PATHNAME / "file1.txt";
@@ -83,4 +84,7 @@ TEST(SystemCallTest, TestDirentsOnCapioDir) {
     EXPECT_NE(unlink(path3.c_str()), -1);
     EXPECT_NE(unlinkat(AT_FDCWD, PATHNAME.c_str(), AT_REMOVEDIR), -1);
     EXPECT_NE(access(PATHNAME.c_str(), F_OK), 0);
+
+    EXPECT_NE(mkdir(PATHNAME1.c_str(), S_IRWXU), -1);
+    EXPECT_NE(rmdir(PATHNAME1.c_str()), -1);
 }
