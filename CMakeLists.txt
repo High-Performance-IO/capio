@@ -47,12 +47,16 @@ find_package(Threads REQUIRED)
 add_compile_definitions(CAPIO_VERSION="${CMAKE_PROJECT_VERSION}")
 
 IF (CAPIO_LOG)
-    message(STATUS "Enabling CAPIO logger")
-    add_compile_definitions(CAPIOLOG)
-    execute_process(
-            COMMAND bash "${PROJECT_SOURCE_DIR}/scripts/gen_syscallnames.sh"
-            "${PROJECT_BINARY_DIR}/include/syscall/syscallnames.h"
-    )
+    if (CMAKE_BUILD_TYPE STREQUAL "Debug")
+        message(STATUS "Enabling CAPIO logger")
+        add_compile_definitions(CAPIOLOG)
+        execute_process(
+                COMMAND bash "${PROJECT_SOURCE_DIR}/scripts/gen_syscallnames.sh"
+                "${PROJECT_BINARY_DIR}/include/syscall/syscallnames.h"
+        )
+    else ()
+        message(WARNING "Capio logger enabled in release mode. skipping compilation of CAPIO logger")
+    endif ()
 ENDIF (CAPIO_LOG)
 
 IF (CAPIO_SYNC)
@@ -65,9 +69,9 @@ ENDIF (CAPIO_SYNC)
 file(GLOB_RECURSE CAPIO_COMMON_HEADERS "src/common/capio/*.hpp")
 include_directories(src/common)
 
-IF (CAPIO_LOG)
+IF (CAPIO_LOG AND CMAKE_BUILD_TYPE STREQUAL "Debug")
     include_directories("${PROJECT_BINARY_DIR}/include/syscall")
-ENDIF (CAPIO_LOG)
+ENDIF (CAPIO_LOG AND CMAKE_BUILD_TYPE STREQUAL "Debug")
 
 #####################################
 # Targets
