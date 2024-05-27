@@ -1,17 +1,8 @@
 # CAPIO
 
-Cross-Application Programmable I/O. High-performance support for direct multi-rail, programmable and portable streaming
-across different distributed applications (e.g. MPI-app1 -> MPI-app2).
-
-## Report bugs + get help
-
-[Create a new issue](https://github.com/High-Performance-IO/capio/issues/new)
-
-[Get help](https://github.com/High-Performance-IO/capio/wiki)
-
-> [!TIP]
-> A [wiki](https://github.com/High-Performance-IO/capio/wiki) is in development! You might want to check the wiki to get
-> more in depth information about CAPIO!
+CAPIO (Cross-Application Programmable I/O), is a middleware aimed at injecting streaming capabilities to workflow steps
+without changing the application codebase. It has been proven to work with C/C++ binaries, Fortran Binaries, JAVA,
+python and bash. 
 
 ## Build and run tests
 
@@ -53,7 +44,7 @@ the first is optional).
    want to execute your program (one daemon for each node). If you desire to specify a custom folder
    for capio, set `CAPIO_DIR` as a environment variable.
    ```bash
-   [CAPIO_DIR=your_capiodir] mpiexec -N 1 --hostfile your_hostfile capio_server -c conf.json 
+   [CAPIO_DIR=your_capiodir] [mpiexec -N 1 --hostfile your_hostfile] capio_server -c conf.json 
    ```
 
 > [!NOTE]
@@ -62,7 +53,11 @@ the first is optional).
 
 3) Launch your programs preloading the CAPIO shared library like this:
    ```bash
-   CAPIO_DIR=your_capiodir LD_PRELOAD=libcapio_posix.so ./your_app args
+   CAPIO_DIR=your_capiodir      \
+   CAPIO_WORKFLOW_NAME=wfname   \ 
+   CAPIO_APP_NAME=appname       \
+   LD_PRELOAD=libcapio_posix.so \ 
+   ./your_app <args>
     ```
 
 > [!WARNING]  
@@ -71,16 +66,42 @@ the first is optional).
 
 ### Available environment variables
 
-- `CAPIO_DIR` This environment variable tells to both server and application the mount point of capio
+CAPIO can be controlled through the usage of environment variables. The available variables are listed below:
+
+#### Global environment variable
+
+- `CAPIO_DIR` This environment variable tells to both server and application the mount point of capio;
 - `CAPIO_LOG_LEVEL` this environment tells both server and application the log level to use. This variable works only
-  if `-DCAPIO_LOG=TRUE` was specified during cmake phase.
+  if `-DCAPIO_LOG=TRUE` was specified during cmake phase;
 - `CAPIO_LOG_PREFIX` This environment variable is defined only for capio_posix applications and specifies the prefix of
   the logfile name to which capio will log to. The default value is `posix_thread_`, which means that capio will log by
   default to a set of files called `posix_thread_*.log`. An equivalent behaviour can be set on the capio server using
-  the `-l` option.
+  the `-l` option;
 - `CAPIO_LOG_DIR` This environment variable is defined only for capio_posix applications and specifies the directory
   name to which capio will be created. If this variable is not defined, capio will log by default to `capio_logs`. An
-  equivalent behaviour can be set on the capio server using the `-d` option.
+  equivalent behaviour can be set on the capio server using the `-d` option;
+- `CAPIO_CACHE_LINES`: This environment variable controls how many lines of cache are presents between posix and server
+  applications. defaults to 10 lines;
+- `CAPIO_CACHE_LINE_SIZE`: This environment variable controls the size of a single cache line. defaults to 256KB;
+
+#### Server only environment variable
+
+- `CAPIO_FILE_INIT_SIZE`: This environment variable defines the default size of pre allocated memory for a new file
+  handled by capio. Defaults to 4MB. Bigger sizes will reduce the overhead of malloc but will fill faster node memory.
+  Value has to be expressed in bytes;
+- `CAPIO_PREFETCH_DATA_SIZE`: If this variable is set, then data transfers between nodes will be always, at least of the
+  given value in bytes;
+
+#### Posix only environment variable
+
+> [!WARNING]  
+> The following variables are mandatory. If not provided to a posix, application, CAPIO will not be able to correctly
+> handle the
+> application, according to the specifications given from the json configuration file!
+
+- `CAPIO_WORKFLOW_NAME`: This environment variable is used to define the scope of a workflow for a given step. Needs to
+  be the same one as the field `"name"` inside the json configuration file;
+- `CAPIO_APP_NAME`: This environment variable defines the app name within a workflow for a given step;
 
 ## How to inject streaming capabilities into your workflow
 
@@ -152,13 +173,22 @@ There are also examples on how to write JSON configuration files for the semanti
 - [mix_semantics](https://github.com/High-Performance-IO/capio/wiki/Examples#mixed-semantics): A pipeline composed by a
   producer and a consumer with mix semantics
 
+## Report bugs + get help
+
+[Create a new issue](https://github.com/High-Performance-IO/capio/issues/new)
+
+[Get help](https://github.com/High-Performance-IO/capio/wiki)
+
+> [!TIP]
+> A [wiki](https://github.com/High-Performance-IO/capio/wiki) is in development! You might want to check the wiki to get
+> more in depth information about CAPIO!
+
 ## CAPIO Team
 
 Made with :heart: by:
 
-Alberto Riccardo Martinelli <albertoriccardo.martinelli@unito.it> (Designer and maintainer)\
+Alberto Riccardo Martinelli <albertoriccardo.martinelli@unito.it> (designer and maintainer) \
 Marco Edoardo Santimaria <marcoedoardo.santimaria@unito.it> (Designer and maintainer) \
-Iacopo Colonnelli <iacopo.colonnelli@unito.it> (Workflows expert and maintainer)\
-Massimo Torquati <massimo.torquati@unipi.it> (Designer)\
+Iacopo Colonnelli <iacopo.colonnelli@unito.it> (Workflows expert and maintainer) \
+Massimo Torquati <massimo.torquati@unipi.it> (Designer) \
 Marco Aldinucci <marco.aldinucci@unito.it> (Designer)
-
