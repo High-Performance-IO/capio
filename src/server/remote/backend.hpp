@@ -43,6 +43,8 @@ class RemoteRequest {
  */
 class Backend {
   public:
+    enum backendActions { writeFile, readFile };
+
     virtual ~Backend() = default;
 
     /**
@@ -85,6 +87,33 @@ class Backend {
      * @param target
      */
     virtual void send_request(const char *message, int message_len, const std::string &target) = 0;
+
+    /**
+     * This method is used to notify the backend that a local action has occurred
+     *
+     * @param actions The action that has occurred
+     * @param buffer The buffer to which action applies
+     * @param buffer_size The size of @param buffer
+     * @return 0 if nothing happens, or the method is not implemented, 1 if the
+     * action has been registered, -1 on error
+     */
+    virtual int notify_backend(enum backendActions actions, void *buffer, ssize_t buffer_size) {
+        START_LOG(gettid(), "call()");
+        return 0;
+    };
+
+    /**
+     * Get the backend name
+     * @return a null terminated pointer to char handlede by the capio backend. as such,
+     * no free, or delete operator shall be called on that pointer
+     */
+    virtual std::string &backend_name() = 0;
+
+    /**
+     * Let CAPIO server know if backend stores the files inside the memory of a nod or not
+     * @return
+     */
+    virtual bool store_file_in_memory() { return true; };
 };
 
 Backend *backend;
