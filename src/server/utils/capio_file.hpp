@@ -53,6 +53,10 @@ class CapioFile {
     std::vector<std::pair<int, int>> _threads_fd;
     bool _complete = false; // whether the file is completed / committed
 
+    // Whether to store a capio file in memory. If false, then the backend will be designated to
+    // handle the storage of the file, wich could be on file system or with other methods
+    bool _store_in_memory = true;
+
     /*sync variables*/
     mutable std::mutex _mutex;
     mutable std::condition_variable _complete_cv;
@@ -77,37 +81,47 @@ class CapioFile {
 
     CapioFile()
         : _buf_size(0), _committed(CAPIO_FILE_COMMITTED_ON_TERMINATION), _directory(false),
-          _permanent(false) {}
+          _permanent(false), _store_in_memory(true) {}
 
     CapioFile(const std::string_view &committed, const std::string_view &mode, bool directory,
               long int n_files_expected, bool permanent, off64_t init_size,
-              long int n_close_expected)
-        : _buf_size(init_size), _committed(committed), _directory(directory), _mode(mode),
+              long int n_close_expected, bool store_in_memory)
+        : _committed(committed), _directory(directory), _mode(mode),
           _n_close_expected(n_close_expected), _permanent(permanent),
-          n_files_expected(n_files_expected + 2) {}
+          n_files_expected(n_files_expected + 2), _store_in_memory(store_in_memory) {
 
-    CapioFile(bool directory, bool permanent, off64_t init_size, long int n_close_expected = -1)
-        : _buf_size(init_size), _committed(CAPIO_FILE_COMMITTED_ON_TERMINATION),
-          _directory(directory), _n_close_expected(n_close_expected), _permanent(permanent) {}
+        _buf_size = _store_in_memory ? init_size : 0;
+    }
+
+    CapioFile(bool directory, bool permanent, off64_t init_size, bool store_in_memory,
+              long int n_close_expected = -1)
+        : _committed(CAPIO_FILE_COMMITTED_ON_TERMINATION), _directory(directory),
+          _n_close_expected(n_close_expected), _permanent(permanent),
+          _store_in_memory(store_in_memory) {
+        _buf_size = _store_in_memory ? init_size : 0;
+    }
 
     CapioFile(const CapioFile &)            = delete;
     CapioFile &operator=(const CapioFile &) = delete;
 
     ~CapioFile() {
         START_LOG(gettid(), "call()");
-        LOG("Deleting capio_file");
-
-        if (_permanent && _home_node) {
-            if (_directory) {
-                delete[] _buf;
-            } else {
-                int res = munmap(_buf, _buf_size);
-                if (res == -1) {
-                    ERR_EXIT("munmap CapioFile");
+        if (_store_in_memory) {
+            LOG("Deleting capio_file");
+            if (_permanent && _home_node) {
+                if (_directory) {
+                    free(_buf);
+                } else {
+                    int res = munmap(_buf, _buf_size);
+                    if (res == -1) {
+                        ERR_EXIT("munmap CapioFile");
+                    }
                 }
+            } else {
+                free(_buf);
             }
         } else {
-            delete[] _buf;
+            LOG("Memory cleanup not required as no buffer has been allocated");
         }
     }
 
@@ -179,31 +193,35 @@ class CapioFile {
     void create_buffer(const std::filesystem::path &path, bool home_node) {
         START_LOG(gettid(), "call(path=%s, home_node=%s)", path.c_str(),
                   home_node ? "true" : "false");
-        std::lock_guard<std::mutex> lock(_mutex);
-        // TODO: will use malloc in order to be able to use realloc
-        _home_node = home_node;
-        if (_permanent && home_node) {
-            if (_directory) {
-                std::filesystem::create_directory(path);
-                std::filesystem::permissions(path, std::filesystem::perms::owner_all);
-                _buf = new char[_buf_size];
+        if (_store_in_memory) {
+            std::lock_guard<std::mutex> lock(_mutex);
+            // TODO: will use malloc in order to be able to use realloc
+            _home_node = home_node;
+            if (_permanent && home_node) {
+                if (_directory) {
+                    std::filesystem::create_directory(path);
+                    std::filesystem::permissions(path, std::filesystem::perms::owner_all);
+                    _buf = static_cast<char *>(malloc(_buf_size * sizeof(char)));
+                } else {
+                    LOG("creating mem mapped file");
+                    _fd = ::open(path.c_str(), O_RDWR | O_CREAT, S_IRWXU | S_IRGRP | S_IROTH);
+                    if (_fd == -1) {
+                        ERR_EXIT("open %s CapioFile constructor", path.c_str());
+                    }
+                    if (ftruncate(_fd, _buf_size) == -1) {
+                        ERR_EXIT("ftruncate CapioFile constructor");
+                    }
+                    _buf = (char *) mmap(nullptr, _buf_size, PROT_READ | PROT_WRITE, MAP_SHARED,
+                                         _fd, 0);
+                    if (_buf == MAP_FAILED) {
+                        ERR_EXIT("mmap CapioFile constructor");
+                    }
+                }
             } else {
-                LOG("creating mem mapped file");
-                _fd = ::open(path.c_str(), O_RDWR | O_CREAT, S_IRWXU | S_IRGRP | S_IROTH);
-                if (_fd == -1) {
-                    ERR_EXIT("open %s CapioFile constructor", path.c_str());
-                }
-                if (ftruncate(_fd, _buf_size) == -1) {
-                    ERR_EXIT("ftruncate CapioFile constructor");
-                }
-                _buf =
-                    (char *) mmap(nullptr, _buf_size, PROT_READ | PROT_WRITE, MAP_SHARED, _fd, 0);
-                if (_buf == MAP_FAILED) {
-                    ERR_EXIT("mmap CapioFile constructor");
-                }
+                _buf = static_cast<char *>(malloc(_buf_size * sizeof(char)));
             }
         } else {
-            _buf = new char[_buf_size];
+            LOG("No action needs to be taken as file are not stored in memory");
         }
     }
 
@@ -213,28 +231,19 @@ class CapioFile {
         }
     }
 
-    void memcpy_capio_file(char *new_p, char *old_p) const {
-        for (auto &sector : _sectors) {
-            off64_t lbound        = sector.first;
-            off64_t ubound        = sector.second;
-            off64_t sector_length = ubound - lbound;
-            memcpy(new_p + lbound, old_p + lbound, sector_length);
-        }
-    }
+    char *expand_buffer(off64_t data_size) {
+        START_LOG(gettid(), "call()");
+        if (_store_in_memory) {
+            LOG("File is stored in memory. reallocating buffer. _buf == nullptr ? %s",
+                _buf == nullptr ? "Yes" : "No");
+            off64_t double_size = _buf_size * 2;
+            off64_t new_size    = data_size > double_size ? data_size : double_size;
 
-    char *expand_buffer(off64_t data_size) { // TODO: use realloc
-        off64_t double_size = _buf_size * 2;
-        off64_t new_size    = data_size > double_size ? data_size : double_size;
-        char *new_buf       = new char[new_size];
-        std::lock_guard<std::mutex> lock(_mutex);
-        //	memcpy(new_p, old_p, file_shm_size); //TODO memcpy only the
-        // sector
-        // stored in CapioFile
-        memcpy_capio_file(new_buf, _buf);
-        delete[] _buf;
-        _buf      = new_buf;
-        _buf_size = new_size;
-        return new_buf;
+            std::lock_guard<std::mutex> lock(_mutex);
+            _buf      = static_cast<char *>(realloc(_buf, new_size));
+            _buf_size = new_size;
+        }
+        return _buf;
     }
 
     inline char *get_buffer() { return _buf; }
@@ -486,6 +495,8 @@ class CapioFile {
 
         std::unique_lock<std::mutex> lock(_mutex);
         queue.read(_buf + offset, num_bytes);
+        backend->notify_backend(Backend::backendActions::writeFile, _buf + offset, num_bytes);
+
         _data_avail_cv.notify_all();
     }
 

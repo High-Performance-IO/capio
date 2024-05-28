@@ -9,7 +9,8 @@ class MPIBackend : public Backend {
 
   protected:
     MPI_Request req{};
-    int rank = -1;
+    int rank                  = -1;
+    std::string _backend_name = "mpi";
 
     /*
      * This structure holds inside the information to convert from hostname to MPI rank*/
@@ -44,6 +45,9 @@ class MPIBackend : public Backend {
         START_LOG(gettid(), "Call()");
         MPI_Finalize();
     }
+
+    inline std::string &backend_name() override { return _backend_name; }
+    inline bool store_file_in_memory() override { return true; }
 
     inline const std::set<std::string> get_nodes() override { return nodes; }
 
@@ -139,6 +143,9 @@ class MPIBackend : public Backend {
 };
 
 class MPISYNCBackend : public MPIBackend {
+  private:
+    std::string _backend_name = "mpifs";
+
   public:
     MPISYNCBackend(int argc, char *argv[]) : MPIBackend(argc, argv) {
         START_LOG(gettid(), "call()");
@@ -149,6 +156,8 @@ class MPISYNCBackend : public MPIBackend {
         START_LOG(gettid(), "Call()");
         MPI_Finalize();
     }
+
+    inline std::string &backend_name() override { return _backend_name; }
 
     RemoteRequest read_next_request() override {
         START_LOG(gettid(), "call()");
