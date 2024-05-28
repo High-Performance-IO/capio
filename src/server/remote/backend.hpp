@@ -97,17 +97,11 @@ class Backend {
      * @return 0 if nothing happens, or the method is not implemented, 1 if the
      * action has been registered, -1 on error
      */
-    virtual int notify_backend(enum backendActions actions, void *buffer, ssize_t buffer_size) {
+    virtual int notify_backend(enum backendActions actions, const std::filesystem::path &file_path,
+                               void *buffer, size_t offset, size_t buffer_size) {
         START_LOG(gettid(), "call()");
         return 0;
     };
-
-    /**
-     * Get the backend name
-     * @return a null terminated pointer to char handlede by the capio backend. as such,
-     * no free, or delete operator shall be called on that pointer
-     */
-    virtual std::string &backend_name() = 0;
 
     /**
      * Let CAPIO server know if backend stores the files inside the memory of a nod or not

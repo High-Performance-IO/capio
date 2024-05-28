@@ -74,7 +74,7 @@ inline void reply_stat(int tid, const std::filesystem::path &path) {
     } else {
         LOG("Delegating backend to reply to remote stats");
         // send a request for file. then start a thread to wait for the request completion
-        c_file.create_buffer_if_needed(path, false);
+        c_file.create_buffer_if_needed(false);
         handle_remote_stat_request(tid, path);
     }
 }

@@ -57,6 +57,8 @@ class CapioFile {
     // handle the storage of the file, which could be on file system or with other methods
     bool _store_in_memory = true;
 
+    std::filesystem::path _file_name;
+
     /*sync variables*/
     mutable std::mutex _mutex;
     mutable std::condition_variable _complete_cv;
@@ -65,6 +67,36 @@ class CapioFile {
     inline off64_t _get_stored_size() const {
         auto it = _sectors.rbegin();
         return (it == _sectors.rend()) ? 0 : it->second;
+    }
+
+    enum _seek_type { data, hole };
+    off64_t _seek(enum _seek_type type, off64_t offset) const {
+        START_LOG(gettid(), "call(type=%s, offset=%ld)", type == _seek_type::data ? "data" : "hole",
+                  offset);
+        if (_store_in_memory) {
+
+            if (_sectors.empty()) {
+                return offset == 0 ? 0 : -1;
+            }
+            auto it = _sectors.upper_bound(std::make_pair(offset, 0));
+            if (it == _sectors.begin()) {
+                return type == _seek_type::data ? it->first : offset;
+            }
+            --it;
+            if (offset <= it->second) {
+                return type == _seek_type::data ? offset : it->first;
+            } else {
+                ++it;
+                if (it == _sectors.end()) {
+                    return -1;
+                } else {
+                    return type == _seek_type::data ? it->first : offset;
+                }
+            }
+        } else {
+            // TODO: Implement this
+            return -1;
+        }
     }
 
   public:
@@ -79,25 +111,26 @@ class CapioFile {
 
     std::size_t real_file_size = 0;
 
-    CapioFile()
+    CapioFile(std::filesystem::path name)
         : _buf_size(0), _committed(CAPIO_FILE_COMMITTED_ON_TERMINATION), _directory(false),
-          _permanent(false), _store_in_memory(true) {}
+          _permanent(false), _store_in_memory(true), _file_name(std::move(name)) {}
 
-    CapioFile(const std::string_view &committed, const std::string_view &mode, bool directory,
-              long int n_files_expected, bool permanent, off64_t init_size,
-              long int n_close_expected, bool store_in_memory)
+    CapioFile(std::filesystem::path name, const std::string_view &committed,
+              const std::string_view &mode, bool directory, long int n_files_expected,
+              bool permanent, off64_t init_size, long int n_close_expected, bool store_in_memory)
         : _committed(committed), _directory(directory), _mode(mode),
           _n_close_expected(n_close_expected), _permanent(permanent),
-          n_files_expected(n_files_expected + 2), _store_in_memory(store_in_memory) {
+          n_files_expected(n_files_expected + 2), _store_in_memory(store_in_memory),
+          _file_name(std::move(name)) {
 
         _buf_size = _store_in_memory ? init_size : 0;
     }
 
-    CapioFile(bool directory, bool permanent, off64_t init_size, bool store_in_memory,
-              long int n_close_expected = -1)
+    CapioFile(std::filesystem::path name, bool directory, bool permanent, off64_t init_size,
+              bool store_in_memory, long int n_close_expected = -1)
         : _committed(CAPIO_FILE_COMMITTED_ON_TERMINATION), _directory(directory),
           _n_close_expected(n_close_expected), _permanent(permanent),
-          _store_in_memory(store_in_memory) {
+          _store_in_memory(store_in_memory), _file_name(std::move(name)) {
         _buf_size = _store_in_memory ? init_size : 0;
     }
 
@@ -163,7 +196,7 @@ class CapioFile {
 
     [[nodiscard]] inline bool buf_to_allocate() const {
         std::lock_guard<std::mutex> lg(_mutex);
-        return _buf == nullptr;
+        return _store_in_memory && _buf == nullptr;
     }
 
     inline void close() {
@@ -190,23 +223,22 @@ class CapioFile {
      * To be called when a process
      * execute a read or a write syscall
      */
-    void create_buffer(const std::filesystem::path &path, bool home_node) {
-        START_LOG(gettid(), "call(path=%s, home_node=%s)", path.c_str(),
+    void create_buffer(bool home_node) {
+        START_LOG(gettid(), "call(path=%s, home_node=%s)", _file_name.c_str(),
                   home_node ? "true" : "false");
         if (_store_in_memory) {
             std::lock_guard<std::mutex> lock(_mutex);
-            // TODO: will use malloc in order to be able to use realloc
             _home_node = home_node;
             if (_permanent && home_node) {
                 if (_directory) {
-                    std::filesystem::create_directory(path);
-                    std::filesystem::permissions(path, std::filesystem::perms::owner_all);
+                    std::filesystem::create_directory(_file_name);
+                    std::filesystem::permissions(_file_name, std::filesystem::perms::owner_all);
                     _buf = static_cast<char *>(malloc(_buf_size * sizeof(char)));
                 } else {
                     LOG("creating mem mapped file");
-                    _fd = ::open(path.c_str(), O_RDWR | O_CREAT, S_IRWXU | S_IRGRP | S_IROTH);
+                    _fd = ::open(_file_name.c_str(), O_RDWR | O_CREAT, S_IRWXU | S_IRGRP | S_IROTH);
                     if (_fd == -1) {
-                        ERR_EXIT("open %s CapioFile constructor", path.c_str());
+                        ERR_EXIT("open %s CapioFile constructor", _file_name.c_str());
                     }
                     if (ftruncate(_fd, _buf_size) == -1) {
                         ERR_EXIT("ftruncate CapioFile constructor");
@@ -225,9 +257,9 @@ class CapioFile {
         }
     }
 
-    inline void create_buffer_if_needed(const std::filesystem::path &path, bool home_node) {
+    inline void create_buffer_if_needed(bool home_node) {
         if (buf_to_allocate()) {
-            create_buffer(path, home_node);
+            create_buffer(home_node);
         }
     }
 
@@ -248,8 +280,14 @@ class CapioFile {
 
     inline char *read(ssize_t offset, ssize_t count) {
         START_LOG(gettid(), "call(offset=%ld)", offset);
-        backend->notify_backend(Backend::backendActions::readFile, _buf + offset, count);
-        return _buf + offset;
+        if (_store_in_memory) {
+            return _buf + offset;
+        } else {
+            char *buffer = static_cast<char *>(malloc(count));
+            backend->notify_backend(Backend::backendActions::readFile, _file_name, buffer, offset,
+                                    count);
+            return buffer;
+        }
     }
 
     [[nodiscard]] inline off64_t get_buf_size() const { return _buf_size; }
@@ -403,77 +441,22 @@ class CapioFile {
 
     /*
      * From the manual:
-     *
-     * Adjust the file offset to the next location in the file
-     * greater than or equal to offset containing data.  If
-     * offset points to data, then the file offset is set to
-     * offset.
-     *
-     * Fails if offset points past the end of the file.
-     *
+     * Adjust the file offset to the next location in the file greater than or equal to offset
+     * containing data. If offset points to data, then the file offset is set to offset. Fails
+     * if offset points past the end of the file.
      */
-    off64_t seek_data(off64_t offset) {
-        if (_sectors.empty()) {
-            if (offset == 0) {
-                return 0;
-            } else {
-                return -1;
-            }
-        }
-        auto it = _sectors.upper_bound(std::make_pair(offset, 0));
-        if (it == _sectors.begin()) {
-            return it->first;
-        }
-        --it;
-        if (offset <= it->second) {
-            return offset;
-        } else {
-            ++it;
-            if (it == _sectors.end()) {
-                return -1;
-            } else {
-                return it->first;
-            }
-        }
-    }
+    [[nodiscard]] off64_t seek_data(off64_t offset) { return _seek(_seek_type::data, offset); }
 
     /*
      * From the manual:
-     *
-     * Adjust the file offset to the next hole in the file
-     * greater than or equal to offset.  If offset points into
-     * the middle of a hole, then the file offset is set to
-     * offset.  If there is no hole past offset, then the file
-     * offset is adjusted to the end of the file (i.e., there is
-     * an implicit hole at the end of any file).
-     *
-     *
+     * Adjust the file offset to the next hole in the file greater than or equal to offset.
+     * If offset points into  the middle of a hole, then the file offset is set to offset.
+     * If there is no hole past offset, then the file offset is adjusted to the end of the
+     * file (i.e., there is an implicit hole at the end of any file).
      * Fails if offset points past the end of the file.
-     *
      */
     [[nodiscard]] off64_t seek_hole(off64_t offset) const {
-        if (_sectors.empty()) {
-            if (offset == 0) {
-                return 0;
-            } else {
-                return -1;
-            }
-        }
-        auto it = _sectors.upper_bound(std::make_pair(offset, 0));
-        if (it == _sectors.begin()) {
-            return offset;
-        }
-        --it;
-        if (offset <= it->second) {
-            return it->second;
-        } else {
-            ++it;
-            if (it == _sectors.end()) {
-                return -1;
-            } else {
-                return offset;
-            }
-        }
+        return _seek(_seek_type::hole, offset);
     }
 
     inline void remove_fd(int tid, int fd) {
@@ -492,7 +475,8 @@ class CapioFile {
         START_LOG(gettid(), "call()");
         std::unique_lock<std::mutex> lock(_mutex);
         backend->recv_file(_buf + offset, dest, buffer_size);
-        backend->notify_backend(Backend::backendActions::writeFile, _buf + offset, buffer_size);
+        backend->notify_backend(Backend::backendActions::writeFile, _file_name, _buf, offset,
+                                buffer_size);
         _data_avail_cv.notify_all();
     }
 
@@ -500,7 +484,8 @@ class CapioFile {
         START_LOG(gettid(), "call()");
         std::unique_lock<std::mutex> lock(_mutex);
         queue.read(_buf + offset, num_bytes);
-        backend->notify_backend(Backend::backendActions::writeFile, _buf + offset, num_bytes);
+        backend->notify_backend(Backend::backendActions::writeFile, _file_name, _buf, offset,
+                                num_bytes);
         _data_avail_cv.notify_all();
     }
 
