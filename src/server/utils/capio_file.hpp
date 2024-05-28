@@ -54,7 +54,7 @@ class CapioFile {
     bool _complete = false; // whether the file is completed / committed
 
     // Whether to store a capio file in memory. If false, then the backend will be designated to
-    // handle the storage of the file, wich could be on file system or with other methods
+    // handle the storage of the file, which could be on file system or with other methods
     bool _store_in_memory = true;
 
     /*sync variables*/
@@ -246,7 +246,11 @@ class CapioFile {
         return _buf;
     }
 
-    inline char *get_buffer() { return _buf; }
+    inline char *read(ssize_t offset, ssize_t count) {
+        START_LOG(gettid(), "call(offset=%ld)", offset);
+        backend->notify_backend(Backend::backendActions::readFile, _buf + offset, count);
+        return _buf + offset;
+    }
 
     [[nodiscard]] inline off64_t get_buf_size() const { return _buf_size; }
 
@@ -485,18 +489,18 @@ class CapioFile {
      * @return
      */
     inline void read_from_node(const std::string &dest, off64_t offset, off64_t buffer_size) {
+        START_LOG(gettid(), "call()");
         std::unique_lock<std::mutex> lock(_mutex);
         backend->recv_file(_buf + offset, dest, buffer_size);
+        backend->notify_backend(Backend::backendActions::writeFile, _buf + offset, buffer_size);
         _data_avail_cv.notify_all();
     }
 
     inline void read_from_queue(SPSCQueue &queue, size_t offset, long int num_bytes) {
         START_LOG(gettid(), "call()");
-
         std::unique_lock<std::mutex> lock(_mutex);
         queue.read(_buf + offset, num_bytes);
         backend->notify_backend(Backend::backendActions::writeFile, _buf + offset, num_bytes);
-
         _data_avail_cv.notify_all();
     }
 
