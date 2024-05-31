@@ -16,7 +16,7 @@ void send_data_to_client(int tid, int fd, char *buf, off64_t offset, off64_t cou
               offset, count);
 
     write_response(tid, offset + count);
-    data_buffers[tid].second->write(buf, count);
+    data_buffers[tid].second->write(buf + offset, count);
     set_capio_file_offset(tid, fd, offset + count);
 }
 

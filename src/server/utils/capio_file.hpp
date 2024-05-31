@@ -69,34 +69,35 @@ class CapioFile {
         return (it == _sectors.rend()) ? 0 : it->second;
     }
 
-    /*   enum _seek_type { data, hole };
-       off64_t _seek(enum _seek_type type, off64_t offset) const {
-           START_LOG(gettid(), "call(type=%s, offset=%ld)", type == _seek_type::data ? "data" :
-       "hole", offset); if (_store_in_memory) {
+    enum _seek_type { data, hole };
+    off64_t _seek(_seek_type type, off64_t offset) const {
+        START_LOG(gettid(), "call(type=%s, offset=%ld)", type == _seek_type::data ? "data" : "hole",
+                  offset);
+        if (_store_in_memory) {
 
-               if (_sectors.empty()) {
-                   return offset == 0 ? 0 : -1;
-               }
-               auto it = _sectors.upper_bound(std::make_pair(offset, 0));
-               if (it == _sectors.begin()) {
-                   return type == _seek_type::data ? it->first : offset;
-               }
-               --it;
-               if (offset <= it->second) {
-                   return type == _seek_type::data ? offset : it->first;
-               } else {
-                   ++it;
-                   if (it == _sectors.end()) {
-                       return -1;
-                   } else {
-                       return type == _seek_type::data ? it->first : offset;
-                   }
-               }
-           } else {
-               // TODO: Implement this
-               return -1;
-           }
-       }*/
+            if (_sectors.empty()) {
+                return offset == 0 ? 0 : -1;
+            }
+            auto it = _sectors.upper_bound(std::make_pair(offset, 0));
+            if (it == _sectors.begin()) {
+                return type == _seek_type::data ? it->first : offset;
+            }
+            --it;
+            if (offset <= it->second) {
+                return type == _seek_type::data ? offset : it->first;
+            } else {
+                ++it;
+                if (it == _sectors.end()) {
+                    return -1;
+                } else {
+                    return type == _seek_type::data ? it->first : offset;
+                }
+            }
+        } else {
+            // TODO: Implement this
+            return -1;
+        }
+    }
 
   public:
     bool first_write          = true;
@@ -280,7 +281,7 @@ class CapioFile {
     inline char *read(ssize_t offset, ssize_t count) {
         START_LOG(gettid(), "call(offset=%ld)", offset);
         if (_store_in_memory) {
-            return _buf + offset;
+            return _buf;
         } else {
             char *buffer = static_cast<char *>(malloc(count));
             backend->notify_backend(Backend::backendActions::readFile, _file_name, buffer, offset,
@@ -444,35 +445,7 @@ class CapioFile {
      * containing data. If offset points to data, then the file offset is set to offset. Fails
      * if offset points past the end of the file.
      */
-    [[nodiscard]] off64_t seek_data(off64_t offset) {
-        START_LOG(gettid(), "call(offset=%ld)", offset);
-        if (_store_in_memory) {
-            if (_sectors.empty()) {
-                if (offset == 0) {
-                    return 0;
-                } else {
-                    return -1;
-                }
-            }
-            auto it = _sectors.upper_bound(std::make_pair(offset, 0));
-            if (it == _sectors.begin()) {
-                return it->first;
-            }
-            --it;
-            if (offset <= it->second) {
-                return offset;
-            } else {
-                ++it;
-                if (it == _sectors.end()) {
-                    return -1;
-                } else {
-                    return it->first;
-                }
-            }
-        } else {
-            return -1;
-        }
-    }
+    [[nodiscard]] off64_t seek_data(off64_t offset) { return _seek(_seek_type::data, offset); }
 
     /*
      * From the manual:
@@ -483,33 +456,7 @@ class CapioFile {
      * Fails if offset points past the end of the file.
      */
     [[nodiscard]] off64_t seek_hole(off64_t offset) const {
-        START_LOG(gettid(), "call(offset=%ld)", offset);
-        if (_store_in_memory) {
-            if (_sectors.empty()) {
-                if (offset == 0) {
-                    return 0;
-                } else {
-                    return -1;
-                }
-            }
-            auto it = _sectors.upper_bound(std::make_pair(offset, 0));
-            if (it == _sectors.begin()) {
-                return offset;
-            }
-            --it;
-            if (offset <= it->second) {
-                return it->second;
-            } else {
-                ++it;
-                if (it == _sectors.end()) {
-                    return -1;
-                } else {
-                    return offset;
-                }
-            }
-        } else {
-            return -1;
-        }
+        return _seek(_seek_type::hole, offset);
     }
 
     inline void remove_fd(int tid, int fd) {
