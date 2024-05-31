@@ -281,7 +281,7 @@ class CapioFile {
     inline char *read(ssize_t offset, ssize_t count) {
         START_LOG(gettid(), "call(offset=%ld)", offset);
         if (_store_in_memory) {
-            return _buf;
+            return _buf + offset;
         } else {
             char *buffer = static_cast<char *>(malloc(count));
             backend->notify_backend(Backend::backendActions::readFile, _file_name, buffer, offset,
