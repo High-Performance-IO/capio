@@ -32,6 +32,8 @@ inline off64_t send_dirent_to_client(int tid, int fd, CapioFile &c_file, off64_t
     off64_t actual_size = (last_entry - first_entry) * static_cast<off64_t>(sizeof(linux_dirent64));
     char *incoming      = c_file.read(0, actual_size);
 
+    LOG("Actual size: %ld. Dirent contains %d items", actual_size, last_entry);
+
     if (actual_size > 0) {
         auto dirents = std::unique_ptr<linux_dirent64[]>(new linux_dirent64[actual_size]);
 
@@ -47,8 +49,7 @@ inline off64_t send_dirent_to_client(int tid, int fd, CapioFile &c_file, off64_t
 
             LOG("DIRENT NAME: %s - TARGET NAME: %s", dir_entity->d_name, current_dirent.d_name);
         }
-        auto buf = reinterpret_cast<char *>(dirents.get()) - offset;
-        send_data_to_client(tid, fd, buf, offset, actual_size);
+        send_data_to_client(tid, fd, reinterpret_cast<char *>(dirents.get()), 0, actual_size);
     } else {
         write_response(tid, offset);
     }
