@@ -26,7 +26,7 @@ inline void request_remote_getdents(int tid, int fd, off64_t count) {
         send_dirent_to_client(tid, fd, c_file, offset, count);
     } else if (end_of_read <= end_of_sector) {
         LOG("?");
-        c_file.create_buffer_if_needed(path, false);
+        c_file.create_buffer_if_needed(false);
         send_data_to_client(tid, fd, c_file.get_buffer(), offset, count);
     } else {
         LOG("Delegating to backend remote read");
