@@ -42,7 +42,7 @@ void write_entry_dir(int tid, const std::filesystem::path &file_path,
     ld.d_reclen = sizeof(linux_dirent64);
 
     CapioFile &c_file = get_capio_file(dir);
-    c_file.create_buffer_if_needed(dir, true);
+    c_file.create_buffer_if_needed(true);
 
     off64_t file_size    = c_file.get_stored_size();
     off64_t data_size    = file_size + ld.d_reclen;
