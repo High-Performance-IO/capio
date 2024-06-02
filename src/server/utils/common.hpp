@@ -16,7 +16,7 @@ void send_data_to_client(int tid, int fd, char *buf, off64_t offset, off64_t cou
               offset, count);
 
     write_response(tid, offset + count);
-    data_buffers[tid].second->write(buf, count);
+    data_buffers[tid].second->write(buf + offset, count);
     set_capio_file_offset(tid, fd, offset + count);
 }
 
@@ -30,7 +30,7 @@ inline off64_t send_dirent_to_client(int tid, int fd, CapioFile &c_file, off64_t
     off64_t end_of_read = std::min(offset + count, c_file.get_stored_size());
     int last_entry      = static_cast<int>(end_of_read / sizeof(linux_dirent64));
     off64_t actual_size = (last_entry - first_entry) * static_cast<off64_t>(sizeof(linux_dirent64));
-    char *incoming      = c_file.read(0, actual_size);
+    char *incoming      = c_file.get_buffer();
 
     LOG("Actual size: %ld. Dirent contains %d items", actual_size, last_entry);
 
@@ -49,7 +49,8 @@ inline off64_t send_dirent_to_client(int tid, int fd, CapioFile &c_file, off64_t
 
             LOG("DIRENT NAME: %s - TARGET NAME: %s", dir_entity->d_name, current_dirent.d_name);
         }
-        send_data_to_client(tid, fd, reinterpret_cast<char *>(dirents.get()), offset, actual_size);
+        send_data_to_client(tid, fd, reinterpret_cast<char *>(dirents.get()) - offset, offset,
+                            actual_size);
     } else {
         write_response(tid, offset);
     }

@@ -223,7 +223,7 @@ class CapioFile {
      * To be called when a process
      * execute a read or a write syscall
      */
-    void create_buffer(bool home_node) {
+    void create_buffer(const std::filesystem::path &path, bool home_node) {
         START_LOG(gettid(), "call(path=%s, home_node=%s)", _file_name.c_str(),
                   home_node ? "true" : "false");
         if (_store_in_memory) {
@@ -257,9 +257,9 @@ class CapioFile {
         }
     }
 
-    inline void create_buffer_if_needed(bool home_node) {
+    inline void create_buffer_if_needed(const std::filesystem::path &path, bool home_node) {
         if (buf_to_allocate()) {
-            create_buffer(home_node);
+            create_buffer(path, home_node);
         }
     }
 
@@ -278,14 +278,13 @@ class CapioFile {
         return _buf;
     }
 
-    inline char *read(ssize_t offset, ssize_t count) {
-        START_LOG(gettid(), "call(offset=%ld)", offset);
+    inline char *get_buffer(off64_t offset = 0, ssize_t size = CAPIO_DEFAULT_FILE_INITIAL_SIZE) {
         if (_store_in_memory) {
-            return _buf + offset;
+            return _buf;
         } else {
-            char *buffer = static_cast<char *>(malloc(count));
+            char *buffer = static_cast<char *>(malloc(size));
             backend->notify_backend(Backend::backendActions::readFile, _file_name, buffer, offset,
-                                    count);
+                                    size);
             return buffer;
         }
     }
