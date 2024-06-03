@@ -42,6 +42,13 @@ inline Backend *select_backend(const std::string &backend_name, int argc, char *
         return new MPIBackend(argc, argv);
     }
 
+    if (backend_name == "fs") {
+        LOG("backend selected: file system");
+        std::cout << CAPIO_SERVER_CLI_LOG_SERVER << "Starting CAPIO with file system backend"
+                  << std::endl;
+        return new FSBackend(argc, argv);
+    }
+
     if (backend_name == "mpisync") {
         LOG("backend selected: mpisync");
         std::cout << CAPIO_SERVER_CLI_LOG_SERVER << "Starting CAPIO with MPI (SYNC) backend"

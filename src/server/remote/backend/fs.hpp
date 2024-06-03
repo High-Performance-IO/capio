@@ -183,7 +183,7 @@ class FSBackend : public Backend {
      * the updated set, as some of them might be new or offline
      * @return
      */
-    const std::set<std::string> get_nodes() override {
+    inline const std::set<std::string> get_nodes() override {
         START_LOG(gettid(), "call()");
         for (const auto &entry : std::filesystem::directory_iterator(".")) {
             auto found_hostname = entry.path().stem().string().erase(
@@ -195,7 +195,7 @@ class FSBackend : public Backend {
     };
 
     // collect information of currently existing tokens in capio
-    void handshake_servers() override {
+    inline void handshake_servers() override {
         START_LOG(gettid(), "call()");
 
         this->create_handshake_token(node_name);
@@ -210,8 +210,9 @@ class FSBackend : public Backend {
         }
     };
 
-    RemoteRequest read_next_request() override {
+    inline RemoteRequest read_next_request() override {
         START_LOG(gettid(), "call()");
+        LOG("FS backend does not uses request. For correctness, sockets are created, but not used");
         struct sockaddr_in clientAddress = {};
         int connectSocket;
         socklen_t clientAddressLen;
@@ -253,52 +254,11 @@ class FSBackend : public Backend {
      * @param message_len
      * @param target
      */
-    void send_request(const char *message, int message_len, const std::string &target) override {
+    inline void send_request(const char *message, int message_len,
+                             const std::string &target) override {
         START_LOG(gettid(), "call(message=%s, message_len=%d), target=%s)", message, message_len,
                   target.c_str());
-        struct sockaddr_in serverAddress {};
-        int outgoingSocket;
-        auto target_ip = hostname_to_ip[target];
-
-        // check if token is present, if not, proceed to create placeholder token
-        if (!std::filesystem::exists(root_dir / handshake_dir / target)) {
-            if (!create_handshake_token(target, true)) {
-                // lost race to become the dead server. Update target ip information
-                this->read_ip_address_from_token(target);
-            }
-            // else I am answering in place of the dead one
-        }
-
-        // at this point I have all the information to proceed to try a connection to target
-
-        if ((outgoingSocket = socket(AF_INET, SOCK_STREAM, 0)) == -1) {
-            ERR_EXIT("Error in socket(): error is: %d", outgoingSocket);
-        }
-
-        serverAddress.sin_family = AF_INET;
-        serverAddress.sin_port   = htons(CAPIO_FS_SOCK_LISTEN_PORT);
-
-        // try to connect to target with all IP addresses that I have found
-        bool connected = false;
-        for (const auto &ip : target_ip) {
-            serverAddress.sin_addr.s_addr = inet_addr(ip.c_str());
-
-            connected = connect(outgoingSocket, (struct sockaddr *) &serverAddress,
-                                sizeof(serverAddress)) != -1;
-            if (connected) {
-                break;
-            }
-        }
-
-        if (!connected) {
-            ERR_EXIT("Error: unable to connect to target host. aborting");
-        }
-
-        int returnCode = write(outgoingSocket, message, message_len);
-
-        LOG("Sent %d (%u request) bytes on socket %d\n", returnCode, (unsigned) message_len,
-            outgoingSocket);
-        close(outgoingSocket);
+        LOG("FS backend does not uses requests... skipping");
     };
 
     /**
@@ -306,8 +266,8 @@ class FSBackend : public Backend {
      * file write can be supported. Random writes in different sections of files,
      * as formally defined by FnU policy are not yet supported
      */
-    void send_file(char *buffer, long int nbytes, const std::string &target,
-                   const std::filesystem::path &file_path) override {
+    inline void send_file(char *buffer, long int nbytes, const std::string &target,
+                          const std::filesystem::path &file_path) override {
         START_LOG(gettid(), "call(buffer=%ld, nbytes=%ld, target=%s, file_path=%s)", buffer, nbytes,
                   target.c_str(), file_path.c_str());
         std::ofstream file;
@@ -317,10 +277,17 @@ class FSBackend : public Backend {
         file.close();
     };
 
-    void recv_file(char *buffer, const std::string &source, long int bytes_expected,
-                   const std::filesystem::path &file_path) override{
+    inline void recv_file(char *shm, const std::string &source, long int bytes_expected,
+                          const std::filesystem::path &file_path) override{
 
     };
+
+    inline void notify_backend(enum backendActions actions, const std::filesystem::path &file_path,
+                               void *buffer, size_t offset, size_t buffer_size) override {
+        START_LOG(gettid(), "call()");
+    };
+
+    inline bool store_file_in_memory() override { return false; };
 };
 
 #endif // CAPIO_FS_BACKEND_HPP
