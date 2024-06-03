@@ -70,7 +70,8 @@ class Backend {
      * @param nbytes length of @param shm
      * @param dest target to send files to
      */
-    virtual void send_file(char *shm, long int nbytes, const std::string &target) = 0;
+    virtual void send_file(char *shm, long int nbytes, const std::string &target,
+                           const std::filesystem::path &file_path) = 0;
 
     /**
      * receive a file from another process
@@ -78,7 +79,8 @@ class Backend {
      * @param source The source target to receive from
      * @param bytes_expected Size of expected incoming buffer
      */
-    virtual void recv_file(char *shm, const std::string &source, long int bytes_expected) = 0;
+    virtual void recv_file(char *shm, const std::string &source, long int bytes_expected,
+                           const std::filesystem::path &file_path) = 0;
 
     /**
      *
