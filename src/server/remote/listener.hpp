@@ -25,7 +25,7 @@ build_server_request_handlers_table() {
     return _server_request_handlers;
 }
 
-inline Backend *select_backend(const std::string &backend_name, int argc, char *argv[]) {
+inline void select_backend(const std::string &backend_name, int argc, char *argv[]) {
     START_LOG(gettid(), "call(backend_name=%s)", backend_name.c_str());
 
     if (backend_name.empty()) {
@@ -33,26 +33,26 @@ inline Backend *select_backend(const std::string &backend_name, int argc, char *
         std::cout << CAPIO_SERVER_CLI_LOG_SERVER
                   << "Starting CAPIO with default backend (MPI) as no preferred backend was chosen"
                   << std::endl;
-        return new MPIBackend(argc, argv);
+        backend =  new Backend<MPIBackend>(argc, argv);
     }
 
     if (backend_name == "mpi") {
         LOG("backend selected: mpi");
         std::cout << CAPIO_SERVER_CLI_LOG_SERVER << "Starting CAPIO with MPI backend" << std::endl;
-        return new MPIBackend(argc, argv);
+        backend =  new Backend<MPIBackend>(argc, argv);
     }
 
     if (backend_name == "mpisync") {
         LOG("backend selected: mpisync");
         std::cout << CAPIO_SERVER_CLI_LOG_SERVER << "Starting CAPIO with MPI (SYNC) backend"
                   << std::endl;
-        return new MPISYNCBackend(argc, argv);
+        backend =  new Backend<MPISYNCBackend>(argc, argv);
     }
     LOG("Backend %s does not exist in CAPIO. Reverting back to the default MPI backend",
         backend_name.c_str());
     std::cout << CAPIO_SERVER_CLI_LOG_SERVER_WARNING << " Backend " << backend_name
               << " does not exist. Reverting to the default MPI backend" << std::endl;
-    return new MPIBackend(argc, argv);
+    backend =  new Backend<MPIBackend>(argc, argv);
 }
 
 [[noreturn]] void capio_remote_listener(Semaphore &internal_server_sem) {

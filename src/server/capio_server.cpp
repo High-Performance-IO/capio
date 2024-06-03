@@ -262,7 +262,7 @@ int parseCLI(int argc, char **argv) {
     if (backend_flag) {
         backend_name_str = args::get(backend_flag);
     }
-    backend = select_backend(backend_name_str, argc, argv);
+    select_backend(backend_name_str, argc, argv);
 
     std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_INFO << "server initialization completed!" << std::endl
               << std::flush;

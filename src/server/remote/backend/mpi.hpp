@@ -5,7 +5,7 @@
 
 #include "remote/backend.hpp"
 
-class MPIBackend : public Backend {
+class MPIBackend{
 
   protected:
     MPI_Request req{};
@@ -40,16 +40,16 @@ class MPIBackend : public Backend {
         rank_nodes_equivalence[node_name]            = std::to_string(rank);
     }
 
-    ~MPIBackend() override {
+    ~MPIBackend() {
         START_LOG(gettid(), "Call()");
         MPI_Finalize();
     }
 
-    inline bool store_file_in_memory() override { return true; }
+    inline bool store_file_in_memory()  { return true; }
 
-    inline const std::set<std::string> get_nodes() override { return nodes; }
+    inline const std::set<std::string> get_nodes()  { return nodes; }
 
-    inline void handshake_servers() override {
+    inline void handshake_servers()  {
         START_LOG(gettid(), "call()");
 
         auto buf = std::unique_ptr<char[]>(new char[MPI_MAX_PROCESSOR_NAME]);
@@ -67,7 +67,7 @@ class MPIBackend : public Backend {
         }
     }
 
-    RemoteRequest read_next_request() override {
+    RemoteRequest read_next_request()  {
         START_LOG(gettid(), "call()");
         MPI_Status status;
         char *buff = new char[CAPIO_SERVER_REQUEST_MAX_SIZE];
@@ -94,7 +94,7 @@ class MPIBackend : public Backend {
         return {buff, rank_nodes_equivalence[std::to_string(status.MPI_SOURCE)]};
     }
 
-    void send_file(char *shm, long int nbytes, const std::string &target) override {
+    void send_file(char *shm, long int nbytes, const std::string &target) {
         START_LOG(gettid(), "call(%.50s, %ld, %s)", shm, nbytes, target.c_str());
         int elem_to_snd = 0;
         int dest        = std::stoi(rank_nodes_equivalence[target]);
@@ -109,7 +109,7 @@ class MPIBackend : public Backend {
         }
     }
 
-    void send_request(const char *message, int message_len, const std::string &target) override {
+    void send_request(const char *message, int message_len, const std::string &target) {
         START_LOG(gettid(), "call(message=%s, message_len=%d, target=%s)", message, message_len,
                   target.c_str());
         const std::string &mpi_target = rank_nodes_equivalence[target];
@@ -118,7 +118,7 @@ class MPIBackend : public Backend {
         MPI_Send(message, message_len + 1, MPI_CHAR, std::stoi(mpi_target), 0, MPI_COMM_WORLD);
     }
 
-    inline void recv_file(char *shm, const std::string &source, long int bytes_expected) override {
+    inline void recv_file(char *shm, const std::string &source, long int bytes_expected)  {
         START_LOG(gettid(), "call(shm=%ld, source=%s, bytes_expected=%ld)", shm, source.c_str(),
                   bytes_expected);
         MPI_Status status;
@@ -147,12 +147,12 @@ class MPISYNCBackend : public MPIBackend {
         LOG("Wrapped MPI backend with MPISYC backend");
     }
 
-    ~MPISYNCBackend() override {
+    ~MPISYNCBackend()  {
         START_LOG(gettid(), "Call()");
         MPI_Finalize();
     }
 
-    RemoteRequest read_next_request() override {
+    RemoteRequest read_next_request()  {
         START_LOG(gettid(), "call()");
         MPI_Status status;
         char *buff = new char[CAPIO_SERVER_REQUEST_MAX_SIZE];

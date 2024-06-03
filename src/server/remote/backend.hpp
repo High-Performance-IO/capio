@@ -35,34 +35,36 @@ class RemoteRequest {
     [[nodiscard]] auto get_code() const { return this->_code; }
 };
 
+enum BackendNotifyActions { writeFile, readFile };
+
 /**
- * This class is the interface prototype
+ * This class is the template prototype
  * for capio backend communication services.
  * To implement a new backend, please implement the following
  * functions in a dedicated backend.
  */
-class Backend {
+template <class T> class Backend {
   public:
-    enum backendActions { writeFile, readFile };
 
-    virtual ~Backend() = default;
+
+    inline Backend(int argc, char *argv[]) { T::Backend(argc, argv); };
 
     /**
      * Returns the node names of the CAPIO servers
      * @return A set containing the node names of all CAPIO servers
      */
-    virtual const std::set<std::string> get_nodes() = 0;
+    inline std::set<std::string> get_nodes() { return T::get_nodes(); };
 
     /**
      * Handshake the server applications
      */
-    virtual void handshake_servers() = 0;
+    inline void handshake_servers() { T::handshake_servers(); };
 
     /**
      * Read the next message from the incoming queue
      * @return A RemoteRequest class object containing the request contents
      */
-    virtual RemoteRequest read_next_request() = 0;
+    inline RemoteRequest read_next_request() { return T::read_next_request(); };
 
     /**
      * Send file
@@ -70,7 +72,9 @@ class Backend {
      * @param nbytes length of @param shm
      * @param dest target to send files to
      */
-    virtual void send_file(char *shm, long int nbytes, const std::string &target) = 0;
+    inline void send_file(char *shm, long int nbytes, const std::string &target) {
+        T::send_file(shm, nbytes, target);
+    };
 
     /**
      * receive a file from another process
@@ -78,7 +82,9 @@ class Backend {
      * @param source The source target to receive from
      * @param bytes_expected Size of expected incoming buffer
      */
-    virtual void recv_file(char *shm, const std::string &source, long int bytes_expected) = 0;
+    inline void recv_file(char *shm, const std::string &source, long int bytes_expected) {
+        T::recv_file(shm, source, bytes_expected);
+    };
 
     /**
      *
@@ -86,7 +92,9 @@ class Backend {
      * @param message_len
      * @param target
      */
-    virtual void send_request(const char *message, int message_len, const std::string &target) = 0;
+    inline void send_request(const char *message, int message_len, const std::string &target) {
+        T::send_request(message, message_len, target);
+    };
 
     /**
      * This method is used to notify the backend that a local action has occurred
@@ -97,19 +105,19 @@ class Backend {
      * @return 0 if nothing happens, or the method is not implemented, 1 if the
      * action has been registered, -1 on error
      */
-    virtual int notify_backend(enum backendActions actions, const std::filesystem::path &file_path,
+    inline void notify_backend(enum BackendNotifyActions actions, const std::filesystem::path &file_path,
                                void *buffer, size_t offset, size_t buffer_size) {
-        START_LOG(gettid(), "call()");
-        return 0;
+        T::notify_backend(actions, file_path, buffer, buffer_size);
     };
 
     /**
      * Let CAPIO server know if backend stores the files inside the memory of a nod or not
      * @return
      */
-    virtual bool store_file_in_memory() { return true; };
+    inline bool store_file_in_memory() { return T::store_file_in_memory(); };
 };
 
-Backend *backend;
+
+template <class T> Backend<T> *backend;
 
 #endif // CAPIO_SERVER_REMOTE_BACKEND_HPP

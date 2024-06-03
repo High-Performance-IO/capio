@@ -283,7 +283,7 @@ class CapioFile {
             return _buf;
         } else {
             char *buffer = static_cast<char *>(malloc(size));
-            backend->notify_backend(Backend::backendActions::readFile, _file_name, buffer, offset,
+            backend->notify_backend(BackendNotifyActions::readFile, _file_name, buffer, offset,
                                     size);
             return buffer;
         }
@@ -474,7 +474,7 @@ class CapioFile {
         START_LOG(gettid(), "call()");
         std::unique_lock<std::mutex> lock(_mutex);
         backend->recv_file(_buf + offset, dest, buffer_size);
-        backend->notify_backend(Backend::backendActions::writeFile, _file_name, _buf, offset,
+        backend->notify_backend(BackendNotifyActions::writeFile, _file_name, _buf, offset,
                                 buffer_size);
         _data_avail_cv.notify_all();
     }
@@ -483,7 +483,7 @@ class CapioFile {
         START_LOG(gettid(), "call()");
         std::unique_lock<std::mutex> lock(_mutex);
         queue.read(_buf + offset, num_bytes);
-        backend->notify_backend(Backend::backendActions::writeFile, _file_name, _buf, offset,
+        backend->notify_backend(BackendNotifyActions::writeFile, _file_name, _buf, offset,
                                 num_bytes);
         _data_avail_cv.notify_all();
     }
