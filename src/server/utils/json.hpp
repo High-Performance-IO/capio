@@ -79,15 +79,22 @@ void parse_conf_file(const std::string &conf_file, const std::filesystem::path &
         } else {
             LOG("Began parsing streaming section for app %s", std::string(app_name).c_str());
             for (auto file : streaming) {
-                std::string_view name, committed, mode, commit_rule;
+                std::string_view committed, mode, commit_rule;
+                std::vector<std::filesystem::path> streaming_names;
                 long int n_close = -1;
                 long n_files, batch_size;
 
-                error = file["name"].get_string().get(name);
-                if (error) {
-                    ERR_EXIT("error name for application is mandatory");
+                simdjson::ondemand::array name = file["name"].get_array();
+                if (name.is_empty()) {
+                    std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_ERROR
+                              << "error: name for application is mandatory" << std::endl;
+                    ERR_EXIT("error: name for application is mandatory");
                 }
-                LOG("Stream name: %s", std::string(name).c_str());
+                for (auto item : name) {
+                    std::string_view elem = item.get_string().value();
+                    streaming_names.emplace_back(elem);
+                    LOG("Found name: %s", std::string(elem).c_str());
+                }
 
                 // PARSING COMMITTED
                 error = file["committed"].get_string().get(committed);
@@ -137,16 +144,18 @@ void parse_conf_file(const std::string &conf_file, const std::filesystem::path &
                     batch_size = 0;
                 }
                 LOG("batch_size: %d", batch_size);
+                for (auto path : streaming_names) {
+                    std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_INFO
+                              << "Updating metadata for path:  " << path << std::endl;
+                    if (path.is_relative()) {
+                        path = (capio_dir / path).lexically_normal();
+                    }
+                    LOG("path: %s", path.c_str());
 
-                std::filesystem::path path(name);
-                if (path.is_relative()) {
-                    path = (capio_dir / path).lexically_normal();
+                    std::size_t pos = path.native().find('*');
+                    update_metadata_conf(path, pos, n_files, batch_size, std::string(commit_rule),
+                                         std::string(mode), std::string(app_name), false, n_close);
                 }
-                LOG("path: %s", path.c_str());
-
-                std::size_t pos = path.native().find('*');
-                update_metadata_conf(path, pos, n_files, batch_size, std::string(commit_rule),
-                                     std::string(mode), std::string(app_name), false, n_close);
             }
 
             std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_INFO
@@ -210,6 +219,13 @@ void parse_conf_file(const std::string &conf_file, const std::filesystem::path &
 
     std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_INFO << "Completed parsing of io_graph" << std::endl;
     LOG("Completed parsing of io_graph");
+
+    auto home_node_policies = entries["home-node-policy"].error();
+    if (!home_node_policies) {
+        std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_WARNING
+                  << "Warning: capio does not support yet home node policies! skipping section "
+                  << std::endl;
+    }
 }
 
 #endif // CAPIO_SERVER_UTILS_JSON_HPP
