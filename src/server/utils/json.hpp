@@ -223,7 +223,7 @@ void parse_conf_file(const std::string &conf_file, const std::filesystem::path &
     auto home_node_policies = entries["home-node-policy"].error();
     if (!home_node_policies) {
         std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_WARNING
-                  << "Warning: capio does not support yet home node policies! skipping section "
+                  << "Warning: capio does not support home node policies yet! skipping section "
                   << std::endl;
     }
 }
