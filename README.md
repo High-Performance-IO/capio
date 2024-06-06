@@ -110,16 +110,16 @@ The following is an example of a simple configuration:
       ],
       "streaming": [
         {
-          "name": "file0.dat",
+          "name": ["file0.dat"],
           "committed": "on_close"
         },
         {
-          "name": "file1.dat",
+          "name": ["file1.dat"],
           "committed": "on_close",
           "mode": "no_update"
         },
         {
-          "name": "file2.dat",
+          "name": ["file2.dat"],
           "committed": "on_termination"
         }
       ]
