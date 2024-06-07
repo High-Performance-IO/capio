@@ -113,7 +113,9 @@ class CapioFile {
 
     CapioFile(std::filesystem::path name)
         : _buf_size(0), _committed(CAPIO_FILE_COMMITTED_ON_TERMINATION), _directory(false),
-          _permanent(false), _store_in_memory(true), _file_name(std::move(name)) {}
+          _permanent(false), _store_in_memory(true), _file_name(std::move(name)) {
+        backend->notify_backend(Backend::createFile, _file_name, nullptr, 0, 0, false);
+    }
 
     CapioFile(std::filesystem::path name, const std::string_view &committed,
               const std::string_view &mode, bool directory, long int n_files_expected,
@@ -122,8 +124,8 @@ class CapioFile {
           _n_close_expected(n_close_expected), _permanent(permanent),
           n_files_expected(n_files_expected + 2), _store_in_memory(store_in_memory),
           _file_name(std::move(name)) {
-
         _buf_size = _store_in_memory ? init_size : 0;
+        backend->notify_backend(Backend::createFile, _file_name, nullptr, 0, 0, directory);
     }
 
     CapioFile(std::filesystem::path name, bool directory, bool permanent, off64_t init_size,
@@ -132,6 +134,7 @@ class CapioFile {
           _n_close_expected(n_close_expected), _permanent(permanent),
           _store_in_memory(store_in_memory), _file_name(std::move(name)) {
         _buf_size = _store_in_memory ? init_size : 0;
+        backend->notify_backend(Backend::createFile, _file_name, nullptr, 0, 0, directory);
     }
 
     CapioFile(const CapioFile &)            = delete;
@@ -254,7 +257,8 @@ class CapioFile {
             }
         } else {
             LOG("Creating file buffer on FS");
-            backend->notify_backend(Backend::backendActions::createFile, _file_name, nullptr, 0, 0);
+            backend->notify_backend(Backend::backendActions::createFile, _file_name, nullptr, 0, 0,
+                                    this->_directory);
         }
     }
 
@@ -285,7 +289,7 @@ class CapioFile {
         } else {
             char *buffer = static_cast<char *>(malloc(size));
             backend->notify_backend(Backend::backendActions::readFile, _file_name, buffer, offset,
-                                    size);
+                                    size, this->_directory);
             return buffer;
         }
     }
@@ -477,7 +481,7 @@ class CapioFile {
         std::unique_lock<std::mutex> lock(_mutex);
         backend->recv_file(_buf + offset, dest, buffer_size, file_path);
         backend->notify_backend(Backend::backendActions::writeFile, _file_name, _buf, offset,
-                                buffer_size);
+                                buffer_size, this->_directory);
         _data_avail_cv.notify_all();
     }
 
@@ -486,7 +490,7 @@ class CapioFile {
         std::unique_lock<std::mutex> lock(_mutex);
         queue.read(_buf + offset, num_bytes);
         backend->notify_backend(Backend::backendActions::writeFile, _file_name, _buf, offset,
-                                num_bytes);
+                                num_bytes, this->_directory);
         _data_avail_cv.notify_all();
     }
 

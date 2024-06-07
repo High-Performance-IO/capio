@@ -287,16 +287,30 @@ class FSBackend : public Backend {
     };
 
     inline void notify_backend(enum backendActions actions, const std::filesystem::path &file_path,
-                               void *buffer, size_t offset, size_t buffer_size) override {
-        START_LOG(gettid(), "call()");
+                               char *buffer, size_t offset, size_t buffer_size,
+                               bool is_dir) override {
+        START_LOG(gettid(), "call(action=%d, path=%s, offset=%ld, buffer_size=%ld, is_dir=%s)",
+                  actions, file_path.c_str(), offset, buffer_size, is_dir ? "true" : "false");
         switch (actions) {
-        case createFile:
-            std::filesystem::path path(root_dir / storage_dir / file_path);
+        case createFile: {
+            std::filesystem::path path = root_dir / storage_dir / file_path;
+            LOG("Creating file %s", path.c_str());
+            if (is_dir) {
+                std::filesystem::create_directories(path);
+            } else {
+                std::filesystem::path _path(path);
+            }
             break;
+        }
 
-        case readFile:
-            
+        case readFile: {
+            LOG("Reading %ld bytes from offset %ld of file %s", buffer_size, offset,
+                (root_dir / storage_dir / file_path).c_str());
+            std::ifstream file(root_dir / storage_dir / file_path);
+            file.seekg(offset, std::ios::end);
+            file.read(buffer, buffer_size);
             break;
+        }
 
         default:
             LOG("Error: action not understood!");
