@@ -188,7 +188,7 @@ class FSBackend : public Backend {
         for (const auto &entry : std::filesystem::directory_iterator(".")) {
             // remove "file_locations_"
             auto hostname = entry.path().stem().string().erase(0, 15);
-            if(!hostname.empty()) {
+            if (!hostname.empty()) {
                 LOG("Found hostname: %s", hostname.c_str());
                 nodes.insert(hostname);
             }
@@ -211,7 +211,7 @@ class FSBackend : public Backend {
             this->read_ip_address_from_token(token);
         }
 
-        n_servers = this->get_nodes().size();
+        n_servers = get_nodes().size();
     };
 
     inline RemoteRequest read_next_request() override {
@@ -289,6 +289,18 @@ class FSBackend : public Backend {
     inline void notify_backend(enum backendActions actions, const std::filesystem::path &file_path,
                                void *buffer, size_t offset, size_t buffer_size) override {
         START_LOG(gettid(), "call()");
+        switch (actions) {
+        case createFile:
+            std::filesystem::path path(root_dir / storage_dir / file_path);
+            break;
+
+        case readFile:
+            
+            break;
+
+        default:
+            LOG("Error: action not understood!");
+        }
     };
 
     inline bool store_file_in_memory() override { return false; };

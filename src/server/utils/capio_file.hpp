@@ -253,7 +253,8 @@ class CapioFile {
                 _buf = static_cast<char *>(malloc(_buf_size * sizeof(char)));
             }
         } else {
-            LOG("No action needs to be taken as file are not stored in memory");
+            LOG("Creating file buffer on FS");
+            backend->notify_backend(Backend::backendActions::createFile, _file_name, nullptr, 0, 0);
         }
     }
 
