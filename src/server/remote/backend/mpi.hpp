@@ -31,7 +31,7 @@ class MPIBackend : public Backend {
             LOG("Error: The threading support level is not MPI_THREAD_MULTIPLE (is %d)", provided);
             MPI_Abort(MPI_COMM_WORLD, EXIT_FAILURE);
         }
-
+        MPI_Comm_size(MPI_COMM_WORLD, &n_servers);
         node_name = new char[MPI_MAX_PROCESSOR_NAME];
         MPI_Get_processor_name(node_name, &node_name_len);
         LOG("Node name = %s, length=%d", node_name, node_name_len);

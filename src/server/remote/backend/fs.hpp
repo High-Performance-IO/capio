@@ -186,10 +186,12 @@ class FSBackend : public Backend {
     inline const std::set<std::string> get_nodes() override {
         START_LOG(gettid(), "call()");
         for (const auto &entry : std::filesystem::directory_iterator(".")) {
-            auto found_hostname = entry.path().stem().string().erase(
-                0, std::strlen(CAPIO_SERVER_FILES_LOCATION_NAME) - 6); // remove %s.txt from string
-            LOG("Found hostname: %s", found_hostname.c_str());
-            nodes.insert(found_hostname);
+            // remove "file_locations_"
+            auto hostname = entry.path().stem().string().erase(0, 15);
+            if(!hostname.empty()) {
+                LOG("Found hostname: %s", hostname.c_str());
+                nodes.insert(hostname);
+            }
         }
         return nodes;
     };
@@ -208,6 +210,8 @@ class FSBackend : public Backend {
             LOG("Found token %s", token.c_str());
             this->read_ip_address_from_token(token);
         }
+
+        n_servers = this->get_nodes().size();
     };
 
     inline RemoteRequest read_next_request() override {
