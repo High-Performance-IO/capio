@@ -114,7 +114,9 @@ class CapioFile {
     CapioFile(std::filesystem::path name)
         : _buf_size(0), _committed(CAPIO_FILE_COMMITTED_ON_TERMINATION), _directory(false),
           _permanent(false), _store_in_memory(true), _file_name(std::move(name)) {
-        backend->notify_backend(Backend::createFile, _file_name, nullptr, 0, 0, false);
+        if (backend != nullptr) {
+            backend->notify_backend(Backend::createFile, _file_name, nullptr, 0, 0, false);
+        }
     }
 
     CapioFile(std::filesystem::path name, const std::string_view &committed,
@@ -125,7 +127,9 @@ class CapioFile {
           n_files_expected(n_files_expected + 2), _store_in_memory(store_in_memory),
           _file_name(std::move(name)) {
         _buf_size = _store_in_memory ? init_size : 0;
-        backend->notify_backend(Backend::createFile, _file_name, nullptr, 0, 0, directory);
+        if (backend != nullptr) {
+            backend->notify_backend(Backend::createFile, _file_name, nullptr, 0, 0, directory);
+        }
     }
 
     CapioFile(std::filesystem::path name, bool directory, bool permanent, off64_t init_size,
@@ -134,7 +138,9 @@ class CapioFile {
           _n_close_expected(n_close_expected), _permanent(permanent),
           _store_in_memory(store_in_memory), _file_name(std::move(name)) {
         _buf_size = _store_in_memory ? init_size : 0;
-        backend->notify_backend(Backend::createFile, _file_name, nullptr, 0, 0, directory);
+        if (backend != nullptr) {
+            backend->notify_backend(Backend::createFile, _file_name, nullptr, 0, 0, directory);
+        }
     }
 
     CapioFile(const CapioFile &)            = delete;

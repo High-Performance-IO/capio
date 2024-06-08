@@ -100,7 +100,7 @@ class Backend {
      * action has been registered, -1 on error
      */
     virtual void notify_backend(enum backendActions actions, std::filesystem::path &file_path,
-                               char *buffer, size_t offset, size_t buffer_size, bool is_dir) {
+                                char *buffer, size_t offset, size_t buffer_size, bool is_dir) {
         START_LOG(gettid(), "call()");
     };
 

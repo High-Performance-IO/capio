@@ -4,6 +4,7 @@
  * Include here all backend classes
  */
 
-#include "mpi.hpp"
 #include "fs.hpp"
+#include "mpi.hpp"
+
 #endif // CAPIO_SERVER_REMOTE_BACKEND_INCLUDE_HPP

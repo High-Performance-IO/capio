@@ -163,7 +163,7 @@ class FSBackend : public Backend {
         }
 
         auto path_len = root_path.native().size() + 1 + path.length();
-        char _path[path_len]{0};
+        char _path[path_len];
         snprintf(_path, path_len, "%s/%s", root_path.native().c_str(), path.c_str());
 
         return std::string(_path);
@@ -263,7 +263,7 @@ class FSBackend : public Backend {
      * Sends a request to target.
      * If capio reacheds this point, then now, or at a certain point in time, a CAPIO server
      * was / is present and online. With this knowloedge, I first need to check whether the token
-     * Is present or not. if it is not present, then I shall create it with exlusive permission.
+     * Is present or not. if it is not present, then I shall create it with exclusive permission.
      * If creation fails, then some one else has beaten me in creating the file. I shall then update
      * the IP addresses of the target.
      * If I have managed to create the token, I shall handle the request by myself in
@@ -339,7 +339,7 @@ class FSBackend : public Backend {
                 dirent *directory{};
                 uint64_t totalSize = 0;
                 while ((directory = readdir(dirp)) != nullptr && totalSize < buffer_size) {
-                    memcpy(static_cast<void *>(buffer) + totalSize, directory, sizeof(dirent));
+                    memcpy(buffer + totalSize, directory, sizeof(dirent));
                     totalSize += sizeof(dirent);
                 }
 
@@ -347,8 +347,24 @@ class FSBackend : public Backend {
                 std::ifstream file(path);
                 file.seekg(offset, std::ios::end);
                 file.read(buffer, buffer_size);
+                file.close();
             }
             break;
+        }
+        case writeFile: {
+            LOG("Writing buffer conttent to FS");
+            if (is_dir) {
+                LOG("File is directory. skipping as FS is being used");
+                return;
+            }
+
+            std::ofstream file(path);
+            file.seekp(offset, std::ios::end);
+            file.write(buffer, buffer_size);
+            file.close();
+        }
+
+        case closeFile: {
         }
 
         default:

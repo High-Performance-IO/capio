@@ -37,7 +37,6 @@ CSDataBufferMap_t data_buffers;
 #include "utils/metadata.hpp"
 #include "utils/requests.hpp"
 
-
 int n_servers;
 // name of the node
 char *node_name;
