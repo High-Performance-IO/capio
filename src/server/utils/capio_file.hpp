@@ -268,7 +268,7 @@ class CapioFile {
         }
     }
 
-    char *expand_buffer(off64_t data_size) {
+    char *expand_buffer(off64_t data_size, void *previus_buffer) {
         START_LOG(gettid(), "call()");
         if (_store_in_memory) {
             LOG("File is stored in memory. reallocating buffer. _buf == nullptr ? %s",
@@ -279,8 +279,10 @@ class CapioFile {
             std::lock_guard<std::mutex> lock(_mutex);
             _buf      = static_cast<char *>(realloc(_buf, new_size));
             _buf_size = new_size;
+            return _buf;
+        } else {
+            return reinterpret_cast<char *>(previus_buffer);
         }
-        return _buf;
     }
 
     inline char *get_buffer(off64_t offset = 0, ssize_t size = CAPIO_DEFAULT_FILE_INITIAL_SIZE) {

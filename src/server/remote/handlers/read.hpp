@@ -186,7 +186,7 @@ handle_remote_read_batch_reply(const std::string &source, int tid, int fd, off64
             c_file.create_buffer_if_needed(false);
             size_t file_shm_size = c_file.get_buf_size();
             if (nbytes > file_shm_size) {
-                c_file.expand_buffer(nbytes);
+                c_file.expand_buffer(nbytes, nullptr);
             }
             c_file.first_write = false;
         } else {
@@ -238,7 +238,7 @@ inline void handle_remote_read_reply(const std::string &source, int tid, int fd,
         auto file_shm_size  = c_file.get_buf_size();
         auto file_size_recv = offset + nbytes;
         if (file_size_recv > file_shm_size) {
-            c_file.expand_buffer(file_size_recv);
+            c_file.expand_buffer(file_size_recv, nullptr);
         }
         c_file.read_from_node(source, offset, nbytes, path);
         nbytes *= sizeof(char);

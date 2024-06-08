@@ -51,7 +51,7 @@ void write_entry_dir(int tid, const std::filesystem::path &file_path,
     void *file_shm       = c_file.get_buffer();
 
     if (data_size > file_shm_size) {
-        file_shm = c_file.expand_buffer(data_size);
+        file_shm = c_file.expand_buffer(data_size, file_shm);
     }
 
     ld.d_type = (c_file.is_dir() ? DT_DIR : DT_REG);

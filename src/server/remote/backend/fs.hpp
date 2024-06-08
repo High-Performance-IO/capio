@@ -154,6 +154,21 @@ class FSBackend : public Backend {
         }
     }
 
+    inline auto generate_capio_path(std::string path) {
+        START_LOG(gettid(), "call(path=%s)", path.c_str());
+        auto root_path = (root_dir / storage_dir / node_name);
+        if (path.rfind(root_path, 0) == 0) {
+            LOG("Path starts already from storage root dir");
+            return path;
+        }
+
+        auto path_len = root_path.native().size() + 1 + path.length();
+        char _path[path_len]{0};
+        snprintf(_path, path_len, "%s/%s", root_path.native().c_str(), path.c_str());
+
+        return std::string(_path);
+    }
+
   public:
     FSBackend(int argc, char **argv) {
         START_LOG(gettid(), "call(argc=%d)", argc);
@@ -286,29 +301,53 @@ class FSBackend : public Backend {
 
     };
 
-    inline void notify_backend(enum backendActions actions, const std::filesystem::path &file_path,
+    inline void notify_backend(enum backendActions actions, std::filesystem::path &file_path,
                                char *buffer, size_t offset, size_t buffer_size,
                                bool is_dir) override {
         START_LOG(gettid(), "call(action=%d, path=%s, offset=%ld, buffer_size=%ld, is_dir=%s)",
                   actions, file_path.c_str(), offset, buffer_size, is_dir ? "true" : "false");
+
+        std::filesystem::path path = generate_capio_path(file_path);
+
         switch (actions) {
         case createFile: {
-            std::filesystem::path path = root_dir / storage_dir / file_path;
             LOG("Creating file %s", path.c_str());
+            if (file_path == get_capio_dir()) {
+                LOG("Path is root dir. skipping creations");
+                return;
+            }
             if (is_dir) {
                 std::filesystem::create_directories(path);
             } else {
-                std::filesystem::path _path(path);
+                std::ofstream file(path);
+                file.close();
             }
             break;
         }
 
         case readFile: {
-            LOG("Reading %ld bytes from offset %ld of file %s", buffer_size, offset,
-                (root_dir / storage_dir / file_path).c_str());
-            std::ifstream file(root_dir / storage_dir / file_path);
-            file.seekg(offset, std::ios::end);
-            file.read(buffer, buffer_size);
+            LOG("Reading %ld bytes from offset %ld of file %s", buffer_size, offset, path.c_str());
+
+            if (file_path == get_capio_dir()) {
+                LOG("Returning contents of files that are local to node");
+                file_path = (root_dir / storage_dir / node_name);
+                path      = file_path;
+            }
+
+            if (is_dir) {
+                auto dirp = opendir(path.c_str());
+                dirent *directory{};
+                uint64_t totalSize = 0;
+                while ((directory = readdir(dirp)) != nullptr && totalSize < buffer_size) {
+                    memcpy(static_cast<void *>(buffer) + totalSize, directory, sizeof(dirent));
+                    totalSize += sizeof(dirent);
+                }
+
+            } else {
+                std::ifstream file(path);
+                file.seekg(offset, std::ios::end);
+                file.read(buffer, buffer_size);
+            }
             break;
         }
 

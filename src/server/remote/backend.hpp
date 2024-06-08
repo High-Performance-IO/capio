@@ -99,7 +99,7 @@ class Backend {
      * @return 0 if nothing happens, or the method is not implemented, 1 if the
      * action has been registered, -1 on error
      */
-    virtual void notify_backend(enum backendActions actions, const std::filesystem::path &file_path,
+    virtual void notify_backend(enum backendActions actions, std::filesystem::path &file_path,
                                char *buffer, size_t offset, size_t buffer_size, bool is_dir) {
         START_LOG(gettid(), "call()");
     };

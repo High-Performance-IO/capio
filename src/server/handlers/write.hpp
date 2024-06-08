@@ -21,7 +21,7 @@ void write_handler(const char *const str) {
 
     c_file.create_buffer_if_needed(false);
     if (end_of_write > file_shm_size) {
-        c_file.expand_buffer(end_of_write);
+        c_file.expand_buffer(end_of_write, nullptr);
     }
     c_file.read_from_queue(*data_buf, offset, count);
 
