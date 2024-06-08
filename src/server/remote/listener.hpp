@@ -33,7 +33,7 @@ inline Backend *select_backend(const std::string &backend_name, int argc, char *
         std::cout << CAPIO_SERVER_CLI_LOG_SERVER
                   << "Starting CAPIO with default backend (MPI) as no preferred backend was chosen"
                   << std::endl;
-        return new MPIBackend(argc, argv);
+        return new FSBackend(argc, argv);
     }
 
     if (backend_name == "mpi") {
