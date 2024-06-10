@@ -344,10 +344,10 @@ class FSBackend : public Backend {
                 }
 
             } else {
-                std::ifstream file(path);
-                file.seekg(offset, std::ios::end);
-                file.read(buffer, buffer_size);
-                file.close();
+                FILE* f = fopen(path.c_str(), "r");
+                fseek(f, offset, SEEK_END);
+                fread(buffer, sizeof(char), buffer_size, f);
+                fclose(f);
             }
             break;
         }
@@ -358,10 +358,10 @@ class FSBackend : public Backend {
                 return;
             }
 
-            std::ofstream file(path);
-            file.seekp(offset, std::ios::end);
-            file.write(buffer, buffer_size);
-            file.close();
+            FILE* f = fopen(path.c_str(), "w");
+            fseek(f, offset, SEEK_END);
+            fwrite(buffer, sizeof(char), buffer_size, f);
+            fclose(f);
         }
 
         case closeFile: {
