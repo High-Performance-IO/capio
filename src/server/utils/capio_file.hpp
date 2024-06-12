@@ -205,7 +205,7 @@ class CapioFile {
 
     [[nodiscard]] inline bool buf_to_allocate() const {
         std::lock_guard<std::mutex> lg(_mutex);
-        return _store_in_memory && _buf == nullptr;
+        return _buf == nullptr;
     }
 
     inline void close() {

@@ -121,14 +121,14 @@ class FSBackend : public Backend {
                     if (ip_is_private(address->s_addr)) {
                         std::cout << CAPIO_SERVER_CLI_LOG_SERVER_WARNING << "IP address " << buffer
                                   << " (0x" << std::hex << address->s_addr << std::dec
-                                  << ") is private. Adding to token file" << std::endl;
+                                  << ") is public. Adding to token file" << std::endl;
                         token << buffer << std::endl;
                         ip_to_hostname.insert({buffer, node_name});
                         hostname_to_ip.at(node_name).emplace_back(buffer);
                     } else {
                         std::cout << CAPIO_SERVER_CLI_LOG_SERVER_WARNING << "IP address " << buffer
                                   << " (0x" << std::hex << address->s_addr << std::dec
-                                  << ") is public. ignoring IP" << std::endl;
+                                  << ") is private. ignoring IP" << std::endl;
                     }
                 }
             }
@@ -155,18 +155,26 @@ class FSBackend : public Backend {
     }
 
     inline auto generate_capio_path(std::string path) {
+        //TODO: use snprintf for efficiency (and better code)
         START_LOG(gettid(), "call(path=%s)", path.c_str());
+
+        if(path.rfind('/', 0) == 0){
+            path.erase(0, 1);
+        }
+
         auto root_path = (root_dir / storage_dir / node_name);
         if (path.rfind(root_path, 0) == 0) {
             LOG("Path starts already from storage root dir");
             return path;
         }
 
-        auto path_len = root_path.native().size() + 1 + path.length();
+        auto path_len = root_path.native().size() + 1 + path.length() + 1; //\n final
         char _path[path_len];
         snprintf(_path, path_len, "%s/%s", root_path.native().c_str(), path.c_str());
 
-        return std::string(_path);
+        std::string computed_path(_path);
+        LOG("Computed path is: %s", computed_path.c_str());
+        return computed_path;
     }
 
   public:
@@ -312,15 +320,14 @@ class FSBackend : public Backend {
         switch (actions) {
         case createFile: {
             LOG("Creating file %s", path.c_str());
-            if (file_path == get_capio_dir()) {
-                LOG("Path is root dir. skipping creations");
-                return;
-            }
             if (is_dir) {
                 std::filesystem::create_directories(path);
             } else {
-                std::ofstream file(path);
-                file.close();
+                int file = open(path.c_str(), O_RDWR | O_CREAT, 0640);
+                if(file == -1){
+                    ERR_EXIT("Error creating file. errno is %s", strerror(errno));
+                }
+                close(file);
             }
             break;
         }
@@ -345,6 +352,9 @@ class FSBackend : public Backend {
 
             } else {
                 FILE* f = fopen(path.c_str(), "r");
+                if(f == nullptr){
+                    ERR_EXIT("Error opening file. error is: %s", strerror(errno));
+                }
                 fseek(f, offset, SEEK_END);
                 fread(buffer, sizeof(char), buffer_size, f);
                 fclose(f);
