@@ -262,7 +262,11 @@ class CapioFile {
                 _buf = static_cast<char *>(malloc(_buf_size * sizeof(char)));
             }
         } else {
-            LOG("Creating file buffer on FS");
+            LOG("Creating file buffer on FS plus a small buffer for data movement inside capio "
+                "server");
+            if (_buf == nullptr) {
+                _buf = new char[CAPIO_DEFAULT_FILE_INITIAL_SIZE];
+            }
             backend->notify_backend(Backend::backendActions::createFile, _file_name, nullptr, 0, 0,
                                     this->_directory);
         }
@@ -487,7 +491,8 @@ class CapioFile {
                                const std::filesystem::path &file_path) {
         START_LOG(gettid(), "call()");
         std::unique_lock<std::mutex> lock(_mutex);
-        backend->recv_file(_buf + offset, dest, buffer_size, file_path);
+        backend->recv_file(_buf + +(this->_store_in_memory ? offset : 0), dest, buffer_size,
+                           file_path);
         backend->notify_backend(Backend::backendActions::writeFile, _file_name, _buf, offset,
                                 buffer_size, this->_directory);
         _data_avail_cv.notify_all();
@@ -496,7 +501,7 @@ class CapioFile {
     inline void read_from_queue(SPSCQueue &queue, size_t offset, long int num_bytes) {
         START_LOG(gettid(), "call()");
         std::unique_lock<std::mutex> lock(_mutex);
-        queue.read(_buf + offset, num_bytes);
+        queue.read(_buf + (this->_store_in_memory ? offset : 0), num_bytes);
         backend->notify_backend(Backend::backendActions::writeFile, _file_name, _buf, offset,
                                 num_bytes, this->_directory);
         _data_avail_cv.notify_all();
