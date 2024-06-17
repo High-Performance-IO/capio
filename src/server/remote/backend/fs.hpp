@@ -161,11 +161,13 @@ class FSBackend : public Backend {
         // TODO: use snprintf for efficiency (and better code)
         START_LOG(gettid(), "call(path=%s)", path.c_str());
 
+        auto home_node = get_file_location(path).first;
+
         if (path.rfind('/', 0) == 0) {
             path.erase(0, 1);
         }
 
-        auto root_path = (root_dir / storage_dir / node_name);
+        auto root_path = (root_dir / storage_dir / home_node);
         if (path.rfind(root_path, 0) == 0) {
             LOG("Path starts already from storage root dir");
             return path;
