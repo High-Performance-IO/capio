@@ -352,11 +352,23 @@ class FSBackend : public Backend {
 
             } else {
                 FILE* f = fopen(path.c_str(), "r");
+
+                //compute file size
+                fseek(f, 0L, SEEK_END);
+                long int actual_size = ftell(f);
+                LOG("File actual size is %ld", actual_size);
+                buffer_size = buffer_size > actual_size ? actual_size : buffer_size;
+                rewind(f);
+                LOG("Will read %ld bytes from file", buffer_size);
+
                 if(f == nullptr){
                     ERR_EXIT("Error opening file. error is: %s", strerror(errno));
                 }
-                fseek(f, offset, SEEK_END);
-                fread(buffer, sizeof(char), buffer_size, f);
+                fseek(f, offset, SEEK_CUR);
+                auto read_return = fread(buffer, sizeof(char), buffer_size, f);
+                if(!read_return) {
+                    ERR_EXIT("Error while fred. errno is %s", strerror(errno));
+                }
                 fclose(f);
             }
             break;
