@@ -27,6 +27,9 @@ class FSBackend : public Backend {
 
     int incomingSocket = -1;
 
+    // structure to store file descriptors of opend files
+    std::unordered_map<std::string, int> open_files_descriptors;
+
     inline void start_listener_socket() {
         START_LOG(gettid(), "call()");
 
@@ -155,10 +158,10 @@ class FSBackend : public Backend {
     }
 
     inline auto generate_capio_path(std::string path) {
-        //TODO: use snprintf for efficiency (and better code)
+        // TODO: use snprintf for efficiency (and better code)
         START_LOG(gettid(), "call(path=%s)", path.c_str());
 
-        if(path.rfind('/', 0) == 0){
+        if (path.rfind('/', 0) == 0) {
             path.erase(0, 1);
         }
 
@@ -324,10 +327,10 @@ class FSBackend : public Backend {
                 std::filesystem::create_directories(path);
             } else {
                 int file = open(path.c_str(), O_RDWR | O_CREAT, 0640);
-                if(file == -1){
+                if (file == -1) {
                     ERR_EXIT("Error creating file. errno is %s", strerror(errno));
                 }
-                close(file);
+                open_files_descriptors.emplace(path, file);
             }
             break;
         }
@@ -351,9 +354,9 @@ class FSBackend : public Backend {
                 }
 
             } else {
-                FILE* f = fopen(path.c_str(), "r");
+                FILE *f = fdopen(open_files_descriptors.at(path), "r");
 
-                //compute file size
+                // compute file size
                 fseek(f, 0L, SEEK_END);
                 long int actual_size = ftell(f);
                 LOG("File actual size is %ld", actual_size);
@@ -361,15 +364,14 @@ class FSBackend : public Backend {
                 rewind(f);
                 LOG("Will read %ld bytes from file", buffer_size);
 
-                if(f == nullptr){
+                if (f == nullptr) {
                     ERR_EXIT("Error opening file. error is: %s", strerror(errno));
                 }
                 fseek(f, offset, SEEK_CUR);
                 auto read_return = fread(buffer, sizeof(char), buffer_size, f);
-                if(!read_return) {
+                if (!read_return) {
                     ERR_EXIT("Error while fred. errno is %s", strerror(errno));
                 }
-                fclose(f);
             }
             break;
         }
@@ -380,13 +382,30 @@ class FSBackend : public Backend {
                 return;
             }
 
-            FILE* f = fopen(path.c_str(), "w");
-            fseek(f, offset, SEEK_END);
+            FILE *f = fdopen(open_files_descriptors.at(path), "w");
+            fseek(f, offset, SEEK_SET);
             fwrite(buffer, sizeof(char), buffer_size, f);
-            fclose(f);
+            fflush(f);
+            break;
         }
 
         case closeFile: {
+            close(open_files_descriptors.at(path));
+            break;
+        }
+
+        case seekFile: {
+            *reinterpret_cast<off64_t *>(buffer) =
+                fseek(fdopen(open_files_descriptors.at(path), "r"), offset, SEEK_SET);
+            break;
+        }
+
+        case deleteFile: {
+            if (open_files_descriptors.find(path) != open_files_descriptors.end()) {
+                close(open_files_descriptors.at(path));
+                open_files_descriptors.erase(path);
+            }
+            unlink(path.c_str());
         }
 
         default:

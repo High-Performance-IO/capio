@@ -43,7 +43,7 @@ class RemoteRequest {
  */
 class Backend {
   public:
-    enum backendActions { writeFile, readFile, createFile, closeFile };
+    enum backendActions { writeFile, readFile, createFile, closeFile, seekFile, deleteFile };
 
     virtual ~Backend() = default;
 

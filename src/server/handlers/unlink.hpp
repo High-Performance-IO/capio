@@ -16,6 +16,8 @@ inline void handle_unlink(int tid, const std::filesystem::path &path) {
     } else {
         write_response(tid, -1);
     }
+    std::filesystem::path tmp = path;
+    backend->notify_backend(Backend::deleteFile, tmp, nullptr, 0, 0, false);
 }
 
 void unlink_handler(const char *const str) {

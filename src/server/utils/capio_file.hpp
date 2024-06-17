@@ -94,8 +94,11 @@ class CapioFile {
                 }
             }
         } else {
-            // TODO: Implement this
-            return -1;
+            std::filesystem::path tmp = _file_name;
+            off64_t return_value;
+            backend->notify_backend(Backend::seekFile, tmp, reinterpret_cast<char *>(&return_value),
+                                    offset, 0, false);
+            return return_value;
         }
     }
 
