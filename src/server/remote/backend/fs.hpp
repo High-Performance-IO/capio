@@ -5,6 +5,7 @@
 #include <ifaddrs.h>
 #include <netdb.h>
 #include <netinet/in.h>
+#include <regex>
 #include <sys/socket.h>
 #include <sys/types.h>
 
@@ -220,10 +221,12 @@ class FSBackend : public Backend {
      */
     inline const std::set<std::string> get_nodes() override {
         START_LOG(gettid(), "call()");
+        const std::regex file_location_regex{"(files_location_)+(.*)+"};
         for (const auto &entry : std::filesystem::directory_iterator(".")) {
-            // remove "file_locations_"
-            auto hostname = entry.path().stem().string().erase(0, 15);
-            if (!hostname.empty()) {
+            // remove "files_location_"
+            std::string pathname = entry.path().stem().string();
+            if (std::regex_match(pathname, file_location_regex)) {
+                auto hostname = pathname.erase(0, strlen("files_location_"));
                 LOG("Found hostname: %s", hostname.c_str());
                 nodes.insert(hostname);
             }
