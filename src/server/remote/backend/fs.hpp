@@ -335,7 +335,8 @@ class FSBackend : public Backend {
             if (is_dir) {
                 std::filesystem::create_directories(path);
             } else {
-                std::filesystem::create_directories(path.remove_filename());
+                std::filesystem::path parent_dir = path;
+                std::filesystem::create_directories(parent_dir.remove_filename());
                 int file = open(path.c_str(), O_RDWR | O_CREAT, 0640);
                 if (file == -1) {
                     ERR_EXIT("Error creating file. errno is %s", strerror(errno));
