@@ -29,15 +29,15 @@ void sig_term_handler(int signum, siginfo_t *info, void *ptr) {
 
     for (auto &p : data_buffers) {
         std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_WARNING << "[ " << node_name << " ] "
-                  << "Deleting data buffer for " << p.second.first->get_name() << std::endl;
+                  << " Deleting data buffer for " << p.second.first->get_name() << std::endl;
         delete p.second.first;
         std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_WARNING << "[ " << node_name << " ] "
-                  << "Deleting data buffer for " << p.second.second->get_name() << std::endl;
+                  << " Deleting data buffer for " << p.second.second->get_name() << std::endl;
         delete p.second.second;
     }
 
     std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_WARNING << "[ " << node_name << " ]"
-              << "data_buffers cleanup completed" << std::endl;
+              << " data_buffers cleanup completed" << std::endl;
 
     destroy_server();
 
