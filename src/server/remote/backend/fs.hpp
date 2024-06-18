@@ -300,7 +300,49 @@ class FSBackend : public Backend {
                              const std::string &target) override {
         START_LOG(gettid(), "call(message=%s, message_len=%d), target=%s)", message, message_len,
                   target.c_str());
-        LOG("FS backend does not uses requests... skipping");
+        struct sockaddr_in serverAddress {};
+        int outgoingSocket;
+        auto target_ip = hostname_to_ip[target];
+
+        // check if token is present, if not, proceed to create placeholder token
+        if (!std::filesystem::exists(root_dir / handshake_dir / target)) {
+            if (!create_handshake_token(target, true)) {
+                // lost race to become the dead server. Update target ip information
+                this->read_ip_address_from_token(target);
+            }
+            // else I am answering in place of the dead one
+        }
+
+        // at this point I have all the information to proceed to try a connection to target
+
+        if ((outgoingSocket = socket(AF_INET, SOCK_STREAM, 0)) == -1) {
+            ERR_EXIT("Error in socket(): error is: %d", outgoingSocket);
+        }
+
+        serverAddress.sin_family = AF_INET;
+        serverAddress.sin_port   = htons(CAPIO_FS_SOCK_LISTEN_PORT);
+
+        // try to connect to target with all IP addresses that I have found
+        bool connected = false;
+        for (const auto &ip : target_ip) {
+            serverAddress.sin_addr.s_addr = inet_addr(ip.c_str());
+
+            connected = connect(outgoingSocket, (struct sockaddr *) &serverAddress,
+                                sizeof(serverAddress)) != -1;
+            if (connected) {
+                break;
+            }
+        }
+
+        if (!connected) {
+            ERR_EXIT("Error: unable to connect to target host. aborting");
+        }
+
+        int returnCode = write(outgoingSocket, message, message_len);
+
+        LOG("Sent %d (%u request) bytes on socket %d\n", returnCode, (unsigned) message_len,
+            outgoingSocket);
+        close(outgoingSocket);
     };
 
     /**
