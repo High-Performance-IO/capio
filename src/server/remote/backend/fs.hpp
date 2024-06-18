@@ -157,12 +157,19 @@ class FSBackend : public Backend {
         }
     }
 
-    inline auto generate_capio_path(std::string path) {
+    inline auto generate_capio_path(std::string path, Backend::backendActions action) {
         // TODO: use snprintf for efficiency (and better code)
         START_LOG(gettid(), "call(path=%s)", path.c_str());
 
-        auto home_node = get_file_location(path).first;
+        std::string home_node;
 
+        if (path == get_capio_dir() || action == Backend::backendActions::createFile) {
+            home_node = node_name;
+        } else {
+            auto loc = get_file_location_opt(path);
+            LOG("Searching for file with path=%s, on node %s", path.c_str(), loc->get().first);
+            home_node = loc->get().first;
+        }
         if (path.rfind('/', 0) == 0) {
             path.erase(0, 1);
         }
@@ -320,7 +327,7 @@ class FSBackend : public Backend {
         START_LOG(gettid(), "call(action=%d, path=%s, offset=%ld, buffer_size=%ld, is_dir=%s)",
                   actions, file_path.c_str(), offset, buffer_size, is_dir ? "true" : "false");
 
-        std::filesystem::path path = generate_capio_path(file_path);
+        std::filesystem::path path = generate_capio_path(file_path, actions);
 
         switch (actions) {
         case createFile: {
@@ -340,11 +347,11 @@ class FSBackend : public Backend {
         case readFile: {
             LOG("Reading %ld bytes from offset %ld of file %s", buffer_size, offset, path.c_str());
 
-            if (file_path == get_capio_dir()) {
+            /*if (file_path == get_capio_dir()) {
                 LOG("Returning contents of files that are local to node");
                 file_path = (root_dir / storage_dir / node_name);
                 path      = file_path;
-            }
+            }*/
 
             if (is_dir) {
                 auto dirp = opendir(path.c_str());
