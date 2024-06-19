@@ -94,7 +94,7 @@ class MPIBackend : public Backend {
         return {buff, rank_nodes_equivalence[std::to_string(status.MPI_SOURCE)]};
     }
 
-    void send_file(char *shm, long int nbytes, const std::string &target,
+    void send_file(char *shm, long int nbytes, long int offset, const std::string &target,
                    const std::filesystem::path &file_path) override {
         START_LOG(gettid(), "call(%.50s, %ld, %s)", shm, nbytes, target.c_str());
         int elem_to_snd = 0;
@@ -120,7 +120,7 @@ class MPIBackend : public Backend {
     }
 
     inline void recv_file(char *shm, const std::string &source, long int bytes_expected,
-                          const std::filesystem::path &file_path) override {
+                          long int offset, const std::filesystem::path &file_path) override {
         START_LOG(gettid(), "call(shm=%ld, source=%s, bytes_expected=%ld)", shm, source.c_str(),
                   bytes_expected);
         MPI_Status status;

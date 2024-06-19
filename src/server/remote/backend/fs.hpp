@@ -254,11 +254,12 @@ class FSBackend : public Backend {
      * file write can be supported. Random writes in different sections of files,
      * as formally defined by FnU policy are not yet supported
      */
-    inline void send_file(char *buffer, long int nbytes, const std::string &target,
+    inline void send_file(char *buffer, long int nbytes, long int offset, const std::string &target,
                           const std::filesystem::path &file_path) override {
         START_LOG(gettid(), "call(buffer=%ld, nbytes=%ld, target=%s, file_path=%s)", buffer, nbytes,
                   target.c_str(), file_path.c_str());
         std::ofstream file;
+        file.seekp(offset);
         file.open(root_dir / storage_dir / std::string(node_name) / file_path.string(),
                   std::ios_base::ate);
         file.write(buffer, nbytes);
@@ -271,13 +272,13 @@ class FSBackend : public Backend {
      * as formally defined by FnU policy are not yet supported
      */
     inline void recv_file(char *shm, const std::string &source, long int bytes_expected,
-                          const std::filesystem::path &file_path) override {
+                          long int offset, const std::filesystem::path &file_path) override {
         START_LOG(gettid(), "call(source=%s, bytes_expected=%ld, file_path=%s)", source.c_str(),
                   bytes_expected, file_path.c_str());
         std::ifstream file;
         file.open(root_dir / storage_dir / std::string(node_name) / file_path.string(),
                   std::ios_base::in);
-        // TODO: handle offsets
+        file.seekg(offset);
         file.read(shm, bytes_expected);
         file.close();
     };

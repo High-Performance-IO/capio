@@ -494,7 +494,7 @@ class CapioFile {
                                const std::filesystem::path &file_path) {
         START_LOG(gettid(), "call()");
         std::unique_lock<std::mutex> lock(_mutex);
-        backend->recv_file(_buf + +(this->_store_in_memory ? offset : 0), dest, buffer_size,
+        backend->recv_file(_buf + (this->_store_in_memory ? offset : 0), dest, buffer_size, offset,
                            file_path);
         backend->notify_backend(Backend::backendActions::writeFile, _file_name, _buf, offset,
                                 buffer_size, this->_directory);
