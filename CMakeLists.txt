@@ -42,6 +42,13 @@ find_package(MPI REQUIRED)
 find_package(Threads REQUIRED)
 
 #####################################
+# Code coverage
+#####################################
+IF(CODE_COVERAGE)
+    add_compile_definitions(--coverage -O0)
+ENDIF (CODE_COVERAGE)
+
+#####################################
 # Definitions
 #####################################
 add_compile_definitions(CAPIO_VERSION="${CMAKE_PROJECT_VERSION}")
