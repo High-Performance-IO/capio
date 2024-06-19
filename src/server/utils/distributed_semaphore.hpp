@@ -11,8 +11,8 @@ class DistributedSemaphore {
 
   public:
     DistributedSemaphore(std::string locking, int sleep_time)
-        : name(std::move(locking)), locked(false), fp(-1) {
-        START_LOG(gettid(), "call(locking=%s, sleep_time=%ld)", locking.c_str(), sleep_time);
+        : name(locking), locked(false), fp(-1) {
+        START_LOG(gettid(), "call(locking=%s, sleep_time=%ld)", name.c_str(), sleep_time);
         sleep.tv_nsec = sleep_time;
     }
 
@@ -30,7 +30,8 @@ class DistributedSemaphore {
                 nanosleep(&sleep, nullptr);
                 fp = open(name.c_str(), O_EXCL | O_CREAT, 0777);
             }
-            write(fp, node_name, strlen(node_name));
+            write(fp, node_name, HOST_NAME_MAX);
+            fflush(fdopen(fp, "w"));
         }
         LOG("Locked %s", name.c_str());
         locked = true;
