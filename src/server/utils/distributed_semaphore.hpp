@@ -29,6 +29,7 @@ class DistributedSemaphore {
             while ((fp = open(name.c_str(), O_EXCL | O_CREAT, 0777)) == -1) {
                 nanosleep(&sleep, nullptr);
             }
+            write(fp, node_name, strlen(node_name));
         }
         LOG("Locked %s", name.c_str());
         locked = true;
