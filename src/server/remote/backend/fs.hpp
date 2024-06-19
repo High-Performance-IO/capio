@@ -5,7 +5,7 @@
 #include <netdb.h>
 #include <netinet/in.h>
 #include <regex>
-#include <utils/DistributedSemaphore.hpp>
+#include <utils/distributed_semaphore.hpp>
 
 class FSBackend : public Backend {
   private:
