@@ -30,10 +30,10 @@ class DistributedSemaphore {
                 nanosleep(&sleep, nullptr);
                 fp = open(name.c_str(), O_EXCL | O_CREAT, 0777);
             }
+            LOG("Locked %s", name.c_str());
             write(fp, node_name, HOST_NAME_MAX);
-            fflush(fdopen(fp, "w"));
         }
-        LOG("Locked %s", name.c_str());
+        LOG("Completed spinlock on lock file %s", name.c_str());
         locked = true;
     }
 
