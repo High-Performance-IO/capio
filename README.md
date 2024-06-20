@@ -6,6 +6,9 @@ python and bash.
 
 ## Build and run tests
 
+[![codecov](https://codecov.io/gh/High-Performance-IO/capio/graph/badge.svg?token=6ATRB5VJO3)](https://codecov.io/gh/High-Performance-IO/capio)
+![CI-Tests](https://github.com/High-Performance-IO/capio/actions/workflows/ci-tests.yaml/badge.svg)
+
 ### Dependencies
 
 CAPIO depends on the following software that needs to be manually installed:
