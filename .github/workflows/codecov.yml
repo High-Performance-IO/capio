@@ -30,10 +30,9 @@ jobs:
                 -DCODE_COVERAGE=ON \
                 -DCAPIO_LOG=ON \
                 -DCAPIO_BUILD_TESTS=ON \
-                -G Ninja \
                 -B build \
                 -S ${GITHUB_WORKSPACE}
-          cmake --build build -j $(nproc)
+          make -j $(nproc)
           sudo cmake --install build --prefix /usr/local
       - name: "Run tests"
         id: run-tests
