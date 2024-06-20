@@ -32,7 +32,7 @@ jobs:
                 -DCAPIO_BUILD_TESTS=ON \
                 -B build \
                 -S ${GITHUB_WORKSPACE}
-		cd ${GITHUB_WORKSPACE}
+	  cd ${GITHUB_WORKSPACE}
           make -j $(nproc)
           sudo cmake --install build --prefix /usr/local
       - name: "Run tests"
