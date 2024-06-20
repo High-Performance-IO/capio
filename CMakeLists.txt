@@ -28,6 +28,7 @@ set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -O3")
 #####################################
 option(CAPIO_BUILD_TESTS "Build CAPIO test suite" FALSE)
 option(CAPIO_LOG "Enable capio debug logging" FALSE)
+option(CODE_COVERAGE "Enable code coverage collection" FALSE)
 
 #####################################
 # CMake module imports
@@ -44,8 +45,9 @@ find_package(Threads REQUIRED)
 #####################################
 # Code coverage
 #####################################
-IF(CODE_COVERAGE)
-    add_compile_definitions(--coverage -O0)
+IF (CODE_COVERAGE)
+    add_compile_options(--coverage -O0)
+    add_link_options(-lgcov --coverage)
 ENDIF (CODE_COVERAGE)
 
 #####################################

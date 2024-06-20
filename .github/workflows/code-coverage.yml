@@ -12,7 +12,6 @@ jobs:
       - uses: actions/checkout@v4
       - name: "Install packages"
         run: |
-          sudo add-apt-repository ppa:ubuntu-toolchain-r/test
           sudo apt update
           sudo apt install -y \
            libcapstone-dev \
@@ -20,11 +19,12 @@ jobs:
            ninja-build \
            openmpi-bin \
            pkg-config \
-           g++-13   
+           g++ \
+           gcovr
            
       - name: "Compile and install capio"
         env:
-          CXX: g++-13
+          CXX: g++
         run: |
           cmake -DCMAKE_BUILD_TYPE=Debug \
                 -DCODE_COVERAGE=ON \
@@ -61,7 +61,7 @@ jobs:
           --gtest_print_time=1
           
           echo "Geerate coverage files"
-          gcovr
+          gcovr --xml coverage1.xml
           ls
       - name: "Upload coverage to Codecov"
         uses: codecov/codecov-action@v4
