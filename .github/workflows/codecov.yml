@@ -20,8 +20,8 @@ jobs:
            ninja-build \
            openmpi-bin \
            pkg-config \
-           g++-13   \
-           cmake
+           g++-13   
+           
       - name: "Compile and install capio"
         env:
           CXX: g++-13
@@ -30,10 +30,10 @@ jobs:
                 -DCODE_COVERAGE=ON \
                 -DCAPIO_LOG=ON \
                 -DCAPIO_BUILD_TESTS=ON \
+                -G Ninja \
                 -B build \
                 -S ${GITHUB_WORKSPACE}
-          cd ${GITHUB_WORKSPACE}
-          make -j $(nproc)
+          cmake --build build -j $(nproc)
           sudo cmake --install build --prefix /usr/local
       - name: "Run tests"
         id: run-tests
