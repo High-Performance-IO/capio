@@ -46,7 +46,7 @@ find_package(Threads REQUIRED)
 # Code coverage
 #####################################
 IF (CODE_COVERAGE)
-    add_compile_options(--coverage -O0)
+    add_compile_options(--coverage -fprofile-abs-path -O0)
     add_link_options(-lgcov --coverage)
 ENDIF (CODE_COVERAGE)
 
