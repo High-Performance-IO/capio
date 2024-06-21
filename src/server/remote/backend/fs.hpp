@@ -248,7 +248,7 @@ class FSBackend : public Backend {
         if (targetPipe < 0) {
             ERR_EXIT("Unable to open pipe: errno is %s", strerror(errno));
         }
-        LOG("Succesfully opend pipe %s", (root_dir / comm_pipe / target).c_str());
+        LOG("Successfully opend pipe %s", (root_dir / comm_pipe / target).c_str());
         // send data
         if (write(targetPipe, host_name_fmt, HOST_NAME_MAX) == -1) {
             ERR_EXIT("Error: unable to send source node name to target node. errno is %s",
