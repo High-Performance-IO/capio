@@ -4,7 +4,6 @@
 #include <ifaddrs.h>
 #include <netdb.h>
 #include <netinet/in.h>
-#include <ompi/mpi/cxx/constants.h>
 #include <regex>
 #include <utils/distributed_semaphore.hpp>
 
