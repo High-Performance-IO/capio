@@ -52,7 +52,7 @@ class FSBackend : public Backend {
         close(fd);
 
         // create pipe for current node
-        if ( mkfifo((root_dir / comm_pipe / node_name).c_str(), S_IRWXU | S_IRWXG) == -1) {
+        if (mkfifo((root_dir / comm_pipe / node_name).c_str(), S_IRWXU | S_IRWXG) == -1) {
 
             std::cout << CAPIO_SERVER_CLI_LOG_SERVER_WARNING << " [ " << node_name << " ] "
                       << "Unable to create communication pipe." << std::endl;
@@ -60,7 +60,7 @@ class FSBackend : public Backend {
                       << "as it might already be present. Deleting and retrying." << std::endl;
 
             std::filesystem::remove(root_dir / comm_pipe / node_name);
-            if ( mkfifo((root_dir / comm_pipe / node_name).c_str(), S_IRWXU | S_IRWXG) == -1) {
+            if (mkfifo((root_dir / comm_pipe / node_name).c_str(), S_IRWXU | S_IRWXG) == -1) {
                 std::cout << CAPIO_SERVER_CLI_LOG_SERVER_ERROR << " [ " << node_name << " ] "
                           << "Unable to create communication pipe" << std::endl;
                 ERR_EXIT("Unable to create named pipe for incoming communications. Error is %s",
@@ -181,7 +181,12 @@ class FSBackend : public Backend {
         ssize_t readValue = 0;
         std::unique_ptr<char> tmp_buf(new char[CAPIO_REQ_MAX_SIZE]);
         std::unique_ptr<char> source(new char[CAPIO_REQ_MAX_SIZE]);
-        auto  ownedPipe = open((root_dir / comm_pipe / node_name).c_str(), S_IRWXU | S_IRWXG);
+        auto ownedPipe = open((root_dir / comm_pipe / node_name).c_str(), S_IRWXU | S_IRWXG);
+
+        if (ownedPipe <= 0) {
+            ERR_EXIT("Error: unable to open communication pipe. error is: %s", strerror(errno));
+        }
+
         // keep reading until data arrives. If 0 is provided, fifo has been closed on other side
         while (readValue == 0) {
             readValue = read(ownedPipe, source.get(), HOST_NAME_MAX);
