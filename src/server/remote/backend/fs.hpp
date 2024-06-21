@@ -181,7 +181,7 @@ class FSBackend : public Backend {
         ssize_t readValue = 0;
         std::unique_ptr<char> tmp_buf(new char[CAPIO_REQ_MAX_SIZE]);
         std::unique_ptr<char> source(new char[CAPIO_REQ_MAX_SIZE]);
-        auto ownedPipe = open((root_dir / comm_pipe / node_name).c_str(), S_IRWXU | S_IRWXG);
+        auto ownedPipe = open((root_dir / comm_pipe / node_name).c_str(), O_RDWR);
 
         if (ownedPipe <= 0) {
             ERR_EXIT("Error: unable to open communication pipe. error is: %s", strerror(errno));
@@ -240,7 +240,7 @@ class FSBackend : public Backend {
             (root_dir / comm_pipe / target).c_str());
 
         // open pipe
-        targetPipe = open((root_dir / comm_pipe / target).c_str(), O_WRONLY);
+        targetPipe = open((root_dir / comm_pipe / target).c_str(), O_RDWR);
         if (targetPipe < 0) {
             ERR_EXIT("Unable to open pipe: errno is %s", strerror(errno));
         }
