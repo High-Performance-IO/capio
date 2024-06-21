@@ -28,10 +28,13 @@ class DistributedSemaphore {
         if (!locked) {
             while (fp == -1) {
                 nanosleep(&sleep, nullptr);
-                fp = open(name.c_str(), O_EXCL | O_CREAT, 0777);
+                fp = open(name.c_str(), O_EXCL | O_CREAT | O_WRONLY, 0777);
             }
             LOG("Locked %s", name.c_str());
-            write(fp, node_name, HOST_NAME_MAX);
+            if (write(fp, node_name, HOST_NAME_MAX) == -1) {
+                ERR_EXIT("Unable to insert lock holder %s on lock file %s", node_name,
+                         name.c_str());
+            }
         }
         LOG("Completed spinlock on lock file %s", name.c_str());
         locked = true;
