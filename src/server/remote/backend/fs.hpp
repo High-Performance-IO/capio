@@ -4,6 +4,7 @@
 #include <ifaddrs.h>
 #include <netdb.h>
 #include <netinet/in.h>
+#include <ompi/mpi/cxx/constants.h>
 #include <regex>
 #include <utils/distributed_semaphore.hpp>
 
@@ -180,7 +181,7 @@ class FSBackend : public Backend {
         START_LOG(gettid(), "call()");
         ssize_t readValue = 0;
         std::unique_ptr<char> tmp_buf(new char[CAPIO_REQ_MAX_SIZE]);
-        std::unique_ptr<char> source(new char[CAPIO_REQ_MAX_SIZE]);
+        std::unique_ptr<char> source(new char[HOST_NAME_MAX]);
         auto ownedPipe = open((root_dir / comm_pipe / node_name).c_str(), O_RDWR);
 
         if (ownedPipe <= 0) {
@@ -230,6 +231,10 @@ class FSBackend : public Backend {
         int targetPipe             = -1;
         const std::string lockFile = (root_dir / comm_pipe / target).string() + ".lock";
 
+        // format nodename to use up to HOST_NAME_MAX bytes for fixed message length
+        char host_name_fmt[HOST_NAME_MAX]{};
+        memcpy(host_name_fmt, node_name, strlen(node_name));
+
         // TODO: handle dead nodes
 
         // Exclusive lock on pipe
@@ -246,7 +251,7 @@ class FSBackend : public Backend {
         }
         LOG("Succesfully opend pipe %s", (root_dir / comm_pipe / target).c_str());
         // send data
-        if (write(targetPipe, node_name, strlen(node_name)) == -1) {
+        if (write(targetPipe, host_name_fmt, HOST_NAME_MAX) == -1) {
             ERR_EXIT("Error: unable to send source node name to target node. errno is %s",
                      strerror(errno));
         }
