@@ -235,18 +235,28 @@ class FSBackend : public Backend {
         DistributedSemaphore locking(lockFile, 100);
         locking.lock();
 
+        LOG("Acquired lock. preparing to send data");
+
         // open pipe
         targetPipe = open((root_dir / comm_pipe / target).c_str(), O_WRONLY);
         if (targetPipe == -1) {
             ERR_EXIT("Unable to open pipe: errno is %s", strerror(errno));
         }
+        LOG("Succesfully opend pipe %s", (root_dir / comm_pipe / target).c_str());
         // send data
-        write(targetPipe, node_name, HOST_NAME_MAX);
-        write(targetPipe, message, CAPIO_REQ_MAX_SIZE);
-
+        if (write(targetPipe, node_name, strlen(node_name)) == -1) {
+            ERR_EXIT("Error: unable to send source node name to target node. errno is %s",
+                     strerror(errno));
+        }
+        if (write(targetPipe, message, CAPIO_REQ_MAX_SIZE) == -1) {
+            ERR_EXIT("Error: unable to send data to target node. errno is %s", strerror(errno));
+        }
+        LOG("Request has been sent");
         // cleanup and unlock
         close(targetPipe);
+        LOG("Closed target pipe");
         locking.unlock();
+        LOG("Unlocked target pipe");
     };
 
     /**

@@ -31,7 +31,7 @@ class DistributedSemaphore {
                 fp = open(name.c_str(), O_EXCL | O_CREAT | O_WRONLY, 0777);
             }
             LOG("Locked %s", name.c_str());
-            if (write(fp, node_name, HOST_NAME_MAX) == -1) {
+            if (write(fp, node_name, strlen(node_name)) == -1) {
                 ERR_EXIT("Unable to insert lock holder %s on lock file %s", node_name,
                          name.c_str());
             }
