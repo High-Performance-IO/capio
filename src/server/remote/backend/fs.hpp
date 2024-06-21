@@ -54,8 +54,7 @@ class FSBackend : public Backend {
         close(fd);
 
         // create pipe for current node
-        ownedPipe = mkfifo((root_dir / comm_pipe / node_name).c_str(), 0666);
-        if (ownedPipe == -1) {
+        if ( mkfifo((root_dir / comm_pipe / node_name).c_str(), S_IRWXU | S_IRWXG) == -1) {
 
             std::cout << CAPIO_SERVER_CLI_LOG_SERVER_WARNING << " [ " << node_name << " ] "
                       << "Unable to create communication pipe." << std::endl;
@@ -63,14 +62,14 @@ class FSBackend : public Backend {
                       << "as it might already be present. Deleting and retrying." << std::endl;
 
             std::filesystem::remove(root_dir / comm_pipe / node_name);
-            ownedPipe = mkfifo((root_dir / comm_pipe / node_name).c_str(), 0666);
-            if (ownedPipe == -1) {
+            if ( mkfifo((root_dir / comm_pipe / node_name).c_str(), S_IRWXU | S_IRWXG) == -1) {
                 std::cout << CAPIO_SERVER_CLI_LOG_SERVER_ERROR << " [ " << node_name << " ] "
                           << "Unable to create communication pipe" << std::endl;
                 ERR_EXIT("Unable to create named pipe for incoming communications. Error is %s",
                          strerror(errno));
             }
         }
+        ownedPipe = open((root_dir / comm_pipe / node_name).c_str(), S_IRWXU | S_IRWXG);
         LOG("Incoming communication Named Pipe created successfully");
 
         return true;
@@ -235,11 +234,12 @@ class FSBackend : public Backend {
         DistributedSemaphore locking(lockFile, 100);
         locking.lock();
 
-        LOG("Acquired lock. preparing to send data");
+        LOG("Acquired lock. preparing to send data on pipe %s",
+            (root_dir / comm_pipe / target).c_str());
 
         // open pipe
         targetPipe = open((root_dir / comm_pipe / target).c_str(), O_WRONLY);
-        if (targetPipe == -1) {
+        if (targetPipe < 0) {
             ERR_EXIT("Unable to open pipe: errno is %s", strerror(errno));
         }
         LOG("Succesfully opend pipe %s", (root_dir / comm_pipe / target).c_str());
