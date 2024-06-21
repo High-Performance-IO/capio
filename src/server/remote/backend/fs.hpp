@@ -15,8 +15,6 @@ class FSBackend : public Backend {
     std::filesystem::path root_dir = "capio_fs", storage_dir = "storage",
                           handshake_dir = "handshake", comm_pipe = "comms";
 
-    int ownedPipe = -1;
-
     // structure to store file descriptors of opend files
     std::unordered_map<std::string, int> open_files_descriptors;
 
@@ -69,7 +67,6 @@ class FSBackend : public Backend {
                          strerror(errno));
             }
         }
-        ownedPipe = open((root_dir / comm_pipe / node_name).c_str(), S_IRWXU | S_IRWXG);
         LOG("Incoming communication Named Pipe created successfully");
 
         return true;
@@ -184,7 +181,7 @@ class FSBackend : public Backend {
         ssize_t readValue = 0;
         std::unique_ptr<char> tmp_buf(new char[CAPIO_REQ_MAX_SIZE]);
         std::unique_ptr<char> source(new char[CAPIO_REQ_MAX_SIZE]);
-
+        auto  ownedPipe = open((root_dir / comm_pipe / node_name).c_str(), S_IRWXU | S_IRWXG);
         // keep reading until data arrives. If 0 is provided, fifo has been closed on other side
         while (readValue == 0) {
             readValue = read(ownedPipe, source.get(), HOST_NAME_MAX);
@@ -202,7 +199,7 @@ class FSBackend : public Backend {
         }
 
         LOG("Received %s from node %s", tmp_buf.get(), source.get());
-
+        close(ownedPipe);
         return {tmp_buf.get(), source.get()};
     };
 
