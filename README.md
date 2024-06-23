@@ -4,10 +4,11 @@ CAPIO (Cross-Application Programmable I/O), is a middleware aimed at injecting s
 without changing the application codebase. It has been proven to work with C/C++ binaries, Fortran Binaries, JAVA,
 python and bash. 
 
-## Build and run tests
-
 [![codecov](https://codecov.io/gh/High-Performance-IO/capio/graph/badge.svg?token=6ATRB5VJO3)](https://codecov.io/gh/High-Performance-IO/capio)
 ![CI-Tests](https://github.com/High-Performance-IO/capio/actions/workflows/ci-tests.yaml/badge.svg)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://raw.githubusercontent.com/High-Performance-IO/capio/master/LICENSE)
+
+## Build and run tests
 
 ### Dependencies
 
