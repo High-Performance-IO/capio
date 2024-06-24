@@ -220,7 +220,7 @@ void parse_conf_file(const std::string &conf_file, const std::filesystem::path &
     std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_INFO << "Completed parsing of io_graph" << std::endl;
     LOG("Completed parsing of io_graph");
 
-    auto home_node_policies = entries["home-node-policy"].error();
+    auto home_node_policies = entries["home_node_policy"].error();
     if (!home_node_policies) {
         std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_WARNING
                   << "Warning: capio does not support home node policies yet! skipping section "
