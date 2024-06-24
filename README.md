@@ -196,3 +196,8 @@ Marco Edoardo Santimaria <marcoedoardo.santimaria@unito.it> (Designer and mainta
 Iacopo Colonnelli <iacopo.colonnelli@unito.it> (Workflows expert and maintainer) \
 Massimo Torquati <massimo.torquati@unipi.it> (Designer) \
 Marco Aldinucci <marco.aldinucci@unito.it> (Designer)
+
+## Papers
+[![CAPIO](https://img.shields.io/badge/CAPIO-10.1109/HiPC58850.2023.00031-red)]([https://arxiv.org/abs/2206.10048](https://dx.doi.org/10.1109/HiPC58850.2023.00031))
+
+
