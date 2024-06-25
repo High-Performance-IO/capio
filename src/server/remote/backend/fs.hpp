@@ -183,22 +183,24 @@ class FSBackend : public Backend {
         START_LOG(gettid(), "call()");
         ssize_t readValue = 0;
         std::string message;
-        message.reserve(HOST_NAME_MAX + CAPIO_REQ_MAX_SIZE + 2);
+        std::ifstream source;
+        source.open(root_dir / comm_pipe / node_name);
 
         // keep reading until data arrives. If 0 is provided, fifo has been closed on other side
-        while (readValue <= 0) {
-            readValue = read(selfCommLinkFile, message.data(), HOST_NAME_MAX);
-            if (readValue == -1 && errno != EINTR) {
-                ERR_EXIT("Error reading from incoming fifo queue: errno is %s", strerror(errno));
-            } else if (readValue == -1) {
-                LOG("Warning: readline returned -1 with error code: %s", strerror(errno));
-            }
-        }
+        // while (readValue <= 0) {
+        // readValue = getline(selfCommLinkFile, message.data(), HOST_NAME_MAX);
+        std::getline(source, message);
+        // if (readValue == -1 && errno != EINTR) {
+        //    ERR_EXIT("Error reading from incoming fifo queue: errno is %s", strerror(errno));
+        // } else if (readValue == -1) {
+        //     LOG("Warning: readline returned -1 with error code: %s", strerror(errno));
+        //   }
+        // }
         LOG("Recived <%s> on communication link.", message.c_str());
 
-        const std::string source  = message.substr(0, message.find("@"));
-        const std::string request = message.substr(message.find("@") + 1, message.length());
-        return {request.c_str(), source};
+        const std::string src     = message.substr(0, message.find('@'));
+        const std::string request = message.substr(message.find('@') + 1, message.length());
+        return {std::move(request.c_str()), std::move(src)};
     };
 
     /**
@@ -223,9 +225,7 @@ class FSBackend : public Backend {
         int targetNodeFile         = -1;
         const std::string lockFile = (root_dir / comm_pipe / target).string() + ".lock";
 
-        // format node name to use up to HOST_NAME_MAX bytes for fixed message length
-        char line[HOST_NAME_MAX + CAPIO_REQ_MAX_SIZE + 2]{};
-        sprintf(line, "%s@%s\n", target.c_str(), message);
+        std::string line = target + "@" + message + "\n";
 
         // TODO: handle dead nodes
 
@@ -242,12 +242,13 @@ class FSBackend : public Backend {
         }
         LOG("Successfully opend pipe %s", (root_dir / comm_pipe / target).c_str());
         // send data
-        if (write(targetNodeFile, line, HOST_NAME_MAX + CAPIO_REQ_MAX_SIZE + 2) == -1) {
+
+        if (write(targetNodeFile, line.c_str(), line.length()) == -1) {
             ERR_EXIT("Error: unable to send source node name to target node. errno is %s",
                      strerror(errno));
         }
 
-        LOG("Request <%s> has been sent", line);
+        LOG("Request <%s> has been sent", line.c_str());
         // cleanup and unlock
         close(targetNodeFile);
         LOG("Closed target pipe");
