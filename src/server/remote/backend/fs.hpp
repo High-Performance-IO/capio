@@ -182,22 +182,22 @@ class FSBackend : public Backend {
     inline RemoteRequest read_next_request() override {
         START_LOG(gettid(), "call()");
         ssize_t readValue = 0;
-        std::string message{};
-        message.reserve(HOST_NAME_MAX + PATH_MAX + PATH_MAX + 2); // reserve bunch of space
+        char *message     = new char[HOST_NAME_MAX + PATH_MAX + PATH_MAX]{};
+
         // keep reading until data arrives. If 0 is provided, fifo has been closed on other side
         while (readValue <= 0) {
-            readValue = read(selfCommLinkFile, message.data(), HOST_NAME_MAX + PATH_MAX + PATH_MAX);
+            readValue = read(selfCommLinkFile, message, HOST_NAME_MAX + PATH_MAX + PATH_MAX);
             if (readValue == -1 && errno != EINTR) {
                 ERR_EXIT("Error reading from incoming fifo queue: errno is %s", strerror(errno));
             } else if (readValue == -1) {
                 LOG("Warning: readline returned -1 with error code: %s", strerror(errno));
             }
         }
-        LOG("Recived <%s> on communication link.", message.c_str());
+        LOG("Recived <%s> on communication link.", message);
 
-        std::string src(message.substr(0, message.find('@')));
-        auto request =  new std::string(message.substr(message.find('@') + 1, message.length()));
-        return {request->c_str(), std::move(src)};
+        const char *items = strtok(message, "@");
+  
+        return RemoteRequest(reinterpret_cast<const char *>(items[1]), std::string(&items[0]));
     };
 
     /**
