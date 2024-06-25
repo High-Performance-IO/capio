@@ -182,14 +182,17 @@ class FSBackend : public Backend {
     inline RemoteRequest read_next_request() override {
         START_LOG(gettid(), "call()");
         ssize_t readValue = 0;
-        std::string message;
+        std::string message{};
         std::ifstream source;
         source.open(root_dir / comm_pipe / node_name);
 
         // keep reading until data arrives. If 0 is provided, fifo has been closed on other side
         // while (readValue <= 0) {
         // readValue = getline(selfCommLinkFile, message.data(), HOST_NAME_MAX);
-        std::getline(source, message);
+        while (!message.empty()) {
+            std::getline(source, message);
+            sleep(1);
+        }
         // if (readValue == -1 && errno != EINTR) {
         //    ERR_EXIT("Error reading from incoming fifo queue: errno is %s", strerror(errno));
         // } else if (readValue == -1) {
