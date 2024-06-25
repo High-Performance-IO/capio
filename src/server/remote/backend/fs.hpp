@@ -54,7 +54,7 @@ class FSBackend : public Backend {
 
         // create file for current node requests
         if ((selfCommLinkFile = open((root_dir / comm_pipe / node_name).c_str(),
-                                     O_EXCL | O_CREAT | O_RDWR)) == -1) {
+                                     O_EXCL | O_CREAT | O_RDWR, 0660)) == -1) {
 
             std::cout << CAPIO_SERVER_CLI_LOG_SERVER_WARNING << " [ " << node_name << " ] "
                       << "Unable to create communication pipe." << std::endl;
@@ -63,7 +63,7 @@ class FSBackend : public Backend {
 
             std::filesystem::remove(root_dir / comm_pipe / node_name);
             if ((selfCommLinkFile = open((root_dir / comm_pipe / node_name).c_str(),
-                                         O_EXCL | O_CREAT | O_RDWR)) == -1) {
+                                         O_EXCL | O_CREAT | O_RDWR, 0660)) == -1) {
                 std::cout << CAPIO_SERVER_CLI_LOG_SERVER_ERROR << " [ " << node_name << " ] "
                           << "Unable to create communication pipe" << std::endl;
                 ERR_EXIT("Unable to create named pipe for incoming communications. Error is %s",
