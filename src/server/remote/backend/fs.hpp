@@ -247,7 +247,7 @@ class FSBackend : public Backend {
                      strerror(errno));
         }
 
-        LOG("Request has been sent");
+        LOG("Request <%s> has been sent", line);
         // cleanup and unlock
         close(targetNodeFile);
         LOG("Closed target pipe");
