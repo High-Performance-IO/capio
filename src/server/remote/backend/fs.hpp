@@ -223,7 +223,7 @@ class FSBackend : public Backend {
         int targetNodeFile         = -1;
         const std::string lockFile = (root_dir / comm_pipe / target).string() + ".lock";
 
-        std::string line = target + "@" + message + "\n";
+        std::string line = std::string(node_name) + "@" + message + "\n";
 
         // TODO: handle dead nodes
 
