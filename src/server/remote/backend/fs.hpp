@@ -236,7 +236,8 @@ class FSBackend : public Backend {
             (root_dir / comm_pipe / target).c_str());
 
         // open target node file
-        if ((targetNodeFile = open((root_dir / comm_pipe / target).c_str(), O_APPEND)) < 0) {
+        if ((targetNodeFile = open((root_dir / comm_pipe / target).c_str(), O_RDWR | O_APPEND)) <
+            0) {
             ERR_EXIT("Unable to open pipe: errno is %s", strerror(errno));
         }
         LOG("Successfully opend pipe %s", (root_dir / comm_pipe / target).c_str());
