@@ -195,9 +195,9 @@ class FSBackend : public Backend {
         }
         LOG("Recived <%s> on communication link.", message.c_str());
 
-        const std::string src     = message.substr(0, message.find('@'));
-        const std::string request = message.substr(message.find('@') + 1, message.length());
-        return {std::move(request.c_str()), std::move(src)};
+        std::string src(message.substr(0, message.find('@')));
+        auto request =  new std::string(message.substr(message.find('@') + 1, message.length()));
+        return {request->c_str(), std::move(src)};
     };
 
     /**
