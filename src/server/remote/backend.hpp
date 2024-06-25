@@ -10,7 +10,7 @@ class RemoteRequest {
     const std::string _source;
 
   public:
-    RemoteRequest(char *buf_recv, const std::string &source) : _source(source) {
+    RemoteRequest(const char *buf_recv, const std::string &source) : _source(source) {
         START_LOG(gettid(), "call(buf_recv=%s, source=%s)", buf_recv, source.c_str());
         int code;
         auto [ptr, ec] = std::from_chars(buf_recv, buf_recv + 4, code);

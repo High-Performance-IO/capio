@@ -18,6 +18,9 @@ class FSBackend : public Backend {
     // structure to store file descriptors of opend files
     std::unordered_map<std::string, int> open_files_descriptors;
 
+    // FD to file on which recive requests
+    int selfCommLinkFile = -1;
+
     inline void create_capio_fs(const std::string &name) {
         std::filesystem::create_directories(root_dir);
         std::filesystem::create_directories(root_dir / storage_dir);
@@ -51,8 +54,9 @@ class FSBackend : public Backend {
         LOG("Created token %s", token_path.c_str());
         close(fd);
 
-        // create pipe for current node
-        if (mkfifo((root_dir / comm_pipe / node_name).c_str(), S_IRWXU | S_IRWXG) == -1) {
+        // create file for current node requests
+        if ((selfCommLinkFile =
+                 open((root_dir / comm_pipe / node_name).c_str(), O_EXCL | O_RDONLY)) == -1) {
 
             std::cout << CAPIO_SERVER_CLI_LOG_SERVER_WARNING << " [ " << node_name << " ] "
                       << "Unable to create communication pipe." << std::endl;
@@ -60,7 +64,8 @@ class FSBackend : public Backend {
                       << "as it might already be present. Deleting and retrying." << std::endl;
 
             std::filesystem::remove(root_dir / comm_pipe / node_name);
-            if (mkfifo((root_dir / comm_pipe / node_name).c_str(), S_IRWXU | S_IRWXG) == -1) {
+            if ((selfCommLinkFile =
+                     open((root_dir / comm_pipe / node_name).c_str(), O_EXCL | O_RDONLY)) == -1) {
                 std::cout << CAPIO_SERVER_CLI_LOG_SERVER_ERROR << " [ " << node_name << " ] "
                           << "Unable to create communication pipe" << std::endl;
                 ERR_EXIT("Unable to create named pipe for incoming communications. Error is %s",
@@ -179,33 +184,23 @@ class FSBackend : public Backend {
     inline RemoteRequest read_next_request() override {
         START_LOG(gettid(), "call()");
         ssize_t readValue = 0;
-        std::unique_ptr<char> tmp_buf(new char[CAPIO_REQ_MAX_SIZE]);
-        std::unique_ptr<char> source(new char[HOST_NAME_MAX]);
-        auto ownedPipe = open((root_dir / comm_pipe / node_name).c_str(), O_RDONLY);
-
-        if (ownedPipe <= 0) {
-            ERR_EXIT("Error: unable to open communication pipe. error is: %s", strerror(errno));
-        }
+        std::string message;
+        message.reserve(HOST_NAME_MAX + CAPIO_REQ_MAX_SIZE + 2);
 
         // keep reading until data arrives. If 0 is provided, fifo has been closed on other side
-        while (readValue == 0) {
-            readValue = read(ownedPipe, source.get(), HOST_NAME_MAX);
+        while (readValue <= 0) {
+            readValue = read(selfCommLinkFile, message.data(), HOST_NAME_MAX);
             if (readValue == -1 && errno != EINTR) {
                 ERR_EXIT("Error reading from incoming fifo queue: errno is %s", strerror(errno));
+            } else if (readValue == -1) {
+                LOG("Warning: readline returned -1 with error code: %s", strerror(errno));
             }
         }
-        readValue = 0;
+        LOG("Recived <%s> on communication link.", message.c_str());
 
-        while (readValue == 0) {
-            readValue = read(ownedPipe, tmp_buf.get(), CAPIO_REQ_MAX_SIZE);
-            if (readValue == -1 && errno != EINTR) {
-                ERR_EXIT("Error reading from incoming fifo queue: errno is %s", strerror(errno));
-            }
-        }
-
-        LOG("Received %s from node %s", tmp_buf.get(), source.get());
-        close(ownedPipe);
-        return {tmp_buf.get(), source.get()};
+        const std::string source  = message.substr(0, message.find("@"));
+        const std::string request = message.substr(message.find("@") + 1, message.length());
+        return {request.c_str(), source};
     };
 
     /**
@@ -227,42 +222,36 @@ class FSBackend : public Backend {
         START_LOG(gettid(), "call(message=%s, message_len=%d), target=%s)", message, message_len,
                   target.c_str());
 
-        int targetPipe             = -1;
+        int targetNodeFile         = -1;
         const std::string lockFile = (root_dir / comm_pipe / target).string() + ".lock";
 
-        // format nodename to use up to HOST_NAME_MAX bytes for fixed message length
-        char host_name_fmt[HOST_NAME_MAX]{};
-        memcpy(host_name_fmt, node_name, strlen(node_name));
+        // format node name to use up to HOST_NAME_MAX bytes for fixed message length
+        char line[HOST_NAME_MAX + CAPIO_REQ_MAX_SIZE + 2]{};
+        sprintf(line, "%s@%s\n", target.c_str(), message);
 
         // TODO: handle dead nodes
 
         // Exclusive lock on pipe
         DistributedSemaphore locking(lockFile, 100);
-        locking.lock();
 
         LOG("Acquired lock. preparing to send data on pipe %s",
             (root_dir / comm_pipe / target).c_str());
 
-        // open pipe
-        targetPipe = open((root_dir / comm_pipe / target).c_str(), O_WRONLY);
-        if (targetPipe < 0) {
+        // open target node file
+        if ((targetNodeFile = open((root_dir / comm_pipe / target).c_str(), O_APPEND)) < 0) {
             ERR_EXIT("Unable to open pipe: errno is %s", strerror(errno));
         }
         LOG("Successfully opend pipe %s", (root_dir / comm_pipe / target).c_str());
         // send data
-        if (write(targetPipe, host_name_fmt, HOST_NAME_MAX) == -1) {
+        if (write(targetNodeFile, line, HOST_NAME_MAX + CAPIO_REQ_MAX_SIZE + 2) == -1) {
             ERR_EXIT("Error: unable to send source node name to target node. errno is %s",
                      strerror(errno));
         }
-        if (write(targetPipe, message, CAPIO_REQ_MAX_SIZE) == -1) {
-            ERR_EXIT("Error: unable to send data to target node. errno is %s", strerror(errno));
-        }
+
         LOG("Request has been sent");
         // cleanup and unlock
-        close(targetPipe);
+        close(targetNodeFile);
         LOG("Closed target pipe");
-        locking.unlock();
-        LOG("Unlocked target pipe");
     };
 
     /**

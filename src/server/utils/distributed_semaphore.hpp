@@ -9,20 +9,6 @@ class DistributedSemaphore {
     bool locked;
     int fp;
 
-  public:
-    DistributedSemaphore(std::string locking, int sleep_time)
-        : name(locking), locked(false), fp(-1) {
-        START_LOG(gettid(), "call(locking=%s, sleep_time=%ld)", name.c_str(), sleep_time);
-        sleep.tv_nsec = sleep_time;
-    }
-
-    ~DistributedSemaphore() {
-        START_LOG(gettid(), "call()");
-        if (locked) {
-            this->unlock();
-        }
-    }
-
     void lock() {
         START_LOG(gettid(), "call(locking=%s)", name.c_str());
         if (!locked) {
@@ -47,6 +33,22 @@ class DistributedSemaphore {
             unlink(name.c_str());
         }
         LOG("Unlocked %s", name.c_str());
+    }
+
+  public:
+    DistributedSemaphore(std::string locking, int sleep_time)
+        : name(locking), locked(false), fp(-1) {
+        START_LOG(gettid(), "call(locking=%s, sleep_time=%ld)", name.c_str(), sleep_time);
+        sleep.tv_nsec = sleep_time;
+
+        this->lock();
+    }
+
+    ~DistributedSemaphore() {
+        START_LOG(gettid(), "call()");
+        if (locked) {
+            this->unlock();
+        }
     }
 };
 #endif // DISTRIBUTEDSEMAPHORE_HPP
