@@ -195,9 +195,10 @@ class FSBackend : public Backend {
         }
         LOG("Recived <%s> on communication link.", message);
 
-        const char *items = strtok(message, "@");
-  
-        return RemoteRequest(reinterpret_cast<const char *>(items[1]), std::string(&items[0]));
+        const char *src = strtok(message, "@");
+        const char *msg = strtok(nullptr, "@");
+
+        return {msg, src};
     };
 
     /**
