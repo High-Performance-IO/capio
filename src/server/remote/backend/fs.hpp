@@ -183,22 +183,16 @@ class FSBackend : public Backend {
         START_LOG(gettid(), "call()");
         ssize_t readValue = 0;
         std::string message{};
-        std::ifstream source;
-        source.open(root_dir / comm_pipe / node_name);
-
+        message.reserve(HOST_NAME_MAX + PATH_MAX + PATH_MAX + 2); // reserve bunch of space
         // keep reading until data arrives. If 0 is provided, fifo has been closed on other side
-        // while (readValue <= 0) {
-        // readValue = getline(selfCommLinkFile, message.data(), HOST_NAME_MAX);
-        while (!message.empty()) {
-            std::getline(source, message);
-            sleep(1);
+        while (readValue <= 0) {
+            readValue = read(selfCommLinkFile, message.data(), HOST_NAME_MAX + PATH_MAX + PATH_MAX);
+            if (readValue == -1 && errno != EINTR) {
+                ERR_EXIT("Error reading from incoming fifo queue: errno is %s", strerror(errno));
+            } else if (readValue == -1) {
+                LOG("Warning: readline returned -1 with error code: %s", strerror(errno));
+            }
         }
-        // if (readValue == -1 && errno != EINTR) {
-        //    ERR_EXIT("Error reading from incoming fifo queue: errno is %s", strerror(errno));
-        // } else if (readValue == -1) {
-        //     LOG("Warning: readline returned -1 with error code: %s", strerror(errno));
-        //   }
-        // }
         LOG("Recived <%s> on communication link.", message.c_str());
 
         const std::string src     = message.substr(0, message.find('@'));
