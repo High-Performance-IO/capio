@@ -34,8 +34,6 @@ class FSBackend : public Backend {
      * capio server exists
      */
     inline bool create_handshake_token(const std::string &name, bool create_exclusive = false) {
-        struct ifaddrs *interfaces = nullptr;
-        struct in_addr *address;
 
         START_LOG(gettid(), "call(name=%s, create_exclusive=%s)", name.c_str(),
                   create_exclusive ? "true" : "false");
@@ -55,8 +53,8 @@ class FSBackend : public Backend {
         close(fd);
 
         // create file for current node requests
-        if ((selfCommLinkFile =
-                 open((root_dir / comm_pipe / node_name).c_str(), O_EXCL | O_RDONLY)) == -1) {
+        if ((selfCommLinkFile = open((root_dir / comm_pipe / node_name).c_str(),
+                                     O_EXCL | O_CREAT | O_RDWR)) == -1) {
 
             std::cout << CAPIO_SERVER_CLI_LOG_SERVER_WARNING << " [ " << node_name << " ] "
                       << "Unable to create communication pipe." << std::endl;
@@ -64,8 +62,8 @@ class FSBackend : public Backend {
                       << "as it might already be present. Deleting and retrying." << std::endl;
 
             std::filesystem::remove(root_dir / comm_pipe / node_name);
-            if ((selfCommLinkFile =
-                     open((root_dir / comm_pipe / node_name).c_str(), O_EXCL | O_RDONLY)) == -1) {
+            if ((selfCommLinkFile = open((root_dir / comm_pipe / node_name).c_str(),
+                                         O_EXCL | O_CREAT | O_RDWR)) == -1) {
                 std::cout << CAPIO_SERVER_CLI_LOG_SERVER_ERROR << " [ " << node_name << " ] "
                           << "Unable to create communication pipe" << std::endl;
                 ERR_EXIT("Unable to create named pipe for incoming communications. Error is %s",
