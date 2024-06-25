@@ -346,7 +346,7 @@ class FSBackend : public Backend {
             break;
         }
         case writeFile: {
-            LOG("Writing buffer conttent to FS");
+            LOG("Writing buffer content to FS");
             if (is_dir) {
                 LOG("File is directory. skipping as FS is being used");
                 return;
