@@ -7,9 +7,9 @@ cmake_minimum_required(VERSION 3.15)
 project(capio LANGUAGES CXX DESCRIPTION "Cross-Application Programmable I/O")
 
 # Set project version
-set(CMAKE_PROJECT_VERSION_MAJOR 0)
+set(CMAKE_PROJECT_VERSION_MAJOR 1)
 set(CMAKE_PROJECT_VERSION_MINOR 0)
-set(CMAKE_PROJECT_VERSION_PATCH 1)
+set(CMAKE_PROJECT_VERSION_PATCH 0)
 set(CMAKE_PROJECT_VERSION ${CMAKE_PROJECT_VERSION_MAJOR}.${CMAKE_PROJECT_VERSION_MINOR}.${CMAKE_PROJECT_VERSION_PATCH})
 
 # Set required C++ standard
@@ -28,6 +28,7 @@ set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -O3")
 #####################################
 option(CAPIO_BUILD_TESTS "Build CAPIO test suite" FALSE)
 option(CAPIO_LOG "Enable capio debug logging" FALSE)
+option(CODE_COVERAGE "Enable code coverage collection" FALSE)
 
 #####################################
 # CMake module imports
@@ -42,17 +43,29 @@ find_package(MPI REQUIRED)
 find_package(Threads REQUIRED)
 
 #####################################
+# Code coverage
+#####################################
+IF (CODE_COVERAGE)
+    add_compile_options(--coverage -fprofile-abs-path -O0)
+    add_link_options(-lgcov --coverage)
+ENDIF (CODE_COVERAGE)
+
+#####################################
 # Definitions
 #####################################
 add_compile_definitions(CAPIO_VERSION="${CMAKE_PROJECT_VERSION}")
 
 IF (CAPIO_LOG)
-    message(STATUS "Enabling CAPIO logger")
-    add_compile_definitions(CAPIOLOG)
-    execute_process(
-            COMMAND bash "${PROJECT_SOURCE_DIR}/scripts/gen_syscallnames.sh"
-            "${PROJECT_BINARY_DIR}/include/syscall/syscallnames.h"
-    )
+    if (CMAKE_BUILD_TYPE STREQUAL "Debug")
+        message(STATUS "Enabling CAPIO logger")
+        add_compile_definitions(CAPIOLOG)
+        execute_process(
+                COMMAND bash "${PROJECT_SOURCE_DIR}/scripts/gen_syscallnames.sh"
+                "${PROJECT_BINARY_DIR}/include/syscall/syscallnames.h"
+        )
+    else ()
+        message(WARNING "Capio logger enabled in release mode. skipping compilation of CAPIO logger")
+    endif ()
 ENDIF (CAPIO_LOG)
 
 IF (CAPIO_SYNC)
@@ -65,9 +78,9 @@ ENDIF (CAPIO_SYNC)
 file(GLOB_RECURSE CAPIO_COMMON_HEADERS "src/common/capio/*.hpp")
 include_directories(src/common)
 
-IF (CAPIO_LOG)
+IF (CAPIO_LOG AND CMAKE_BUILD_TYPE STREQUAL "Debug")
     include_directories("${PROJECT_BINARY_DIR}/include/syscall")
-ENDIF (CAPIO_LOG)
+ENDIF (CAPIO_LOG AND CMAKE_BUILD_TYPE STREQUAL "Debug")
 
 #####################################
 # Targets
