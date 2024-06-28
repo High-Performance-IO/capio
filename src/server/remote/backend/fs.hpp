@@ -306,7 +306,7 @@ class FSBackend : public Backend {
                 if (file == -1) {
                     ERR_EXIT("Error creating file. errno is %s", strerror(errno));
                 }
-                open_files_descriptors.emplace(path, file);
+                open_files_descriptors.insert(std::make_pair(path, file));
             }
             break;
         }
