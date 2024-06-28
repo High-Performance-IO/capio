@@ -10,10 +10,12 @@ void sig_term_handler(int signum, siginfo_t *info, void *ptr) {
               strsignal(signum), info != nullptr ? info->si_pid : -1);
 
     std::cout << std::endl
-              << CAPIO_LOG_SERVER_CLI_LEVEL_WARNING << "shutting down server" << std::endl;
+              << CAPIO_LOG_SERVER_CLI_LEVEL_WARNING << "[ " << node_name << " ] "
+              << "shutting down server" << std::endl;
 
     if (signum == SIGSEGV) {
-        std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_ERROR << "Segfault detected!" << std::endl;
+        std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_ERROR << "[ " << node_name << " ] "
+                  << "Segfault detected!" << std::endl;
     }
 
     // free all the memory used
@@ -22,19 +24,20 @@ void sig_term_handler(int signum, siginfo_t *info, void *ptr) {
             delete_capio_file_from_tid(it.first, fd);
         }
     }
-    std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_WARNING << "shm cleanup completed" << std::endl;
+    std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_WARNING << "[ " << node_name << " ] "
+              << "shm cleanup completed" << std::endl;
 
     for (auto &p : data_buffers) {
-        std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_WARNING << "Deleting data buffer for "
-                  << p.second.first->get_name() << std::endl;
+        std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_WARNING << "[ " << node_name << " ] "
+                  << " Deleting data buffer for " << p.second.first->get_name() << std::endl;
         delete p.second.first;
-        std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_WARNING << "Deleting data buffer for "
-                  << p.second.second->get_name() << std::endl;
+        std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_WARNING << "[ " << node_name << " ] "
+                  << " Deleting data buffer for " << p.second.second->get_name() << std::endl;
         delete p.second.second;
     }
 
-    std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_WARNING << "data_buffers cleanup completed"
-              << std::endl;
+    std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_WARNING << "[ " << node_name << " ]"
+              << " data_buffers cleanup completed" << std::endl;
 
     destroy_server();
 

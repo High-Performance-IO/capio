@@ -42,15 +42,16 @@ void write_entry_dir(int tid, const std::filesystem::path &file_path,
     ld.d_reclen = sizeof(linux_dirent64);
 
     CapioFile &c_file = get_capio_file(dir);
-    c_file.create_buffer_if_needed(dir, true);
-    void *file_shm       = c_file.get_buffer();
+    c_file.create_buffer_if_needed(true);
+
     off64_t file_size    = c_file.get_stored_size();
     off64_t data_size    = file_size + ld.d_reclen;
     size_t file_shm_size = c_file.get_buf_size();
     ld.d_off             = data_size;
+    void *file_shm       = c_file.get_buffer();
 
     if (data_size > file_shm_size) {
-        file_shm = c_file.expand_buffer(data_size);
+        file_shm = c_file.expand_buffer(data_size, file_shm);
     }
 
     ld.d_type = (c_file.is_dir() ? DT_DIR : DT_REG);

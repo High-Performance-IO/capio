@@ -148,7 +148,7 @@ CapioFile &create_capio_file(const std::filesystem::path &path, bool is_dir, siz
                 init_size = CAPIO_DEFAULT_DIR_INITIAL_SIZE;
                 LOG("Glob %s is a directory", path.c_str());
             }
-            c_file = new CapioFile(is_dir, false, init_size);
+            c_file = new CapioFile(path, is_dir, false, init_size, backend->store_file_in_memory());
             add_capio_file(path, c_file);
         } else {
             LOG("Path %s is found in metadata_conf_globs", path.c_str());
@@ -164,7 +164,8 @@ CapioFile &create_capio_file(const std::filesystem::path &path, bool is_dir, siz
             metadata_conf[path] =
                 std::make_tuple(committed, mode, app_name, n_files, permanent, n_close);
             LOG("Creating new capio_file. committed=%s, mode=%s", committed.c_str(), mode.c_str());
-            c_file = new CapioFile(committed, mode, is_dir, n_files, permanent, init_size, n_close);
+            c_file = new CapioFile(path, committed, mode, is_dir, n_files, permanent, init_size,
+                                   n_close, backend->store_file_in_memory());
             add_capio_file(path, c_file);
         }
     } else {
@@ -175,7 +176,8 @@ CapioFile &create_capio_file(const std::filesystem::path &path, bool is_dir, siz
             init_size = CAPIO_DEFAULT_DIR_INITIAL_SIZE;
         }
         LOG("Creating new capio_file. committed=%s, mode=%s", committed.c_str(), mode.c_str());
-        c_file = new CapioFile(committed, mode, is_dir, n_files, permanent, init_size, n_close);
+        c_file = new CapioFile(path, committed, mode, is_dir, n_files, permanent, init_size,
+                               n_close, backend->store_file_in_memory());
         add_capio_file(path, c_file);
     }
     return *c_file;

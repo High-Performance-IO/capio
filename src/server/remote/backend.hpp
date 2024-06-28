@@ -10,7 +10,7 @@ class RemoteRequest {
     const std::string _source;
 
   public:
-    RemoteRequest(char *buf_recv, const std::string &source) : _source(source) {
+    RemoteRequest(const char *buf_recv, const std::string &source) : _source(source) {
         START_LOG(gettid(), "call(buf_recv=%s, source=%s)", buf_recv, source.c_str());
         int code;
         auto [ptr, ec] = std::from_chars(buf_recv, buf_recv + 4, code);
@@ -43,6 +43,8 @@ class RemoteRequest {
  */
 class Backend {
   public:
+    enum backendActions { writeFile, readFile, createFile, closeFile, seekFile, deleteFile };
+
     virtual ~Backend() = default;
 
     /**
@@ -68,7 +70,8 @@ class Backend {
      * @param nbytes length of @param shm
      * @param dest target to send files to
      */
-    virtual void send_file(char *shm, long int nbytes, const std::string &target) = 0;
+    virtual void send_file(char *shm, long int nbytes, long int offset, const std::string &target,
+                           const std::filesystem::path &file_path) = 0;
 
     /**
      * receive a file from another process
@@ -76,7 +79,8 @@ class Backend {
      * @param source The source target to receive from
      * @param bytes_expected Size of expected incoming buffer
      */
-    virtual void recv_file(char *shm, const std::string &source, long int bytes_expected) = 0;
+    virtual void recv_file(char *shm, const std::string &source, long int bytes_expected,
+                           long int offset, const std::filesystem::path &file_path) = 0;
 
     /**
      *
@@ -85,6 +89,26 @@ class Backend {
      * @param target
      */
     virtual void send_request(const char *message, int message_len, const std::string &target) = 0;
+
+    /**
+     * This method is used to notify the backend that a local action has occurred
+     *
+     * @param actions The action that has occurred
+     * @param buffer The buffer to which action applies
+     * @param buffer_size The size of @param buffer
+     * @return 0 if nothing happens, or the method is not implemented, 1 if the
+     * action has been registered, -1 on error
+     */
+    virtual void notify_backend(enum backendActions actions, std::filesystem::path &file_path,
+                                char *buffer, size_t offset, size_t buffer_size, bool is_dir) {
+        START_LOG(gettid(), "call()");
+    };
+
+    /**
+     * Let CAPIO server know if backend stores the files inside the memory of a nod or not
+     * @return
+     */
+    virtual bool store_file_in_memory() { return true; };
 };
 
 Backend *backend;

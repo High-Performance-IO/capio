@@ -29,7 +29,7 @@ inline void handle_pending_read(int tid, int fd, long int process_offset, long i
         bytes_read = end_of_sector - process_offset;
     }
 
-    c_file.create_buffer_if_needed(path, false);
+    c_file.create_buffer_if_needed(false);
     send_data_to_client(tid, fd, c_file.get_buffer(), process_offset, bytes_read);
 
     // TODO: check if the file was moved to the disk
@@ -74,12 +74,12 @@ inline void handle_local_read(int tid, int fd, off64_t count, bool is_prod) {
                 write_response(tid, process_offset);
                 return;
             }
-            c_file.create_buffer_if_needed(path, false);
+            c_file.create_buffer_if_needed(false);
             send_data_to_client(tid, fd, c_file.get_buffer(), process_offset,
                                 end_of_sector - process_offset);
         }
     } else {
-        c_file.create_buffer_if_needed(path, false);
+        c_file.create_buffer_if_needed(false);
         send_data_to_client(tid, fd, c_file.get_buffer(), process_offset, count);
     }
 }
@@ -100,7 +100,7 @@ inline void request_remote_read(int tid, int fd, off64_t count) {
         handle_local_read(tid, fd, count, true);
     } else if (end_of_read <= end_of_sector) {
         LOG("Data is present locally and can be served to client");
-        c_file.create_buffer_if_needed(path, false);
+        c_file.create_buffer_if_needed(false);
         send_data_to_client(tid, fd, c_file.get_buffer(), offset, count);
     } else {
         LOG("Delegating to backend remote read");

@@ -27,7 +27,7 @@ inline void serve_remote_read(const std::filesystem::path &path, const std::stri
     // send request
     serve_remote_read_request(tid, fd, count, nbytes, file_size, complete, is_getdents, dest);
     // send data
-    backend->send_file(c_file.get_buffer() + offset, nbytes, dest);
+    backend->send_file(c_file.get_buffer() + offset, nbytes, offset, dest, path);
 }
 
 std::vector<std::string> *files_available(const std::string &prefix, const std::string &app_name,
@@ -81,7 +81,7 @@ inline void handle_read_reply(int tid, int fd, long count, off64_t file_size, of
     c_file.set_complete(complete);
 
     off64_t end_of_sector = c_file.get_sector_end(offset);
-    c_file.create_buffer_if_needed(path, false);
+    c_file.create_buffer_if_needed(false);
     off64_t bytes_read;
     off64_t end_of_read = offset + count;
     if (end_of_sector > end_of_read) {
@@ -122,7 +122,7 @@ inline void send_files_batch(const std::string &prefix, const std::string &dest,
     for (const std::string &path : *files_to_send) {
         LOG("Sending file %s to target %s", path.c_str(), dest.c_str());
         CapioFile &c_file = get_capio_file(path);
-        backend->send_file(c_file.get_buffer(), c_file.get_stored_size(), dest);
+        backend->send_file(c_file.get_buffer(), c_file.get_stored_size(), 0, dest, path);
     }
 }
 
@@ -183,10 +183,10 @@ handle_remote_read_batch_reply(const std::string &source, int tid, int fd, off64
         auto c_file_opt = get_capio_file_opt(path);
         if (c_file_opt) {
             CapioFile &c_file = c_file_opt->get();
-            c_file.create_buffer_if_needed(path, false);
+            c_file.create_buffer_if_needed(false);
             size_t file_shm_size = c_file.get_buf_size();
             if (nbytes > file_shm_size) {
-                c_file.expand_buffer(nbytes);
+                c_file.expand_buffer(nbytes, nullptr);
             }
             c_file.first_write = false;
         } else {
@@ -198,7 +198,7 @@ handle_remote_read_batch_reply(const std::string &source, int tid, int fd, off64
             c_file.set_complete();
         }
         // as was done previously, write to the capio file buffer from its beginning
-        c_file_opt->get().read_from_node(source, 0, nbytes);
+        c_file_opt->get().read_from_node(source, 0, nbytes, path);
         handle_read_reply(tid, fd, count, nbytes, nbytes, true, is_getdents);
     }
 }
@@ -233,14 +233,14 @@ inline void handle_remote_read_reply(const std::string &source, int tid, int fd,
     off64_t offset                    = get_capio_file_offset(tid, fd);
     CapioFile &c_file                 = get_capio_file(path);
 
-    c_file.create_buffer_if_needed(path, false);
+    c_file.create_buffer_if_needed(false);
     if (nbytes != 0) {
         auto file_shm_size  = c_file.get_buf_size();
         auto file_size_recv = offset + nbytes;
         if (file_size_recv > file_shm_size) {
-            c_file.expand_buffer(file_size_recv);
+            c_file.expand_buffer(file_size_recv, nullptr);
         }
-        c_file.read_from_node(source, offset, nbytes);
+        c_file.read_from_node(source, offset, nbytes, path);
         nbytes *= sizeof(char);
     }
     handle_read_reply(tid, fd, count, file_size, nbytes, complete, is_getdents);
