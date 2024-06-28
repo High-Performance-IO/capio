@@ -351,8 +351,21 @@ class FSBackend : public Backend {
                 LOG("File is directory. skipping as FS is being used");
                 return;
             }
+            int file_descriptor = -1;
+            if (open_files_descriptors.find(path) != open_files_descriptors.end()){
+                LOG("File is local.");
+                file_descriptor = open_files_descriptors.at(path);
+            }else{
+                LOG("File has been found on remote node. opening file and inserting it into map");
+                file_descriptor = open(path.c_str(), O_RDWR, 0640);
+                if(file_descriptor == -1){
+                    ERR_EXIT("Unable to open file. error is %s", strerror(errno));
+                }
+                open_files_descriptors.insert(std::make_pair(path, file_descriptor));
+            }
 
-            FILE *f = fdopen(open_files_descriptors.at(path), "w");
+
+            FILE *f = fdopen(file_descriptor, "w");
             fseek(f, offset, SEEK_SET);
             fwrite(buffer, sizeof(char), buffer_size, f);
             fflush(f);
