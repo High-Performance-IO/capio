@@ -4,7 +4,7 @@
 set(TARGET_NAME capio_unit_integration_tests)
 set(TARGET_SOURCES
         src/main.cpp
-        src/test1.cpp
+        src/mapreduce.cpp
 )
 
 #####################################
