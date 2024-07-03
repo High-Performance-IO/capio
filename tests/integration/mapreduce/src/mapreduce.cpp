@@ -8,8 +8,8 @@
 #include <sys/stat.h>
 #include <sys/time.h>
 #include <sys/types.h>
-#include <unistd.h>
 #include <thread>
+#include <unistd.h>
 
 // just a bunch of random phrases
 static const char *phrases[] = {
@@ -461,11 +461,10 @@ int mapReduceFunction(int argc, char *argv[]) {
 
 TEST(integrationTests, RunTestSplitMergeAndMapReduceFunction) {
     char **splitArgsVect = (char **) malloc(4 * sizeof(uintptr_t));
-    splitArgsVect[0] = strdup("split");
-    splitArgsVect[1] = strdup("10"); //lines
-    splitArgsVect[2] = strdup("10"); //2 mapreducers * 5 files (ex total map files)
-    splitArgsVect[3] = strdup(std::getenv("CAPIO_DIR"));
+    splitArgsVect[0]     = strdup("split");
+    splitArgsVect[1]     = strdup("10"); // lines
+    splitArgsVect[2]     = strdup("10"); // 2 mapreducers * 5 files (ex total map files)
+    splitArgsVect[3]     = strdup(std::getenv("CAPIO_DIR"));
 
     EXPECT_EQ(splitFunction(4, splitArgsVect), 0);
-
 }
