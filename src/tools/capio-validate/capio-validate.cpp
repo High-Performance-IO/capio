@@ -8,7 +8,7 @@ std::string workflow_name;
 #include <capio/json.hpp>
 
 int main(int argc, char **argv) {
-    std::cout << CAPIO_LOG_SERVER_BANNER << std::end;
+    std::cout << CAPIO_LOG_SERVER_BANNER << std::endl;
     args::ArgumentParser parser(CAPIO_SERVER_ARG_PARSER_PRE, CAPIO_SERVER_ARG_PARSER_EPILOGUE);
     parser.LongSeparator(" ");
     parser.LongPrefix("--");
