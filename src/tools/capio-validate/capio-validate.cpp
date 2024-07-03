@@ -1,6 +1,6 @@
+#include <filesystem>
 #include <iostream>
 #include <string>
-#include <filesystem>
 
 std::string workflow_name;
 
@@ -8,7 +8,7 @@ std::string workflow_name;
 #include <capio/json.hpp>
 
 int main(int argc, char **argv) {
-
+    std::cout << CAPIO_LOG_SERVER_BANNER << std::end;
     args::ArgumentParser parser(CAPIO_SERVER_ARG_PARSER_PRE, CAPIO_SERVER_ARG_PARSER_EPILOGUE);
     parser.LongSeparator(" ");
     parser.LongPrefix("--");
@@ -18,7 +18,7 @@ int main(int argc, char **argv) {
     args::HelpFlag help(arguments, "help", "Display this help menu", {'h', "help"});
 
     args::ValueFlag<std::string> config(arguments, "filename",
-                                        CAPIO_SERVER_ARG_PARSER_CONFIG_OPT_HELP, {'c', "config"});
+                                        CAPIO_SERVER_ARG_PARSER_CONFIG_OPT_HELP, {'f', "file"});
 
     try {
         parser.ParseCLI(argc, argv);

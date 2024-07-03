@@ -17,10 +17,9 @@ inline bool is_int(const std::string &s) {
     return res;
 }
 
-void parse_conf_file(const std::string &conf_file, const std::filesystem::path &capio_dir,
-                     bool check_only = false) {
-        START_LOG(gettid(), "call(config_file='%s', capio_dir='%s')", conf_file.c_str(),
-                  capio_dir.c_str());
+void parse_conf_file(const std::string &conf_file, const std::filesystem::path &capio_dir) {
+    START_LOG(gettid(), "call(config_file='%s', capio_dir='%s')", conf_file.c_str(),
+              capio_dir.c_str());
 
     simdjson::ondemand::parser parser;
     simdjson::padded_string json;
@@ -41,6 +40,8 @@ void parse_conf_file(const std::string &conf_file, const std::filesystem::path &
     std::string_view wf_name;
     error = entries["name"].get_string().get(wf_name);
     if (error) {
+        std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_ERROR << "Error:" << error_message(error)
+                  << std::endl;
         ERR_EXIT("Error: workflow name is mandatory");
     }
     workflow_name = std::string(wf_name);
@@ -54,6 +55,8 @@ void parse_conf_file(const std::string &conf_file, const std::filesystem::path &
         std::string_view app_name;
         error = app["name"].get_string().get(app_name);
         if (error) {
+            std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_ERROR << "Error:" << error_message(error)
+                      << std::endl;
             ERR_EXIT("Error: app name is mandatory");
         }
 
@@ -190,6 +193,8 @@ void parse_conf_file(const std::string &conf_file, const std::filesystem::path &
             std::string_view name;
             error = file.get_string().get(name);
             if (error) {
+                std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_ERROR
+                          << "Error: name for permanent section mandatory" << std::endl;
                 ERR_EXIT("error name for permanent section is mandatory");
             }
             LOG("Permanent name: %s", std::string(name).c_str());
