@@ -3,8 +3,8 @@
 #####################################
 set(TARGET_NAME capio_unit_integration_tests)
 set(TARGET_SOURCES
-        ${CMAKE_CURRENT_SOURCE_DIR}/src/main.cpp
-        ${CMAKE_CURRENT_SOURCE_DIR}/src/test1.cpp
+        src/main.cpp
+        src/test1.cpp
 )
 
 #####################################
