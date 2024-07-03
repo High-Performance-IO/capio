@@ -2,6 +2,7 @@
 
 #include <assert.h>
 #include <errno.h>
+#include <future>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -456,6 +457,8 @@ int mapReduceFunction(int argc, char *argv[]) {
     double elapsed_time = diffmsec(after, before);
     fprintf(stdout, "MAPREDUCE: elapsed time (ms) : %g\n", elapsed_time);
 
+    EXPECT_EQ(r, 0);
+
     return r;
 }
 
@@ -466,5 +469,18 @@ TEST(integrationTests, RunTestSplitMergeAndMapReduceFunction) {
     splitArgsVect[2]     = strdup("10"); // 2 mapreducers * 5 files (ex total map files)
     splitArgsVect[3]     = strdup(std::getenv("CAPIO_DIR"));
 
+    char **mapReducer1ArgsVect = (char **) malloc(8 * sizeof(uintptr_t));
+    splitArgsVect[0]           = strdup("mapreduce");
+    splitArgsVect[1]           = strdup(std::getenv("CAPIO_DIR")); // datadir
+    splitArgsVect[2]           = strdup("0");                      // next
+    splitArgsVect[3]           = strdup("5");                      // files
+    splitArgsVect[4]           = strdup(std::getenv("CAPIO_DIR")); // resultdir
+    splitArgsVect[5]           = strdup("0");                      // next
+    splitArgsVect[6]           = strdup("5");                      // files
+    splitArgsVect[7]           = strdup("0.3");                    // percent
+
     EXPECT_EQ(splitFunction(4, splitArgsVect), 0);
+    std::thread mapReducer1(mapReduceFunction, 8, mapReducer1ArgsVect);
+
+    mapReducer1.join();
 }
