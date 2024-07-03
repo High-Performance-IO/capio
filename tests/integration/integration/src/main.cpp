@@ -78,9 +78,38 @@ class CapioServerEnvironment : public testing::Environment {
     }
 };
 
+class TraceHandler : public testing::EmptyTestEventListener {
+
+    CapioServerEnvironment *_env;
+
+    // Called before a test starts.
+    void OnTestStart(const testing::TestInfo &test_info) override { _env->SetUp(); }
+
+    // Called after a test ends.
+    void OnTestEnd(const testing::TestInfo &test_info) override { _env->TearDown(); }
+
+    // Do nothing at first startup of the environment
+    void OnEnvironmentsSetUpStart(const testing::UnitTest &) override {}
+
+    // Do nothing at final teardown of the environment
+    void OnEnvironmentsTearDownStart(const testing::UnitTest &) override {}
+
+  public:
+    explicit TraceHandler(CapioServerEnvironment *env)
+        : testing::EmptyTestEventListener(), _env(env) {}
+};
+
 int main(int argc, char **argv, char **envp) {
     testing::InitGoogleTest(&argc, argv);
-    testing::AddGlobalTestEnvironment(new CapioServerEnvironment(envp));
+    auto serverEnv    = new CapioServerEnvironment(envp);
+    auto traceHandler = new TraceHandler(serverEnv);
+
+    testing::AddGlobalTestEnvironment(serverEnv);
+
+    // Destroy CAPIO SERVER and recreate it between each test execution
+    // to provide a clean environment for each test
+    testing::TestEventListeners &listeners = testing::UnitTest::GetInstance()->listeners();
+    listeners.Append(traceHandler);
 
     return RUN_ALL_TESTS();
 }

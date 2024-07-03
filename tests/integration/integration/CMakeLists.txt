@@ -1,7 +1,7 @@
 #####################################
 # Target information
 #####################################
-set(TARGET_NAME capio_integration_mapreduce_test)
+set(TARGET_NAME capio_integration_tests)
 set(TARGET_SOURCES
         src/main.cpp
         src/mapreduce.cpp
