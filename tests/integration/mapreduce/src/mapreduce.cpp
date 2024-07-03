@@ -282,57 +282,34 @@ int splitFunction(int argc, char *argv[]) {
         return -1;
     }
     ssize_t nlines = strtol(argv[1], NULL, 10);
-    if (nlines == 0 || nlines < 0) {
-        fprintf(stderr, "Invalid #lines (%ld)\n", nlines);
-        return -1;
-    }
+    EXPECT_GT(nlines, 0);
+
     ssize_t nfiles = strtol(argv[2], NULL, 10);
-    if (nlines == 0 || nlines < 0) {
-        fprintf(stderr, "Invalid #files (%ld)\n", nfiles);
-        return -1;
-    }
+    EXPECT_GT(nfiles, 0);
+
     // sanity check
-    if (nfiles > maxnumfiles) {
-        fprintf(stderr, "#files=%ld too big, max value is %d\n", nfiles, maxnumfiles);
-        return -1;
-    }
+    EXPECT_LE(nfiles, maxnumfiles);
+
     struct stat statbuf;
-    if (stat(argv[3], &statbuf) == -1) {
-        perror("stat");
-        fprintf(stderr, "Does the directory %s exit?\n", argv[3]);
-        return -1;
-    }
-    if (!S_ISDIR(statbuf.st_mode)) {
-        fprintf(stderr, "%s is not a directory!\n", argv[3]);
-        return -1;
-    }
+    EXPECT_NE(stat(argv[3], &statbuf), -1);
+    EXPECT_TRUE(S_ISDIR(statbuf.st_mode)); // not a directory
+
     char *dirname = argv[3];
     FILE **fp     = (FILE **) calloc(sizeof(FILE *), nfiles);
-    if (!fp) {
-        perror("malloc");
-        return -1;
-    }
+    EXPECT_TRUE(fp);
+
     char **buffer = (char **) calloc(IO_BUFFER, nfiles);
-    if (!buffer) {
-        perror("malloc");
-        return -1;
-    }
+    EXPECT_TRUE(buffer);
+
     int error = 0;
     char filepath[strlen(dirname) + maxfilename];
     // opening (truncating) all files
     for (int i = 0; i < nfiles; ++i) {
         sprintf(filepath, fmtin, dirname, i);
         fp[i] = fopen(filepath, "w");
-        if (!fp[i]) {
-            perror("fopen");
-            fprintf(stderr, "cannot create (open) the file %s\n", filepath);
-            error = -1;
-        }
 
-        if (setvbuf(fp[i], buffer[i], _IOFBF, IO_BUFFER) != 0) {
-            perror("setvbuf");
-            return -1;
-        }
+        EXPECT_TRUE(fp[i]);
+        EXPECT_NE(setvbuf(fp[i], buffer[i], _IOFBF, IO_BUFFER), 0);
     }
     if (!error) {
         char *buffer = (char *) calloc(maxphraselen, 1);
