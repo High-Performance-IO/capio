@@ -1,7 +1,7 @@
 #ifndef CAPIO_SERVER_HANDLERS_DUP_HPP
 #define CAPIO_SERVER_HANDLERS_DUP_HPP
 
-#include "utils/metadata.hpp"
+#include "capio/metadata.hpp"
 
 void dup_handler(const char *const str) {
     int tid, old_fd, new_fd;

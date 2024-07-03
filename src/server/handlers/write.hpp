@@ -1,8 +1,8 @@
 #ifndef CAPIO_SERVER_HANDLERS_WRITE_HPP
 #define CAPIO_SERVER_HANDLERS_WRITE_HPP
 
+#include "capio/metadata.hpp"
 #include "utils/location.hpp"
-#include "utils/metadata.hpp"
 
 void write_handler(const char *const str) {
     std::string request;

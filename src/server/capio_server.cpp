@@ -22,19 +22,19 @@
 
 std::string workflow_name;
 
-#include "utils/types.hpp"
+#include "capio/types.hpp"
 
 // tid -> (client_to_server_data_buf, server_to_client_data_buf)
 CSDataBufferMap_t data_buffers;
 
+#include "capio/capio_file.hpp"
 #include "capio/env.hpp"
+#include "capio/json.hpp"
 #include "capio/logger.hpp"
+#include "capio/metadata.hpp"
 #include "capio/semaphore.hpp"
-#include "utils/capio_file.hpp"
 #include "utils/common.hpp"
 #include "utils/env.hpp"
-#include "utils/json.hpp"
-#include "utils/metadata.hpp"
 #include "utils/requests.hpp"
 
 using namespace simdjson;

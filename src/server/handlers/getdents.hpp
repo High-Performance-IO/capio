@@ -6,8 +6,8 @@
 #include "remote/backend.hpp"
 #include "remote/requests.hpp"
 
+#include "capio/metadata.hpp"
 #include "utils/location.hpp"
-#include "utils/metadata.hpp"
 #include "utils/producer.hpp"
 
 inline void request_remote_getdents(int tid, int fd, off64_t count) {

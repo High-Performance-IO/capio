@@ -4,7 +4,7 @@
 #include <charconv>
 
 #include "capio/requests.hpp"
-#include "types.hpp"
+#include "capio/types.hpp"
 
 CSBufRequest_t *buf_requests;
 CSBufResponse_t *bufs_response;

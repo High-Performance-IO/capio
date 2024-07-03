@@ -8,11 +8,11 @@
 
 #include "capio/dirent.hpp"
 
-#include "capio_file.hpp"
+#include "capio/capio_file.hpp"
+#include "capio/metadata.hpp"
+#include "capio/types.hpp"
 #include "common.hpp"
 #include "location.hpp"
-#include "metadata.hpp"
-#include "types.hpp"
 
 /*
  * type == 0 -> regular entry

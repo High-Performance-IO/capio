@@ -3,12 +3,24 @@
 
 #include <singleheader/simdjson.h>
 
-#include "utils/metadata.hpp"
-#include "utils/types.hpp"
+#include "metadata.hpp"
+#include "types.hpp"
 
-void parse_conf_file(const std::string &conf_file, const std::filesystem::path &capio_dir) {
-    START_LOG(gettid(), "call(config_file='%s', capio_dir='%s')", conf_file.c_str(),
-              capio_dir.c_str());
+inline bool is_int(const std::string &s) {
+    START_LOG(gettid(), "call(%s)", s.c_str());
+    bool res = false;
+    if (!s.empty()) {
+        char *p;
+        strtol(s.c_str(), &p, 10);
+        res = *p == 0;
+    }
+    return res;
+}
+
+void parse_conf_file(const std::string &conf_file, const std::filesystem::path &capio_dir,
+                     bool check_only = false) {
+        START_LOG(gettid(), "call(config_file='%s', capio_dir='%s')", conf_file.c_str(),
+                  capio_dir.c_str());
 
     simdjson::ondemand::parser parser;
     simdjson::padded_string json;

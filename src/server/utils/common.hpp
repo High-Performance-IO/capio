@@ -6,10 +6,10 @@
 #include "capio/constants.hpp"
 #include "capio/dirent.hpp"
 
-#include "capio_file.hpp"
-#include "metadata.hpp"
+#include "capio/capio_file.hpp"
+#include "capio/metadata.hpp"
+#include "capio/types.hpp"
 #include "requests.hpp"
-#include "types.hpp"
 
 void send_data_to_client(int tid, int fd, char *buf, off64_t offset, off64_t count) {
     START_LOG(gettid(), "call(tid=%d, fd=%d, buf=0x%08x, offset=%ld, count=%ld)", tid, fd, buf,
@@ -55,17 +55,6 @@ inline off64_t send_dirent_to_client(int tid, int fd, CapioFile &c_file, off64_t
     }
 
     return actual_size;
-}
-
-inline bool is_int(const std::string &s) {
-    START_LOG(gettid(), "call(%s)", s.c_str());
-    bool res = false;
-    if (!s.empty()) {
-        char *p;
-        strtol(s.c_str(), &p, 10);
-        res = *p == 0;
-    }
-    return res;
 }
 
 inline int find_batch_size(const std::string &glob, CSMetadataConfGlobs_t &metadata_conf_globs) {

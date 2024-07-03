@@ -3,7 +3,7 @@
 
 #include <string>
 
-#include "metadata.hpp"
+#include "capio/metadata.hpp"
 
 std::string get_producer_name(const std::filesystem::path &path) {
     START_LOG(gettid(), "call( %s)", path.c_str());

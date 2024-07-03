@@ -74,6 +74,7 @@ ENDIF (CAPIO_LOG)
 #####################################
 add_subdirectory(src/posix)
 add_subdirectory(src/server)
+add_subdirectory(src/tools/capio-validate)
 
 IF (CAPIO_BUILD_TESTS)
     message(STATUS "Building CAPIO test suite")
