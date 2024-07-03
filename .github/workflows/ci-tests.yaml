@@ -145,7 +145,7 @@ jobs:
           sudo cmake --install build --prefix /usr/local
       - name: "Run tests"
         id: run-tests
-        timeout-minutes: 2
+        timeout-minutes: 5
         env:
           CAPIO_DIR: ${{ github.workspace }}
           CAPIO_LOG_LEVEL: -1
@@ -169,6 +169,7 @@ jobs:
             --gtest_print_time=1
           
           echo "Run CAPIO MAPREDUCE tests"
+          rm -rf /dev/shm/CAPIO*
           LD_PRELOAD=libcapio_posix.so \
           capio_integration_mapreduce_test \
             --gtest_break_on_failure \

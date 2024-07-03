@@ -191,111 +191,65 @@ static char *getrandomphrase(char *buffer, size_t len) {
     return buffer;
 }
 
-int mergeFunction(int argc, char *argv[]) {
-    (void) fmtin;
-    (void) phrases;
+int mergeFunction(ssize_t nfiles, char *sourcedir, char *destdir) {
 
     struct timeval before, after;
+    struct stat statbuf;
+    char *dataptr  = NULL;
+    size_t datalen = 0, datacapacity = 0;
     gettimeofday(&before, NULL);
 
-    if (argc != 4) {
-        fprintf(stderr, "use: %s #files sourcedir destdir\n", argv[0]);
-        return -1;
-    }
-    ssize_t nfiles = strtol(argv[1], NULL, 10);
-    if (nfiles == 0 || nfiles < 0) {
-        fprintf(stderr, "Invalid #files (%ld)\n", nfiles);
-        return -1;
-    }
-    struct stat statbuf;
-    if (stat(argv[2], &statbuf) == -1) {
-        perror("stat");
-        fprintf(stderr, "Does the directory %s exit?\n", argv[2]);
-        return -1;
-    }
-    if (!S_ISDIR(statbuf.st_mode)) {
-        fprintf(stderr, "%s is not a directory!\n", argv[2]);
-        return -1;
-    }
-    if (stat(argv[3], &statbuf) == -1) {
-        perror("stat");
-        fprintf(stderr, "Does the directory %s exit?\n", argv[3]);
-        return -1;
-    }
-    if (!S_ISDIR(statbuf.st_mode)) {
-        fprintf(stderr, "%s is not a directory!\n", argv[3]);
-        return -1;
-    }
+    EXPECT_GT(nfiles, 0);
 
-    char *sourcedir     = argv[2];
-    char *destdir       = argv[3];
-    char *dataptr       = NULL;
-    size_t datalen      = 0;
-    size_t datacapacity = 0;
+    EXPECT_NE(stat(sourcedir, &statbuf), -1);
+    EXPECT_TRUE(S_ISDIR(statbuf.st_mode));
+
+    EXPECT_NE(stat(destdir, &statbuf), -1);
+    EXPECT_TRUE(S_ISDIR(statbuf.st_mode));
+
     char filepath[strlen(sourcedir) + maxfilename];
     for (int i = 0; i < nfiles; ++i) {
         sprintf(filepath, fmtout, sourcedir, i);
         FILE *fp = fopen(filepath, "r");
-        if (!fp) {
-            perror("fopen");
-            fprintf(stderr, "cannot open the file %s\n", filepath);
-            return -1;
-        }
+        EXPECT_TRUE(fp);
+
         char *ptr = readdata(fp, dataptr, &datalen, &datacapacity);
-        if (ptr == NULL) {
-            free(dataptr);
-            return -1;
-        }
+        EXPECT_NE(ptr, nullptr);
+
         dataptr = ptr;
         fclose(fp);
     }
-    int error = 0;
+
     char resultpath[strlen(destdir) + strlen("/result.dat")];
     sprintf(resultpath, "%s/result.dat", destdir);
     FILE *fp = fopen(resultpath, "w");
-    if (!fp) {
-        perror("fopen");
-        fprintf(stderr, "cannot creat %s\n", resultpath);
-        error = -1;
-    } else {
-        if (fwrite(dataptr, 1, datalen, fp) != datalen) {
-            perror("fwrite");
-            error = -1;
-        }
-    }
+    EXPECT_TRUE(fp);
+
+    EXPECT_EQ(fwrite(dataptr, 1, datalen, fp), datalen);
+
     free(dataptr);
 
     gettimeofday(&after, NULL);
     double elapsed_time = diffmsec(after, before);
     fprintf(stdout, "MERGE: elapsed time (ms) : %g\n", elapsed_time);
 
-    return error;
+    return 0;
 }
 
-int splitFunction(int argc, char *argv[]) {
+int splitFunction(ssize_t nlines, ssize_t nfiles, char *dirname) {
     struct timeval before, after;
     gettimeofday(&before, NULL);
-
-    (void) fmtout;
-    if (argc != 4) {
-        fprintf(stderr, "use: %s #lines #files destdir\n", argv[0]);
-        return -1;
-    }
-    ssize_t nlines = strtol(argv[1], NULL, 10);
     EXPECT_GT(nlines, 0);
-
-    ssize_t nfiles = strtol(argv[2], NULL, 10);
     EXPECT_GT(nfiles, 0);
 
     // sanity check
     EXPECT_LE(nfiles, maxnumfiles);
 
     struct stat statbuf;
-    EXPECT_NE(stat(argv[3], &statbuf), -1);
+    EXPECT_NE(stat(dirname, &statbuf), -1);
     EXPECT_TRUE(S_ISDIR(statbuf.st_mode)); // not a directory
 
-    char *dirname = argv[3];
-    FILE **fp     = (FILE **) calloc(sizeof(FILE *), nfiles);
+    FILE **fp = (FILE **) calloc(sizeof(FILE *), nfiles);
     EXPECT_TRUE(fp);
 
     char **buffer = (char **) calloc(IO_BUFFER, nfiles);
@@ -309,7 +263,7 @@ int splitFunction(int argc, char *argv[]) {
         fp[i] = fopen(filepath, "w");
 
         EXPECT_TRUE(fp[i]);
-        EXPECT_NE(setvbuf(fp[i], buffer[i], _IOFBF, IO_BUFFER), 0);
+        EXPECT_EQ(setvbuf(fp[i], buffer[i], _IOFBF, IO_BUFFER), 0);
     }
     if (!error) {
         char *buffer = (char *) calloc(maxphraselen, 1);
@@ -347,82 +301,37 @@ int splitFunction(int argc, char *argv[]) {
     return error;
 }
 
-int mapReduceFunction(int argc, char *argv[]) {
-    (void) phrases;
-
+int mapReduceFunction(char *sourcedirname, ssize_t sstart, ssize_t sfiles, char *destdirname,
+                      ssize_t dstart, ssize_t dfiles, float percent) {
     struct timeval before, after;
-    gettimeofday(&before, NULL);
-
-    if (argc != 8) {
-        fprintf(stderr, "use: %s sourcedir #sstart #sfiles destdir #dstart #dfiles percent\n",
-                argv[0]);
-        return -1;
-    }
     struct stat statbuf;
-    if (stat(argv[1], &statbuf) == -1) {
-        perror("stat source");
-        fprintf(stderr, "Does the directory %s exit?\n", argv[1]);
-        return -1;
-    }
-    if (!S_ISDIR(statbuf.st_mode)) {
-        fprintf(stderr, "%s is not a directory!\n", argv[1]);
-        return -1;
-    }
-    char *sourcedirname = argv[1];
-    ssize_t sstart      = strtol(argv[2], NULL, 10);
-    if (sstart < 0) {
-        fprintf(stderr, "Invalid #sstart (%ld)\n", sstart);
-        return -1;
-    }
-    ssize_t sfiles = strtol(argv[3], NULL, 10);
-    if (sfiles == 0 || sfiles < 0) {
-        fprintf(stderr, "Invalid #sfiles (%ld)\n", sfiles);
-        return -1;
-    }
-    if (stat(argv[4], &statbuf) == -1) {
-        perror("stat destination");
-        fprintf(stderr, "Does the directory %s exit?\n", argv[4]);
-        return -1;
-    }
-    if (!S_ISDIR(statbuf.st_mode)) {
-        fprintf(stderr, "%s is not a directory!\n", argv[4]);
-        return -1;
-    }
-    char *destdirname = argv[4];
-    ssize_t dstart    = strtol(argv[5], NULL, 10);
-    if (dstart < 0) {
-        fprintf(stderr, "Invalid #dstart (%ld)\n", dstart);
-        return -1;
-    }
-    ssize_t dfiles = strtol(argv[6], NULL, 10);
-    if (dfiles == 0 || dfiles < 0) {
-        fprintf(stderr, "Invalid #dfiles (%ld)\n", dfiles);
-        return -1;
-    }
-    float percent = strtof(argv[7], NULL);
-    if (percent > 1 || percent <= 0) {
-        fprintf(stderr, "Invalid percent (%f)\n", percent);
-        return -1;
-    }
-
     char *dataptr       = NULL;
     size_t datalen      = 0;
     size_t datacapacity = 0;
+    gettimeofday(&before, NULL);
+
+    EXPECT_NE(stat(sourcedirname, &statbuf), -1);
+    EXPECT_TRUE(S_ISDIR(statbuf.st_mode));
+    EXPECT_GE(sstart, 0);
+    EXPECT_GT(sfiles, 0);
+    EXPECT_NE(stat(destdirname, &statbuf), -1);
+    EXPECT_TRUE(S_ISDIR(statbuf.st_mode));
+    EXPECT_GE(dstart, 0);
+    EXPECT_GT(dfiles, 0);
+    EXPECT_GT(percent, 0);
+    EXPECT_LE(percent, 1);
+
     char filepath[strlen(sourcedirname) + maxfilename];
     // concatenating all files in memory (dataptr)
     for (int i = 0 + sstart; i < (sfiles + sstart); ++i) {
         sprintf(filepath, fmtin, sourcedirname, i);
+
         FILE *fp = fopen(filepath, "r");
-        if (!fp) {
-            perror("fopen");
-            fprintf(stderr, "cannot open the file %s\n", filepath);
-            return -1;
-        }
+        EXPECT_TRUE(fp);
+
         char *ptr = readdata(fp, dataptr, &datalen, &datacapacity);
-        if (ptr == NULL) {
-            free(dataptr);
-            return -1;
-        }
+        EXPECT_NE(ptr, nullptr);
+
         dataptr = ptr;
         fclose(fp);
     }
@@ -440,24 +349,15 @@ int mapReduceFunction(int argc, char *argv[]) {
 }
 
 TEST(integrationTests, RunTestSplitMergeAndMapReduceFunction) {
-    char **splitArgsVect = (char **) malloc(4 * sizeof(uintptr_t));
-    splitArgsVect[0]     = strdup("split");
-    splitArgsVect[1]     = strdup("10"); // lines
-    splitArgsVect[2]     = strdup("10"); // 2 mapreducers * 5 files (ex total map files)
-    splitArgsVect[3]     = strdup(std::getenv("CAPIO_DIR"));
 
-    char **mapReducer1ArgsVect = (char **) malloc(8 * sizeof(uintptr_t));
-    splitArgsVect[0]           = strdup("mapreduce");
-    splitArgsVect[1]           = strdup(std::getenv("CAPIO_DIR")); // datadir
-    splitArgsVect[2]           = strdup("0");                      // next
-    splitArgsVect[3]           = strdup("5");                      // files
-    splitArgsVect[4]           = strdup(std::getenv("CAPIO_DIR")); // resultdir
-    splitArgsVect[5]           = strdup("0");                      // next
-    splitArgsVect[6]           = strdup("5");                      // files
-    splitArgsVect[7]           = strdup("0.3");                    // percent
-
-    EXPECT_EQ(splitFunction(4, splitArgsVect), 0);
-    std::thread mapReducer1(mapReduceFunction, 8, mapReducer1ArgsVect);
+    EXPECT_EQ(splitFunction(10, 10, std::getenv("CAPIO_DIR")), 0);
+    std::thread mapReducer1(mapReduceFunction, std::getenv("CAPIO_DIR"), 0, 5,
+                            std::getenv("CAPIO_DIR"), 0, 5, 0.3);
+    std::thread mapReducer2(mapReduceFunction, std::getenv("CAPIO_DIR"), 1, 5,
+                            std::getenv("CAPIO_DIR"), 1, 5, 0.3);
 
     mapReducer1.join();
+    mapReducer2.join();
+
+    EXPECT_EQ(mergeFunction(2, std::getenv("CAPIO_DIR"), std::getenv("CAPIO_DIR")), 0);
 }
