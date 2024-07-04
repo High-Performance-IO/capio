@@ -38,19 +38,23 @@ int main(int argc, char **argv) {
     }
 
     if (config) {
-        std::string token = args::get(config);
+        std::string token                      = args::get(config);
         const std::filesystem::path &capio_dir = std::filesystem::current_path();
         std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_INFO << "parsing config file: " << token
                   << std::endl;
         try {
             parse_conf_file(token, capio_dir);
-            std::cout << std::endl << std::endl << CAPIO_LOG_SERVER_CLI_LEVEL_INFO
-                      << "JSON file  \033[0;32mis a valid \033[0m CAPIO-CL configuration" << std::endl
+            std::cout << std::endl
+                      << std::endl
+                      << CAPIO_LOG_SERVER_CLI_LEVEL_INFO
+                      << "JSON file  \033[0;32mis a valid \033[0m CAPIO-CL configuration"
+                      << std::endl
                       << std::flush;
 
         } catch (std::exception &ex) {
             std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_ERROR
-                      << "ERROR: JSON file \033[0;31mis NOT\033[0m a valid CAPIO-CL configuration" << std::endl;
+                      << "ERROR: JSON file \033[0;31mis NOT\033[0m a valid CAPIO-CL configuration"
+                      << std::endl;
 
             std::cout << std::endl << std::endl << "JSON error is:" << ex.what() << std::endl;
         }
@@ -59,7 +63,6 @@ int main(int argc, char **argv) {
                   << std::endl;
         exit(EXIT_FAILURE);
     }
-
 
     return 0;
 }
