@@ -24,7 +24,7 @@ void parse_conf_file(const std::string &conf_file, const std::filesystem::path &
     simdjson::ondemand::parser parser;
     simdjson::padded_string json;
     simdjson::ondemand::document entries;
-    simdjson::ondemand::array input_stream, output_stream, streaming, permanent_files;
+    simdjson::ondemand::array output_stream, streaming, permanent_files;
     simdjson::error_code error;
 
     try {
@@ -37,24 +37,27 @@ void parse_conf_file(const std::string &conf_file, const std::filesystem::path &
     }
 
     entries = parser.iterate(json);
-    std::string_view wf_name;
-    error = entries["name"].get_string().get(wf_name);
-    if (error) {
-        std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_ERROR << "Error:" << error_message(error)
+    auto wf_name = entries["name"];
+
+    if (wf_name.error()) {
+        std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_ERROR << "Error:" << error_message(wf_name.error())
                   << std::endl;
         ERR_EXIT("Error: workflow name is mandatory");
     }
-    workflow_name = std::string(wf_name);
+    workflow_name = std::string(wf_name.get_string().value());
     std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_INFO
               << "Parsing configuration for workflow: " << workflow_name << std::endl;
     LOG("Parsing configuration for workflow: %s", std::string(workflow_name).c_str());
 
     auto io_graph = entries["IO_Graph"];
+    if (io_graph.error()) {
+        std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_ERROR << "Error: missing \033[0;31m IO_STREAM \033[0m section!"
+                  << std::endl;
+    }
+    for (auto app: io_graph) {
+        auto app_name = app["name"];
 
-    for (auto app : io_graph) {
-        std::string_view app_name;
-        error = app["name"].get_string().get(app_name);
-        if (error) {
+        if (app_name.error()) {
             std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_ERROR << "Error:" << error_message(error)
                       << std::endl;
             ERR_EXIT("Error: app name is mandatory");
@@ -62,72 +65,80 @@ void parse_conf_file(const std::string &conf_file, const std::filesystem::path &
 
         std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_INFO << "Parsing config for app " << app_name
                   << std::endl;
-        LOG("Parsing config for app %s", std::string(app_name).c_str());
+        LOG("Parsing config for app %s", std::string(app_name.get_string().value()).c_str());
 
-        if (app["input_stream"].get_array().get(input_stream)) {
+        auto input_stream = app["input_stream"];
+        if (input_stream.error()) {
             std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_WARNING
                       << "No input_stream section found for app " << app_name << std::endl;
-            LOG("No input_stream section found for app %s", std::string(app_name).c_str());
+            LOG("No input_stream section found for app %s", std::string(app_name.get_string().value()).c_str());
         } else {
             // TODO: parse input_stream
             std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_INFO
                       << "Completed input_stream parsing for app: " << app_name << std::endl;
-            LOG("Completed input_stream parsing for app: %s", std::string(app_name).c_str());
+            LOG("Completed input_stream parsing for app: %s", std::string(app_name.get_string().value()).c_str());
         }
 
-        if (app["output_stream"].get_array().get(output_stream)) {
+        auto output_stream = app["output_stream"];
+        if (output_stream.error()) {
             std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_WARNING
                       << "No output_stream section found for app " << app_name << std::endl;
-            LOG("No output_stream section found for app %s", std::string(app_name).c_str());
+            LOG("No output_stream section found for app %s", std::string(app_name.get_string().value()).c_str());
         } else {
             // TODO: parse output stream
             std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_INFO
                       << "Completed output_stream parsing for app: " << app_name << std::endl;
-            LOG("Completed output_stream parsing for app: %s", std::string(app_name).c_str());
+            LOG("Completed output_stream parsing for app: %s", std::string(app_name.get_string().value()).c_str());
         }
 
         // PARSING STREAMING FILES
-        if (app["streaming"].get_array().get(streaming)) {
+        auto streaming = app["streaming"];
+        if (streaming.error()) {
             std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_WARNING
                       << "No streaming section found for app: " << app_name << std::endl;
-            LOG("No streaming section found for app: %s", std::string(app_name).c_str());
+            LOG("No streaming section found for app: %s", std::string(app_name.get_string().value()).c_str());
         } else {
-            LOG("Began parsing streaming section for app %s", std::string(app_name).c_str());
-            for (auto file : streaming) {
-                std::string_view committed, mode, commit_rule;
+            LOG("Began parsing streaming section for app %s", std::string(app_name.get_string().value()).c_str());
+            for (auto file: streaming) {
+                std::string_view commit_rule;
                 std::vector<std::filesystem::path> streaming_names;
                 long int n_close = -1;
                 long n_files, batch_size;
 
+                //gathering name section
                 simdjson::ondemand::array name = file["name"].get_array();
                 if (name.is_empty()) {
-                    std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_ERROR
-                              << "error: name for application is mandatory" << std::endl;
-                    ERR_EXIT("error: name for application is mandatory");
+                    name = file["dirname"].get_array();
+                    if (name.is_empty()) {
+                        std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_ERROR
+                                  << "error: name / dirname for application is mandatory" << std::endl;
+                        ERR_EXIT("error: name for application is mandatory");
+                    }
                 }
-                for (auto item : name) {
+                for (auto item: name) {
                     std::string_view elem = item.get_string().value();
                     streaming_names.emplace_back(elem);
                     LOG("Found name: %s", std::string(elem).c_str());
                 }
 
                 // PARSING COMMITTED
-                error = file["committed"].get_string().get(committed);
-                if (error) {
+                auto committed = file["committed"];
+                if (committed.error()) {
                     std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_ERROR
                               << "commit rule is mandatory in streaming section" << std::endl;
                     ERR_EXIT("error commit rule is mandatory in streaming section");
                 } else {
-                    auto pos = committed.find(':');
+                    auto committed_string = committed.get_string().value();
+                    auto pos = committed_string.find(':');
                     if (pos != std::string::npos) {
-                        commit_rule = committed.substr(0, pos);
+                        commit_rule = committed_string.substr(0, pos);
                         if (commit_rule != CAPIO_FILE_COMMITTED_ON_CLOSE) {
                             std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_ERROR << "commit rule "
                                       << commit_rule << std::endl;
                             ERR_EXIT("error commit rule: %s", std::string(commit_rule).c_str());
                         }
 
-                        std::string n_close_str(committed.substr(pos + 1, committed.length()));
+                        std::string n_close_str(committed_string.substr(pos + 1, committed_string.length()));
 
                         if (!is_int(n_close_str)) {
                             std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_ERROR
@@ -139,27 +150,37 @@ void parse_conf_file(const std::string &conf_file, const std::filesystem::path &
                         commit_rule = committed;
                     }
                 }
-                LOG("Committed: %s", std::string(committed).c_str());
+                LOG("Committed: %s", std::string(committed.get_string().value()).c_str());
+
                 // END PARSING COMMITTED
 
-                error = file["mode"].get_string().get(mode);
-                if (error) {
-                    mode = CAPIO_FILE_MODE_UPDATE;
+                auto mode = file["mode"];
+                std::string mode_str;
+                if (mode.error()) {
+                    mode_str = CAPIO_FILE_MODE_UPDATE;
+                } else {
+                    mode_str = mode.get_string().value();
                 }
-                LOG("Mode: %s", std::string(mode).c_str());
+                LOG("Mode: %s", std::string(mode.get_string().value()).c_str());
 
-                error = file["n_files"].get_int64().get(n_files);
-                if (error) {
+                auto n_files_simdjson = file["n_files"];
+                if (n_files_simdjson.error()) {
                     n_files = -1;
+                } else {
+                    n_files = n_files_simdjson.get_int64().value();
                 }
                 LOG("n_files: %d", n_files);
 
-                error = file["batch_size"].get_int64().get(batch_size);
-                if (error) {
+                auto batch_size_json = file["batch_size"];
+                if (batch_size_json.error()) {
                     batch_size = 0;
+                } else {
+                    batch_size = batch_size_json.get_int64().value();
                 }
                 LOG("batch_size: %d", batch_size);
-                for (auto path : streaming_names) {
+
+
+                for (auto path: streaming_names) {
                     std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_INFO
                               << "Updating metadata for path:  " << path << std::endl;
                     if (path.is_relative()) {
@@ -169,7 +190,8 @@ void parse_conf_file(const std::string &conf_file, const std::filesystem::path &
 
                     std::size_t pos = path.native().find('*');
                     update_metadata_conf(path, pos, n_files, batch_size, std::string(commit_rule),
-                                         std::string(mode), std::string(app_name), false, n_close);
+                                         std::string(mode.get_string().value()),
+                                         std::string(app_name.get_string().value()), false, n_close);
                 }
             }
 
@@ -177,25 +199,29 @@ void parse_conf_file(const std::string &conf_file, const std::filesystem::path &
                       << "completed parsing of streaming section for app: " << app_name
                       << std::endl;
             LOG("completed parsing of streaming section for app: %s",
-                std::string(app_name).c_str());
+                std::string(app_name.get_string().value()).c_str());
         } // END PARSING STREAMING FILES
 
     } // END OF APP MAIN LOOPS
     LOG("Completed parsing of io_graph app main loops");
 
     long int batch_size = 0;
-    if (entries["permanent"].get_array().get(permanent_files)) { // PARSING PERMANENT FILES
+
+    auto permanent_files_json = entries["permanent"];
+    if (permanent_files_json.error()) { // PARSING PERMANENT FILES
         std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_WARNING
                   << "No permanent section found for workflow: " << workflow_name << std::endl;
         LOG("No permanent section found for workflow: %s", std::string(workflow_name).c_str());
     } else {
-        for (auto file : permanent_files) {
-            std::string_view name;
-            error = file.get_string().get(name);
-            if (error) {
+        for (auto file: permanent_files_json) {
+            std::string name;
+            auto name_json = file.get_string();
+            if (name_json.error()) {
                 std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_ERROR
                           << "Error: name for permanent section mandatory" << std::endl;
                 ERR_EXIT("error name for permanent section is mandatory");
+            } else {
+                name = name_json.value();
             }
             LOG("Permanent name: %s", std::string(name).c_str());
 
@@ -219,12 +245,12 @@ void parse_conf_file(const std::string &conf_file, const std::filesystem::path &
                 }
             } else {
                 std::string prefix_str = path.native().substr(0, pos);
-                long int i             = match_globs(prefix_str);
+                long int i = match_globs(prefix_str);
                 if (i == -1) {
                     update_metadata_conf(path, pos, -1, batch_size,
                                          CAPIO_FILE_COMMITTED_ON_TERMINATION, "", "", true, -1);
                 } else {
-                    auto &tuple        = metadata_conf_globs[i];
+                    auto &tuple = metadata_conf_globs[i];
                     std::get<6>(tuple) = true;
                 }
             }
@@ -237,11 +263,13 @@ void parse_conf_file(const std::string &conf_file, const std::filesystem::path &
     std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_INFO << "Completed parsing of io_graph" << std::endl;
     LOG("Completed parsing of io_graph");
 
-    auto home_node_policies = entries["home_node_policy"].error();
-    if (!home_node_policies) {
+    auto home_node_policies = entries["home_node_policy"];
+    if (home_node_policies.error()) {
+        std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_WARNING << "No home node policy found" << std::endl;
+    } else {
         std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_WARNING
-                  << "Warning: capio does not support home node policies yet! skipping section "
-                  << std::endl;
+                  << "Warning: capio does not support home node policies yet!" << std::endl;
+
     }
 }
 
