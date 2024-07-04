@@ -93,6 +93,7 @@ COPY --from=builder                                         \
     "/usr/local/bin/capio_server"                           \
     "/usr/local/bin/capio_server_unit_test[s]"              \
     "/usr/local/bin/capio_syscall_unit_test[s]"             \
+    "/usr/local/bin/capio_integration_test[s]"              \
     /usr/local/bin/
 
 # Pkgconfig

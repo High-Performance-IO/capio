@@ -70,6 +70,18 @@ jobs:
             capio_server_unit_tests               \
               --gtest_break_on_failure            \
               --gtest_print_time=1
+          
+          echo "Run CAPIO integration tests"
+            docker run --rm                     \
+            --env CAPIO_DIR=/tmp                \
+            --env CAPIO_LOG_LEVEL=-1            \
+            --env LD_PRELOAD=libcapio_posix.so  \
+            --name capio-docker                 \
+            hpio/capio:latest                   \
+            capio_integration_tests             \
+            --gtest_break_on_failure            \
+            --gtest_print_time=1
+
   format-check:
     name: "Check ${{ matrix.path }} clang-format conformance"
     runs-on: ubuntu-22.04
@@ -145,7 +157,7 @@ jobs:
           sudo cmake --install build --prefix /usr/local
       - name: "Run tests"
         id: run-tests
-        timeout-minutes: 2
+        timeout-minutes: 5
         env:
           CAPIO_DIR: ${{ github.workspace }}
           CAPIO_LOG_LEVEL: -1
@@ -167,6 +179,15 @@ jobs:
           capio_syscall_unit_tests \
             --gtest_break_on_failure \
             --gtest_print_time=1
+          
+          echo "Run CAPIO integration tests"
+          rm -rf /dev/shm/CAPIO*
+          LD_PRELOAD=libcapio_posix.so \
+          capio_integration_tests \
+            --gtest_break_on_failure \
+            --gtest_print_time=1
+
+
       - name: "Show client logs on failure"
         if: ${{ always() && steps.run-tests.outcome == 'failure' && matrix.build_type == 'Debug' }}
         run: tail -v -n +1 capio_logs/posix/$(hostname)/posix_thread_*.log
