@@ -126,8 +126,7 @@ jobs:
             libopenmpi-dev \
             ninja-build \
             openmpi-bin \
-            pkg-config \
-            gcovr
+            pkg-config
       - name: "Get compiler version"
         run: |
           IFS='-' read -r -a COMPILER <<< "${{ matrix.cxx }}"
@@ -203,10 +202,11 @@ jobs:
       - name: "Generate coverage report"
         if: ${{ matrix.build_type == 'Debug' }}
         run: |
+          pip install --upgrade gcovr
           gcovr \
             --exclude-throw-branches \
             --xml coverage.xml \
-            --gcov-executable ${{ startsWith(matrix.cxx, 'clang-') && 'llvm-cov' || 'gcov' }}-${{ env.CXX_VERSION }} \
+            --gcov-executable "${{ startsWith(matrix.cxx, 'clang-') && format('llvm-cov-{0} gcov', env.CXX_VERSION) || format('gcov-{0}', env.CXX_VERSION) }}" \
             ../build
       - name: "Upload coverage report"
         if: ${{ matrix.build_type == 'Debug' }}
