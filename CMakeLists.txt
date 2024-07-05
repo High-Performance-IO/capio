@@ -20,7 +20,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED TRUE)
 set(CMAKE_EXPORT_COMPILE_COMMANDS TRUE)
 
 # Set compiler flags
-set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -g -Wall -pedantic -O0")
+set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -Wall -pedantic -O0")
 set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -O3")
 
 #####################################
@@ -28,7 +28,7 @@ set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -O3")
 #####################################
 option(CAPIO_BUILD_TESTS "Build CAPIO test suite" FALSE)
 option(CAPIO_LOG "Enable capio debug logging" FALSE)
-option(CODE_COVERAGE "Enable code coverage collection" FALSE)
+option(ENABLE_COVERAGE "Enable code coverage collection" FALSE)
 
 #####################################
 # CMake module imports
@@ -43,34 +43,22 @@ find_package(MPI REQUIRED)
 find_package(Threads REQUIRED)
 
 #####################################
-# Code coverage
-#####################################
-IF (CODE_COVERAGE)
-    add_compile_options(--coverage -fprofile-abs-path -O0)
-    add_link_options(-lgcov --coverage)
-ENDIF (CODE_COVERAGE)
-
-#####################################
 # Definitions
 #####################################
 add_compile_definitions(CAPIO_VERSION="${CMAKE_PROJECT_VERSION}")
 
 IF (CAPIO_LOG)
-    if (CMAKE_BUILD_TYPE STREQUAL "Debug")
+    IF (CMAKE_BUILD_TYPE STREQUAL "Debug")
         message(STATUS "Enabling CAPIO logger")
-        add_compile_definitions(CAPIOLOG)
+        add_compile_definitions(CAPIO_LOG)
         execute_process(
                 COMMAND bash "${PROJECT_SOURCE_DIR}/scripts/gen_syscallnames.sh"
                 "${PROJECT_BINARY_DIR}/include/syscall/syscallnames.h"
         )
-    else ()
+    ELSE (CMAKE_BUILD_TYPE STREQUAL "Debug")
         message(WARNING "Capio logger enabled in release mode. skipping compilation of CAPIO logger")
-    endif ()
+    ENDIF (CMAKE_BUILD_TYPE STREQUAL "Debug")
 ENDIF (CAPIO_LOG)
-
-IF (CAPIO_SYNC)
-    add_compile_definitions(CAPIOSYNC)
-ENDIF (CAPIO_SYNC)
 
 #####################################
 # Include files and directories

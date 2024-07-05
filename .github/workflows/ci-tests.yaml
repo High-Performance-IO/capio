@@ -116,6 +116,7 @@ jobs:
           - clang-15
           - clang-16
           - clang-17
+          - clang-18
     steps:
       - uses: actions/checkout@v4
       - name: "Install packages"
@@ -125,7 +126,8 @@ jobs:
             libopenmpi-dev \
             ninja-build \
             openmpi-bin \
-            pkg-config
+            pkg-config \
+            gcovr
       - name: "Get compiler version"
         run: |
           IFS='-' read -r -a COMPILER <<< "${{ matrix.cxx }}"
@@ -137,6 +139,11 @@ jobs:
           chmod u+x /tmp/llvm.sh
           sudo /tmp/llvm.sh ${{ env.CXX_VERSION }}
           rm -f /tmp/llvm.sh
+      - name: "Fix missing libclang_rt.profile for Clang 14"
+        if: ${{ matrix.cxx == 'clang-14' }}
+        run: |
+          sudo apt download libclang-rt-14-dev
+          sudo dpkg --force-all -i libclang-rt-14-dev*
       - name: "Install GCC"
         if: ${{ startsWith(matrix.cxx, 'g++-') }}
         run: |
@@ -149,12 +156,13 @@ jobs:
         run: |
           cmake -DCMAKE_BUILD_TYPE=${{ matrix.build_type }} \
                 -DCAPIO_LOG=${{ matrix.build_type == 'Debug' && 'ON' || 'OFF' }} \
+                -DENABLE_COVERAGE=${{ matrix.build_type == 'Debug' && 'ON' || 'OFF' }} \
                 -DCAPIO_BUILD_TESTS=ON \
                 -G Ninja \
-                -B build \
+                -B ../build \
                 -S ${GITHUB_WORKSPACE}
-          cmake --build build -j $(nproc)
-          sudo cmake --install build --prefix /usr/local
+          cmake --build ../build -j $(nproc)
+          sudo cmake --install ../build --prefix /usr/local
       - name: "Run tests"
         id: run-tests
         timeout-minutes: 5
@@ -186,11 +194,38 @@ jobs:
           capio_integration_tests \
             --gtest_break_on_failure \
             --gtest_print_time=1
-
-
       - name: "Show client logs on failure"
         if: ${{ always() && steps.run-tests.outcome == 'failure' && matrix.build_type == 'Debug' }}
         run: tail -v -n +1 capio_logs/posix/$(hostname)/posix_thread_*.log
       - name: "Show server logs on failure"
         if: ${{ always() && steps.run-tests.outcome == 'failure' && matrix.build_type == 'Debug' }}
         run: tail -v -n +1 capio_logs/server/$(hostname)/server_thread_*.log
+      - name: "Generate coverage report"
+        if: ${{ matrix.build_type == 'Debug' }}
+        run: |
+          gcovr \
+            --exclude-throw-branches \
+            --xml coverage.xml \
+            --gcov-executable ${{ startsWith(matrix.cxx, 'clang-') && 'llvm-cov' || 'gcov' }}-${{ env.CXX_VERSION }} \
+            ../build
+      - name: "Upload coverage report"
+        if: ${{ matrix.build_type == 'Debug' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ format('{0}-tests', matrix.cxx) }}
+          path: ./coverage.xml
+          retention-days: 1
+          if-no-files-found: error
+  upload-to-codecov:
+    name: "Codecov report upload"
+    needs: [ "unit-tests" ]
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: "Download artifacts"
+        uses: actions/download-artifact@v4
+      - name: "Upload coverage to Codecov"
+        uses: codecov/codecov-action@v4
+        with:
+          fail_ci_if_error: true
+          token: ${{ secrets.CODECOV_TOKEN }}

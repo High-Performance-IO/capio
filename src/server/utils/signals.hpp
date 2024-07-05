@@ -5,6 +5,10 @@
 
 #include "remote/backend.hpp"
 
+#ifdef CAPIO_COVERAGE
+extern "C" void __gcov_dump(void);
+#endif
+
 void sig_term_handler(int signum, siginfo_t *info, void *ptr) {
     START_LOG(gettid(), "call(signal=[%d] (%s) from process with pid=%ld)", signum,
               strsignal(signum), info != nullptr ? info->si_pid : -1);
@@ -35,6 +39,10 @@ void sig_term_handler(int signum, siginfo_t *info, void *ptr) {
 
     std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_WARNING << "data_buffers cleanup completed"
               << std::endl;
+
+#ifdef CAPIO_COVERAGE
+    __gcov_dump();
+#endif
 
     destroy_server();
 

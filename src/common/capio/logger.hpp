@@ -16,7 +16,7 @@
 
 bool continue_on_error = false; // change behaviour of ERR_EXIT to continue if set to true
 
-#if defined(CAPIOLOG) && defined(__CAPIO_POSIX)
+#if defined(CAPIO_LOG) && defined(__CAPIO_POSIX)
 #include "syscallnames.h"
 #endif
 
@@ -200,7 +200,7 @@ class Logger {
         va_start(argp, message);
         va_copy(argpc, argp);
 
-#if defined(CAPIOLOG) && defined(__CAPIO_POSIX)
+#if defined(CAPIO_LOG) && defined(__CAPIO_POSIX)
         if (current_log_level == 0 && logging_syscall) {
             int syscallNumber = va_arg(argp, int);
             auto buf1         = reinterpret_cast<char *>(capio_syscall(
@@ -277,7 +277,7 @@ class Logger {
     }
 };
 
-#ifdef CAPIOLOG
+#ifdef CAPIO_LOG
 #define ERR_EXIT(message, ...)                                                                     \
     log.log(message, ##__VA_ARGS__);                                                               \
     if (!continue_on_error) {                                                                      \
