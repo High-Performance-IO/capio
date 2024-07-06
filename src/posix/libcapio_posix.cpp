@@ -182,6 +182,9 @@ static constexpr std::array<CPHandler_t, CAPIO_NR_SYSCALLS> build_syscall_table(
 #ifdef SYS_chmod
     _syscallTable[SYS_chmod] = fchmod_handler;
 #endif
+#ifdef SYS_fchmod
+    _syscallTable[SYS_fchmod] = fchmod_handler;
+#endif
 #ifdef SYS_chown
     _syscallTable[SYS_chown] = fchown_handler;
 #endif
