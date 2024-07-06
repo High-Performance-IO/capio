@@ -139,6 +139,10 @@ class MPIBackend : public Backend {
             MPI_Get_count(&status, MPI_BYTE, &bytes_received);
             LOG("Chunk size is %ld bytes", bytes_received);
         }
+
+        this->notify_backend(Backend::backendActions::writeFile,
+                             (std::filesystem::path &) file_path, shm, offset, bytes_expected,
+                             false);
     }
 };
 

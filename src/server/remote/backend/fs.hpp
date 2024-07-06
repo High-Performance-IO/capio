@@ -17,7 +17,7 @@ class FSBackend : public Backend {
     // structure to store file descriptors of opend files
     std::unordered_map<std::string, int> open_files_descriptors;
 
-    // FD to file on which recive requests
+    // FD to file on which receive requests
     int selfCommLinkFile = -1;
 
     inline void create_capio_fs() {
@@ -158,7 +158,7 @@ class FSBackend : public Backend {
                 LOG("Warning: readline returned -1 with error code: %s", strerror(errno));
             }
         }
-        LOG("Recived <%s> on communication link.", message);
+        LOG("Received <%s> on communication link.", message);
 
         const char *src = strtok(message, "@");
         const char *msg = strtok(nullptr, "@");
@@ -201,9 +201,9 @@ class FSBackend : public Backend {
         // open target node file
         if ((targetNodeFile = open((root_dir / comm_pipe / target).c_str(), O_RDWR | O_APPEND)) <
             0) {
-            ERR_EXIT("Unable to open pipe: errno is %s", strerror(errno));
+            ERR_EXIT("Unable to open comm channel: errno is %s", strerror(errno));
         }
-        LOG("Successfully opend pipe %s", (root_dir / comm_pipe / target).c_str());
+        LOG("Successfully opened comm channel %s", (root_dir / comm_pipe / target).c_str());
         // send data
 
         if (write(targetNodeFile, line.c_str(), line.length()) == -1) {
@@ -218,9 +218,8 @@ class FSBackend : public Backend {
     };
 
     /**
-     * TODO: Warning: as of now, the FnU is implemented only that subsequent
-     * file write can be supported. Random writes in different sections of files,
-     * as formally defined by FnU policy are not yet supported
+     *  There is not the need to implement this as writes are already on the CAPIO_DIR and available
+     * to all nodes
      */
     inline void send_file(char *buffer, long int nbytes, long int offset, const std::string &target,
                           const std::filesystem::path &file_path) override {
@@ -229,9 +228,8 @@ class FSBackend : public Backend {
     };
 
     /**
-     * TODO: Warning: as of now, the FnU is implemented only that subsequent
-     * file write can be supported. Random writes in different sections of files,
-     * as formally defined by FnU policy are not yet supported
+     * There is the need to implement this as some times the reads operations are carried out trough
+     * the read from node
      */
     inline void recv_file(char *shm, const std::string &source, long int bytes_expected,
                           long int offset, const std::filesystem::path &file_path) override {
