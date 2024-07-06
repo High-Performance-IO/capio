@@ -59,6 +59,29 @@ TEST(SystemCallTest, TestThreadCloneProducerConsumer) {
     EXPECT_NE(unlink(PATHNAME), -1);
 }
 
+TEST(SystemCallTest, TestForkProducerConsumer) {
+    constexpr const char *PATHNAME = "test_file.txt";
+    int flags                      = O_CREAT | O_RDWR | O_TRUNC;
+    int fd                         = open(PATHNAME, flags, S_IRUSR | S_IWUSR);
+    EXPECT_NE(fd, -1);
+    pid_t tid = fork();
+
+    if (tid == 0) {
+        // child
+        write_file(fd);
+    } else {
+        EXPECT_EQ(lseek(fd, 0, SEEK_SET), 0);
+        int num;
+        for (int i = 0; i < ARRAY_SIZE; i++) {
+            EXPECT_EQ(read(fd, &num, sizeof(int)), sizeof(int));
+            EXPECT_EQ(num, i);
+        }
+        EXPECT_EQ(read(fd, &num, sizeof(int)), 0);
+        EXPECT_NE(close(fd), -1);
+        EXPECT_NE(unlink(PATHNAME), -1);
+    }
+}
+
 TEST(SystemCallTest, TestThreadCloneProducerConsumerWithStat) {
     constexpr const char *PATHNAME = "test_file.txt";
     sem                            = static_cast<sem_t *>(malloc(sizeof(sem_t)));
