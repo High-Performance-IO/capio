@@ -70,6 +70,7 @@ TEST(SystemCallTest, TestForkProducerConsumer) {
         // child
         write_file(fd);
     } else {
+        sleep(5); // only for safety to wait for function to finish
         EXPECT_EQ(lseek(fd, 0, SEEK_SET), 0);
         int num;
         for (int i = 0; i < ARRAY_SIZE; i++) {
