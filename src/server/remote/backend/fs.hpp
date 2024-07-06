@@ -295,8 +295,8 @@ class FSBackend : public Backend {
                 }
                 fseek(f, offset, SEEK_CUR);
                 auto read_return = fread(buffer, sizeof(char), buffer_size, f);
-                if (!read_return) {
-                    ERR_EXIT("Error while fred. errno is %s", strerror(errno));
+                if (read_return != buffer_size) {
+                    ERR_EXIT("Error while fread. errno is %s", strerror(errno));
                 }
             }
             break;
