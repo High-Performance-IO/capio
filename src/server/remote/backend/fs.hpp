@@ -12,8 +12,7 @@ class FSBackend : public Backend {
     std::set<std::string> nodes; // store nodes seen from files locations
 
     // TODO: use parameters to change this
-    std::filesystem::path root_dir = "capio_fs", storage_dir = "storage",
-                          handshake_dir = "handshake", comm_pipe = "comms";
+    std::filesystem::path root_dir = "capio_fs", handshake_dir = "handshake", comm_pipe = "comms";
 
     // structure to store file descriptors of opend files
     std::unordered_map<std::string, int> open_files_descriptors;
@@ -21,10 +20,8 @@ class FSBackend : public Backend {
     // FD to file on which recive requests
     int selfCommLinkFile = -1;
 
-    inline void create_capio_fs(const std::string &name) {
+    inline void create_capio_fs() {
         std::filesystem::create_directories(root_dir);
-        std::filesystem::create_directories(root_dir / storage_dir);
-        std::filesystem::create_directories(root_dir / storage_dir / name);
         std::filesystem::create_directories(root_dir / handshake_dir);
         std::filesystem::create_directories(root_dir / comm_pipe);
     }
@@ -75,38 +72,6 @@ class FSBackend : public Backend {
         return true;
     }
 
-    inline auto generate_capio_path(std::string path, Backend::backendActions action) {
-        // TODO: use snprintf for efficiency (and better code)
-        START_LOG(gettid(), "call(path=%s)", path.c_str());
-
-        std::string home_node;
-
-        if (path == get_capio_dir() || action == Backend::backendActions::createFile) {
-            home_node = node_name;
-        } else {
-            auto loc = get_file_location_opt(path);
-            LOG("Searching for file with path=%s, on node %s", path.c_str(), loc->get().first);
-            home_node = loc->get().first;
-        }
-        if (path.rfind('/', 0) == 0) {
-            path.erase(0, 1);
-        }
-
-        auto root_path = (root_dir / storage_dir / home_node);
-        if (path.rfind(root_path, 0) == 0) {
-            LOG("Path starts already from storage root dir");
-            return path;
-        }
-
-        auto path_len = root_path.native().size() + 1 + path.length() + 1; //\n final
-        char _path[path_len];
-        snprintf(_path, path_len, "%s/%s", root_path.native().c_str(), path.c_str());
-
-        std::string computed_path(_path);
-        LOG("Computed path is: %s", computed_path.c_str());
-        return computed_path;
-    }
-
   public:
     FSBackend(int argc, char **argv) {
         START_LOG(gettid(), "call(argc=%d)", argc);
@@ -115,7 +80,7 @@ class FSBackend : public Backend {
 
         std::cout << CAPIO_SERVER_CLI_LOG_SERVER << "Hostname is " << node_name << std::endl;
 
-        this->create_capio_fs(node_name);
+        this->create_capio_fs();
 
         std::cout << CAPIO_SERVER_CLI_LOG_SERVER << "Created capio_fs" << std::endl;
 
@@ -261,12 +226,6 @@ class FSBackend : public Backend {
                           const std::filesystem::path &file_path) override {
         START_LOG(gettid(), "call(buffer=%ld, nbytes=%ld, target=%s, file_path=%s)", buffer, nbytes,
                   target.c_str(), file_path.c_str());
-        std::ofstream file;
-        file.seekp(offset);
-        file.open(root_dir / storage_dir / std::string(node_name) / file_path.string(),
-                  std::ios_base::ate);
-        file.write(buffer, nbytes);
-        file.close();
     };
 
     /**
@@ -279,20 +238,17 @@ class FSBackend : public Backend {
         START_LOG(gettid(), "call(source=%s, bytes_expected=%ld, file_path=%s)", source.c_str(),
                   bytes_expected, file_path.c_str());
         std::ifstream file;
-        file.open(root_dir / storage_dir / std::string(node_name) / file_path.string(),
-                  std::ios_base::in);
+        file.open(file_path.string(), std::ios_base::in);
         file.seekg(offset);
         file.read(shm, bytes_expected);
         file.close();
     };
 
-    inline void notify_backend(enum backendActions actions, std::filesystem::path &file_path,
+    inline void notify_backend(enum backendActions actions, std::filesystem::path &path,
                                char *buffer, size_t offset, size_t buffer_size,
                                bool is_dir) override {
         START_LOG(gettid(), "call(action=%d, path=%s, offset=%ld, buffer_size=%ld, is_dir=%s)",
-                  actions, file_path.c_str(), offset, buffer_size, is_dir ? "true" : "false");
-
-        std::filesystem::path path = generate_capio_path(file_path, actions);
+                  actions, path.c_str(), offset, buffer_size, is_dir ? "true" : "false");
 
         switch (actions) {
         case createFile: {
@@ -352,18 +308,17 @@ class FSBackend : public Backend {
                 return;
             }
             int file_descriptor = -1;
-            if (open_files_descriptors.find(path) != open_files_descriptors.end()){
+            if (open_files_descriptors.find(path) != open_files_descriptors.end()) {
                 LOG("File is local.");
                 file_descriptor = open_files_descriptors.at(path);
-            }else{
+            } else {
                 LOG("File has been found on remote node. opening file and inserting it into map");
                 file_descriptor = open(path.c_str(), O_RDWR, 0640);
-                if(file_descriptor == -1){
+                if (file_descriptor == -1) {
                     ERR_EXIT("Unable to open file. error is %s", strerror(errno));
                 }
                 open_files_descriptors.insert(std::make_pair(path, file_descriptor));
             }
-
 
             FILE *f = fdopen(file_descriptor, "w");
             fseek(f, offset, SEEK_SET);
