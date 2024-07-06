@@ -228,8 +228,8 @@ class FSBackend : public Backend {
     };
 
     /**
-     * There is the need to implement this as some times the reads operations are carried out trough
-     * the read from node
+     * There is the need to implement this as some times the reads operations are carried out
+     * through the read from node
      */
     inline void recv_file(char *shm, const std::string &source, long int bytes_expected,
                           long int offset, const std::filesystem::path &file_path) override {
