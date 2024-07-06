@@ -218,7 +218,7 @@ jobs:
           if-no-files-found: error
   upload-to-codecov:
     name: "Codecov report upload"
-    needs: [ "unit-tests" ]
+    needs: [ "unit-tests" , "codespell-check" , "format-check" ]
     runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v4
