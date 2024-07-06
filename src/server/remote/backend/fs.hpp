@@ -235,6 +235,8 @@ class FSBackend : public Backend {
                           long int offset, const std::filesystem::path &file_path) override {
         START_LOG(gettid(), "call(source=%s, bytes_expected=%ld, file_path=%s)", source.c_str(),
                   bytes_expected, file_path.c_str());
+
+        // WARNING: this part might not be required, but for now it is just commented out
         /* std::ifstream file;
          file.open(file_path.string(), std::ios_base::in);
          file.seekg(offset);

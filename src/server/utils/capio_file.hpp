@@ -507,6 +507,10 @@ class CapioFile {
         backend->notify_backend(Backend::backendActions::writeFile, _file_name, _buf, offset,
                                 num_bytes, this->_directory);
         _data_avail_cv.notify_all();
+
+        if(!this->_store_in_memory){
+            free(_buf);
+        }
     }
 
     inline void unlink() { _n_links--; }
