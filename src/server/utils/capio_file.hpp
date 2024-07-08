@@ -114,6 +114,8 @@ class CapioFile {
 
     std::size_t real_file_size = 0;
 
+    std::size_t actual_file_buffer_size_fs = CAPIO_DEFAULT_FILE_INITIAL_SIZE;
+
     CapioFile(std::filesystem::path name)
         : _buf_size(0), _committed(CAPIO_FILE_COMMITTED_ON_TERMINATION), _directory(false),
           _permanent(false), _store_in_memory(true), _file_name(std::move(name)) {
@@ -304,10 +306,14 @@ class CapioFile {
         if (_store_in_memory) {
             return _buf;
         } else {
-            char *buffer = static_cast<char *>(malloc(size));
-            backend->notify_backend(Backend::backendActions::readFile, _file_name, buffer, offset,
+            if(size > actual_file_buffer_size_fs) {
+                actual_file_buffer_size_fs = size;
+                delete[] _buf;
+                _buf = new char[size];
+            }
+            backend->notify_backend(Backend::backendActions::readFile, _file_name, _buf, offset,
                                     size, this->_directory);
-            return buffer;
+            return _buf;
         }
     }
 
