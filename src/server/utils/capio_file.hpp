@@ -306,7 +306,7 @@ class CapioFile {
         if (_store_in_memory) {
             return _buf;
         } else {
-            if(size > actual_file_buffer_size_fs) {
+            if (size > actual_file_buffer_size_fs) {
                 actual_file_buffer_size_fs = size;
                 delete[] _buf;
                 _buf = new char[size];
