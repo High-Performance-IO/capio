@@ -276,7 +276,7 @@ class CapioFile {
     }
 
     inline void create_buffer_if_needed(bool home_node) {
-        START_LOG(gettid(), "call(home_node=%d)", home_node ? "true" : "false");
+        START_LOG(gettid(), "call(home_node=%s)", home_node ? "true" : "false");
         if (buf_to_allocate()) {
             LOG("Buffer needs to be allocated");
             create_buffer(home_node);
