@@ -235,13 +235,6 @@ class FSBackend : public Backend {
                           long int offset, const std::filesystem::path &file_path) override {
         START_LOG(gettid(), "call(source=%s, bytes_expected=%ld, file_path=%s)", source.c_str(),
                   bytes_expected, file_path.c_str());
-
-        // WARNING: this part might not be required, but for now it is just commented out
-        /* std::ifstream file;
-         file.open(file_path.string(), std::ios_base::in);
-         file.seekg(offset);
-         file.read(shm, bytes_expected);
-         file.close();*/
     };
 
     inline size_t notify_backend(enum backendActions actions, std::filesystem::path &path,
@@ -281,25 +274,13 @@ class FSBackend : public Backend {
                 return totalSize;
 
             } else {
-                FILE *f = fdopen(open_files_descriptors.at(path), "r");
+                auto f = open_files_descriptors.at(path);
 
-                // compute file size
-                fseek(f, 0L, SEEK_END);
-                long int actual_size = ftell(f);
-                LOG("File actual size is %ld", actual_size);
-                buffer_size = buffer_size > actual_size ? actual_size : buffer_size;
-                rewind(f);
-                LOG("Will read %ld bytes from file", buffer_size);
-
-                if (f == nullptr) {
-                    ERR_EXIT("Error opening file. error is: %s", strerror(errno));
-                }
-                fseek(f, offset, SEEK_CUR);
-                auto read_return = fread(buffer, sizeof(char), buffer_size, f);
+                lseek(f, offset, SEEK_SET);
+                auto read_return = read(f, buffer, buffer_size);
                 LOG("Read %ld of %ld bytes from file", read_return, buffer_size);
                 return read_return;
             }
-            break;
         }
         case writeFile: {
             LOG("Writing buffer content to FS");
@@ -307,24 +288,9 @@ class FSBackend : public Backend {
                 LOG("File is directory. skipping as FS is being used");
                 break;
             }
-            int file_descriptor = -1;
-            if (open_files_descriptors.find(path) != open_files_descriptors.end()) {
-                LOG("File is local.");
-                file_descriptor = open_files_descriptors.at(path);
-            } else {
-                LOG("File has been found on remote node. opening file and inserting it into map");
-                file_descriptor = open(path.c_str(), O_RDWR, 0640);
-                if (file_descriptor == -1) {
-                    ERR_EXIT("Unable to open file. error is %s", strerror(errno));
-                }
-                open_files_descriptors.insert(std::make_pair(path, file_descriptor));
-            }
-
-            FILE *f = fdopen(file_descriptor, "w");
-            fseek(f, offset, SEEK_SET);
-            auto write_return = fwrite(buffer, sizeof(char), buffer_size, f);
-            fflush(f);
-            return write_return;
+            int file_descriptor = open_files_descriptors.at(path);
+            lseek(file_descriptor, offset, SEEK_SET);
+            return write(file_descriptor, buffer, buffer_size);
         }
 
         case closeFile: {
@@ -334,7 +300,7 @@ class FSBackend : public Backend {
 
         case seekFile: {
             *reinterpret_cast<off64_t *>(buffer) =
-                fseek(fdopen(open_files_descriptors.at(path), "r"), offset, SEEK_SET);
+                lseek(open_files_descriptors.at(path), offset, SEEK_SET);
             break;
         }
 
