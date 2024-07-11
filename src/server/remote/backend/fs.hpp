@@ -244,9 +244,9 @@ class FSBackend : public Backend {
          file.close();*/
     };
 
-    inline void notify_backend(enum backendActions actions, std::filesystem::path &path,
-                               char *buffer, size_t offset, size_t buffer_size,
-                               bool is_dir) override {
+    inline size_t notify_backend(enum backendActions actions, std::filesystem::path &path,
+                                 char *buffer, size_t offset, size_t buffer_size,
+                                 bool is_dir) override {
         START_LOG(gettid(), "call(action=%d, path=%s, offset=%ld, buffer_size=%ld, is_dir=%s)",
                   actions, path.c_str(), offset, buffer_size, is_dir ? "true" : "false");
 
@@ -278,6 +278,7 @@ class FSBackend : public Backend {
                     memcpy(buffer + totalSize, directory, sizeof(dirent));
                     totalSize += sizeof(dirent);
                 }
+                return totalSize;
 
             } else {
                 FILE *f = fdopen(open_files_descriptors.at(path), "r");
@@ -296,6 +297,7 @@ class FSBackend : public Backend {
                 fseek(f, offset, SEEK_CUR);
                 auto read_return = fread(buffer, sizeof(char), buffer_size, f);
                 LOG("Read %ld of %ld bytes from file", read_return, buffer_size);
+                return read_return;
             }
             break;
         }
@@ -303,7 +305,7 @@ class FSBackend : public Backend {
             LOG("Writing buffer content to FS");
             if (is_dir) {
                 LOG("File is directory. skipping as FS is being used");
-                return;
+                break;
             }
             int file_descriptor = -1;
             if (open_files_descriptors.find(path) != open_files_descriptors.end()) {
@@ -320,9 +322,9 @@ class FSBackend : public Backend {
 
             FILE *f = fdopen(file_descriptor, "w");
             fseek(f, offset, SEEK_SET);
-            fwrite(buffer, sizeof(char), buffer_size, f);
+            auto write_return = fwrite(buffer, sizeof(char), buffer_size, f);
             fflush(f);
-            break;
+            return write_return;
         }
 
         case closeFile: {
@@ -344,9 +346,18 @@ class FSBackend : public Backend {
             unlink(path.c_str());
         }
 
+        case fileSize: {
+            try {
+                return std::filesystem::file_size(path);
+            } catch (std::exception &e) {
+                return 0;
+            }
+        }
+
         default:
             LOG("Error: action not understood!");
         }
+        return 0;
     };
 
     inline bool store_file_in_memory() override { return false; };

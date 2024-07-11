@@ -76,7 +76,7 @@ inline void handle_read_reply(int tid, int fd, long count, off64_t file_size, of
     const std::filesystem::path &path = get_capio_file_path(tid, fd);
     CapioFile &c_file                 = get_capio_file(path);
     off64_t offset                    = get_capio_file_offset(tid, fd);
-    c_file.real_file_size             = file_size;
+    c_file.set_file_size(file_size);
     c_file.insert_sector(offset, offset + nbytes);
     c_file.set_complete(complete);
 
@@ -193,8 +193,8 @@ handle_remote_read_batch_reply(const std::string &source, int tid, int fd, off64
             add_file_location(path, source.c_str(), -1);
             CapioFile &c_file = create_capio_file(path, false, nbytes);
             c_file.insert_sector(0, nbytes);
-            c_file.real_file_size = nbytes;
-            c_file.first_write    = false;
+            c_file.set_file_size(nbytes);
+            c_file.first_write = false;
             c_file.set_complete();
         }
         // as was done previously, write to the capio file buffer from its beginning

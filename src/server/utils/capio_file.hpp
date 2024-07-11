@@ -102,6 +102,8 @@ class CapioFile {
         }
     }
 
+    std::size_t real_file_size = 0;
+
   public:
     bool first_write          = true;
     long int n_files          = 0;  // useful for directories
@@ -112,9 +114,27 @@ class CapioFile {
      * could need to known the size of the file but not its content
      */
 
-    std::size_t real_file_size = 0;
-
     std::size_t actual_file_buffer_size_fs = CAPIO_DEFAULT_FILE_INITIAL_SIZE;
+
+    ssize_t get_file_size() {
+        if (_store_in_memory) {
+            return real_file_size;
+        }
+        try {
+            if (std::filesystem::exists(this->_file_name)) {
+                return backend->notify_backend(Backend::fileSize, this->_file_name, nullptr, 0, 0,
+                                               this->is_dir());
+            }
+        } catch (std::exception &e) {
+            return 0;
+        }
+    }
+
+    inline void set_file_size(off64_t size) {
+        if (_store_in_memory) {
+            real_file_size = size;
+        }
+    };
 
     CapioFile(std::filesystem::path name)
         : _buf_size(0), _committed(CAPIO_FILE_COMMITTED_ON_TERMINATION), _directory(false),

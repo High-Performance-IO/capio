@@ -21,7 +21,7 @@ inline void request_remote_getdents(int tid, int fd, off64_t count) {
 
     if (c_file.is_complete() &&
         (end_of_read <= end_of_sector ||
-         (end_of_sector == -1 ? 0 : end_of_sector) == c_file.real_file_size)) {
+         (end_of_sector == -1 ? 0 : end_of_sector) == c_file.get_file_size())) {
         LOG("Handling local read");
         send_dirent_to_client(tid, fd, c_file, offset, count);
     } else if (end_of_read <= end_of_sector) {
