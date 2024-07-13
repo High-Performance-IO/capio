@@ -4,7 +4,7 @@ Even if CAPIO has been primarily designed for bare metal, high-performance execu
 
 ### Start the execution environment
 
-A `docker-compose.yml` file is provided in the current folder. By default, it starts `2` container instances of the CAPIO standard image, called `hpio/capio:latest`. Note that both images mount a `./server` directory from the host in the `/home/capio/server` folder on the container file system. Due to the way CAPIO servers communicate, the `/home/capio/server` folder must be shared between all CAPIO instances. To start the environment, use the following command
+A `docker-compose.yml` file is provided in the current folder. By default, it starts `2` container instances of the CAPIO standard image, called `alphaunito/capio:latest`. Note that both images mount a `./server` directory from the host in the `/home/capio/server` folder on the container file system. Due to the way CAPIO servers communicate, the `/home/capio/server` folder must be shared between all CAPIO instances. To start the environment, use the following command
 
 ```bash
 docker compose -p example up -d 
@@ -20,8 +20,8 @@ which should print something like this
 
 ```
 NAME              IMAGE               COMMAND               SERVICE   CREATED         STATUS         PORTS
-example-capio-1   hpio/capio:latest   "/usr/sbin/sshd -D"   capio     5 seconds ago   Up 5 seconds   22/tcp
-example-capio-2   hpio/capio:latest   "/usr/sbin/sshd -D"   capio     5 seconds ago   Up 5 seconds   22/tcp
+example-capio-1   alphaunito/capio:latest   "/usr/sbin/sshd -D"   capio     5 seconds ago   Up 5 seconds   22/tcp
+example-capio-2   alphaunito/capio:latest   "/usr/sbin/sshd -D"   capio     5 seconds ago   Up 5 seconds   22/tcp
 ```
 
 ### Start the CAPIO server
