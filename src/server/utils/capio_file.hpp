@@ -58,6 +58,7 @@ class CapioFile {
     bool _store_in_memory = true;
 
     std::filesystem::path _file_name;
+    std::filesystem::path _metadata_file_name;
 
     /*sync variables*/
     mutable std::mutex _mutex;
@@ -104,6 +105,24 @@ class CapioFile {
 
     std::size_t real_file_size = 0;
 
+    /**
+     * Following fuctions used to store and retrive metadata of a given capio file
+     */
+
+    void write_metadata_to_fs() {
+        auto f = std::fopen(_metadata_file_name.c_str(), "w");
+        std::fprintf(f, "%d %ld %d %d", _n_links, _n_close, _n_opens, _complete ? 1 : 0);
+        std::fclose(f);
+    }
+
+    std::tuple<int, long, int, bool> read_metadata_from_fs() {
+        long size, close;
+        int links, opens, complete;
+        auto f = fopen(_metadata_file_name.c_str(), "r");
+        std::fscanf(f, "%d %ld %d %d", &links, &close, &opens, &complete);
+        return {links, close, opens, complete};
+    }
+
   public:
     bool first_write          = true;
     long int n_files          = 0;  // useful for directories
@@ -139,6 +158,7 @@ class CapioFile {
     CapioFile(std::filesystem::path name)
         : _buf_size(0), _committed(CAPIO_FILE_COMMITTED_ON_TERMINATION), _directory(false),
           _permanent(false), _store_in_memory(true), _file_name(std::move(name)) {
+        _metadata_file_name = _file_name.append(".capio");
         if (backend != nullptr) {
             backend->notify_backend(Backend::createFile, _file_name, nullptr, 0, 0, false);
         }
@@ -151,7 +171,8 @@ class CapioFile {
           _n_close_expected(n_close_expected), _permanent(permanent),
           n_files_expected(n_files_expected + 2), _store_in_memory(store_in_memory),
           _file_name(std::move(name)) {
-        _buf_size = _store_in_memory ? init_size : 0;
+        _metadata_file_name = _file_name.append(".capio");
+        _buf_size           = _store_in_memory ? init_size : 0;
         if (backend != nullptr) {
             backend->notify_backend(Backend::createFile, _file_name, nullptr, 0, 0, directory);
         }
@@ -162,7 +183,8 @@ class CapioFile {
         : _committed(CAPIO_FILE_COMMITTED_ON_TERMINATION), _directory(directory),
           _n_close_expected(n_close_expected), _permanent(permanent),
           _store_in_memory(store_in_memory), _file_name(std::move(name)) {
-        _buf_size = _store_in_memory ? init_size : 0;
+        _metadata_file_name = _file_name.append(".capio");
+        _buf_size           = _store_in_memory ? init_size : 0;
         if (backend != nullptr) {
             backend->notify_backend(Backend::createFile, _file_name, nullptr, 0, 0, directory);
         }
@@ -192,17 +214,29 @@ class CapioFile {
         }
     }
 
-    [[nodiscard]] inline bool is_complete() const {
+    [[nodiscard]] inline bool is_complete() {
         START_LOG(gettid(), "capio_file is complete? %s", this->_complete ? "true" : "false");
-        std::lock_guard<std::mutex> lg(_mutex);
-        return this->_complete;
+        if (_store_in_memory) {
+            std::lock_guard<std::mutex> lg(_mutex);
+            return this->_complete;
+        } else {
+            return std::get<3>(read_metadata_from_fs());
+        };
     }
 
-    inline void wait_for_completion() const {
+    inline void wait_for_completion() {
         START_LOG(gettid(), "call()");
-        LOG("Thread waiting for file to be committed");
-        std::unique_lock<std::mutex> lock(_mutex);
-        _complete_cv.wait(lock, [this] { return _complete; });
+        if (_store_in_memory) {
+            LOG("Thread waiting for file to be committed");
+            std::unique_lock<std::mutex> lock(_mutex);
+            _complete_cv.wait(lock, [this] { return _complete; });
+        } else {
+            timespec t{};
+            t.tv_nsec = 1000;
+            while (!is_complete()) {
+                nanosleep(&t, nullptr);
+            }
+        }
     }
 
     inline void wait_for_data(long offset) const {
@@ -224,6 +258,10 @@ class CapioFile {
                 _data_avail_cv.notify_all();
             }
         }
+
+        if (_store_in_memory) {
+            write_metadata_to_fs();
+        }
     }
 
     inline void add_fd(int tid, int fd) { _threads_fd.emplace_back(tid, fd); }
@@ -236,6 +274,10 @@ class CapioFile {
     inline void close() {
         _n_close++;
         _n_opens--;
+
+        if (_store_in_memory) {
+            write_metadata_to_fs();
+        }
     }
 
     void commit() {
@@ -249,6 +291,9 @@ class CapioFile {
             _buf_size = size;
             if (::close(_fd) == -1) {
                 ERR_EXIT("close commit capio_file");
+            }
+            if (_store_in_memory) {
+                write_metadata_to_fs();
             }
         }
     }
