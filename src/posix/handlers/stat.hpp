@@ -161,7 +161,7 @@ int lstat_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long ar
     auto *buf = reinterpret_cast<struct stat *>(arg1);
     long tid  = syscall_no_intercept(SYS_gettid);
 
-    return posix_return_value(capio_lstat(pathname, buf, tid), result);
+    return posix_return_value(capio_lstat_wrapper(pathname, buf, tid), result);
 }
 
 int stat_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg5, long *result) {
