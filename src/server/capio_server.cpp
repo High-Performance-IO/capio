@@ -173,7 +173,7 @@ int parseCLI(int argc, char **argv) {
     }
 
     if (continueOnErrorFlag) {
-#ifdef CAPIOLOG
+#ifdef CAPIO_LOG
         continue_on_error = true;
         std::cout << CAPIO_LOG_SERVER_CLI_CONT_ON_ERR_WARNING << std::endl;
 #else
@@ -185,7 +185,7 @@ int parseCLI(int argc, char **argv) {
     }
 
     if (logfile_folder) {
-#ifdef CAPIOLOG
+#ifdef CAPIO_LOG
         log_master_dir_name = args::get(logfile_folder);
 #else
         std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_WARNING
@@ -195,7 +195,7 @@ int parseCLI(int argc, char **argv) {
     }
 
     if (logfile_src) {
-#ifdef CAPIOLOG
+#ifdef CAPIO_LOG
         // log file was given
         std::string token = args::get(logfile_src);
         if (token.find(".log") != std::string::npos) {
@@ -209,7 +209,7 @@ int parseCLI(int argc, char **argv) {
                   << std::endl;
 #endif
     }
-#ifdef CAPIOLOG
+#ifdef CAPIO_LOG
     auto logname = open_server_logfile();
     log          = new Logger(__func__, __FILE__, __LINE__, gettid(), "Created new log file");
     std::cout << CAPIO_SERVER_CLI_LOG_SERVER << "started logging to logfile " << logname
@@ -234,7 +234,7 @@ int parseCLI(int argc, char **argv) {
         std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_ERROR
                   << "Error: no config file provided. To skip config file use --no-config option!"
                   << std::endl;
-#ifdef CAPIOLOG
+#ifdef CAPIO_LOG
         log->log("no config file provided, and  --no-config not provided");
 #endif
         exit(EXIT_FAILURE);
@@ -243,7 +243,7 @@ int parseCLI(int argc, char **argv) {
     std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_INFO << "CAPIO_DIR=" << get_capio_dir().c_str()
               << std::endl;
 
-#ifdef CAPIOLOG
+#ifdef CAPIO_LOG
     CAPIO_LOG_LEVEL = get_capio_log_level();
     std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_INFO << "LOG_LEVEL set to: " << CAPIO_LOG_LEVEL
               << std::endl;

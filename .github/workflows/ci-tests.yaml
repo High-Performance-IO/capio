@@ -37,7 +37,7 @@ jobs:
             CAPIO_LOG=${{ matrix.cmake-build-type == 'Debug' && 'ON' || 'OFF' }}
             CMAKE_BUILD_TYPE=${{ matrix.cmake-build-type }}
           load: true
-          tags: hpio/capio:latest
+          tags: alphaunito/capio:latest
       - name: "Run unit tests with Docker"
         run: |
           echo "Run CAPIO POSIX Unit tests"
@@ -45,7 +45,7 @@ jobs:
               --env CAPIO_DIR=/tmp                \
               --env CAPIO_LOG_LEVEL=-1            \
               --name capio-docker                 \
-              hpio/capio:latest                   \
+              alphaunito/capio:latest             \
             capio_posix_unit_tests                \
               --gtest_break_on_failure            \
               --gtest_print_time=1
@@ -55,7 +55,7 @@ jobs:
               --env CAPIO_DIR=/tmp                \
               --env CAPIO_LOG_LEVEL=-1            \
               --name capio-docker                 \
-              hpio/capio:latest                   \
+              alphaunito/capio:latest             \
             capio_server_unit_tests               \
               --gtest_break_on_failure            \
               --gtest_print_time=1
@@ -66,7 +66,7 @@ jobs:
               --env CAPIO_LOG_LEVEL=-1            \
               --env LD_PRELOAD=libcapio_posix.so  \
               --name capio-docker                 \
-              hpio/capio:latest                   \
+              alphaunito/capio:latest             \
             capio_server_unit_tests               \
               --gtest_break_on_failure            \
               --gtest_print_time=1
@@ -77,7 +77,7 @@ jobs:
             --env CAPIO_LOG_LEVEL=-1            \
             --env LD_PRELOAD=libcapio_posix.so  \
             --name capio-docker                 \
-            hpio/capio:latest                   \
+            alphaunito/capio:latest             \
             capio_integration_tests             \
             --gtest_break_on_failure            \
             --gtest_print_time=1
@@ -116,6 +116,7 @@ jobs:
           - clang-15
           - clang-16
           - clang-17
+          - clang-18
     steps:
       - uses: actions/checkout@v4
       - name: "Install packages"
@@ -137,6 +138,11 @@ jobs:
           chmod u+x /tmp/llvm.sh
           sudo /tmp/llvm.sh ${{ env.CXX_VERSION }}
           rm -f /tmp/llvm.sh
+      - name: "Fix missing libclang_rt.profile for Clang 14"
+        if: ${{ matrix.cxx == 'clang-14' }}
+        run: |
+          sudo apt download libclang-rt-14-dev
+          sudo dpkg --force-all -i libclang-rt-14-dev*
       - name: "Install GCC"
         if: ${{ startsWith(matrix.cxx, 'g++-') }}
         run: |
@@ -149,12 +155,13 @@ jobs:
         run: |
           cmake -DCMAKE_BUILD_TYPE=${{ matrix.build_type }} \
                 -DCAPIO_LOG=${{ matrix.build_type == 'Debug' && 'ON' || 'OFF' }} \
+                -DENABLE_COVERAGE=${{ matrix.build_type == 'Debug' && 'ON' || 'OFF' }} \
                 -DCAPIO_BUILD_TESTS=ON \
                 -G Ninja \
-                -B build \
+                -B ../build \
                 -S ${GITHUB_WORKSPACE}
-          cmake --build build -j $(nproc)
-          sudo cmake --install build --prefix /usr/local
+          cmake --build ../build -j $(nproc)
+          sudo cmake --install ../build --prefix /usr/local
       - name: "Run tests"
         id: run-tests
         timeout-minutes: 5
@@ -186,11 +193,39 @@ jobs:
           capio_integration_tests \
             --gtest_break_on_failure \
             --gtest_print_time=1
-
-
       - name: "Show client logs on failure"
         if: ${{ always() && steps.run-tests.outcome == 'failure' && matrix.build_type == 'Debug' }}
         run: tail -v -n +1 capio_logs/posix/$(hostname)/posix_thread_*.log
       - name: "Show server logs on failure"
         if: ${{ always() && steps.run-tests.outcome == 'failure' && matrix.build_type == 'Debug' }}
         run: tail -v -n +1 capio_logs/server/$(hostname)/server_thread_*.log
+      - name: "Generate coverage report"
+        if: ${{ matrix.build_type == 'Debug' }}
+        run: |
+          pip install --upgrade gcovr
+          gcovr \
+            --exclude-throw-branches \
+            --xml coverage.xml \
+            --gcov-executable "${{ startsWith(matrix.cxx, 'clang-') && format('llvm-cov-{0} gcov', env.CXX_VERSION) || format('gcov-{0}', env.CXX_VERSION) }}" \
+            ../build
+      - name: "Upload coverage report"
+        if: ${{ matrix.build_type == 'Debug' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ format('{0}-tests', matrix.cxx) }}
+          path: ./coverage.xml
+          retention-days: 1
+          if-no-files-found: error
+  upload-to-codecov:
+    name: "Codecov report upload"
+    needs: [ "unit-tests" , "codespell-check" , "format-check" ]
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: "Download artifacts"
+        uses: actions/download-artifact@v4
+      - name: "Upload coverage to Codecov"
+        uses: codecov/codecov-action@v4
+        with:
+          fail_ci_if_error: true
+          token: ${{ secrets.CODECOV_TOKEN }}

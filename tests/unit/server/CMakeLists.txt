@@ -25,7 +25,7 @@ target_include_directories(${TARGET_NAME} PRIVATE ${TARGET_INCLUDE_FOLDER})
 #####################################
 # Link libraries
 #####################################
-target_link_libraries(${TARGET_NAME} PRIVATE GTest::gtest_main)
+target_link_libraries(${TARGET_NAME} PRIVATE GTest::gtest_main rt)
 
 #####################################
 # Configure tests

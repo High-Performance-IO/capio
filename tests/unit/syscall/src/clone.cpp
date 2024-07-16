@@ -59,6 +59,14 @@ TEST(SystemCallTest, TestThreadCloneProducerConsumer) {
     EXPECT_NE(unlink(PATHNAME), -1);
 }
 
+TEST(SystemCallTest, TestForkParentChild) {
+    auto pid = fork();
+    EXPECT_GE(pid, 0);
+    if (pid == 0) {
+        exit(EXIT_SUCCESS);
+    }
+}
+
 TEST(SystemCallTest, TestThreadCloneProducerConsumerWithStat) {
     constexpr const char *PATHNAME = "test_file.txt";
     sem                            = static_cast<sem_t *>(malloc(sizeof(sem_t)));

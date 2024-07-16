@@ -51,8 +51,8 @@ RUN apt update                                                \
  && mkdir -p ~capio/.ssh                                      \
  && ssh-keygen -q                                             \
         -t ed25519                                            \
-        -C "capio@hpio"                                       \
-            -N ""                                             \
+        -C "capio@alphaunito"                                 \
+        -N ""                                                 \
         -f"/home/capio/.ssh/id_ed25519"                       \
  && cp ~capio/.ssh/id_ed25519.pub ~capio/.ssh/authorized_keys \
  && echo "StrictHostKeyChecking no" > ~capio/.ssh/config      \
@@ -74,8 +74,8 @@ COPY --from=builder                                         \
 # Libraries
 COPY --from=builder                                         \
     "/usr/local/lib/libcapio_posix.so"                      \
-    "/usr/local/lib/libcapio_posix.so.0"                    \
-    "/usr/local/lib/libcapio_posix.so.0.0.1"                \
+    "/usr/local/lib/libcapio_posix.so.1"                    \
+    "/usr/local/lib/libcapio_posix.so.1.0.0"                \
     "/usr/local/lib/libgmock.[a]"                           \
     "/usr/local/lib/libgmock_main.[a]"                      \
     "/usr/local/lib/libgtest.[a]"                           \

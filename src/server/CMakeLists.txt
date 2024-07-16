@@ -64,3 +64,19 @@ target_link_libraries(${TARGET_NAME} PRIVATE ${MPI_LIBRARIES} pthread rt stdc++f
 install(TARGETS ${TARGET_NAME}
         RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
 )
+
+#####################################
+# Code coverage
+#####################################
+IF (ENABLE_COVERAGE)
+    IF (CMAKE_BUILD_TYPE STREQUAL "Debug")
+        target_compile_definitions(${TARGET_NAME} PRIVATE CAPIO_COVERAGE)
+        target_compile_options(${TARGET_NAME} PRIVATE --coverage -fprofile-arcs -ftest-coverage)
+        target_link_options(${TARGET_NAME} PRIVATE --coverage -fprofile-arcs -ftest-coverage)
+        IF (CMAKE_C_COMPILER_ID MATCHES "GNU" OR CMAKE_CXX_COMPILER_ID MATCHES "GNU")
+            target_link_libraries(${TARGET_NAME} PRIVATE gcov)
+        ENDIF (CMAKE_C_COMPILER_ID MATCHES "GNU" OR CMAKE_CXX_COMPILER_ID MATCHES "GNU")
+    ELSE (CMAKE_BUILD_TYPE STREQUAL "Debug")
+        message(WARNING "Code coverage is disabled in release mode.")
+    ENDIF (CMAKE_BUILD_TYPE STREQUAL "Debug")
+ENDIF (ENABLE_COVERAGE)

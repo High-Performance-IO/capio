@@ -4,10 +4,12 @@
 set(TARGET_NAME capio_syscall_unit_tests)
 set(TARGET_SOURCES
         ${CMAKE_CURRENT_SOURCE_DIR}/src/clone.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/src/chdir.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/src/directory.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/src/dirent.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/src/dup.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/src/file.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/src/fcntl.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/src/main.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/src/rename.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/src/stat.cpp
