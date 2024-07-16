@@ -19,15 +19,12 @@ void write_handler(const char *const str) {
     off64_t file_shm_size             = c_file.get_buf_size();
     auto *data_buf                    = data_buffers[tid].first;
 
-    c_file.create_buffer(path, true);
-    if (end_of_write > file_shm_size) {
-        c_file.realloc(end_of_write);
-    }
+
     c_file.read_from_queue(*data_buf, offset, count);
 
     int pid            = pids[tid];
     writers[pid][path] = true;
-    c_file.insert_sector(offset, end_of_write);
+
     if (c_file.first_write) {
         c_file.first_write = false;
         write_file_location(path);
