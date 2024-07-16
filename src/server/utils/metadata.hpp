@@ -164,7 +164,8 @@ CapioFile &create_capio_file(const std::filesystem::path &path, bool is_dir, siz
             metadata_conf[path] =
                 std::make_tuple(committed, mode, app_name, n_files, permanent, n_close);
             LOG("Creating new capio_file. committed=%s, mode=%s", committed.c_str(), mode.c_str());
-            c_file = new CapioFile(path, committed, mode, is_dir, n_files, permanent, init_size, n_close);
+            c_file = new CapioFile(path, committed, mode, is_dir, n_files, permanent, init_size,
+                                   n_close);
             add_capio_file(path, c_file);
         }
     } else {
@@ -175,7 +176,8 @@ CapioFile &create_capio_file(const std::filesystem::path &path, bool is_dir, siz
             init_size = CAPIO_DEFAULT_DIR_INITIAL_SIZE;
         }
         LOG("Creating new capio_file. committed=%s, mode=%s", committed.c_str(), mode.c_str());
-        c_file = new CapioFile(path, committed, mode, is_dir, n_files, permanent, init_size, n_close);
+        c_file =
+            new CapioFile(path, committed, mode, is_dir, n_files, permanent, init_size, n_close);
         add_capio_file(path, c_file);
     }
     return *c_file;

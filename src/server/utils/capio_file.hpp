@@ -242,10 +242,6 @@ class CapioFile {
 
     inline char *get_buffer() { return _buf; }
 
-    inline void write(char *buffer, size_t buffer_length, off64_t offset) {
-        this->create_buffer(_file_name, _home_node);
-    }
-
     [[nodiscard]] inline const std::vector<std::pair<int, int>> &get_fds() const {
         return _threads_fd;
     }
@@ -446,6 +442,20 @@ class CapioFile {
 
         lock.unlock();
         insert_sector(offset, offset + num_bytes); // register the read
+    }
+
+    inline void write(char *buffer, size_t buffer_length, off64_t offset) {
+        START_LOG(gettid(), "call()");
+
+        this->create_buffer(_file_name, _home_node);
+        if (offset + buffer_length > _buf_size) {
+            this->realloc(offset + buffer_length);
+        }
+        std::unique_lock<std::mutex> lock(_mutex);
+        memcpy(_buf + offset, buffer, buffer_length);
+        lock.unlock();
+
+        insert_sector(offset, offset + buffer_length);
     }
 };
 

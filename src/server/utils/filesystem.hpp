@@ -26,7 +26,7 @@ void write_entry_dir(int tid, const std::filesystem::path &file_path,
               type);
 
     struct linux_dirent64 ld {};
-    ld.d_ino = std::hash<std::string>{}(file_path);
+
     std::filesystem::path file_name;
     if (type == 0) {
         file_name = file_path.filename();
@@ -39,29 +39,17 @@ void write_entry_dir(int tid, const std::filesystem::path &file_path,
 
     strcpy(ld.d_name, file_name.c_str());
     LOG("FILENAME LD: %s", ld.d_name);
-    ld.d_reclen = sizeof(linux_dirent64);
 
     CapioFile &c_file = get_capio_file(dir);
-    c_file.create_buffer(dir, true);
-    void *file_shm       = c_file.get_buffer();
-    off64_t file_size    = c_file.get_stored_size();
-    off64_t data_size    = file_size + ld.d_reclen;
-    size_t file_shm_size = c_file.get_buf_size();
-    ld.d_off             = data_size;
+    off64_t file_size = c_file.get_stored_size();
 
-    if (data_size > file_shm_size) {
-        file_shm = c_file.realloc(data_size);
-    }
+    ld.d_ino    = std::hash<std::string>{}(file_path);
+    ld.d_reclen = sizeof(linux_dirent64);
+    ld.d_off    = file_size + ld.d_reclen;
+    ld.d_type   = (c_file.is_dir() ? DT_DIR : DT_REG);
 
-    ld.d_type = (c_file.is_dir() ? DT_DIR : DT_REG);
+    c_file.write(reinterpret_cast<char *>(&ld), sizeof(ld), file_size);
 
-    memcpy((char *) file_shm + file_size, &ld, sizeof(ld));
-    off64_t base_offset = file_size;
-
-    LOG("STORED FILENAME LD: %s",
-        ((struct linux_dirent64 *) ((char *) file_shm + file_size))->d_name);
-
-    c_file.insert_sector(base_offset, data_size);
     ++c_file.n_files;
     int pid           = pids[tid];
     writers[pid][dir] = true;
