@@ -20,7 +20,7 @@ void wait_for_file_completion(int tid, const std::filesystem::path &path) {
     CapioFile &c_file = get_capio_file(path);
 
     // if file is streamable
-    if (c_file.is_complete() || c_file.get_mode() == CAPIO_FILE_MODE_NO_UPDATE ||
+    if (c_file.is_complete() || c_file.firing_rule() == CAPIO_FILE_MODE_NO_UPDATE ||
         strcmp(std::get<0>(get_file_location(path)), node_name) == 0) {
 
         write_response(tid, c_file.get_file_size());
@@ -67,14 +67,14 @@ inline void reply_stat(int tid, const std::filesystem::path &path) {
         file_location_opt = get_file_location_opt(path);
     }
     if (c_file.is_complete() || strcmp(std::get<0>(file_location_opt->get()), node_name) == 0 ||
-        c_file.get_mode() == CAPIO_FILE_MODE_NO_UPDATE || capio_dir == path) {
+        c_file.firing_rule() == CAPIO_FILE_MODE_NO_UPDATE || capio_dir == path) {
         LOG("Sending response to client");
         write_response(tid, c_file.get_file_size());
         write_response(tid, static_cast<int>(c_file.is_dir() ? 1 : 0));
     } else {
         LOG("Delegating backend to reply to remote stats");
         // send a request for file. then start a thread to wait for the request completion
-        c_file.create_buffer_if_needed(path, false);
+        c_file.create_buffer(path, false);
         handle_remote_stat_request(tid, path);
     }
 }

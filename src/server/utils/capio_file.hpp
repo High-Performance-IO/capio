@@ -75,6 +75,8 @@ class CapioFile {
 
     std::size_t real_file_size = 0;
 
+    enum seek_type { data, hole };
+
     CapioFile()
         : _buf_size(0), _committed(CAPIO_FILE_COMMITTED_ON_TERMINATION), _directory(false),
           _permanent(false) {}
@@ -147,10 +149,14 @@ class CapioFile {
 
     inline void add_fd(int tid, int fd) { _threads_fd.emplace_back(tid, fd); }
 
-    [[nodiscard]] inline bool buf_to_allocate() const {
-        std::lock_guard<std::mutex> lg(_mutex);
-        return _buf == nullptr;
+    inline void remove_fd(int tid, int fd) {
+        auto it = std::find(_threads_fd.begin(), _threads_fd.end(), std::make_pair(tid, fd));
+        if (it != _threads_fd.end()) {
+            _threads_fd.erase(it);
+        }
     }
+
+    inline void open() { _n_opens++; }
 
     inline void close() {
         _n_close++;
@@ -180,6 +186,11 @@ class CapioFile {
         START_LOG(gettid(), "call(path=%s, home_node=%s)", path.c_str(),
                   home_node ? "true" : "false");
         std::lock_guard<std::mutex> lock(_mutex);
+
+        if (_buf != nullptr) {
+            return;
+        }
+
         // TODO: will use malloc in order to be able to use realloc
         _home_node = home_node;
         if (_permanent && home_node) {
@@ -207,45 +218,34 @@ class CapioFile {
         }
     }
 
-    inline void create_buffer_if_needed(const std::filesystem::path &path, bool home_node) {
-        if (buf_to_allocate()) {
-            create_buffer(path, home_node);
-        }
-    }
+    char *realloc(off64_t data_size) {
+        START_LOG(gettid(), "call()");
 
-    void memcpy_capio_file(char *new_p, char *old_p) const {
-        for (auto &sector : _sectors) {
-            off64_t lbound        = sector.first;
-            off64_t ubound        = sector.second;
-            off64_t sector_length = ubound - lbound;
-            memcpy(new_p + lbound, old_p + lbound, sector_length);
-        }
-    }
-
-    char *expand_buffer(off64_t data_size) { // TODO: use realloc
         off64_t double_size = _buf_size * 2;
         off64_t new_size    = data_size > double_size ? data_size : double_size;
-        char *new_buf       = new char[new_size];
+
         std::lock_guard<std::mutex> lock(_mutex);
-        //	memcpy(new_p, old_p, file_shm_size); //TODO memcpy only the
-        // sector
-        // stored in CapioFile
-        memcpy_capio_file(new_buf, _buf);
-        delete[] _buf;
-        _buf      = new_buf;
+        _buf      = static_cast<char *>(std::realloc(_buf, new_size));
         _buf_size = new_size;
-        return new_buf;
+        return _buf;
     }
 
     inline char *get_buffer() { return _buf; }
 
-    [[nodiscard]] inline off64_t get_buf_size() const { return _buf_size; }
-
-    [[nodiscard]] inline const std::string_view &get_committed() const { return _committed; }
+    inline void unlink() { _n_links--; }
 
     [[nodiscard]] inline const std::vector<std::pair<int, int>> &get_fds() const {
         return _threads_fd;
     }
+    [[nodiscard]] inline bool is_closed() const {
+        return _n_close_expected == -1 || _n_close == _n_close_expected;
+    }
+
+    [[nodiscard]] inline off64_t get_buf_size() const { return _buf_size; }
+    [[nodiscard]] inline bool is_deletable() const { return _n_opens == 0 && _n_links <= 0; }
+    [[nodiscard]] inline bool is_dir() const { return _directory; }
+    [[nodiscard]] inline const std::string_view &commit_rule() const { return _committed; }
+    [[nodiscard]] inline const std::string_view &firing_rule() const { return _mode; }
 
     [[nodiscard]] inline off64_t get_file_size() const {
         std::lock_guard<std::mutex> lock(_mutex);
@@ -254,11 +254,6 @@ class CapioFile {
         } else {
             return 0;
         }
-    }
-
-    [[nodiscard]] inline const std::string_view &get_mode() const {
-        START_LOG(gettid(), "call()");
-        return _mode;
     }
 
     /*
@@ -378,97 +373,43 @@ class CapioFile {
         }
     }
 
-    [[nodiscard]] inline bool is_closed() const {
-        return _n_close_expected == -1 || _n_close == _n_close_expected;
-    }
-
-    [[nodiscard]] inline bool is_deletable() const { return _n_opens == 0 && _n_links <= 0; }
-
-    [[nodiscard]] inline bool is_dir() const { return _directory; }
-
-    inline void open() { _n_opens++; }
-
     /*
-     * From the manual:
-     *
-     * Adjust the file offset to the next location in the file
-     * greater than or equal to offset containing data.  If
-     * offset points to data, then the file offset is set to
-     * offset.
-     *
-     * Fails if offset points past the end of the file.
-     *
-     */
-    off64_t seek_data(off64_t offset) {
+   * From the manual:
+   * Adjust the file offset to the next location in the file greater than or equal to offset
+   * containing data. If offset points to data, then the file offset is set to offset. Fails
+   * if offset points past the end of the file.
+   * From the manual:
+   * Adjust the file offset to the next hole in the file greater than or equal to offset.
+   * If offset points into  the middle of a hole, then the file offset is set to offset.
+   * If there is no hole past offset, then the file offset is adjusted to the end of the
+   * file (i.e., there is an implicit hole at the end of any file).
+   * Fails if offset points past the end of the file.
+   */
+    off64_t seek(CapioFile::seek_type type, off64_t offset) {
+        START_LOG(gettid(), "call(type=%s, offset=%ld)",
+                  type == CapioFile::seek_type::data ? "data" : "hole", offset);
+
         if (_sectors.empty()) {
-            if (offset == 0) {
-                return 0;
-            } else {
-                return -1;
-            }
+            return offset == 0 ? 0 : -1;
         }
         auto it = _sectors.upper_bound(std::make_pair(offset, 0));
         if (it == _sectors.begin()) {
-            return it->first;
+            return type == seek_type::data ? it->first : offset;
         }
         --it;
         if (offset <= it->second) {
-            return offset;
+            return type == seek_type::data ? offset : it->first;
         } else {
             ++it;
             if (it == _sectors.end()) {
                 return -1;
             } else {
-                return it->first;
+                return type == seek_type::data ? it->first : offset;
             }
         }
     }
 
-    /*
-     * From the manual:
-     *
-     * Adjust the file offset to the next hole in the file
-     * greater than or equal to offset.  If offset points into
-     * the middle of a hole, then the file offset is set to
-     * offset.  If there is no hole past offset, then the file
-     * offset is adjusted to the end of the file (i.e., there is
-     * an implicit hole at the end of any file).
-     *
-     *
-     * Fails if offset points past the end of the file.
-     *
-     */
-    [[nodiscard]] off64_t seek_hole(off64_t offset) const {
-        if (_sectors.empty()) {
-            if (offset == 0) {
-                return 0;
-            } else {
-                return -1;
-            }
-        }
-        auto it = _sectors.upper_bound(std::make_pair(offset, 0));
-        if (it == _sectors.begin()) {
-            return offset;
-        }
-        --it;
-        if (offset <= it->second) {
-            return it->second;
-        } else {
-            ++it;
-            if (it == _sectors.end()) {
-                return -1;
-            } else {
-                return offset;
-            }
-        }
-    }
 
-    inline void remove_fd(int tid, int fd) {
-        auto it = std::find(_threads_fd.begin(), _threads_fd.end(), std::make_pair(tid, fd));
-        if (it != _threads_fd.end()) {
-            _threads_fd.erase(it);
-        }
-    }
 
     /**
      * Save data inside the capio_file buffer
@@ -489,7 +430,7 @@ class CapioFile {
         _data_avail_cv.notify_all();
     }
 
-    inline void unlink() { _n_links--; }
+
 };
 
 #endif // CAPIO_SERVER_UTILS_CAPIO_FILE_HPP
