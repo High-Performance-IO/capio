@@ -8,7 +8,7 @@
 
 #include "capio/dirent.hpp"
 
-#include "capio_file.hpp"
+#include "utils/capio_file/capio_file.hpp"
 #include "common.hpp"
 #include "location.hpp"
 #include "metadata.hpp"
@@ -48,7 +48,7 @@ void write_entry_dir(int tid, const std::filesystem::path &file_path,
     off64_t data_size    = file_size + ld.d_reclen;
     size_t file_shm_size = c_file.get_buf_size();
     ld.d_off             = data_size;
-    void *file_shm       = c_file.get_buffer();
+    void *file_shm       = c_file.get_buffer(0, file_size);
 
     if (data_size > file_shm_size) {
         file_shm = c_file.expand_buffer(data_size, file_shm);

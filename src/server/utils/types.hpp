@@ -8,9 +8,7 @@
 
 #include "capio/queue.hpp"
 
-#include "utils/capio_file.hpp"
-
-#include "capio_file.hpp"
+#include "utils/capio_file/capio_file.hpp"
 
 typedef std::unordered_map<int, int> CSPidsMap_T;
 typedef std::unordered_map<int, std::string> CSAppsMap_t;

@@ -27,7 +27,7 @@ inline void serve_remote_read(const std::filesystem::path &path, const std::stri
     // send request
     serve_remote_read_request(tid, fd, count, nbytes, file_size, complete, is_getdents, dest);
     // send data
-    backend->send_file(c_file.get_buffer() + offset, nbytes, offset, dest, path);
+    backend->send_file(c_file.get_buffer(0, file_size) + offset, nbytes, offset, dest, path);
 }
 
 std::vector<std::string> *files_available(const std::string &prefix, const std::string &app_name,
@@ -103,7 +103,7 @@ void wait_for_data(const std::filesystem::path &path, const std::string &dest, i
               "call(path=%s, dest=%s, tid=%d, fs=%d, count=%ld, offset=%ld, is_getdents=%s)",
               path.c_str(), dest.c_str(), tid, fd, count, offset, is_getdents ? "true" : "false");
 
-    const CapioFile &c_file = get_capio_file(path);
+    CapioFile &c_file = get_capio_file(path);
     // wait that nbytes are written
     c_file.wait_for_data(offset + count);
     serve_remote_read(path, dest, tid, fd, count, offset, c_file.is_complete(), is_getdents);
@@ -122,7 +122,8 @@ inline void send_files_batch(const std::string &prefix, const std::string &dest,
     for (const std::string &path : *files_to_send) {
         LOG("Sending file %s to target %s", path.c_str(), dest.c_str());
         CapioFile &c_file = get_capio_file(path);
-        backend->send_file(c_file.get_buffer(), c_file.get_stored_size(), 0, dest, path);
+        backend->send_file(c_file.get_buffer(0, c_file.get_stored_size()), c_file.get_stored_size(),
+                           0, dest, path);
     }
 }
 

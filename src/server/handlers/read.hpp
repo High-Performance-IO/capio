@@ -30,7 +30,8 @@ inline void handle_pending_read(int tid, int fd, long int process_offset, long i
     }
 
     c_file.create_buffer_if_needed(false);
-    send_data_to_client(tid, fd, c_file.get_buffer(), process_offset, bytes_read);
+    send_data_to_client(tid, fd, c_file.get_buffer(process_offset, bytes_read), process_offset,
+                        bytes_read);
 
     // TODO: check if the file was moved to the disk
 }
@@ -74,13 +75,16 @@ inline void handle_local_read(int tid, int fd, off64_t count, bool is_prod) {
                 write_response(tid, process_offset);
                 return;
             }
+
+            auto bytes_read = end_of_sector - process_offset;
             c_file.create_buffer_if_needed(false);
-            send_data_to_client(tid, fd, c_file.get_buffer(), process_offset,
-                                end_of_sector - process_offset);
+            send_data_to_client(tid, fd, c_file.get_buffer(process_offset, bytes_read),
+                                process_offset, bytes_read);
         }
     } else {
         c_file.create_buffer_if_needed(false);
-        send_data_to_client(tid, fd, c_file.get_buffer(), process_offset, count);
+        send_data_to_client(tid, fd, c_file.get_buffer(process_offset, count), process_offset,
+                            count);
     }
 }
 
@@ -101,7 +105,7 @@ inline void request_remote_read(int tid, int fd, off64_t count) {
     } else if (end_of_read <= end_of_sector) {
         LOG("Data is present locally and can be served to client");
         c_file.create_buffer_if_needed(false);
-        send_data_to_client(tid, fd, c_file.get_buffer(), offset, count);
+        send_data_to_client(tid, fd, c_file.get_buffer(offset, count), offset, count);
     } else {
         LOG("Delegating to backend remote read");
         handle_remote_read_request(tid, fd, count, false);
@@ -117,8 +121,8 @@ void wait_for_file(const std::filesystem::path &path, int tid, int fd, off64_t c
     if (strcmp(std::get<0>(get_file_location(path)), node_name) == 0) {
         handle_local_read(tid, fd, count, false);
     } else {
-        const CapioFile &c_file = get_capio_file(path);
-        auto remote_app         = apps.find(tid);
+        CapioFile &c_file = get_capio_file(path);
+        auto remote_app   = apps.find(tid);
         if (!c_file.is_complete() && remote_app != apps.end()) {
             long int pos = match_globs(path);
             if (pos != -1) {

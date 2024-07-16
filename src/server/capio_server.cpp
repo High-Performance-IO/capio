@@ -30,7 +30,7 @@ CSDataBufferMap_t data_buffers;
 #include "capio/env.hpp"
 #include "capio/logger.hpp"
 #include "capio/semaphore.hpp"
-#include "utils/capio_file.hpp"
+#include "utils/capio_file/capio_file.hpp"
 #include "utils/common.hpp"
 #include "utils/env.hpp"
 #include "utils/json.hpp"

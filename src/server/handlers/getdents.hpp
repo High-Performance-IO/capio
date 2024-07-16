@@ -27,7 +27,7 @@ inline void request_remote_getdents(int tid, int fd, off64_t count) {
     } else if (end_of_read <= end_of_sector) {
         LOG("?");
         c_file.create_buffer_if_needed(false);
-        send_data_to_client(tid, fd, c_file.get_buffer(), offset, count);
+        send_data_to_client(tid, fd, c_file.get_buffer(offset, count), offset, count);
     } else {
         LOG("Delegating to backend remote read");
         handle_remote_read_request(tid, fd, count, true);
@@ -52,7 +52,7 @@ inline void handle_getdents(int tid, int fd, long int count) {
             if (strcmp(std::get<0>(get_file_location(path_to_check)), node_name) == 0) {
                 handle_getdents(tid, fd, count);
             } else {
-                const CapioFile &c_file = get_capio_file(path_to_check);
+                CapioFile &c_file = get_capio_file(path_to_check);
                 auto remote_app         = apps.find(tid);
                 if (!c_file.is_complete() && remote_app != apps.end()) {
                     long int pos = match_globs(path_to_check);

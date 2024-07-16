@@ -6,7 +6,7 @@
 #include "capio/constants.hpp"
 #include "capio/dirent.hpp"
 
-#include "capio_file.hpp"
+#include "utils/capio_file/capio_file.hpp"
 #include "metadata.hpp"
 #include "requests.hpp"
 #include "types.hpp"
@@ -30,7 +30,7 @@ inline off64_t send_dirent_to_client(int tid, int fd, CapioFile &c_file, off64_t
     off64_t end_of_read = std::min(offset + count, c_file.get_stored_size());
     int last_entry      = static_cast<int>(end_of_read / sizeof(linux_dirent64));
     off64_t actual_size = (last_entry - first_entry) * static_cast<off64_t>(sizeof(linux_dirent64));
-    char *incoming      = c_file.get_buffer();
+    char *incoming      = c_file.get_buffer(0, actual_size);
 
     LOG("Actual size: %ld. Dirent contains %d items", actual_size, last_entry);
 
