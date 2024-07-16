@@ -49,7 +49,6 @@ class CapioFile {
     // vector of (tid, fd)
     std::vector<std::pair<int, int>> _threads_fd;
     char *_buf = nullptr; // buffer containing the data
-    enum _seek_type { data, hole };
 
     /*sync variables*/
     mutable std::mutex _mutex;
@@ -57,6 +56,7 @@ class CapioFile {
     mutable std::condition_variable _data_avail_cv;
 
   public:
+    enum seek_type { data, hole };
     virtual ~CapioFile() = default;
     explicit CapioFile(const std::filesystem::path &name)
         : _committed(CAPIO_FILE_COMMITTED_ON_TERMINATION), _permanent(false), _directory(false),
@@ -89,29 +89,29 @@ class CapioFile {
     long int n_files          = 0;  // useful for directories
     long int n_files_expected = -1; // useful for directories
 
-    CapioFile(const CapioFile &)                                                       = delete;
-    CapioFile &operator=(const CapioFile &)                                            = delete;
-    virtual ssize_t get_file_size()                                                    = 0;
-    virtual inline bool is_complete()                                                  = 0;
-    virtual inline void wait_for_completion()                                          = 0;
-    virtual inline bool buf_to_allocate()                                              = 0;
-    virtual void commit()                                                              = 0;
-    virtual void create_buffer(bool home_node)                                         = 0;
-    virtual inline void create_buffer_if_needed(bool home_node)                        = 0;
-    virtual char *expand_buffer(off64_t data_size, void *previus_buffer)               = 0;
-    virtual inline char *get_buffer(off64_t offset, ssize_t size)                      = 0;
-    virtual inline off64_t get_buf_size()                                              = 0;
-    virtual off64_t get_sector_end(off64_t offset)                                     = 0;
-    virtual inline const std::set<std::pair<off64_t, off64_t>, compare> &get_sectors() = 0;
-    virtual inline off64_t get_stored_size()                                           = 0;
-    virtual void insert_sector(off64_t new_start, off64_t new_end)                     = 0;
-    virtual off64_t seek_data(off64_t offset)                                          = 0;
-    virtual off64_t seek_hole(off64_t offset)                                          = 0;
+    CapioFile(const CapioFile &)                                   = delete;
+    CapioFile &operator=(const CapioFile &)                        = delete;
+    virtual ssize_t get_file_size()                                = 0;
+    virtual inline bool is_complete()                              = 0;
+    virtual inline void wait_for_completion()                      = 0;
+    virtual void commit()                                          = 0;
+    virtual void inline close()                                    = 0;
+    virtual void allocate(bool home_node)                          = 0;
+    virtual char *realloc(off64_t data_size, void *previus_buffer) = 0;
+    virtual inline char *get_buffer(off64_t offset,
+                                    ssize_t size)   = 0; // TOGLIERE. FARE DIVENTARE READ
+    virtual inline void set_file_size(off64_t size) = 0;
+    virtual inline off64_t get_buf_size()           = 0;
+    virtual inline off64_t get_stored_size()        = 0;
+
+    virtual off64_t get_sector_end(off64_t offset)                                     = 0; // BOH
+    virtual inline const std::set<std::pair<off64_t, off64_t>, compare> &get_sectors() = 0; // BOH
+
+    virtual void insert_sector(off64_t new_start, off64_t new_end)                           = 0;
+    virtual off64_t seek(CapioFile::seek_type type, off64_t offset)                          = 0;
     virtual inline void read_from_node(const std::string &dest, off64_t offset, off64_t buffer_size,
-                                       const std::filesystem::path &file_path)         = 0;
+                                       const std::filesystem::path &file_path)               = 0;
     virtual inline void read_from_queue(SPSCQueue &queue, size_t offset, long int num_bytes) = 0;
-    virtual inline void set_file_size(off64_t size)                                          = 0;
-    virtual void inline close()                                                              = 0;
 
     inline void add_fd(int tid, int fd) { _threads_fd.emplace_back(tid, fd); }
 

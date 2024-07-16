@@ -10,8 +10,8 @@ inline void serve_remote_stat(const std::filesystem::path &path, const std::stri
               source_tid);
 
     CapioFile &c_file = get_capio_file(path);
-    off64_t file_size       = c_file.get_file_size();
-    bool is_dir             = c_file.is_dir();
+    off64_t file_size = c_file.get_file_size();
+    bool is_dir       = c_file.is_dir();
     serve_remote_stat_request(path, source_tid, file_size, is_dir, dest);
 }
 

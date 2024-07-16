@@ -17,36 +17,11 @@ class CapioMemFile : public CapioFile {
         return (it == _sectors.rend()) ? 0 : it->second;
     }
 
-    off64_t _seek(_seek_type type, off64_t offset) const {
-        START_LOG(gettid(), "call(type=%s, offset=%ld)", type == _seek_type::data ? "data" : "hole",
-                  offset);
-
-        if (_sectors.empty()) {
-            return offset == 0 ? 0 : -1;
-        }
-        auto it = _sectors.upper_bound(std::make_pair(offset, 0));
-        if (it == _sectors.begin()) {
-            return type == _seek_type::data ? it->first : offset;
-        }
-        --it;
-        if (offset <= it->second) {
-            return type == _seek_type::data ? offset : it->first;
-        } else {
-            ++it;
-            if (it == _sectors.end()) {
-                return -1;
-            } else {
-                return type == _seek_type::data ? it->first : offset;
-            }
-        }
-    }
-
     std::size_t real_file_size = 0;
 
   public:
     CapioMemFile(const CapioFile &)               = delete;
     CapioMemFile &operator=(const CapioMemFile &) = delete;
-
 
     /*
      * file size in the home node. In a given moment could not be up-to-date.
@@ -130,11 +105,17 @@ class CapioMemFile : public CapioFile {
      * To be called when a process
      * execute a read or a write syscall
      */
-    void create_buffer(bool home_node) override {
+    void allocate(bool home_node) override {
         START_LOG(gettid(), "call(path=%s, home_node=%s)", _file_name.c_str(),
                   home_node ? "true" : "false");
 
         std::lock_guard<std::mutex> lock(_mutex);
+
+        // allocate buffer only if it is required
+        if (_buf != nullptr) {
+            return;
+        }
+
         _home_node = home_node;
         if (_permanent && home_node) {
             if (_directory) {
@@ -161,20 +142,7 @@ class CapioMemFile : public CapioFile {
         }
     }
 
-    [[nodiscard]] inline bool buf_to_allocate() override {
-        std::lock_guard<std::mutex> lg(_mutex);
-        return _buf == nullptr;
-    }
-
-    inline void create_buffer_if_needed(bool home_node) override {
-        START_LOG(gettid(), "call(home_node=%s)", home_node ? "true" : "false");
-        if (buf_to_allocate()) {
-            LOG("Buffer needs to be allocated");
-            create_buffer(home_node);
-        }
-    }
-
-    char *expand_buffer(off64_t data_size, void *previus_buffer) override {
+    char *realloc(off64_t data_size, void *previus_buffer) override {
         START_LOG(gettid(), "call()");
 
         LOG("File is stored in memory. reallocating buffer. _buf == nullptr ? %s",
@@ -183,7 +151,7 @@ class CapioMemFile : public CapioFile {
         off64_t new_size    = data_size > double_size ? data_size : double_size;
 
         std::lock_guard<std::mutex> lock(_mutex);
-        _buf      = static_cast<char *>(realloc(_buf, new_size));
+        _buf      = static_cast<char *>(std::realloc(_buf, new_size));
         _buf_size = new_size;
         return _buf;
     }
@@ -327,10 +295,6 @@ class CapioMemFile : public CapioFile {
      * Adjust the file offset to the next location in the file greater than or equal to offset
      * containing data. If offset points to data, then the file offset is set to offset. Fails
      * if offset points past the end of the file.
-     */
-    off64_t seek_data(off64_t offset) override { return _seek(_seek_type::data, offset); }
-
-    /*
      * From the manual:
      * Adjust the file offset to the next hole in the file greater than or equal to offset.
      * If offset points into  the middle of a hole, then the file offset is set to offset.
@@ -338,7 +302,29 @@ class CapioMemFile : public CapioFile {
      * file (i.e., there is an implicit hole at the end of any file).
      * Fails if offset points past the end of the file.
      */
-    off64_t seek_hole(off64_t offset) override { return _seek(_seek_type::hole, offset); }
+    off64_t seek(CapioFile::seek_type type, off64_t offset) override {
+        START_LOG(gettid(), "call(type=%s, offset=%ld)",
+                  type == CapioFile::seek_type::data ? "data" : "hole", offset);
+
+        if (_sectors.empty()) {
+            return offset == 0 ? 0 : -1;
+        }
+        auto it = _sectors.upper_bound(std::make_pair(offset, 0));
+        if (it == _sectors.begin()) {
+            return type == seek_type::data ? it->first : offset;
+        }
+        --it;
+        if (offset <= it->second) {
+            return type == seek_type::data ? offset : it->first;
+        } else {
+            ++it;
+            if (it == _sectors.end()) {
+                return -1;
+            } else {
+                return type == seek_type::data ? it->first : offset;
+            }
+        }
+    }
 
     /**
      * Save data inside the capio_file buffer
