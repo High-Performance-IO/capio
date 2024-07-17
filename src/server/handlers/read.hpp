@@ -19,18 +19,10 @@ inline void handle_pending_read(int tid, int fd, long int process_offset, long i
 
     const std::filesystem::path &path = get_capio_file_path(tid, fd);
     CapioFile &c_file                 = get_capio_file(path);
-    off64_t end_of_sector             = c_file.get_sector_end(process_offset);
-    off64_t end_of_read               = process_offset + count;
-
     off64_t bytes_read;
-    if (end_of_sector > end_of_read) {
-        bytes_read = count;
-    } else {
-        bytes_read = end_of_sector - process_offset;
-    }
-
+    auto buf = c_file.read(process_offset, count, &bytes_read);
     c_file.allocate(path, false);
-    send_data_to_client(tid, fd, c_file.get_buffer(), process_offset, bytes_read);
+    send_data_to_client(tid, fd, buf, process_offset, bytes_read);
 
     // TODO: check if the file was moved to the disk
 }

@@ -8,6 +8,7 @@
 class CapioTestFile : public CapioFile {
   public:
     void insert_sector(off64_t new_start, off64_t new_end) { _insert_sector(new_start, new_end); }
+    auto &get_sectors() const { return _get_sectors(); }
 };
 
 TEST(ServerTest, TestInsertSingleSector) {

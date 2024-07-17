@@ -66,6 +66,11 @@ class CapioFile {
     }
 
   protected:
+
+    [[nodiscard]] inline const std::set<std::pair<off64_t, off64_t>, compare> &_get_sectors() const {
+        return _sectors;
+    }
+
     /*
      * Insert the new sector automatically modifying the
      * existent _sectors if needed.
@@ -372,10 +377,6 @@ class CapioFile {
         }
 
         return sector_end;
-    }
-
-    [[nodiscard]] inline const std::set<std::pair<off64_t, off64_t>, compare> &get_sectors() const {
-        return _sectors;
     }
 
     /*
