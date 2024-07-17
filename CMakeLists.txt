@@ -4,13 +4,11 @@
 cmake_minimum_required(VERSION 3.15)
 
 # Define project name and description
-project(capio LANGUAGES CXX DESCRIPTION "Cross-Application Programmable I/O")
-
-# Set project version
-set(CMAKE_PROJECT_VERSION_MAJOR 1)
-set(CMAKE_PROJECT_VERSION_MINOR 0)
-set(CMAKE_PROJECT_VERSION_PATCH 0)
-set(CMAKE_PROJECT_VERSION ${CMAKE_PROJECT_VERSION_MAJOR}.${CMAKE_PROJECT_VERSION_MINOR}.${CMAKE_PROJECT_VERSION_PATCH})
+project(capio
+        LANGUAGES CXX
+        DESCRIPTION "Cross-Application Programmable I/O"
+        VERSION 1.0.0
+)
 
 # Set required C++ standard
 set(CMAKE_CXX_STANDARD 17)
