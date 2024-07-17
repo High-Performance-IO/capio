@@ -77,23 +77,16 @@ inline void handle_read_reply(int tid, int fd, long count, off64_t file_size, of
     CapioFile &c_file                 = get_capio_file(path);
     off64_t offset                    = get_capio_file_offset(tid, fd);
     c_file.real_file_size             = file_size;
-    c_file.insert_sector(offset, offset + nbytes);
+
     c_file.set_complete(complete);
 
-    off64_t end_of_sector = c_file.get_sector_end(offset);
-    c_file.create_buffer(path, false);
     off64_t bytes_read;
-    off64_t end_of_read = offset + count;
-    if (end_of_sector > end_of_read) {
-        end_of_sector = end_of_read;
-        bytes_read    = count;
-    } else {
-        bytes_read = end_of_sector - offset;
-    }
+    auto buf = c_file.read(offset, nbytes, &bytes_read);
+
     if (is_getdents) {
         send_dirent_to_client(tid, fd, c_file, offset, bytes_read);
     } else {
-        send_data_to_client(tid, fd, c_file.get_buffer(), offset, bytes_read);
+        send_data_to_client(tid, fd, buf, offset, bytes_read);
     }
 }
 
@@ -183,7 +176,7 @@ handle_remote_read_batch_reply(const std::string &source, int tid, int fd, off64
         auto c_file_opt = get_capio_file_opt(path);
         if (c_file_opt) {
             CapioFile &c_file = c_file_opt->get();
-            c_file.create_buffer(path, false);
+            c_file.allocate(path, false);
             size_t file_shm_size = c_file.get_buf_size();
             if (nbytes > file_shm_size) {
                 c_file.realloc(nbytes);
@@ -191,8 +184,7 @@ handle_remote_read_batch_reply(const std::string &source, int tid, int fd, off64
             c_file.first_write = false;
         } else {
             add_file_location(path, source.c_str(), -1);
-            CapioFile &c_file = create_capio_file(path, false, nbytes);
-            c_file.insert_sector(0, nbytes);
+            CapioFile &c_file     = create_capio_file(path, false, nbytes);
             c_file.real_file_size = nbytes;
             c_file.first_write    = false;
             c_file.set_complete();
@@ -233,7 +225,7 @@ inline void handle_remote_read_reply(const std::string &source, int tid, int fd,
     off64_t offset                    = get_capio_file_offset(tid, fd);
     CapioFile &c_file                 = get_capio_file(path);
 
-    c_file.create_buffer(path, false);
+    c_file.allocate(path, false);
     if (nbytes != 0) {
         auto file_shm_size  = c_file.get_buf_size();
         auto file_size_recv = offset + nbytes;

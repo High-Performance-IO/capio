@@ -130,7 +130,8 @@ inline void clone_capio_file(pid_t parent_tid, pid_t child_tid) {
     }
 }
 
-CapioFile &create_capio_file(const std::filesystem::path &path, bool is_dir, size_t init_size) {
+inline CapioFile &create_capio_file(const std::filesystem::path &path, bool is_dir,
+                                    size_t init_size) {
     START_LOG(gettid(), "call(path=%s, is_dir=%s, init_size=%ld)", path.c_str(),
               is_dir ? "true" : "false", init_size);
 

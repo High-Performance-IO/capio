@@ -5,8 +5,13 @@
 #include "capio/env.hpp"
 #include "utils/capio_file.hpp"
 
+class CapioTestFile : public CapioFile {
+  public:
+    void insert_sector(off64_t new_start, off64_t new_end) { _insert_sector(new_start, new_end); }
+};
+
 TEST(ServerTest, TestInsertSingleSector) {
-    CapioFile c_file;
+    CapioTestFile c_file;
     c_file.insert_sector(1, 3);
     auto &sectors = c_file.get_sectors();
     EXPECT_EQ(sectors.size(), 1);
@@ -14,7 +19,7 @@ TEST(ServerTest, TestInsertSingleSector) {
 }
 
 TEST(ServerTest, TestInsertTwoNonOverlappingSectors) {
-    CapioFile c_file;
+    CapioTestFile c_file;
     c_file.insert_sector(5, 7);
     c_file.insert_sector(1, 3);
     auto &sectors = c_file.get_sectors();
@@ -26,7 +31,7 @@ TEST(ServerTest, TestInsertTwoNonOverlappingSectors) {
 }
 
 TEST(ServerTest, TestInsertTwoOverlappingSectors) {
-    CapioFile c_file;
+    CapioTestFile c_file;
     c_file.insert_sector(2, 4);
     c_file.insert_sector(1, 3);
     auto &sectors = c_file.get_sectors();
@@ -35,7 +40,7 @@ TEST(ServerTest, TestInsertTwoOverlappingSectors) {
 }
 
 TEST(ServerTest, TestInsertTwoOverlappingSectorsSameStart) {
-    CapioFile c_file;
+    CapioTestFile c_file;
     c_file.insert_sector(1, 4);
     c_file.insert_sector(1, 3);
     auto &sectors = c_file.get_sectors();
@@ -44,7 +49,7 @@ TEST(ServerTest, TestInsertTwoOverlappingSectorsSameStart) {
 }
 
 TEST(ServerTest, TestInsertTwoOverlappingSectorsSameEnd) {
-    CapioFile c_file;
+    CapioTestFile c_file;
     c_file.insert_sector(1, 4);
     c_file.insert_sector(2, 4);
     auto &sectors = c_file.get_sectors();
@@ -53,7 +58,7 @@ TEST(ServerTest, TestInsertTwoOverlappingSectorsSameEnd) {
 }
 
 TEST(ServerTest, TestInsertTwoOverlappingSectorsNested) {
-    CapioFile c_file;
+    CapioTestFile c_file;
     c_file.insert_sector(1, 4);
     c_file.insert_sector(2, 3);
     auto &sectors = c_file.get_sectors();

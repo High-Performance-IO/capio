@@ -65,6 +65,88 @@ class CapioFile {
         return (it == _sectors.rend()) ? 0 : it->second;
     }
 
+  protected:
+    /*
+     * Insert the new sector automatically modifying the
+     * existent _sectors if needed.
+     *
+     * Params:
+     * off64_t new_start: the beginning of the sector to insert
+     * off64_t new_end: the beginning of the sector to insert
+     *
+     * new_start must be > new_end otherwise the behaviour
+     * in undefined
+     *
+     */
+    void _insert_sector(off64_t new_start, off64_t new_end) {
+        START_LOG(gettid(), "call(new_start=%ld, new_end=%ld)", new_start, new_end);
+
+        auto p = std::make_pair(new_start, new_end);
+        std::lock_guard<std::mutex> lock(_mutex);
+
+        if (_sectors.empty()) {
+            LOG("Insert sector <%ld, %ld>", p.first, p.second);
+            _sectors.insert(p);
+            return;
+        }
+        auto it_lbound = _sectors.upper_bound(p);
+        if (it_lbound == _sectors.begin()) {
+            if (new_end < it_lbound->first) {
+                LOG("Insert sector <%ld, %ld>", p.first, p.second);
+                _sectors.insert(p);
+            } else {
+                auto it         = it_lbound;
+                bool end_before = false;
+                bool end_inside = false;
+                while (it != _sectors.end() && !end_before && !end_inside) {
+                    end_before = p.second < it->first;
+                    if (!end_before) {
+                        end_inside = p.second <= it->second;
+                        if (!end_inside) {
+                            ++it;
+                        }
+                    }
+                }
+
+                if (end_inside) {
+                    p.second = it->second;
+                    ++it;
+                }
+                _sectors.erase(it_lbound, it);
+                LOG("Insert sector <%ld, %ld>", p.first, p.second);
+                _sectors.insert(p);
+            }
+        } else {
+            --it_lbound;
+            auto it = it_lbound;
+            if (p.first <= it_lbound->second) {
+                // new sector starts inside a sector
+                p.first = it_lbound->first;
+            } else { // in this way the sector will not be deleted
+                ++it_lbound;
+            }
+            bool end_before = false;
+            bool end_inside = false;
+            while (it != _sectors.end() && !end_before && !end_inside) {
+                end_before = p.second < it->first;
+                if (!end_before) {
+                    end_inside = p.second <= it->second;
+                    if (!end_inside) {
+                        ++it;
+                    }
+                }
+            }
+
+            if (end_inside) {
+                p.second = it->second;
+                ++it;
+            }
+            _sectors.erase(it_lbound, it);
+            LOG("Insert sector <%ld, %ld>", p.first, p.second);
+            _sectors.insert(p);
+        }
+    }
+
   public:
     bool first_write          = true;
     long int n_files          = 0;  // useful for directories
@@ -85,20 +167,26 @@ class CapioFile {
 
     explicit CapioFile(std::string filename)
         : _file_name(std::move(filename)), _buf_size(0),
-          _committed(CAPIO_FILE_COMMITTED_ON_TERMINATION), _directory(false), _permanent(false) {}
+          _committed(CAPIO_FILE_COMMITTED_ON_TERMINATION), _directory(false), _permanent(false) {
+      //  _insert_sector(0, CAPIO_DEFAULT_FILE_INITIAL_SIZE);
+    }
 
     CapioFile(std::string filename, const std::string_view &committed, const std::string_view &mode,
               bool directory, long int n_files_expected, bool permanent, off64_t init_size,
               long int n_close_expected)
         : _file_name(std::move(filename)), _buf_size(init_size), _committed(committed),
           _directory(directory), _mode(mode), _n_close_expected(n_close_expected),
-          _permanent(permanent), n_files_expected(n_files_expected + 2) {}
+          _permanent(permanent), n_files_expected(n_files_expected + 2) {
+      //  _insert_sector(0, init_size);
+    }
 
     CapioFile(std::string filename, bool directory, bool permanent, off64_t init_size,
               long int n_close_expected = -1)
         : _file_name(std::move(filename)), _buf_size(init_size),
           _committed(CAPIO_FILE_COMMITTED_ON_TERMINATION), _directory(directory),
-          _n_close_expected(n_close_expected), _permanent(permanent) {}
+          _n_close_expected(n_close_expected), _permanent(permanent) {
+      //  _insert_sector(0, init_size);
+    }
 
     CapioFile(const CapioFile &)            = delete;
     CapioFile &operator=(const CapioFile &) = delete;
@@ -192,7 +280,7 @@ class CapioFile {
      * To be called when a process
      * execute a read or a write syscall
      */
-    void create_buffer(const std::filesystem::path &path, bool home_node) {
+    void allocate(const std::filesystem::path &path, bool home_node) {
         START_LOG(gettid(), "call(path=%s, home_node=%s)", path.c_str(),
                   home_node ? "true" : "false");
         std::lock_guard<std::mutex> lock(_mutex);
@@ -301,87 +389,6 @@ class CapioFile {
     }
 
     /*
-     * Insert the new sector automatically modifying the
-     * existent _sectors if needed.
-     *
-     * Params:
-     * off64_t new_start: the beginning of the sector to insert
-     * off64_t new_end: the beginning of the sector to insert
-     *
-     * new_start must be > new_end otherwise the behaviour
-     * in undefined
-     *
-     */
-    void insert_sector(off64_t new_start, off64_t new_end) {
-        START_LOG(gettid(), "call(new_start=%ld, new_end=%ld)", new_start, new_end);
-
-        auto p = std::make_pair(new_start, new_end);
-        std::lock_guard<std::mutex> lock(_mutex);
-
-        if (_sectors.empty()) {
-            LOG("Insert sector <%ld, %ld>", p.first, p.second);
-            _sectors.insert(p);
-            return;
-        }
-        auto it_lbound = _sectors.upper_bound(p);
-        if (it_lbound == _sectors.begin()) {
-            if (new_end < it_lbound->first) {
-                LOG("Insert sector <%ld, %ld>", p.first, p.second);
-                _sectors.insert(p);
-            } else {
-                auto it         = it_lbound;
-                bool end_before = false;
-                bool end_inside = false;
-                while (it != _sectors.end() && !end_before && !end_inside) {
-                    end_before = p.second < it->first;
-                    if (!end_before) {
-                        end_inside = p.second <= it->second;
-                        if (!end_inside) {
-                            ++it;
-                        }
-                    }
-                }
-
-                if (end_inside) {
-                    p.second = it->second;
-                    ++it;
-                }
-                _sectors.erase(it_lbound, it);
-                LOG("Insert sector <%ld, %ld>", p.first, p.second);
-                _sectors.insert(p);
-            }
-        } else {
-            --it_lbound;
-            auto it = it_lbound;
-            if (p.first <= it_lbound->second) {
-                // new sector starts inside a sector
-                p.first = it_lbound->first;
-            } else { // in this way the sector will not be deleted
-                ++it_lbound;
-            }
-            bool end_before = false;
-            bool end_inside = false;
-            while (it != _sectors.end() && !end_before && !end_inside) {
-                end_before = p.second < it->first;
-                if (!end_before) {
-                    end_inside = p.second <= it->second;
-                    if (!end_inside) {
-                        ++it;
-                    }
-                }
-            }
-
-            if (end_inside) {
-                p.second = it->second;
-                ++it;
-            }
-            _sectors.erase(it_lbound, it);
-            LOG("Insert sector <%ld, %ld>", p.first, p.second);
-            _sectors.insert(p);
-        }
-    }
-
-    /*
      * From the manual:
      * Adjust the file offset to the next location in the file greater than or equal to offset
      * containing data. If offset points to data, then the file offset is set to offset. Fails
@@ -431,7 +438,7 @@ class CapioFile {
     inline void read_from_queue(SPSCQueue &queue, size_t offset, long int num_bytes) {
         START_LOG(gettid(), "call()");
 
-        this->create_buffer(_file_name, _home_node);
+        this->allocate(_file_name, _home_node);
         if (offset + num_bytes > _buf_size) {
             this->realloc(offset + num_bytes);
         }
@@ -441,13 +448,13 @@ class CapioFile {
         _data_avail_cv.notify_all();
 
         lock.unlock();
-        insert_sector(offset, offset + num_bytes); // register the read
+        _insert_sector(offset, offset + num_bytes); // register the read
     }
 
     inline void write(char *buffer, size_t buffer_length, off64_t offset) {
         START_LOG(gettid(), "call()");
 
-        this->create_buffer(_file_name, _home_node);
+        this->allocate(_file_name, _home_node);
         if (offset + buffer_length > _buf_size) {
             this->realloc(offset + buffer_length);
         }
@@ -455,7 +462,28 @@ class CapioFile {
         memcpy(_buf + offset, buffer, buffer_length);
         lock.unlock();
 
-        insert_sector(offset, offset + buffer_length);
+        _insert_sector(offset, offset + buffer_length);
+    }
+
+    // read from buffer. actual_bytes_read is a ptr to a variable that will contain the actual count
+    // of bytes that can be read safely (this is to accommodate non subsequent reads)
+    // TODO: Warning this method return the start of the buffer, but should actually return the
+    // TODO: beginning of _buf+offset. Fixes are needed but for the time being are too complex
+    char *read(off64_t offset, off64_t count, off64_t *actual_bytes_count) {
+        START_LOG(gettid(), "call(offset=%ld, cout=%ld)", offset, count);
+        _insert_sector(offset, offset + count);
+
+        off64_t end_of_sector = get_sector_end(offset);
+        allocate(_file_name, false);
+
+        if (end_of_sector > offset + count) {
+            *actual_bytes_count = count;
+        } else {
+            *actual_bytes_count = end_of_sector - offset;
+        }
+        LOG("Will perform a read of %ld, against the acqual required count of %ld",
+            *actual_bytes_count, count);
+        return _buf;
     }
 };
 
