@@ -1,9 +1,8 @@
 #ifndef CAPIO_SERVER_HANDLERS_SIGNALS_HPP
 #define CAPIO_SERVER_HANDLERS_SIGNALS_HPP
 
+#include <cl-engine/cl_engine.hpp>
 #include <csignal>
-
-#include "remote/backend.hpp"
 
 #ifdef CAPIO_COVERAGE
 extern "C" void __gcov_dump(void);
@@ -20,12 +19,9 @@ void sig_term_handler(int signum, siginfo_t *info, void *ptr) {
         std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_ERROR << "Segfault detected!" << std::endl;
     }
 
-    // free all the memory used
-    for (auto &it : get_capio_fds()) {
-        for (auto &fd : it.second) {
-            delete_capio_file_from_tid(it.first, fd);
-        }
-    }
+
+    // TODO: free all the memory used
+
     std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_WARNING << "shm cleanup completed" << std::endl;
 
     for (auto &p : data_buffers) {
@@ -44,9 +40,8 @@ void sig_term_handler(int signum, siginfo_t *info, void *ptr) {
     __gcov_dump();
 #endif
 
-    destroy_server();
 
-    delete backend;
+    delete cl_engine;
     delete shm_canary;
 
     std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_INFO << "shutdown completed" << std::endl;

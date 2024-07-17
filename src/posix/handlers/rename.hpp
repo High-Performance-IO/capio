@@ -14,26 +14,21 @@ int rename_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long a
     auto oldpath_abs = capio_absolute(oldpath);
     auto newpath_abs = capio_absolute(newpath);
 
-    if (is_prefix(oldpath_abs, newpath_abs)) { // TODO: The check is more complex
-        errno   = EINVAL;
-        *result = -errno;
-        return CAPIO_POSIX_SYSCALL_SUCCESS;
-    }
+    /* if (is_prefix(oldpath_abs, newpath_abs)) { // TODO: The check is more complex
+         errno   = EINVAL;
+         *result = -errno;
+         return CAPIO_POSIX_SYSCALL_SUCCESS;
+     }*/
 
     if (is_capio_path(oldpath_abs)) {
         rename_capio_path(oldpath_abs, newpath_abs);
-        auto res = rename_request(tid, oldpath_abs, newpath_abs);
-        *result  = (res < 0 ? -errno : res);
-        return CAPIO_POSIX_SYSCALL_SUCCESS;
-    } else {
-        if (is_capio_path(newpath_abs)) {
-            std::filesystem::copy(oldpath_abs, newpath_abs);
-            *result = -errno;
-            return CAPIO_POSIX_SYSCALL_SUCCESS;
-        } else {
-            return CAPIO_POSIX_SYSCALL_SKIP;
-        }
+        rename_request(tid, oldpath_abs, newpath_abs);
+
+    } else if (is_capio_path(newpath_abs)) {
+        rename_request(tid, oldpath_abs, newpath_abs);
     }
+
+    return CAPIO_POSIX_SYSCALL_SUCCESS;
 }
 
 #endif // SYS_rename

@@ -6,7 +6,6 @@
 
 #include "capio/syscall.hpp"
 
-#include "data.hpp"
 #include "requests.hpp"
 
 std::mutex clone_mutex;
@@ -36,7 +35,6 @@ void init_process(long tid) {
     syscall_no_intercept_flag = true;
 
     register_listener(tid);
-    register_data_listener(tid);
 
     const char *capio_app_name = get_capio_app_name();
     long pid                   = syscall_no_intercept(SYS_getpid);

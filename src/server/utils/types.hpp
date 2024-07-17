@@ -8,9 +8,6 @@
 
 #include "capio/queue.hpp"
 
-#include "utils/capio_file.hpp"
-
-#include "capio_file.hpp"
 
 typedef std::unordered_map<int, int> CSPidsMap_T;
 typedef std::unordered_map<int, std::string> CSAppsMap_t;
@@ -18,7 +15,6 @@ typedef std::unordered_map<std::string, std::unordered_set<std::string>> CSFiles
 typedef std::unordered_map<int, std::unordered_map<int, std::filesystem::path>>
     CSProcessFileMetadataMap_t;
 typedef std::unordered_map<int, std::pair<SPSCQueue *, SPSCQueue *>> CSDataBufferMap_t;
-typedef std::unordered_map<std::string, CapioFile *> CSFilesMetadata_t;
 typedef std::unordered_map<
     std::string, std::tuple<std::string, std::string, std::string, long int, bool, long int>>
     CSMetadataConfMap_t;

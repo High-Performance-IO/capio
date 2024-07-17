@@ -3,7 +3,6 @@
 
 #if defined(SYS_read) || defined(SYS_readv)
 
-#include "utils/data.hpp"
 
 inline off64_t capio_read(int fd, void *buffer, off64_t count, long tid) {
     START_LOG(tid, "call(fd=%d, buf=0x%08x, count=%ld)", fd, buffer, count);
@@ -13,11 +12,9 @@ inline off64_t capio_read(int fd, void *buffer, off64_t count, long tid) {
             ERR_EXIT("CAPIO does not support read bigger than SSIZE_MAX yet");
         }
 
-        get_write_cache(tid).flush();
-        return get_read_cache(tid).read(fd, buffer, count, false, false);
-    } else {
-        return CAPIO_POSIX_SYSCALL_REQUEST_SKIP;
+        read_request(get_capio_fd_path(fd), count, tid);
     }
+    return CAPIO_POSIX_SYSCALL_REQUEST_SKIP;
 }
 
 inline ssize_t capio_readv(int fd, const struct iovec *iov, int iovcnt, long tid) {

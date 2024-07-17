@@ -15,49 +15,13 @@ inline blkcnt_t get_nblocks(off64_t file_size) {
     return (file_size % 4096 == 0) ? (file_size / 512) : (file_size / 512 + 8);
 }
 
-inline void fill_statbuf(struct stat *statbuf, off_t file_size, bool is_dir, ino_t inode) {
-    START_LOG(syscall_no_intercept(SYS_gettid),
-              "call(statbuf=0x%08x, file_size=%ld, is_dir=%s, inode=%ul)", statbuf, file_size,
-              is_dir ? "true" : "false", inode);
-
-    struct timespec time {
-        1, 1
-    };
-    if (is_dir == 1) {
-        statbuf->st_mode = S_IFDIR | S_IRWXU | S_IRGRP | S_IXGRP | S_IROTH | S_IXOTH;
-        file_size        = 4096;
-    } else {
-        statbuf->st_mode = S_IFREG | S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH;
-    }
-    statbuf->st_dev     = 100;
-    statbuf->st_ino     = inode;
-    statbuf->st_nlink   = 1;
-    statbuf->st_uid     = syscall_no_intercept(SYS_getuid);
-    statbuf->st_gid     = syscall_no_intercept(SYS_getgid);
-    statbuf->st_rdev    = 0;
-    statbuf->st_size    = file_size;
-    statbuf->st_blksize = 4096;
-    statbuf->st_blocks  = (file_size < 4096) ? 8 : get_nblocks(file_size);
-    statbuf->st_atim    = time;
-    statbuf->st_mtim    = time;
-    statbuf->st_ctim    = time;
-}
-
 inline int capio_fstat(int fd, struct stat *statbuf, long tid) {
     START_LOG(tid, "call(fd=%d, statbuf=0x%08x)", fd, statbuf);
 
     if (exists_capio_fd(fd)) {
-        get_write_cache(tid).flush();
-        auto [file_size, is_dir] = fstat_request(fd, tid);
-        if (file_size == -1) {
-            errno = ENOENT;
-            return CAPIO_POSIX_SYSCALL_ERRNO;
-        }
-        fill_statbuf(statbuf, file_size, is_dir, std::hash<std::string>{}(get_capio_fd_path(fd)));
-        return CAPIO_POSIX_SYSCALL_SUCCESS;
-    } else {
-        return CAPIO_POSIX_SYSCALL_REQUEST_SKIP;
+        consent_to_proceed_request(get_capio_fd_path(fd), tid);
     }
+    return CAPIO_POSIX_SYSCALL_REQUEST_SKIP;
 }
 
 inline int capio_lstat(const std::string_view &pathname, struct stat *statbuf, long tid) {
@@ -70,17 +34,9 @@ inline int capio_lstat(const std::string_view &pathname, struct stat *statbuf, l
 
     const std::filesystem::path absolute_path(pathname);
     if (is_capio_path(absolute_path)) {
-        get_write_cache(tid).flush();
-        auto [file_size, is_dir] = stat_request(absolute_path, tid);
-        if (file_size == -1) {
-            errno = ENOENT;
-            return CAPIO_POSIX_SYSCALL_ERRNO;
-        }
-        fill_statbuf(statbuf, file_size, is_dir, std::hash<std::string>{}(absolute_path));
-        return CAPIO_POSIX_SYSCALL_SUCCESS;
-    } else {
-        return CAPIO_POSIX_SYSCALL_REQUEST_SKIP;
+        consent_to_proceed_request(pathname, tid);
     }
+    return CAPIO_POSIX_SYSCALL_REQUEST_SKIP;
 }
 
 inline int capio_lstat_wrapper(const std::string_view &pathname, struct stat *statbuf, long tid) {

@@ -10,9 +10,7 @@ int ioctl_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long ar
     START_LOG(tid, "call(fd=%d, request=%ld)", fd, request, tid);
 
     if (exists_capio_fd(fd)) {
-        errno   = ENOTTY;
-        *result = -errno;
-        return CAPIO_POSIX_SYSCALL_SUCCESS;
+        consent_to_proceed_request(get_capio_fd_path(fd), tid);
     }
     return CAPIO_POSIX_SYSCALL_REQUEST_SKIP;
 }

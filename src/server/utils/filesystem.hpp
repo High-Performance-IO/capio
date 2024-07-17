@@ -8,7 +8,6 @@
 
 #include "capio/dirent.hpp"
 
-#include "capio_file.hpp"
 #include "common.hpp"
 #include "location.hpp"
 #include "metadata.hpp"

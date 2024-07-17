@@ -365,7 +365,6 @@ static int hook(long syscall_number, long arg0, long arg1, long arg2, long arg3,
 
 static __attribute__((constructor)) void init() {
     init_client();
-    init_data_plane();
     init_filesystem();
     init_threading_support();
 

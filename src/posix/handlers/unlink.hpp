@@ -9,21 +9,11 @@ off64_t capio_unlink_abs(const std::filesystem::path &abs_path, long tid, bool i
     START_LOG(tid, "call(abs_path=%s, is_dir=%s)", abs_path.c_str(), is_dir ? "true" : "false");
 
     if (is_capio_path(abs_path)) {
-        if (is_capio_dir(abs_path)) {
-            ERR_EXIT("ERROR: unlink to the capio_dir %s", abs_path.c_str());
-        } else {
-            off64_t res = is_dir ? rmdir_request(abs_path, tid) : unlink_request(abs_path, tid);
-            if (res == -1) {
-                errno = ENOENT;
-            } else {
-                LOG("Removing %s from capio_files_path", abs_path.c_str());
-                delete_capio_path(abs_path);
-            }
-            return res;
-        }
-    } else {
-        return CAPIO_POSIX_SYSCALL_REQUEST_SKIP;
+        is_dir ? rmdir_request(abs_path, tid) : unlink_request(abs_path, tid);
+        LOG("Removing %s from capio_files_path", abs_path.c_str());
+        delete_capio_path(abs_path);
     }
+    return CAPIO_POSIX_SYSCALL_REQUEST_SKIP;
 }
 
 inline off64_t capio_unlinkat(int dirfd, const std::string_view &pathname, int flags, long tid) {
