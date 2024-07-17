@@ -51,7 +51,7 @@ inline void handle_close(int tid, int fd) {
     c_file.close();
     LOG("File with path %s was closed", path.c_str());
 
-    if (c_file.get_committed() == CAPIO_FILE_COMMITTED_ON_CLOSE && c_file.is_closed()) {
+    if (c_file.commit_rule() == CAPIO_FILE_COMMITTED_ON_CLOSE && c_file.is_closed()) {
         LOG("Capio File %s is closed and commit rule is on_close. setting it to complete and "
             "starting batch handling",
             path.c_str());
