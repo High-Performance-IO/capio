@@ -15,6 +15,7 @@ constexpr std::array CAPIO_DIR_FORBIDDEN_PATHS    = {std::string_view{"/proc/"},
 
 // CAPIO default values for shared memory
 constexpr char CAPIO_DEFAULT_WORKFLOW_NAME[] = "CAPIO";
+constexpr char CAPIO_DEFAULT_APP_NAME[] = "default_app";
 constexpr char CAPIO_SHM_CANARY_ERROR[] =
     "FATAL ERROR:  Shared memories for workflow %s already "
     "exists. One of two (or both) reasons are to blame: \n             "

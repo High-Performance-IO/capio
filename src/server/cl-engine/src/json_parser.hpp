@@ -4,8 +4,8 @@
 
 class JsonParser {
   public:
-    static CapioFileLocations *parse(const std::filesystem::path &source) {
-        auto locations = new CapioFileLocations();
+    static CapioCLConfiguration *parse(const std::filesystem::path &source) {
+        auto locations = new CapioCLConfiguration();
         auto capio_dir = get_capio_dir();
 
         START_LOG(gettid(), "call(config_file='%s', capio_dir='%s')", source.c_str(),

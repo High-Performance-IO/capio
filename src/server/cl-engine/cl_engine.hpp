@@ -1,42 +1,39 @@
 #ifndef CAPIO_CL_ENGINE_MAIN_HPP
 #define CAPIO_CL_ENGINE_MAIN_HPP
 #include "capio/requests.hpp"
-#include "src/capio_file_locations.hpp"
+#include "src/capio_cl_configuration.hpp"
+#include "src/client_manager.hpp"
 #include "src/json_parser.hpp"
+
+#include "src/handlers.hpp"
 
 class ClEngine {
   private:
     //// Variables
-    CapioFileLocations *locations;
     std::array<CSHandler_t, CAPIO_NR_REQUESTS> request_handlers;
 
     CSBufRequest_t *buf_requests;
-    CSBufResponse_t *bufs_response;
 
     //// Class methods
 
     static constexpr std::array<CSHandler_t, CAPIO_NR_REQUESTS> build_request_handlers_table() {
         std::array<CSHandler_t, CAPIO_NR_REQUESTS> _request_handlers{0};
 
-        _request_handlers[CAPIO_REQUEST_ACCESS]              = nullptr;
-        _request_handlers[CAPIO_REQUEST_CLONE]               = nullptr;
-        _request_handlers[CAPIO_REQUEST_CLOSE]               = nullptr;
-        _request_handlers[CAPIO_REQUEST_CREATE]              = nullptr;
-        _request_handlers[CAPIO_REQUEST_EXIT_GROUP]          = nullptr;
-        _request_handlers[CAPIO_REQUEST_GETDENTS]            = nullptr;
-        _request_handlers[CAPIO_REQUEST_GETDENTS64]          = nullptr;
-        _request_handlers[CAPIO_REQUEST_HANDSHAKE_NAMED]     = nullptr;
-        _request_handlers[CAPIO_REQUEST_HANDSHAKE_ANONYMOUS] = nullptr;
+        _request_handlers[CAPIO_REQUEST_CONSENT]             = consent_to_proceed_handler;
+        _request_handlers[CAPIO_REQUEST_CLONE]               = clone_handler;
+        _request_handlers[CAPIO_REQUEST_CLOSE]               = close_handler;
+        _request_handlers[CAPIO_REQUEST_CREATE]              = create_handler;
+        _request_handlers[CAPIO_REQUEST_EXIT_GROUP]          = exit_handler;
+        _request_handlers[CAPIO_REQUEST_HANDSHAKE_NAMED]     = handshake_named_handler;
+        _request_handlers[CAPIO_REQUEST_HANDSHAKE_ANONYMOUS] = handshake_anonymous_handler;
         _request_handlers[CAPIO_REQUEST_MKDIR]               = nullptr;
         _request_handlers[CAPIO_REQUEST_OPEN]                = nullptr;
         _request_handlers[CAPIO_REQUEST_READ]                = nullptr;
         _request_handlers[CAPIO_REQUEST_RENAME]              = nullptr;
-        _request_handlers[CAPIO_REQUEST_RMDIR]               = nullptr;
         _request_handlers[CAPIO_REQUEST_SEEK]                = nullptr;
-        _request_handlers[CAPIO_REQUEST_SEEK]                = nullptr;
-        _request_handlers[CAPIO_REQUEST_STAT]                = nullptr;
         _request_handlers[CAPIO_REQUEST_UNLINK]              = nullptr;
         _request_handlers[CAPIO_REQUEST_WRITE]               = nullptr;
+        _request_handlers[CAPIO_REQUEST_RMDIR]               = nullptr;
 
         return _request_handlers;
     }
@@ -66,64 +63,24 @@ class ClEngine {
     explicit ClEngine(const std::filesystem::path &json_path) {
         START_LOG(gettid(), "call(path=%s)", json_path.c_str());
 
-        locations        = JsonParser::parse(json_path);
-        request_handlers = build_request_handlers_table();
+        client_manager      = new ClientManager();
+        capio_configuration = JsonParser::parse(json_path);
+        request_handlers    = build_request_handlers_table();
 
-        buf_requests  = new CSBufRequest_t(SHM_COMM_CHAN_NAME, CAPIO_REQ_BUFF_CNT,
-                                           CAPIO_REQ_MAX_SIZE, workflow_name);
-        bufs_response = new CSBufResponse_t();
-        locations->print();
+        buf_requests = new CSBufRequest_t(SHM_COMM_CHAN_NAME, CAPIO_REQ_BUFF_CNT,
+                                          CAPIO_REQ_MAX_SIZE, workflow_name);
+
+        capio_configuration->print();
 
         std::cout << CAPIO_SERVER_CLI_LOG_SERVER
-                  << " CL-Engine initialization completed. ready to listen for incoming requests" << std::endl;
+                  << " CL-Engine initialization completed. ready to listen for incoming requests"
+                  << std::endl;
     }
 
     ~ClEngine() {
         delete buf_requests;
         std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_WARNING << "buf_requests cleanup completed"
                   << std::endl;
-
-        delete bufs_response;
-        std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_WARNING << "buf_response cleanup completed"
-                  << std::endl;
-    }
-
-    /**
-     * Add a new response buffer for thread @param tid
-     * @param tid
-     * @return
-     */
-    inline void register_new_client(long tid) const {
-        // TODO: replace numbers with constexpr
-        auto *p_buf_response =
-            new CircularBuffer<off_t>(SHM_COMM_CHAN_NAME_RESP + std::to_string(tid),
-                                      CAPIO_REQ_BUFF_CNT, sizeof(off_t), workflow_name);
-        bufs_response->insert(std::make_pair(tid, p_buf_response));
-    }
-
-    /**
-     * Delete the response buffer associated with thread @param tid
-     * @param tid
-     * @return
-     */
-    inline void remove_client(int tid) {
-        auto it_resp = bufs_response->find(tid);
-        if (it_resp != bufs_response->end()) {
-            delete it_resp->second;
-            bufs_response->erase(it_resp);
-        }
-    }
-
-    /**
-     * Write offset to response buffer of process @param tid
-     * @param tid
-     * @param offset
-     * @return
-     */
-    inline void reply_to_client(int tid, off64_t offset) {
-        START_LOG(gettid(), "call(tid=%d, offset=%ld)", tid, offset);
-
-        return bufs_response->at(tid)->write(&offset);
     }
 
     [[noreturn]] void start() {

@@ -1,7 +1,7 @@
 #ifndef CAPIO_ENGINE_HPP
 #define CAPIO_ENGINE_HPP
 
-class CapioFileLocations {
+class CapioCLConfiguration {
   private:
     std::unordered_map<std::string,                         // path name
                        std::tuple<std::vector<std::string>, // Vector for producers
@@ -136,9 +136,19 @@ class CapioFileLocations {
         std::get<2>(_locations.at(path)) = commit_rule;
     }
 
+    inline auto getCommitRule(const std::string &path) {
+        this->newFile(path);
+        return std::get<2>(_locations.at(path));
+    }
+
     inline void setFireRule(const std::string &path, const std::string &fire_rule) {
         this->newFile(path);
         std::get<3>(_locations.at(path)) = fire_rule;
+    }
+
+    inline auto getFireRule(const std::string &path) {
+        this->newFile(path);
+        return std::get<3>(_locations.at(path));
     }
 
     inline void setPermanent(const std::string &path, bool value) {
@@ -184,4 +194,5 @@ class CapioFileLocations {
     inline auto consumers(const std::string &path) { return std::get<1>(_locations.at(path)); }
 };
 
+inline CapioCLConfiguration *capio_configuration;
 #endif // CAPIO_ENGINE_HPP
