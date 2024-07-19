@@ -13,10 +13,18 @@ int lseek_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long ar
 
     START_LOG(tid, "call(fd=%d, offset=%ld, whence=%d)", fd, offset, whence);
     if (exists_capio_fd(fd)) {
-        (get_capio_fd_path(fd), tid);
-    }
+        off64_t computed_offset = 0;
 
-    seek_request(get_capio_fd_path(fd), offset, whence, tid);
+        if (whence == SEEK_CUR) {
+            computed_offset = get_capio_fd_offset(fd) + offset;
+        } else {
+            computed_offset = offset;
+        }
+
+        // computed_offset = seek_request(get_capio_fd_path(fd), computed_offset, whence, tid, fd);
+
+        set_capio_fd_offset(fd, computed_offset);
+    }
 
     return CAPIO_POSIX_SYSCALL_REQUEST_SKIP;
 }

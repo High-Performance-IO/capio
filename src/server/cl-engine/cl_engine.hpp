@@ -20,20 +20,17 @@ class ClEngine {
         std::array<CSHandler_t, CAPIO_NR_REQUESTS> _request_handlers{0};
 
         _request_handlers[CAPIO_REQUEST_CONSENT]             = consent_to_proceed_handler;
-        _request_handlers[CAPIO_REQUEST_CLONE]               = clone_handler;
         _request_handlers[CAPIO_REQUEST_CLOSE]               = close_handler;
         _request_handlers[CAPIO_REQUEST_CREATE]              = create_handler;
         _request_handlers[CAPIO_REQUEST_EXIT_GROUP]          = exit_handler;
         _request_handlers[CAPIO_REQUEST_HANDSHAKE_NAMED]     = handshake_named_handler;
         _request_handlers[CAPIO_REQUEST_HANDSHAKE_ANONYMOUS] = handshake_anonymous_handler;
-        _request_handlers[CAPIO_REQUEST_MKDIR]               = nullptr;
-        _request_handlers[CAPIO_REQUEST_OPEN]                = nullptr;
-        _request_handlers[CAPIO_REQUEST_READ]                = nullptr;
-        _request_handlers[CAPIO_REQUEST_RENAME]              = nullptr;
-        _request_handlers[CAPIO_REQUEST_SEEK]                = nullptr;
-        _request_handlers[CAPIO_REQUEST_UNLINK]              = nullptr;
-        _request_handlers[CAPIO_REQUEST_WRITE]               = nullptr;
-        _request_handlers[CAPIO_REQUEST_RMDIR]               = nullptr;
+        _request_handlers[CAPIO_REQUEST_MKDIR]               = create_handler;
+        _request_handlers[CAPIO_REQUEST_OPEN]                = open_handler;
+        _request_handlers[CAPIO_REQUEST_READ]                = read_handler;
+        _request_handlers[CAPIO_REQUEST_RENAME]              = rename_handler;
+        _request_handlers[CAPIO_REQUEST_SEEK]                = seek_handler;
+        _request_handlers[CAPIO_REQUEST_WRITE]               = write_handler;
 
         return _request_handlers;
     }

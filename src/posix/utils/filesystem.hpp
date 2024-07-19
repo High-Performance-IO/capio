@@ -55,10 +55,15 @@ inline void add_capio_path(const std::string &path) {
  */
 inline void add_capio_fd(long tid, const std::string &path, int fd, off64_t offset,
                          off64_t init_size, int flags, bool is_cloexec) {
+    START_LOG(tid, "call(path=%s, fd=%d)", path.c_str(), fd);
     add_capio_path(path);
+    LOG("Added capio path %s", path.c_str());
     capio_files_paths->at(path).insert(fd);
+    LOG("Inserted tid %d for path %s", tid, path.c_str());
     capio_files_descriptors->insert({fd, path});
+    LOG("Inserted file descriptor tuple");
     files->insert({fd, {std::make_shared<off64_t>(offset), init_size, flags, is_cloexec}});
+    LOG("Registered file");
 }
 
 /**
@@ -110,6 +115,7 @@ inline std::filesystem::path capio_absolute(const std::filesystem::path &path) {
  * @return
  */
 inline void delete_capio_fd(int fd) {
+    START_LOG(syscall_no_intercept(SYS_gettid), "call(fd=%d)", fd);
     auto &path = capio_files_descriptors->at(fd);
     capio_files_paths->at(path).erase(fd);
     capio_files_descriptors->erase(fd);
@@ -122,11 +128,17 @@ inline void delete_capio_fd(int fd) {
  * @return
  */
 inline void delete_capio_path(const std::string &path) {
-    auto it = capio_files_paths->at(path).begin();
-    while (it != capio_files_paths->at(path).end()) {
-        delete_capio_fd(*it++);
+    START_LOG(syscall_no_intercept(SYS_gettid), "call(path=%s)", path.c_str());
+    if (capio_files_paths->find(path) != capio_files_paths->end()) {
+        auto it = capio_files_paths->at(path).begin();
+        LOG("Proceeding to remove fds");
+        while (it != capio_files_paths->at(path).end()) {
+            delete_capio_fd(*it++);
+        }
+        LOG("Proceeding to remove path from capio_files_paths");
+        capio_files_paths->erase(path);
+        LOG("Cleanup completed");
     }
-    capio_files_paths->erase(path);
 }
 
 /**
@@ -265,11 +277,17 @@ inline void init_filesystem() {
  * @return
  */
 inline void rename_capio_path(const std::string &oldpath, const std::string &newpath) {
-    auto entry  = capio_files_paths->extract(oldpath);
-    entry.key() = newpath;
-    capio_files_paths->insert(std::move(entry));
-    for (auto fd : capio_files_paths->at(newpath)) {
-        capio_files_descriptors->at(fd).assign(newpath);
+    START_LOG(syscall_no_intercept(SYS_gettid), "call(oldpath=%s, newpath=%s)", oldpath.c_str(),
+              newpath.c_str());
+    if (capio_files_paths->find(oldpath) != capio_files_paths->find(newpath)) {
+        auto entry  = capio_files_paths->extract(oldpath);
+        entry.key() = newpath;
+        capio_files_paths->insert(std::move(entry));
+        for (auto fd : capio_files_paths->at(newpath)) {
+            capio_files_descriptors->at(fd).assign(newpath);
+        }
+    }else {
+        LOG("Warning: olpath not found in capio_files_paths");
     }
 }
 

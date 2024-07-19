@@ -78,7 +78,6 @@ void hook_clone_parent(long child_tid) {
 
     LOG("Initializing child thread %d", child_tid);
     init_process(child_tid);
-    clone_request(parent_tid, child_tid);
     LOG("Child thread %d initialized", child_tid);
 
     register_capio_tid(child_tid);

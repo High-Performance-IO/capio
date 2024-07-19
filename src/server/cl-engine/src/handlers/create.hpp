@@ -2,14 +2,13 @@
 #define CAPIO_CREATE_HPP
 
 #include <cl-engine/cl_engine.hpp>
-#include <storage-engine/storage_engine.hpp>
 
 inline void create_handler(const char *const str) {
     int tid;
     char path[PATH_MAX];
     sscanf(str, "%d %s", &tid, path);
-    std::filesystem::path filename(path);
-    storage_engine->create_capio_file(path, tid);
+
+    client_manager->unlock_thread_awaiting_creation(path);
 }
 
 #endif // CAPIO_CREATE_HPP

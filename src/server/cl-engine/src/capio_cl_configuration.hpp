@@ -103,6 +103,24 @@ class CapioCLConfiguration {
         std::cout << std::endl;
     };
 
+    // TODO: might need to be improved
+    bool file_to_be_handled(std::filesystem::path::iterator::reference path) {
+        for (const auto &entry : _locations) {
+            auto capio_path = entry.first;
+            if (path == capio_path) {
+                return true;
+            }
+
+            if (capio_path.find('*') != std::string::npos) { // check for globs
+                if (capio_path.find(path) == 0) { // if path and capio_path begins in the same way
+                    return true;
+                }
+            }
+        }
+
+        return false;
+    };
+
     inline void add(std::string &path, std::vector<std::string> &producers,
                     std::vector<std::string> &consumers, const std::string &commit_rule,
                     const std::string &fire_rule, bool permanent, bool exclude) {

@@ -10,7 +10,7 @@ inline off64_t capio_write(int fd, const void *buffer, off64_t count, long tid) 
     START_LOG(tid, "call(fd=%d, buf=0x%08x, count=%ld)", fd, buffer, count);
 
     if (exists_capio_fd(fd)) {
-        write_request(get_capio_fd_path(fd), count, tid);
+        write_request(get_capio_fd_path(fd), count, tid, fd);
     }
     return CAPIO_POSIX_SYSCALL_REQUEST_SKIP;
 }

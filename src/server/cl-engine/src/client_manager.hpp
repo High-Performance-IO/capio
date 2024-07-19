@@ -6,14 +6,23 @@ class ClientManager {
     CSBufResponse_t *bufs_response;
     std::unordered_map<int, const std::string> *app_names;
 
+    std::unordered_map<std::string, std::vector<int> *> *thread_awaiting_file_creation;
+    std::unordered_map<std::string, std::unordered_map<int, size_t> *> *thread_awaiting_data;
+
   public:
     ClientManager() {
-        bufs_response = new CSBufResponse_t();
-        app_names     = new std::unordered_map<int, const std::string>;
+        bufs_response                 = new CSBufResponse_t();
+        app_names                     = new std::unordered_map<int, const std::string>;
+        thread_awaiting_file_creation = new std::unordered_map<std::string, std::vector<int> *>;
+        thread_awaiting_data =
+            new std::unordered_map<std::string, std::unordered_map<int, size_t> *>;
     }
 
     ~ClientManager() {
         delete bufs_response;
+        delete app_names;
+        delete thread_awaiting_file_creation;
+        delete thread_awaiting_data;
         std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_WARNING << "buf_response cleanup completed"
                   << std::endl;
     }
@@ -30,8 +39,6 @@ class ClientManager {
                                       CAPIO_REQ_BUFF_CNT, sizeof(off_t), workflow_name);
         bufs_response->insert(std::make_pair(tid, p_buf_response));
         app_names->emplace(tid, app_name);
-        std::cout << CAPIO_SERVER_CLI_LOG_SERVER << "Handshaked a new client: <" << tid << ","
-                  << app_name << ">" << std::endl;
     }
 
     /**
@@ -57,6 +64,50 @@ class ClientManager {
         START_LOG(gettid(), "call(tid=%ld, offset=%ld)", tid, offset);
 
         return bufs_response->at(tid)->write(&offset);
+    }
+
+    void add_thread_awaiting_creation(std::string path, int tid) {
+        if (thread_awaiting_file_creation->find(path) == thread_awaiting_file_creation->end()) {
+            thread_awaiting_file_creation->emplace(path, new std::vector<int>);
+        }
+        thread_awaiting_file_creation->at(path)->emplace_back(tid);
+    }
+
+    void unlock_thread_awaiting_creation(std::string path) {
+        if (thread_awaiting_file_creation->find(path) != thread_awaiting_file_creation->end()) {
+            auto th = thread_awaiting_file_creation->at(path);
+            for (auto tid : *th) {
+                reply_to_client(tid, 1);
+            }
+        }
+    }
+
+    // register tid to wait for file size of certain size
+    void add_thread_awaiting_data(std::string path, int tid, size_t expected_size) {
+        if (thread_awaiting_data->find(path) == thread_awaiting_data->end()) {
+            thread_awaiting_data->emplace(path, new std::unordered_map<int, size_t>);
+        }
+        thread_awaiting_data->at(path)->emplace(tid, expected_size);
+    }
+
+    void unlock_thread_awaiting_data(std::string path) {
+        auto path_size = std::filesystem::file_size(path);
+
+        if (thread_awaiting_data->find(path) == thread_awaiting_data->end()) {
+            auto th = thread_awaiting_data->at(path);
+            std::vector<int> item_to_delete;
+            for (auto item : *th) {
+                if (item.second >= std::filesystem::file_size(path)) {
+                    reply_to_client(item.first, path_size);
+                    item_to_delete.emplace_back(item.first);
+                }
+            }
+
+            // cleanup of served clients
+            for (auto itm : item_to_delete) {
+                th->erase(itm);
+            }
+        }
     }
 };
 

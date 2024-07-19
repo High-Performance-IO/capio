@@ -34,7 +34,8 @@ inline off64_t capio_mkdirat(int dirfd, const std::string_view &pathname, mode_t
     }
 
     if (is_capio_path(path)) {
-        mkdir_request(path, tid);
+
+        create_request(-1, path, tid);
     }
     return CAPIO_POSIX_SYSCALL_REQUEST_SKIP;
 }
@@ -42,23 +43,6 @@ inline off64_t capio_mkdirat(int dirfd, const std::string_view &pathname, mode_t
 inline off64_t capio_rmdir(const std::string_view &pathname, long tid) {
     START_LOG(tid, "call(pathname=%s)", pathname.data());
 
-    if (is_forbidden_path(pathname)) {
-        LOG("Path %s is forbidden: skip", pathname.data());
-        return CAPIO_POSIX_SYSCALL_REQUEST_SKIP;
-    }
-
-    std::filesystem::path path(pathname);
-    if (path.is_relative()) {
-        path = capio_posix_realpath(path);
-        if (path.empty()) {
-            LOG("path_to_check.len = 0!");
-            return CAPIO_POSIX_SYSCALL_REQUEST_SKIP;
-        }
-    }
-
-    if (is_capio_path(path)) {
-        rmdir_request(path, tid);
-    }
     return CAPIO_POSIX_SYSCALL_REQUEST_SKIP;
 }
 

@@ -6,9 +6,6 @@
 #include "capio/constants.hpp"
 #include "types.hpp"
 
-
-
-
 inline bool is_int(const std::string &s) {
     START_LOG(gettid(), "call(%s)", s.c_str());
     bool res = false;

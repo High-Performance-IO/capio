@@ -6,85 +6,124 @@
 #include "utils/common.hpp"
 #include "utils/filesystem.hpp"
 
-inline int capio_openat(int dirfd, const std::string_view &pathname, int flags, long tid) {
-    START_LOG(tid, "call(dirfd=%d, pathname=%s, flags=%X)", dirfd, pathname.data(), flags);
-
-    if (is_forbidden_path(pathname)) {
-        LOG("Path %s is forbidden: skip", pathname.data());
-        return CAPIO_POSIX_SYSCALL_REQUEST_SKIP;
-    }
-
+std::string compute_abs_path(char *pathname, int dirfd) {
+    START_LOG(syscall_no_intercept(SYS_gettid), "call(pathname=%s, dirfd=%d)", pathname, dirfd);
     std::filesystem::path path(pathname);
     if (path.is_relative()) {
         if (dirfd == AT_FDCWD) {
             path = capio_posix_realpath(path);
             if (path.empty()) {
-                return CAPIO_POSIX_SYSCALL_REQUEST_SKIP;
+                LOG("path empty AT_FDCWD");
+                return "";
             }
         } else {
             if (!is_directory(dirfd)) {
                 LOG("dirfd does not point to a directory");
-                return CAPIO_POSIX_SYSCALL_REQUEST_SKIP;
+                return "";
             }
             const std::filesystem::path dir_path = get_dir_path(dirfd);
             if (dir_path.empty()) {
-                return CAPIO_POSIX_SYSCALL_REQUEST_SKIP;
+                LOG("path empty");
+                return "";
             }
 
             path = (dir_path / path).lexically_normal();
+            LOG("path = %s", path.c_str());
         }
     }
-
-    if (is_capio_path(path)) {
-
-        auto fd = static_cast<int>(syscall_no_intercept(SYS_open, path.c_str(), flags));
-
-        bool create = (flags & O_CREAT) == O_CREAT;
-        bool excl   = (flags & O_EXCL) == O_EXCL;
-
-        if (excl | create) {
-            LOG("excl");
-            create_request(fd, path, tid);
-        } else {
-            LOG("!excl && !create");
-            open_request(fd, path, tid);
-        }
-
-        int actual_flags = flags & ~O_CLOEXEC;
-        if ((flags & O_DIRECTORY) == O_DIRECTORY) {
-            actual_flags = actual_flags | O_LARGEFILE;
-        }
-        add_capio_fd(tid, path, fd, 0, CAPIO_DEFAULT_FILE_INITIAL_SIZE, actual_flags,
-                     (flags & O_CLOEXEC) == O_CLOEXEC);
-
-        return fd;
-    }
-    return CAPIO_POSIX_SYSCALL_REQUEST_SKIP;
+    return path;
 }
 
 int creat_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg5, long *result) {
-    const std::string_view pathname(reinterpret_cast<const char *>(arg0));
-    long tid = syscall_no_intercept(SYS_gettid);
+    std::string pathname(reinterpret_cast<const char *>(arg0));
+    long tid    = syscall_no_intercept(SYS_gettid);
+    int flags   = O_CREAT | O_WRONLY | O_TRUNC;
+    mode_t mode = static_cast<int>(arg2);
+    START_LOG(tid, "call(path=%s, flags=%d, mode=%d)", pathname.data(), flags, mode);
 
-    return posix_return_value(capio_openat(AT_FDCWD, pathname, O_CREAT | O_WRONLY | O_TRUNC, tid),
-                              result);
+    std::string path = compute_abs_path(pathname.data(), -1);
+
+    if (is_capio_path(path)) {
+        create_request(-1, path.data(), tid);
+        LOG("Create request sent");
+    }
+
+    int fd = static_cast<int>(syscall_no_intercept(SYS_creat, arg0, arg1, arg2, arg3, arg4, arg5));
+
+    LOG("fd=%d", fd);
+
+    if (is_capio_path(path) && fd >= 0) {
+        LOG("Registering path and fd");
+        add_capio_fd(tid, path, fd, 0, CAPIO_DEFAULT_FILE_INITIAL_SIZE, flags,
+                     (flags & O_CLOEXEC) == O_CLOEXEC);
+    }
+
+    *result = fd;
+    return CAPIO_POSIX_SYSCALL_SUCCESS;
 }
 
 int open_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg5, long *result) {
-    const std::string_view pathname(reinterpret_cast<const char *>(arg0));
-    int flags = static_cast<int>(arg1);
-    long tid  = syscall_no_intercept(SYS_gettid);
+    std::string pathname(reinterpret_cast<const char *>(arg0));
+    int flags   = static_cast<int>(arg1);
+    mode_t mode = static_cast<int>(arg2);
+    long tid    = syscall_no_intercept(SYS_gettid);
+    START_LOG(tid, "call(path=%s, flags=%d, mode=%d)", pathname.data(), flags, mode);
 
-    return posix_return_value(capio_openat(AT_FDCWD, pathname, flags, tid), result);
+    std::string path = compute_abs_path(pathname.data(), -1);
+
+    if (is_capio_path(path)) {
+        if ((flags & O_CREAT) == O_CREAT) {
+            LOG("O_CREAT");
+            create_request(-1, path.data(), tid);
+        } else {
+            LOG("not O_CREAT");
+            open_request(-1, path.data(), tid);
+        }
+    }
+
+    int fd = static_cast<int>(syscall_no_intercept(SYS_open, arg0, arg1, arg2, arg3, arg4, arg5));
+
+    if (is_capio_path(path) && fd >= 0) {
+        LOG("Adding capio path");
+        add_capio_fd(tid, path, fd, 0, CAPIO_DEFAULT_FILE_INITIAL_SIZE, flags,
+                     (flags & O_CLOEXEC) == O_CLOEXEC);
+    }
+
+    *result = fd;
+    return CAPIO_POSIX_SYSCALL_SUCCESS;
 }
 
 int openat_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg5, long *result) {
     int dirfd = static_cast<int>(arg0);
-    const std::string_view pathname(reinterpret_cast<const char *>(arg1));
-    int flags = static_cast<int>(arg2);
-    long tid  = syscall_no_intercept(SYS_gettid);
+    std::string pathname(reinterpret_cast<const char *>(arg1));
+    int flags   = static_cast<int>(arg2);
+    mode_t mode = static_cast<int>(arg3);
+    long tid    = syscall_no_intercept(SYS_gettid);
+    START_LOG(tid, "call(path=%s, flags=%d, mode=%d)", pathname.data(), flags, mode);
 
-    return posix_return_value(capio_openat(dirfd, pathname, flags, tid), result);
+    std::string path = compute_abs_path(pathname.data(), dirfd);
+
+    if (is_capio_path(path)) {
+        if ((flags & O_CREAT) == O_CREAT) {
+            LOG("O_CREAT");
+            create_request(-1, path.data(), tid);
+        } else {
+            LOG("not O_CREAT");
+            open_request(-1, path.data(), tid);
+        }
+    }
+
+    int fd = static_cast<int>(syscall_no_intercept(SYS_openat, arg0, arg1, arg2, arg3, arg4, arg5));
+    LOG("fd=%d", fd);
+
+    if (is_capio_path(path) && fd >= 0) {
+        LOG("Adding capio path");
+        add_capio_fd(tid, path, fd, 0, CAPIO_DEFAULT_FILE_INITIAL_SIZE, flags,
+                     (flags & O_CLOEXEC) == O_CLOEXEC);
+    }
+
+    *result = fd;
+    return CAPIO_POSIX_SYSCALL_SUCCESS;
 }
 
 #endif // SYS_creat || SYS_open || SYS_openat

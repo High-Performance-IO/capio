@@ -8,7 +8,6 @@
 
 #include "capio/queue.hpp"
 
-
 typedef std::unordered_map<int, int> CSPidsMap_T;
 typedef std::unordered_map<int, std::string> CSAppsMap_t;
 typedef std::unordered_map<std::string, std::unordered_set<std::string>> CSFilesSentMap_t;

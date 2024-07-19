@@ -153,7 +153,7 @@ jobs:
           sudo cmake --install ../build --prefix /usr/local
       - name: "Run tests"
         id: run-tests
-        timeout-minutes: 5
+        timeout-minutes: 2
         env:
           CAPIO_DIR: ${{ github.workspace }}
           CAPIO_LOG_LEVEL: -1

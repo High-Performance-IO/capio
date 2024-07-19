@@ -3,18 +3,8 @@
 
 #if defined(SYS_read) || defined(SYS_readv)
 
-
 inline off64_t capio_read(int fd, void *buffer, off64_t count, long tid) {
     START_LOG(tid, "call(fd=%d, buf=0x%08x, count=%ld)", fd, buffer, count);
-
-    if (exists_capio_fd(fd)) {
-        if (count >= SSIZE_MAX) {
-            ERR_EXIT("CAPIO does not support read bigger than SSIZE_MAX yet");
-        }
-
-        read_request(get_capio_fd_path(fd), count, tid);
-    }
-    return CAPIO_POSIX_SYSCALL_REQUEST_SKIP;
 }
 
 inline ssize_t capio_readv(int fd, const struct iovec *iov, int iovcnt, long tid) {
@@ -51,7 +41,10 @@ int read_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg
     auto count   = static_cast<off64_t>(arg2);
     long tid     = syscall_no_intercept(SYS_gettid);
 
-    return posix_return_value(capio_read(fd, buffer, count, tid), result);
+    if (exists_capio_fd(fd)) {
+        read_request(get_capio_fd_path(fd), get_capio_fd_offset(fd) + count, tid, fd);
+    }
+    return CAPIO_POSIX_SYSCALL_REQUEST_SKIP;
 }
 
 int readv_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg5, long *result) {
@@ -60,7 +53,12 @@ int readv_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long ar
     auto iovcnt     = static_cast<int>(arg2);
     long tid        = syscall_no_intercept(SYS_gettid);
 
-    return posix_return_value(capio_readv(fd, iov, iovcnt, tid), result);
+    // return posix_return_value(capio_readv(fd, iov, iovcnt, tid), result);
+    if (exists_capio_fd(fd)) {
+        read_request(get_capio_fd_path(fd), get_capio_fd_offset(fd) + iovcnt * sizeof(iovec), tid,
+                     fd);
+    }
+    return CAPIO_POSIX_SYSCALL_REQUEST_SKIP;
 }
 
 #endif // SYS_read || SYS_readv

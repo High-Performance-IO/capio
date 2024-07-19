@@ -3,8 +3,6 @@
 
 #if defined(SYS_getdents) || defined(SYS_getdents64)
 
-
-
 // TODO: too similar to capio_read, refactoring needed
 inline int getdents_handler_impl(long arg0, long arg1, long arg2, long *result, bool is64bit) {
     auto fd      = static_cast<int>(arg0);
