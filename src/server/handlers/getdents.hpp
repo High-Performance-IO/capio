@@ -21,13 +21,13 @@ inline void request_remote_getdents(int tid, int fd, off64_t count) {
 
     if (c_file.is_complete() &&
         (end_of_read <= end_of_sector ||
-         (end_of_sector == -1 ? 0 : end_of_sector) == c_file.real_file_size)) {
+         (end_of_sector == -1 ? 0 : end_of_sector) == c_file.get_file_size())) {
         LOG("Handling local read");
         send_dirent_to_client(tid, fd, c_file, offset, count);
     } else if (end_of_read <= end_of_sector) {
         LOG("?");
-        c_file.create_buffer_if_needed(path, false);
-        send_data_to_client(tid, fd, c_file.get_buffer(), offset, count);
+        c_file.allocate(false);
+        send_data_to_client(tid, fd, c_file.get_buffer(offset, count), offset, count);
     } else {
         LOG("Delegating to backend remote read");
         handle_remote_read_request(tid, fd, count, true);
@@ -52,8 +52,8 @@ inline void handle_getdents(int tid, int fd, long int count) {
             if (strcmp(std::get<0>(get_file_location(path_to_check)), node_name) == 0) {
                 handle_getdents(tid, fd, count);
             } else {
-                const CapioFile &c_file = get_capio_file(path_to_check);
-                auto remote_app         = apps.find(tid);
+                CapioFile &c_file = get_capio_file(path_to_check);
+                auto remote_app   = apps.find(tid);
                 if (!c_file.is_complete() && remote_app != apps.end()) {
                     long int pos = match_globs(path_to_check);
                     if (pos != -1) {

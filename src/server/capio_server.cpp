@@ -30,14 +30,12 @@ CSDataBufferMap_t data_buffers;
 #include "capio/env.hpp"
 #include "capio/logger.hpp"
 #include "capio/semaphore.hpp"
-#include "utils/capio_file.hpp"
+#include "utils/capio_file/capio_file.hpp"
 #include "utils/common.hpp"
 #include "utils/env.hpp"
 #include "utils/json.hpp"
 #include "utils/metadata.hpp"
 #include "utils/requests.hpp"
-
-using namespace simdjson;
 
 int n_servers;
 // name of the node
@@ -107,7 +105,6 @@ static constexpr std::array<CSHandler_t, CAPIO_NR_REQUESTS> build_request_handle
 
     START_LOG(gettid(), "call()");
 
-    MPI_Comm_size(MPI_COMM_WORLD, &n_servers);
     setup_signal_handlers();
     backend->handshake_servers();
 

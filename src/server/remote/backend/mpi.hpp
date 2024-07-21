@@ -31,7 +31,7 @@ class MPIBackend : public Backend {
             LOG("Error: The threading support level is not MPI_THREAD_MULTIPLE (is %d)", provided);
             MPI_Abort(MPI_COMM_WORLD, EXIT_FAILURE);
         }
-
+        MPI_Comm_size(MPI_COMM_WORLD, &n_servers);
         node_name = new char[MPI_MAX_PROCESSOR_NAME];
         MPI_Get_processor_name(node_name, &node_name_len);
         LOG("Node name = %s, length=%d", node_name, node_name_len);
@@ -44,6 +44,8 @@ class MPIBackend : public Backend {
         START_LOG(gettid(), "Call()");
         MPI_Finalize();
     }
+
+    inline bool store_file_in_memory() override { return true; }
 
     inline const std::set<std::string> get_nodes() override { return nodes; }
 
@@ -92,7 +94,8 @@ class MPIBackend : public Backend {
         return {buff, rank_nodes_equivalence[std::to_string(status.MPI_SOURCE)]};
     }
 
-    void send_file(char *shm, long int nbytes, const std::string &target) override {
+    void send_file(char *shm, long int nbytes, long int offset, const std::string &target,
+                   const std::filesystem::path &file_path) override {
         START_LOG(gettid(), "call(%.50s, %ld, %s)", shm, nbytes, target.c_str());
         int elem_to_snd = 0;
         int dest        = std::stoi(rank_nodes_equivalence[target]);
@@ -116,7 +119,8 @@ class MPIBackend : public Backend {
         MPI_Send(message, message_len + 1, MPI_CHAR, std::stoi(mpi_target), 0, MPI_COMM_WORLD);
     }
 
-    inline void recv_file(char *shm, const std::string &source, long int bytes_expected) override {
+    inline void recv_file(char *shm, const std::string &source, long int bytes_expected,
+                          long int offset, const std::filesystem::path &file_path) override {
         START_LOG(gettid(), "call(shm=%ld, source=%s, bytes_expected=%ld)", shm, source.c_str(),
                   bytes_expected);
         MPI_Status status;
@@ -135,6 +139,10 @@ class MPIBackend : public Backend {
             MPI_Get_count(&status, MPI_BYTE, &bytes_received);
             LOG("Chunk size is %ld bytes", bytes_received);
         }
+
+        this->notify_backend(Backend::backendActions::writeFile,
+                             (std::filesystem::path &) file_path, shm, offset, bytes_expected,
+                             false);
     }
 };
 

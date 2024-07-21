@@ -48,3 +48,6 @@ capio_logs
 debug
 build
 
+#capio
+file_location*
+capio_fs/*
