@@ -69,4 +69,9 @@ ENDIF (ENABLE_COVERAGE)
 #####################################
 install(TARGETS ${TARGET_NAME} LIBRARY DESTINATION ${CMAKE_INSTALL_BINDIR})
 
-install(FILES ${CMAKE_CURRENT_SOURCE_DIR}/src/test1.json DESTINATION ${CAPIO_TEST_EXTRA_DIR})
+install(FILES
+        ${CMAKE_CURRENT_SOURCE_DIR}/src/test1.json
+        ${CMAKE_CURRENT_SOURCE_DIR}/src/test2.json
+        ${CMAKE_CURRENT_SOURCE_DIR}/src/test3.json
+        DESTINATION ${CAPIO_TEST_EXTRA_DIR}
+)
