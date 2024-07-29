@@ -1,6 +1,8 @@
 #ifndef CAPIO_VALIDATOR_CL_CONFIGURATION
 #define CAPIO_VALIDATOR_CL_CONFIGURATION
 
+#include <filesystem>
+
 #include <capio/constants.hpp>
 
 class CapioCLConfiguration {

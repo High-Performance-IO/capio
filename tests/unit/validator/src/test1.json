@@ -1,0 +1,117 @@
+{
+  "name": "1000_genome",
+  "aliases": [
+    {
+      "group_name": "file1",
+      "files": [
+        "file_a",
+        "file_b",
+        "file_c"
+      ]
+    }
+  ],
+  "IO_Graph": [
+    {
+      "name": "step1",
+      "input_stream": [],
+      "output_stream": [
+        "file1"
+      ],
+      "streaming": [
+        {
+          "name": [
+            "file1"
+          ],
+          "committed": "on_close",
+          "mode": "update"
+        }
+      ]
+    },
+    {
+      "name": "step2",
+      "input_stream": [
+        "file1"
+      ],
+      "output_stream": [
+        "file2"
+      ],
+      "streaming": [
+        {
+          "name": [
+            "file2"
+          ],
+          "committed": "on_termination",
+          "mode": "no_update"
+        }
+      ]
+    },
+    {
+      "name": "step3",
+      "input_stream": [
+        "file2"
+      ],
+      "output_stream": [
+        "file3"
+      ],
+      "streaming": [
+        {
+          "name": [
+            "file3"
+          ],
+          "committed": "on_file:file4",
+          "mode": "update"
+        }
+      ]
+    },
+    {
+      "name": "step4",
+      "input_stream": [],
+      "output_stream": [
+        "file4"
+      ],
+      "streaming": [
+        {
+          "dirname": [
+            "file4"
+          ],
+          "committed": "n_files:10",
+          "mode": "update"
+        }
+      ]
+    }
+  ],
+  "permanent": [
+    "file1",
+    "file2",
+    "file4"
+  ],
+  "exclude": [
+    "file3"
+  ],
+  "home_node_policy": {
+    "create": [
+      "file0.dat",
+      "file1.dat"
+    ],
+    "hashing": [
+      "file6.dat",
+      "file7.dat"
+    ],
+    "manual": [
+      {
+        "name": [
+          "file2.dat",
+          "file3.dat"
+        ],
+        "app_node": "writer:0"
+      },
+      {
+        "name": [
+          "file4.dat",
+          "file5.dat"
+        ],
+        "app_node": "writer:1"
+      }
+    ]
+  }
+}

@@ -41,7 +41,13 @@ int main(int argc, char **argv) {
         std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_INFO << "parsing config file: " << token
                   << std::endl;
         auto loc = JsonParser::parse(token.c_str(), "/tmp");
-        loc->print();
+        if (loc != nullptr) {
+            loc->print();
+        } else {
+            std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_ERROR
+                      << "Error: provided CAPIO-CL configuration file is not valid!" << std::endl;
+        }
+
     } else {
         std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_ERROR << "Error: no config file provided!"
                   << std::endl;

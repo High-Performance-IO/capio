@@ -193,6 +193,12 @@ jobs:
           capio_integration_tests \
             --gtest_break_on_failure \
             --gtest_print_time=1
+          
+          echo "Run CAPIO validator tests"
+          capio_validator_tests \
+            --gtest_break_on_failure \
+            --gtest_print_time=1
+
       - name: "Show client logs on failure"
         if: ${{ always() && steps.run-tests.outcome == 'failure' && matrix.build_type == 'Debug' }}
         run: tail -v -n +1 capio_logs/posix/$(hostname)/posix_thread_*.log
