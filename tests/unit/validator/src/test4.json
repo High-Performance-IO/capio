@@ -1,0 +1,20 @@
+{
+  "name": "test4",
+  "IO_Graph": [
+    {
+      "name": "step1",
+      "output_stream": [
+        "file1"
+      ],
+      "streaming": [
+        {
+          "name": [
+            "file1"
+          ],
+          "committed": "on_close",
+          "mode": "update"
+        }
+      ]
+    }
+  ]
+}

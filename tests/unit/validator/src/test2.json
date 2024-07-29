@@ -1,0 +1,38 @@
+{
+  "IO_Graph": [
+    {
+      "name": "step1",
+      "input_stream": [],
+      "output_stream": [
+        "file1"
+      ],
+      "streaming": [
+        {
+          "name": [
+            "file1"
+          ],
+          "committed": "on_close",
+          "mode": "update"
+        }
+      ]
+    },
+    {
+      "name": "step2",
+      "input_stream": [
+        "file1"
+      ],
+      "output_stream": [
+        "file2"
+      ],
+      "streaming": [
+        {
+          "name": [
+            "file2"
+          ],
+          "committed": "on_termination",
+          "mode": "no_update"
+        }
+      ]
+    }
+  ]
+}

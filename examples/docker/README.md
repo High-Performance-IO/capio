@@ -1,16 +1,25 @@
 # CAPIO on Docker
 
-Even if CAPIO has been primarily designed for bare metal, high-performance execution environments, [Docker](https://www.docker.com/) containers can be used to set up a simulated distributed environment on a local development machine. This example shows how to set up a minimal environment using CAPIO standard Docker images. Make sure you correctly installed and configured Docker on your local environment (see [here](https://docs.docker.com/engine/install/)).
+Even if CAPIO has been primarily designed for bare metal, high-performance execution
+environments, [Docker](https://www.docker.com/) containers can be used to set up a simulated distributed environment on
+a local development machine. This example shows how to set up a minimal environment using CAPIO standard Docker images.
+Make sure you correctly installed and configured Docker on your local environment (
+see [here](https://docs.docker.com/engine/install/)).
 
 ### Start the execution environment
 
-A `docker-compose.yml` file is provided in the current folder. By default, it starts `2` container instances of the CAPIO standard image, called `alphaunito/capio:latest`. Note that both images mount a `./server` directory from the host in the `/home/capio/server` folder on the container file system. Due to the way CAPIO servers communicate, the `/home/capio/server` folder must be shared between all CAPIO instances. To start the environment, use the following command
+A `docker-compose.yml` file is provided in the current folder. By default, it starts `2` container instances of the
+CAPIO standard image, called `alphaunito/capio:latest`. Note that both images mount a `./server` directory from the host
+in the `/home/capio/server` folder on the container file system. Due to the way CAPIO servers communicate,
+the `/home/capio/server` folder must be shared between all CAPIO instances. To start the environment, use the following
+command
 
 ```bash
 docker compose -p example up -d 
 ```
 
-This command will start two Docker containers called `example-capio-1` and `example-capio-2`. You should be able to see them up and running by using the following command
+This command will start two Docker containers called `example-capio-1` and `example-capio-2`. You should be able to see
+them up and running by using the following command
 
 ```bash
 docker compose -p example ps
@@ -26,7 +35,8 @@ example-capio-2   alphaunito/capio:latest   "/usr/sbin/sshd -D"   capio     5 se
 
 ### Start the CAPIO server
 
-Now it's time to start CAPIO using MPI. The first step is to correctly configure your MPI `hostfile`. You can generate a valid `hostfile` with the following command
+Now it's time to start CAPIO using MPI. The first step is to correctly configure your MPI `hostfile`. You can generate a
+valid `hostfile` with the following command
 
 ```bash
 docker compose -p example ps --format '{{.Names}}' > hostfile
@@ -38,21 +48,25 @@ Then you can copy it inside the first container instance, called `example-capio-
 docker compose -p example cp --index 1 ./hostfile capio:/home/capio/
 ```
 
-Note that you are transferring the file in the home directory of the `capio` user. It is a good practice to avoid using the privileged `root` user whenever possible when working with Docker containers. If the command succeeds, it should print something like this
+Note that you are transferring the file in the home directory of the `capio` user. It is a good practice to avoid using
+the privileged `root` user whenever possible when working with Docker containers. If the command succeeds, it should
+print something like this
 
 ```
 [+] Copying 1/0
  ✔ example-capio-1 copy ./hostfile to example-capio-1:/home/capio/ Copied 
 ```
 
-The last preliminary step is to create the `CAPIO_DIR` on every node. For this example, we set it to `/tmp/capio`. The following command creates a `/tmp/capio` directory on all CAPIO instances using MPI
+The last preliminary step is to create the `CAPIO_DIR` on every node. For this example, we set it to `/tmp/capio`. The
+following command creates a `/tmp/capio` directory on all CAPIO instances using MPI
 
 ```bash
 docker compose -p example exec --user capio --index 1 capio \
   mpirun -N 1 --hostfile /home/capio/hostfile mkdir -p /tmp/capio
 ```
 
-Note that the command requires MPI to execute one process per node using the `-N 1` option of the `mpirun` command, and specifies the nodes' hostnames through the `hostfile` you just generated.
+Note that the command requires MPI to execute one process per node using the `-N 1` option of the `mpirun` command, and
+specifies the nodes' hostnames through the `hostfile` you just generated.
 
 Finally, the CAPIO server can be started in background using the following command
 
@@ -72,11 +86,16 @@ docker compose -p example exec                \
   > server_${OMPI_COMM_WORLD_RANK}.out 2>&1'
 ```
 
-Let's examine some of the options introduced in the previous command. The `--detach` option allows to run a command in background. The `--env` option adds environment variables to the target container instance, in this case the one called `example-capio-1`. The `-x` option of the `mpirun` command propagates the specified list of environment variables to all nodes it targets. Finally, the `--workdir` option specifies that the CAPIO server should use the shared `/home/capio/server` directory as the working directory, to store logs and other configuration files.
+Let's examine some of the options introduced in the previous command. The `--detach` option allows to run a command in
+background. The `--env` option adds environment variables to the target container instance, in this case the one
+called `example-capio-1`. The `-x` option of the `mpirun` command propagates the specified list of environment variables
+to all nodes it targets. Finally, the `--workdir` option specifies that the CAPIO server should use the
+shared `/home/capio/server` directory as the working directory, to store logs and other configuration files.
 
 ### Start the CAPIO application
 
-To run a CAPIO application it is necessary to preload the `libcapio_posix.so` library through the `LD_PRELOAD` environment variable. This operation can be easily achieved using the `docker compose exec` action as follows
+To run a CAPIO application it is necessary to preload the `libcapio_posix.so` library through the `LD_PRELOAD`
+environment variable. This operation can be easily achieved using the `docker compose exec` action as follows
 
 ```bash
 docker compose -p example exec        \
@@ -89,7 +108,9 @@ docker compose -p example exec        \
   touch /tmp/capio/test_file.txt
 ```
 
-The previous command creates an empty file called `test_file.txt` inside the `CAPIO_DIR` of the first CAPIO instance. Now it should be possible to see the file just created by executing an `ls` command on the other CAPIO instance, as follows
+The previous command creates an empty file called `test_file.txt` inside the `CAPIO_DIR` of the first CAPIO instance.
+Now it should be possible to see the file just created by executing an `ls` command on the other CAPIO instance, as
+follows
 
 ```bash
 docker compose -p example exec        \
