@@ -29,7 +29,8 @@ class JsonParser {
 
         locations->newFile(capio_dir);
         if (source.empty()) {
-            return locations;
+            delete locations;
+            return nullptr;
         }
 
         simdjson::ondemand::parser parser;
@@ -43,6 +44,7 @@ class JsonParser {
             std::cerr << CAPIO_LOG_SERVER_CLI_LEVEL_ERROR
                       << "Exception thrown while opening config file: " << e.what() << std::endl;
             LOG("Exception thrown while opening config file: %s", e.what());
+            delete locations;
             return nullptr;
         }
 
@@ -52,6 +54,7 @@ class JsonParser {
         if (entries["name"].get_string().get(wf_name)) {
             std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_ERROR << "Error: workflow name is mandatory"
                       << std::endl;
+            delete locations;
             return nullptr;
         }
         workflow_name = std::string(wf_name);
@@ -67,6 +70,7 @@ class JsonParser {
             if (app["name"].get_string().get(app_name)) {
                 std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_ERROR << "Error: app name is mandatory"
                           << std::endl;
+                delete locations;
                 return nullptr;
             }
 
@@ -77,6 +81,7 @@ class JsonParser {
             if (app["input_stream"].get_array().get(input_stream)) {
                 std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_ERROR
                           << "No input_stream section found for app " << app_name << std::endl;
+                delete locations;
                 return nullptr;
             }
 
@@ -94,6 +99,7 @@ class JsonParser {
             if (app["output_stream"].get_array().get(output_stream)) {
                 std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_ERROR
                           << "No output_stream section found for app " << app_name << std::endl;
+                delete locations;
                 return nullptr;
             }
 
@@ -129,6 +135,7 @@ class JsonParser {
                             // both not found
                             std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_ERROR
                                       << "error: name for application is mandatory" << std::endl;
+                            delete locations;
                             return nullptr;
                         }
                         // found directory
@@ -138,6 +145,7 @@ class JsonParser {
                     if (name.is_empty()) {
                         std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_ERROR
                                   << "error: empty name/dirname section" << std::endl;
+                        delete locations;
                         return nullptr;
                     }
 
@@ -151,6 +159,7 @@ class JsonParser {
                     if (file["committed"].get_string().get(committed)) {
                         std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_ERROR
                                   << "commit rule is mandatory in streaming section" << std::endl;
+                        delete locations;
                         return nullptr;
                     }
                     auto pos = committed.find(':');
@@ -164,6 +173,7 @@ class JsonParser {
                             if (!is_int(n_close_str)) {
                                 std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_ERROR
                                           << "commit rule on_close invalid number" << std::endl;
+                                delete locations;
                                 return nullptr;
                             }
                             n_close = std::stol(n_close_str);
@@ -177,6 +187,7 @@ class JsonParser {
                                       << std::endl;
                             std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_ERROR
                                       << "invalid token is: " << commit_rule << std::endl;
+                            delete locations;
                             return nullptr;
                         }
 
@@ -249,6 +260,7 @@ class JsonParser {
                 if (file.get_string().get(name)) {
                     std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_ERROR
                               << "error name for permanent section is mandatory" << std::endl;
+                    delete locations;
                     return nullptr;
                 }
                 LOG("Permanent name: %s", std::string(name).c_str());
