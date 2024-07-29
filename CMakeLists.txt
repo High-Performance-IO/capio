@@ -73,6 +73,7 @@ ENDIF (CAPIO_LOG AND CMAKE_BUILD_TYPE STREQUAL "Debug")
 #####################################
 add_subdirectory(src/posix)
 add_subdirectory(src/server)
+add_subdirectory(src/cl_validate)
 
 IF (CAPIO_BUILD_TESTS)
     message(STATUS "Building CAPIO test suite")

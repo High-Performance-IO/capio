@@ -31,6 +31,7 @@ constexpr size_t CAPIO_REQ_MAX_SIZE                  = 256 * sizeof(char);
 constexpr char CAPIO_SERVER_CLI_LOG_SERVER[]         = "[ \033[1;32m SERVER \033[0m ] ";
 constexpr char CAPIO_SERVER_CLI_LOG_SERVER_WARNING[] = "[ \033[1;33m SERVER \033[0m ] ";
 constexpr char CAPIO_SERVER_CLI_LOG_SERVER_ERROR[]   = "[ \033[1;31m SERVER \033[0m ] ";
+constexpr char CAPIO_LOG_SERVER_CLI_LEVEL_JSON[]     = "[ \033[1;34m SERVER \033[0m ] ";
 constexpr char LOG_CAPIO_START_REQUEST[]             = "\n+++++++++++ SYSCALL %s (%d) +++++++++++";
 constexpr char LOG_CAPIO_END_REQUEST[]               = "----------- END SYSCALL ----------\n";
 constexpr char CAPIO_SERVER_LOG_START_REQUEST_MSG[]  = "+++++++++++++++++REQUEST+++++++++++++++++";

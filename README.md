@@ -2,7 +2,7 @@
 
 CAPIO (Cross-Application Programmable I/O), is a middleware aimed at injecting streaming capabilities to workflow steps
 without changing the application codebase. It has been proven to work with C/C++ binaries, Fortran Binaries, JAVA,
-python and bash. 
+python and bash.
 
 [![codecov](https://codecov.io/gh/High-Performance-IO/capio/graph/badge.svg?token=6ATRB5VJO3)](https://codecov.io/gh/High-Performance-IO/capio)
 ![CI-Tests](https://github.com/High-Performance-IO/capio/actions/workflows/ci-tests.yaml/badge.svg)
@@ -198,6 +198,7 @@ Massimo Torquati <massimo.torquati@unipi.it> (Designer) \
 Marco Aldinucci <marco.aldinucci@unito.it> (Designer)
 
 ## Papers
+
 [![CAPIO](https://img.shields.io/badge/CAPIO-10.1109/HiPC58850.2023.00031-red)]([https://arxiv.org/abs/2206.10048](https://dx.doi.org/10.1109/HiPC58850.2023.00031))
 
 
