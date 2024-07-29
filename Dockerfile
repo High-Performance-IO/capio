@@ -87,6 +87,11 @@ COPY --from=builder                                         \
     "/usr/local/lib/libsyscall_intercept.so.0.1.0"          \
     /usr/local/lib/
 
+# Additional test files
+COPY --from=builder                                         \
+        "/usr/local/capio_tests/test1.json"                 \
+        /usr/local/capio_tests/
+
 # Binaries
 COPY --from=builder                                         \
     "/usr/local/bin/capio_posix_unit_test[s]"               \
@@ -94,6 +99,7 @@ COPY --from=builder                                         \
     "/usr/local/bin/capio_server_unit_test[s]"              \
     "/usr/local/bin/capio_syscall_unit_test[s]"             \
     "/usr/local/bin/capio_integration_test[s]"              \
+    "/usr/local/bin/capio_validator_test[s]"                \
     /usr/local/bin/
 
 # Pkgconfig

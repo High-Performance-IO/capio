@@ -81,6 +81,14 @@ jobs:
             capio_integration_tests             \
             --gtest_break_on_failure            \
             --gtest_print_time=1
+          
+          echo "Run CAPIO validator tests"
+          docker run --rm                     \
+          --name capio-docker                 \
+          alphaunito/capio:latest             \
+          capio_validator_tests               \
+          --gtest_break_on_failure            \
+          --gtest_print_time=1
 
   format-check:
     name: "Check ${{ matrix.path }} clang-format conformance"
