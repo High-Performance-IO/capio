@@ -22,7 +22,7 @@
           "name": [
             "file1"
           ],
-          "committed": "on_close",
+          "committed": "on_close:5",
           "mode": "update"
         }
       ]
@@ -77,6 +77,13 @@
           "committed": "n_files:10",
           "mode": "update"
         }
+      ]
+    },
+    {
+      "name": "step5",
+      "input_stream": [],
+      "output_stream": [
+        "file4"
       ]
     }
   ],

@@ -73,5 +73,7 @@ install(FILES
         ${CMAKE_CURRENT_SOURCE_DIR}/src/test1.json
         ${CMAKE_CURRENT_SOURCE_DIR}/src/test2.json
         ${CMAKE_CURRENT_SOURCE_DIR}/src/test3.json
+        ${CMAKE_CURRENT_SOURCE_DIR}/src/test4.json
+        ${CMAKE_CURRENT_SOURCE_DIR}/src/test5.json
         DESTINATION ${CAPIO_TEST_EXTRA_DIR}
 )

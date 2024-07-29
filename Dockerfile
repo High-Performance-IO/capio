@@ -92,6 +92,8 @@ COPY --from=builder                                         \
         "/usr/local/capio_tests/test1.json"                 \
         "/usr/local/capio_tests/test2.json"                 \
         "/usr/local/capio_tests/test3.json"                 \
+        "/usr/local/capio_tests/test4.json"                 \
+        "/usr/local/capio_tests/test5.json"                 \
         /usr/local/capio_tests/
 
 # Binaries
