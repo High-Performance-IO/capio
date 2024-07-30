@@ -29,7 +29,7 @@ inline void consent_to_proceed_handler(const char *const str) {
         return;
     }
 
-    if (std::filesystem::exists(path)) {
+    if (std::filesystem::exists(path) || CapioFileManager::is_committed(path)) {
         client_manager->reply_to_client(tid, 1);
     } else {
         client_manager->add_thread_awaiting_creation(path, tid);

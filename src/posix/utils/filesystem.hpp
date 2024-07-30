@@ -286,7 +286,7 @@ inline void rename_capio_path(const std::string &oldpath, const std::string &new
         for (auto fd : capio_files_paths->at(newpath)) {
             capio_files_descriptors->at(fd).assign(newpath);
         }
-    }else {
+    } else {
         LOG("Warning: olpath not found in capio_files_paths");
     }
 }

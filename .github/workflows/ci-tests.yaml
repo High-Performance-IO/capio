@@ -183,33 +183,33 @@ jobs:
       - name: "Show server logs on failure"
         if: ${{ always() && steps.run-tests.outcome == 'failure' && matrix.build_type == 'Debug' }}
         run: tail -v -n +1 capio_logs/server/$(hostname)/server_thread_*.log
-      - name: "Generate coverage report"
-        if: ${{ matrix.build_type == 'Debug' }}
-        run: |
-          pip install --upgrade gcovr
-          gcovr \
-            --exclude-throw-branches \
-            --xml coverage.xml \
-            --gcov-executable "${{ startsWith(matrix.cxx, 'clang-') && format('llvm-cov-{0} gcov', env.CXX_VERSION) || format('gcov-{0}', env.CXX_VERSION) }}" \
-            ../build
-      - name: "Upload coverage report"
-        if: ${{ matrix.build_type == 'Debug' }}
-        uses: actions/upload-artifact@v4
-        with:
-          name: ${{ format('{0}-tests', matrix.cxx) }}
-          path: ./coverage.xml
-          retention-days: 1
-          if-no-files-found: error
-  upload-to-codecov:
-    name: "Codecov report upload"
-    needs: [ "unit-tests" , "codespell-check" , "format-check" ]
-    runs-on: ubuntu-22.04
-    steps:
-      - uses: actions/checkout@v4
-      - name: "Download artifacts"
-        uses: actions/download-artifact@v4
-      - name: "Upload coverage to Codecov"
-        uses: codecov/codecov-action@v4
-        with:
-          fail_ci_if_error: true
-          token: ${{ secrets.CODECOV_TOKEN }}
+#      - name: "Generate coverage report"
+#        if: ${{ matrix.build_type == 'Debug' }}
+#        run: |
+#          pip install --upgrade gcovr
+#          gcovr \
+#            --exclude-throw-branches \
+#            --xml coverage.xml \
+#            --gcov-executable "${{ startsWith(matrix.cxx, 'clang-') && format('llvm-cov-{0} gcov', env.CXX_VERSION) || format('gcov-{0}', env.CXX_VERSION) }}" \
+#            ../build
+#      - name: "Upload coverage report"
+#        if: ${{ matrix.build_type == 'Debug' }}
+#        uses: actions/upload-artifact@v4
+#        with:
+#          name: ${{ format('{0}-tests', matrix.cxx) }}
+#          path: ./coverage.xml
+#          retention-days: 1
+#          if-no-files-found: error
+#  upload-to-codecov:
+#    name: "Codecov report upload"
+#    needs: [ "unit-tests" , "codespell-check" , "format-check" ]
+#    runs-on: ubuntu-22.04
+#    steps:
+#      - uses: actions/checkout@v4
+#      - name: "Download artifacts"
+#        uses: actions/download-artifact@v4
+#      - name: "Upload coverage to Codecov"
+#        uses: codecov/codecov-action@v4
+#        with:
+#          fail_ci_if_error: true
+#          token: ${{ secrets.CODECOV_TOKEN }}

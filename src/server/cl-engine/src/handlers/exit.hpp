@@ -5,10 +5,10 @@
 inline void exit_handler(const char *const str) {
     // TODO: register files open for each tid ti register a close
     int tid;
-    char path[PATH_MAX];
     sscanf(str, "%d", &tid);
-
-    // TODO: handle commits on termination
+    START_LOG(gettid(), "call(tid=%d)", tid);
+    CapioFileManager::set_committed(tid);
+    client_manager->remove_client(tid);
 }
 
 #endif // CAPIO_EXIT_HPP

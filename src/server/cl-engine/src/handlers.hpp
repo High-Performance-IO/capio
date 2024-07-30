@@ -9,7 +9,6 @@
 #include "handlers/open.hpp"
 #include "handlers/read.hpp"
 #include "handlers/rename.hpp"
-#include "handlers/seek.hpp"
 #include "handlers/write.hpp"
 
 #endif // HANDLERS_HPP

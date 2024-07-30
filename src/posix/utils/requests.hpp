@@ -42,19 +42,6 @@ inline void consent_to_proceed_request(const std::filesystem::path &path, const 
     bufs_response->at(tid)->read(&res);
 }
 
-inline off64_t seek_request(const std::filesystem::path &path, const long offset, const int whence,
-                            const long tid, int fd) {
-    START_LOG(capio_syscall(SYS_gettid), "call(path=%s, offset=%ld, tid=%ld)", path.c_str(), offset,
-              tid);
-    char req[CAPIO_REQ_MAX_SIZE];
-    sprintf(req, "%04d %ld %s %ld %d %d", CAPIO_REQUEST_SEEK, tid, path.c_str(), offset, fd,
-            whence);
-    buf_requests->write(req, CAPIO_REQ_MAX_SIZE);
-    off64_t res;
-    bufs_response->at(tid)->read(&res);
-    return res;
-}
-
 // non blocking
 inline void close_request(const std::filesystem::path &path, const long tid) {
     START_LOG(capio_syscall(SYS_gettid), "call(path=%s, tid=%ld)", path.c_str(), tid);

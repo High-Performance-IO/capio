@@ -9,6 +9,10 @@ class ClientManager {
     std::unordered_map<std::string, std::vector<int> *> *thread_awaiting_file_creation;
     std::unordered_map<std::string, std::unordered_map<int, size_t> *> *thread_awaiting_data;
 
+    // TODO: this is an approx. here opnly the creator will commit the file.
+    // TODO: more complex checks needs to be done but this is a temporary fix
+    std::unordered_map<int, std::vector<std::string> *> *files_to_be_committed_by_tid;
+
   public:
     ClientManager() {
         bufs_response                 = new CSBufResponse_t();
@@ -16,6 +20,8 @@ class ClientManager {
         thread_awaiting_file_creation = new std::unordered_map<std::string, std::vector<int> *>;
         thread_awaiting_data =
             new std::unordered_map<std::string, std::unordered_map<int, size_t> *>;
+
+        files_to_be_committed_by_tid = new std::unordered_map<int, std::vector<std::string> *>;
     }
 
     ~ClientManager() {
@@ -23,6 +29,7 @@ class ClientManager {
         delete app_names;
         delete thread_awaiting_file_creation;
         delete thread_awaiting_data;
+        delete files_to_be_committed_by_tid;
         std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_WARNING << "buf_response cleanup completed"
                   << std::endl;
     }
@@ -39,6 +46,7 @@ class ClientManager {
                                       CAPIO_REQ_BUFF_CNT, sizeof(off_t), workflow_name);
         bufs_response->insert(std::make_pair(tid, p_buf_response));
         app_names->emplace(tid, app_name);
+        files_to_be_committed_by_tid->emplace(tid, new std::vector<std::string>);
     }
 
     /**
@@ -52,6 +60,7 @@ class ClientManager {
             delete it_resp->second;
             bufs_response->erase(it_resp);
         }
+        files_to_be_committed_by_tid->erase(tid);
     }
 
     /**
@@ -91,23 +100,37 @@ class ClientManager {
     }
 
     void unlock_thread_awaiting_data(std::string path) {
+        START_LOG(gettid(), "call(path=%s)", path.c_str());
         auto path_size = std::filesystem::file_size(path);
 
-        if (thread_awaiting_data->find(path) == thread_awaiting_data->end()) {
+        if (thread_awaiting_data->find(path) != thread_awaiting_data->end()) {
+            LOG("Path has thread awaiting");
             auto th = thread_awaiting_data->at(path);
             std::vector<int> item_to_delete;
+
             for (auto item : *th) {
-                if (item.second >= std::filesystem::file_size(path)) {
+                LOG("Handling thread");
+                if (CapioFileManager::is_committed(path) ||
+                    item.second >= std::filesystem::file_size(path)) {
+                    LOG("Thread %ld can be unlocked", item.first);
                     reply_to_client(item.first, path_size);
                     item_to_delete.emplace_back(item.first);
                 }
             }
-
             // cleanup of served clients
             for (auto itm : item_to_delete) {
+                LOG("Cleanup of thread %ld", itm);
                 th->erase(itm);
             }
         }
+    }
+
+    void add_producer_file_path(int tid, std::string &path) const {
+        files_to_be_committed_by_tid->at(tid)->emplace_back(path);
+    }
+
+    [[nodiscard]] auto get_produced_files(int tid) const {
+        return files_to_be_committed_by_tid->at(tid);
     }
 };
 

@@ -1,8 +1,12 @@
 #ifndef CAPIO_CL_ENGINE_MAIN_HPP
 #define CAPIO_CL_ENGINE_MAIN_HPP
+
+#include "src/file_manager_header.hpp"
+
 #include "capio/requests.hpp"
 #include "src/capio_cl_configuration.hpp"
 #include "src/client_manager.hpp"
+#include "src/file_manager.hpp"
 #include "src/json_parser.hpp"
 
 #include "src/handlers.hpp"
@@ -29,7 +33,6 @@ class ClEngine {
         _request_handlers[CAPIO_REQUEST_OPEN]                = open_handler;
         _request_handlers[CAPIO_REQUEST_READ]                = read_handler;
         _request_handlers[CAPIO_REQUEST_RENAME]              = rename_handler;
-        _request_handlers[CAPIO_REQUEST_SEEK]                = seek_handler;
         _request_handlers[CAPIO_REQUEST_WRITE]               = write_handler;
 
         return _request_handlers;
