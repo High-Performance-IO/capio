@@ -3,7 +3,7 @@
 #include <cl-engine/cl_engine.hpp>
 
 inline void close_handler(const char *const str) {
-    int tid;
+    pid_t tid;
     char path[PATH_MAX];
     sscanf(str, "%d %s", &tid, path);
 

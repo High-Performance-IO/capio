@@ -21,7 +21,7 @@ template <class T, class Mutex> class Queue {
     Mutex _mutex;
     NamedSemaphore _sem_num_elems, _sem_num_empty;
 
-    inline void _read(T *buff_recv, int num_bytes) {
+    inline void _read(T *buff_recv, unsigned long long int num_bytes) {
         _sem_num_elems.lock();
 
         std::lock_guard<Mutex> lg(_mutex);
@@ -32,7 +32,7 @@ template <class T, class Mutex> class Queue {
         _sem_num_empty.unlock();
     }
 
-    inline void _write(const T *data, int num_bytes) {
+    inline void _write(const T *data, unsigned long long int num_bytes) {
         _sem_num_empty.lock();
 
         std::lock_guard<Mutex> lg(_mutex);
@@ -95,8 +95,8 @@ template <class T, class Mutex> class Queue {
 
     inline auto get_name() { return this->_shm_name; }
 
-    inline void read(T *buff_rcv, long int num_bytes) {
-        START_LOG(capio_syscall(SYS_gettid), "call(buff_rcv=0x%08x, num_bytes=%ld)", buff_rcv,
+    inline void read(T *buff_rcv, unsigned long long int num_bytes) {
+        START_LOG(capio_syscall(SYS_gettid), "call(buff_rcv=0x%08x, num_bytes=%llu)", buff_rcv,
                   num_bytes);
 
         off64_t n_reads = num_bytes / _elem_size;
@@ -129,8 +129,8 @@ template <class T, class Mutex> class Queue {
         return segment;
     }
 
-    inline void write(const T *data, long int num_bytes) {
-        START_LOG(capio_syscall(SYS_gettid), "call(data=0x%08x, num_bytes=%ld)", data, num_bytes);
+    inline void write(const T *data, unsigned long long int num_bytes) {
+        START_LOG(capio_syscall(SYS_gettid), "call(data=0x%08x, num_bytes=%llu)", data, num_bytes);
 
         off64_t n_writes = num_bytes / _elem_size;
         size_t r         = num_bytes % _elem_size;

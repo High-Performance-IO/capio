@@ -3,7 +3,7 @@
 #include <cl-engine/cl_engine.hpp>
 
 inline void rename_handler(const char *const str) {
-    int tid;
+    pid_t tid;
     char old_path[PATH_MAX], new_path[PATH_MAX];
     sscanf(str, "%d %s %s", &tid, old_path, new_path);
     START_LOG(gettid(), "call(tid=%d, old=%s, new=%s)", tid, old_path, new_path);

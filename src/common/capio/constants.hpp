@@ -7,6 +7,9 @@
 
 #include <sys/types.h>
 
+// 64bit unsigned long int type for file offsets
+typedef unsigned long long int capio_off64_t;
+
 // CAPIO files constants
 constexpr size_t CAPIO_DEFAULT_DIR_INITIAL_SIZE   = 1024L * 1024 * 1024;
 constexpr off64_t CAPIO_DEFAULT_FILE_INITIAL_SIZE = 1024L * 1024 * 1024 * 4;
@@ -85,18 +88,24 @@ constexpr char CAPIO_LOG_POSIX_SYSCALL_END[]             = "~~~~~~~~~  END SYSCA
 constexpr char CAPIO_SERVER_DEFAULT_LOG_FILE_PREFIX[] = "server_thread_\0";
 constexpr char CAPIO_LOG_SERVER_BANNER[] =
     "\n\n "
-    "\033[1;34m /$$$$$$   /$$$$$$  /$$$$$$$\033[0;96m  /$$$$$$  /$$$$$$ \n"
-    "\033[1;34m /$$__  $$ /$$__  $$| $$__  $$\033[0;96m|_  $$_/ /$$__  $$\n"
-    "\033[1;34m| $$  \\__/| $$  \\ $$| $$  \\ $$ \033[0;96m | $$  | $$  \\ "
-    "$$\n"
-    "\033[1;34m| $$      | $$$$$$$$| $$$$$$$/  \033[0;96m| $$  | $$  | $$\n"
-    "\033[1;34m| $$      | $$__  $$| $$____/   \033[0;96m| $$  | $$  | $$\n"
-    "\033[1;34m| $$    $$| $$  | $$| $$        \033[0;96m| $$  | $$  | $$\n"
-    "\033[1;34m|  $$$$$$/| $$  | $$| $$       \033[0;96m/$$$$$$|  $$$$$$/\n"
-    "\033[1;34m \\______/ |__/  |__/|__/      \033[0;96m|______/ "
-    "\\______/\n\n"
-    "\033[0m   CAPIO - Cross Application Programmable IO         \n"
-    "                    V. " CAPIO_VERSION "\n\n";
+    "\033[1;34m /$$$$$$   /$$$$$$  /$$$$$$$\033[0;96m  /$$$$$$  /$$$$$$ \033[1;33m         "
+    "$$$$$$$$\\  $$$$$$\\  \n"
+    "\033[1;34m /$$__  $$ /$$__  $$| $$__  $$\033[0;96m|_  $$_/ /$$__  $$\033[1;33m         $$  "
+    "_____|$$  __$$\\ \n"
+    "\033[1;34m| $$  \\__/| $$  \\ $$| $$  \\ $$ \033[0;96m | $$  | $$  \\ $$\033[1;33m         $$ "
+    "|      $$ /  \\__|\n"
+    "\033[1;34m| $$      | $$$$$$$$| $$$$$$$/  \033[0;96m| $$  | $$  | $$\033[1;33m $$$$$$\\ "
+    "$$$$$\\    \\$$$$$$\\  \n"
+    "\033[1;34m| $$      | $$__  $$| $$____/   \033[0;96m| $$  | $$  | $$\033[1;33m \\______|$$  "
+    "__|    \\____$$\\ \n"
+    "\033[1;34m| $$    $$| $$  | $$| $$        \033[0;96m| $$  | $$  | $$\033[1;33m         $$ |   "
+    "   $$\\   $$ |\n"
+    "\033[1;34m|  $$$$$$/| $$  | $$| $$       \033[0;96m/$$$$$$|  $$$$$$/\033[1;33m         $$ |   "
+    "   \\$$$$$$  |\n"
+    "\033[1;34m \\______/ |__/  |__/|__/      \033[0;96m|______/ \\______/\033[1;33m          "
+    "\\__|       \\______/ \n\n"
+    "\033[0m        CAPIO - Cross Application Programmable IO - File System edition        \n"
+    "                                V. " CAPIO_VERSION "\n\n";
 constexpr char CAPIO_LOG_SERVER_CLI_LEVEL_INFO[]    = "[ \033[1;32m SERVER \033[0m ] ";
 constexpr char CAPIO_LOG_SERVER_CLI_LEVEL_WARNING[] = "[ \033[1;33m SERVER \033[0m ] ";
 constexpr char CAPIO_LOG_SERVER_CLI_LEVEL_ERROR[]   = "[ \033[1;31m SERVER \033[0m ] ";
@@ -121,9 +130,8 @@ constexpr char CAPIO_LOG_SERVER_REQUEST_END[]   = "~~~~~~~~~ END REQUEST ~~~~~~~
 
 // CAPIO server argument parser
 constexpr char CAPIO_SERVER_ARG_PARSER_PRE[] =
-    "Cross Application Programmable IO application. developed by Alberto "
-    "Riccardo Martinelli (UniTO), Massimo Torquati(UniPI), Marco Aldinucci (UniTO), Iacopo "
-    "Colonnelli(UniTO)  and Marco Edoardo Santimaria (UniTO).";
+    "Cross Application Programmable IO application. developed by Marco Edoardo Santimaria (UniTO), "
+    "Iacopo Colonnelli(UniTO),  Massimo Torquati(UniPI) and  Marco Aldinucci (UniTO), ";
 constexpr char CAPIO_SERVER_ARG_PARSER_EPILOGUE[] =
     "For further help, a full list of the available ENVIRONMENT VARIABLES,"
     " and a guide on config JSON file structure, please visit "

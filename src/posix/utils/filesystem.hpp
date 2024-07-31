@@ -17,10 +17,10 @@
 
 #include "types.hpp"
 
-CPFileDescriptors_t *capio_files_descriptors;
-CPFilesPaths_t *capio_files_paths;
-std::unique_ptr<std::filesystem::path> current_dir;
-CPFiles_t *files;
+inline CPFileDescriptors_t *capio_files_descriptors;
+inline CPFilesPaths_t *capio_files_paths;
+inline std::unique_ptr<std::filesystem::path> current_dir;
+inline CPFiles_t *files;
 
 /**
  * Set the CLOEXEC property of a file descriptor in metadata structures
@@ -53,8 +53,8 @@ inline void add_capio_path(const std::string &path) {
  * @param fd
  * @return
  */
-inline void add_capio_fd(long tid, const std::string &path, int fd, off64_t offset,
-                         off64_t init_size, int flags, bool is_cloexec) {
+inline void add_capio_fd(pid_t tid, const std::string &path, int fd, capio_off64_t offset,
+                         capio_off64_t init_size, int flags, bool is_cloexec) {
     START_LOG(tid, "call(path=%s, fd=%d)", path.c_str(), fd);
     add_capio_path(path);
     LOG("Added capio path %s", path.c_str());
@@ -114,7 +114,7 @@ inline std::filesystem::path capio_absolute(const std::filesystem::path &path) {
  * @param fd
  * @return
  */
-inline void delete_capio_fd(int fd) {
+inline void delete_capio_fd(pid_t fd) {
     START_LOG(syscall_no_intercept(SYS_gettid), "call(fd=%d)", fd);
     auto &path = capio_files_descriptors->at(fd);
     capio_files_paths->at(path).erase(fd);
@@ -158,7 +158,7 @@ inline void destroy_filesystem() {
  * @param newfd
  * @return
  */
-inline void dup_capio_fd(long tid, int oldfd, int newfd, bool is_cloexec) {
+inline void dup_capio_fd(pid_t tid, int oldfd, int newfd, bool is_cloexec) {
     const std::string &path = capio_files_descriptors->at(oldfd);
     capio_files_paths->at(path).insert(newfd);
     files->insert({newfd, files->at(oldfd)});
@@ -171,7 +171,7 @@ inline void dup_capio_fd(long tid, int oldfd, int newfd, bool is_cloexec) {
  * @param fd
  * @return if the file descriptor exists
  */
-inline bool exists_capio_fd(int fd) {
+inline bool exists_capio_fd(pid_t fd) {
     START_LOG(capio_syscall(SYS_gettid), "call(fd=%d)", fd);
     return files->find(fd) != files->end();
 }

@@ -8,7 +8,7 @@ This handler only checks if the client is allowed to continue
 */
 
 inline void consent_to_proceed_handler(const char *const str) {
-    int tid;
+    pid_t tid;
     char path[1024];
     sscanf(str, "%d %s", &tid, path);
     START_LOG(gettid(), "call(tid=%d, path=%s)", tid, path);
@@ -24,7 +24,7 @@ inline void consent_to_proceed_handler(const char *const str) {
     }
 
     if (!capio_configuration->file_to_be_handled(path_fs)) {
-        LOG("Ignore calls as fiel should not be treated by CAPIO");
+        LOG("Ignore calls as file should not be treated by CAPIO");
         client_manager->reply_to_client(tid, 1);
         return;
     }

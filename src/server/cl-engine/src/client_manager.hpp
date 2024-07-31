@@ -6,22 +6,22 @@ class ClientManager {
     CSBufResponse_t *bufs_response;
     std::unordered_map<int, const std::string> *app_names;
 
-    std::unordered_map<std::string, std::vector<int> *> *thread_awaiting_file_creation;
-    std::unordered_map<std::string, std::unordered_map<int, size_t> *> *thread_awaiting_data;
+    std::unordered_map<std::string, std::vector<pid_t> *> *thread_awaiting_file_creation;
+    std::unordered_map<std::string, std::unordered_map<pid_t, capio_off64_t> *>
+        *thread_awaiting_data;
 
     // TODO: this is an approx. here opnly the creator will commit the file.
     // TODO: more complex checks needs to be done but this is a temporary fix
-    std::unordered_map<int, std::vector<std::string> *> *files_to_be_committed_by_tid;
+    std::unordered_map<pid_t, std::vector<std::string> *> *files_to_be_committed_by_tid;
 
   public:
     ClientManager() {
         bufs_response                 = new CSBufResponse_t();
         app_names                     = new std::unordered_map<int, const std::string>;
-        thread_awaiting_file_creation = new std::unordered_map<std::string, std::vector<int> *>;
+        thread_awaiting_file_creation = new std::unordered_map<std::string, std::vector<pid_t> *>;
         thread_awaiting_data =
-            new std::unordered_map<std::string, std::unordered_map<int, size_t> *>;
-
-        files_to_be_committed_by_tid = new std::unordered_map<int, std::vector<std::string> *>;
+            new std::unordered_map<std::string, std::unordered_map<pid_t, capio_off64_t> *>;
+        files_to_be_committed_by_tid = new std::unordered_map<pid_t, std::vector<std::string> *>;
     }
 
     ~ClientManager() {
@@ -39,11 +39,11 @@ class ClientManager {
      * @param tid
      * @return
      */
-    inline void register_new_client(long tid, const std::string &app_name) const {
+    inline void register_new_client(pid_t tid, const std::string &app_name) const {
         // TODO: replace numbers with constexpr
         auto *p_buf_response =
-            new CircularBuffer<off_t>(SHM_COMM_CHAN_NAME_RESP + std::to_string(tid),
-                                      CAPIO_REQ_BUFF_CNT, sizeof(off_t), workflow_name);
+            new CircularBuffer<capio_off64_t>(SHM_COMM_CHAN_NAME_RESP + std::to_string(tid),
+                                              CAPIO_REQ_BUFF_CNT, sizeof(off_t), workflow_name);
         bufs_response->insert(std::make_pair(tid, p_buf_response));
         app_names->emplace(tid, app_name);
         files_to_be_committed_by_tid->emplace(tid, new std::vector<std::string>);
@@ -54,7 +54,7 @@ class ClientManager {
      * @param tid
      * @return
      */
-    inline void remove_client(int tid) {
+    inline void remove_client(pid_t tid) {
         auto it_resp = bufs_response->find(tid);
         if (it_resp != bufs_response->end()) {
             delete it_resp->second;
@@ -69,13 +69,13 @@ class ClientManager {
      * @param offset
      * @return
      */
-    inline void reply_to_client(long tid, off64_t offset) {
+    inline void reply_to_client(pid_t tid, capio_off64_t offset) {
         START_LOG(gettid(), "call(tid=%ld, offset=%ld)", tid, offset);
 
         return bufs_response->at(tid)->write(&offset);
     }
 
-    void add_thread_awaiting_creation(std::string path, int tid) {
+    void add_thread_awaiting_creation(std::string path, pid_t tid) {
         if (thread_awaiting_file_creation->find(path) == thread_awaiting_file_creation->end()) {
             thread_awaiting_file_creation->emplace(path, new std::vector<int>);
         }
@@ -94,7 +94,7 @@ class ClientManager {
     // register tid to wait for file size of certain size
     void add_thread_awaiting_data(std::string path, int tid, size_t expected_size) {
         if (thread_awaiting_data->find(path) == thread_awaiting_data->end()) {
-            thread_awaiting_data->emplace(path, new std::unordered_map<int, size_t>);
+            thread_awaiting_data->emplace(path, new std::unordered_map<pid_t, capio_off64_t>);
         }
         thread_awaiting_data->at(path)->emplace(tid, expected_size);
     }
@@ -106,7 +106,7 @@ class ClientManager {
         if (thread_awaiting_data->find(path) != thread_awaiting_data->end()) {
             LOG("Path has thread awaiting");
             auto th = thread_awaiting_data->at(path);
-            std::vector<int> item_to_delete;
+            std::vector<pid_t> item_to_delete;
 
             for (auto item : *th) {
                 LOG("Handling thread");
@@ -125,11 +125,11 @@ class ClientManager {
         }
     }
 
-    void add_producer_file_path(int tid, std::string &path) const {
+    void add_producer_file_path(pid_t tid, std::string &path) const {
         files_to_be_committed_by_tid->at(tid)->emplace_back(path);
     }
 
-    [[nodiscard]] auto get_produced_files(int tid) const {
+    [[nodiscard]] auto get_produced_files(pid_t tid) const {
         return files_to_be_committed_by_tid->at(tid);
     }
 };

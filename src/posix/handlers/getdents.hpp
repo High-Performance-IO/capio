@@ -8,7 +8,7 @@ inline int getdents_handler_impl(long arg0, long arg1, long arg2, long *result, 
     auto fd      = static_cast<int>(arg0);
     auto *buffer = reinterpret_cast<struct linux_dirent64 *>(arg1);
     auto count   = static_cast<off64_t>(arg2);
-    long tid     = syscall_no_intercept(SYS_gettid);
+    auto tid     = static_cast<pid_t>(syscall_no_intercept(SYS_gettid));
 
     START_LOG(tid, "call(fd=%d, dirp=0x%08x, count=%ld, is64bit=%s)", fd, buffer, count,
               is64bit ? "true" : "false");

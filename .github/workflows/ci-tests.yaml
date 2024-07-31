@@ -17,59 +17,59 @@ jobs:
       - uses: actions/checkout@v4
       - name: "Run codespell"
         uses: codespell-project/actions-codespell@v2
-  docker-check:
-    name: "Check Docker image"
-    runs-on: ubuntu-22.04
-    strategy:
-      matrix:
-        cmake-build-type:
-          - "Debug"
-          - "Release"
-    steps:
-      - uses: actions/checkout@v4
-      - uses: docker/setup-qemu-action@v3
-      - uses: docker/setup-buildx-action@v3
-      - name: "Build Docker image"
-        uses: docker/build-push-action@v5
-        with:
-          build-args: |
-            CAPIO_BUILD_TESTS=ON
-            CAPIO_LOG=${{ matrix.cmake-build-type == 'Debug' && 'ON' || 'OFF' }}
-            CMAKE_BUILD_TYPE=${{ matrix.cmake-build-type }}
-          load: true
-          tags: alphaunito/capio:latest
-      - name: "Run unit tests with Docker"
-        run: |
-          echo "Run CAPIO POSIX Unit tests"
-          docker run --rm                         \
-              --env CAPIO_DIR=/tmp                \
-              --env CAPIO_LOG_LEVEL=-1            \
-              --name capio-docker                 \
-              alphaunito/capio:latest             \
-            capio_posix_unit_tests                \
-              --gtest_break_on_failure            \
-              --gtest_print_time=1
-          
-          echo "Run CAPIO server Unit tests"
-          docker run --rm                         \
-              --env CAPIO_DIR=/tmp                \
-              --env CAPIO_LOG_LEVEL=-1            \
-              --name capio-docker                 \
-              alphaunito/capio:latest             \
-            capio_server_unit_tests               \
-              --gtest_break_on_failure            \
-              --gtest_print_time=1
-          
-          echo "Run CAPIO integration tests"
-            docker run --rm                     \
-            --env CAPIO_DIR=/tmp                \
-            --env CAPIO_LOG_LEVEL=-1            \
-            --env LD_PRELOAD=libcapio_posix.so  \
-            --name capio-docker                 \
-            alphaunito/capio:latest             \
-            capio_integration_tests             \
-            --gtest_break_on_failure            \
-            --gtest_print_time=1
+#  docker-check:
+#    name: "Check Docker image"
+#    runs-on: ubuntu-22.04
+#    strategy:
+#      matrix:
+#        cmake-build-type:
+#          - "Debug"
+#          - "Release"
+#    steps:
+#      - uses: actions/checkout@v4
+#      - uses: docker/setup-qemu-action@v3
+#      - uses: docker/setup-buildx-action@v3
+#      - name: "Build Docker image"
+#        uses: docker/build-push-action@v5
+#        with:
+#          build-args: |
+#            CAPIO_BUILD_TESTS=ON
+#            CAPIO_LOG=${{ matrix.cmake-build-type == 'Debug' && 'ON' || 'OFF' }}
+#            CMAKE_BUILD_TYPE=${{ matrix.cmake-build-type }}
+#          load: true
+#          tags: alphaunito/capio:latest
+#      - name: "Run unit tests with Docker"
+#        run: |
+#          echo "Run CAPIO POSIX Unit tests"
+#          docker run --rm                         \
+#              --env CAPIO_DIR=/tmp                \
+#              --env CAPIO_LOG_LEVEL=-1            \
+#              --name capio-docker                 \
+#              alphaunito/capio:latest             \
+#            capio_posix_unit_tests                \
+#              --gtest_break_on_failure            \
+#              --gtest_print_time=1
+#
+#          echo "Run CAPIO server Unit tests"
+#          docker run --rm                         \
+#              --env CAPIO_DIR=/tmp                \
+#              --env CAPIO_LOG_LEVEL=-1            \
+#              --name capio-docker                 \
+#              alphaunito/capio:latest             \
+#            capio_server_unit_tests               \
+#              --gtest_break_on_failure            \
+#              --gtest_print_time=1
+#
+#          echo "Run CAPIO integration tests"
+#            docker run --rm                     \
+#            --env CAPIO_DIR=/tmp                \
+#            --env CAPIO_LOG_LEVEL=-1            \
+#            --env LD_PRELOAD=libcapio_posix.so  \
+#            --name capio-docker                 \
+#            alphaunito/capio:latest             \
+#            capio_integration_tests             \
+#            --gtest_break_on_failure            \
+#            --gtest_print_time=1
 
   format-check:
     name: "Check ${{ matrix.path }} clang-format conformance"

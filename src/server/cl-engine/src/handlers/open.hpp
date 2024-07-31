@@ -1,9 +1,10 @@
 #ifndef OPEN_HPP
 #define OPEN_HPP
 inline void open_handler(const char *const str) {
-    int tid, fd;
+    pid_t tid;
+    int fd;
     char path[PATH_MAX];
-    sscanf(str, "%ld %d %s", &tid, &fd, path);
+    sscanf(str, "%d %d %s", &tid, &fd, path);
     START_LOG(gettid(), "call(tid=%d, fd=%d, path=%s", tid, fd, path);
 
     if (std::filesystem::exists(path)) {

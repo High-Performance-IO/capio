@@ -170,8 +170,6 @@ class JsonParser {
                         }
                         LOG("path: %s", path.c_str());
 
-                        std::size_t pos = path.native().find('*');
-
                         // TODO: check for globs
                         std::string commit(commit_rule), firerule(mode);
                         if (n_files != -1) {
@@ -194,7 +192,6 @@ class JsonParser {
         } // END OF APP MAIN LOOPS
         LOG("Completed parsing of io_graph app main loops");
 
-        long int batch_size = 0;
         if (entries["permanent"].get_array().get(permanent_files)) { // PARSING PERMANENT FILES
             std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_WARNING
                       << "No permanent section found for workflow: " << workflow_name << std::endl;
@@ -216,7 +213,6 @@ class JsonParser {
                 // NOTE: here there was a copy of the previous structured block.
                 // pretty much sure it is a bug, but it might be wanted...
 
-                std::size_t pos = path.native().find('*');
                 // TODO: check for globs
 
                 locations->setPermanent(name.data(), true);

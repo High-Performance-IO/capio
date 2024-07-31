@@ -8,8 +8,7 @@
 
 int access_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg5, long *result) {
     const std::string_view pathname(reinterpret_cast<const char *>(arg0));
-    auto mode = static_cast<mode_t>(arg1);
-    long tid  = syscall_no_intercept(SYS_gettid);
+    auto tid = static_cast<pid_t>(syscall_no_intercept(SYS_gettid));
     START_LOG(tid, "call()");
     if (is_forbidden_path(pathname)) {
         LOG("Path %s is forbidden: skip", pathname.data());
@@ -29,9 +28,7 @@ int faccessat_handler(long arg0, long arg1, long arg2, long arg3, long arg4, lon
                       long *result) {
     auto dirfd = static_cast<int>(arg0);
     const std::string_view pathname(reinterpret_cast<const char *>(arg1));
-    auto mode  = static_cast<mode_t>(arg2);
-    auto flags = static_cast<int>(arg3);
-    long tid   = syscall_no_intercept(SYS_gettid);
+    auto tid = static_cast<pid_t>(syscall_no_intercept(SYS_gettid));
     START_LOG(tid, "call()");
 
     if (is_forbidden_path(pathname)) {

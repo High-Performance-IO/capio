@@ -7,13 +7,13 @@
 
 int lseek_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg5, long *result) {
     int fd      = static_cast<int>(arg0);
-    auto offset = static_cast<off64_t>(arg1);
+    auto offset = static_cast<capio_off64_t>(arg1);
     int whence  = static_cast<int>(arg2);
-    long tid    = syscall_no_intercept(SYS_gettid);
+    auto tid    = static_cast<pid_t>(syscall_no_intercept(SYS_gettid));
 
     START_LOG(tid, "call(fd=%d, offset=%ld, whence=%d)", fd, offset, whence);
     if (exists_capio_fd(fd)) {
-        off64_t computed_offset = 0;
+        capio_off64_t computed_offset = 0;
 
         if (whence == SEEK_CUR) {
             computed_offset = get_capio_fd_offset(fd) + offset;

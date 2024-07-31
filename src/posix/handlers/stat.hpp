@@ -11,11 +11,7 @@
 #include "utils/filesystem.hpp"
 #include "utils/requests.hpp"
 
-inline blkcnt_t get_nblocks(off64_t file_size) {
-    return (file_size % 4096 == 0) ? (file_size / 512) : (file_size / 512 + 8);
-}
-
-inline int capio_fstat(int fd, struct stat *statbuf, long tid) {
+inline int capio_fstat(int fd, struct stat *statbuf, pid_t tid) {
     START_LOG(tid, "call(fd=%d, statbuf=0x%08x)", fd, statbuf);
 
     if (exists_capio_fd(fd)) {
@@ -24,7 +20,7 @@ inline int capio_fstat(int fd, struct stat *statbuf, long tid) {
     return CAPIO_POSIX_SYSCALL_REQUEST_SKIP;
 }
 
-inline int capio_lstat(const std::string_view &pathname, struct stat *statbuf, long tid) {
+inline int capio_lstat(const std::string_view &pathname, struct stat *statbuf, pid_t tid) {
     START_LOG(tid, "call(absolute_path=%s, statbuf=0x%08x)", pathname.data(), statbuf);
 
     if (is_forbidden_path(pathname)) {
@@ -39,7 +35,7 @@ inline int capio_lstat(const std::string_view &pathname, struct stat *statbuf, l
     return CAPIO_POSIX_SYSCALL_REQUEST_SKIP;
 }
 
-inline int capio_lstat_wrapper(const std::string_view &pathname, struct stat *statbuf, long tid) {
+inline int capio_lstat_wrapper(const std::string_view &pathname, struct stat *statbuf, pid_t tid) {
     START_LOG(tid, "call(path=%s, buf=0x%08x)", pathname.data(), statbuf);
 
     if (is_forbidden_path(pathname)) {
@@ -56,7 +52,7 @@ inline int capio_lstat_wrapper(const std::string_view &pathname, struct stat *st
 }
 
 inline int capio_fstatat(int dirfd, const std::string_view &pathname, struct stat *statbuf,
-                         int flags, long tid) {
+                         int flags, pid_t tid) {
     START_LOG(tid, "call(dirfd=%ld, pathname=%s, statbuf=0x%08x, flags=%X)", dirfd, pathname.data(),
               statbuf, flags);
 
@@ -96,7 +92,7 @@ inline int capio_fstatat(int dirfd, const std::string_view &pathname, struct sta
 int fstat_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg5, long *result) {
     auto fd   = static_cast<int>(arg0);
     auto *buf = reinterpret_cast<struct stat *>(arg1);
-    long tid  = syscall_no_intercept(SYS_gettid);
+    auto tid  = static_cast<pid_t>(syscall_no_intercept(SYS_gettid));
 
     return posix_return_value(capio_fstat(fd, buf, tid), result);
 }
@@ -107,7 +103,7 @@ int fstatat_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long 
     const std::string_view pathname(reinterpret_cast<const char *>(arg1));
     auto *statbuf = reinterpret_cast<struct stat *>(arg2);
     auto flags    = static_cast<int>(arg3);
-    long tid      = syscall_no_intercept(SYS_gettid);
+    auto tid      = static_cast<pid_t>(syscall_no_intercept(SYS_gettid));
 
     return posix_return_value(capio_fstatat(dirfd, pathname, statbuf, flags, tid), result);
 }
@@ -115,7 +111,7 @@ int fstatat_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long 
 int lstat_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg5, long *result) {
     const std::string_view pathname(reinterpret_cast<const char *>(arg0));
     auto *buf = reinterpret_cast<struct stat *>(arg1);
-    long tid  = syscall_no_intercept(SYS_gettid);
+    auto tid  = static_cast<pid_t>(syscall_no_intercept(SYS_gettid));
 
     return posix_return_value(capio_lstat_wrapper(pathname, buf, tid), result);
 }

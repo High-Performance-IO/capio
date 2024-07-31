@@ -6,7 +6,7 @@
 #include "utils/common.hpp"
 
 inline int capio_statx(int dirfd, const std::string_view &pathname, int flags, int mask,
-                       struct statx *statxbuf, long tid) {
+                       struct statx *statxbuf, pid_t tid) {
     START_LOG(tid, "call(dirfd=%d, pathname=%s, flags=%d, mask=%d, statxbuf=0x%08x)", dirfd,
               pathname.data(), flags, mask, statxbuf);
 
@@ -29,7 +29,7 @@ int statx_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long ar
     auto flags = static_cast<int>(arg2);
     auto mask  = static_cast<int>(arg3);
     auto *buf  = reinterpret_cast<struct statx *>(arg4);
-    long tid   = syscall_no_intercept(SYS_gettid);
+    auto tid   = static_cast<pid_t>(syscall_no_intercept(SYS_gettid));
 
     return posix_return_value(capio_statx(dirfd, pathname, flags, mask, buf, tid), result);
 }

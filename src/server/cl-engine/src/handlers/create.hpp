@@ -4,7 +4,7 @@
 #include <cl-engine/cl_engine.hpp>
 
 inline void create_handler(const char *const str) {
-    int tid;
+    pid_t tid;
     char path[PATH_MAX];
     sscanf(str, "%d %s", &tid, path);
     START_LOG(gettid(), "call(tid=%d, path=%s)", tid, path);

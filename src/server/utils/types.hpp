@@ -25,7 +25,7 @@ typedef std::unordered_map<std::string,
                            std::list<std::tuple<const std::filesystem::path, size_t, std::string,
                                                 std::vector<std::string> *, Semaphore *>>>
     CSClientsRemotePendingNFilesMap_t;
-typedef std::unordered_map<int, CircularBuffer<off_t> *> CSBufResponse_t;
+typedef std::unordered_map<int, CircularBuffer<capio_off64_t> *> CSBufResponse_t;
 typedef CircularBuffer<char> CSBufRequest_t;
 
 typedef void (*CSHandler_t)(const char *const);

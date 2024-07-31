@@ -13,7 +13,7 @@ inline void CapioFileManager::set_committed(const std::filesystem::path &path) {
     client_manager->unlock_thread_awaiting_creation(path);
 }
 
-inline void CapioFileManager::set_committed(long tid) {
+inline void CapioFileManager::set_committed(pid_t tid) {
     START_LOG(gettid(), "call(tid=%d)", tid);
     auto files = client_manager->get_produced_files(tid);
     for (const auto &file : *files) {

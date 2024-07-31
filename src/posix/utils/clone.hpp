@@ -8,28 +8,28 @@
 
 #include "requests.hpp"
 
-std::mutex clone_mutex;
-std::condition_variable clone_cv;
-std::unordered_set<long> *tids;
+inline std::mutex clone_mutex;
+inline std::condition_variable clone_cv;
+inline std::unordered_set<pid_t> *tids;
 
-inline bool is_capio_tid(const long tid) {
+inline bool is_capio_tid(const pid_t tid) {
     const std::lock_guard<std::mutex> lg(clone_mutex);
     return tids->find(tid) != tids->end();
 }
 
-inline void register_capio_tid(const long tid) {
+inline void register_capio_tid(const pid_t tid) {
     const std::lock_guard<std::mutex> lg(clone_mutex);
     tids->insert(tid);
 }
 
-inline void remove_capio_tid(const long tid) {
+inline void remove_capio_tid(const pid_t tid) {
     const std::lock_guard<std::mutex> lg(clone_mutex);
     tids->erase(tid);
 }
 
-void init_threading_support() { tids = new std::unordered_set<long>{}; }
+void init_threading_support() { tids = new std::unordered_set<pid_t>{}; }
 
-void init_process(long tid) {
+void init_process(pid_t tid) {
     START_LOG(syscall_no_intercept(SYS_gettid), "call(tid=%ld)", tid);
 
     syscall_no_intercept_flag = true;
@@ -37,7 +37,7 @@ void init_process(long tid) {
     register_listener(tid);
 
     const char *capio_app_name = get_capio_app_name();
-    long pid                   = syscall_no_intercept(SYS_getpid);
+    auto pid                   = static_cast<pid_t>(syscall_no_intercept(SYS_gettid));
     if (capio_app_name == nullptr) {
         handshake_anonymous_request(tid, pid);
     } else {
@@ -48,7 +48,7 @@ void init_process(long tid) {
 }
 
 void hook_clone_child() {
-    long tid = syscall_no_intercept(SYS_gettid);
+    auto tid = static_cast<pid_t>(syscall_no_intercept(SYS_gettid));
     START_LOG(tid, "call()");
 
     std::unique_lock<std::mutex> lock(clone_mutex);
@@ -64,11 +64,13 @@ void hook_clone_child() {
 
     lock.unlock();
     LOG("Starting child thread %d", tid);
+    write_request_cache = new WriteRequestCache(8192);
+    read_request_cache = new ReadRequestCache();
 }
 
 void hook_clone_parent(long child_tid) {
     SUSPEND_SYSCALL_LOGGING();
-    long parent_tid = syscall_no_intercept(SYS_gettid);
+    auto parent_tid = static_cast<pid_t>(syscall_no_intercept(SYS_gettid));
     START_LOG(parent_tid, "call(parent_tid=%d, child_tid=%d)", parent_tid, child_tid);
 
     if (child_tid < 0) {

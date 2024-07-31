@@ -7,7 +7,7 @@
 #include "utils/requests.hpp"
 
 int dup_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg5, long *result) {
-    long tid = syscall_no_intercept(SYS_gettid);
+    auto tid = static_cast<pid_t>(syscall_no_intercept(SYS_gettid));
     int fd   = static_cast<int>(arg0);
 
     START_LOG(tid, "call(fd=%d)", fd);
@@ -27,14 +27,14 @@ int dup_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg5
 }
 
 int dup2_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg5, long *result) {
-    long tid = syscall_no_intercept(SYS_gettid);
-    int fd   = static_cast<int>(arg0);
-    int fd2  = static_cast<int>(arg1);
+    auto tid = static_cast<pid_t>(syscall_no_intercept(SYS_gettid));
+    auto fd  = static_cast<int>(arg0);
+    auto fd2 = static_cast<int>(arg1);
 
     START_LOG(tid, "call(fd=%d, fd2=%d)", fd, fd2);
 
     if (exists_capio_fd(fd)) {
-        int res = static_cast<int>(syscall_no_intercept(SYS_dup2, fd, fd2));
+        auto res = static_cast<int>(syscall_no_intercept(SYS_dup2, fd, fd2));
         if (res == -1) {
             *result = -errno;
             return CAPIO_POSIX_SYSCALL_SUCCESS;
@@ -49,7 +49,7 @@ int dup2_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg
 }
 
 int dup3_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg5, long *result) {
-    long tid  = syscall_no_intercept(SYS_gettid);
+    auto tid  = static_cast<pid_t>(syscall_no_intercept(SYS_gettid));
     int fd    = static_cast<int>(arg0);
     int fd2   = static_cast<int>(arg1);
     int flags = static_cast<int>(arg2);

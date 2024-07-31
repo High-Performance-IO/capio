@@ -6,7 +6,7 @@
 #include "utils/common.hpp"
 #include "utils/filesystem.hpp"
 
-inline off64_t capio_mkdirat(int dirfd, const std::string_view &pathname, mode_t mode, long tid) {
+inline off64_t capio_mkdirat(int dirfd, const std::string_view &pathname, mode_t mode, pid_t tid) {
     START_LOG(tid, "call(dirfd=%d, pathname=%s, mode=%o)", dirfd, pathname.data(), mode);
 
     if (is_forbidden_path(pathname)) {
@@ -40,7 +40,7 @@ inline off64_t capio_mkdirat(int dirfd, const std::string_view &pathname, mode_t
     return CAPIO_POSIX_SYSCALL_REQUEST_SKIP;
 }
 
-inline off64_t capio_rmdir(const std::string_view &pathname, long tid) {
+inline off64_t capio_rmdir(const std::string_view &pathname, pid_t tid) {
     START_LOG(tid, "call(pathname=%s)", pathname.data());
 
     return CAPIO_POSIX_SYSCALL_REQUEST_SKIP;
@@ -49,7 +49,7 @@ inline off64_t capio_rmdir(const std::string_view &pathname, long tid) {
 int mkdir_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg5, long *result) {
     const std::string_view pathname(reinterpret_cast<const char *>(arg0));
     auto mode = static_cast<mode_t>(arg1);
-    long tid  = syscall_no_intercept(SYS_gettid);
+    auto tid  = static_cast<pid_t>(syscall_no_intercept(SYS_gettid));
 
     return posix_return_value(capio_mkdirat(AT_FDCWD, pathname, mode, tid), result);
 }
@@ -59,14 +59,14 @@ int mkdirat_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long 
     int dirfd = static_cast<int>(arg0);
     const std::string_view pathname(reinterpret_cast<const char *>(arg1));
     auto mode = static_cast<mode_t>(arg2);
-    long tid  = syscall_no_intercept(SYS_gettid);
+    auto tid  = static_cast<pid_t>(syscall_no_intercept(SYS_gettid));
 
     return posix_return_value(capio_mkdirat(dirfd, pathname, mode, tid), result);
 }
 
 int rmdir_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg5, long *result) {
     const std::string_view pathname(reinterpret_cast<const char *>(arg0));
-    long tid = syscall_no_intercept(SYS_gettid);
+    auto tid = static_cast<pid_t>(syscall_no_intercept(SYS_gettid));
 
     return posix_return_value(capio_rmdir(pathname, tid), result);
 }
