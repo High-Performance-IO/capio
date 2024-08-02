@@ -132,6 +132,22 @@ class ClientManager {
     [[nodiscard]] auto get_produced_files(pid_t tid) const {
         return files_to_be_committed_by_tid->at(tid);
     }
+
+    auto get_file_awaiting_creation() {
+        std::vector<std::string> keys;
+        for (auto itm : *thread_awaiting_file_creation) {
+            keys.emplace_back(itm.first);
+        }
+        return keys;
+    }
+
+    auto get_file_awaiting_data() {
+        std::vector<std::string> keys;
+        for (auto itm : *thread_awaiting_data) {
+            keys.emplace_back(itm.first);
+        }
+        return keys;
+    }
 };
 
 inline ClientManager *client_manager;

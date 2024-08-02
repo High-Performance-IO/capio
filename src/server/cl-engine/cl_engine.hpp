@@ -11,6 +11,8 @@
 
 #include "src/handlers.hpp"
 
+#include "src/file_system_monitor.hpp"
+
 class ClEngine {
   private:
     //// Variables
@@ -72,6 +74,8 @@ class ClEngine {
 
         capio_configuration->print();
 
+        fs_monitor = new FileSystemMonitor();
+
         std::cout << CAPIO_SERVER_CLI_LOG_SERVER
                   << " CL-Engine initialization completed. ready to listen for incoming requests"
                   << std::endl;
@@ -79,6 +83,7 @@ class ClEngine {
 
     ~ClEngine() {
         delete buf_requests;
+        delete fs_monitor;
         std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_WARNING << "buf_requests cleanup completed"
                   << std::endl;
     }

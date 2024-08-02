@@ -48,8 +48,7 @@ class CapioCLConfiguration {
             std::string name_trunc = truncate_last_n(itm.first, 12);
             auto kind              = std::get<5>(itm.second) ? "F" : "D";
 
-            std::cout << "|   " << kind << "  "
-                      << "| " << name_trunc << std::setfill(' ')
+            std::cout << "|   " << kind << "  " << "| " << name_trunc << std::setfill(' ')
                       << std::setw(20 - name_trunc.length()) << "| ";
 
             auto producers = std::get<0>(itm.second);
