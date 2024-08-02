@@ -29,8 +29,7 @@ constexpr char CAPIO_SHM_CANARY_ERROR[] =
 // CAPIO communication constants
 constexpr int CAPIO_REQ_BUFF_CNT                     = 512; // Max number of elements inside buffers
 constexpr int CAPIO_CACHE_LINES_DEFAULT              = 10;
-constexpr int CAPIO_CACHE_LINE_SIZE_DEFAULT          = 256 * 1024;
-constexpr size_t CAPIO_SERVER_REQUEST_MAX_SIZE       = sizeof(char) * (PATH_MAX + 81920);
+constexpr int CAPIO_CACHE_LINE_SIZE_DEFAULT          = 4096;
 constexpr size_t CAPIO_REQ_MAX_SIZE                  = 256 * sizeof(char);
 constexpr char CAPIO_SERVER_CLI_LOG_SERVER[]         = "[ \033[1;32m SERVER \033[0m ] ";
 constexpr char CAPIO_SERVER_CLI_LOG_SERVER_WARNING[] = "[ \033[1;33m SERVER \033[0m ] ";
@@ -40,10 +39,6 @@ constexpr char LOG_CAPIO_END_REQUEST[]               = "----------- END SYSCALL 
 constexpr char CAPIO_SERVER_LOG_START_REQUEST_MSG[]  = "+++++++++++++++++REQUEST+++++++++++++++++";
 constexpr char CAPIO_SERVER_LOG_END_REQUEST_MSG[]    = "~~~~~~~~~~~~~~~END REQUEST~~~~~~~~~~~~~~~";
 constexpr int CAPIO_LOG_MAX_MSG_LEN                  = 2048;
-constexpr int CAPIO_SEM_RETRIES                      = 100;
-constexpr int THEORETICAL_SIZE_DIRENT64              = sizeof(ino64_t) + sizeof(off64_t) +
-                                          sizeof(unsigned short) + sizeof(unsigned char) +
-                                          sizeof(char) * NAME_MAX;
 
 // CAPIO streaming semantics
 constexpr char CAPIO_FILE_MODE_NO_UPDATE[]           = "no_update";

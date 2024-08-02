@@ -82,7 +82,7 @@ class JsonParser {
                     std::filesystem::path file(itm.get_string().take_value());
                     std::string appname(app_name);
                     locations->newFile(file);
-                    locations->addConsumer(file, appname);
+                    locations->addProducer(file, appname);
                 }
                 std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_JSON
                           << "Completed output_stream parsing for app: " << app_name << std::endl;

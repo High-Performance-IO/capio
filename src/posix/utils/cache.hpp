@@ -6,7 +6,7 @@ class WriteRequestCache {
     int current_fd         = -1;
     long long current_size = 0;
 
-    const long long _max_size;
+    const capio_off64_t _max_size;
 
     std::filesystem::path current_path;
 
@@ -21,7 +21,7 @@ class WriteRequestCache {
     }
 
   public:
-    explicit WriteRequestCache(long long max_size) : _max_size(max_size) {}
+    explicit WriteRequestCache() : _max_size(get_capio_write_cache_size()) {}
 
     ~WriteRequestCache() { this->flush(capio_syscall(SYS_gettid)); }
 
@@ -48,15 +48,15 @@ class WriteRequestCache {
 };
 
 class ReadRequestCache {
-    int current_fd     = -1;
-    long long max_read = 0;
-    bool is_committed  = false;
+    int current_fd         = -1;
+    capio_off64_t max_read = 0;
+    std::unordered_map<std::string, capio_off64_t> *available_read_cache;
 
     std::filesystem::path current_path;
 
     // return amount of readable bytes
-    inline off64_t _read_request(const std::filesystem::path &path, const off64_t end_of_Read,
-                                 const long tid, const long fd) {
+    static inline off64_t _read_request(const std::filesystem::path &path,
+                                        const off64_t end_of_Read, const long tid, const long fd) {
         START_LOG(capio_syscall(SYS_gettid), "call(path=%s, end_of_Read=%ld, tid=%ld, fd=%ld)",
                   path.c_str(), end_of_Read, tid, fd);
         char req[CAPIO_REQ_MAX_SIZE];
@@ -70,27 +70,38 @@ class ReadRequestCache {
     }
 
   public:
-    explicit ReadRequestCache() = default;
+    explicit ReadRequestCache() {
+        available_read_cache = new std::unordered_map<std::string, capio_off64_t>;
+    };
 
-    ~ReadRequestCache() = default;
+    ~ReadRequestCache() { delete available_read_cache; };
 
     void read_request(std::filesystem::path path, long end_of_read, int tid, int fd) {
 
         if (fd != current_fd) {
             current_path = std::move(path);
             current_fd   = fd;
-            max_read     = 0;
-            is_committed = false;
+
+            auto entry = available_read_cache->find(path);
+            if (entry != available_read_cache->end()) {
+                max_read = entry->second;
+            } else {
+                max_read = 0;
+                available_read_cache->emplace(path, max_read);
+            }
         }
 
-        if (is_committed) {
+        // File is committed if server reports its size to be ULLONG_MAX
+        if (max_read == ULLONG_MAX) {
             return;
         }
 
         if (end_of_read > max_read) {
             max_read = _read_request(current_path, end_of_read, tid, fd);
-            if (max_read == -1) {
-                is_committed = true;
+            if (available_read_cache->find(path) == available_read_cache->end()) {
+                available_read_cache->emplace(path, max_read);
+            } else {
+                available_read_cache->at(path) = max_read;
             }
         }
     };

@@ -26,7 +26,7 @@ inline void init_client() {
 
     // TODO: use var to set cache size
     // TODO: also enable multithreading
-    write_request_cache = new WriteRequestCache(8192);
+    write_request_cache = new WriteRequestCache();
     read_request_cache  = new ReadRequestCache();
 }
 
