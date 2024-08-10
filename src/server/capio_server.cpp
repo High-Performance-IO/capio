@@ -25,17 +25,15 @@ char node_name[HOST_NAME_MAX];
 
 #include "utils/types.hpp"
 
-// tid -> (client_to_server_data_buf, server_to_client_data_buf)
-CSDataBufferMap_t data_buffers;
-
 #include "capio/env.hpp"
 #include "capio/logger.hpp"
 #include "capio/semaphore.hpp"
 #include "utils/common.hpp"
 #include "utils/env.hpp"
-#include "utils/signals.hpp"
 
 #include "cl-engine/cl_engine.hpp"
+#include "ctl-engine/capio_ctl.hpp"
+#include "utils/signals.hpp"
 
 std::string parseCLI(int argc, char **argv) {
     Logger *log;
@@ -182,7 +180,8 @@ int main(int argc, char **argv) {
 
     setup_signal_handlers();
 
-    cl_engine = new ClEngine(config_path);
+    ctl_engine = new CapioCtlEngine();
+    cl_engine  = new ClEngine(config_path);
     cl_engine->start();
 
     return 0;

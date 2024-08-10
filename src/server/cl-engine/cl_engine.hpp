@@ -82,6 +82,7 @@ class ClEngine {
     }
 
     ~ClEngine() {
+        START_LOG(gettid(), "call()");
         delete buf_requests;
         delete fs_monitor;
         std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_WARNING << "buf_requests cleanup completed"

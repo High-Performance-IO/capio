@@ -41,6 +41,7 @@ class FileSystemMonitor {
 
     ~FileSystemMonitor() {
         *continue_execution = false;
+        pthread_cancel(th->native_handle());
         th->join();
         delete th;
         delete continue_execution;

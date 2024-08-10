@@ -19,28 +19,17 @@ void sig_term_handler(int signum, siginfo_t *info, void *ptr) {
         std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_ERROR << "Segfault detected!" << std::endl;
     }
 
-    std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_WARNING << "shm cleanup completed" << std::endl;
-
-    for (auto &p : data_buffers) {
-        std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_WARNING << "Deleting data buffer for "
-                  << p.second.first->get_name() << std::endl;
-        delete p.second.first;
-        std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_WARNING << "Deleting data buffer for "
-                  << p.second.second->get_name() << std::endl;
-        delete p.second.second;
-    }
-
-    std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_WARNING << "data_buffers cleanup completed"
-              << std::endl;
-
 #ifdef CAPIO_COVERAGE
     __gcov_dump();
 #endif
 
     delete cl_engine;
+    std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_WARNING << "cl_engine cleanup completed" << std::endl;
+    delete ctl_engine;
+    std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_WARNING << "ctl_engine cleanup completed" << std::endl;
     delete shm_canary;
-
     std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_INFO << "shutdown completed" << std::endl;
+
     exit(EXIT_SUCCESS);
 }
 
