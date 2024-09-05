@@ -19,7 +19,7 @@ inline void read_handler(const char *const str) {
         return;
     }
 
-    if (!capio_configuration->file_to_be_handled(path_fs)) {
+    if (!capio_cl_engine->file_to_be_handled(path_fs)) {
         LOG("Ignore calls as file should not be treated by CAPIO");
         client_manager->reply_to_client(tid, 1);
         return;
@@ -33,7 +33,7 @@ inline void read_handler(const char *const str) {
     if (file_size >= end_of_read || is_committed) {
         client_manager->reply_to_client(tid, is_committed ? ULLONG_MAX : file_size);
     } else {
-        client_manager->add_thread_awaiting_data(path, tid, end_of_read);
+        file_manager->add_thread_awaiting_data(path, tid, end_of_read);
     }
 }
 

@@ -1,7 +1,7 @@
 #ifndef CAPIO_ENGINE_HPP
 #define CAPIO_ENGINE_HPP
 
-class CapioCLConfiguration {
+class CapioCLEngine {
   private:
     std::unordered_map<std::string,                         // path name
                        std::tuple<std::vector<std::string>, // Vector for producers
@@ -48,7 +48,8 @@ class CapioCLConfiguration {
             std::string name_trunc = truncate_last_n(itm.first, 12);
             auto kind              = std::get<5>(itm.second) ? "F" : "D";
 
-            std::cout << "|   " << kind << "  " << "| " << name_trunc << std::setfill(' ')
+            std::cout << "|   " << kind << "  "
+                      << "| " << name_trunc << std::setfill(' ')
                       << std::setw(20 - name_trunc.length()) << "| ";
 
             auto producers = std::get<0>(itm.second);
@@ -211,5 +212,5 @@ class CapioCLConfiguration {
     inline auto consumers(const std::string &path) { return std::get<1>(_locations.at(path)); }
 };
 
-inline CapioCLConfiguration *capio_configuration;
+inline CapioCLEngine *capio_cl_engine;
 #endif // CAPIO_ENGINE_HPP

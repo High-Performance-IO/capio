@@ -31,9 +31,11 @@ char node_name[HOST_NAME_MAX];
 #include "utils/common.hpp"
 #include "utils/env.hpp"
 
-#include "cl-engine/cl_engine.hpp"
-#include "ctl-engine/capio_ctl.hpp"
+#include "client-manager/request_handler_engine.hpp"
+#include "ctl-module/capio_ctl.hpp"
 #include "utils/signals.hpp"
+
+#include "file-manager/file_manager.hpp"
 
 std::string parseCLI(int argc, char **argv) {
     Logger *log;
@@ -169,20 +171,21 @@ std::string parseCLI(int argc, char **argv) {
 int main(int argc, char **argv) {
 
     std::cout << CAPIO_LOG_SERVER_BANNER;
-
     gethostname(node_name, HOST_NAME_MAX);
-
     const std::string config_path = parseCLI(argc, argv);
 
     START_LOG(gettid(), "call()");
-
-    shm_canary = new CapioShmCanary(workflow_name);
-
     setup_signal_handlers();
 
-    ctl_engine = new CapioCtlEngine();
-    cl_engine  = new ClEngine(config_path);
-    cl_engine->start();
+    capio_cl_engine         = JsonParser::parse(config_path);
+    shm_canary              = new CapioShmCanary(workflow_name);
+    file_manager            = new CapioFileManager();
+    fs_monitor              = new FileSystemMonitor();
+    ctl_module              = new CapioCTLModule();
+    request_handlers_engine = new RequestHandlerEngine();
+
+    capio_cl_engine->print();
+    request_handlers_engine->start();
 
     return 0;
 }

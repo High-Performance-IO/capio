@@ -1,8 +1,5 @@
 #ifndef CONSENT_HPP
 #define CONSENT_HPP
-
-#include <cl-engine/cl_engine.hpp>
-
 /*
 This handler only checks if the client is allowed to continue
 */
@@ -23,7 +20,7 @@ inline void consent_to_proceed_handler(const char *const str) {
         return;
     }
 
-    if (!capio_configuration->file_to_be_handled(path_fs)) {
+    if (!capio_cl_engine->file_to_be_handled(path_fs)) {
         LOG("Ignore calls as file should not be treated by CAPIO");
         client_manager->reply_to_client(tid, 1);
         return;
@@ -32,7 +29,7 @@ inline void consent_to_proceed_handler(const char *const str) {
     if (std::filesystem::exists(path) || CapioFileManager::is_committed(path)) {
         client_manager->reply_to_client(tid, 1);
     } else {
-        client_manager->add_thread_awaiting_creation(path, tid);
+        file_manager->add_thread_awaiting_creation(path, tid);
     }
 }
 

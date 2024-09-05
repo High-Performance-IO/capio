@@ -1,5 +1,6 @@
 #ifndef WRITE_HPP
 #define WRITE_HPP
+#include "capio-cl-engine/capio_cl_engine.hpp"
 
 inline void write_handler(const char *const str) {
     pid_t tid;
@@ -11,12 +12,12 @@ inline void write_handler(const char *const str) {
     START_LOG(gettid(), "call(tid=%d, fd=%d, path=%s, count=%llu)", tid, fd, path, write_size);
     std::filesystem::path filename(path);
 
-    if (path == get_capio_dir() || !capio_configuration->file_to_be_handled(filename)) {
+    if (path == get_capio_dir() || !capio_cl_engine->file_to_be_handled(filename)) {
         return;
     }
 
     LOG("File needs to be handled");
-    client_manager->unlock_thread_awaiting_data(path);
+    file_manager->check_and_unlock_thread_awaiting_data(path);
 }
 
 #endif // WRITE_HPP

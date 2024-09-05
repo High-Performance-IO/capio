@@ -1,7 +1,6 @@
 #ifndef CAPIO_SERVER_HANDLERS_SIGNALS_HPP
 #define CAPIO_SERVER_HANDLERS_SIGNALS_HPP
 
-#include <cl-engine/cl_engine.hpp>
 #include <csignal>
 
 #ifdef CAPIO_COVERAGE
@@ -23,10 +22,13 @@ void sig_term_handler(int signum, siginfo_t *info, void *ptr) {
     __gcov_dump();
 #endif
 
-    delete cl_engine;
-    std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_WARNING << "cl_engine cleanup completed" << std::endl;
-    delete ctl_engine;
-    std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_WARNING << "ctl_engine cleanup completed" << std::endl;
+    delete request_handlers_engine;
+    std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_WARNING << "request_handlers_engine cleanup completed"
+              << std::endl;
+    delete ctl_module;
+    std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_WARNING << "ctl_module cleanup completed" << std::endl;
+    delete fs_monitor;
+    std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_WARNING << "fs_monitor cleanup completed" << std::endl;
     delete shm_canary;
     std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_INFO << "shutdown completed" << std::endl;
 

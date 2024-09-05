@@ -1,26 +1,28 @@
 #ifndef CAPIO_CL_ENGINE_MAIN_HPP
 #define CAPIO_CL_ENGINE_MAIN_HPP
 
-#include "src/file_manager_header.hpp"
-
+#include "capio-cl-engine/capio_cl_engine.hpp"
+#include "capio-cl-engine/json_parser.hpp"
 #include "capio/requests.hpp"
-#include "src/capio_cl_configuration.hpp"
-#include "src/client_manager.hpp"
-#include "src/file_manager.hpp"
-#include "src/json_parser.hpp"
+#include "client_manager.hpp"
+#include "file-manager/file_manager.hpp"
 
-#include "src/handlers.hpp"
+/*
+ * REQUESTS handlers
+ */
+#include "handlers/close.hpp"
+#include "handlers/consent.hpp"
+#include "handlers/create.hpp"
+#include "handlers/exit.hpp"
+#include "handlers/handshake.hpp"
+#include "handlers/open.hpp"
+#include "handlers/read.hpp"
+#include "handlers/rename.hpp"
+#include "handlers/write.hpp"
 
-#include "src/file_system_monitor.hpp"
-
-class ClEngine {
-  private:
-    //// Variables
-    std::array<CSHandler_t, CAPIO_NR_REQUESTS> request_handlers;
-
+class RequestHandlerEngine {
+    std::array<CSHandler_t, CAPIO_NR_REQUESTS> request_handlers{};
     CSBufRequest_t *buf_requests;
-
-    //// Class methods
 
     static constexpr std::array<CSHandler_t, CAPIO_NR_REQUESTS> build_request_handlers_table() {
         std::array<CSHandler_t, CAPIO_NR_REQUESTS> _request_handlers{0};
@@ -45,7 +47,7 @@ class ClEngine {
      * @param str
      * @return request code
      */
-    inline auto read_next_request(char *str) {
+    inline auto read_next_request(char *str) const {
         char req[CAPIO_REQ_MAX_SIZE];
         buf_requests->read(req);
         START_LOG(gettid(), "call(req=%s)", req);
@@ -62,29 +64,23 @@ class ClEngine {
     }
 
   public:
-    explicit ClEngine(const std::filesystem::path &json_path) {
-        START_LOG(gettid(), "call(path=%s)", json_path.c_str());
+    explicit RequestHandlerEngine() {
+        START_LOG(gettid(), "call()");
 
-        client_manager      = new ClientManager();
-        capio_configuration = JsonParser::parse(json_path);
-        request_handlers    = build_request_handlers_table();
-
-        buf_requests = new CSBufRequest_t(SHM_COMM_CHAN_NAME, CAPIO_REQ_BUFF_CNT,
-                                          CAPIO_REQ_MAX_SIZE, workflow_name);
-
-        capio_configuration->print();
-
-        fs_monitor = new FileSystemMonitor();
+        client_manager   = new ClientManager();
+        request_handlers = build_request_handlers_table();
+        buf_requests     = new CSBufRequest_t(SHM_COMM_CHAN_NAME, CAPIO_REQ_BUFF_CNT,
+                                              CAPIO_REQ_MAX_SIZE, workflow_name);
 
         std::cout << CAPIO_SERVER_CLI_LOG_SERVER
                   << " CL-Engine initialization completed. ready to listen for incoming requests"
                   << std::endl;
     }
 
-    ~ClEngine() {
+    ~RequestHandlerEngine() {
         START_LOG(gettid(), "call()");
         delete buf_requests;
-        delete fs_monitor;
+
         std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_WARNING << "buf_requests cleanup completed"
                   << std::endl;
     }
@@ -108,6 +104,6 @@ class ClEngine {
     }
 };
 
-inline ClEngine *cl_engine;
+inline RequestHandlerEngine *request_handlers_engine;
 
 #endif // CAPIO_CL_ENGINE_MAIN_HPP

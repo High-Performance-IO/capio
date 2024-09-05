@@ -43,11 +43,11 @@ int main(int argc, char *argv[]) {
 
     args::ArgumentParser parser("Parser for capioctl");
     args::Group commands(parser, "commands");
-    args::Command get(commands, "get", "Retrive informations on object");
+    args::Command get(commands, "get", "Retrieve information's on object");
     args::Command set(commands, "set", "Configure the CAPIO server");
 
     args::ValueFlag<std::string> apps(
-        get, "apps", "[ all , ... ]List the currently registered apps with capio", {"apps"});
+        get, "apps", "[ all , ... ]List the currently registered apps with CAPIO", {"apps"});
     args::ValueFlag<std::string> config(
         get, "config", "[ all, ... ] Retrieve the currently loaded CAPIO-CL configuration",
         {"config"});

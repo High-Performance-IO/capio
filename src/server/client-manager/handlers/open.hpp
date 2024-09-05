@@ -10,7 +10,7 @@ inline void open_handler(const char *const str) {
     if (std::filesystem::exists(path)) {
         client_manager->reply_to_client(tid, 1);
     } else {
-        client_manager->add_thread_awaiting_creation(path, tid);
+        file_manager->add_thread_awaiting_creation(path, tid);
     }
 }
 #endif // OPEN_HPP

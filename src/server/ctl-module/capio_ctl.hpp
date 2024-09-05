@@ -1,7 +1,7 @@
 #ifndef CAPIO_FS_CAPIO_CTL_HPP
 #define CAPIO_FS_CAPIO_CTL_HPP
 
-class CapioCtlEngine {
+class CapioCTLModule {
 
     std::thread *th;
 
@@ -11,21 +11,20 @@ class CapioCtlEngine {
 
     static void _main(const bool *continue_execution, CSBufRequest_t *readQueue,
                       CSBufRequest_t *writeQueue) {
-        START_LOG(gettid(), "call()");
+        START_LOG(gettid(), "INFO: instance of FileSystemMonitor");
 
         char request[CAPIO_REQ_MAX_SIZE];
 
         while (*continue_execution) {
             LOG("Reading incoming request");
             readQueue->read(request);
-            LOG("Recived request %s", request);
-
+            LOG("Received request %s", request);
             writeQueue->write("CIAO PLUTO");
         }
     }
 
   public:
-    CapioCtlEngine() {
+    CapioCTLModule() {
         readQueue = new CSBufRequest_t("RX", CAPIO_REQ_BUFF_CNT, CAPIO_REQ_MAX_SIZE, workflow_name);
         writeQueue =
             new CSBufRequest_t("TX", CAPIO_REQ_BUFF_CNT, CAPIO_REQ_MAX_SIZE, workflow_name);
@@ -34,7 +33,7 @@ class CapioCtlEngine {
         th                  = new std::thread(_main, continue_execution, readQueue, writeQueue);
     }
 
-    ~CapioCtlEngine() {
+    ~CapioCTLModule() {
         *continue_execution = false;
         pthread_cancel(th->native_handle());
         th->join();
@@ -44,6 +43,6 @@ class CapioCtlEngine {
     }
 };
 
-CapioCtlEngine *ctl_engine;
+inline CapioCTLModule *ctl_module;
 
 #endif // CAPIO_FS_CAPIO_CTL_HPP
