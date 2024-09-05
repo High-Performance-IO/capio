@@ -14,6 +14,8 @@ class ClientManager {
         bufs_response                = new CSBufResponse_t();
         app_names                    = new std::unordered_map<int, const std::string>;
         files_to_be_committed_by_tid = new std::unordered_map<pid_t, std::vector<std::string> *>;
+        std::cout << CAPIO_SERVER_CLI_LOG_SERVER << "ClientManager initialization completed."
+                  << std::endl;
     }
 
     ~ClientManager() {

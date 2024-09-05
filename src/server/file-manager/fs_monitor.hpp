@@ -52,6 +52,8 @@ class FileSystemMonitor {
     explicit FileSystemMonitor() {
         *continue_execution = true;
         th                  = new std::thread(_main, std::ref(continue_execution));
+        std::cout << CAPIO_SERVER_CLI_LOG_SERVER
+                  << "CapioFileSystemMonitor initialization completed." << std::endl;
     }
 
     ~FileSystemMonitor() {

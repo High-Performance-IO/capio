@@ -72,8 +72,7 @@ class RequestHandlerEngine {
         buf_requests     = new CSBufRequest_t(SHM_COMM_CHAN_NAME, CAPIO_REQ_BUFF_CNT,
                                               CAPIO_REQ_MAX_SIZE, workflow_name);
 
-        std::cout << CAPIO_SERVER_CLI_LOG_SERVER
-                  << " CL-Engine initialization completed. ready to listen for incoming requests"
+        std::cout << CAPIO_SERVER_CLI_LOG_SERVER << "RequestHandlerEngine initialization completed."
                   << std::endl;
     }
 

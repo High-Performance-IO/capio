@@ -11,7 +11,7 @@ class CapioCTLModule {
 
     static void _main(const bool *continue_execution, CSBufRequest_t *readQueue,
                       CSBufRequest_t *writeQueue) {
-        START_LOG(gettid(), "INFO: instance of FileSystemMonitor");
+        START_LOG(gettid(), "INFO: instance of CapioCTLModule");
 
         char request[CAPIO_REQ_MAX_SIZE];
 
@@ -31,6 +31,8 @@ class CapioCTLModule {
 
         *continue_execution = true;
         th                  = new std::thread(_main, continue_execution, readQueue, writeQueue);
+        std::cout << CAPIO_SERVER_CLI_LOG_SERVER << "CapioCTL initialization completed."
+                  << std::endl;
     }
 
     ~CapioCTLModule() {

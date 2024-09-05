@@ -37,7 +37,6 @@ include(GNUInstallDirs)
 #####################################
 # Dependencies
 #####################################
-find_package(MPI REQUIRED)
 find_package(Threads REQUIRED)
 
 #####################################

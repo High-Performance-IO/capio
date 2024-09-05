@@ -2,7 +2,6 @@
 #define FILE_MANAGER_HEADER_HPP
 
 class CapioFileManager {
-  private:
     std::unordered_map<std::string, std::vector<pid_t> *> *thread_awaiting_file_creation;
     std::unordered_map<std::string, std::unordered_map<pid_t, capio_off64_t> *>
         *thread_awaiting_data;
@@ -12,6 +11,8 @@ class CapioFileManager {
         thread_awaiting_file_creation = new std::unordered_map<std::string, std::vector<pid_t> *>;
         thread_awaiting_data =
             new std::unordered_map<std::string, std::unordered_map<pid_t, capio_off64_t> *>;
+        std::cout << CAPIO_SERVER_CLI_LOG_SERVER << "CapioFileManager initialization completed."
+                  << std::endl;
     }
     ~CapioFileManager() {
         delete thread_awaiting_file_creation;

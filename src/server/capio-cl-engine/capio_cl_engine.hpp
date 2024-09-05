@@ -1,18 +1,20 @@
 #ifndef CAPIO_ENGINE_HPP
 #define CAPIO_ENGINE_HPP
 
+#include "utils/common.hpp"
+
 class CapioCLEngine {
   private:
     std::unordered_map<std::string,                         // path name
-                       std::tuple<std::vector<std::string>, // Vector for producers
-                                  std::vector<std::string>, // Vector for consumers
-                                  std::string,              // commit rule
-                                  std::string,              // fire_rule
-                                  bool,                     // permanent
-                                  bool,                     // exclude
-                                  bool, // is_file (if true yes otherwise it is a directory)
-                                  int,  // commit on file number
-                                  long> // directory file count
+                       std::tuple<std::vector<std::string>, // Vector for producers          [0]
+                                  std::vector<std::string>, // Vector for consumers          [1]
+                                  std::string,              // commit rule                   [2]
+                                  std::string,              // fire_rule                     [3]
+                                  bool,                     // permanent                     [4]
+                                  bool,                     // exclude                       [5]
+                                  bool, // is_file (if true yes otherwise it is a directory) [6]
+                                  int,  // commit on file number                             [7]
+                                  long> // directory file count                              [8]
                        >
         _locations;
 
@@ -46,7 +48,7 @@ class CapioCLEngine {
                   << std::endl;
         for (auto itm : _locations) {
             std::string name_trunc = truncate_last_n(itm.first, 12);
-            auto kind              = std::get<5>(itm.second) ? "F" : "D";
+            auto kind              = std::get<6>(itm.second) ? "F" : "D";
 
             std::cout << "|   " << kind << "  "
                       << "| " << name_trunc << std::setfill(' ')
@@ -104,20 +106,18 @@ class CapioCLEngine {
     };
 
     // TODO: might need to be improved
-    bool file_to_be_handled(std::filesystem::path::iterator::reference path) {
+    bool file_to_be_handled(std::filesystem::path::iterator::reference path) const {
         for (const auto &entry : _locations) {
             auto capio_path = entry.first;
             if (path == capio_path) {
                 return true;
             }
-
             if (capio_path.find('*') != std::string::npos) { // check for globs
                 if (capio_path.find(path) == 0) { // if path and capio_path begins in the same way
                     return true;
                 }
             }
         }
-
         return false;
     };
 
@@ -130,77 +130,79 @@ class CapioCLEngine {
 
     inline void newFile(const std::string &path) {
         if (_locations.find(path) == _locations.end()) {
-            _locations.emplace(
-                path, std::make_tuple(std::vector<std::string>(), std::vector<std::string>(),
-                                      CAPIO_FILE_COMMITTED_ON_TERMINATION, CAPIO_FILE_MODE_UPDATE,
-                                      false, false, true, -1, -1));
+            std::string commit = CAPIO_FILE_COMMITTED_ON_TERMINATION;
+            std::string fire   = CAPIO_FILE_MODE_UPDATE;
+
+            /*
+             * Inherit commit and fire rules from LPM directory
+             * matchSize is used to compute LPM
+             */
+            size_t matchSize = 0;
+            for (const auto &[filename, data] : _locations) {
+                if (match_globs(filename, path) && this->isDirectory(filename) &&
+                    filename.length() > matchSize) {
+                    matchSize = filename.length();
+                    commit    = this->getCommitRule(filename);
+                    fire      = this->getFireRule(filename);
+                }
+            }
+
+            _locations.emplace(path, std::make_tuple(std::vector<std::string>(),
+                                                     std::vector<std::string>(), commit, fire,
+                                                     false, false, true, -1, -1));
         }
     }
 
     inline void addProducer(const std::string &path, std::string &producer) {
-        this->newFile(path);
         producer.erase(remove_if(producer.begin(), producer.end(), isspace), producer.end());
         std::get<0>(_locations.at(path)).emplace_back(producer);
     }
 
     inline void addConsumer(const std::string &path, std::string &consumer) {
-        this->newFile(path);
         consumer.erase(remove_if(consumer.begin(), consumer.end(), isspace), consumer.end());
         std::get<1>(_locations.at(path)).emplace_back(consumer);
     }
 
     inline void setCommitRule(const std::string &path, const std::string &commit_rule) {
-        this->newFile(path);
         std::get<2>(_locations.at(path)) = commit_rule;
     }
 
-    inline auto getCommitRule(const std::string &path) {
-        this->newFile(path);
+    inline std::string getCommitRule(const std::string &path) {
         return std::get<2>(_locations.at(path));
     }
 
     inline void setFireRule(const std::string &path, const std::string &fire_rule) {
-        this->newFile(path);
         std::get<3>(_locations.at(path)) = fire_rule;
     }
 
-    inline auto getFireRule(const std::string &path) {
-        this->newFile(path);
+    inline std::string getFireRule(const std::string &path) {
         return std::get<3>(_locations.at(path));
     }
 
     inline void setPermanent(const std::string &path, bool value) {
-        this->newFile(path);
-        std::get<5>(_locations.at(path)) = value;
-    }
-
-    inline void setExclude(const std::string &path, bool value) {
-        this->newFile(path);
         std::get<4>(_locations.at(path)) = value;
     }
 
-    inline void setDirectory(const std::string &path) {
-        this->newFile(path);
-        std::get<5>(_locations.at(path)) = false;
+    inline void setExclude(const std::string &path, const bool value) {
+        std::get<5>(_locations.at(path)) = value;
     }
 
-    inline bool isDirectory(const std::string &path) { return !std::get<5>(_locations.at(path)); }
+    inline void setDirectory(const std::string &path) { std::get<6>(_locations.at(path)) = false; }
 
-    inline void setFile(const std::string &path) {
-        this->newFile(path);
-        std::get<5>(_locations.at(path)) = true;
+    inline bool isDirectory(const std::string &path) const {
+        return !std::get<6>(_locations.at(path));
     }
 
-    inline bool isFile(const std::string &path) { return std::get<5>(_locations.at(path)); }
+    inline void setFile(const std::string &path) { std::get<6>(_locations.at(path)) = true; }
 
-    inline void setCommitedNumber(const std::string &path, int num) {
-        this->newFile(path);
-        std::get<6>(_locations.at(path)) = num;
+    inline bool isFile(const std::string &path) const { return std::get<6>(_locations.at(path)); }
+
+    inline void setCommitedNumber(const std::string &path, const int num) {
+        std::get<7>(_locations.at(path)) = num;
     }
 
     inline void setDirectoryFileCount(const std::string &path, long num) {
-        this->newFile(path);
-        std::get<7>(_locations.at(path)) = num;
+        std::get<8>(_locations.at(path)) = num;
     }
 
     inline void remove(const std::string &path) { _locations.erase(path); }
