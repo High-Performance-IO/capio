@@ -50,6 +50,7 @@ class FileSystemMonitor {
     }
 
     explicit FileSystemMonitor() {
+        START_LOG(gettid(), "call()");
         *continue_execution = true;
         th                  = new std::thread(_main, std::ref(continue_execution));
         std::cout << CAPIO_SERVER_CLI_LOG_SERVER
@@ -57,6 +58,7 @@ class FileSystemMonitor {
     }
 
     ~FileSystemMonitor() {
+        START_LOG(gettid(), "call()");
         *continue_execution = false;
         pthread_cancel(th->native_handle());
         th->join();

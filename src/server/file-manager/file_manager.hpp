@@ -1,6 +1,10 @@
 #ifndef FILE_MANAGER_HEADER_HPP
 #define FILE_MANAGER_HEADER_HPP
 
+#include <mutex>
+std::mutex threads_mutex;
+std::mutex data_mutex;
+
 class CapioFileManager {
     std::unordered_map<std::string, std::vector<pid_t> *> *thread_awaiting_file_creation;
     std::unordered_map<std::string, std::unordered_map<pid_t, capio_off64_t> *>
@@ -8,6 +12,7 @@ class CapioFileManager {
 
   public:
     CapioFileManager() {
+        START_LOG(gettid(), "call()");
         thread_awaiting_file_creation = new std::unordered_map<std::string, std::vector<pid_t> *>;
         thread_awaiting_data =
             new std::unordered_map<std::string, std::unordered_map<pid_t, capio_off64_t> *>;
@@ -15,6 +20,7 @@ class CapioFileManager {
                   << std::endl;
     }
     ~CapioFileManager() {
+        START_LOG(gettid(), "call()");
         delete thread_awaiting_file_creation;
         delete thread_awaiting_data;
     }

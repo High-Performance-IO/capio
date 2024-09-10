@@ -36,9 +36,9 @@ constexpr char CAPIO_SERVER_CLI_LOG_SERVER_WARNING[] = "[ \033[1;33m SERVER \033
 constexpr char CAPIO_SERVER_CLI_LOG_SERVER_ERROR[]   = "[ \033[1;31m SERVER \033[0m ] ";
 constexpr char LOG_CAPIO_START_REQUEST[]             = "\n+++++++++++ SYSCALL %s (%d) +++++++++++";
 constexpr char LOG_CAPIO_END_REQUEST[]               = "----------- END SYSCALL ----------\n";
-constexpr char CAPIO_SERVER_LOG_START_REQUEST_MSG[]  = "\n+++++++++++++++++REQUEST+++++++++++++++++";
-constexpr char CAPIO_SERVER_LOG_END_REQUEST_MSG[]    = "~~~~~~~~~~~~~~~END REQUEST~~~~~~~~~~~~~~~";
-constexpr int CAPIO_LOG_MAX_MSG_LEN                  = 2048;
+constexpr char CAPIO_SERVER_LOG_START_REQUEST_MSG[] = "\n+++++++++++++++++REQUEST+++++++++++++++++";
+constexpr char CAPIO_SERVER_LOG_END_REQUEST_MSG[]   = "~~~~~~~~~~~~~~~END REQUEST~~~~~~~~~~~~~~~";
+constexpr int CAPIO_LOG_MAX_MSG_LEN                 = 2048;
 
 // CAPIO streaming semantics
 constexpr char CAPIO_FILE_MODE_NO_UPDATE[]           = "no_update";

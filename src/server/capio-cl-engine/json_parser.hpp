@@ -142,7 +142,7 @@ class JsonParser {
                         std::filesystem::path file_fs(elem);
                         if (file_fs.is_relative() ||
                             first_is_subpath_of_second(file_fs, get_capio_dir())) {
-                            LOG("Saving file %s to locations", elem.data());
+                            LOG("Saving file %s to locations", std::string(elem).c_str());
                             streaming_names.emplace_back(elem);
                         }
                     }

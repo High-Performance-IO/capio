@@ -11,6 +11,7 @@ class ClientManager {
 
   public:
     ClientManager() {
+        START_LOG(gettid(), "call()");
         bufs_response                = new CSBufResponse_t();
         app_names                    = new std::unordered_map<int, const std::string>;
         files_to_be_committed_by_tid = new std::unordered_map<pid_t, std::vector<std::string> *>;
@@ -19,6 +20,7 @@ class ClientManager {
     }
 
     ~ClientManager() {
+        START_LOG(gettid(), "call()");
         delete bufs_response;
         delete app_names;
         delete files_to_be_committed_by_tid;
@@ -32,6 +34,7 @@ class ClientManager {
      * @return
      */
     inline void register_new_client(pid_t tid, const std::string &app_name) const {
+        START_LOG(gettid(), "call(tid=%ld, app_name=%s)", tid, app_name.c_str());
         // TODO: replace numbers with constexpr
         auto *p_buf_response =
             new CircularBuffer<capio_off64_t>(SHM_COMM_CHAN_NAME_RESP + std::to_string(tid),
@@ -47,6 +50,7 @@ class ClientManager {
      * @return
      */
     inline void remove_client(pid_t tid) {
+        START_LOG(gettid(), "call(tid=%ld)", tid);
         auto it_resp = bufs_response->find(tid);
         if (it_resp != bufs_response->end()) {
             delete it_resp->second;
@@ -68,11 +72,18 @@ class ClientManager {
     }
 
     void add_producer_file_path(pid_t tid, std::string &path) const {
+        START_LOG(gettid(), "call(tid=%ld, path=%s)", tid, path.c_str());
         files_to_be_committed_by_tid->at(tid)->emplace_back(path);
     }
 
     [[nodiscard]] auto get_produced_files(pid_t tid) const {
+        START_LOG(gettid(), "call(tid=%ld)", tid);
         return files_to_be_committed_by_tid->at(tid);
+    }
+
+    std::string get_app_name(pid_t tid) const {
+        START_LOG(gettid(), "call(tid=%ld)", tid);
+        return app_names->at(tid);
     }
 };
 

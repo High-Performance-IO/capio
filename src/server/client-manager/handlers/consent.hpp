@@ -26,8 +26,9 @@ inline void consent_to_proceed_handler(const char *const str) {
         return;
     }
 
-    if (std::filesystem::exists(path) || CapioFileManager::is_committed(path)) {
-        LOG("It is possible to unlokc waiting thread");
+    if (std::filesystem::exists(path) || CapioFileManager::is_committed(path) ||
+        capio_cl_engine->isProducer(path, tid)) {
+        LOG("It is possible to unlock waiting thread");
         client_manager->reply_to_client(tid, 1);
     } else {
         LOG("Requested file %s does not exists yet. awaiting for creation", path);
