@@ -6,8 +6,8 @@ This handler only checks if the client is allowed to continue
 
 inline void consent_to_proceed_handler(const char *const str) {
     pid_t tid;
-    char path[1024];
-    sscanf(str, "%d %s", &tid, path);
+    char path[1024], source_func[1024];
+    sscanf(str, "%d %s %s", &tid, path, source_func);
     START_LOG(gettid(), "call(tid=%d, path=%s)", tid, path);
 
     std::filesystem::path path_fs(path);
@@ -27,8 +27,10 @@ inline void consent_to_proceed_handler(const char *const str) {
     }
 
     if (std::filesystem::exists(path) || CapioFileManager::is_committed(path)) {
+        LOG("It is possible to unlokc waiting thread");
         client_manager->reply_to_client(tid, 1);
     } else {
+        LOG("Requested file %s does not exists yet. awaiting for creation", path);
         file_manager->add_thread_awaiting_creation(path, tid);
     }
 }

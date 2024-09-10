@@ -42,10 +42,12 @@ inline void register_listener(long tid) {
 }
 
 // Block until server allows for proceeding to a generic request
-inline void consent_to_proceed_request(const std::filesystem::path &path, const long tid) {
-    START_LOG(capio_syscall(SYS_gettid), "call(path=%s, tid=%ld)", path.c_str(), tid);
+inline void consent_to_proceed_request(const std::filesystem::path &path, const long tid,
+                                       std::string source_func) {
+    START_LOG(capio_syscall(SYS_gettid), "call(path=%s, tid=%ld, source_func=%s)", path.c_str(),
+              tid, source_func.c_str());
     char req[CAPIO_REQ_MAX_SIZE];
-    sprintf(req, "%04d %ld %s", CAPIO_REQUEST_CONSENT, tid, path.c_str());
+    sprintf(req, "%04d %ld %s %s", CAPIO_REQUEST_CONSENT, tid, path.c_str(), source_func.c_str());
     buf_requests->write(req, CAPIO_REQ_MAX_SIZE);
     off64_t res;
     bufs_response->at(tid)->read(&res);

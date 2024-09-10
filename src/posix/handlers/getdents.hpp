@@ -14,7 +14,7 @@ inline int getdents_handler_impl(long arg0, long arg1, long arg2, long *result, 
               is64bit ? "true" : "false");
 
     if (exists_capio_fd(fd)) {
-        consent_to_proceed_request(get_capio_fd_path(fd), tid);
+        consent_to_proceed_request(get_capio_fd_path(fd), tid, __FUNCTION__);
     }
     return CAPIO_POSIX_SYSCALL_SKIP;
 }

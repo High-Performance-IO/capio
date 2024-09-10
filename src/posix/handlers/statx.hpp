@@ -18,7 +18,7 @@ inline int capio_statx(int dirfd, const std::string_view &pathname, int flags, i
     std::filesystem::path path(pathname);
 
     if (is_capio_path(path)) {
-        consent_to_proceed_request(path, tid);
+        consent_to_proceed_request(path, tid, __FUNCTION__);
     }
     return CAPIO_POSIX_SYSCALL_REQUEST_SKIP;
 }
