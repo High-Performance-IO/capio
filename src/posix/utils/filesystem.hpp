@@ -106,7 +106,15 @@ std::filesystem::path capio_posix_realpath(const std::filesystem::path &pathname
  * @return
  */
 inline std::filesystem::path capio_absolute(const std::filesystem::path &path) {
-    return path.is_absolute() ? path : capio_posix_realpath(path);
+    START_LOG(capio_syscall(SYS_gettid), "call(path=%s)", path.c_str());
+    if (!path.is_absolute()) {
+        LOG("PATH is not absolute");
+        auto absolute = capio_posix_realpath(path);
+        LOG("Computed absolute path is %s", absolute.c_str());
+        return absolute;
+    }
+    LOG("Path is absolute");
+    return path;
 }
 
 /**
@@ -246,6 +254,7 @@ std::filesystem::path get_dir_path(int dirfd) {
         LOG("dirfd %d points to path %s", dirfd, it->second.c_str());
         return it->second;
     } else {
+        LOG("dirfd %d not found. Computing it trough proclnk", dirfd);
         char proclnk[128];
         char dir_pathname[PATH_MAX];
         sprintf(proclnk, "/proc/self/fd/%d", dirfd);

@@ -23,20 +23,22 @@ class FileSystemMonitor {
              * there is enough data) is carried out by the CapioFileManager class
              * and not by the file_system monitor component itself
              */
-            std::vector<std::string> paths_to_check;
 
-            auto wait_exists = file_manager->get_file_awaiting_creation();
-            auto wait_data   = file_manager->get_file_awaiting_data();
-
-            paths_to_check.reserve((wait_data.size() + wait_data.size()));
-            paths_to_check.insert(paths_to_check.end(), wait_exists.begin(), wait_exists.end());
-            paths_to_check.insert(paths_to_check.end(), wait_data.begin(), wait_data.end());
-
-            for (const auto &file : paths_to_check) {
+            for (const auto &file : file_manager->get_file_awaiting_creation()) {
                 if (std::filesystem::exists(file)) {
                     LOG("File %s exists. Unlocking thread awaiting for creation", file.c_str());
                     file_manager->unlock_thread_awaiting_creation(file);
                     file_manager->delete_file_awaiting_creation(file);
+                    LOG("File %s exists. Checking if enough data is available", file.c_str());
+                    // actual update, end eventual removal from map is handled by the
+                    // CapioFileManager class and not by the FileSystemMonitor class
+                    file_manager->check_and_unlock_thread_awaiting_data(file);
+                    LOG("Completed handling.\n\n");
+                }
+            }
+
+            for (const auto &file : file_manager->get_file_awaiting_data()) {
+                if (std::filesystem::exists(file)) {
                     LOG("File %s exists. Checking if enough data is available", file.c_str());
                     // actual update, end eventual removal from map is handled by the
                     // CapioFileManager class and not by the FileSystemMonitor class

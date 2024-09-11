@@ -38,10 +38,11 @@ inline void CapioFileManager::add_thread_awaiting_data(std::string path, int tid
     thread_awaiting_data->at(path)->emplace(tid, expected_size);
 }
 
-inline void CapioFileManager::check_and_unlock_thread_awaiting_data(std::string path) const {
+inline void CapioFileManager::check_and_unlock_thread_awaiting_data(const std::string &path) const {
     START_LOG(gettid(), "call(path=%s)", path.c_str());
-    auto path_size = std::filesystem::file_size(path);
+    LOG("Before lockguard");
     std::lock_guard<std::mutex> lg(data_mutex);
+    LOG("Acquired lockguard");
     if (thread_awaiting_data->find(path) != thread_awaiting_data->end()) {
         LOG("Path has thread awaiting");
         auto threads = thread_awaiting_data->at(path);
@@ -50,19 +51,32 @@ inline void CapioFileManager::check_and_unlock_thread_awaiting_data(std::string 
             LOG("Handling thread");
             if (is_committed(path) || item->first >= std::filesystem::file_size(path)) {
                 LOG("Thread %ld can be unlocked", item->first);
-                client_manager->reply_to_client(item->first, path_size);
+                /*
+                 * Check for file size only if it is directory, otherwise,
+                 * return the max allowed size, to allow the process to continue.
+                 * This is caused by the fact that std::filesystem::file_size is
+                 * implementation defined when invoked on directories
+                 */
+                client_manager->reply_to_client(item->first,
+                                                std::filesystem::is_directory(path)
+                                                    ? ULLONG_MAX
+                                                    : std::filesystem::file_size(path));
                 // remove thread from map
                 LOG("Removing thread %ld from threads awaiting on data", item->first);
                 item = threads->erase(item);
             } else {
+                LOG("Waiting threads cannot yet be unlocked");
                 ++item;
             }
         }
+
+        LOG("Completed loops over threads vector for file!");
 
         if (threads->empty()) {
             LOG("There are no threads waiting for path %s. cleaning up map", path.c_str());
             thread_awaiting_data->erase(path);
         }
+        LOG("Completed checks");
     }
 }
 

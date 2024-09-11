@@ -28,7 +28,7 @@ class CapioFileManager {
     void set_committed(const std::filesystem::path &path) const;
     void set_committed(pid_t tid) const;
     static bool is_committed(const std::filesystem::path &path);
-    void check_and_unlock_thread_awaiting_data(std::string path) const;
+    void check_and_unlock_thread_awaiting_data(const std::string& path) const;
     void add_thread_awaiting_data(std::string path, int tid, size_t expected_size) const;
     void unlock_thread_awaiting_creation(std::string path) const;
     void add_thread_awaiting_creation(std::string path, pid_t tid) const;
