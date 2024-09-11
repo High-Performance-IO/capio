@@ -10,6 +10,7 @@ inline off64_t capio_write(int fd, capio_off64_t count, pid_t tid) {
     START_LOG(tid, "call(fd=%d, count=%ld)", fd, count);
 
     if (exists_capio_fd(fd)) {
+        LOG("File needs to be handled");
         write_request_cache->write_request(get_capio_fd_path(fd), count, tid, fd);
     }
     return CAPIO_POSIX_SYSCALL_REQUEST_SKIP;

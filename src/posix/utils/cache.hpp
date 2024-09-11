@@ -26,8 +26,10 @@ class WriteRequestCache {
     ~WriteRequestCache() { this->flush(capio_syscall(SYS_gettid)); }
 
     void write_request(std::filesystem::path path, int tid, int fd, long count) {
-
+        START_LOG(capio_syscall(SYS_gettid), "call(path=%s, tid=%ld, fd=%ld, count=%ld)",
+                  path.c_str(), tid, fd, count);
         if (fd != current_fd) {
+            LOG("File descriptor changed from previous state. updating");
             this->flush(tid);
             current_path = std::move(path);
             current_fd   = fd;
@@ -35,12 +37,15 @@ class WriteRequestCache {
         current_size += count;
 
         if (current_size > _max_size) {
+            LOG("exceeded maximum cache size. flushing...");
             this->flush(tid);
         }
     };
 
     void flush(int tid) {
+        START_LOG(capio_syscall(SYS_gettid), "call(tid=%ld)", tid);
         if (current_fd != -1 && current_size > 0) {
+            LOG("Performing write to SHM");
             _write_request(tid, current_fd, current_size);
         }
         current_size = 0;
