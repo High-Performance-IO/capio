@@ -253,18 +253,17 @@ std::filesystem::path get_dir_path(int dirfd) {
     if (it != capio_files_descriptors->end()) {
         LOG("dirfd %d points to path %s", dirfd, it->second.c_str());
         return it->second;
-    } else {
-        LOG("dirfd %d not found. Computing it trough proclnk", dirfd);
-        char proclnk[128];
-        char dir_pathname[PATH_MAX];
-        sprintf(proclnk, "/proc/self/fd/%d", dirfd);
-        if (syscall_no_intercept(SYS_readlink, proclnk, dir_pathname, PATH_MAX) < 0) {
-            LOG("failed to readlink\n");
-            return {};
-        }
-        LOG("dirfd %d points to path %s", dirfd, dir_pathname);
-        return {dir_pathname};
     }
+    LOG("dirfd %d not found. Computing it through proclnk", dirfd);
+    char proclnk[128]           = {};
+    char dir_pathname[PATH_MAX] = {};
+    sprintf(proclnk, "/proc/self/fd/%d", dirfd);
+    if (syscall_no_intercept(SYS_readlink, proclnk, dir_pathname, PATH_MAX) < 0) {
+        LOG("failed to readlink\n");
+        return {};
+    }
+    LOG("dirfd %d points to path %s", dirfd, dir_pathname);
+    return {dir_pathname};
 }
 
 /**
@@ -288,7 +287,7 @@ inline void init_filesystem() {
 inline void rename_capio_path(const std::string &oldpath, const std::string &newpath) {
     START_LOG(syscall_no_intercept(SYS_gettid), "call(oldpath=%s, newpath=%s)", oldpath.c_str(),
               newpath.c_str());
-    if (capio_files_paths->find(oldpath) != capio_files_paths->find(newpath)) {
+    if (capio_files_paths->find(oldpath) != capio_files_paths->end()) {
         auto entry  = capio_files_paths->extract(oldpath);
         entry.key() = newpath;
         capio_files_paths->insert(std::move(entry));

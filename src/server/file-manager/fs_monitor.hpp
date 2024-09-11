@@ -29,10 +29,6 @@ class FileSystemMonitor {
                     LOG("File %s exists. Unlocking thread awaiting for creation", file.c_str());
                     file_manager->unlock_thread_awaiting_creation(file);
                     file_manager->delete_file_awaiting_creation(file);
-                    LOG("File %s exists. Checking if enough data is available", file.c_str());
-                    // actual update, end eventual removal from map is handled by the
-                    // CapioFileManager class and not by the FileSystemMonitor class
-                    file_manager->check_and_unlock_thread_awaiting_data(file);
                     LOG("Completed handling.\n\n");
                 }
             }

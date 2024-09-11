@@ -28,7 +28,7 @@ class WriteRequestCache {
     void write_request(std::filesystem::path path, int tid, int fd, long count) {
         START_LOG(capio_syscall(SYS_gettid), "call(path=%s, tid=%ld, fd=%ld, count=%ld)",
                   path.c_str(), tid, fd, count);
-        if (fd != current_fd) {
+        if (fd != current_fd || path.compare(current_path) != 0) {
             LOG("File descriptor changed from previous state. updating");
             this->flush(tid);
             current_path = std::move(path);
@@ -48,6 +48,7 @@ class WriteRequestCache {
             LOG("Performing write to SHM");
             _write_request(tid, current_fd, current_size);
         }
+        current_fd   = -1;
         current_size = 0;
     }
 };
@@ -82,8 +83,10 @@ class ReadRequestCache {
     ~ReadRequestCache() { delete available_read_cache; };
 
     void read_request(std::filesystem::path path, long end_of_read, int tid, int fd) {
-
-        if (fd != current_fd) {
+        START_LOG(capio_syscall(SYS_gettid), "call(path=%s, end_of_read=%ld, tid=%ld)",
+                  path.c_str(), end_of_read, tid);
+        if (fd != current_fd || path.compare(current_path) != 0) {
+            LOG("File descriptor / path changed from previous state. updating");
             current_path = std::move(path);
             current_fd   = fd;
 
@@ -94,20 +97,26 @@ class ReadRequestCache {
                 max_read = 0;
                 available_read_cache->emplace(path, max_read);
             }
+            LOG("Max read value is %llu %s", max_read, max_read == ULLONG_MAX ? "(ULLONG_MAX)" : "");
         }
 
         // File is committed if server reports its size to be ULLONG_MAX
         if (max_read == ULLONG_MAX) {
+            LOG("Max read is ULLONG_MAX. returning as file is committed");
             return;
         }
 
         if (end_of_read > max_read) {
+            LOG("end_of_read > max_read. Performing server request");
             max_read = _read_request(current_path, end_of_read, tid, fd);
+            LOG("Obtained value from server is %ld", max_read);
             if (available_read_cache->find(path) == available_read_cache->end()) {
                 available_read_cache->emplace(path, max_read);
             } else {
                 available_read_cache->at(path) = max_read;
             }
+            LOG("completed update from server of max read for file. returning control to "
+                "application");
         }
     };
 };
