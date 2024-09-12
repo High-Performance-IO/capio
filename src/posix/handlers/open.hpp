@@ -54,8 +54,7 @@ int creat_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long ar
 
     if (is_capio_path(path) && fd >= 0) {
         LOG("Registering path and fd");
-        add_capio_fd(tid, path, fd, 0, CAPIO_DEFAULT_FILE_INITIAL_SIZE, flags,
-                     (flags & O_CLOEXEC) == O_CLOEXEC);
+        add_capio_fd(tid, path, fd, 0, (flags & O_CLOEXEC) == O_CLOEXEC);
     }
 
     *result = fd;
@@ -85,8 +84,7 @@ int open_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg
 
     if (is_capio_path(path) && fd >= 0) {
         LOG("Adding capio path");
-        add_capio_fd(tid, path, fd, 0, CAPIO_DEFAULT_FILE_INITIAL_SIZE, flags,
-                     (flags & O_CLOEXEC) == O_CLOEXEC);
+        add_capio_fd(tid, path, fd, 0, (flags & O_CLOEXEC) == O_CLOEXEC);
     }
 
     *result = fd;
@@ -118,8 +116,7 @@ int openat_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long a
 
     if (is_capio_path(path) && fd >= 0) {
         LOG("Adding capio path");
-        add_capio_fd(tid, path, fd, 0, CAPIO_DEFAULT_FILE_INITIAL_SIZE, flags,
-                     (flags & O_CLOEXEC) == O_CLOEXEC);
+        add_capio_fd(tid, path, fd, 0, (flags & O_CLOEXEC) == O_CLOEXEC);
     }
 
     *result = fd;

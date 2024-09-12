@@ -48,13 +48,14 @@ inline void add_capio_path(const std::string &path) {
 }
 
 /**
- * Add a file descriptor to metadata structures
+ * Add a file descriptor to metadata structures. is_cloexec is used to handle whether the fd needs
+ * to be closed before executing an execve or not (fd persists if is_cloexec == true)
  * @param path
  * @param fd
  * @return
  */
 inline void add_capio_fd(pid_t tid, const std::string &path, int fd, capio_off64_t offset,
-                         capio_off64_t init_size, int flags, bool is_cloexec) {
+                         bool is_cloexec) {
     START_LOG(tid, "call(path=%s, fd=%d)", path.c_str(), fd);
     add_capio_path(path);
     LOG("Added capio path %s", path.c_str());
@@ -62,7 +63,7 @@ inline void add_capio_fd(pid_t tid, const std::string &path, int fd, capio_off64
     LOG("Inserted tid %d for path %s", tid, path.c_str());
     capio_files_descriptors->insert({fd, path});
     LOG("Inserted file descriptor tuple");
-    files->insert({fd, {std::make_shared<off64_t>(offset), init_size, flags, is_cloexec}});
+    files->insert({fd, {std::make_shared<capio_off64_t>(offset), 0, 0, is_cloexec}});
     LOG("Registered file");
 }
 
@@ -185,27 +186,11 @@ inline bool exists_capio_fd(pid_t fd) {
 }
 
 /**
- * Check if a path exists in metadata structures
- * @param path
- * @return if the path exists
- */
-inline bool exists_capio_path(const std::string &path) {
-    return capio_files_paths->find(path) != capio_files_paths->end();
-}
-
-/**
  * Get the CLOEXEC property of a file descriptor in metadata structures
  * @param fd
  * @return the CLOEXEC property
  */
 inline bool get_capio_fd_cloexec(int fd) { return std::get<3>(files->at(fd)); }
-
-/**
- * Get the active flags of a file descriptor in metadata structures
- * @param fd
- * @return the active flags
- */
-inline bool get_capio_fd_flags(int fd) { return std::get<2>(files->at(fd)); }
 
 /**
  * Get the path of a file descriptor
@@ -219,14 +204,7 @@ inline const std::string &get_capio_fd_path(int fd) { return capio_files_descrip
  * @param fd
  * @return the current offset
  */
-inline off64_t get_capio_fd_offset(int fd) { return *std::get<0>(files->at(fd)); }
-
-/**
- * Get the actual size of a file descriptor
- * @param fd
- * @return the actual size of the file
- */
-inline off64_t get_capio_fd_size(int fd) { return std::get<1>(files->at(fd)); }
+inline capio_off64_t get_capio_fd_offset(int fd) { return *std::get<0>(files->at(fd)); }
 
 /**
  * Get all the file descriptors stored in metadata structures
@@ -300,20 +278,14 @@ inline void rename_capio_path(const std::string &oldpath, const std::string &new
 }
 
 /**
- * Modify the active flags of a file descriptor in metadata structures
- * @param fd
- * @param flags
- * @return
- */
-inline void set_capio_fd_flags(int fd, int flags) { std::get<2>(files->at(fd)) = flags; }
-
-/**
  * Set the offset of a file descriptor in metadata structures
  * @param fd
  * @param offset
  * @return
  */
-inline void set_capio_fd_offset(int fd, off64_t offset) { *std::get<0>(files->at(fd)) = offset; }
+inline void set_capio_fd_offset(int fd, capio_off64_t offset) {
+    *std::get<0>(files->at(fd)) = offset;
+}
 
 /**
  * Change the current directory

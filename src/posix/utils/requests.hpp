@@ -36,8 +36,8 @@ inline void init_client() {
  * @return
  */
 inline void register_listener(long tid) {
-    auto *p_buf_response = new CircularBuffer<off_t>(SHM_COMM_CHAN_NAME_RESP + std::to_string(tid),
-                                                     CAPIO_REQ_BUFF_CNT, sizeof(off_t));
+    auto *p_buf_response = new CircularBuffer<capio_off64_t>(
+        SHM_COMM_CHAN_NAME_RESP + std::to_string(tid), CAPIO_REQ_BUFF_CNT, sizeof(off_t));
     bufs_response->insert(std::make_pair(tid, p_buf_response));
 }
 
@@ -49,7 +49,7 @@ inline void consent_to_proceed_request(const std::filesystem::path &path, const 
     char req[CAPIO_REQ_MAX_SIZE];
     sprintf(req, "%04d %ld %s %s", CAPIO_REQUEST_CONSENT, tid, path.c_str(), source_func.c_str());
     buf_requests->write(req, CAPIO_REQ_MAX_SIZE);
-    off64_t res;
+    capio_off64_t res;
     bufs_response->at(tid)->read(&res);
 }
 
@@ -103,7 +103,7 @@ inline void open_request(const int fd, const std::filesystem::path &path, const 
     char req[CAPIO_REQ_MAX_SIZE];
     sprintf(req, "%04d %ld %d %s", CAPIO_REQUEST_OPEN, tid, fd, path.c_str());
     buf_requests->write(req, CAPIO_REQ_MAX_SIZE);
-    off64_t res;
+    capio_off64_t res;
     bufs_response->at(tid)->read(&res);
 }
 

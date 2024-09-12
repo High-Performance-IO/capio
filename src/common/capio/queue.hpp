@@ -22,7 +22,7 @@ template <class T, class Mutex> class Queue {
     Mutex _mutex;
     NamedSemaphore _sem_num_elems, _sem_num_empty;
 
-    inline void _read(T *buff_recv, unsigned long long int num_bytes) {
+    inline void _read(T *buff_recv, capio_off64_t num_bytes) {
         _sem_num_elems.lock();
 
         std::lock_guard<Mutex> lg(_mutex);
