@@ -50,9 +50,7 @@ class CapioCLEngine {
         for (auto itm : _locations) {
             std::string name_trunc = truncate_last_n(itm.first, 12);
             auto kind              = std::get<6>(itm.second) ? "F" : "D";
-
-            std::cout << "|   " << kind << "  "
-                      << "| " << name_trunc << std::setfill(' ')
+            std::cout << "|   " << kind << "  " << "| " << name_trunc << std::setfill(' ')
                       << std::setw(20 - name_trunc.length()) << "| ";
 
             auto producers = std::get<0>(itm.second);
@@ -159,6 +157,13 @@ class CapioCLEngine {
         }
     }
 
+    long getDirectoryFileCount(std::string path) {
+        if (_locations.find(path) != _locations.end()) {
+            return std::get<8>(_locations.at(path));
+        }
+        return 0;
+    }
+
     void addProducer(const std::string &path, std::string &producer) {
         START_LOG(gettid(), "call(path=%s, producer=%s)", path.c_str(), producer.c_str());
         producer.erase(remove_if(producer.begin(), producer.end(), isspace), producer.end());
@@ -189,6 +194,9 @@ class CapioCLEngine {
 
     std::string getFireRule(const std::string &path) {
         START_LOG(gettid(), "call(path=%s)", path.c_str());
+        if(_locations.find(path) == _locations.end()) {
+            return CAPIO_FILE_MODE_UPDATE;
+        }
         return std::get<3>(_locations.at(path));
     }
 

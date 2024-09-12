@@ -38,6 +38,7 @@ inline void CapioFileManager::add_thread_awaiting_data(std::string path, int tid
     thread_awaiting_data->at(path)->emplace(tid, expected_size);
 }
 
+// TODO: maybe merge check for data and existance
 inline void CapioFileManager::check_and_unlock_thread_awaiting_data(const std::string &path) const {
     START_LOG(gettid(), "call(path=%s)", path.c_str());
     LOG("Before lockguard");
@@ -46,10 +47,17 @@ inline void CapioFileManager::check_and_unlock_thread_awaiting_data(const std::s
     if (thread_awaiting_data->find(path) != thread_awaiting_data->end()) {
         LOG("Path has thread awaiting");
         auto threads = thread_awaiting_data->at(path);
-
+        LOG("Obtained threads");
         for (auto item = threads->begin(); item != threads->end();) {
             LOG("Handling thread");
-            if (is_committed(path) || item->first >= std::filesystem::file_size(path)) {
+            uintmax_t filesize = -1;
+            if (std::filesystem::exists(path)) {
+                filesize =
+                    std::filesystem::is_directory(path) ? -1 : std::filesystem::file_size(path);
+            }
+            if (is_committed(path) ||
+                (item->first >= filesize &&
+                 capio_cl_engine->getFireRule(path) == CAPIO_FILE_MODE_NO_UPDATE)) {
                 LOG("Thread %ld can be unlocked", item->first);
                 /*
                  * Check for file size only if it is directory, otherwise,
@@ -102,10 +110,37 @@ inline void CapioFileManager::set_committed(pid_t tid) const {
 
 inline bool CapioFileManager::is_committed(const std::filesystem::path &path) {
     START_LOG(gettid(), "call(path=%s)", path.c_str());
-    std::string computed_path = path.string() + ".capio";
-    LOG("File %s %s committed", path.c_str(),
-        std::filesystem::exists(computed_path) ? "is" : "is not");
-    return std::filesystem::exists(computed_path);
+    bool file_exists = std::filesystem::exists(path);
+    LOG("File exists: %s", file_exists ? "true" : "false");
+
+    if (!file_exists) {
+        return false;
+    }
+
+    if (std::filesystem::is_directory(path)) {
+        // is directory
+        // check for n_files inside a directory
+        LOG("Path is a directory");
+        auto file_count = capio_cl_engine->getDirectoryFileCount(path);
+        LOG("Expected file count is %ld", file_count);
+        long count = 0;
+        for (auto const &file : std::filesystem::directory_iterator{path}) {
+            if (file.path().extension() != ".capio") {
+                ++count;
+            }
+        }
+        bool continue_directory = count >= file_count;
+
+        LOG("Final result: %s", continue_directory ? "COMMITTED" : "NOT COMMITTED");
+        return continue_directory;
+    } else {
+        // if is file
+        LOG("Path is a file");
+        std::string computed_path = path.string() + ".capio";
+        LOG("File %s %s existing", path.c_str(),
+            std::filesystem::exists(computed_path) ? "is" : "is not");
+        return std::filesystem::exists(computed_path);
+    }
 }
 
 inline std::vector<std::string> CapioFileManager::get_file_awaiting_creation() const {

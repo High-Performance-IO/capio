@@ -8,7 +8,7 @@ inline void consent_to_proceed_handler(const char *const str) {
     pid_t tid;
     char path[1024], source_func[1024];
     sscanf(str, "%d %s %s", &tid, path, source_func);
-    START_LOG(gettid(), "call(tid=%d, path=%s)", tid, path);
+    START_LOG(gettid(), "call(tid=%d, path=%s, source=%s)", tid, path, source_func);
 
     std::filesystem::path path_fs(path);
 
@@ -26,13 +26,21 @@ inline void consent_to_proceed_handler(const char *const str) {
         return;
     }
 
-    if (std::filesystem::exists(path) || CapioFileManager::is_committed(path) ||
-        capio_cl_engine->isProducer(path, tid)) {
+    // TODO: check this expression as being the correct evaluation one
+    // NOTE: expression is (exists AND (committed OR no_update)) OR is_producer
+
+    bool exists      = std::filesystem::exists(path);
+    bool committed   = CapioFileManager::is_committed(path);
+    bool firable     = capio_cl_engine->getFireRule(path) == CAPIO_FILE_MODE_NO_UPDATE;
+    bool is_producer = capio_cl_engine->isProducer(path, tid);
+    LOG("exists=%s, committed=%s, firable=%s, is_producer=%s", exists ? "true" : "false",
+        committed ? "true" : "false", firable ? "true" : "false", is_producer ? "true" : "false");
+    if ((exists && (committed || firable)) || is_producer) {
         LOG("It is possible to unlock waiting thread");
         client_manager->reply_to_client(tid, 1);
     } else {
         LOG("Requested file %s does not exists yet. awaiting for creation", path);
-        file_manager->add_thread_awaiting_creation(path, tid);
+        file_manager->add_thread_awaiting_data(path, tid, 0);
     }
 }
 

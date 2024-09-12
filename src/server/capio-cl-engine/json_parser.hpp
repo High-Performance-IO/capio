@@ -207,13 +207,9 @@ class JsonParser {
                         std::string commit(commit_rule), firerule(mode);
                         if (n_files != -1) {
                             std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_JSON
-                                      << "Setting path:  " << path << " to be a directory"
+                                      << "Setting path:  " << path << " n_files to " << n_files
                                       << std::endl;
                             locations->setDirectoryFileCount(path, n_files);
-                        } else {
-                            std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_JSON
-                                      << "Setting path:  " << path << " to be a file" << std::endl;
-                            locations->setFile(path);
                         }
 
                         is_file ? locations->setFile(path) : locations->setDirectory(path);
