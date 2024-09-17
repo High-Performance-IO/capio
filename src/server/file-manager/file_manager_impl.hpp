@@ -38,7 +38,7 @@ inline void CapioFileManager::add_thread_awaiting_data(std::string path, int tid
     thread_awaiting_data->at(path)->emplace(tid, expected_size);
 }
 
-// TODO: maybe merge check for data and existance
+// TODO: maybe merge check for data and existence
 inline void CapioFileManager::check_and_unlock_thread_awaiting_data(const std::string &path) const {
     START_LOG(gettid(), "call(path=%s)", path.c_str());
     LOG("Before lockguard");
@@ -111,7 +111,7 @@ inline void CapioFileManager::set_committed(pid_t tid) const {
 inline bool CapioFileManager::is_committed(const std::filesystem::path &path) {
     START_LOG(gettid(), "call(path=%s)", path.c_str());
     bool file_exists = std::filesystem::exists(path);
-    LOG("File exists: %s", file_exists ? "true" : "false");
+    LOG("File %s exists: %s", path.c_str(), file_exists ? "true" : "false");
 
     if (!file_exists) {
         return false;
@@ -137,8 +137,21 @@ inline bool CapioFileManager::is_committed(const std::filesystem::path &path) {
         // if is file
         LOG("Path is a file");
         std::string computed_path = path.string() + ".capio";
-        LOG("File %s %s existing", path.c_str(),
+        LOG("CAPIO token file %s %s existing", computed_path.c_str(),
             std::filesystem::exists(computed_path) ? "is" : "is not");
+
+        if (capio_cl_engine->getCommitRule(path) == CAPIO_FILE_COMMITTED_ON_FILE) {
+            LOG("Commit rule is on_file. Checking for file dependencies");
+            bool commit_computed = true;
+            for (auto file : capio_cl_engine->get_file_deps(path)) {
+                commit_computed = commit_computed && is_committed(file);
+            }
+
+            LOG("Commit result for file %s is: %s", computed_path.c_str(),
+                commit_computed ? "committed" : "not committed");
+            return commit_computed;
+        }
+
         return std::filesystem::exists(computed_path);
     }
 }

@@ -15,8 +15,8 @@ class CapioCLEngine {
                                   bool,                     // exclude                       [5]
                                   bool, // is_file (if true yes otherwise it is a directory) [6]
                                   int,  // commit on file number                             [7]
-                                  long> // directory file count                              [8]
-                       >
+                                  long, // directory file count                              [8]
+                                  std::vector<std::string>>> // File dependencies            [9]
         _locations;
 
     static std::string truncate_last_n(const std::string &str, int n) {
@@ -50,7 +50,7 @@ class CapioCLEngine {
         for (auto itm : _locations) {
             std::string name_trunc = truncate_last_n(itm.first, 12);
             auto kind              = std::get<6>(itm.second) ? "F" : "D";
-            std::cout << "|   " << kind << "  " << "| " << name_trunc << std::setfill(' ')
+            std::cout << "|   " << kind << "  | " << name_trunc << std::setfill(' ')
                       << std::setw(20 - name_trunc.length()) << "| ";
 
             auto producers = std::get<0>(itm.second);
@@ -123,12 +123,13 @@ class CapioCLEngine {
 
     void add(std::string &path, std::vector<std::string> &producers,
              std::vector<std::string> &consumers, const std::string &commit_rule,
-             const std::string &fire_rule, bool permanent, bool exclude) {
+             const std::string &fire_rule, bool permanent, bool exclude,
+             const std::vector<std::string> &dependencies) {
         START_LOG(gettid(), "call(path=%s, commit=%s, fire=%s, permanent=%s, exclude=%s)",
                   path.c_str(), commit_rule.c_str(), fire_rule.c_str(), permanent ? "YES" : "NO",
                   exclude ? "YES" : "NO");
         _locations.emplace(path, std::make_tuple(producers, consumers, commit_rule, fire_rule,
-                                                 permanent, exclude, true, -1, -1));
+                                                 permanent, exclude, true, -1, -1, dependencies));
     }
 
     void newFile(const std::string &path) {
@@ -151,9 +152,10 @@ class CapioCLEngine {
                 }
             }
 
-            _locations.emplace(path, std::make_tuple(std::vector<std::string>(),
-                                                     std::vector<std::string>(), commit, fire,
-                                                     false, false, true, -1, -1));
+            _locations.emplace(path,
+                               std::make_tuple(std::vector<std::string>(),
+                                               std::vector<std::string>(), commit, fire, false,
+                                               false, true, -1, -1, std::vector<std::string>()));
         }
     }
 
@@ -194,7 +196,7 @@ class CapioCLEngine {
 
     std::string getFireRule(const std::string &path) {
         START_LOG(gettid(), "call(path=%s)", path.c_str());
-        if(_locations.find(path) == _locations.end()) {
+        if (_locations.find(path) == _locations.end()) {
             return CAPIO_FILE_MODE_UPDATE;
         }
         return std::get<3>(_locations.at(path));
@@ -280,6 +282,21 @@ class CapioCLEngine {
         }
         LOG("No match has been found");
         return false;
+    }
+
+    void set_file_deps(const std::filesystem::path &path,
+                       const std::vector<std::string> &dependencies) {
+        START_LOG(gettid(), "call()");
+        std::get<9>(_locations.at(path)) = dependencies;
+        for (const auto &itm : dependencies) {
+            LOG("Creating new fie (if it exists) for path %s", itm.c_str());
+            newFile(itm);
+        }
+    }
+
+    // todo fix leak
+    std::vector<std::string> get_file_deps(const std::filesystem::path &path) {
+        return std::get<9>(_locations.at(path));
     }
 };
 

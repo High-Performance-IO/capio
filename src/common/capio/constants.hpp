@@ -44,6 +44,7 @@ constexpr int CAPIO_LOG_MAX_MSG_LEN                 = 2048;
 constexpr char CAPIO_FILE_MODE_NO_UPDATE[]           = "no_update";
 constexpr char CAPIO_FILE_MODE_UPDATE[]              = "update";
 constexpr char CAPIO_FILE_COMMITTED_ON_CLOSE[]       = "on_close";
+constexpr char CAPIO_FILE_COMMITTED_ON_FILE[]        = "on_file";
 constexpr char CAPIO_FILE_COMMITTED_ON_TERMINATION[] = "on_termination";
 
 // CAPIO POSIX return codes

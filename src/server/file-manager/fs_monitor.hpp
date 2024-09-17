@@ -33,7 +33,7 @@ class FileSystemMonitor {
                 }
             }
 
-            for (const auto &file : file_manager->get_file_awaiting_data()) {
+            for (auto &file : file_manager->get_file_awaiting_data()) {
                 if (std::filesystem::exists(file)) {
                     LOG("File %s exists. Checking if enough data is available", file.c_str());
                     // actual update, end eventual removal from map is handled by the

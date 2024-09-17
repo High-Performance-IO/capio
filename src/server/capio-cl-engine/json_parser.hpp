@@ -73,7 +73,10 @@ class JsonParser {
                         std::string appname(app_name);
                         std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_JSON << "File : " << file
                                   << " added to app: " << app_name << std::endl;
-                        locations->newFile(file);
+                        if (file.is_relative()) {
+                            file = capio_dir / file;
+                        }
+                        locations->newFile(file.c_str());
                         locations->addConsumer(file, appname);
                     } else {
                         std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_WARNING << "File : " << file
@@ -98,6 +101,9 @@ class JsonParser {
                         std::string appname(app_name);
                         std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_JSON << "Adding file: " << file
                                   << " to app: " << app_name << std::endl;
+                        if (file.is_relative()) {
+                            file = capio_dir / file;
+                        }
                         locations->newFile(file);
                         locations->addProducer(file, appname);
                     }
@@ -117,6 +123,7 @@ class JsonParser {
                 for (auto file : streaming) {
                     std::string_view committed, mode, commit_rule;
                     std::vector<std::filesystem::path> streaming_names;
+                    std::vector<std::string> file_deps;
                     long int n_close = -1;
                     long n_files, batch_size;
                     bool is_file = true;
@@ -175,6 +182,33 @@ class JsonParser {
                             commit_rule = committed;
                         }
                     }
+
+                    // check for committed on file:
+                    if (commit_rule == CAPIO_FILE_COMMITTED_ON_FILE) {
+                        simdjson::ondemand::array file_deps_tmp;
+                        error = file["file_deps"].get_array().get(file_deps_tmp);
+
+                        if (error) {
+                            std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_ERROR
+                                      << "commit rule is on_file but no file_deps section found"
+                                      << std::endl;
+                            ERR_EXIT("commit rule is on_file but no file_deps section found");
+                        }
+
+                        std::string_view name_tmp;
+                        for (auto itm : file_deps_tmp) {
+                            name_tmp = itm.get_string().value();
+                            std::filesystem::path computed_path(name_tmp);
+                            computed_path = computed_path.is_relative()
+                                                ? (get_capio_dir() / computed_path)
+                                                : computed_path;
+                            std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_JSON
+                                      << "Adding file: " << computed_path
+                                      << " to file dependencies: " << std::endl;
+                            file_deps.emplace_back(computed_path);
+                        }
+                    }
+
                     LOG("Committed: %s", std::string(committed).c_str());
                     // END PARSING COMMITTED
 
@@ -216,6 +250,7 @@ class JsonParser {
                         locations->setCommitRule(path, commit);
                         locations->setFireRule(path, firerule);
                         locations->setCommitedNumber(path, n_close);
+                        locations->set_file_deps(path, file_deps);
                     }
                 }
 
