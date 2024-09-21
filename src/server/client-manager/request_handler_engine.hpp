@@ -56,8 +56,8 @@ class RequestHandlerEngine {
         if (ec == std::errc()) {
             strcpy(str, ptr + 1);
         } else {
-            std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_ERROR << "Received invalid code: " << code
-                      << std::endl;
+            std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_ERROR << " [ " << node_name << " ] "
+                      << "Received invalid code: " << code << std::endl;
             ERR_EXIT("Invalid request %d%s", code, ptr);
         }
         return code;
@@ -80,8 +80,8 @@ class RequestHandlerEngine {
         START_LOG(gettid(), "call()");
         delete buf_requests;
 
-        std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_WARNING << "buf_requests cleanup completed"
-                  << std::endl;
+        std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_WARNING << " [ " << node_name << " ] "
+                  << "buf_requests cleanup completed" << std::endl;
     }
 
     [[noreturn]] void start() {
@@ -92,8 +92,8 @@ class RequestHandlerEngine {
             LOG(CAPIO_LOG_SERVER_REQUEST_START);
             int code = read_next_request(str.get());
             if (code < 0 || code > CAPIO_NR_REQUESTS) {
-                std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_ERROR << "Received invalid code: " << code
-                          << std::endl;
+                std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_ERROR << " [ " << node_name << " ] "
+                          << "Received invalid code: " << code << std::endl;
 
                 ERR_EXIT("Error: received invalid request code");
             }

@@ -1,9 +1,8 @@
 #ifndef DISTRIBUTEDSEMAPHORE_HPP
 #define DISTRIBUTEDSEMAPHORE_HPP
 class DistributedSemaphore {
-  private:
     std::string name;
-    struct timespec sleep {};
+    timespec sleep{};
     bool locked;
     int fp;
 

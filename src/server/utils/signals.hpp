@@ -12,10 +12,12 @@ void sig_term_handler(int signum, siginfo_t *info, void *ptr) {
               strsignal(signum), info != nullptr ? info->si_pid : -1);
 
     std::cout << std::endl
-              << CAPIO_LOG_SERVER_CLI_LEVEL_WARNING << "shutting down server" << std::endl;
+              << CAPIO_LOG_SERVER_CLI_LEVEL_WARNING << " [ " << node_name << " ] "
+              << "shutting down server" << std::endl;
 
     if (signum == SIGSEGV) {
-        std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_ERROR << "Segfault detected!" << std::endl;
+        std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_ERROR << " [ " << node_name << " ] "
+                  << "Segfault detected!" << std::endl;
     }
 
 #ifdef CAPIO_COVERAGE
@@ -23,14 +25,17 @@ void sig_term_handler(int signum, siginfo_t *info, void *ptr) {
 #endif
 
     delete request_handlers_engine;
-    std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_WARNING << "request_handlers_engine cleanup completed"
-              << std::endl;
+    std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_WARNING << " [ " << node_name << " ] "
+              << "request_handlers_engine cleanup completed" << std::endl;
     delete ctl_module;
-    std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_WARNING << "ctl_module cleanup completed" << std::endl;
+    std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_WARNING << " [ " << node_name << " ] "
+              << "ctl_module cleanup completed" << std::endl;
     delete fs_monitor;
-    std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_WARNING << "fs_monitor cleanup completed" << std::endl;
+    std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_WARNING << " [ " << node_name << " ] "
+              << "fs_monitor cleanup completed" << std::endl;
     delete shm_canary;
-    std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_INFO << "shutdown completed" << std::endl;
+    std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_INFO << " [ " << node_name << " ] "
+              << "shutdown completed" << std::endl;
 
     exit(EXIT_SUCCESS);
 }

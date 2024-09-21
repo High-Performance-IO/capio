@@ -22,20 +22,12 @@ const std::filesystem::path &get_capio_dir() {
         auto buf        = std::unique_ptr<char[]>(new char[PATH_MAX]);
 
         if (val == nullptr) {
-
-            std::cout << "\n"
-                      << CAPIO_LOG_SERVER_CLI_LEVEL_ERROR << "Fatal: CAPIO_DIR not provided!"
-                      << std::endl;
             ERR_EXIT("Fatal:  CAPIO_DIR not provided!");
 
         } else {
 
             const char *realpath_res = capio_realpath(val, buf.get());
             if (realpath_res == nullptr) {
-                std::cout << "\n"
-                          << CAPIO_LOG_SERVER_CLI_LEVEL_ERROR
-                          << "Fatal: CAPIO_DIR set, but folder does not exists on filesystem!"
-                          << std::endl;
                 ERR_EXIT("error CAPIO_DIR: directory %s does not "
                          "exist. [buf=%s]",
                          val, buf.get());
@@ -98,8 +90,6 @@ inline int get_capio_log_level() {
         } else {
             auto [ptr, ec] = std::from_chars(log_level, log_level + strlen(log_level), level);
             if (ec != std::errc()) {
-                std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_WARNING << "invalid CAPIO_LOG_LEVEL value"
-                          << std::endl;
                 level = 0;
             }
         }

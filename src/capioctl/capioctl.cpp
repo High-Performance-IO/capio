@@ -20,6 +20,10 @@
 #include <vector>
 
 #include "args.hxx"
+#include <iostream>
+#include <string>
+std::string workflow_name;
+char node_name[HOST_NAME_MAX];
 
 #include "capio/queue.hpp"
 

@@ -132,7 +132,7 @@ constexpr char CAPIO_SERVER_ARG_PARSER_EPILOGUE[] =
     "For further help, a full list of the available ENVIRONMENT VARIABLES,"
     " and a guide on config JSON file structure, please visit "
     "https://github.com/High-Performance-IO/capio";
-constexpr char CAPIO_SERVER_ARG_PARSER_PRE_COMMAND[] = "{ENVIRONMENT_VARS}  mpirun -n 1";
+constexpr char CAPIO_SERVER_ARG_PARSER_PRE_COMMAND[] = "{ENVIRONMENT_VARS} ";
 constexpr char CAPIO_SERVER_ARG_PARSER_LOGILE_DIR_OPT_HELP[] =
     "Name of the folder to which CAPIO server will put log files into";
 constexpr char CAPIO_SERVER_ARG_PARSER_LOGILE_OPT_HELP[] =

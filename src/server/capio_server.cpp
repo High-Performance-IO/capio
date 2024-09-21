@@ -121,19 +121,19 @@ std::string parseCLI(int argc, char **argv) {
 
     if (config) {
         std::string token = args::get(config);
-        std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_INFO << "parsing config file: " << token
-                  << std::endl;
+        std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_INFO << " [ " << node_name << " ] "
+                  << "parsing config file: " << token << std::endl;
         // TODO: pass config file path
     } else if (noConfigFile) {
         workflow_name = std::string_view(get_capio_workflow_name());
-        std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_WARNING << "skipping config file parsing."
-                  << std::endl
-                  << CAPIO_LOG_SERVER_CLI_LEVEL_WARNING
+        std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_WARNING << " [ " << node_name << " ] "
+                  << "skipping config file parsing." << std::endl
+                  << CAPIO_LOG_SERVER_CLI_LEVEL_WARNING << " [ " << node_name << " ] "
                   << "Obtained from environment variable current workflow name: "
                   << workflow_name.data() << std::endl;
 
     } else {
-        std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_ERROR
+        std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_ERROR << " [ " << node_name << " ] "
                   << "Error: no config file provided. To skip config file use --no-config option!"
                   << std::endl;
 #ifdef CAPIO_LOG
@@ -142,13 +142,13 @@ std::string parseCLI(int argc, char **argv) {
         exit(EXIT_FAILURE);
     }
 
-    std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_INFO << "CAPIO_DIR=" << get_capio_dir().c_str()
-              << std::endl;
+    std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_INFO << " [ " << node_name << " ] "
+              << "CAPIO_DIR=" << get_capio_dir().c_str() << std::endl;
 
 #ifdef CAPIO_LOG
     CAPIO_LOG_LEVEL = get_capio_log_level();
-    std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_INFO << "LOG_LEVEL set to: " << CAPIO_LOG_LEVEL
-              << std::endl;
+    std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_INFO << " [ " << node_name << " ] "
+              << "LOG_LEVEL set to: " << CAPIO_LOG_LEVEL << std::endl;
     std::cout << CAPIO_LOG_SERVER_CLI_LOGGING_ENABLED_WARNING;
     log->log("LOG_LEVEL set to: %d", CAPIO_LOG_LEVEL);
     delete log;
@@ -159,7 +159,8 @@ std::string parseCLI(int argc, char **argv) {
     }
 #endif
 
-    std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_INFO << "server initialization completed!" << std::endl
+    std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_INFO << " [ " << node_name << " ] "
+              << "server initialization completed!" << std::endl
               << std::flush;
 
     if (config) {

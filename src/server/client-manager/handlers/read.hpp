@@ -12,28 +12,21 @@ inline void read_handler(const char *const str) {
 
     std::filesystem::path path_fs(path);
     // Skip operations on CAPIO_DIR
-    // TODO: check if it is coherent with CAPIO_CL
-    if (path_fs == get_capio_dir()) {
-        LOG("Ignore calls on exactly CAPIO_DIR");
-        client_manager->reply_to_client(tid, 1);
-        return;
-    }
-
-    if (!capio_cl_engine->file_to_be_handled(path_fs)) {
+    if (!CapioCLEngine::fileToBeHandled(path_fs)) {
         LOG("Ignore calls as file should not be treated by CAPIO");
         client_manager->reply_to_client(tid, 1);
         return;
     }
 
-    auto is_committed = CapioFileManager::is_committed(path);
+    auto is_committed = CapioFileManager::isCommitted(path);
     auto file_size    = std::filesystem::file_size(path);
 
     // return ULLONG_MAX to signal client cache that file is committed and no more requests are
     // required
-    if (file_size >= end_of_read || is_committed) {
+    if (file_size >= end_of_read || is_committed || capio_cl_engine->isProducer(path, tid)) {
         client_manager->reply_to_client(tid, is_committed ? ULLONG_MAX : file_size);
     } else {
-        file_manager->add_thread_awaiting_data(path, tid, end_of_read);
+        file_manager->addThreadAwaitingData(path, tid, end_of_read);
     }
 }
 

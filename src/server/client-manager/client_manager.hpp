@@ -24,8 +24,8 @@ class ClientManager {
         delete bufs_response;
         delete app_names;
         delete files_to_be_committed_by_tid;
-        std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_WARNING << "buf_response cleanup completed"
-                  << std::endl;
+        std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_WARNING << " [ " << node_name << " ] "
+                  << "buf_response cleanup completed" << std::endl;
     }
 
     /**

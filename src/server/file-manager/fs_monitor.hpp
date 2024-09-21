@@ -24,21 +24,21 @@ class FileSystemMonitor {
              * and not by the file_system monitor component itself
              */
 
-            for (const auto &file : file_manager->get_file_awaiting_creation()) {
+            for (const auto &file : file_manager->getFileAwaitingCreation()) {
                 if (std::filesystem::exists(file)) {
                     LOG("File %s exists. Unlocking thread awaiting for creation", file.c_str());
-                    file_manager->unlock_thread_awaiting_creation(file);
-                    file_manager->delete_file_awaiting_creation(file);
+                    file_manager->unlockThreadAwaitingCreation(file);
+                    file_manager->deleteFileAwaitingCreation(file);
                     LOG("Completed handling.\n\n");
                 }
             }
 
-            for (auto &file : file_manager->get_file_awaiting_data()) {
+            for (auto &file : file_manager->getFileAwaitingData()) {
                 if (std::filesystem::exists(file)) {
                     LOG("File %s exists. Checking if enough data is available", file.c_str());
                     // actual update, end eventual removal from map is handled by the
                     // CapioFileManager class and not by the FileSystemMonitor class
-                    file_manager->check_and_unlock_thread_awaiting_data(file);
+                    file_manager->checkAndUnlockThreadAwaitingData(file);
                     LOG("Completed handling.\n\n");
                 }
             }

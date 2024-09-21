@@ -14,18 +14,18 @@ class CapioCLEngine {
                                   bool,                     // permanent                     [4]
                                   bool,                     // exclude                       [5]
                                   bool, // is_file (if true yes otherwise it is a directory) [6]
-                                  int,  // commit on file number                             [7]
+                                  int,  // commit on close number                            [7]
                                   long, // directory file count                              [8]
                                   std::vector<std::string>>> // File dependencies            [9]
         _locations;
 
-    static std::string truncate_last_n(const std::string &str, int n) {
+    static std::string truncateLastN(const std::string &str, int n) {
         return str.length() > n ? "[..] " + str.substr(str.length() - n) : str;
     }
 
   public:
     void print() const {
-        std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_JSON
+        std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_JSON << " [ " << node_name << " ] "
                   << "Composition of expected CAPIO FS: " << std::endl
                   << std::endl
                   << "|============================================================================"
@@ -48,7 +48,7 @@ class CapioCLEngine {
                      "============|============|===========|=========|"
                   << std::endl;
         for (auto itm : _locations) {
-            std::string name_trunc = truncate_last_n(itm.first, 12);
+            std::string name_trunc = truncateLastN(itm.first, 12);
             auto kind              = std::get<6>(itm.second) ? "F" : "D";
             std::cout << "|   " << kind << "  | " << name_trunc << std::setfill(' ')
                       << std::setw(20 - name_trunc.length()) << "| ";
@@ -65,7 +65,7 @@ class CapioCLEngine {
                 }
 
                 if (i < producers.size()) {
-                    auto prod1 = truncate_last_n(producers.at(i), 12);
+                    auto prod1 = truncateLastN(producers.at(i), 12);
                     std::cout << prod1 << std::setfill(' ') << std::setw(20 - prod1.length())
                               << " | ";
                 } else {
@@ -73,7 +73,7 @@ class CapioCLEngine {
                 }
 
                 if (i < consumers.size()) {
-                    auto cons1 = truncate_last_n(consumers.at(i), 12);
+                    auto cons1 = truncateLastN(consumers.at(i), 12);
                     std::cout << " " << cons1 << std::setfill(' ') << std::setw(20 - cons1.length())
                               << " | ";
                 } else {
@@ -105,20 +105,18 @@ class CapioCLEngine {
     };
 
     // TODO: might need to be improved
-    bool file_to_be_handled(std::filesystem::path::iterator::reference path) const {
+    static bool fileToBeHandled(std::filesystem::path::iterator::reference path) {
         START_LOG(gettid(), "call(path=%s)", path.c_str());
-        for (const auto &entry : _locations) {
-            auto capio_path = entry.first;
-            if (path == capio_path) {
-                return true;
-            }
-            if (capio_path.find('*') != std::string::npos) { // check for globs
-                if (capio_path.find(path) == 0) { // if path and capio_path begins in the same way
-                    return true;
-                }
-            }
+
+        if (path == get_capio_dir()) {
+            LOG("Path is capio_dir. Ignoring.");
+            return false;
         }
-        return false;
+
+        LOG("Parent path=%s", path.parent_path().c_str());
+        LOG("Path %s be handled by CAPIO",
+            path.parent_path().string().rfind(get_capio_dir(), 0) == 0 ? "SHOULD" : "SHOULD NOT");
+        return path.parent_path().string().rfind(get_capio_dir(), 0) == 0;
     };
 
     void add(std::string &path, std::vector<std::string> &producers,
@@ -169,6 +167,7 @@ class CapioCLEngine {
     void addProducer(const std::string &path, std::string &producer) {
         START_LOG(gettid(), "call(path=%s, producer=%s)", path.c_str(), producer.c_str());
         producer.erase(remove_if(producer.begin(), producer.end(), isspace), producer.end());
+        newFile(path);
         std::get<0>(_locations.at(path)).emplace_back(producer);
     }
 
@@ -185,8 +184,12 @@ class CapioCLEngine {
 
     std::string getCommitRule(const std::string &path) {
         START_LOG(gettid(), "call(path=%s)", path.c_str());
-        LOG("Fire rule: %s", std::get<2>(_locations.at(path)).c_str());
-        return std::get<2>(_locations.at(path));
+        if (_locations.find(path) != _locations.end()) {
+            LOG("Commit rule: %s", std::get<2>(_locations.at(path)).c_str());
+            return std::get<2>(_locations.at(path));
+        }
+        LOG("File not present in config file. Returning default rule.");
+        return CAPIO_FILE_COMMITTED_ON_TERMINATION;
     }
 
     void setFireRule(const std::string &path, const std::string &fire_rule) {
@@ -277,6 +280,11 @@ class CapioCLEngine {
             if (match_globs(k, path)) {
                 LOG("Found possible glob match");
                 std::vector<std::string> producers = std::get<0>(_locations.at(k));
+                DBG(gettid(), [&](std::vector<std::string> &arr) {
+                    for (auto itm : arr) {
+                        LOG("producer: %s", itm.c_str());
+                    }
+                }(producers));
                 return std::find(producers.begin(), producers.end(), app_name) != producers.end();
             }
         }
@@ -284,8 +292,8 @@ class CapioCLEngine {
         return false;
     }
 
-    void set_file_deps(const std::filesystem::path &path,
-                       const std::vector<std::string> &dependencies) {
+    void setFileDeps(const std::filesystem::path &path,
+                     const std::vector<std::string> &dependencies) {
         START_LOG(gettid(), "call()");
         std::get<9>(_locations.at(path)) = dependencies;
         for (const auto &itm : dependencies) {
@@ -293,6 +301,16 @@ class CapioCLEngine {
             newFile(itm);
         }
     }
+
+    int getCommitCloseCount(std::filesystem::path::iterator::reference path) const {
+        START_LOG(gettid(), "call(path=%s)", path.c_str());
+        int count = 0;
+        if (_locations.find(path) != _locations.end()) {
+            count = std::get<7>(_locations.at(path));
+        }
+        LOG("Expected number on close to commit file: %d", count);
+        return count;
+    };
 
     // todo fix leak
     std::vector<std::string> get_file_deps(const std::filesystem::path &path) {
