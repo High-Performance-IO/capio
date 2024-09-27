@@ -4,6 +4,13 @@
 #include "file_manager.hpp"
 #include "utils/distributed_semaphore.hpp"
 
+inline uintmax_t get_file_size_if_exists(const std::filesystem::path &path) {
+    if (std::filesystem::exists(path)) {
+        return std::filesystem::file_size(path);
+    }
+    return 0;
+}
+
 inline void CapioFileManager::addThreadAwaitingCreation(std::string path, pid_t tid) const {
     START_LOG(gettid(), "call(path=%s, tid=%ld)", path.c_str(), tid);
     std::lock_guard<std::mutex> lg(threads_mutex);
@@ -52,10 +59,9 @@ inline void CapioFileManager::checkAndUnlockThreadAwaitingData(const std::string
         for (auto item = threads->begin(); item != threads->end();) {
             LOG("Handling thread");
             uintmax_t filesize = -1;
-            if (std::filesystem::exists(path)) {
-                filesize =
-                    std::filesystem::is_directory(path) ? -1 : std::filesystem::file_size(path);
-            }
+
+            filesize = std::filesystem::is_directory(path) ? -1 : get_file_size_if_exists(path);
+
             bool committed       = isCommitted(path);
             bool file_size_check = item->first >= filesize;
             bool is_fnu          = capio_cl_engine->getFireRule(path) == CAPIO_FILE_MODE_NO_UPDATE;
@@ -76,10 +82,9 @@ inline void CapioFileManager::checkAndUnlockThreadAwaitingData(const std::string
                  * This is caused by the fact that std::filesystem::file_size is
                  * implementation defined when invoked on directories
                  */
-                client_manager->reply_to_client(item->first,
-                                                std::filesystem::is_directory(path)
-                                                    ? ULLONG_MAX
-                                                    : std::filesystem::file_size(path));
+                client_manager->reply_to_client(item->first, std::filesystem::is_directory(path)
+                                                                 ? ULLONG_MAX
+                                                                 : get_file_size_if_exists(path));
                 // remove thread from map
                 LOG("Removing thread %ld from threads awaiting on data", item->first);
                 item = threads->erase(item);
@@ -195,18 +200,21 @@ inline bool CapioFileManager::isCommitted(const std::filesystem::path &path) {
             LOG("Expected close count is: %d", commit_count);
             long actual_commit_count = 0;
 
-            if (std::filesystem::exists(path.string() + ".capio") && commit_count != -1) {
-                LOG("Commit file exists. retriving commit count");
-                std::ifstream in(path.string() + ".capio");
-                if (in.is_open()) {
-                    LOG("Opened file");
-                    in >> actual_commit_count;
+            if (std::filesystem::exists(path.string() + ".capio")) {
+                if (commit_count != -1) {
+                    LOG("Commit file exists. retrieving commit count");
+                    std::ifstream in(path.string() + ".capio");
+                    if (in.is_open()) {
+                        LOG("Opened file");
+                        in >> actual_commit_count;
+                    }
+                    LOG("Obtained actual commit count: %l", actual_commit_count);
+                    LOG("File %s committed", actual_commit_count >= commit_count ? "IS" : "IS NOT");
+                    return actual_commit_count >= commit_count;
                 }
-                LOG("Obtained actual commit count: %l", actual_commit_count);
+                LOG("File needs to be closed exactly once. checking for token existence");
+                return std::filesystem::exists(path.string() + ".capio");
             }
-
-            LOG("File %s committed", actual_commit_count >= commit_count ? "IS" : "IS NOT");
-            return actual_commit_count >= commit_count;
         }
 
         LOG("Commit rule is ON_TERMINATION. File exists? %s",

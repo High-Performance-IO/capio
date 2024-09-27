@@ -17,8 +17,10 @@ inline void close_handler(const char *const str) {
 
     LOG("File needs handling");
 
-    // Call the set_committed method only if the commit rule is on_close
-    if (capio_cl_engine->getCommitRule(filename) == CAPIO_FILE_COMMITTED_ON_CLOSE) {
+    // Call the set_committed method only if the commit rule is on_close and calling thread is a
+    // producer
+    if (capio_cl_engine->getCommitRule(filename) == CAPIO_FILE_COMMITTED_ON_CLOSE &&
+        capio_cl_engine->isProducer(filename, tid)) {
         file_manager->setCommitted(path);
 
         // The increase close count is called only on explicit close() sc, as defined by the

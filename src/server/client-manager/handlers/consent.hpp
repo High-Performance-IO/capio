@@ -18,17 +18,23 @@ inline void consent_to_proceed_handler(const char *const str) {
         client_manager->reply_to_client(tid, 1);
         return;
     }
+    if (capio_cl_engine->isProducer(path, tid)) {
+        LOG("Application is producer. continuing");
+        client_manager->reply_to_client(tid, 1);
+        return;
+    }
 
     // TODO: check this expression as being the correct evaluation one
-    // NOTE: expression is (exists AND (committed OR no_update)) OR is_producer
+    // NOTE: expression is (exists AND (committed OR no_update))
 
-    bool exists      = std::filesystem::exists(path);
-    bool committed   = CapioFileManager::isCommitted(path);
-    bool firable     = capio_cl_engine->getFireRule(path) == CAPIO_FILE_MODE_NO_UPDATE;
-    bool is_producer = capio_cl_engine->isProducer(path, tid);
-    LOG("exists=%s, committed=%s, firable=%s, is_producer=%s", exists ? "true" : "false",
-        committed ? "true" : "false", firable ? "true" : "false", is_producer ? "true" : "false");
-    if ((exists && (committed || firable)) || is_producer) {
+    bool exists    = std::filesystem::exists(path);
+    bool committed = CapioFileManager::isCommitted(path);
+    bool firable   = capio_cl_engine->getFireRule(path) == CAPIO_FILE_MODE_NO_UPDATE;
+
+    LOG("exists=%s, committed=%s, firable=%s", exists ? "true" : "false",
+        committed ? "true" : "false", firable ? "true" : "false");
+
+    if (exists && (committed || firable)) {
         LOG("It is possible to unlock waiting thread");
         client_manager->reply_to_client(tid, 1);
     } else {

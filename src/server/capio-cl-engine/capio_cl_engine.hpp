@@ -272,6 +272,11 @@ class CapioCLEngine {
         if (_locations.find(path) != _locations.end()) {
             LOG("Found exact match for path");
             std::vector<std::string> producers = std::get<0>(_locations.at(path));
+            DBG(gettid(), [&](std::vector<std::string> &arr) {
+                for (auto itm : arr) {
+                    LOG("producer: %s", itm.c_str());
+                }
+            }(producers));
             return std::find(producers.begin(), producers.end(), app_name) != producers.end();
         }
         LOG("No exact match found in locations. checking for globs");
