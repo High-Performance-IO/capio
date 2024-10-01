@@ -20,7 +20,7 @@ inline void read_handler(const char *const str) {
     }
 
     auto is_committed = CapioFileManager::isCommitted(path);
-    auto file_size    = get_file_size_if_exists(path);
+    auto file_size    = CapioFileManager::get_file_size_if_exists(path);
 
     // return ULLONG_MAX to signal client cache that file is committed and no more requests are
     // required

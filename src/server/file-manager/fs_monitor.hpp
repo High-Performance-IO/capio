@@ -51,7 +51,7 @@ class FileSystemMonitor {
         START_LOG(gettid(), "call()");
         *continue_execution = true;
         th                  = new std::thread(_main, std::ref(continue_execution));
-        std::cout << CAPIO_SERVER_CLI_LOG_SERVER
+        std::cout << CAPIO_SERVER_CLI_LOG_SERVER << " [ " << node_name << " ] "
                   << "CapioFileSystemMonitor initialization completed." << std::endl;
     }
 
@@ -65,6 +65,6 @@ class FileSystemMonitor {
     }
 };
 
-FileSystemMonitor *fs_monitor;
+inline FileSystemMonitor *fs_monitor;
 
 #endif // CAPIO_FS_FILE_SYSTEM_MONITOR_HPP

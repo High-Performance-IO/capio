@@ -19,7 +19,9 @@ class CapioCTLModule {
             LOG("Reading incoming request");
             readQueue->read(request);
             LOG("Received request %s", request);
-            writeQueue->write("CIAO PLUTO");
+            /*
+             * TODO: implement logic of CAPIO-CTL
+             */
         }
     }
 
@@ -31,8 +33,8 @@ class CapioCTLModule {
 
         *continue_execution = true;
         th                  = new std::thread(_main, continue_execution, readQueue, writeQueue);
-        std::cout << CAPIO_SERVER_CLI_LOG_SERVER << "CapioCTL initialization completed."
-                  << std::endl;
+        std::cout << CAPIO_SERVER_CLI_LOG_SERVER << " [ " << node_name << " ] "
+                  << "CapioCTL initialization completed." << std::endl;
     }
 
     ~CapioCTLModule() {

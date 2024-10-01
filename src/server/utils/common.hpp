@@ -6,8 +6,8 @@
 #include "capio/constants.hpp"
 #include "types.hpp"
 
-bool first_is_subpath_of_second(const std::filesystem::path &path,
-                                const std::filesystem::path &base) {
+inline bool first_is_subpath_of_second(const std::filesystem::path &path,
+                                       const std::filesystem::path &base) {
     const auto mismatch_pair = std::mismatch(path.begin(), path.end(), base.begin(), base.end());
     return mismatch_pair.second == base.end();
 }

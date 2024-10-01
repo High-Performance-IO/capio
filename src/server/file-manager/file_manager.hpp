@@ -10,14 +10,16 @@ class CapioFileManager {
     std::unordered_map<std::string, std::unordered_map<pid_t, capio_off64_t> *>
         *thread_awaiting_data;
 
+    static std::string getAndCreateMetadataPath(const std::string &path);
+
   public:
     CapioFileManager() {
         START_LOG(gettid(), "call()");
         thread_awaiting_file_creation = new std::unordered_map<std::string, std::vector<pid_t> *>;
         thread_awaiting_data =
             new std::unordered_map<std::string, std::unordered_map<pid_t, capio_off64_t> *>;
-        std::cout << CAPIO_SERVER_CLI_LOG_SERVER << "CapioFileManager initialization completed."
-                  << std::endl;
+        std::cout << CAPIO_SERVER_CLI_LOG_SERVER << " [ " << node_name << " ] "
+                  << "CapioFileManager initialization completed." << std::endl;
     }
     ~CapioFileManager() {
         START_LOG(gettid(), "call()");
@@ -25,11 +27,12 @@ class CapioFileManager {
         delete thread_awaiting_data;
     }
 
+    static uintmax_t get_file_size_if_exists(const std::filesystem::path &path);
+    static void increaseCloseCount(const std::filesystem::path &path);
+    static bool isCommitted(const std::filesystem::path &path);
     void setCommitted(const std::filesystem::path &path) const;
     void setCommitted(pid_t tid) const;
-    static bool isCommitted(const std::filesystem::path &path);
     void checkAndUnlockThreadAwaitingData(const std::string &path) const;
-    static void increaseCloseCount(const std::filesystem::path &path);
     void addThreadAwaitingData(std::string path, int tid, size_t expected_size) const;
     void unlockThreadAwaitingCreation(std::string path) const;
     void addThreadAwaitingCreation(std::string path, pid_t tid) const;

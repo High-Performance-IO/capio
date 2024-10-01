@@ -1,10 +1,24 @@
 #ifndef FILE_MANAGER_HPP
 #define FILE_MANAGER_HPP
+#include "capio/env.hpp"
 #include "client-manager/client_manager.hpp"
 #include "file_manager.hpp"
 #include "utils/distributed_semaphore.hpp"
 
-inline uintmax_t get_file_size_if_exists(const std::filesystem::path &path) {
+inline std::string CapioFileManager::getAndCreateMetadataPath(const std::string &path) {
+    START_LOG(gettid(), "call(path=%s)", path.c_str());
+    std::filesystem::path result =
+        get_capio_metadata_path() / (path.substr(path.find(get_capio_dir()) + 1) + ".capio");
+
+    LOG("metadata path is %s", result.c_str());
+    LOG("Creating metadata directory (%s)", result.parent_path().c_str());
+    std::filesystem::create_directories(result.parent_path());
+
+    LOG("Created capio metadata parent path (if no file existed). returning metadata token file");
+    return result;
+}
+
+inline uintmax_t CapioFileManager::get_file_size_if_exists(const std::filesystem::path &path) {
     if (std::filesystem::exists(path)) {
         return std::filesystem::file_size(path);
     }
@@ -106,7 +120,7 @@ inline void CapioFileManager::checkAndUnlockThreadAwaitingData(const std::string
 
 inline void CapioFileManager::increaseCloseCount(const std::filesystem::path &path) {
     START_LOG(gettid(), "call(path=%s)", path.c_str());
-    auto metadata_path    = path.string() + ".capio";
+    auto metadata_path    = getAndCreateMetadataPath(path);
     const auto lock       = new DistributedSemaphore(metadata_path + ".lock", 300);
     long long close_count = 0;
     LOG("Gained mutual exclusive access to token file %s", (metadata_path + ".lock").c_str());
@@ -129,7 +143,7 @@ inline void CapioFileManager::increaseCloseCount(const std::filesystem::path &pa
 
 inline void CapioFileManager::setCommitted(const std::filesystem::path &path) const {
     START_LOG(gettid(), "call(path=%s)", path.c_str());
-    auto metadata_path = path.string() + ".capio";
+    auto metadata_path = getAndCreateMetadataPath(path);
     LOG("Creating token %s", metadata_path.c_str());
     auto fd = open(metadata_path.c_str(), O_CREAT | S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH, 0664);
     LOG("Token fd = %d", fd);
@@ -149,13 +163,6 @@ inline void CapioFileManager::setCommitted(pid_t tid) const {
 
 inline bool CapioFileManager::isCommitted(const std::filesystem::path &path) {
     START_LOG(gettid(), "call(path=%s)", path.c_str());
-    bool file_exists = std::filesystem::exists(path);
-    LOG("File %s exists: %s", path.c_str(), file_exists ? "true" : "false");
-
-    if (!file_exists) {
-        LOG("File %s does not yet exists", path.c_str());
-        return false;
-    }
 
     if (std::filesystem::is_directory(path)) {
         // is directory
@@ -173,54 +180,57 @@ inline bool CapioFileManager::isCommitted(const std::filesystem::path &path) {
 
         LOG("Final result: %s", continue_directory ? "COMMITTED" : "NOT COMMITTED");
         return continue_directory;
-    } else {
-        // if is file
-        LOG("Path is a file");
-        std::string computed_path = path.string() + ".capio";
-        LOG("CAPIO token file %s %s existing", computed_path.c_str(),
-            std::filesystem::exists(computed_path) ? "is" : "is not");
-
-        std::string commit_rule = capio_cl_engine->getCommitRule(path);
-
-        if (commit_rule == CAPIO_FILE_COMMITTED_ON_FILE) {
-            LOG("Commit rule is on_file. Checking for file dependencies");
-            bool commit_computed = true;
-            for (auto file : capio_cl_engine->get_file_deps(path)) {
-                commit_computed = commit_computed && isCommitted(file);
-            }
-
-            LOG("Commit result for file %s is: %s", computed_path.c_str(),
-                commit_computed ? "committed" : "not committed");
-            return commit_computed;
-        }
-
-        if (commit_rule == CAPIO_FILE_COMMITTED_ON_CLOSE) {
-            LOG("Commit rule is ON_CLOSE");
-            int commit_count = capio_cl_engine->getCommitCloseCount(path);
-            LOG("Expected close count is: %d", commit_count);
-            long actual_commit_count = 0;
-
-            if (std::filesystem::exists(path.string() + ".capio")) {
-                if (commit_count != -1) {
-                    LOG("Commit file exists. retrieving commit count");
-                    std::ifstream in(path.string() + ".capio");
-                    if (in.is_open()) {
-                        LOG("Opened file");
-                        in >> actual_commit_count;
-                    }
-                    LOG("Obtained actual commit count: %l", actual_commit_count);
-                    LOG("File %s committed", actual_commit_count >= commit_count ? "IS" : "IS NOT");
-                    return actual_commit_count >= commit_count;
-                }
-                LOG("File needs to be closed exactly once. checking for token existence");
-                return std::filesystem::exists(path.string() + ".capio");
-            }
-        }
-
-        LOG("Commit rule is ON_TERMINATION. File exists? %s",
-            std::filesystem::exists(computed_path) ? "TRUE" : "FALSE");
-        return std::filesystem::exists(computed_path);
     }
+
+    // if is file
+    LOG("Path is a file");
+    std::string metadata_computed_path = getAndCreateMetadataPath(path);
+    LOG("Computed metadata file path is %s", metadata_computed_path.c_str());
+
+    std::string commit_rule = capio_cl_engine->getCommitRule(path);
+
+    bool metadata_token_exists = std::filesystem::exists(metadata_computed_path);
+
+    if (commit_rule == CAPIO_FILE_COMMITTED_ON_FILE) {
+        LOG("Commit rule is on_file. Checking for file dependencies");
+        bool commit_computed = true;
+        for (auto file : capio_cl_engine->get_file_deps(path)) {
+            commit_computed = commit_computed && isCommitted(file);
+        }
+
+        LOG("Commit result for file %s is: %s", path.c_str(),
+            commit_computed ? "committed" : "not committed");
+
+        return commit_computed;
+    }
+
+    if (commit_rule == CAPIO_FILE_COMMITTED_ON_CLOSE) {
+        LOG("Commit rule is ON_CLOSE");
+        int commit_count = capio_cl_engine->getCommitCloseCount(path);
+        LOG("Expected close count is: %d", commit_count);
+
+        if (metadata_token_exists) {
+            if (commit_count != -1) {
+                long actual_commit_count = 0;
+                LOG("Commit file exists. retrieving commit count");
+                std::ifstream in(metadata_computed_path);
+                if (in.is_open()) {
+                    LOG("Opened file");
+                    in >> actual_commit_count;
+                }
+                LOG("Obtained actual commit count: %l", actual_commit_count);
+                LOG("File %s committed", actual_commit_count >= commit_count ? "IS" : "IS NOT");
+                return actual_commit_count >= commit_count;
+            }
+            LOG("File needs to be closed exactly once and token exists. returning");
+            return true;
+        }
+        LOG("Commit file does not yet exists. returning false");
+        return false;
+    }
+
+    LOG("Commit rule is ON_TERMINATION. File exists? %s", metadata_token_exists ? "TRUE" : "FALSE");
+    return metadata_token_exists;
 }
 
 inline std::vector<std::string> CapioFileManager::getFileAwaitingCreation() const {

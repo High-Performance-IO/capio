@@ -29,7 +29,6 @@ char node_name[HOST_NAME_MAX];
 #include "capio/logger.hpp"
 #include "capio/semaphore.hpp"
 #include "utils/common.hpp"
-#include "utils/env.hpp"
 
 #include "client-manager/request_handler_engine.hpp"
 #include "ctl-module/capio_ctl.hpp"
@@ -154,7 +153,7 @@ std::string parseCLI(int argc, char **argv) {
     delete log;
 #else
     if (std::getenv("CAPIO_LOG_LEVEL") != nullptr) {
-        std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_WARNING
+        std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_WARNING << " [ " << node_name << " ] "
                   << CAPIO_LOG_SERVER_CLI_LOGGING_NOT_AVAILABLE << std::endl;
     }
 #endif
