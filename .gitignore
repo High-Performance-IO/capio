@@ -44,6 +44,10 @@ cmake-build-*
 files_location*.txt
 capio_logs
 
+#Doxygen generated documentation
+doxy/html
+doxy/latex
+
 # Other
 debug
 build
