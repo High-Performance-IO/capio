@@ -131,7 +131,7 @@ Marco Aldinucci <marco.aldinucci@unito.it> (Designer)
 
 Former members:
 
-Alberto Riccardo Martinelli <albertoriccardo.martinelli@unito.it> (designer and maintainer) 
+Alberto Riccardo Martinelli <albertoriccardo.martinelli@unito.it> (designer and maintainer up to release/v1.0.0) 
 
 ## Papers
 
