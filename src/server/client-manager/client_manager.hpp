@@ -1,6 +1,9 @@
 #ifndef CLIENT_MANAGER_HPP
 #define CLIENT_MANAGER_HPP
 
+/**
+ * @brief Handle libcapio_posix clients applications
+ */
 class ClientManager {
     CSBufResponse_t *bufs_response;
     std::unordered_map<int, const std::string> *app_names;
@@ -71,16 +74,33 @@ class ClientManager {
         return bufs_response->at(tid)->write(&offset);
     }
 
+    /**
+     * @brief Add a file that is not yet ready to be consumed by a process to a list of files
+     * waiting to be ready
+     *
+     * @param tid
+     * @param path
+     */
     void add_producer_file_path(pid_t tid, std::string &path) const {
         START_LOG(gettid(), "call(tid=%ld, path=%s)", tid, path.c_str());
         files_to_be_committed_by_tid->at(tid)->emplace_back(path);
     }
-
+    /**
+     * @brief Get the files that a given pid is waiting to be produced
+     *
+     * @param tid
+     * @return auto
+     */
     [[nodiscard]] auto get_produced_files(pid_t tid) const {
         START_LOG(gettid(), "call(tid=%ld)", tid);
         return files_to_be_committed_by_tid->at(tid);
     }
-
+    /**
+     * @brief Get the app name given a process pid
+     *
+     * @param tid
+     * @return std::string
+     */
     std::string get_app_name(pid_t tid) const {
         START_LOG(gettid(), "call(tid=%ld)", tid);
         return app_names->at(tid);
