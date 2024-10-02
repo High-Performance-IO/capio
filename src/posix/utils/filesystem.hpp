@@ -17,10 +17,10 @@
 
 #include "types.hpp"
 
-CPFileDescriptors_t *capio_files_descriptors;
-CPFilesPaths_t *capio_files_paths;
-std::unique_ptr<std::filesystem::path> current_dir;
-CPFiles_t *files;
+inline CPFileDescriptors_t *capio_files_descriptors;
+inline CPFilesPaths_t *capio_files_paths;
+inline std::unique_ptr<std::filesystem::path> current_dir;
+inline CPFiles_t *files;
 
 /**
  * Set the CLOEXEC property of a file descriptor in metadata structures
@@ -48,17 +48,23 @@ inline void add_capio_path(const std::string &path) {
 }
 
 /**
- * Add a file descriptor to metadata structures
+ * Add a file descriptor to metadata structures. is_cloexec is used to handle whether the fd needs
+ * to be closed before executing an execve or not (fd persists if is_cloexec == true)
  * @param path
  * @param fd
  * @return
  */
-inline void add_capio_fd(long tid, const std::string &path, int fd, off64_t offset,
-                         off64_t init_size, int flags, bool is_cloexec) {
+inline void add_capio_fd(pid_t tid, const std::string &path, int fd, capio_off64_t offset,
+                         bool is_cloexec) {
+    START_LOG(tid, "call(path=%s, fd=%d)", path.c_str(), fd);
     add_capio_path(path);
+    LOG("Added capio path %s", path.c_str());
     capio_files_paths->at(path).insert(fd);
+    LOG("Inserted tid %d for path %s", tid, path.c_str());
     capio_files_descriptors->insert({fd, path});
-    files->insert({fd, {std::make_shared<off64_t>(offset), init_size, flags, is_cloexec}});
+    LOG("Inserted file descriptor tuple");
+    files->insert({fd, {std::make_shared<capio_off64_t>(offset), 0, 0, is_cloexec}});
+    LOG("Registered file");
 }
 
 /**
@@ -101,7 +107,15 @@ std::filesystem::path capio_posix_realpath(const std::filesystem::path &pathname
  * @return
  */
 inline std::filesystem::path capio_absolute(const std::filesystem::path &path) {
-    return path.is_absolute() ? path : capio_posix_realpath(path);
+    START_LOG(capio_syscall(SYS_gettid), "call(path=%s)", path.c_str());
+    if (!path.is_absolute()) {
+        LOG("PATH is not absolute");
+        auto absolute = capio_posix_realpath(path);
+        LOG("Computed absolute path is %s", absolute.c_str());
+        return absolute;
+    }
+    LOG("Path is absolute");
+    return path;
 }
 
 /**
@@ -109,7 +123,8 @@ inline std::filesystem::path capio_absolute(const std::filesystem::path &path) {
  * @param fd
  * @return
  */
-inline void delete_capio_fd(int fd) {
+inline void delete_capio_fd(pid_t fd) {
+    START_LOG(syscall_no_intercept(SYS_gettid), "call(fd=%d)", fd);
     auto &path = capio_files_descriptors->at(fd);
     capio_files_paths->at(path).erase(fd);
     capio_files_descriptors->erase(fd);
@@ -122,11 +137,17 @@ inline void delete_capio_fd(int fd) {
  * @return
  */
 inline void delete_capio_path(const std::string &path) {
-    auto it = capio_files_paths->at(path).begin();
-    while (it != capio_files_paths->at(path).end()) {
-        delete_capio_fd(*it++);
+    START_LOG(syscall_no_intercept(SYS_gettid), "call(path=%s)", path.c_str());
+    if (capio_files_paths->find(path) != capio_files_paths->end()) {
+        auto it = capio_files_paths->at(path).begin();
+        LOG("Proceeding to remove fds");
+        while (it != capio_files_paths->at(path).end()) {
+            delete_capio_fd(*it++);
+        }
+        LOG("Proceeding to remove path from capio_files_paths");
+        capio_files_paths->erase(path);
+        LOG("Cleanup completed");
     }
-    capio_files_paths->erase(path);
 }
 
 /**
@@ -146,7 +167,7 @@ inline void destroy_filesystem() {
  * @param newfd
  * @return
  */
-inline void dup_capio_fd(long tid, int oldfd, int newfd, bool is_cloexec) {
+inline void dup_capio_fd(pid_t tid, int oldfd, int newfd, bool is_cloexec) {
     const std::string &path = capio_files_descriptors->at(oldfd);
     capio_files_paths->at(path).insert(newfd);
     files->insert({newfd, files->at(oldfd)});
@@ -159,18 +180,9 @@ inline void dup_capio_fd(long tid, int oldfd, int newfd, bool is_cloexec) {
  * @param fd
  * @return if the file descriptor exists
  */
-inline bool exists_capio_fd(int fd) {
+inline bool exists_capio_fd(pid_t fd) {
     START_LOG(capio_syscall(SYS_gettid), "call(fd=%d)", fd);
     return files->find(fd) != files->end();
-}
-
-/**
- * Check if a path exists in metadata structures
- * @param path
- * @return if the path exists
- */
-inline bool exists_capio_path(const std::string &path) {
-    return capio_files_paths->find(path) != capio_files_paths->end();
 }
 
 /**
@@ -179,13 +191,6 @@ inline bool exists_capio_path(const std::string &path) {
  * @return the CLOEXEC property
  */
 inline bool get_capio_fd_cloexec(int fd) { return std::get<3>(files->at(fd)); }
-
-/**
- * Get the active flags of a file descriptor in metadata structures
- * @param fd
- * @return the active flags
- */
-inline bool get_capio_fd_flags(int fd) { return std::get<2>(files->at(fd)); }
 
 /**
  * Get the path of a file descriptor
@@ -199,14 +204,7 @@ inline const std::string &get_capio_fd_path(int fd) { return capio_files_descrip
  * @param fd
  * @return the current offset
  */
-inline off64_t get_capio_fd_offset(int fd) { return *std::get<0>(files->at(fd)); }
-
-/**
- * Get the actual size of a file descriptor
- * @param fd
- * @return the actual size of the file
- */
-inline off64_t get_capio_fd_size(int fd) { return std::get<1>(files->at(fd)); }
+inline capio_off64_t get_capio_fd_offset(int fd) { return *std::get<0>(files->at(fd)); }
 
 /**
  * Get all the file descriptors stored in metadata structures
@@ -233,17 +231,17 @@ std::filesystem::path get_dir_path(int dirfd) {
     if (it != capio_files_descriptors->end()) {
         LOG("dirfd %d points to path %s", dirfd, it->second.c_str());
         return it->second;
-    } else {
-        char proclnk[128];
-        char dir_pathname[PATH_MAX];
-        sprintf(proclnk, "/proc/self/fd/%d", dirfd);
-        if (syscall_no_intercept(SYS_readlink, proclnk, dir_pathname, PATH_MAX) < 0) {
-            LOG("failed to readlink\n");
-            return {};
-        }
-        LOG("dirfd %d points to path %s", dirfd, dir_pathname);
-        return {dir_pathname};
     }
+    LOG("dirfd %d not found. Computing it through proclnk", dirfd);
+    char proclnk[128]           = {};
+    char dir_pathname[PATH_MAX] = {};
+    sprintf(proclnk, "/proc/self/fd/%d", dirfd);
+    if (syscall_no_intercept(SYS_readlink, proclnk, dir_pathname, PATH_MAX) < 0) {
+        LOG("failed to readlink\n");
+        return {};
+    }
+    LOG("dirfd %d points to path %s", dirfd, dir_pathname);
+    return {dir_pathname};
 }
 
 /**
@@ -265,21 +263,19 @@ inline void init_filesystem() {
  * @return
  */
 inline void rename_capio_path(const std::string &oldpath, const std::string &newpath) {
-    auto entry  = capio_files_paths->extract(oldpath);
-    entry.key() = newpath;
-    capio_files_paths->insert(std::move(entry));
-    for (auto fd : capio_files_paths->at(newpath)) {
-        capio_files_descriptors->at(fd).assign(newpath);
+    START_LOG(syscall_no_intercept(SYS_gettid), "call(oldpath=%s, newpath=%s)", oldpath.c_str(),
+              newpath.c_str());
+    if (capio_files_paths->find(oldpath) != capio_files_paths->end()) {
+        auto entry  = capio_files_paths->extract(oldpath);
+        entry.key() = newpath;
+        capio_files_paths->insert(std::move(entry));
+        for (auto fd : capio_files_paths->at(newpath)) {
+            capio_files_descriptors->at(fd).assign(newpath);
+        }
+    } else {
+        LOG("Warning: olpath not found in capio_files_paths");
     }
 }
-
-/**
- * Modify the active flags of a file descriptor in metadata structures
- * @param fd
- * @param flags
- * @return
- */
-inline void set_capio_fd_flags(int fd, int flags) { std::get<2>(files->at(fd)) = flags; }
 
 /**
  * Set the offset of a file descriptor in metadata structures
@@ -287,7 +283,9 @@ inline void set_capio_fd_flags(int fd, int flags) { std::get<2>(files->at(fd)) =
  * @param offset
  * @return
  */
-inline void set_capio_fd_offset(int fd, off64_t offset) { *std::get<0>(files->at(fd)) = offset; }
+inline void set_capio_fd_offset(int fd, capio_off64_t offset) {
+    *std::get<0>(files->at(fd)) = offset;
+}
 
 /**
  * Change the current directory

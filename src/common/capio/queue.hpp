@@ -18,10 +18,11 @@ template <class T, class Mutex> class Queue {
     long int _buff_size;                       // buffer size in bytes
     long int *_first_elem = nullptr, *_last_elem = nullptr;
     const std::string _shm_name, _first_elem_name, _last_elem_name;
+    bool require_cleanup;
     Mutex _mutex;
     NamedSemaphore _sem_num_elems, _sem_num_empty;
 
-    inline void _read(T *buff_recv, int num_bytes) {
+    inline void _read(T *buff_recv, capio_off64_t num_bytes) {
         _sem_num_elems.lock();
 
         std::lock_guard<Mutex> lg(_mutex);
@@ -32,7 +33,7 @@ template <class T, class Mutex> class Queue {
         _sem_num_empty.unlock();
     }
 
-    inline void _write(const T *data, int num_bytes) {
+    inline void _write(const T *data, unsigned long long int num_bytes) {
         _sem_num_empty.lock();
 
         std::lock_guard<Mutex> lg(_mutex);
@@ -45,18 +46,20 @@ template <class T, class Mutex> class Queue {
 
   public:
     Queue(const std::string &shm_name, const long int max_num_elems, const long int elem_size,
-          const std::string &workflow_name = get_capio_workflow_name())
+          const std::string &workflow_name = get_capio_workflow_name(), bool cleanup = true)
         : _max_num_elems(max_num_elems), _elem_size(elem_size),
           _buff_size(_max_num_elems * _elem_size), _shm_name(workflow_name + "_" + shm_name),
           _first_elem_name(workflow_name + SHM_FIRST_ELEM + shm_name),
           _last_elem_name(workflow_name + SHM_LAST_ELEM + shm_name),
           _mutex(workflow_name + SHM_MUTEX_PREFIX + shm_name, 1),
           _sem_num_elems(workflow_name + SHM_SEM_ELEMS + shm_name, 0),
-          _sem_num_empty(workflow_name + SHM_SEM_EMPTY + shm_name, max_num_elems) {
+          _sem_num_empty(workflow_name + SHM_SEM_EMPTY + shm_name, max_num_elems),
+          require_cleanup(cleanup) {
         START_LOG(capio_syscall(SYS_gettid),
                   "call(shm_name=%s, _max_num_elems=%ld, elem_size=%ld, "
-                  "workflow_name=%s)",
-                  shm_name.data(), max_num_elems, elem_size, workflow_name.data());
+                  "workflow_name=%s, cleanup=%s)",
+                  shm_name.data(), max_num_elems, elem_size, workflow_name.data(),
+                  cleanup ? "yes" : "no");
 
         _first_elem = (long int *) create_shm(_first_elem_name, sizeof(long int));
         _last_elem  = (long int *) create_shm(_last_elem_name, sizeof(long int));
@@ -74,9 +77,12 @@ template <class T, class Mutex> class Queue {
         START_LOG(capio_syscall(SYS_gettid),
                   "call(_shm_name=%s, _first_elem_name=%s, _last_elem_name=%s)", _shm_name.c_str(),
                   _first_elem_name.c_str(), _last_elem_name.c_str());
-        SHM_DESTROY_CHECK(_shm_name.c_str());
-        SHM_DESTROY_CHECK(_first_elem_name.c_str());
-        SHM_DESTROY_CHECK(_last_elem_name.c_str());
+        if (require_cleanup) {
+            LOG("Performing cleanup of allocated resources");
+            SHM_DESTROY_CHECK(_shm_name.c_str());
+            SHM_DESTROY_CHECK(_first_elem_name.c_str());
+            SHM_DESTROY_CHECK(_last_elem_name.c_str());
+        }
     }
 
     inline T *fetch() {
@@ -95,8 +101,8 @@ template <class T, class Mutex> class Queue {
 
     inline auto get_name() { return this->_shm_name; }
 
-    inline void read(T *buff_rcv, long int num_bytes) {
-        START_LOG(capio_syscall(SYS_gettid), "call(buff_rcv=0x%08x, num_bytes=%ld)", buff_rcv,
+    inline void read(T *buff_rcv, unsigned long long int num_bytes) {
+        START_LOG(capio_syscall(SYS_gettid), "call(buff_rcv=0x%08x, num_bytes=%llu)", buff_rcv,
                   num_bytes);
 
         off64_t n_reads = num_bytes / _elem_size;
@@ -129,8 +135,8 @@ template <class T, class Mutex> class Queue {
         return segment;
     }
 
-    inline void write(const T *data, long int num_bytes) {
-        START_LOG(capio_syscall(SYS_gettid), "call(data=0x%08x, num_bytes=%ld)", data, num_bytes);
+    inline void write(const T *data, unsigned long long int num_bytes) {
+        START_LOG(capio_syscall(SYS_gettid), "call(data=0x%08x, num_bytes=%llu)", data, num_bytes);
 
         off64_t n_writes = num_bytes / _elem_size;
         size_t r         = num_bytes % _elem_size;

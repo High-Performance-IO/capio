@@ -1,186 +1,130 @@
-#ifndef CAPIO_SERVER_UTILS_CACHE
-#define CAPIO_SERVER_UTILS_CACHE
+#ifndef CAPIO_CACHE_HPP
+#define CAPIO_CACHE_HPP
 
-#include "capio/dirent.hpp"
-#include "capio/queue.hpp"
+class WriteRequestCache {
 
-#include "requests.hpp"
+    int current_fd         = -1;
+    long long current_size = 0;
 
-class ReadCache {
-  private:
-    char *_cache;
-    long _tid;
-    int _last_fd;
-    off64_t _max_line_size, _actual_size, _cache_offset;
-    SPSCQueue _queue;
+    const capio_off64_t _max_size;
 
-    inline void _read(void *buffer, off64_t count) {
-        START_LOG(capio_syscall(SYS_gettid), "call(count=%ld)", count);
+    std::filesystem::path current_path;
 
-        if (count > 0) {
-            memcpy(buffer, _cache + _cache_offset, count);
-            LOG("Read %ld. adding it to _cache_offset of value %ld", count, _cache_offset);
-            _cache_offset += count;
-        }
+    // non-blocking as write is not in the pre port of CAPIO semantics
+    inline void _write_request(const off64_t count, const long tid, const long fd) {
+        START_LOG(capio_syscall(SYS_gettid), "call(path=%s, count=%ld, tid=%ld)",
+                  current_path.c_str(), count, tid);
+        char req[CAPIO_REQ_MAX_SIZE];
+        sprintf(req, "%04d %ld %ld %s %ld", CAPIO_REQUEST_WRITE, tid, fd, current_path.c_str(),
+                count);
+        buf_requests->write(req, CAPIO_REQ_MAX_SIZE);
     }
 
   public:
-    ReadCache(long tid, off64_t lines, off64_t line_size, const std::string &workflow_name)
-        : _cache(nullptr), _tid(tid), _last_fd(-1), _max_line_size(line_size), _actual_size(0),
-          _cache_offset(0),
-          _queue(SHM_SPSC_PREFIX_READ + std::to_string(tid), lines, line_size, workflow_name) {}
+    explicit WriteRequestCache() : _max_size(get_capio_write_cache_size()) {}
 
-    inline void flush() {
-        START_LOG(capio_syscall(SYS_gettid), "call()");
+    ~WriteRequestCache() { this->flush(capio_syscall(SYS_gettid)); }
 
-        if (_cache_offset != _actual_size) {
-            _actual_size = _cache_offset = 0;
-            seek_request(_last_fd, get_capio_fd_offset(_last_fd), _tid);
+    void write_request(std::filesystem::path path, int tid, int fd, long count) {
+        START_LOG(capio_syscall(SYS_gettid), "call(path=%s, tid=%ld, fd=%ld, count=%ld)",
+                  path.c_str(), tid, fd, count);
+        if (fd != current_fd || path.compare(current_path) != 0) {
+            LOG("File descriptor changed from previous state. updating");
+            this->flush(tid);
+            current_path = std::move(path);
+            current_fd   = fd;
         }
-    }
+        current_size += count;
 
-    inline off64_t read(int fd, void *buffer, off64_t count, bool is_getdents, bool is64bit) {
-        START_LOG(capio_syscall(SYS_gettid), "call(fd=%d, count=%ld, is_getdents=%s, is64bit=%s)",
-                  fd, count, is_getdents ? "true" : "false", is64bit ? "true" : "false");
-
-        if (_last_fd != fd) {
-            LOG("changed fd from %d to %d: flushing", _last_fd, fd);
-            flush();
-            _last_fd = fd;
+        if (current_size > _max_size) {
+            LOG("exceeded maximum cache size. flushing...");
+            this->flush(tid);
         }
+    };
 
-        off64_t remaining_bytes = _actual_size - _cache_offset;
-        off64_t file_offset     = get_capio_fd_offset(fd);
-        off64_t bytes_read;
-
-        if (is_getdents) {
-            auto dirent_size = static_cast<off64_t>(sizeof(linux_dirent64));
-            count            = (count / dirent_size) * dirent_size;
+    void flush(int tid) {
+        START_LOG(capio_syscall(SYS_gettid), "call(tid=%ld)", tid);
+        if (current_fd != -1 && current_size > 0) {
+            LOG("Performing write to SHM");
+            _write_request(tid, current_fd, current_size);
         }
-
-        auto read_size = count - remaining_bytes;
-        LOG("Read() will need to read %ld bytes", read_size);
-
-        if (count <= remaining_bytes) {
-            LOG("count %ld <= remaining_bytes %ld", count, remaining_bytes);
-            _read(buffer, count);
-            bytes_read = count;
-        } else {
-            LOG("count %ld > remaining_bytes %ld", count, remaining_bytes);
-            _read(buffer, remaining_bytes);
-            buffer = reinterpret_cast<char *>(buffer) + remaining_bytes;
-
-            if (read_size > _max_line_size) {
-                LOG("count - remaining_bytes %ld > _max_line_size %ld", read_size, _max_line_size);
-                LOG("Reading exactly requested size");
-                off64_t end_of_read = is_getdents ? getdents_request(fd, read_size, is64bit, _tid)
-                                                  : read_request(fd, read_size, _tid);
-                bytes_read          = end_of_read - file_offset;
-                _queue.read(reinterpret_cast<char *>(buffer), bytes_read);
-            } else {
-                LOG("count - remaining_bytes %ld <= _max_line_size %ld", read_size, _max_line_size);
-                LOG("Reading more to use pre fetching and caching");
-                off64_t end_of_read = is_getdents
-                                          ? getdents_request(fd, _max_line_size, is64bit, _tid)
-                                          : read_request(fd, _max_line_size, _tid);
-                LOG("request return value is %ld", end_of_read);
-                _actual_size = end_of_read - file_offset - remaining_bytes;
-                LOG("ReaderCache actual size, after requested read is: %ld bytes", _actual_size);
-                _cache_offset = 0;
-                if (_actual_size > 0) {
-                    LOG("Fetching data from shm _queue");
-                    _cache = _queue.fetch();
-                }
-                if (read_size < _actual_size) {
-                    LOG("count - remaining_bytes %ld < _actual_size %ld", read_size, _actual_size);
-                    _read(buffer, read_size);
-                    bytes_read = count;
-                } else {
-                    LOG("count - remaining_bytes %ld >= _actual_size %ld", read_size, _actual_size);
-                    _read(buffer, _actual_size);
-                    bytes_read = remaining_bytes + _actual_size;
-                }
-            }
-        }
-        LOG("%ld bytes have been read. setting fd offset to %ld", bytes_read,
-            file_offset + bytes_read);
-        set_capio_fd_offset(fd, file_offset + bytes_read);
-        return bytes_read;
+        current_fd   = -1;
+        current_size = 0;
     }
 };
 
-class WriteCache {
-  private:
-    char *_cache;
-    long _tid;
-    int _fd;
-    off64_t _max_line_size, _actual_size;
-    SPSCQueue _queue;
+class ReadRequestCache {
+    int current_fd         = -1;
+    capio_off64_t max_read = 0;
+    std::unordered_map<std::string, capio_off64_t> *available_read_cache;
 
-    inline void _write(off64_t count, const void *buffer) {
-        START_LOG(capio_syscall(SYS_gettid), "call(count=%ld)", count);
+    std::filesystem::path current_path;
 
-        if (count > 0) {
-            if (_cache == nullptr) {
-                _cache = _queue.reserve();
-            }
-            memcpy(_cache + _actual_size, buffer, count);
-            _actual_size += count;
-            if (_actual_size == _max_line_size) {
-                flush();
-            }
-        }
+    // return amount of readable bytes
+    static capio_off64_t _read_request(const std::filesystem::path &path, const off64_t end_of_Read,
+                                       const long tid, const long fd) {
+        START_LOG(capio_syscall(SYS_gettid), "call(path=%s, end_of_Read=%ld, tid=%ld, fd=%ld)",
+                  path.c_str(), end_of_Read, tid, fd);
+        char req[CAPIO_REQ_MAX_SIZE];
+        sprintf(req, "%04d %s %ld %ld %ld", CAPIO_REQUEST_READ, path.c_str(), tid, fd, end_of_Read);
+        LOG("Sending read request %s", req);
+        buf_requests->write(req, CAPIO_REQ_MAX_SIZE);
+        capio_off64_t res;
+        bufs_response->at(tid)->read(&res);
+        LOG("Response to request is %llu", res);
+        return res;
     }
 
   public:
-    WriteCache(long tid, off64_t lines, off64_t line_size, const std::string &workflow_name)
-        : _cache(nullptr), _tid(tid), _fd(-1), _max_line_size(line_size), _actual_size(0),
-          _queue(SHM_SPSC_PREFIX_WRITE + std::to_string(tid), lines, line_size, workflow_name) {}
+    explicit ReadRequestCache() {
+        available_read_cache = new std::unordered_map<std::string, capio_off64_t>;
+    };
 
-    inline void flush() {
-        START_LOG(capio_syscall(SYS_gettid), "call()");
+    ~ReadRequestCache() { delete available_read_cache; };
 
-        if (_actual_size != 0) {
-            write_request(_fd, _actual_size, _tid);
-            _cache       = nullptr;
-            _actual_size = 0;
-        }
-    }
+    void read_request(std::filesystem::path path, long end_of_read, int tid, int fd) {
+        START_LOG(capio_syscall(SYS_gettid), "[cache] call(path=%s, end_of_read=%ld, tid=%ld)",
+                  path.c_str(), end_of_read, tid);
+        if (fd != current_fd || path.compare(current_path) != 0) {
+            LOG("[cache] %s changed from previous state. updating",
+                fd != current_fd ? "File descriptor" : "File path");
+            current_path = std::move(path);
+            current_fd   = fd;
 
-    inline void write(int fd, const void *buffer, off64_t count) {
-        START_LOG(capio_syscall(SYS_gettid), "call(fd=%d, buffer=0x%08x, count=%ld)", fd, buffer,
-                  count);
-
-        if (_fd != fd) {
-            LOG("changed fd from %d to %d: flushing", _fd, fd);
-            flush();
-            _fd = fd;
-        }
-
-        if (count <= _max_line_size - _actual_size) {
-            LOG("count %ld <= _max_line_size - _actual_size %ld", count,
-                _max_line_size - _actual_size);
-            _write(count, buffer);
-        } else {
-            LOG("count %ld > _max_line_size - _actual_size %ld", count,
-                _max_line_size - _actual_size);
-            flush();
-            if (count - _actual_size > _max_line_size) {
-                LOG("count - _actual_size %ld > _max_line_size %ld", count - _actual_size,
-                    _max_line_size);
-                write_request(_fd, count, _tid);
-                _queue.write(reinterpret_cast<const char *>(buffer), count);
+            if (available_read_cache->find(current_path) != available_read_cache->end()) {
+                LOG("[cache] Found file entry in cache");
+                max_read = available_read_cache->at(current_path);
             } else {
-                LOG("count - _actual_size %ld <= _max_line_size %ld", count - _actual_size,
-                    _max_line_size);
-                _write(count, buffer);
+                LOG("[cache] Entry not found, initializing new entry to offset 0");
+                max_read = 0;
+                available_read_cache->emplace(current_path, max_read);
             }
+            LOG("[cache] Max read value is %llu %s", max_read,
+                max_read == ULLONG_MAX ? "(ULLONG_MAX)" : "");
         }
 
-        set_capio_fd_offset(fd, get_capio_fd_offset(fd) + count);
-    }
+        // File is committed if server reports its size to be ULLONG_MAX
+        if (max_read == ULLONG_MAX) {
+            LOG("[cache] Returning as file is committed");
+            return;
+        }
+
+        if (end_of_read > max_read) {
+            LOG("[cache] end_of_read > max_read. Performing server request");
+            max_read = _read_request(current_path, end_of_read, tid, fd);
+            LOG("[cache] Obtained value from server is %llu", max_read);
+            if (available_read_cache->find(path) == available_read_cache->end()) {
+                available_read_cache->emplace(path, max_read);
+            } else {
+                available_read_cache->at(path) = max_read;
+            }
+            LOG("[cache] completed update from server of max read for file. returning control to "
+                "application");
+        }
+    };
 };
 
-typedef std::unordered_map<long, std::pair<WriteCache *, ReadCache *>> CPThreadDataCache_t;
+thread_local ReadRequestCache *read_request_cache;
+thread_local WriteRequestCache *write_request_cache;
 
-#endif // CAPIO_SERVER_UTILS_CACHE
+#endif // CAPIO_CACHE_HPP

@@ -6,9 +6,10 @@
 
 #include "capio/queue.hpp"
 
-typedef std::unordered_map<int, std::tuple<std::shared_ptr<off64_t>, off64_t, int, bool>> CPFiles_t;
-typedef std::pair<off64_t, off64_t> CPStatResponse_t;
-typedef std::unordered_map<long, CircularBuffer<off_t> *> CPBufResponse_t;
+typedef std::unordered_map<int,
+                           std::tuple<std::shared_ptr<capio_off64_t>, capio_off64_t, int, bool>>
+    CPFiles_t;
+typedef std::unordered_map<long, CircularBuffer<capio_off64_t> *> CPBufResponse_t;
 typedef std::unordered_map<int, std::string> CPFileDescriptors_t;
 typedef std::unordered_map<std::string, std::unordered_set<int>> CPFilesPaths_t;
 

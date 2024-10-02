@@ -1,10 +1,12 @@
 #ifndef CAPIO_POSIX_HANDLERS_FCHOWN_HPP
 #define CAPIO_POSIX_HANDLERS_FCHOWN_HPP
+#include "utils/requests.hpp"
 
 #if defined(SYS_chown)
 
 int fchown_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg5, long *result) {
-    int fd = static_cast<int>(arg0);
+    int fd   = static_cast<int>(arg0);
+    auto tid = static_cast<pid_t>(syscall_no_intercept(SYS_gettid));
     START_LOG(syscall_no_intercept(SYS_gettid), "call(fd=%d)", fd);
 
     if (!exists_capio_fd(fd)) {
@@ -12,13 +14,9 @@ int fchown_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long a
         return CAPIO_POSIX_SYSCALL_SKIP;
     }
 
-    // Upon success fchown shall return 0
-    // Since capio does not handle permission, we will be
-    // Upon the assumption that all the operations occurs with success
-    *result = 0;
-    LOG("File is present in capio. Ignoring fchmod operation");
-    return CAPIO_POSIX_SYSCALL_SUCCESS;
-    return CAPIO_POSIX_SYSCALL_SUCCESS;
+    consent_to_proceed_request(get_capio_fd_path(fd), tid, __FUNCTION__);
+
+    return CAPIO_POSIX_SYSCALL_SKIP;
 }
 
 #endif // SYS_chown
