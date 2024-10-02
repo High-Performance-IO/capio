@@ -1,6 +1,8 @@
 #ifndef FILE_MANAGER_HEADER_HPP
 #define FILE_MANAGER_HEADER_HPP
 
+#include "storage-service/capio_storage.hpp"
+
 #include <mutex>
 std::mutex threads_mutex;
 std::mutex data_mutex;
