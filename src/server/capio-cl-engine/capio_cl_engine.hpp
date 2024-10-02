@@ -168,18 +168,24 @@ class CapioCLEngine {
         START_LOG(gettid(), "call(path=%s, producer=%s)", path.c_str(), producer.c_str());
         producer.erase(remove_if(producer.begin(), producer.end(), isspace), producer.end());
         newFile(path);
-        std::get<0>(_locations.at(path)).emplace_back(producer);
+        if (_locations.find(path) != _locations.end()) {
+            std::get<0>(_locations.at(path)).emplace_back(producer);
+        }
     }
 
     void addConsumer(const std::string &path, std::string &consumer) {
         START_LOG(gettid(), "call(path=%s, consumer=%s)", path.c_str(), consumer.c_str());
         consumer.erase(remove_if(consumer.begin(), consumer.end(), isspace), consumer.end());
-        std::get<1>(_locations.at(path)).emplace_back(consumer);
+        if (_locations.find(path) != _locations.end()) {
+            std::get<1>(_locations.at(path)).emplace_back(consumer);
+        }
     }
 
     void setCommitRule(const std::string &path, const std::string &commit_rule) {
         START_LOG(gettid(), "call(path=%s, commit_rule=%s)", path.c_str(), commit_rule.c_str());
-        std::get<2>(_locations.at(path)) = commit_rule;
+        if (_locations.find(path) != _locations.end()) {
+            std::get<2>(_locations.at(path)) = commit_rule;
+        }
     }
 
     std::string getCommitRule(const std::string &path) {
@@ -194,55 +200,72 @@ class CapioCLEngine {
 
     void setFireRule(const std::string &path, const std::string &fire_rule) {
         START_LOG(gettid(), "call(path=%s, fire_rule=%s)", path.c_str(), fire_rule.c_str());
-        std::get<3>(_locations.at(path)) = fire_rule;
+        if (_locations.find(path) != _locations.end()) {
+            std::get<3>(_locations.at(path)) = fire_rule;
+        }
     }
 
     std::string getFireRule(const std::string &path) {
         START_LOG(gettid(), "call(path=%s)", path.c_str());
-        if (_locations.find(path) == _locations.end()) {
-            return CAPIO_FILE_MODE_UPDATE;
+        if (_locations.find(path) != _locations.end()) {
+            return std::get<3>(_locations.at(path));
         }
-        return std::get<3>(_locations.at(path));
+        return CAPIO_FILE_MODE_UPDATE;
     }
 
     void setPermanent(const std::string &path, bool value) {
         START_LOG(gettid(), "call(path=%s, value=%s)", path.c_str(), value ? "true" : "false");
-        std::get<4>(_locations.at(path)) = value;
+        if (_locations.find(path) != _locations.end()) {
+            std::get<4>(_locations.at(path)) = value;
+        }
     }
 
     void setExclude(const std::string &path, const bool value) {
         START_LOG(gettid(), "call(path=%s, value=%s)", path.c_str(), value ? "true" : "false");
-        std::get<5>(_locations.at(path)) = value;
+        if (_locations.find(path) != _locations.end()) {
+            std::get<5>(_locations.at(path)) = value;
+        }
     }
 
     void setDirectory(const std::string &path) {
         START_LOG(gettid(), "call(path=%s)", path.c_str());
-        std::get<6>(_locations.at(path)) = false;
-    }
-
-    bool isDirectory(const std::string &path) const {
-        START_LOG(gettid(), "call(path=%s)", path.c_str());
-        return !std::get<6>(_locations.at(path));
+        if (_locations.find(path) != _locations.end()) {
+            std::get<6>(_locations.at(path)) = false;
+        }
     }
 
     void setFile(const std::string &path) {
         START_LOG(gettid(), "call(path=%s)", path.c_str());
-        std::get<6>(_locations.at(path)) = true;
+        if (_locations.find(path) != _locations.end()) {
+            std::get<6>(_locations.at(path)) = true;
+        }
     }
 
     bool isFile(const std::string &path) const {
         START_LOG(gettid(), "call(path=%s)", path.c_str());
-        return std::get<6>(_locations.at(path));
+        if (_locations.find(path) != _locations.end()) {
+            return std::get<6>(_locations.at(path));
+        }
+        return false;
+    }
+
+    bool isDirectory(const std::string &path) const {
+        START_LOG(gettid(), "call(path=%s)", path.c_str());
+        return !isFile(path);
     }
 
     void setCommitedNumber(const std::string &path, const int num) {
         START_LOG(gettid(), "call(path=%s, num=%ld)", path.c_str(), num);
-        std::get<7>(_locations.at(path)) = num;
+        if (_locations.find(path) != _locations.end()) {
+            std::get<7>(_locations.at(path)) = num;
+        }
     }
 
     void setDirectoryFileCount(const std::string &path, long num) {
         START_LOG(gettid(), "call(path=%s, num=%ld)", path.c_str(), num);
-        std::get<8>(_locations.at(path)) = num;
+        if (_locations.find(path) != _locations.end()) {
+            std::get<8>(_locations.at(path)) = num;
+        }
     }
 
     void remove(const std::string &path) {
@@ -251,15 +274,21 @@ class CapioCLEngine {
     }
 
     // TODO: return vector
-    auto producers(const std::string &path) {
+    std::vector<std::string> producers(const std::string &path) {
         START_LOG(gettid(), "call(path=%s)", path.c_str());
-        return std::get<0>(_locations.at(path));
+        if (_locations.find(path) != _locations.end()) {
+            return std::get<0>(_locations.at(path));
+        }
+        return {};
     }
 
     // TODO: return vector
-    auto consumers(const std::string &path) {
+    std::vector<std::string> consumers(const std::string &path) {
         START_LOG(gettid(), "call(path=%s)", path.c_str());
-        return std::get<1>(_locations.at(path));
+        if (_locations.find(path) != _locations.end()) {
+            return std::get<1>(_locations.at(path));
+        }
+        return {};
     }
 
     bool isProducer(const std::string &path, const pid_t pid) {
@@ -319,7 +348,10 @@ class CapioCLEngine {
 
     // todo fix leak
     std::vector<std::string> get_file_deps(const std::filesystem::path &path) {
-        return std::get<9>(_locations.at(path));
+        if (_locations.find(path) != _locations.end()) {
+            return std::get<9>(_locations.at(path));
+        }
+        return {};
     }
 };
 
