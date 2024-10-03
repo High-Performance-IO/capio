@@ -3,6 +3,12 @@
 
 #include "capio/constants.hpp"
 
+/**
+ * @brief Perform handshake without the application name being provided.
+ *
+ * @param str raw request as read from the shared memory interface stripped of the request number
+ * (first parameter of the request)
+ */
 inline void handshake_anonymous_handler(const char *const str) {
     pid_t tid, pid;
     sscanf(str, "%d %d", &tid, &pid);
@@ -10,6 +16,12 @@ inline void handshake_anonymous_handler(const char *const str) {
     client_manager->register_new_client(tid, CAPIO_DEFAULT_APP_NAME);
 }
 
+/**
+ * @brief Perform handshake while providing the posix application name
+ *
+ * @param str raw request as read from the shared memory interface stripped of the request number
+ * (first parameter of the request)
+ */
 inline void handshake_named_handler(const char *const str) {
     pid_t tid, pid;
     char app_name[1024];

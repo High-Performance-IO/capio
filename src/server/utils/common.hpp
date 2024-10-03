@@ -6,12 +6,27 @@
 #include "capio/constants.hpp"
 #include "types.hpp"
 
+/**
+ * @brief compare two paths
+ *
+ * @param path
+ * @param base
+ * @return true if path is a subdirectory of base
+ * @return false otherwise
+ */
 inline bool first_is_subpath_of_second(const std::filesystem::path &path,
                                        const std::filesystem::path &base) {
     const auto mismatch_pair = std::mismatch(path.begin(), path.end(), base.begin(), base.end());
     return mismatch_pair.second == base.end();
 }
 
+/**
+ * @brief Check if a string is a representation of a integer number
+ *
+ * @param s
+ * @return true
+ * @return false
+ */
 inline bool is_int(const std::string &s) {
     START_LOG(gettid(), "call(%s)", s.c_str());
     bool res = false;

@@ -2,7 +2,7 @@
 #define CLIENT_MANAGER_HPP
 
 /**
- * @brief Handle libcapio_posix clients applications
+ * @brief Class to handle libcapio_posix clients applications
  */
 class ClientManager {
     CSBufResponse_t *bufs_response;

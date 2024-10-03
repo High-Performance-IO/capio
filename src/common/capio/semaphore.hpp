@@ -7,6 +7,10 @@
 
 #include "capio/logger.hpp"
 
+/**
+ * @brief Class that implements the C++20 semaphore interface but provides no locking whatsoever
+ *
+ */
 class NoLock {
   public:
     NoLock(const std::string &name, unsigned int init_value) {
@@ -23,6 +27,11 @@ class NoLock {
     static inline void unlock() { START_LOG(capio_syscall(SYS_gettid), "call()"); };
 };
 
+/**
+ * @brief Class that provides the C++20 interface of std::semaphore but uses named semaphores on
+ * shared memory
+ *
+ */
 class NamedSemaphore {
   private:
     const std::string _name;
@@ -70,6 +79,10 @@ class NamedSemaphore {
     }
 };
 
+/**
+ * @brief C++20 backport of std::semaphore
+ *
+ */
 class Semaphore {
   private:
     sem_t _sem{};

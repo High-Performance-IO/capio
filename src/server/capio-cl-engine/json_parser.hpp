@@ -10,12 +10,12 @@
 class JsonParser {
 
   public:
-  /**
-   * @brief Perform the parsing of the capio_server configuration file
-   * 
-   * @param source 
-   * @return CapioCLEngine instance with the information provided by the config file
-   */
+    /**
+     * @brief Perform the parsing of the capio_server configuration file
+     *
+     * @param source
+     * @return CapioCLEngine instance with the information provided by the config file
+     */
     static CapioCLEngine *parse(const std::filesystem::path &source) {
         auto locations = new CapioCLEngine();
         auto capio_dir = get_capio_dir();

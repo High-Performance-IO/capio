@@ -2,6 +2,12 @@
 #define WRITE_HPP
 #include "capio-cl-engine/capio_cl_engine.hpp"
 
+/**
+ * @brief Handle the write systemcall
+ *
+ * @param str raw request as read from the shared memory interface stripped of the request number
+ * (first parameter of the request)
+ */
 inline void write_handler(const char *const str) {
     pid_t tid;
     int fd;

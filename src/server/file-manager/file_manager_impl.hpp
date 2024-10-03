@@ -5,6 +5,13 @@
 #include "file_manager.hpp"
 #include "utils/distributed_semaphore.hpp"
 
+/**
+ * @brief Creates the directory structure for the metadata file and proceed to return the path
+ * pointing to the metadata token file.
+ *
+ * @param path real path of the file
+ * @return std::string with the translated capio token metadata path
+ */
 inline std::string CapioFileManager::getAndCreateMetadataPath(const std::string &path) {
     START_LOG(gettid(), "call(path=%s)", path.c_str());
     std::filesystem::path result =
@@ -18,6 +25,12 @@ inline std::string CapioFileManager::getAndCreateMetadataPath(const std::string 
     return result;
 }
 
+/**
+ * @brief Get the file size
+ *
+ * @param path
+ * @return uintmax_t file size if file exists, 0 otherwise
+ */
 inline uintmax_t CapioFileManager::get_file_size_if_exists(const std::filesystem::path &path) {
     if (std::filesystem::exists(path)) {
         return std::filesystem::file_size(path);
@@ -25,6 +38,13 @@ inline uintmax_t CapioFileManager::get_file_size_if_exists(const std::filesystem
     return 0;
 }
 
+/**
+ * @brief Register a thread to the threads waiting for a file to exists (inside the CapioFSMonitor)
+ * for a given file path to exists
+ *
+ * @param path
+ * @param tid
+ */
 inline void CapioFileManager::addThreadAwaitingCreation(std::string path, pid_t tid) const {
     START_LOG(gettid(), "call(path=%s, tid=%ld)", path.c_str(), tid);
     std::lock_guard<std::mutex> lg(threads_mutex);
@@ -32,6 +52,11 @@ inline void CapioFileManager::addThreadAwaitingCreation(std::string path, pid_t 
     thread_awaiting_file_creation->at(path)->emplace_back(tid);
 }
 
+/**
+ * @brief Awakes all threads waiting for the creation of a file
+ *
+ * @param path file that has just been created
+ */
 inline void CapioFileManager::unlockThreadAwaitingCreation(std::string path) const {
     START_LOG(gettid(), "call(path=%s)", path.c_str());
     std::lock_guard<std::mutex> lg(threads_mutex);
@@ -44,13 +69,27 @@ inline void CapioFileManager::unlockThreadAwaitingCreation(std::string path) con
     thread_awaiting_file_creation->erase(path);
 }
 
+/**
+ * @brief Remove a file from the list of files for which at least a thread is waiting. if some
+ * thread are still waiting they will be removed and hence go into deadlock indefinitely. This
+ * method should only be called after awaking all waiting threads
+ *
+ * @param path
+ */
 inline void CapioFileManager::deleteFileAwaitingCreation(std::string path) const {
     START_LOG(gettid(), "call(path=%s)", path.c_str());
     std::lock_guard<std::mutex> lg(threads_mutex);
     thread_awaiting_file_creation->erase(path);
 }
 
-// register tid to wait for file size of certain size
+/**
+ * @brief Register a process waiting on a file to exist and with a file size of at least the
+ * expected_size parameter.
+ *
+ * @param path
+ * @param tid
+ * @param expected_size
+ */
 inline void CapioFileManager::addThreadAwaitingData(std::string path, int tid,
                                                     size_t expected_size) const {
     START_LOG(gettid(), "call(path=%s, tid=%ld, expected_size=%ld)", path.c_str(), tid,
@@ -60,7 +99,12 @@ inline void CapioFileManager::addThreadAwaitingData(std::string path, int tid,
     thread_awaiting_data->at(path)->emplace(tid, expected_size);
 }
 
-// TODO:
+/**
+ * @brief Loop between all thread registered on the file path, and check for each
+ * one if enough data has been produced. If so, unlock and remove the thread
+ *
+ * @param path
+ */
 inline void CapioFileManager::checkAndUnlockThreadAwaitingData(const std::string &path) const {
     START_LOG(gettid(), "call(path=%s)", path.c_str());
     LOG("Before lockguard");
@@ -118,6 +162,11 @@ inline void CapioFileManager::checkAndUnlockThreadAwaitingData(const std::string
     }
 }
 
+/**
+ * @brief Update the CAPIO metadata n_close option by adding one to the current value
+ *
+ * @param path
+ */
 inline void CapioFileManager::increaseCloseCount(const std::filesystem::path &path) {
     START_LOG(gettid(), "call(path=%s)", path.c_str());
     auto metadata_path    = getAndCreateMetadataPath(path);
@@ -141,6 +190,11 @@ inline void CapioFileManager::increaseCloseCount(const std::filesystem::path &pa
     delete lock;
 }
 
+/**
+ * @brief Set a CAPIO handled file to be committed
+ *
+ * @param path
+ */
 inline void CapioFileManager::setCommitted(const std::filesystem::path &path) const {
     START_LOG(gettid(), "call(path=%s)", path.c_str());
     auto metadata_path = getAndCreateMetadataPath(path);
@@ -152,6 +206,12 @@ inline void CapioFileManager::setCommitted(const std::filesystem::path &path) co
     unlockThreadAwaitingCreation(path);
 }
 
+/**
+ * @brief Set all the files that are currently open, or have been open by a given process to be
+ * committed
+ *
+ * @param tid
+ */
 inline void CapioFileManager::setCommitted(pid_t tid) const {
     START_LOG(gettid(), "call(tid=%d)", tid);
     auto files = client_manager->get_produced_files(tid);
@@ -161,6 +221,13 @@ inline void CapioFileManager::setCommitted(pid_t tid) const {
     }
 }
 
+/**
+ * @brief Returns whether the file is committed or not
+ *
+ * @param path
+ * @return true if is committed
+ * @return false if it is not
+ */
 inline bool CapioFileManager::isCommitted(const std::filesystem::path &path) {
     START_LOG(gettid(), "call(path=%s)", path.c_str());
 
@@ -233,6 +300,11 @@ inline bool CapioFileManager::isCommitted(const std::filesystem::path &path) {
     return metadata_token_exists;
 }
 
+/**
+ * @brief Return the files that have at least one process waiting for its creation
+ *
+ * @return std::vector<std::string>
+ */
 inline std::vector<std::string> CapioFileManager::getFileAwaitingCreation() const {
     // NOTE: do not put inside here log code as it will generate a lot of useless log
     std::lock_guard<std::mutex> lg(threads_mutex);
@@ -243,6 +315,11 @@ inline std::vector<std::string> CapioFileManager::getFileAwaitingCreation() cons
     return keys;
 }
 
+/**
+ * @brief Return a list of files for which there is a thread waiting for data to be produced
+ *
+ * @return std::vector<std::string>
+ */
 inline std::vector<std::string> CapioFileManager::getFileAwaitingData() const {
     // NOTE: do not put inside here log code as it will generate a lot of useless log
     std::lock_guard<std::mutex> lg(data_mutex);

@@ -1,6 +1,12 @@
 #ifndef CAPIO_CLOSE_HPP
 #define CAPIO_CLOSE_HPP
 
+/**
+ * @brief Handle the close systemcall
+ *
+ * @param str raw request as read from the shared memory interface stripped of the request number
+ * (first parameter of the request)
+ */
 inline void close_handler(const char *const str) {
     pid_t tid;
     char path[PATH_MAX];
