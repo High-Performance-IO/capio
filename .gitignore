@@ -47,9 +47,11 @@ capio_logs
 #Doxygen generated documentation
 doxy/html
 doxy/latex
+doxy/doxygen-awesome-css-*
 
 # Other
 debug
 build
 .devcontainer
 .DS_Store
+
