@@ -48,6 +48,7 @@ capio_logs
 doxy/html
 doxy/latex
 doxy/doxygen-awesome-css-*
+doxy/theme
 
 # Other
 debug
