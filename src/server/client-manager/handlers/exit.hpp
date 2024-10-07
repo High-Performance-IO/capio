@@ -1,6 +1,12 @@
 #ifndef CAPIO_EXIT_HPP
 #define CAPIO_EXIT_HPP
 
+/**
+ * @brief Handle the exit systemcall
+ *
+ * @param str raw request as read from the shared memory interface stripped of the request number
+ * (first parameter of the request)
+ */
 inline void exit_handler(const char *const str) {
     // TODO: register files open for each tid ti register a close
     pid_t tid;

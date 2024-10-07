@@ -1,6 +1,9 @@
 #ifndef CAPIO_FS_CAPIO_CTL_HPP
 #define CAPIO_FS_CAPIO_CTL_HPP
-
+/**
+ * @brief Class that contains the logic to to the CapioCTL component yet to e implemented
+ *
+ */
 class CapioCTLModule {
 
     std::thread *th;

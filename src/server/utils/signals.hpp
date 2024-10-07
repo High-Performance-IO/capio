@@ -7,6 +7,13 @@
 extern "C" void __gcov_dump(void);
 #endif
 
+/**
+ * @brief Generic handler for incoming signals
+ *
+ * @param signum
+ * @param info
+ * @param ptr
+ */
 inline void sig_term_handler(int signum, siginfo_t *info, void *ptr) {
     START_LOG(gettid(), "call(signal=[%d] (%s) from process with pid=%ld)", signum,
               strsignal(signum), info != nullptr ? info->si_pid : -1);
@@ -40,6 +47,10 @@ inline void sig_term_handler(int signum, siginfo_t *info, void *ptr) {
     exit(EXIT_SUCCESS);
 }
 
+/**
+ * @brief Set the up signal handlers
+ *
+ */
 inline void setup_signal_handlers() {
     START_LOG(gettid(), "call()");
     static struct sigaction sigact;

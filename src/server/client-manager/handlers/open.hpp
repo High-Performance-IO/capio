@@ -1,5 +1,12 @@
 #ifndef OPEN_HPP
 #define OPEN_HPP
+
+/**
+ * @brief Handle the open systemcall
+ *
+ * @param str raw request as read from the shared memory interface stripped of the request number
+ * (first parameter of the request)
+ */
 inline void open_handler(const char *const str) {
     pid_t tid;
     int fd;

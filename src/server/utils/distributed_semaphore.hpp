@@ -1,5 +1,10 @@
 #ifndef DISTRIBUTEDSEMAPHORE_HPP
 #define DISTRIBUTEDSEMAPHORE_HPP
+
+/**
+ * @brief Class to provide mutually exclusive access to files on distributed file systems by
+ * providing file based locking
+ */
 class DistributedSemaphore {
     std::string name;
     timespec sleep{};
@@ -33,6 +38,14 @@ class DistributedSemaphore {
     }
 
   public:
+    /**
+     * @brief Construct a new Distributed Semaphore object. At instantiation of the object, the
+     * _lock() method is created this locking the resource. If the locking fails, a new attempt is
+     * done after sleep_time nanoseconds
+     *
+     * @param locking The file that is the target to mutual exclusive access
+     * @param sleep_time Sleep time between lock tries in nano seconds
+     */
     DistributedSemaphore(std::string locking, int sleep_time)
         : name(locking), locked(false), fp(-1) {
         START_LOG(gettid(), "call(locking=%s, sleep_time=%ld)", name.c_str(), sleep_time);
@@ -41,6 +54,10 @@ class DistributedSemaphore {
         this->lock();
     }
 
+    /**
+     * @brief Destroy the Distributed Semaphore object thus unlocking the resource
+     *
+     */
     ~DistributedSemaphore() {
         START_LOG(gettid(), "call()");
         if (locked) {

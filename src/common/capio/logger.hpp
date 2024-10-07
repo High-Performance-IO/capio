@@ -143,12 +143,22 @@ void log_write_to(char *buffer, size_t bufflen) {
 #endif
 }
 
+/**
+ * @brief Class used to suspend the logging capabilities of CAPIO, by setting the logging_syscall
+ * flag to false at instantiation, and restarting the logging at destruction
+ *
+ */
 class SyscallLoggingSuspender {
   public:
     SyscallLoggingSuspender() { logging_syscall = false; }
     ~SyscallLoggingSuspender() { logging_syscall = true; }
 };
 
+/**
+ * @brief Class that provides logging capabilities to CAPIO. It uses the STL it the component is not
+ * the intercepting library, otherwise it uses POSIX defined systemcalls.
+ *
+ */
 class Logger {
   private:
     char invoker[256]{0};
