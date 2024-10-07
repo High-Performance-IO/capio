@@ -2,6 +2,12 @@
 #define READ_HPP
 #include "file-manager/file_manager_impl.hpp"
 
+/**
+ * @brief Handle the read systemcall
+ *
+ * @param str raw request as read from the shared memory interface stripped of the request number
+ * (first parameter of the request)
+ */
 inline void read_handler(const char *const str) {
     pid_t tid;
     int fd;

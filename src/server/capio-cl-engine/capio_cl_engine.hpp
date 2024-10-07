@@ -4,6 +4,10 @@
 #include "client-manager/client_manager.hpp"
 #include "utils/common.hpp"
 
+/**
+ * @brief Class that stores the parsed configuration of the CAPIO-CL configuration file.
+ *
+ */
 class CapioCLEngine {
   private:
     std::unordered_map<std::string,                         // path name

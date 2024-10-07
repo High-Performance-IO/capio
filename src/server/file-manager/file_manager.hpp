@@ -4,7 +4,11 @@
 #include <mutex>
 std::mutex threads_mutex;
 std::mutex data_mutex;
-
+/**
+ * @brief Class that handle all the information related to the files handled by capio, as well
+ * metadata for such files.
+ *
+ */
 class CapioFileManager {
     std::unordered_map<std::string, std::vector<pid_t> *> *thread_awaiting_file_creation;
     std::unordered_map<std::string, std::unordered_map<pid_t, capio_off64_t> *>

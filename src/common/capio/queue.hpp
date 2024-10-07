@@ -11,6 +11,12 @@
 #include "capio/semaphore.hpp"
 #include "capio/shm.hpp"
 
+/**
+ * @brief Generic shared memory queue class
+ *
+ * @tparam T Type of data that is being transported
+ * @tparam Mutex Type of semaphore
+ */
 template <class T, class Mutex> class Queue {
   private:
     void *_shm;

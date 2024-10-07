@@ -20,6 +20,10 @@
 #include "handlers/rename.hpp"
 #include "handlers/write.hpp"
 
+/**
+ * @brief Class that handles the system calls received from the posix client application
+ *
+ */
 class RequestHandlerEngine {
     std::array<CSHandler_t, CAPIO_NR_REQUESTS> request_handlers{};
     CSBufRequest_t *buf_requests;
@@ -84,6 +88,11 @@ class RequestHandlerEngine {
                   << "buf_requests cleanup completed" << std::endl;
     }
 
+    /**
+     * @brief Start the main loop on the main thread that will read each request one by one from all
+     * the posix clients (aggregated) and handle the response
+     *
+     */
     [[noreturn]] void start() {
         START_LOG(gettid(), "call()");
 

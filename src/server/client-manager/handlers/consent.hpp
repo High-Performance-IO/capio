@@ -1,9 +1,13 @@
 #ifndef CONSENT_HPP
 #define CONSENT_HPP
-/*
-This handler only checks if the client is allowed to continue
-*/
 
+/**
+ * @brief Handle the consent to proceed request. This handler only checks whether the conditions for
+ * a systemcall to continue are met.
+ *
+ * @param str raw request as read from the shared memory interface stripped of the request number
+ * (first parameter of the request)
+ */
 inline void consent_to_proceed_handler(const char *const str) {
     pid_t tid;
     char path[1024], source_func[1024];
