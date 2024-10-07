@@ -20,13 +20,10 @@ int exit_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg
 
     if (is_capio_tid(tid)) {
         LOG("Thread %d is a CAPIO thread: clean up", tid);
-
         exit_group_request(tid);
         remove_capio_tid(tid);
     }
-
-   delete_caches();
-
+    delete_caches();
     return CAPIO_POSIX_SYSCALL_SKIP;
 }
 
