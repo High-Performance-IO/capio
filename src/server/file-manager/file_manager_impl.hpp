@@ -32,10 +32,7 @@ inline std::string CapioFileManager::getAndCreateMetadataPath(const std::string 
  * @return uintmax_t file size if file exists, 0 otherwise
  */
 inline uintmax_t CapioFileManager::get_file_size_if_exists(const std::filesystem::path &path) {
-    if (std::filesystem::exists(path)) {
-        return std::filesystem::file_size(path);
-    }
-    return 0;
+    return std::filesystem::exists(path) ? std::filesystem::file_size(path) : 0;
 }
 
 /**
@@ -120,11 +117,11 @@ inline void CapioFileManager::checkAndUnlockThreadAwaitingData(const std::string
 
             filesize = std::filesystem::is_directory(path) ? -1 : get_file_size_if_exists(path);
 
-            bool committed       = isCommitted(path);
-            bool file_size_check = item->first >= filesize;
-            bool is_fnu          = capio_cl_engine->getFireRule(path) == CAPIO_FILE_MODE_NO_UPDATE;
-            bool is_producer     = capio_cl_engine->isProducer(path, item->first);
-            bool lock_condition  = committed || is_producer || (file_size_check && is_fnu);
+            const bool committed       = isCommitted(path);
+            const bool file_size_check = item->first >= filesize;
+            const bool is_fnu = capio_cl_engine->getFireRule(path) == CAPIO_FILE_MODE_NO_UPDATE;
+            const bool is_producer    = capio_cl_engine->isProducer(path, item->first);
+            const bool lock_condition = committed || is_producer || (file_size_check && is_fnu);
 
             LOG("( committed(%s) || is_producer(%s) ||  ( file_size_check(%s) && is_fnu(%s) ) )",
                 committed ? "true" : "false", is_producer ? "true" : "false",
@@ -256,12 +253,10 @@ inline bool CapioFileManager::isCommitted(const std::filesystem::path &path) {
 
     std::string commit_rule = capio_cl_engine->getCommitRule(path);
 
-    bool metadata_token_exists = std::filesystem::exists(metadata_computed_path);
-
     if (commit_rule == CAPIO_FILE_COMMITTED_ON_FILE) {
         LOG("Commit rule is on_file. Checking for file dependencies");
         bool commit_computed = true;
-        for (auto file : capio_cl_engine->get_file_deps(path)) {
+        for (const auto &file : capio_cl_engine->get_file_deps(path)) {
             commit_computed = commit_computed && isCommitted(file);
         }
 
@@ -273,31 +268,34 @@ inline bool CapioFileManager::isCommitted(const std::filesystem::path &path) {
 
     if (commit_rule == CAPIO_FILE_COMMITTED_ON_CLOSE) {
         LOG("Commit rule is ON_CLOSE");
+
+        if (!std::filesystem::exists(metadata_computed_path)) {
+            LOG("Commit file does not yet exists. returning false");
+            return false;
+        }
+
         int commit_count = capio_cl_engine->getCommitCloseCount(path);
         LOG("Expected close count is: %d", commit_count);
-
-        if (metadata_token_exists) {
-            if (commit_count != -1) {
-                long actual_commit_count = 0;
-                LOG("Commit file exists. retrieving commit count");
-                std::ifstream in(metadata_computed_path);
-                if (in.is_open()) {
-                    LOG("Opened file");
-                    in >> actual_commit_count;
-                }
-                LOG("Obtained actual commit count: %l", actual_commit_count);
-                LOG("File %s committed", actual_commit_count >= commit_count ? "IS" : "IS NOT");
-                return actual_commit_count >= commit_count;
-            }
+        if (commit_count == -1) {
             LOG("File needs to be closed exactly once and token exists. returning");
             return true;
         }
-        LOG("Commit file does not yet exists. returning false");
-        return false;
+
+        long actual_commit_count = 0;
+        LOG("Commit file exists. retrieving commit count");
+        std::ifstream in(metadata_computed_path);
+        if (in.is_open()) {
+            LOG("Opened file");
+            in >> actual_commit_count;
+        }
+        LOG("Obtained actual commit count: %l", actual_commit_count);
+        LOG("File %s committed", actual_commit_count >= commit_count ? "IS" : "IS NOT");
+        return actual_commit_count >= commit_count;
     }
 
-    LOG("Commit rule is ON_TERMINATION. File exists? %s", metadata_token_exists ? "TRUE" : "FALSE");
-    return metadata_token_exists;
+    LOG("Commit rule is ON_TERMINATION. File exists? %s",
+        std::filesystem::exists(metadata_computed_path) ? "TRUE" : "FALSE");
+    return std::filesystem::exists(metadata_computed_path);
 }
 
 /**
