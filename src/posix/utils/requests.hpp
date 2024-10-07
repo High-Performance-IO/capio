@@ -26,8 +26,7 @@ inline void init_client() {
 
     // TODO: use var to set cache size
     // TODO: also enable multithreading
-    write_request_cache = new WriteRequestCache();
-    read_request_cache  = new ReadRequestCache();
+    init_caches();
 }
 
 /**
@@ -39,18 +38,6 @@ inline void register_listener(long tid) {
     auto *p_buf_response = new CircularBuffer<capio_off64_t>(
         SHM_COMM_CHAN_NAME_RESP + std::to_string(tid), CAPIO_REQ_BUFF_CNT, sizeof(off_t));
     bufs_response->insert(std::make_pair(tid, p_buf_response));
-}
-
-// Block until server allows for proceeding to a generic request
-inline void consent_to_proceed_request(const std::filesystem::path &path, const long tid,
-                                       std::string source_func) {
-    START_LOG(capio_syscall(SYS_gettid), "call(path=%s, tid=%ld, source_func=%s)", path.c_str(),
-              tid, source_func.c_str());
-    char req[CAPIO_REQ_MAX_SIZE];
-    sprintf(req, "%04d %ld %s %s", CAPIO_REQUEST_CONSENT, tid, path.c_str(), source_func.c_str());
-    buf_requests->write(req, CAPIO_REQ_MAX_SIZE);
-    capio_off64_t res;
-    bufs_response->at(tid)->read(&res);
 }
 
 // non blocking
