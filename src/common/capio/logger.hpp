@@ -167,6 +167,7 @@ class Logger {
 #else
         if (!logfileOpen) {
             setup_posix_log_filename();
+            current_log_level = 0; // reset after clone log level, so to not inherit it
 
             capio_syscall(SYS_mkdir, get_log_dir(), 0755);
             capio_syscall(SYS_mkdir, get_posix_log_dir(), 0755);

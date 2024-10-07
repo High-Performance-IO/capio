@@ -3,7 +3,7 @@
 #ifndef CAPIO_FUNCTIONS_H
 #define CAPIO_FUNCTIONS_H
 
-int posix_return_value(long res, long *result) {
+inline int posix_return_value(long res, long *result) {
     START_LOG(capio_syscall(SYS_gettid), "cal(res=%ld)", res);
     if (res != CAPIO_POSIX_SYSCALL_REQUEST_SKIP) {
         *result = (res < 0 ? -errno : res);
