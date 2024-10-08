@@ -7,22 +7,26 @@
 
 /**
  * @brief Creates the directory structure for the metadata file and proceed to return the path
- * pointing to the metadata token file.
+ * pointing to the metadata token file. For improvements in performances, a hash map is included to
+ * cache the computed paths. For thread safety conserns, see
+ * https://en.cppreference.com/w/cpp/container#Thread_safety
  *
  * @param path real path of the file
  * @return std::string with the translated capio token metadata path
  */
 inline std::string CapioFileManager::getAndCreateMetadataPath(const std::string &path) {
     START_LOG(gettid(), "call(path=%s)", path.c_str());
-    std::filesystem::path result =
-        get_capio_metadata_path() / (path.substr(path.find(get_capio_dir()) + 1) + ".capio");
-
-    LOG("metadata path is %s", result.c_str());
-    LOG("Creating metadata directory (%s)", result.parent_path().c_str());
-    std::filesystem::create_directories(result.parent_path());
-
-    LOG("Created capio metadata parent path (if no file existed). returning metadata token file");
-    return result;
+    static std::unordered_map<std::string, std::string> metadata_paths;
+    if (metadata_paths.find(path) == metadata_paths.end()) {
+        std::filesystem::path result =
+            get_capio_metadata_path() / (path.substr(path.find(get_capio_dir()) + 1) + ".capio");
+        metadata_paths.emplace(path, result);
+        LOG("Creating metadata directory (%s)", result.parent_path().c_str());
+        std::filesystem::create_directories(result.parent_path());
+        LOG("Created capio metadata parent path (if no file existed). returning metadata token "
+            "file");
+    }
+    return metadata_paths[path];
 }
 
 /**
