@@ -33,8 +33,11 @@ inline void close_handler(const char *const str) {
         // CAPIO-CL specification. If it were to be called every time the file is committed, then
         // an extra increase would occur as by default, at termination all files are committed.
         // By calling this only when close sc are occurred, we guarantee the correct count of
-        // how many close sc occurs.
-        CapioFileManager::increaseCloseCount(path);
+        // how many close sc occurs. Also, checks are computed to increase the count only if the
+        // commit count is greater than 1 to avoid unnecessary overhead.
+        if (capio_cl_engine->getCommitCloseCount(filename) > 1) {
+            CapioFileManager::increaseCloseCount(path);
+        }
     }
 }
 
