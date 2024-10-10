@@ -2,8 +2,7 @@
 #define CAPIO_ENGINE_HPP
 
 #include "client-manager/client_manager.hpp"
-#include "utils/common.hpp"
-
+#include <regex>
 /**
  * @brief Class that stores the parsed configuration of the CAPIO-CL configuration file.
  *
@@ -20,7 +19,8 @@ class CapioCLEngine {
                                   bool, // is_file (if true yes otherwise it is a directory) [6]
                                   int,  // commit on close number                            [7]
                                   long, // directory file count                              [8]
-                                  std::vector<std::string>>> // File dependencies            [9]
+                                  std::vector<std::string>, // File dependencies             [9]
+                                  std::regex>> // Regex from name to match globs             [10]
         _locations;
 
     static std::string truncateLastN(const std::string &str, int n) {
@@ -130,8 +130,9 @@ class CapioCLEngine {
         START_LOG(gettid(), "call(path=%s, commit=%s, fire=%s, permanent=%s, exclude=%s)",
                   path.c_str(), commit_rule.c_str(), fire_rule.c_str(), permanent ? "YES" : "NO",
                   exclude ? "YES" : "NO");
-        _locations.emplace(path, std::make_tuple(producers, consumers, commit_rule, fire_rule,
-                                                 permanent, exclude, true, -1, -1, dependencies));
+        _locations.emplace(path,
+                           std::make_tuple(producers, consumers, commit_rule, fire_rule, permanent,
+                                           exclude, true, -1, -1, dependencies, path));
     }
 
     void newFile(const std::string &path) {
@@ -146,7 +147,7 @@ class CapioCLEngine {
              */
             size_t matchSize = 0;
             for (const auto &[filename, data] : _locations) {
-                if (match_globs(filename, path) && this->isDirectory(filename) &&
+                if (std::regex_match(path, std::get<10>(data)) && this->isDirectory(filename) &&
                     filename.length() > matchSize) {
                     matchSize = filename.length();
                     commit    = this->getCommitRule(filename);
@@ -154,10 +155,10 @@ class CapioCLEngine {
                 }
             }
 
-            _locations.emplace(path,
-                               std::make_tuple(std::vector<std::string>(),
-                                               std::vector<std::string>(), commit, fire, false,
-                                               false, true, -1, -1, std::vector<std::string>()));
+            _locations.emplace(path, std::make_tuple(std::vector<std::string>(),
+                                                     std::vector<std::string>(), commit, fire,
+                                                     false, false, true, -1, -1,
+                                                     std::vector<std::string>(), path));
         }
     }
 
@@ -315,7 +316,7 @@ class CapioCLEngine {
         LOG("No exact match found in locations. checking for globs");
         // check for glob
         for (const auto &[k, entry] : _locations) {
-            if (match_globs(k, path)) {
+            if (std::regex_match(path, std::get<10>(entry))) {
                 LOG("Found possible glob match");
                 std::vector<std::string> producers = std::get<0>(_locations.at(k));
                 DBG(gettid(), [&](std::vector<std::string> &arr) {
@@ -356,6 +357,13 @@ class CapioCLEngine {
             return std::get<9>(_locations.at(path));
         }
         return {};
+    }
+
+    const std::regex &getPathRegex(const std::filesystem::path &path) {
+        if (_locations.find(path) != _locations.end()) {
+            return std::get<10>(_locations.at(path));
+        }
+        return std::regex("");
     }
 };
 

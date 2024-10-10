@@ -1,6 +1,5 @@
 #ifndef JSON_PARSER_HPP
 #define JSON_PARSER_HPP
-#include "utils/common.hpp"
 #include <singleheader/simdjson.h>
 
 /**
