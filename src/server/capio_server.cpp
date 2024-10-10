@@ -28,7 +28,6 @@ char node_name[HOST_NAME_MAX];
 #include "capio/env.hpp"
 #include "capio/logger.hpp"
 #include "capio/semaphore.hpp"
-#include "utils/common.hpp"
 
 #include "client-manager/request_handler_engine.hpp"
 #include "ctl-module/capio_ctl.hpp"
