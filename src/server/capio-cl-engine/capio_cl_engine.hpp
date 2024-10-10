@@ -130,9 +130,14 @@ class CapioCLEngine {
         START_LOG(gettid(), "call(path=%s, commit=%s, fire=%s, permanent=%s, exclude=%s)",
                   path.c_str(), commit_rule.c_str(), fire_rule.c_str(), permanent ? "YES" : "NO",
                   exclude ? "YES" : "NO");
+
+        std::string str_reg(path);
+        std::replace(str_reg.begin(), str_reg.end(), '.', '\.');
+        std::replace(str_reg.begin(), str_reg.end(), '*', '.');
+
         _locations.emplace(path, std::make_tuple(producers, consumers, commit_rule, fire_rule,
                                                  permanent, exclude, true, -1, -1, dependencies,
-                                                 std::regex(path, std::regex::extended)));
+                                                 std::regex(str_reg)));
     }
 
     void newFile(const std::string &path) {
@@ -155,11 +160,14 @@ class CapioCLEngine {
                 }
             }
 
-            _locations.emplace(path,
-                               std::make_tuple(std::vector<std::string>(),
-                                               std::vector<std::string>(), commit, fire, false,
-                                               false, true, -1, -1, std::vector<std::string>(),
-                                               std::regex(path, std::regex::extended)));
+            std::string str_reg(path);
+            std::replace(str_reg.begin(), str_reg.end(), '.', '\.');
+            std::replace(str_reg.begin(), str_reg.end(), '*', '.');
+
+            _locations.emplace(
+                path, std::make_tuple(std::vector<std::string>(), std::vector<std::string>(),
+                                      commit, fire, false, false, true, -1, -1,
+                                      std::vector<std::string>(), std::regex(str_reg)));
         }
     }
 
