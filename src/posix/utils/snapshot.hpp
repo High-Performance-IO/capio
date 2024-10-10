@@ -24,7 +24,7 @@ inline int *get_fd_snapshot(long tid) {
     return static_cast<int *>(get_shm_if_exist("capio_snapshot_" + std::to_string(tid)));
 }
 
-void initialize_from_snapshot(const int *fd_shm, pid_t tid) {
+inline void initialize_from_snapshot(const int *fd_shm, pid_t tid) {
     START_LOG(tid, "call(%ld)", fd_shm);
     int i = 0;
     std::string shm_name;
@@ -64,7 +64,7 @@ void initialize_from_snapshot(const int *fd_shm, pid_t tid) {
     }
 }
 
-void create_snapshot(long tid) {
+inline void create_snapshot(long tid) {
     START_LOG(tid, "call()");
     capio_off64_t *p_shm;
     char *path_shm;

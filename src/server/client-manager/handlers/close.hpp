@@ -14,7 +14,7 @@ inline void close_handler(const char *const str) {
 
     START_LOG(gettid(), "call(tid=%d, path=%s)", tid, path);
 
-    std::filesystem::path filename(path);
+    const std::filesystem::path filename(path);
 
     if (!CapioCLEngine::fileToBeHandled(filename)) {
         LOG("File should not be handled");

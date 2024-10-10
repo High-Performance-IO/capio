@@ -18,7 +18,7 @@ class JsonParser {
      */
     static CapioCLEngine *parse(const std::filesystem::path &source) {
         auto locations = new CapioCLEngine();
-        auto capio_dir = get_capio_dir();
+        const auto& capio_dir = get_capio_dir();
 
         START_LOG(gettid(), "call(config_file='%s', capio_dir='%s')", source.c_str(),
                   capio_dir.c_str());
