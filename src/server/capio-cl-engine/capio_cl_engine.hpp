@@ -23,7 +23,7 @@ class CapioCLEngine {
                                   std::regex>> // Regex from name to match globs             [10]
         _locations;
 
-    static std::string truncateLastN(const std::string &str, int n) {
+    static std::string truncateLastN(const std::string &str, const int n) {
         return str.length() > n ? "[..] " + str.substr(str.length() - n) : str;
     }
 
@@ -162,7 +162,7 @@ class CapioCLEngine {
         }
     }
 
-    long getDirectoryFileCount(std::string path) {
+    long getDirectoryFileCount(const std::string &path) {
         if (_locations.find(path) != _locations.end()) {
             return std::get<8>(_locations.at(path));
         }
@@ -358,14 +358,7 @@ class CapioCLEngine {
         }
         return {};
     }
-
-    const std::regex &getPathRegex(const std::filesystem::path &path) {
-        if (_locations.find(path) != _locations.end()) {
-            return std::get<10>(_locations.at(path));
-        }
-        return std::regex("");
-    }
 };
 
-CapioCLEngine *capio_cl_engine;
+inline CapioCLEngine *capio_cl_engine;
 #endif // CAPIO_ENGINE_HPP
