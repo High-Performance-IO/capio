@@ -11,7 +11,7 @@ class WriteRequestCache {
     std::filesystem::path current_path;
 
     // non-blocking as write is not in the pre port of CAPIO semantics
-    inline void _write_request(const off64_t count, const long tid, const long fd) {
+    inline void _write_request(const off64_t count, const long tid, const long fd) const {
         START_LOG(capio_syscall(SYS_gettid), "call(path=%s, count=%ld, tid=%ld)",
                   current_path.c_str(), count, tid);
         char req[CAPIO_REQ_MAX_SIZE];
@@ -131,7 +131,7 @@ class ConsentRequestCache {
     // Block until server allows for proceeding to a generic request
     static inline capio_off64_t _consent_to_proceed_request(const std::filesystem::path &path,
                                                             const long tid,
-                                                            std::string source_func) {
+                                                            const std::string &source_func) {
         START_LOG(capio_syscall(SYS_gettid), "call(path=%s, tid=%ld, source_func=%s)", path.c_str(),
                   tid, source_func.c_str());
         char req[CAPIO_REQ_MAX_SIZE];
@@ -150,14 +150,19 @@ class ConsentRequestCache {
 
     ~ConsentRequestCache() { delete available_consent; };
 
-    void consent_request(const std::filesystem::path path, long tid, std::string source_func) {
+    void consent_request(const std::filesystem::path &path, long tid,
+                         const std::string &source_func) const {
         START_LOG(capio_syscall(SYS_gettid), "call(path=%s, tid=%ld, source=%s)", path.c_str(), tid,
                   source_func.c_str());
+
+        /**
+         * If entry is not present in cache, then proceed to perform request. othrewise if present,
+         * there is no need to perform request to server and can proceed
+         */
         if (available_consent->find(path) == available_consent->end()) {
             LOG("File not present in cache. performing request");
-            auto res = ConsentRequestCache::_consent_to_proceed_request(path, tid, source_func);
             LOG("Registering new file for consent to proceed");
-            available_consent->emplace(path, res);
+            available_consent->emplace(path, _consent_to_proceed_request(path, tid, source_func));
         }
         LOG("Unlocking thread");
     }

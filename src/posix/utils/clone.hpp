@@ -27,9 +27,9 @@ inline void remove_capio_tid(const pid_t tid) {
     tids->erase(tid);
 }
 
-void init_threading_support() { tids = new std::unordered_set<pid_t>{}; }
+inline void init_threading_support() { tids = new std::unordered_set<pid_t>{}; }
 
-void init_process(pid_t tid) {
+inline void init_process(pid_t tid) {
     START_LOG(syscall_no_intercept(SYS_gettid), "call(tid=%ld)", tid);
 
     syscall_no_intercept_flag = true;
@@ -47,7 +47,7 @@ void init_process(pid_t tid) {
     syscall_no_intercept_flag = false;
 }
 
-void hook_clone_child() {
+inline void hook_clone_child() {
     auto tid = static_cast<pid_t>(syscall_no_intercept(SYS_gettid));
     START_LOG(tid, "call()");
 
@@ -67,7 +67,7 @@ void hook_clone_child() {
     init_caches();
 }
 
-void hook_clone_parent(long child_tid) {
+inline void hook_clone_parent(long child_tid) {
     SUSPEND_SYSCALL_LOGGING();
     auto parent_tid = static_cast<pid_t>(syscall_no_intercept(SYS_gettid));
     START_LOG(parent_tid, "call(parent_tid=%d, child_tid=%d)", parent_tid, child_tid);

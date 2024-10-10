@@ -141,9 +141,8 @@ inline void CapioFileManager::checkAndUnlockThreadAwaitingData(const std::string
                  * This is caused by the fact that std::filesystem::file_size is
                  * implementation defined when invoked on directories
                  */
-                client_manager->reply_to_client(item->first, std::filesystem::is_directory(path)
-                                                                 ? ULLONG_MAX
-                                                                 : get_file_size_if_exists(path));
+                client_manager->reply_to_client(
+                    item->first, std::filesystem::is_directory(path) ? ULLONG_MAX : filesize);
                 // remove thread from map
                 LOG("Removing thread %ld from threads awaiting on data", item->first);
                 item = threads->erase(item);
