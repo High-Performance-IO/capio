@@ -27,6 +27,43 @@ class CapioCLEngine {
         return str.length() > n ? "[..] " + str.substr(str.length() - n) : str;
     }
 
+    /**
+     * Given a string, replace a single character with a string. This function is used
+     * when converting a CAPIO-CL wildcard into a C++ valid regular expression
+     * @param str
+     * @param symbol
+     * @param replacement
+     * @return
+     */
+    [[nodiscard]] static std::string replaceSymbol(const std::string &str, char symbol,
+                                                   const std::string &replacement) {
+        std::string result = str;
+        size_t pos         = 0;
+
+        // Find the symbol and replace it
+        while ((pos = result.find(symbol, pos)) != std::string::npos) {
+            result.replace(pos, 1, replacement);
+            pos += replacement.length(); // Move past the replacement
+        }
+
+        return result;
+    }
+
+    /**
+     * Convert a CAPIO-CL regular expression into a c++ valid regular expression
+     * @param capio_path String to convert
+     * @return std::regex compiled with the corresponding c++ regex
+     */
+    [[nodiscard]] static std::regex generateCapioRegex(const std::string &capio_path) {
+        START_LOG("call(capio_path=%s)", capio_path.c_str());
+        auto computed = replaceSymbol(capio_path, '.', "\\.");
+        computed      = CapioCLEngine::replaceSymbol(computed, '/', "\\/");
+        computed      = CapioCLEngine::replaceSymbol(computed, '*', R"([a-zA-Z0-9\/\.\-_]*)");
+        computed      = CapioCLEngine::replaceSymbol(computed, '+', ".");
+        LOG("Computed regex: %s", computed.c_str());
+        return std::regex(computed);
+    }
+
   public:
     void print() const {
         std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_JSON << " [ " << node_name << " ] "
@@ -131,13 +168,9 @@ class CapioCLEngine {
                   path.c_str(), commit_rule.c_str(), fire_rule.c_str(), permanent ? "YES" : "NO",
                   exclude ? "YES" : "NO");
 
-        std::string str_reg(path);
-        std::replace(str_reg.begin(), str_reg.end(), '.', '\.');
-        std::replace(str_reg.begin(), str_reg.end(), '*', '.');
-
         _locations.emplace(path, std::make_tuple(producers, consumers, commit_rule, fire_rule,
                                                  permanent, exclude, true, -1, -1, dependencies,
-                                                 std::regex(str_reg)));
+                                                 CapioCLEngine::generateCapioRegex(path)));
     }
 
     void newFile(const std::string &path) {
@@ -160,14 +193,11 @@ class CapioCLEngine {
                 }
             }
 
-            std::string str_reg(path);
-            std::replace(str_reg.begin(), str_reg.end(), '.', '\.');
-            std::replace(str_reg.begin(), str_reg.end(), '*', '.');
-
-            _locations.emplace(
-                path, std::make_tuple(std::vector<std::string>(), std::vector<std::string>(),
-                                      commit, fire, false, false, true, -1, -1,
-                                      std::vector<std::string>(), std::regex(str_reg)));
+            _locations.emplace(path,
+                               std::make_tuple(std::vector<std::string>(),
+                                               std::vector<std::string>(), commit, fire, false,
+                                               false, true, -1, -1, std::vector<std::string>(),
+                                               CapioCLEngine::generateCapioRegex(path)));
         }
     }
 
