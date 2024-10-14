@@ -15,7 +15,11 @@ inline void create_handler(const char *const str) {
     std::string name(client_manager->get_app_name(tid));
 
     START_LOG(gettid(), "call(tid=%d, path=%s)", tid, path);
-    file_manager->unlockThreadAwaitingCreation(path);
+    /**
+     * See write.hpp for a reason for which the method on file manager is not being invoked
+     */
+    // file_manager->unlockThreadAwaitingCreation(path);
+
     capio_cl_engine->addProducer(path, name);
     client_manager->register_produced_file(tid, path_str);
 }

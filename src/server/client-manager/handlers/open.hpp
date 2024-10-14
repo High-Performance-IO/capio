@@ -14,10 +14,19 @@ inline void open_handler(const char *const str) {
     sscanf(str, "%d %d %s", &tid, &fd, path);
     START_LOG(gettid(), "call(tid=%d, fd=%d, path=%s", tid, fd, path);
 
-    if (std::filesystem::exists(path) || capio_cl_engine->isProducer(path, tid)) {
+    if (capio_cl_engine->isProducer(path, tid)) {
+        LOG("Thread is producer. allowing to continue with open");
         client_manager->reply_to_client(tid, 1);
-    } else {
-        file_manager->addThreadAwaitingCreation(path, tid);
+        return;
     }
+
+    if (std::filesystem::exists(path)) {
+        LOG("File already exists! allowing to continue with open");
+        client_manager->reply_to_client(tid, 1);
+        return;
+    }
+
+    LOG("File does not yet exists. halting operation and adding it to queue");
+    file_manager->addThreadAwaitingCreation(path, tid);
 }
 #endif // OPEN_HPP
