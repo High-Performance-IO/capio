@@ -117,39 +117,56 @@ inline void CapioFileManager::checkAndUnlockThreadAwaitingData(const std::string
         LOG("Obtained threads");
         for (auto item = threads->begin(); item != threads->end();) {
             LOG("Handling thread");
-            uintmax_t filesize = -1;
 
-            filesize = std::filesystem::is_directory(path) ? -1 : get_file_size_if_exists(path);
+            /**
+             * if the file is a directory, allow to continue by returning ULLONG_MAX. This behaviour
+             * should be triggered only if the file is a directory and the rule specified on it is
+             * Fire No Update
+             */
+            const bool is_directory = std::filesystem::is_directory(path);
+            uintmax_t filesize      = is_directory ? ULLONG_MAX : get_file_size_if_exists(path);
+            /*
+             * Check for file size only if it is directory, otherwise,
+             * return the max allowed size, to allow the process to continue.
+             * This is caused by the fact that std::filesystem::file_size is
+             * implementation defined when invoked on directories
+             */
 
-            const bool committed       = isCommitted(path);
-            const bool file_size_check = item->first >= filesize;
-            const bool is_fnu = capio_cl_engine->getFireRule(path) == CAPIO_FILE_MODE_NO_UPDATE;
-            const bool is_producer    = capio_cl_engine->isProducer(path, item->first);
-            const bool lock_condition = committed || is_producer || (file_size_check && is_fnu);
-
-            LOG("( committed(%s) || is_producer(%s) ||  ( file_size_check(%s) && is_fnu(%s) ) )",
-                committed ? "true" : "false", is_producer ? "true" : "false",
-                file_size_check ? "true" : "false", is_fnu ? "true" : "false");
-
-            LOG("Evaluation of expression: %s", lock_condition ? "TRUE" : "FALSE");
-
-            if (lock_condition) {
-                LOG("Thread %ld can be unlocked", item->first);
-                /*
-                 * Check for file size only if it is directory, otherwise,
-                 * return the max allowed size, to allow the process to continue.
-                 * This is caused by the fact that std::filesystem::file_size is
-                 * implementation defined when invoked on directories
-                 */
-                client_manager->reply_to_client(
-                    item->first, std::filesystem::is_directory(path) ? ULLONG_MAX : filesize);
+            if (capio_cl_engine->isProducer(path, item->first)) {
+                LOG("Thread %ld can be unlocked as thread is producer", item->first);
+                client_manager->reply_to_client(item->first, filesize);
                 // remove thread from map
                 LOG("Removing thread %ld from threads awaiting on data", item->first);
                 item = threads->erase(item);
-            } else {
-                LOG("Waiting threads cannot yet be unlocked");
-                ++item;
+                continue;
             }
+
+            /**
+             * if is Fire No Update and there is enough data
+             */
+            if (capio_cl_engine->getFireRule(path) == CAPIO_FILE_MODE_NO_UPDATE &&
+                item->first >= filesize) {
+                LOG("Thread %ld can be unlocked as mode is FNU AND there is enough data to serve",
+                    item->first);
+                client_manager->reply_to_client(item->first, filesize);
+                // remove thread from map
+                LOG("Removing thread %ld from threads awaiting on data", item->first);
+                item = threads->erase(item);
+                continue;
+            }
+
+            if (isCommitted(path)) {
+                LOG("Thread %ld can be unlocked as file is committed", item->first);
+                client_manager->reply_to_client(item->first, filesize);
+                // remove thread from map
+                LOG("Removing thread %ld from threads awaiting on data", item->first);
+                item = threads->erase(item);
+                continue;
+            }
+
+            // DEFAULT: no condition to unlock has occurred, hence wait...
+            LOG("Waiting threads cannot yet be unlocked");
+            ++item;
         }
 
         LOG("Completed loops over threads vector for file!");
