@@ -11,10 +11,13 @@ inline void create_handler(const char *const str) {
     pid_t tid, fd;
     char path[PATH_MAX];
     sscanf(str, "%d %d %s", &tid, &fd, path);
+    std::string path_str(path);
+    std::string name(client_manager->get_app_name(tid));
+
     START_LOG(gettid(), "call(tid=%d, path=%s)", tid, path);
     file_manager->unlockThreadAwaitingCreation(path);
-    std::string name(client_manager->get_app_name(tid));
     capio_cl_engine->addProducer(path, name);
+    client_manager->register_produced_file(tid, path_str);
 }
 
 #endif // CAPIO_CREATE_HPP

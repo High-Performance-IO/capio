@@ -8,16 +8,17 @@ class ClientManager {
     CSBufResponse_t *bufs_response;
     std::unordered_map<int, const std::string> *app_names;
 
-    // TODO: this is an approx. here only the creator will commit the file.
-    // TODO: more complex checks needs to be done but this is a temporary fix
-    std::unordered_map<pid_t, std::vector<std::string> *> *files_to_be_committed_by_tid;
+    /**
+     * Files that are produced by a given pid. Used for Commit On Termination fallback rule
+     */
+    std::unordered_map<pid_t, std::vector<std::string> *> *files_created_by_producer;
 
   public:
     ClientManager() {
         START_LOG(gettid(), "call()");
         bufs_response                = new CSBufResponse_t();
         app_names                    = new std::unordered_map<int, const std::string>;
-        files_to_be_committed_by_tid = new std::unordered_map<pid_t, std::vector<std::string> *>;
+        files_created_by_producer = new std::unordered_map<pid_t, std::vector<std::string> *>;
         std::cout << CAPIO_SERVER_CLI_LOG_SERVER << " [ " << node_name << " ] "
                   << "ClientManager initialization completed." << std::endl;
     }
@@ -26,7 +27,7 @@ class ClientManager {
         START_LOG(gettid(), "call()");
         delete bufs_response;
         delete app_names;
-        delete files_to_be_committed_by_tid;
+        delete files_created_by_producer;
         std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_WARNING << " [ " << node_name << " ] "
                   << "buf_response cleanup completed" << std::endl;
     }
@@ -44,7 +45,7 @@ class ClientManager {
                                               CAPIO_REQ_BUFF_CNT, sizeof(off_t), workflow_name);
         bufs_response->insert(std::make_pair(tid, p_buf_response));
         app_names->emplace(tid, app_name);
-        files_to_be_committed_by_tid->emplace(tid, new std::vector<std::string>);
+        files_created_by_producer->emplace(tid, new std::vector<std::string>);
     }
 
     /**
@@ -59,7 +60,7 @@ class ClientManager {
             delete it_resp->second;
             bufs_response->erase(it_resp);
         }
-        files_to_be_committed_by_tid->erase(tid);
+        files_created_by_producer->erase(tid);
     }
 
     /**
@@ -81,9 +82,9 @@ class ClientManager {
      * @param tid
      * @param path
      */
-    void add_producer_file_path(pid_t tid, std::string &path) const {
+    void register_produced_file(pid_t tid, std::string &path) const {
         START_LOG(gettid(), "call(tid=%ld, path=%s)", tid, path.c_str());
-        files_to_be_committed_by_tid->at(tid)->emplace_back(path);
+        files_created_by_producer->at(tid)->emplace_back(path);
     }
     /**
      * @brief Get the files that a given pid is waiting to be produced
@@ -93,7 +94,7 @@ class ClientManager {
      */
     [[nodiscard]] auto get_produced_files(pid_t tid) const {
         START_LOG(gettid(), "call(tid=%ld)", tid);
-        return files_to_be_committed_by_tid->at(tid);
+        return files_created_by_producer->at(tid);
     }
     /**
      * @brief Get the app name given a process pid
