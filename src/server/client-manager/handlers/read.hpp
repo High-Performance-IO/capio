@@ -17,7 +17,7 @@ inline void read_handler(const char *const str) {
     sscanf(str, "%s %d %d %llu", path, &tid, &fd, &end_of_read);
     START_LOG(gettid(), "call(path=%s, tid=%ld, end_of_read=%llu)", path, tid, end_of_read);
 
-    std::filesystem::path path_fs(path);
+    const std::filesystem::path path_fs(path);
     // Skip operations on CAPIO_DIR
     if (!CapioCLEngine::fileToBeHandled(path_fs)) {
         LOG("Ignore calls as file should not be treated by CAPIO");
@@ -25,16 +25,33 @@ inline void read_handler(const char *const str) {
         return;
     }
 
-    auto is_committed = CapioFileManager::isCommitted(path);
-    auto file_size    = CapioFileManager::get_file_size_if_exists(path);
-
-    // return ULLONG_MAX to signal client cache that file is committed and no more requests are
-    // required
-    if (file_size >= end_of_read || is_committed || capio_cl_engine->isProducer(path, tid)) {
-        client_manager->reply_to_client(tid, is_committed ? ULLONG_MAX : file_size);
-    } else {
-        file_manager->addThreadAwaitingData(path, tid, end_of_read);
+    /**
+     * If process is producer OR fire rule is no update and there is enough data, allow the process
+     * to continue in its execution
+     */
+    const uintmax_t file_size = CapioFileManager::get_file_size_if_exists(path);
+    if (capio_cl_engine->isProducer(path, tid) ||
+        (capio_cl_engine->getFireRule(path_fs) == CAPIO_FILE_MODE_NO_UPDATE &&
+         file_size >= end_of_read)) {
+        LOG("File can be consumed as it is either the producer, or the fire rule is FNU and there "
+            "is enough data");
+        client_manager->reply_to_client(tid, file_size);
     }
+
+    /**
+     * return ULLONG_MAX to signal client cache that file is committed and no more requests are
+     * required
+     */
+    if (CapioFileManager::isCommitted(path)) {
+        LOG("File is committed, and hence can be consumed");
+        client_manager->reply_to_client(tid, ULLONG_MAX);
+    }
+
+    /**
+     * Otherwise, file cannot yet be consumed, and hence add thread to wait for data...
+     */
+    LOG("File cannot yet be consumed. Adding thread to wait list");
+    file_manager->addThreadAwaitingData(path, tid, end_of_read);
 }
 
 #endif // READ_HPP
