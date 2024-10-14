@@ -7,22 +7,26 @@
 
 /**
  * @brief Creates the directory structure for the metadata file and proceed to return the path
- * pointing to the metadata token file.
+ * pointing to the metadata token file. For improvements in performances, a hash map is included to
+ * cache the computed paths. For thread safety conserns, see
+ * https://en.cppreference.com/w/cpp/container#Thread_safety
  *
  * @param path real path of the file
  * @return std::string with the translated capio token metadata path
  */
 inline std::string CapioFileManager::getAndCreateMetadataPath(const std::string &path) {
     START_LOG(gettid(), "call(path=%s)", path.c_str());
-    std::filesystem::path result =
-        get_capio_metadata_path() / (path.substr(path.find(get_capio_dir()) + 1) + ".capio");
-
-    LOG("metadata path is %s", result.c_str());
-    LOG("Creating metadata directory (%s)", result.parent_path().c_str());
-    std::filesystem::create_directories(result.parent_path());
-
-    LOG("Created capio metadata parent path (if no file existed). returning metadata token file");
-    return result;
+    static std::unordered_map<std::string, std::string> metadata_paths;
+    if (metadata_paths.find(path) == metadata_paths.end()) {
+        std::filesystem::path result =
+            get_capio_metadata_path() / (path.substr(path.find(get_capio_dir()) + 1) + ".capio");
+        metadata_paths.emplace(path, result);
+        LOG("Creating metadata directory (%s)", result.parent_path().c_str());
+        std::filesystem::create_directories(result.parent_path());
+        LOG("Created capio metadata parent path (if no file existed). returning metadata token "
+            "file");
+    }
+    return metadata_paths[path];
 }
 
 /**
@@ -32,10 +36,7 @@ inline std::string CapioFileManager::getAndCreateMetadataPath(const std::string 
  * @return uintmax_t file size if file exists, 0 otherwise
  */
 inline uintmax_t CapioFileManager::get_file_size_if_exists(const std::filesystem::path &path) {
-    if (std::filesystem::exists(path)) {
-        return std::filesystem::file_size(path);
-    }
-    return 0;
+    return std::filesystem::exists(path) ? std::filesystem::file_size(path) : 0;
 }
 
 /**
@@ -45,7 +46,7 @@ inline uintmax_t CapioFileManager::get_file_size_if_exists(const std::filesystem
  * @param path
  * @param tid
  */
-inline void CapioFileManager::addThreadAwaitingCreation(std::string path, pid_t tid) const {
+inline void CapioFileManager::addThreadAwaitingCreation(const std::string &path, pid_t tid) const {
     START_LOG(gettid(), "call(path=%s, tid=%ld)", path.c_str(), tid);
     std::lock_guard<std::mutex> lg(threads_mutex);
     thread_awaiting_file_creation->try_emplace(path, new std::vector<int>);
@@ -57,7 +58,7 @@ inline void CapioFileManager::addThreadAwaitingCreation(std::string path, pid_t 
  *
  * @param path file that has just been created
  */
-inline void CapioFileManager::unlockThreadAwaitingCreation(std::string path) const {
+inline void CapioFileManager::unlockThreadAwaitingCreation(const std::string &path) const {
     START_LOG(gettid(), "call(path=%s)", path.c_str());
     std::lock_guard<std::mutex> lg(threads_mutex);
     if (thread_awaiting_file_creation->find(path) != thread_awaiting_file_creation->end()) {
@@ -76,7 +77,7 @@ inline void CapioFileManager::unlockThreadAwaitingCreation(std::string path) con
  *
  * @param path
  */
-inline void CapioFileManager::deleteFileAwaitingCreation(std::string path) const {
+inline void CapioFileManager::deleteFileAwaitingCreation(const std::string &path) const {
     START_LOG(gettid(), "call(path=%s)", path.c_str());
     std::lock_guard<std::mutex> lg(threads_mutex);
     thread_awaiting_file_creation->erase(path);
@@ -90,7 +91,7 @@ inline void CapioFileManager::deleteFileAwaitingCreation(std::string path) const
  * @param tid
  * @param expected_size
  */
-inline void CapioFileManager::addThreadAwaitingData(std::string path, int tid,
+inline void CapioFileManager::addThreadAwaitingData(const std::string &path, int tid,
                                                     size_t expected_size) const {
     START_LOG(gettid(), "call(path=%s, tid=%ld, expected_size=%ld)", path.c_str(), tid,
               expected_size);
@@ -108,7 +109,7 @@ inline void CapioFileManager::addThreadAwaitingData(std::string path, int tid,
 inline void CapioFileManager::checkAndUnlockThreadAwaitingData(const std::string &path) const {
     START_LOG(gettid(), "call(path=%s)", path.c_str());
     LOG("Before lockguard");
-    std::lock_guard<std::mutex> lg(data_mutex);
+    std::lock_guard lg(data_mutex);
     LOG("Acquired lockguard");
     if (thread_awaiting_data->find(path) != thread_awaiting_data->end()) {
         LOG("Path has thread awaiting");
@@ -120,11 +121,11 @@ inline void CapioFileManager::checkAndUnlockThreadAwaitingData(const std::string
 
             filesize = std::filesystem::is_directory(path) ? -1 : get_file_size_if_exists(path);
 
-            bool committed       = isCommitted(path);
-            bool file_size_check = item->first >= filesize;
-            bool is_fnu          = capio_cl_engine->getFireRule(path) == CAPIO_FILE_MODE_NO_UPDATE;
-            bool is_producer     = capio_cl_engine->isProducer(path, item->first);
-            bool lock_condition  = committed || is_producer || (file_size_check && is_fnu);
+            const bool committed       = isCommitted(path);
+            const bool file_size_check = item->first >= filesize;
+            const bool is_fnu = capio_cl_engine->getFireRule(path) == CAPIO_FILE_MODE_NO_UPDATE;
+            const bool is_producer    = capio_cl_engine->isProducer(path, item->first);
+            const bool lock_condition = committed || is_producer || (file_size_check && is_fnu);
 
             LOG("( committed(%s) || is_producer(%s) ||  ( file_size_check(%s) && is_fnu(%s) ) )",
                 committed ? "true" : "false", is_producer ? "true" : "false",
@@ -140,9 +141,8 @@ inline void CapioFileManager::checkAndUnlockThreadAwaitingData(const std::string
                  * This is caused by the fact that std::filesystem::file_size is
                  * implementation defined when invoked on directories
                  */
-                client_manager->reply_to_client(item->first, std::filesystem::is_directory(path)
-                                                                 ? ULLONG_MAX
-                                                                 : get_file_size_if_exists(path));
+                client_manager->reply_to_client(
+                    item->first, std::filesystem::is_directory(path) ? ULLONG_MAX : filesize);
                 // remove thread from map
                 LOG("Removing thread %ld from threads awaiting on data", item->first);
                 item = threads->erase(item);
@@ -212,7 +212,7 @@ inline void CapioFileManager::setCommitted(const std::filesystem::path &path) co
  *
  * @param tid
  */
-inline void CapioFileManager::setCommitted(pid_t tid) const {
+inline void CapioFileManager::setCommitted(const pid_t tid) const {
     START_LOG(gettid(), "call(tid=%d)", tid);
     auto files = client_manager->get_produced_files(tid);
     for (const auto &file : *files) {
@@ -230,6 +230,15 @@ inline void CapioFileManager::setCommitted(pid_t tid) const {
  */
 inline bool CapioFileManager::isCommitted(const std::filesystem::path &path) {
     START_LOG(gettid(), "call(path=%s)", path.c_str());
+    /**
+     * Hash map to store committed files to avoid recomputing the commit state of a given file
+     * Files inside here are inserted only when they are committed
+     */
+    static args::detail::unordered_map<std::string, bool> committed_files;
+
+    if (committed_files.find(path) != committed_files.end()) {
+        return true;
+    }
 
     if (std::filesystem::is_directory(path)) {
         // is directory
@@ -243,10 +252,14 @@ inline bool CapioFileManager::isCommitted(const std::filesystem::path &path) {
                 ++count;
             }
         }
-        bool continue_directory = count >= file_count;
 
-        LOG("Final result: %s", continue_directory ? "COMMITTED" : "NOT COMMITTED");
-        return continue_directory;
+        LOG("Final result: %s", count >= file_count ? "COMMITTED" : "NOT COMMITTED");
+
+        if (count >= file_count) {
+            committed_files[path] = true;
+            return true;
+        }
+        return false;
     }
 
     // if is file
@@ -256,48 +269,61 @@ inline bool CapioFileManager::isCommitted(const std::filesystem::path &path) {
 
     std::string commit_rule = capio_cl_engine->getCommitRule(path);
 
-    bool metadata_token_exists = std::filesystem::exists(metadata_computed_path);
-
     if (commit_rule == CAPIO_FILE_COMMITTED_ON_FILE) {
         LOG("Commit rule is on_file. Checking for file dependencies");
         bool commit_computed = true;
-        for (auto file : capio_cl_engine->get_file_deps(path)) {
+        for (const auto &file : capio_cl_engine->get_file_deps(path)) {
             commit_computed = commit_computed && isCommitted(file);
         }
 
         LOG("Commit result for file %s is: %s", path.c_str(),
             commit_computed ? "committed" : "not committed");
-
+        if (commit_computed) {
+            committed_files[path] = true;
+        }
         return commit_computed;
     }
 
     if (commit_rule == CAPIO_FILE_COMMITTED_ON_CLOSE) {
         LOG("Commit rule is ON_CLOSE");
+
+        if (!std::filesystem::exists(metadata_computed_path)) {
+            LOG("Commit file does not yet exists. returning false");
+            return false;
+        }
+
         int commit_count = capio_cl_engine->getCommitCloseCount(path);
         LOG("Expected close count is: %d", commit_count);
-
-        if (metadata_token_exists) {
-            if (commit_count != -1) {
-                long actual_commit_count = 0;
-                LOG("Commit file exists. retrieving commit count");
-                std::ifstream in(metadata_computed_path);
-                if (in.is_open()) {
-                    LOG("Opened file");
-                    in >> actual_commit_count;
-                }
-                LOG("Obtained actual commit count: %l", actual_commit_count);
-                LOG("File %s committed", actual_commit_count >= commit_count ? "IS" : "IS NOT");
-                return actual_commit_count >= commit_count;
-            }
+        if (commit_count == -1) {
             LOG("File needs to be closed exactly once and token exists. returning");
             return true;
         }
-        LOG("Commit file does not yet exists. returning false");
+
+        long actual_commit_count = 0;
+        LOG("Commit file exists. retrieving commit count");
+        std::ifstream in(metadata_computed_path);
+        if (in.is_open()) {
+            LOG("Opened file");
+            in >> actual_commit_count;
+        }
+        LOG("Obtained actual commit count: %l", actual_commit_count);
+        LOG("File %s committed", actual_commit_count >= commit_count ? "IS" : "IS NOT");
+
+        if (actual_commit_count >= commit_count) {
+            committed_files[path] = true;
+            return true;
+        }
         return false;
     }
 
-    LOG("Commit rule is ON_TERMINATION. File exists? %s", metadata_token_exists ? "TRUE" : "FALSE");
-    return metadata_token_exists;
+    LOG("Commit rule is ON_TERMINATION. File exists? %s",
+        std::filesystem::exists(metadata_computed_path) ? "TRUE" : "FALSE");
+
+    if (std::filesystem::exists(metadata_computed_path)) {
+        committed_files[path] = true;
+        return true;
+    }
+    return false;
 }
 
 /**

@@ -37,15 +37,15 @@ class CapioFileManager {
     void setCommitted(const std::filesystem::path &path) const;
     void setCommitted(pid_t tid) const;
     void checkAndUnlockThreadAwaitingData(const std::string &path) const;
-    void addThreadAwaitingData(std::string path, int tid, size_t expected_size) const;
-    void unlockThreadAwaitingCreation(std::string path) const;
-    void addThreadAwaitingCreation(std::string path, pid_t tid) const;
-    void deleteFileAwaitingCreation(std::string path) const;
+    void addThreadAwaitingData(const std::string &path, int tid, size_t expected_size) const;
+    void unlockThreadAwaitingCreation(const std::string &path) const;
+    void addThreadAwaitingCreation(const std::string &path, pid_t tid) const;
+    void deleteFileAwaitingCreation(const std::string &path) const;
     [[nodiscard]] std::vector<std::string> getFileAwaitingCreation() const;
     [[nodiscard]] std::vector<std::string> getFileAwaitingData() const;
 };
 
-CapioFileManager *file_manager;
+inline CapioFileManager *file_manager;
 
 #include "fs_monitor.hpp"
 

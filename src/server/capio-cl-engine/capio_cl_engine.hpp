@@ -2,8 +2,7 @@
 #define CAPIO_ENGINE_HPP
 
 #include "client-manager/client_manager.hpp"
-#include "utils/common.hpp"
-
+#include <regex>
 /**
  * @brief Class that stores the parsed configuration of the CAPIO-CL configuration file.
  *
@@ -20,11 +19,49 @@ class CapioCLEngine {
                                   bool, // is_file (if true yes otherwise it is a directory) [6]
                                   int,  // commit on close number                            [7]
                                   long, // directory file count                              [8]
-                                  std::vector<std::string>>> // File dependencies            [9]
+                                  std::vector<std::string>, // File dependencies             [9]
+                                  std::regex>> // Regex from name to match globs             [10]
         _locations;
 
-    static std::string truncateLastN(const std::string &str, int n) {
+    static std::string truncateLastN(const std::string &str, const int n) {
         return str.length() > n ? "[..] " + str.substr(str.length() - n) : str;
+    }
+
+    /**
+     * Given a string, replace a single character with a string. This function is used
+     * when converting a CAPIO-CL wildcard into a C++ valid regular expression
+     * @param str
+     * @param symbol
+     * @param replacement
+     * @return
+     */
+    [[nodiscard]] static std::string replaceSymbol(const std::string &str, char symbol,
+                                                   const std::string &replacement) {
+        std::string result = str;
+        size_t pos         = 0;
+
+        // Find the symbol and replace it
+        while ((pos = result.find(symbol, pos)) != std::string::npos) {
+            result.replace(pos, 1, replacement);
+            pos += replacement.length(); // Move past the replacement
+        }
+
+        return result;
+    }
+
+    /**
+     * Convert a CAPIO-CL regular expression into a c++ valid regular expression
+     * @param capio_path String to convert
+     * @return std::regex compiled with the corresponding c++ regex
+     */
+    [[nodiscard]] static std::regex generateCapioRegex(const std::string &capio_path) {
+        START_LOG(gettid(), "call(capio_path=%s)", capio_path.c_str());
+        auto computed = replaceSymbol(capio_path, '.', "\\.");
+        computed      = CapioCLEngine::replaceSymbol(computed, '/', "\\/");
+        computed      = CapioCLEngine::replaceSymbol(computed, '*', R"([a-zA-Z0-9\/\.\-_]*)");
+        computed      = CapioCLEngine::replaceSymbol(computed, '+', ".");
+        LOG("Computed regex: %s", computed.c_str());
+        return std::regex(computed);
     }
 
   public:
@@ -130,8 +167,10 @@ class CapioCLEngine {
         START_LOG(gettid(), "call(path=%s, commit=%s, fire=%s, permanent=%s, exclude=%s)",
                   path.c_str(), commit_rule.c_str(), fire_rule.c_str(), permanent ? "YES" : "NO",
                   exclude ? "YES" : "NO");
+
         _locations.emplace(path, std::make_tuple(producers, consumers, commit_rule, fire_rule,
-                                                 permanent, exclude, true, -1, -1, dependencies));
+                                                 permanent, exclude, true, -1, -1, dependencies,
+                                                 CapioCLEngine::generateCapioRegex(path)));
     }
 
     void newFile(const std::string &path) {
@@ -146,7 +185,7 @@ class CapioCLEngine {
              */
             size_t matchSize = 0;
             for (const auto &[filename, data] : _locations) {
-                if (match_globs(filename, path) && this->isDirectory(filename) &&
+                if (std::regex_match(path, std::get<10>(data)) && this->isDirectory(filename) &&
                     filename.length() > matchSize) {
                     matchSize = filename.length();
                     commit    = this->getCommitRule(filename);
@@ -157,11 +196,12 @@ class CapioCLEngine {
             _locations.emplace(path,
                                std::make_tuple(std::vector<std::string>(),
                                                std::vector<std::string>(), commit, fire, false,
-                                               false, true, -1, -1, std::vector<std::string>()));
+                                               false, true, -1, -1, std::vector<std::string>(),
+                                               CapioCLEngine::generateCapioRegex(path)));
         }
     }
 
-    long getDirectoryFileCount(std::string path) {
+    long getDirectoryFileCount(const std::string &path) {
         if (_locations.find(path) != _locations.end()) {
             return std::get<8>(_locations.at(path));
         }
@@ -315,7 +355,7 @@ class CapioCLEngine {
         LOG("No exact match found in locations. checking for globs");
         // check for glob
         for (const auto &[k, entry] : _locations) {
-            if (match_globs(k, path)) {
+            if (std::regex_match(path, std::get<10>(entry))) {
                 LOG("Found possible glob match");
                 std::vector<std::string> producers = std::get<0>(_locations.at(k));
                 DBG(gettid(), [&](std::vector<std::string> &arr) {
@@ -359,5 +399,5 @@ class CapioCLEngine {
     }
 };
 
-CapioCLEngine *capio_cl_engine;
+inline CapioCLEngine *capio_cl_engine;
 #endif // CAPIO_ENGINE_HPP

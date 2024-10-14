@@ -72,7 +72,7 @@ inline void add_capio_fd(pid_t tid, const std::string &path, int fd, capio_off64
  * @param pathname
  * @return
  */
-std::filesystem::path capio_posix_realpath(const std::filesystem::path &pathname) {
+inline std::filesystem::path capio_posix_realpath(const std::filesystem::path &pathname) {
     START_LOG(syscall_no_intercept(SYS_gettid), "call(path=%s)", pathname.c_str());
     char *posix_real_path = capio_realpath((char *) pathname.c_str(), nullptr);
 
@@ -163,6 +163,7 @@ inline void destroy_filesystem() {
 
 /**
  * Clone a file descriptor in metadata structures
+ * @param tid
  * @param oldfd
  * @param newfd
  * @return
@@ -224,7 +225,7 @@ inline std::vector<int> get_capio_fds() {
  * @param dirfd
  * @return the corresponding path
  */
-std::filesystem::path get_dir_path(int dirfd) {
+inline std::filesystem::path get_dir_path(int dirfd) {
     START_LOG(syscall_no_intercept(SYS_gettid), "call(dirfd=%d)", dirfd);
 
     auto it = capio_files_descriptors->find(dirfd);
@@ -259,7 +260,8 @@ inline void init_filesystem() {
 
 /**
  * Rename a file or folder in metadata structures
- * @param path
+ * @param oldpath
+ * @param newpath
  * @return
  */
 inline void rename_capio_path(const std::string &oldpath, const std::string &newpath) {

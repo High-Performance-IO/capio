@@ -1,6 +1,5 @@
 #ifndef JSON_PARSER_HPP
 #define JSON_PARSER_HPP
-#include "utils/common.hpp"
 #include <singleheader/simdjson.h>
 
 /**
@@ -8,6 +7,39 @@
  *
  */
 class JsonParser {
+
+    /**
+     * @brief Check if a string is a representation of a integer number
+     *
+     * @param s
+     * @return true
+     * @return false
+     */
+    static inline bool is_int(const std::string &s) {
+        START_LOG(gettid(), "call(%s)", s.c_str());
+        bool res = false;
+        if (!s.empty()) {
+            char *p;
+            strtol(s.c_str(), &p, 10);
+            res = *p == 0;
+        }
+        return res;
+    }
+
+    /**
+     * @brief compare two paths
+     *
+     * @param path
+     * @param base
+     * @return true if path is a subdirectory of base
+     * @return false otherwise
+     */
+    static inline bool first_is_subpath_of_second(const std::filesystem::path &path,
+                                                  const std::filesystem::path &base) {
+        const auto mismatch_pair =
+            std::mismatch(path.begin(), path.end(), base.begin(), base.end());
+        return mismatch_pair.second == base.end();
+    }
 
   public:
     /**
@@ -17,8 +49,8 @@ class JsonParser {
      * @return CapioCLEngine instance with the information provided by the config file
      */
     static CapioCLEngine *parse(const std::filesystem::path &source) {
-        auto locations = new CapioCLEngine();
-        auto capio_dir = get_capio_dir();
+        auto locations        = new CapioCLEngine();
+        const auto &capio_dir = get_capio_dir();
 
         START_LOG(gettid(), "call(config_file='%s', capio_dir='%s')", source.c_str(),
                   capio_dir.c_str());
