@@ -55,7 +55,7 @@ class CapioCLEngine {
      * @return std::regex compiled with the corresponding c++ regex
      */
     [[nodiscard]] static std::regex generateCapioRegex(const std::string &capio_path) {
-        START_LOG("call(capio_path=%s)", capio_path.c_str());
+        START_LOG(gettid(), "call(capio_path=%s)", capio_path.c_str());
         auto computed = replaceSymbol(capio_path, '.', "\\.");
         computed      = CapioCLEngine::replaceSymbol(computed, '/', "\\/");
         computed      = CapioCLEngine::replaceSymbol(computed, '*', R"([a-zA-Z0-9\/\.\-_]*)");
