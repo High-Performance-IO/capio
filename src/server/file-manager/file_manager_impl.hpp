@@ -138,30 +138,26 @@ inline void CapioFileManager::checkAndUnlockThreadAwaitingData(const std::string
                 // remove thread from map
                 LOG("Removing thread %ld from threads awaiting on data", item->first);
                 item = threads->erase(item);
-                continue;
-            }
 
-            /**
-             * if is Fire No Update and there is enough data
-             */
-            if (capio_cl_engine->getFireRule(path) == CAPIO_FILE_MODE_NO_UPDATE &&
-                item->first >= filesize) {
+            } else if (capio_cl_engine->getFireRule(path) == CAPIO_FILE_MODE_NO_UPDATE &&
+                       item->first >= filesize) {
+                /**
+                 * if is Fire No Update and there is enough data
+                 */
                 LOG("Thread %ld can be unlocked as mode is FNU AND there is enough data to serve",
                     item->first);
                 client_manager->reply_to_client(item->first, filesize);
                 // remove thread from map
                 LOG("Removing thread %ld from threads awaiting on data", item->first);
                 item = threads->erase(item);
-                continue;
-            }
 
-            if (isCommitted(path)) {
+            } else if (isCommitted(path)) {
+
                 LOG("Thread %ld can be unlocked as file is committed", item->first);
                 client_manager->reply_to_client(item->first, filesize);
                 // remove thread from map
                 LOG("Removing thread %ld from threads awaiting on data", item->first);
                 item = threads->erase(item);
-                continue;
             }
 
             // DEFAULT: no condition to unlock has occurred, hence wait...
