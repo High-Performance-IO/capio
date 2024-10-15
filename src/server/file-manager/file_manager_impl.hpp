@@ -349,7 +349,7 @@ inline std::vector<std::string> CapioFileManager::getFileAwaitingCreation() cons
     // NOTE: do not put inside here log code as it will generate a lot of useless log
     std::lock_guard<std::mutex> lg(threads_mutex);
     std::vector<std::string> keys;
-    for (auto itm : *thread_awaiting_file_creation) {
+    for (const auto& itm : *thread_awaiting_file_creation) {
         keys.emplace_back(itm.first);
     }
     return keys;
@@ -364,7 +364,7 @@ inline std::vector<std::string> CapioFileManager::getFileAwaitingData() const {
     // NOTE: do not put inside here log code as it will generate a lot of useless log
     std::lock_guard<std::mutex> lg(data_mutex);
     std::vector<std::string> keys;
-    for (auto itm : *thread_awaiting_data) {
+    for (const auto& itm : *thread_awaiting_data) {
         keys.emplace_back(itm.first);
     }
     return keys;

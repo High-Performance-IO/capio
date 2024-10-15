@@ -43,7 +43,7 @@ inline void consent_to_proceed_handler(const char *const str) {
         client_manager->reply_to_client(tid, 1);
     } else {
         LOG("Requested file %s does not exists yet. awaiting for creation", path);
-        file_manager->addThreadAwaitingData(path, tid, 0);
+        file_manager->addThreadAwaitingCreation(path, tid);
     }
 }
 
