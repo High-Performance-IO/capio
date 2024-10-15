@@ -158,11 +158,12 @@ inline void CapioFileManager::checkAndUnlockThreadAwaitingData(const std::string
                 // remove thread from map
                 LOG("Removing thread %ld from threads awaiting on data", item->first);
                 item = threads->erase(item);
-            }
+            } else {
 
-            // DEFAULT: no condition to unlock has occurred, hence wait...
-            LOG("Waiting threads cannot yet be unlocked");
-            ++item;
+                // DEFAULT: no condition to unlock has occurred, hence wait...
+                LOG("Waiting threads cannot yet be unlocked");
+                ++item;
+            }
         }
 
         LOG("Completed loops over threads vector for file!");
