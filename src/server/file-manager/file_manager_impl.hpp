@@ -61,9 +61,9 @@ inline void CapioFileManager::addThreadAwaitingCreation(const std::string &path,
 inline void CapioFileManager::unlockThreadAwaitingCreation(const std::string &path) const {
     START_LOG(gettid(), "call(path=%s)", path.c_str());
     std::lock_guard<std::mutex> lg(threads_mutex);
-    if (thread_awaiting_file_creation->find(path) != thread_awaiting_file_creation->end()) {
-        auto th = thread_awaiting_file_creation->at(path);
-        for (auto tid : *th) {
+    if (const auto itm = thread_awaiting_file_creation->find(path);
+        itm != thread_awaiting_file_creation->end()) {
+        for (const auto tid : *itm->second) {
             client_manager->reply_to_client(tid, 1);
         }
     }
@@ -111,11 +111,10 @@ inline void CapioFileManager::checkAndUnlockThreadAwaitingData(const std::string
     LOG("Before lockguard");
     std::lock_guard lg(data_mutex);
     LOG("Acquired lockguard");
-    if (thread_awaiting_data->find(path) != thread_awaiting_data->end()) {
+    if (const auto threads = thread_awaiting_data->find(path);
+        threads != thread_awaiting_data->end()) {
         LOG("Path has thread awaiting");
-        auto threads = thread_awaiting_data->at(path);
-        LOG("Obtained threads");
-        for (auto item = threads->begin(); item != threads->end();) {
+        for (auto item = threads->second->begin(); item != threads->second->end();) {
             LOG("Handling thread");
 
             /**
@@ -137,7 +136,7 @@ inline void CapioFileManager::checkAndUnlockThreadAwaitingData(const std::string
                 client_manager->reply_to_client(item->first, filesize);
                 // remove thread from map
                 LOG("Removing thread %ld from threads awaiting on data", item->first);
-                item = threads->erase(item);
+                item = threads->second->erase(item);
 
             } else if (capio_cl_engine->getFireRule(path) == CAPIO_FILE_MODE_NO_UPDATE &&
                        item->first >= filesize) {
@@ -149,7 +148,7 @@ inline void CapioFileManager::checkAndUnlockThreadAwaitingData(const std::string
                 client_manager->reply_to_client(item->first, filesize);
                 // remove thread from map
                 LOG("Removing thread %ld from threads awaiting on data", item->first);
-                item = threads->erase(item);
+                item = threads->second->erase(item);
 
             } else if (isCommitted(path)) {
 
@@ -157,7 +156,7 @@ inline void CapioFileManager::checkAndUnlockThreadAwaitingData(const std::string
                 client_manager->reply_to_client(item->first, filesize);
                 // remove thread from map
                 LOG("Removing thread %ld from threads awaiting on data", item->first);
-                item = threads->erase(item);
+                item = threads->second->erase(item);
             } else {
 
                 // DEFAULT: no condition to unlock has occurred, hence wait...
@@ -168,7 +167,7 @@ inline void CapioFileManager::checkAndUnlockThreadAwaitingData(const std::string
 
         LOG("Completed loops over threads vector for file!");
 
-        if (threads->empty()) {
+        if (threads->second->empty()) {
             LOG("There are no threads waiting for path %s. cleaning up map", path.c_str());
             thread_awaiting_data->erase(path);
         }
@@ -349,7 +348,7 @@ inline std::vector<std::string> CapioFileManager::getFileAwaitingCreation() cons
     // NOTE: do not put inside here log code as it will generate a lot of useless log
     std::lock_guard<std::mutex> lg(threads_mutex);
     std::vector<std::string> keys;
-    for (const auto& itm : *thread_awaiting_file_creation) {
+    for (const auto &itm : *thread_awaiting_file_creation) {
         keys.emplace_back(itm.first);
     }
     return keys;
@@ -364,7 +363,7 @@ inline std::vector<std::string> CapioFileManager::getFileAwaitingData() const {
     // NOTE: do not put inside here log code as it will generate a lot of useless log
     std::lock_guard<std::mutex> lg(data_mutex);
     std::vector<std::string> keys;
-    for (const auto& itm : *thread_awaiting_data) {
+    for (const auto &itm : *thread_awaiting_data) {
         keys.emplace_back(itm.first);
     }
     return keys;
