@@ -31,7 +31,6 @@ class FileSystemMonitor {
         while (*continue_execution) {
 
             file_manager->checkFilesAwaitingCreation();
-
             file_manager->checkFileAwaitingData();
 
             nanosleep(&sleep, nullptr);
