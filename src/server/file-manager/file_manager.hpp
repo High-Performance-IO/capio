@@ -2,8 +2,8 @@
 #define FILE_MANAGER_HEADER_HPP
 
 #include <mutex>
-std::mutex threads_mutex;
-std::mutex data_mutex;
+inline std::mutex creation_mutex;
+inline std::mutex data_mutex;
 /**
  * @brief Class that handle all the information related to the files handled by capio, as well
  * metadata for such files.
@@ -15,6 +15,12 @@ class CapioFileManager {
         *thread_awaiting_data;
 
     static std::string getAndCreateMetadataPath(const std::string &path);
+
+    void _unlockThreadAwaitingCreation(const std::string &path,
+                                      const std::vector<pid_t> &pids) const;
+
+    void _unlockThreadAwaitingData(const std::string &path,
+                                  std::unordered_map<pid_t, capio_off64_t> *pids_awaiting) const;
 
   public:
     CapioFileManager() {
@@ -34,15 +40,12 @@ class CapioFileManager {
     static uintmax_t get_file_size_if_exists(const std::filesystem::path &path);
     static void increaseCloseCount(const std::filesystem::path &path);
     static bool isCommitted(const std::filesystem::path &path);
-    void setCommitted(const std::filesystem::path &path) const;
-    void setCommitted(pid_t tid) const;
-    void checkAndUnlockThreadAwaitingData(const std::string &path) const;
+    static void setCommitted(const std::filesystem::path &path);
+    static void setCommitted(pid_t tid);
     void addThreadAwaitingData(const std::string &path, int tid, size_t expected_size) const;
-    void unlockThreadAwaitingCreation(const std::string &path) const;
     void addThreadAwaitingCreation(const std::string &path, pid_t tid) const;
-    void deleteFileAwaitingCreation(const std::string &path) const;
-    [[nodiscard]] std::vector<std::string> getFileAwaitingCreation() const;
-    [[nodiscard]] std::vector<std::string> getFileAwaitingData() const;
+    void checkFilesAwaitingCreation();
+    void checkFileAwaitingData();
 };
 
 inline CapioFileManager *file_manager;
