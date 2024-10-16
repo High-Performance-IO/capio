@@ -60,7 +60,7 @@ inline void CapioFileManager::addThreadAwaitingCreation(const std::string &path,
  * @param pids
  */
 inline void CapioFileManager::_unlockThreadAwaitingCreation(const std::string &path,
-                                                           const std::vector<pid_t> &pids) const {
+                                                            const std::vector<pid_t> &pids) const {
     START_LOG(gettid(), "call(path=%s)", path.c_str());
     for (const auto tid : pids) {
         client_manager->reply_to_client(tid, 1);
@@ -228,7 +228,7 @@ inline bool CapioFileManager::isCommitted(const std::filesystem::path &path) {
      * Hash map to store committed files to avoid recomputing the commit state of a given file
      * Files inside here are inserted only when they are committed
      */
-    static args::detail::unordered_map<std::string, bool> committed_files;
+    static std::unordered_map<std::string, bool> committed_files;
 
     if (committed_files.find(path) != committed_files.end()) {
         return true;
@@ -327,37 +327,31 @@ inline bool CapioFileManager::isCommitted(const std::filesystem::path &path) {
 inline void CapioFileManager::checkFilesAwaitingCreation() {
     // NOTE: do not put inside here log code as it will generate a lot of useless log
     std::lock_guard<std::mutex> lg(creation_mutex);
-    if (!thread_awaiting_file_creation->empty()) {
+    for (auto [file, pids] : *thread_awaiting_file_creation) {
         START_LOG(gettid(), "call()");
-        for (auto [file, pids] : *thread_awaiting_file_creation) {
-            if (std::filesystem::exists(file)) {
-                LOG("File %s exists. Unlocking thread awaiting for creation", file.c_str());
-                file_manager->_unlockThreadAwaitingCreation(file, *pids);
-                LOG("Completed handling.\n\n");
-            }
+        if (std::filesystem::exists(file)) {
+            LOG("File %s exists. Unlocking thread awaiting for creation", file.c_str());
+            file_manager->_unlockThreadAwaitingCreation(file, *pids);
+            LOG("Completed handling.\n\n");
         }
     }
 }
 
 /**
- * @brief Return a list of files for which there is a thread waiting for data to be produced
+ * @brief
  *
- * @return std::vector<std::string>
  */
 inline void CapioFileManager::checkFileAwaitingData() {
     // NOTE: do not put inside here log code as it will generate a lot of useless log
     std::lock_guard<std::mutex> lg(data_mutex);
-    if (!thread_awaiting_data->empty()) {
+    for (auto &[file, pids_awaiting] : *thread_awaiting_data) {
         START_LOG(gettid(), "call()");
-        for (auto &[file, pids_awaiting] : *thread_awaiting_data) {
-            if (std::filesystem::exists(file)) {
-                LOG("File %s exists. Checking if enough data is available", file.c_str());
-                // actual update, end eventual removal from map is handled by the
-                // CapioFileManager class and not by the FileSystemMonitor class
-                file_manager->_unlockThreadAwaitingData(file, pids_awaiting);
-                LOG("Completed handling.\n\n");
-            }
-        }
+        // no need to check if file exists as this method is called only by read_handler
+        // and as such, the file already exists
+        // actual update, end eventual removal from map is handled by the
+        // CapioFileManager class and not by the FileSystemMonitor class
+        file_manager->_unlockThreadAwaitingData(file, pids_awaiting);
+        LOG("Completed handling.\n\n");
     }
 }
 
