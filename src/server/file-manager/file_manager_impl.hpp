@@ -128,7 +128,7 @@ inline void CapioFileManager::_unlockThreadAwaitingData(
              */
             LOG("Thread %ld can be unlocked as mode is FNU AND there is enough data  to serve "
                 "(%llu bytes available. Requested %llu)",
-                item->first, filesize, , item->second);
+                item->first, filesize, item->second);
             client_manager->reply_to_client(item->first, filesize);
             // remove thread from map
             LOG("Removing thread %ld from threads awaiting on data", item->first);
