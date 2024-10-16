@@ -249,7 +249,7 @@ inline bool CapioFileManager::isCommitted(const std::filesystem::path &path) {
         return false;
     }
 
-    // if is file
+    // if file
     LOG("Path is a file");
     std::string metadata_computed_path = getAndCreateMetadataPath(path);
     LOG("Computed metadata file path is %s", metadata_computed_path.c_str());
@@ -326,7 +326,7 @@ inline void CapioFileManager::checkFilesAwaitingCreation() {
         if (std::filesystem::exists(element->first)) {
             START_LOG(gettid(), "\n\ncall()");
             LOG("File %s exists. Unlocking thread awaiting for creation", element->first.c_str());
-            file_manager->_unlockThreadAwaitingCreation(element->first, element->second);
+            CapioFileManager::_unlockThreadAwaitingCreation(element->first, element->second);
             LOG("Completed handling.");
             element = thread_awaiting_file_creation.erase(element);
         } else {
@@ -336,7 +336,8 @@ inline void CapioFileManager::checkFilesAwaitingCreation() {
 }
 
 /**
- * @brief
+ * @brief check if there are threads waiting for data, and for each one of them check if the file
+ * has enough data
  *
  */
 inline void CapioFileManager::checkFileAwaitingData() {
@@ -348,7 +349,7 @@ inline void CapioFileManager::checkFileAwaitingData() {
         // and as such, the file already exists
         // actual update, end eventual removal from map is handled by the
         // CapioFileManager class and not by the FileSystemMonitor class
-        file_manager->_unlockThreadAwaitingData(iter->first, iter->second);
+        CapioFileManager::_unlockThreadAwaitingData(iter->first, iter->second);
 
         // cleanup of map while iterating over it
         if (iter->second.empty()) {

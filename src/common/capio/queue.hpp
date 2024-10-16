@@ -57,10 +57,10 @@ template <class T, class Mutex> class Queue {
           _buff_size(_max_num_elems * _elem_size), _shm_name(workflow_name + "_" + shm_name),
           _first_elem_name(workflow_name + SHM_FIRST_ELEM + shm_name),
           _last_elem_name(workflow_name + SHM_LAST_ELEM + shm_name),
+          require_cleanup(cleanup),
           _mutex(workflow_name + SHM_MUTEX_PREFIX + shm_name, 1),
           _sem_num_elems(workflow_name + SHM_SEM_ELEMS + shm_name, 0),
-          _sem_num_empty(workflow_name + SHM_SEM_EMPTY + shm_name, max_num_elems),
-          require_cleanup(cleanup) {
+          _sem_num_empty(workflow_name + SHM_SEM_EMPTY + shm_name, max_num_elems) {
         START_LOG(capio_syscall(SYS_gettid),
                   "call(shm_name=%s, _max_num_elems=%ld, elem_size=%ld, "
                   "workflow_name=%s, cleanup=%s)",
@@ -105,7 +105,7 @@ template <class T, class Mutex> class Queue {
         return segment;
     }
 
-    inline auto get_name() { return this->_shm_name; }
+    inline auto get_name() const { return this->_shm_name; }
 
     inline void read(T *buff_rcv, unsigned long long int num_bytes) {
         START_LOG(capio_syscall(SYS_gettid), "call(buff_rcv=0x%08x, num_bytes=%llu)", buff_rcv,

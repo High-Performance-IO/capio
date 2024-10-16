@@ -36,7 +36,7 @@ inline void init_client() {
  */
 inline void register_listener(long tid) {
     auto *p_buf_response = new CircularBuffer<capio_off64_t>(
-        SHM_COMM_CHAN_NAME_RESP + std::to_string(tid), CAPIO_REQ_BUFF_CNT, sizeof(off_t));
+        SHM_COMM_CHAN_NAME_RESP + std::to_string(tid), CAPIO_REQ_BUFF_CNT, sizeof(capio_off64_t));
     bufs_response->insert(std::make_pair(tid, p_buf_response));
 }
 
