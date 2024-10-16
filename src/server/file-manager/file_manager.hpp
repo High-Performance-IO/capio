@@ -15,9 +15,9 @@ class CapioFileManager {
 
     static std::string getAndCreateMetadataPath(const std::string &path);
 
-    void _unlockThreadAwaitingCreation(const std::string &path, const std::vector<pid_t> &pids);
+    static void _unlockThreadAwaitingCreation(const std::string &path, const std::vector<pid_t> &pids);
 
-    void _unlockThreadAwaitingData(const std::string &path,
+    static void _unlockThreadAwaitingData(const std::string &path,
                                    std::unordered_map<pid_t, capio_off64_t> &pids_awaiting);
 
   public:

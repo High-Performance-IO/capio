@@ -118,7 +118,7 @@ inline void CapioFileManager::_unlockThreadAwaitingData(
             item = pids_awaiting.erase(item);
 
         } else if (capio_cl_engine->getFireRule(path) == CAPIO_FILE_MODE_NO_UPDATE &&
-                   item->second >= filesize) {
+                   filesize >= item->second) {
             /**
              * if is Fire No Update and there is enough data
              */
