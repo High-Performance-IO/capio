@@ -93,11 +93,11 @@ inline void CapioFileManager::addThreadAwaitingData(const std::string &path, int
  * @param pids_awaiting
  */
 inline void CapioFileManager::_unlockThreadAwaitingData(
-    const std::string &path, std::unordered_map<pid_t, capio_off64_t> *pids_awaiting) const {
+    const std::string &path, std::unordered_map<pid_t, capio_off64_t> &pids_awaiting) const {
     START_LOG(gettid(), "call(path=%s)", path.c_str());
 
     LOG("Path has thread awaiting");
-    for (auto item = pids_awaiting->begin(); item != pids_awaiting->end();) {
+    for (auto item = pids_awaiting.begin(); item != pids_awaiting.end();) {
         LOG("Handling thread");
 
         /**
@@ -119,7 +119,7 @@ inline void CapioFileManager::_unlockThreadAwaitingData(
             client_manager->reply_to_client(item->first, filesize);
             // remove thread from map
             LOG("Removing thread %ld from threads awaiting on data", item->first);
-            item = pids_awaiting->erase(item);
+            item = pids_awaiting.erase(item);
 
         } else if (capio_cl_engine->getFireRule(path) == CAPIO_FILE_MODE_NO_UPDATE &&
                    item->second >= filesize) {
@@ -132,7 +132,7 @@ inline void CapioFileManager::_unlockThreadAwaitingData(
             client_manager->reply_to_client(item->first, filesize);
             // remove thread from map
             LOG("Removing thread %ld from threads awaiting on data", item->first);
-            item = item = pids_awaiting->erase(item);
+            item = item = pids_awaiting.erase(item);
 
         } else if (isCommitted(path)) {
 
@@ -140,7 +140,7 @@ inline void CapioFileManager::_unlockThreadAwaitingData(
             client_manager->reply_to_client(item->first, filesize);
             // remove thread from map
             LOG("Removing thread %ld from threads awaiting on data", item->first);
-            item = item = pids_awaiting->erase(item);
+            item = item = pids_awaiting.erase(item);
         } else {
 
             // DEFAULT: no condition to unlock has occurred, hence wait...
@@ -151,7 +151,7 @@ inline void CapioFileManager::_unlockThreadAwaitingData(
 
     LOG("Completed loops over threads vector for file!");
 
-    if (pids_awaiting->empty()) {
+    if (pids_awaiting.empty()) {
         LOG("There are no threads waiting for path %s. cleaning up map", path.c_str());
         thread_awaiting_data->erase(path);
     }
@@ -344,7 +344,7 @@ inline void CapioFileManager::checkFilesAwaitingCreation() {
 inline void CapioFileManager::checkFileAwaitingData() {
     // NOTE: do not put inside here log code as it will generate a lot of useless log
     std::lock_guard<std::mutex> lg(data_mutex);
-    for (auto &[file, pids_awaiting] : *thread_awaiting_data) {
+    for (auto [file, pids_awaiting] : *thread_awaiting_data) {
         START_LOG(gettid(), "\n\ncall()");
         // no need to check if file exists as this method is called only by read_handler
         // and as such, the file already exists

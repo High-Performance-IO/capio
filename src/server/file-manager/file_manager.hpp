@@ -20,7 +20,7 @@ class CapioFileManager {
                                       const std::vector<pid_t> &pids) const;
 
     void _unlockThreadAwaitingData(const std::string &path,
-                                  std::unordered_map<pid_t, capio_off64_t> *pids_awaiting) const;
+                                  std::unordered_map<pid_t, capio_off64_t> &pids_awaiting) const;
 
   public:
     CapioFileManager() {
