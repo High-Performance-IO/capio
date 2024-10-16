@@ -328,13 +328,14 @@ inline void CapioFileManager::checkFilesAwaitingCreation() {
     // NOTE: do not put inside here log code as it will generate a lot of useless log
     std::lock_guard<std::mutex> lg(creation_mutex);
     for (auto [file, pids] : *thread_awaiting_file_creation) {
-        START_LOG(gettid(), "call()");
         if (std::filesystem::exists(file)) {
+            START_LOG(gettid(), "\n\ncall()");
             LOG("File %s exists. Unlocking thread awaiting for creation", file.c_str());
             file_manager->_unlockThreadAwaitingCreation(file, *pids);
-            LOG("Completed handling.\n\n");
+            LOG("Completed handling.");
         }
     }
+}
 }
 
 /**
@@ -345,13 +346,13 @@ inline void CapioFileManager::checkFileAwaitingData() {
     // NOTE: do not put inside here log code as it will generate a lot of useless log
     std::lock_guard<std::mutex> lg(data_mutex);
     for (auto &[file, pids_awaiting] : *thread_awaiting_data) {
-        START_LOG(gettid(), "call()");
+        START_LOG(gettid(), "\n\ncall()");
         // no need to check if file exists as this method is called only by read_handler
         // and as such, the file already exists
         // actual update, end eventual removal from map is handled by the
         // CapioFileManager class and not by the FileSystemMonitor class
         file_manager->_unlockThreadAwaitingData(file, pids_awaiting);
-        LOG("Completed handling.\n\n");
+        LOG("Completed handling.");
     }
 }
 
