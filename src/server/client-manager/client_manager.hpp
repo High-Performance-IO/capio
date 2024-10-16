@@ -53,7 +53,7 @@ class ClientManager {
      * @param tid
      * @return
      */
-    inline void remove_client(pid_t tid) {
+    inline void remove_client(pid_t tid) const {
         START_LOG(gettid(), "call(tid=%ld)", tid);
         auto it_resp = bufs_response->find(tid);
         if (it_resp != bufs_response->end()) {
@@ -69,7 +69,7 @@ class ClientManager {
      * @param offset
      * @return
      */
-    inline void reply_to_client(pid_t tid, capio_off64_t offset) {
+    inline void reply_to_client(pid_t tid, capio_off64_t offset) const {
         START_LOG(gettid(), "call(tid=%ld, offset=%ld)", tid, offset);
 
         return bufs_response->at(tid)->write(&offset);
@@ -102,7 +102,7 @@ class ClientManager {
      * @param tid
      * @return std::string
      */
-    std::string get_app_name(pid_t tid) const {
+    [[nodiscard]] std::string get_app_name(pid_t tid) const {
         START_LOG(gettid(), "call(tid=%ld)", tid);
         return app_names->at(tid);
     }
