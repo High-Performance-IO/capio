@@ -336,7 +336,6 @@ inline void CapioFileManager::checkFilesAwaitingCreation() {
         }
     }
 }
-}
 
 /**
  * @brief
