@@ -46,11 +46,10 @@ inline uintmax_t CapioFileManager::get_file_size_if_exists(const std::filesystem
  * @param path
  * @param tid
  */
-inline void CapioFileManager::addThreadAwaitingCreation(const std::string &path, pid_t tid) const {
+inline void CapioFileManager::addThreadAwaitingCreation(const std::string &path, pid_t tid) {
     START_LOG(gettid(), "call(path=%s, tid=%ld)", path.c_str(), tid);
     std::lock_guard<std::mutex> lg(creation_mutex);
-    thread_awaiting_file_creation->try_emplace(path, new std::vector<int>);
-    thread_awaiting_file_creation->at(path)->emplace_back(tid);
+    thread_awaiting_file_creation[path].push_back(tid);
 }
 
 /**
@@ -60,12 +59,11 @@ inline void CapioFileManager::addThreadAwaitingCreation(const std::string &path,
  * @param pids
  */
 inline void CapioFileManager::_unlockThreadAwaitingCreation(const std::string &path,
-                                                            const std::vector<pid_t> &pids) const {
+                                                            const std::vector<pid_t> &pids) {
     START_LOG(gettid(), "call(path=%s)", path.c_str());
     for (const auto tid : pids) {
         client_manager->reply_to_client(tid, 1);
     }
-    thread_awaiting_file_creation->erase(path);
 }
 
 /**
@@ -77,12 +75,11 @@ inline void CapioFileManager::_unlockThreadAwaitingCreation(const std::string &p
  * @param expected_size
  */
 inline void CapioFileManager::addThreadAwaitingData(const std::string &path, int tid,
-                                                    size_t expected_size) const {
+                                                    size_t expected_size) {
     START_LOG(gettid(), "call(path=%s, tid=%ld, expected_size=%ld)", path.c_str(), tid,
               expected_size);
     std::lock_guard<std::mutex> lg(data_mutex);
-    thread_awaiting_data->try_emplace(path, new std::unordered_map<pid_t, capio_off64_t>);
-    thread_awaiting_data->at(path)->emplace(tid, expected_size);
+    thread_awaiting_data[path].emplace(tid, expected_size);
 }
 
 /**
@@ -93,7 +90,7 @@ inline void CapioFileManager::addThreadAwaitingData(const std::string &path, int
  * @param pids_awaiting
  */
 inline void CapioFileManager::_unlockThreadAwaitingData(
-    const std::string &path, std::unordered_map<pid_t, capio_off64_t> &pids_awaiting) const {
+    const std::string &path, std::unordered_map<pid_t, capio_off64_t> &pids_awaiting) {
     START_LOG(gettid(), "call(path=%s)", path.c_str());
 
     LOG("Path has thread awaiting");
@@ -153,7 +150,7 @@ inline void CapioFileManager::_unlockThreadAwaitingData(
 
     if (pids_awaiting.empty()) {
         LOG("There are no threads waiting for path %s. cleaning up map", path.c_str());
-        thread_awaiting_data->erase(path);
+        thread_awaiting_data.erase(path);
     }
     LOG("Completed checks");
 }
@@ -327,12 +324,17 @@ inline bool CapioFileManager::isCommitted(const std::filesystem::path &path) {
 inline void CapioFileManager::checkFilesAwaitingCreation() {
     // NOTE: do not put inside here log code as it will generate a lot of useless log
     std::lock_guard<std::mutex> lg(creation_mutex);
-    for (auto [file, pids] : *thread_awaiting_file_creation) {
-        if (std::filesystem::exists(file)) {
+
+    for (auto element = thread_awaiting_file_creation.begin();
+         element != thread_awaiting_file_creation.end();) {
+        if (std::filesystem::exists(element->first)) {
             START_LOG(gettid(), "\n\ncall()");
-            LOG("File %s exists. Unlocking thread awaiting for creation", file.c_str());
-            file_manager->_unlockThreadAwaitingCreation(file, *pids);
+            LOG("File %s exists. Unlocking thread awaiting for creation", element->first.c_str());
+            file_manager->_unlockThreadAwaitingCreation(element->first, element->second);
             LOG("Completed handling.");
+            element = thread_awaiting_file_creation.erase(element);
+        } else {
+            ++element;
         }
     }
 }
@@ -344,13 +346,13 @@ inline void CapioFileManager::checkFilesAwaitingCreation() {
 inline void CapioFileManager::checkFileAwaitingData() {
     // NOTE: do not put inside here log code as it will generate a lot of useless log
     std::lock_guard<std::mutex> lg(data_mutex);
-    for (auto [file, pids_awaiting] : *thread_awaiting_data) {
+    for (auto [file, pids_awaiting] : thread_awaiting_data) {
         START_LOG(gettid(), "\n\ncall()");
         // no need to check if file exists as this method is called only by read_handler
         // and as such, the file already exists
         // actual update, end eventual removal from map is handled by the
         // CapioFileManager class and not by the FileSystemMonitor class
-        file_manager->_unlockThreadAwaitingData(file, *pids_awaiting);
+        file_manager->_unlockThreadAwaitingData(file, pids_awaiting);
         LOG("Completed handling.");
     }
 }
