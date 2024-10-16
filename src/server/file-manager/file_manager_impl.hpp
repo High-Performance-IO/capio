@@ -93,7 +93,6 @@ inline void CapioFileManager::_unlockThreadAwaitingData(
     const std::string &path, std::unordered_map<pid_t, capio_off64_t> &pids_awaiting) {
     START_LOG(gettid(), "call(path=%s)", path.c_str());
 
-    LOG("Path has thread awaiting");
     for (auto item = pids_awaiting.begin(); item != pids_awaiting.end();) {
         LOG("Handling thread");
 
@@ -147,12 +146,6 @@ inline void CapioFileManager::_unlockThreadAwaitingData(
     }
 
     LOG("Completed loops over threads vector for file!");
-
-    if (pids_awaiting.empty()) {
-        LOG("There are no threads waiting for path %s. cleaning up map", path.c_str());
-        thread_awaiting_data.erase(path);
-    }
-    LOG("Completed checks");
 }
 
 /**
@@ -346,13 +339,22 @@ inline void CapioFileManager::checkFilesAwaitingCreation() {
 inline void CapioFileManager::checkFileAwaitingData() {
     // NOTE: do not put inside here log code as it will generate a lot of useless log
     std::lock_guard<std::mutex> lg(data_mutex);
-    for (auto [file, pids_awaiting] : thread_awaiting_data) {
+    for (auto iter = thread_awaiting_data.begin(); iter != thread_awaiting_data.end();) {
         START_LOG(gettid(), "\n\ncall()");
         // no need to check if file exists as this method is called only by read_handler
         // and as such, the file already exists
         // actual update, end eventual removal from map is handled by the
         // CapioFileManager class and not by the FileSystemMonitor class
-        file_manager->_unlockThreadAwaitingData(file, pids_awaiting);
+        file_manager->_unlockThreadAwaitingData(iter->first, iter->second);
+
+        // cleanup of map while iterating over it
+        if (iter->second.empty()) {
+            LOG("There are no threads waiting for path %s. cleaning up map", iter->first.c_str());
+            iter = thread_awaiting_data.erase(iter);
+        } else {
+            LOG("There are threads waiting for path %s. SKIPPING CLEANUP", iter->first.c_str());
+            ++iter;
+        }
         LOG("Completed handling.");
     }
 }
