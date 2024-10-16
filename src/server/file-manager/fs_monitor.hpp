@@ -30,24 +30,9 @@ class FileSystemMonitor {
         sleep.tv_nsec = 300; // sleep 0.3 seconds
         while (*continue_execution) {
 
-            for (const auto &file : file_manager->getFileAwaitingCreation()) {
-                if (std::filesystem::exists(file)) {
-                    LOG("File %s exists. Unlocking thread awaiting for creation", file.c_str());
-                    file_manager->unlockThreadAwaitingCreation(file);
-                    file_manager->deleteFileAwaitingCreation(file);
-                    LOG("Completed handling.\n\n");
-                }
-            }
+            file_manager->checkFilesAwaitingCreation();
 
-            for (auto &file : file_manager->getFileAwaitingData()) {
-                if (std::filesystem::exists(file)) {
-                    LOG("File %s exists. Checking if enough data is available", file.c_str());
-                    // actual update, end eventual removal from map is handled by the
-                    // CapioFileManager class and not by the FileSystemMonitor class
-                    file_manager->checkAndUnlockThreadAwaitingData(file);
-                    LOG("Completed handling.\n\n");
-                }
-            }
+            file_manager->checkFileAwaitingData();
 
             nanosleep(&sleep, nullptr);
         }
