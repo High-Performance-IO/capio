@@ -101,8 +101,8 @@ inline void CapioFileManager::_unlockThreadAwaitingData(
          * should be triggered only if the file is a directory and the rule specified on it is
          * Fire No Update
          */
-        const bool is_directory = std::filesystem::is_directory(path);
-        uintmax_t filesize      = is_directory ? ULLONG_MAX : get_file_size_if_exists(path);
+        const bool is_directory  = std::filesystem::is_directory(path);
+        const uintmax_t filesize = is_directory ? ULLONG_MAX : get_file_size_if_exists(path);
         /*
          * Check for file size only if it is directory, otherwise,
          * return the max allowed size, to allow the process to continue.
@@ -112,7 +112,10 @@ inline void CapioFileManager::_unlockThreadAwaitingData(
 
         if (capio_cl_engine->isProducer(path, item->first)) {
             LOG("Thread %ld can be unlocked as thread is producer", item->first);
-            client_manager->reply_to_client(item->first, filesize);
+            // if producer, return the file as commutted to allow to execute operations without
+            // being interrupted
+            // todo: this might be an issue later. not shure yet
+            client_manager->reply_to_client(item->first, ULLONG_MAX);
             // remove thread from map
             LOG("Removing thread %ld from threads awaiting on data", item->first);
             item = pids_awaiting.erase(item);
@@ -133,7 +136,7 @@ inline void CapioFileManager::_unlockThreadAwaitingData(
         } else if (isCommitted(path)) {
 
             LOG("Thread %ld can be unlocked as file is committed", item->first);
-            client_manager->reply_to_client(item->first, filesize);
+            client_manager->reply_to_client(item->first, ULLONG_MAX);
             // remove thread from map
             LOG("Removing thread %ld from threads awaiting on data", item->first);
             item = item = pids_awaiting.erase(item);
