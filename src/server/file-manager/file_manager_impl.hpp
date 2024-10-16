@@ -350,7 +350,7 @@ inline void CapioFileManager::checkFileAwaitingData() {
         // and as such, the file already exists
         // actual update, end eventual removal from map is handled by the
         // CapioFileManager class and not by the FileSystemMonitor class
-        file_manager->_unlockThreadAwaitingData(file, pids_awaiting);
+        file_manager->_unlockThreadAwaitingData(file, *pids_awaiting);
         LOG("Completed handling.");
     }
 }
