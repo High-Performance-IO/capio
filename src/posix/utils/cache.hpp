@@ -140,6 +140,7 @@ class ConsentRequestCache {
         buf_requests->write(req, CAPIO_REQ_MAX_SIZE);
         capio_off64_t res;
         bufs_response->at(tid)->read(&res);
+        LOG("Obtained from server %llu", res);
         return res;
     }
 
