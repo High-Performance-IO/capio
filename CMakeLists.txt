@@ -4,7 +4,7 @@
 cmake_minimum_required(VERSION 3.15)
 
 # Define project name and description
-project(capio
+project(capio-fs
         LANGUAGES CXX
         DESCRIPTION "Cross-Application Programmable I/O"
         VERSION 1.0.0
@@ -20,6 +20,11 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS TRUE)
 # Set compiler flags
 set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -Wall -pedantic -O0")
 set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -O3")
+
+# Silence warning from clang
+if (CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
+    set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -Wall -pedantic -O0 -Wno-gnu-zero-variadic-macro-arguments")
+endif (CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
 
 #####################################
 # Options
@@ -37,7 +42,6 @@ include(GNUInstallDirs)
 #####################################
 # Dependencies
 #####################################
-find_package(MPI REQUIRED)
 find_package(Threads REQUIRED)
 
 #####################################
@@ -73,6 +77,7 @@ ENDIF (CAPIO_LOG AND CMAKE_BUILD_TYPE STREQUAL "Debug")
 #####################################
 add_subdirectory(src/posix)
 add_subdirectory(src/server)
+add_subdirectory(src/capioctl)
 
 IF (CAPIO_BUILD_TESTS)
     message(STATUS "Building CAPIO test suite")

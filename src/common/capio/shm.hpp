@@ -27,15 +27,16 @@
 
 #define SHM_DESTROY_CHECK(source_name)                                                             \
     if (shm_unlink(source_name) == -1) {                                                           \
-        std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_WARNING << "Unable to destroy shared mem: '"       \
-                  << source_name << "' (" << strerror(errno) << ")" << std::endl;                  \
+        std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_WARNING << " [ " << node_name << " ] "             \
+                  << "Unable to destroy shared mem: '" << source_name << "' (" << strerror(errno)  \
+                  << ")" << std::endl;                                                             \
     };
 
 #define SHM_CREATE_CHECK(condition, source)                                                        \
     if (condition) {                                                                               \
         LOG("error while creating %s", source);                                                    \
-        std::cout << CAPIO_SERVER_CLI_LOG_SERVER_ERROR << "Unable to create shm: " << source       \
-                  << std::endl;                                                                    \
+        std::cout << CAPIO_SERVER_CLI_LOG_SERVER_ERROR << " [ " << node_name << " ] "              \
+                  << "Unable to create shm: " << source << std::endl;                              \
         ERR_EXIT("Unable to open shm: %s", source);                                                \
     };
 
@@ -66,9 +67,9 @@ class CapioShmCanary {
 
     ~CapioShmCanary() {
         START_LOG(capio_syscall(SYS_gettid), "call()");
-#ifndef __CAPIO_POSIx
-        std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_WARNING << "Removing shared memory canary flag"
-                  << std::endl;
+#ifndef __CAPIO_POSIX
+        std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_WARNING << " [ " << node_name << " ] "
+                  << "Removing shared memory canary flag" << std::endl;
 #endif
         close(_shm_id);
         SHM_DESTROY_CHECK(_canary_name.c_str());

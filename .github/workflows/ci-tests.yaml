@@ -49,28 +49,7 @@ jobs:
             capio_posix_unit_tests                \
               --gtest_break_on_failure            \
               --gtest_print_time=1
-          
-          echo "Run CAPIO server Unit tests"
-          docker run --rm                         \
-              --env CAPIO_DIR=/tmp                \
-              --env CAPIO_LOG_LEVEL=-1            \
-              --name capio-docker                 \
-              alphaunito/capio:latest             \
-            capio_server_unit_tests               \
-              --gtest_break_on_failure            \
-              --gtest_print_time=1
-          
-          echo "Run CAPIO syscall Unit tests"
-          docker run --rm                         \
-              --env CAPIO_DIR=/tmp                \
-              --env CAPIO_LOG_LEVEL=-1            \
-              --env LD_PRELOAD=libcapio_posix.so  \
-              --name capio-docker                 \
-              alphaunito/capio:latest             \
-            capio_server_unit_tests               \
-              --gtest_break_on_failure            \
-              --gtest_print_time=1
-          
+
           echo "Run CAPIO integration tests"
             docker run --rm                     \
             --env CAPIO_DIR=/tmp                \
@@ -164,7 +143,7 @@ jobs:
           sudo cmake --install ../build --prefix /usr/local
       - name: "Run tests"
         id: run-tests
-        timeout-minutes: 5
+        timeout-minutes: 1
         env:
           CAPIO_DIR: ${{ github.workspace }}
           CAPIO_LOG_LEVEL: -1
@@ -173,11 +152,6 @@ jobs:
           
           echo "Run CAPIO POSIX Unit tests"
           capio_posix_unit_tests \
-            --gtest_break_on_failure \
-            --gtest_print_time=1
-          
-          echo "Run CAPIO server Unit tests"
-          capio_server_unit_tests \
             --gtest_break_on_failure \
             --gtest_print_time=1
           

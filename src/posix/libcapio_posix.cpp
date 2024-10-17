@@ -360,12 +360,12 @@ static int hook(long syscall_number, long arg0, long arg1, long arg2, long arg3,
         return 1;
     }
 
+    LOG("Handling syscall NO %ld (max num is %ld)", syscall_number, CAPIO_NR_SYSCALLS);
     return syscallTable[syscall_number](arg0, arg1, arg2, arg3, arg4, arg5, result);
 }
 
 static __attribute__((constructor)) void init() {
     init_client();
-    init_data_plane();
     init_filesystem();
     init_threading_support();
 
