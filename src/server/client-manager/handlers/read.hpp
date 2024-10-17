@@ -36,6 +36,7 @@ inline void read_handler(const char *const str) {
         LOG("File can be consumed as it is either the producer, or the fire rule is FNU and there "
             "is enough data");
         client_manager->reply_to_client(tid, file_size);
+        return;
     }
 
     /**
@@ -45,6 +46,7 @@ inline void read_handler(const char *const str) {
     if (CapioFileManager::isCommitted(path)) {
         LOG("File is committed, and hence can be consumed");
         client_manager->reply_to_client(tid, ULLONG_MAX);
+        return;
     }
 
     /**

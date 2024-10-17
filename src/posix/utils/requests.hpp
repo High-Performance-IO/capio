@@ -87,6 +87,7 @@ inline void handshake_named_request(const long tid, const long pid, const std::s
 inline void open_request(const int fd, const std::filesystem::path &path, const long tid) {
     START_LOG(capio_syscall(SYS_gettid), "call(fd=%ld, path=%s, tid=%ld)", fd, path.c_str(), tid);
     write_request_cache->flush(tid);
+
     char req[CAPIO_REQ_MAX_SIZE];
     sprintf(req, "%04d %ld %d %s", CAPIO_REQUEST_OPEN, tid, fd, path.c_str());
     buf_requests->write(req, CAPIO_REQ_MAX_SIZE);
