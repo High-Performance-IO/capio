@@ -128,6 +128,12 @@ inline void setup_posix_log_filename() {
 }
 #endif
 
+inline long long current_time_in_millis() {
+    timespec ts{};
+    capio_syscall(SYS_clock_gettime, CLOCK_REALTIME, &ts);
+    return static_cast<long long>(ts.tv_sec) * 1000 + (ts.tv_nsec) / 1000000;
+}
+
 inline void log_write_to(char *buffer, size_t bufflen) {
 #ifdef __CAPIO_POSIX
     if (current_log_level < CAPIO_MAX_LOG_LEVEL || CAPIO_MAX_LOG_LEVEL < 0) {
@@ -203,8 +209,7 @@ class Logger {
 
         va_list argp, argpc;
 
-        sprintf(format, CAPIO_LOG_PRE_MSG, this->invoker,
-                static_cast<unsigned long>(time(nullptr)));
+        sprintf(format, CAPIO_LOG_PRE_MSG, current_time_in_millis(), this->invoker);
         size_t pre_msg_len = strlen(format);
 
         strcpy(format + pre_msg_len, message);
@@ -242,8 +247,7 @@ class Logger {
 
     inline ~Logger() {
         current_log_level--;
-        sprintf(format, CAPIO_LOG_PRE_MSG, this->invoker,
-                static_cast<unsigned long>(time(nullptr)));
+        sprintf(format, CAPIO_LOG_PRE_MSG, current_time_in_millis(), this->invoker);
         size_t pre_msg_len = strlen(format);
         strcpy(format + pre_msg_len, "returned");
 
@@ -259,8 +263,7 @@ class Logger {
     inline void log(const char *message, ...) {
         va_list argp, argpc;
 
-        sprintf(format, CAPIO_LOG_PRE_MSG, this->invoker,
-                static_cast<unsigned long>(time(nullptr)));
+        sprintf(format, CAPIO_LOG_PRE_MSG, current_time_in_millis(), this->invoker);
         size_t pre_msg_len = strlen(format);
 
         strcpy(format + pre_msg_len, message);
