@@ -91,9 +91,10 @@ class ReadRequestCache {
             current_path = std::move(path);
             current_fd   = fd;
 
-            if (available_read_cache->find(current_path) != available_read_cache->end()) {
+            auto item = available_read_cache->find(current_path);
+            if (item != available_read_cache->end()) {
                 LOG("[cache] Found file entry in cache");
-                max_read = available_read_cache->at(current_path);
+                max_read = item->second;
             } else {
                 LOG("[cache] Entry not found, initializing new entry to offset 0");
                 max_read = 0;
