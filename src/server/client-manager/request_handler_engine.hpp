@@ -93,8 +93,8 @@ class RequestHandlerEngine {
      * the posix clients (aggregated) and handle the response
      *
      */
-    [[noreturn]] void start() {
-        START_LOG(gettid(), "call()");
+    [[noreturn]] void start() const {
+        START_LOG(gettid(), "call()\n\n");
 
         auto str = std::unique_ptr<char[]>(new char[CAPIO_REQ_MAX_SIZE]);
         while (true) {

@@ -38,7 +38,7 @@ constexpr char LOG_CAPIO_START_REQUEST[]             = "\n+++++++++++ SYSCALL %s
 constexpr char LOG_CAPIO_END_REQUEST[]               = "----------- END SYSCALL ----------\n";
 constexpr char CAPIO_SERVER_LOG_START_REQUEST_MSG[] = "\n+++++++++++++++++REQUEST+++++++++++++++++";
 constexpr char CAPIO_SERVER_LOG_END_REQUEST_MSG[]   = "~~~~~~~~~~~~~~~END REQUEST~~~~~~~~~~~~~~~";
-constexpr int CAPIO_LOG_MAX_MSG_LEN                 = 2048;
+constexpr int CAPIO_LOG_MAX_MSG_LEN                 = 4096;
 
 // CAPIO streaming semantics
 constexpr char CAPIO_FILE_MODE_NO_UPDATE[]           = "no_update";
@@ -54,7 +54,7 @@ constexpr int CAPIO_POSIX_SYSCALL_SKIP         = 1;
 constexpr int CAPIO_POSIX_SYSCALL_SUCCESS      = 0;
 
 // CAPIO logger - common
-constexpr char CAPIO_LOG_PRE_MSG[]        = "at[%s]: ";
+constexpr char CAPIO_LOG_PRE_MSG[]        = "at[%.15lu][%.40s]: ";
 constexpr char CAPIO_DEFAULT_LOG_FOLDER[] = "capio_logs\0";
 
 // CAPIO common - shared memory constant names

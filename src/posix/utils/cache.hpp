@@ -91,9 +91,10 @@ class ReadRequestCache {
             current_path = std::move(path);
             current_fd   = fd;
 
-            if (available_read_cache->find(current_path) != available_read_cache->end()) {
+            auto item = available_read_cache->find(current_path);
+            if (item != available_read_cache->end()) {
                 LOG("[cache] Found file entry in cache");
-                max_read = available_read_cache->at(current_path);
+                max_read = item->second;
             } else {
                 LOG("[cache] Entry not found, initializing new entry to offset 0");
                 max_read = 0;
@@ -140,6 +141,7 @@ class ConsentRequestCache {
         buf_requests->write(req, CAPIO_REQ_MAX_SIZE);
         capio_off64_t res;
         bufs_response->at(tid)->read(&res);
+        LOG("Obtained from server %llu", res);
         return res;
     }
 
@@ -161,8 +163,9 @@ class ConsentRequestCache {
          */
         if (available_consent->find(path) == available_consent->end()) {
             LOG("File not present in cache. performing request");
+            auto res = ConsentRequestCache::_consent_to_proceed_request(path, tid, source_func);
             LOG("Registering new file for consent to proceed");
-            available_consent->emplace(path, _consent_to_proceed_request(path, tid, source_func));
+            available_consent->emplace(path, res);
         }
         LOG("Unlocking thread");
     }

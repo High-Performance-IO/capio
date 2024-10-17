@@ -22,8 +22,15 @@ inline void write_handler(const char *const str) {
         return;
     }
 
+    /**
+     * File needs to be handled, however, to not overload the client manager thread, on which
+     * this function is being called, the function checkAndUnlockThreadAwaitingData is not
+     * being called, as worst case scenario after 300ms the FSMonitor thread will catch the
+     * occurrence of the write and handle it. TODO: possibly find a low overhead way to improve on
+     * this
+     */
     LOG("File needs to be handled");
-    file_manager->checkAndUnlockThreadAwaitingData(path);
+    // file_manager->checkAndUnlockThreadAwaitingData(path);
 }
 
 #endif // WRITE_HPP

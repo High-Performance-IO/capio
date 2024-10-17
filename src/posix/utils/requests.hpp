@@ -36,7 +36,7 @@ inline void init_client() {
  */
 inline void register_listener(long tid) {
     auto *p_buf_response = new CircularBuffer<capio_off64_t>(
-        SHM_COMM_CHAN_NAME_RESP + std::to_string(tid), CAPIO_REQ_BUFF_CNT, sizeof(off_t));
+        SHM_COMM_CHAN_NAME_RESP + std::to_string(tid), CAPIO_REQ_BUFF_CNT, sizeof(capio_off64_t));
     bufs_response->insert(std::make_pair(tid, p_buf_response));
 }
 
@@ -87,11 +87,13 @@ inline void handshake_named_request(const long tid, const long pid, const std::s
 inline void open_request(const int fd, const std::filesystem::path &path, const long tid) {
     START_LOG(capio_syscall(SYS_gettid), "call(fd=%ld, path=%s, tid=%ld)", fd, path.c_str(), tid);
     write_request_cache->flush(tid);
+
     char req[CAPIO_REQ_MAX_SIZE];
     sprintf(req, "%04d %ld %d %s", CAPIO_REQUEST_OPEN, tid, fd, path.c_str());
     buf_requests->write(req, CAPIO_REQ_MAX_SIZE);
     capio_off64_t res;
     bufs_response->at(tid)->read(&res);
+    LOG("Obtained from server %llu", res);
 }
 
 // non blocking

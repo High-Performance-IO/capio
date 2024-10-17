@@ -46,41 +46,24 @@ inline uintmax_t CapioFileManager::get_file_size_if_exists(const std::filesystem
  * @param path
  * @param tid
  */
-inline void CapioFileManager::addThreadAwaitingCreation(const std::string &path, pid_t tid) const {
+inline void CapioFileManager::addThreadAwaitingCreation(const std::string &path, pid_t tid) {
     START_LOG(gettid(), "call(path=%s, tid=%ld)", path.c_str(), tid);
-    std::lock_guard<std::mutex> lg(threads_mutex);
-    thread_awaiting_file_creation->try_emplace(path, new std::vector<int>);
-    thread_awaiting_file_creation->at(path)->emplace_back(tid);
+    std::lock_guard<std::mutex> lg(creation_mutex);
+    thread_awaiting_file_creation[path].push_back(tid);
 }
 
 /**
  * @brief Awakes all threads waiting for the creation of a file
  *
  * @param path file that has just been created
+ * @param pids
  */
-inline void CapioFileManager::unlockThreadAwaitingCreation(const std::string &path) const {
+inline void CapioFileManager::_unlockThreadAwaitingCreation(const std::string &path,
+                                                            const std::vector<pid_t> &pids) {
     START_LOG(gettid(), "call(path=%s)", path.c_str());
-    std::lock_guard<std::mutex> lg(threads_mutex);
-    if (thread_awaiting_file_creation->find(path) != thread_awaiting_file_creation->end()) {
-        auto th = thread_awaiting_file_creation->at(path);
-        for (auto tid : *th) {
-            client_manager->reply_to_client(tid, 1);
-        }
+    for (const auto tid : pids) {
+        client_manager->reply_to_client(tid, 1);
     }
-    thread_awaiting_file_creation->erase(path);
-}
-
-/**
- * @brief Remove a file from the list of files for which at least a thread is waiting. if some
- * thread are still waiting they will be removed and hence go into deadlock indefinitely. This
- * method should only be called after awaking all waiting threads
- *
- * @param path
- */
-inline void CapioFileManager::deleteFileAwaitingCreation(const std::string &path) const {
-    START_LOG(gettid(), "call(path=%s)", path.c_str());
-    std::lock_guard<std::mutex> lg(threads_mutex);
-    thread_awaiting_file_creation->erase(path);
 }
 
 /**
@@ -92,12 +75,11 @@ inline void CapioFileManager::deleteFileAwaitingCreation(const std::string &path
  * @param expected_size
  */
 inline void CapioFileManager::addThreadAwaitingData(const std::string &path, int tid,
-                                                    size_t expected_size) const {
+                                                    size_t expected_size) {
     START_LOG(gettid(), "call(path=%s, tid=%ld, expected_size=%ld)", path.c_str(), tid,
               expected_size);
     std::lock_guard<std::mutex> lg(data_mutex);
-    thread_awaiting_data->try_emplace(path, new std::unordered_map<pid_t, capio_off64_t>);
-    thread_awaiting_data->at(path)->emplace(tid, expected_size);
+    thread_awaiting_data[path].emplace(tid, expected_size);
 }
 
 /**
@@ -105,61 +87,68 @@ inline void CapioFileManager::addThreadAwaitingData(const std::string &path, int
  * one if enough data has been produced. If so, unlock and remove the thread
  *
  * @param path
+ * @param pids_awaiting
  */
-inline void CapioFileManager::checkAndUnlockThreadAwaitingData(const std::string &path) const {
+inline void CapioFileManager::_unlockThreadAwaitingData(
+    const std::string &path, std::unordered_map<pid_t, capio_off64_t> &pids_awaiting) {
     START_LOG(gettid(), "call(path=%s)", path.c_str());
-    LOG("Before lockguard");
-    std::lock_guard lg(data_mutex);
-    LOG("Acquired lockguard");
-    if (thread_awaiting_data->find(path) != thread_awaiting_data->end()) {
-        LOG("Path has thread awaiting");
-        auto threads = thread_awaiting_data->at(path);
-        LOG("Obtained threads");
-        for (auto item = threads->begin(); item != threads->end();) {
-            LOG("Handling thread");
-            uintmax_t filesize = -1;
 
-            filesize = std::filesystem::is_directory(path) ? -1 : get_file_size_if_exists(path);
+    for (auto item = pids_awaiting.begin(); item != pids_awaiting.end();) {
+        LOG("Handling thread");
 
-            const bool committed       = isCommitted(path);
-            const bool file_size_check = item->first >= filesize;
-            const bool is_fnu = capio_cl_engine->getFireRule(path) == CAPIO_FILE_MODE_NO_UPDATE;
-            const bool is_producer    = capio_cl_engine->isProducer(path, item->first);
-            const bool lock_condition = committed || is_producer || (file_size_check && is_fnu);
+        /**
+         * if the file is a directory, allow to continue by returning ULLONG_MAX. This behaviour
+         * should be triggered only if the file is a directory and the rule specified on it is
+         * Fire No Update
+         */
+        const bool is_directory  = std::filesystem::is_directory(path);
+        const uintmax_t filesize = is_directory ? ULLONG_MAX : get_file_size_if_exists(path);
+        /*
+         * Check for file size only if it is directory, otherwise,
+         * return the max allowed size, to allow the process to continue.
+         * This is caused by the fact that std::filesystem::file_size is
+         * implementation defined when invoked on directories
+         */
 
-            LOG("( committed(%s) || is_producer(%s) ||  ( file_size_check(%s) && is_fnu(%s) ) )",
-                committed ? "true" : "false", is_producer ? "true" : "false",
-                file_size_check ? "true" : "false", is_fnu ? "true" : "false");
+        if (capio_cl_engine->isProducer(path, item->first)) {
+            LOG("Thread %ld can be unlocked as thread is producer", item->first);
+            // if producer, return the file as committed to allow to execute operations without
+            // being interrupted
+            // todo: this might be an issue later. not sure yet
+            client_manager->reply_to_client(item->first, ULLONG_MAX);
+            // remove thread from map
+            LOG("Removing thread %ld from threads awaiting on data", item->first);
+            item = pids_awaiting.erase(item);
 
-            LOG("Evaluation of expression: %s", lock_condition ? "TRUE" : "FALSE");
+        } else if (capio_cl_engine->getFireRule(path) == CAPIO_FILE_MODE_NO_UPDATE &&
+                   filesize >= item->second) {
+            /**
+             * if is Fire No Update and there is enough data
+             */
+            LOG("Thread %ld can be unlocked as mode is FNU AND there is enough data  to serve "
+                "(%llu bytes available. Requested %llu)",
+                item->first, filesize, item->second);
+            client_manager->reply_to_client(item->first, filesize);
+            // remove thread from map
+            LOG("Removing thread %ld from threads awaiting on data", item->first);
+            item = item = pids_awaiting.erase(item);
 
-            if (lock_condition) {
-                LOG("Thread %ld can be unlocked", item->first);
-                /*
-                 * Check for file size only if it is directory, otherwise,
-                 * return the max allowed size, to allow the process to continue.
-                 * This is caused by the fact that std::filesystem::file_size is
-                 * implementation defined when invoked on directories
-                 */
-                client_manager->reply_to_client(
-                    item->first, std::filesystem::is_directory(path) ? ULLONG_MAX : filesize);
-                // remove thread from map
-                LOG("Removing thread %ld from threads awaiting on data", item->first);
-                item = threads->erase(item);
-            } else {
-                LOG("Waiting threads cannot yet be unlocked");
-                ++item;
-            }
+        } else if (isCommitted(path)) {
+
+            LOG("Thread %ld can be unlocked as file is committed", item->first);
+            client_manager->reply_to_client(item->first, ULLONG_MAX);
+            // remove thread from map
+            LOG("Removing thread %ld from threads awaiting on data", item->first);
+            item = item = pids_awaiting.erase(item);
+        } else {
+
+            // DEFAULT: no condition to unlock has occurred, hence wait...
+            LOG("Waiting threads cannot yet be unlocked");
+            ++item;
         }
-
-        LOG("Completed loops over threads vector for file!");
-
-        if (threads->empty()) {
-            LOG("There are no threads waiting for path %s. cleaning up map", path.c_str());
-            thread_awaiting_data->erase(path);
-        }
-        LOG("Completed checks");
     }
+
+    LOG("Completed loops over threads vector for file!");
 }
 
 /**
@@ -195,15 +184,13 @@ inline void CapioFileManager::increaseCloseCount(const std::filesystem::path &pa
  *
  * @param path
  */
-inline void CapioFileManager::setCommitted(const std::filesystem::path &path) const {
+inline void CapioFileManager::setCommitted(const std::filesystem::path &path) {
     START_LOG(gettid(), "call(path=%s)", path.c_str());
     auto metadata_path = getAndCreateMetadataPath(path);
     LOG("Creating token %s", metadata_path.c_str());
     auto fd = open(metadata_path.c_str(), O_CREAT | S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH, 0664);
     LOG("Token fd = %d", fd);
     close(fd);
-    checkAndUnlockThreadAwaitingData(path);
-    unlockThreadAwaitingCreation(path);
 }
 
 /**
@@ -212,7 +199,7 @@ inline void CapioFileManager::setCommitted(const std::filesystem::path &path) co
  *
  * @param tid
  */
-inline void CapioFileManager::setCommitted(const pid_t tid) const {
+inline void CapioFileManager::setCommitted(const pid_t tid) {
     START_LOG(gettid(), "call(tid=%d)", tid);
     auto files = client_manager->get_produced_files(tid);
     for (const auto &file : *files) {
@@ -234,7 +221,7 @@ inline bool CapioFileManager::isCommitted(const std::filesystem::path &path) {
      * Hash map to store committed files to avoid recomputing the commit state of a given file
      * Files inside here are inserted only when they are committed
      */
-    static args::detail::unordered_map<std::string, bool> committed_files;
+    static std::unordered_map<std::string, bool> committed_files;
 
     if (committed_files.find(path) != committed_files.end()) {
         return true;
@@ -262,7 +249,7 @@ inline bool CapioFileManager::isCommitted(const std::filesystem::path &path) {
         return false;
     }
 
-    // if is file
+    // if file
     LOG("Path is a file");
     std::string metadata_computed_path = getAndCreateMetadataPath(path);
     LOG("Computed metadata file path is %s", metadata_computed_path.c_str());
@@ -327,33 +314,53 @@ inline bool CapioFileManager::isCommitted(const std::filesystem::path &path) {
 }
 
 /**
- * @brief Return the files that have at least one process waiting for its creation
+ * @brief Check for threads awaiting file creation and unlock threads waiting on them
  *
- * @return std::vector<std::string>
  */
-inline std::vector<std::string> CapioFileManager::getFileAwaitingCreation() const {
+inline void CapioFileManager::checkFilesAwaitingCreation() {
     // NOTE: do not put inside here log code as it will generate a lot of useless log
-    std::lock_guard<std::mutex> lg(threads_mutex);
-    std::vector<std::string> keys;
-    for (auto itm : *thread_awaiting_file_creation) {
-        keys.emplace_back(itm.first);
+    std::lock_guard<std::mutex> lg(creation_mutex);
+
+    for (auto element = thread_awaiting_file_creation.begin();
+         element != thread_awaiting_file_creation.end();) {
+        if (std::filesystem::exists(element->first)) {
+            START_LOG(gettid(), "\n\ncall()");
+            LOG("File %s exists. Unlocking thread awaiting for creation", element->first.c_str());
+            CapioFileManager::_unlockThreadAwaitingCreation(element->first, element->second);
+            LOG("Completed handling.");
+            element = thread_awaiting_file_creation.erase(element);
+        } else {
+            ++element;
+        }
     }
-    return keys;
 }
 
 /**
- * @brief Return a list of files for which there is a thread waiting for data to be produced
+ * @brief check if there are threads waiting for data, and for each one of them check if the file
+ * has enough data
  *
- * @return std::vector<std::string>
  */
-inline std::vector<std::string> CapioFileManager::getFileAwaitingData() const {
+inline void CapioFileManager::checkFileAwaitingData() {
     // NOTE: do not put inside here log code as it will generate a lot of useless log
     std::lock_guard<std::mutex> lg(data_mutex);
-    std::vector<std::string> keys;
-    for (auto itm : *thread_awaiting_data) {
-        keys.emplace_back(itm.first);
+    for (auto iter = thread_awaiting_data.begin(); iter != thread_awaiting_data.end();) {
+        START_LOG(gettid(), "\n\ncall()");
+        // no need to check if file exists as this method is called only by read_handler
+        // and as such, the file already exists
+        // actual update, end eventual removal from map is handled by the
+        // CapioFileManager class and not by the FileSystemMonitor class
+        CapioFileManager::_unlockThreadAwaitingData(iter->first, iter->second);
+
+        // cleanup of map while iterating over it
+        if (iter->second.empty()) {
+            LOG("There are no threads waiting for path %s. cleaning up map", iter->first.c_str());
+            iter = thread_awaiting_data.erase(iter);
+        } else {
+            LOG("There are threads waiting for path %s. SKIPPING CLEANUP", iter->first.c_str());
+            ++iter;
+        }
+        LOG("Completed handling.");
     }
-    return keys;
 }
 
 #endif // FILE_MANAGER_HPP

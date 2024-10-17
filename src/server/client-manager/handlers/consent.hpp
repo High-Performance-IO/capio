@@ -14,10 +14,8 @@ inline void consent_to_proceed_handler(const char *const str) {
     sscanf(str, "%d %s %s", &tid, path, source_func);
     START_LOG(gettid(), "call(tid=%d, path=%s, source=%s)", tid, path, source_func);
 
-    std::filesystem::path path_fs(path);
-
     // Skip operations on CAPIO_DIR
-    if (!CapioCLEngine::fileToBeHandled(path_fs)) {
+    if (!CapioCLEngine::fileToBeHandled(path)) {
         LOG("Ignore calls as file should not be treated by CAPIO");
         client_manager->reply_to_client(tid, 1);
         return;
@@ -28,23 +26,27 @@ inline void consent_to_proceed_handler(const char *const str) {
         return;
     }
 
-    // TODO: check this expression as being the correct evaluation one
-    // NOTE: expression is (exists AND (committed OR no_update))
+    if (!std::filesystem::exists(path)) {
+        LOG("Requested file %s does not exists yet. awaiting for creation", path);
+        file_manager->addThreadAwaitingCreation(path, tid);
+        return;
+    }
 
-    bool exists    = std::filesystem::exists(path);
-    bool committed = CapioFileManager::isCommitted(path);
-    bool firable   = capio_cl_engine->getFireRule(path) == CAPIO_FILE_MODE_NO_UPDATE;
+    if (capio_cl_engine->getFireRule(path) == CAPIO_FILE_MODE_NO_UPDATE) {
+        LOG("Mode for file %s is no_update. allowing process to continue");
+        client_manager->reply_to_client(tid, 1);
+        return;
+    }
 
-    LOG("exists=%s, committed=%s, firable=%s", exists ? "true" : "false",
-        committed ? "true" : "false", firable ? "true" : "false");
-
-    if (exists && (committed || firable)) {
+    if (CapioFileManager::isCommitted(path)) {
         LOG("It is possible to unlock waiting thread");
         client_manager->reply_to_client(tid, 1);
-    } else {
-        LOG("Requested file %s does not exists yet. awaiting for creation", path);
-        file_manager->addThreadAwaitingData(path, tid, 0);
+        return;
     }
+
+    LOG("File %s is not yet committed. Adding to threads waiting for committed with  ULLONG_MAX",
+        path);
+    file_manager->addThreadAwaitingData(path, tid, ULLONG_MAX);
 }
 
 #endif // CONSENT_HPP
