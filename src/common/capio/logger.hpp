@@ -130,8 +130,14 @@ inline void setup_posix_log_filename() {
 
 inline long long current_time_in_millis() {
     timespec ts{};
+    static long long start_time = -1;
+    if (start_time == -1) {
+        capio_syscall(SYS_clock_gettime, CLOCK_REALTIME, &ts);
+        start_time = static_cast<long long>(ts.tv_sec) * 1000 + (ts.tv_nsec) / 1000000;
+    }
     capio_syscall(SYS_clock_gettime, CLOCK_REALTIME, &ts);
-    return static_cast<long long>(ts.tv_sec) * 1000 + (ts.tv_nsec) / 1000000;
+    auto time_now = static_cast<long long>(ts.tv_sec) * 1000 + (ts.tv_nsec) / 1000000;
+    return time_now - start_time;
 }
 
 inline void log_write_to(char *buffer, size_t bufflen) {
