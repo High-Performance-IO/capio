@@ -19,7 +19,7 @@ inline void exit_handler(const char *const str) {
      * to a file that might have already been closing (hence increasing the close count by an extra
      * close
      */
-    file_manager->setCommitted(tid);
+    CapioFileManager::setCommitted(tid);
     client_manager->remove_client(tid);
 }
 
