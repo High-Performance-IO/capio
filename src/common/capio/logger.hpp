@@ -9,12 +9,11 @@
 #include <string>
 #include <sys/mman.h>
 #include <unistd.h>
-#include <utility>
 
 #include "constants.hpp"
 #include "syscall.hpp"
 
-bool continue_on_error = false; // change behaviour of ERR_EXIT to continue if set to true
+inline bool continue_on_error = false; // change behaviour of ERR_EXIT to continue if set to true
 
 #if defined(CAPIO_LOG) && defined(__CAPIO_POSIX)
 #include "syscallnames.h"
@@ -22,24 +21,25 @@ bool continue_on_error = false; // change behaviour of ERR_EXIT to continue if s
 
 #ifndef __CAPIO_POSIX
 #include <filesystem>
-thread_local std::ofstream logfile; // if building for server, self contained logfile
+thread_local std::ofstream logfile; // if building for server, self-contained logfile
 std::string log_master_dir_name = CAPIO_DEFAULT_LOG_FOLDER;
 std::string logfile_prefix      = CAPIO_SERVER_DEFAULT_LOG_FILE_PREFIX;
 #else
-thread_local bool logfileOpen = false;
-thread_local int logfileFD    = -1;
-thread_local char logfile_path[PATH_MAX]{'\0'};
+inline thread_local bool logfileOpen = false;
+inline thread_local int logfileFD    = -1;
+inline thread_local char logfile_path[PATH_MAX]{'\0'};
 #endif
 
-thread_local int current_log_level = 0;
-thread_local bool logging_syscall  = false; // this variable tells the logger that syscall logging
-                                            // has started and we are not in setup phase
+inline thread_local int current_log_level = 0;
+inline thread_local bool logging_syscall =
+    false; // this variable tells the logger that syscall logging
+           // has started and we are not in setup phase
 
 #ifndef CAPIO_MAX_LOG_LEVEL // capio max log level. defaults to -1, where everything is logged
 #define CAPIO_MAX_LOG_LEVEL -1
 #endif
 
-int CAPIO_LOG_LEVEL = CAPIO_MAX_LOG_LEVEL;
+inline int CAPIO_LOG_LEVEL = CAPIO_MAX_LOG_LEVEL;
 
 #ifndef __CAPIO_POSIX
 inline auto open_server_logfile() {
@@ -128,7 +128,7 @@ inline void setup_posix_log_filename() {
 }
 #endif
 
-void log_write_to(char *buffer, size_t bufflen) {
+inline void log_write_to(char *buffer, size_t bufflen) {
 #ifdef __CAPIO_POSIX
     if (current_log_level < CAPIO_MAX_LOG_LEVEL || CAPIO_MAX_LOG_LEVEL < 0) {
         capio_syscall(SYS_write, logfileFD, buffer, bufflen);
@@ -203,7 +203,8 @@ class Logger {
 
         va_list argp, argpc;
 
-        sprintf(format, CAPIO_LOG_PRE_MSG, this->invoker);
+        sprintf(format, CAPIO_LOG_PRE_MSG, this->invoker,
+                static_cast<unsigned long>(time(nullptr)));
         size_t pre_msg_len = strlen(format);
 
         strcpy(format + pre_msg_len, message);
@@ -241,7 +242,8 @@ class Logger {
 
     inline ~Logger() {
         current_log_level--;
-        sprintf(format, CAPIO_LOG_PRE_MSG, this->invoker);
+        sprintf(format, CAPIO_LOG_PRE_MSG, this->invoker,
+                static_cast<unsigned long>(time(nullptr)));
         size_t pre_msg_len = strlen(format);
         strcpy(format + pre_msg_len, "returned");
 
@@ -257,7 +259,8 @@ class Logger {
     inline void log(const char *message, ...) {
         va_list argp, argpc;
 
-        sprintf(format, CAPIO_LOG_PRE_MSG, this->invoker);
+        sprintf(format, CAPIO_LOG_PRE_MSG, this->invoker,
+                static_cast<unsigned long>(time(nullptr)));
         size_t pre_msg_len = strlen(format);
 
         strcpy(format + pre_msg_len, message);

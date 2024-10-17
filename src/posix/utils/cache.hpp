@@ -161,8 +161,9 @@ class ConsentRequestCache {
          */
         if (available_consent->find(path) == available_consent->end()) {
             LOG("File not present in cache. performing request");
+            auto res = ConsentRequestCache::_consent_to_proceed_request(path, tid, source_func);
             LOG("Registering new file for consent to proceed");
-            available_consent->emplace(path, _consent_to_proceed_request(path, tid, source_func));
+            available_consent->emplace(path, res);
         }
         LOG("Unlocking thread");
     }
