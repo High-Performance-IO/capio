@@ -70,9 +70,8 @@ class ClientManager {
      * @return
      */
     inline void reply_to_client(pid_t tid, capio_off64_t offset) const {
-        START_LOG(gettid(), "call(tid=%ld, offset=%ld)", tid, offset);
-
-        return bufs_response->at(tid)->write(&offset);
+        START_LOG(gettid(), "call(tid=%ld, offset=%llu)", tid, offset);
+        bufs_response->at(tid)->write(&offset);
     }
 
     /**

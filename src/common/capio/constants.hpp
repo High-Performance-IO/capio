@@ -54,7 +54,7 @@ constexpr int CAPIO_POSIX_SYSCALL_SKIP         = 1;
 constexpr int CAPIO_POSIX_SYSCALL_SUCCESS      = 0;
 
 // CAPIO logger - common
-constexpr char CAPIO_LOG_PRE_MSG[]        = "at[%s]: ";
+constexpr char CAPIO_LOG_PRE_MSG[]        = "at[%s][%lu]: ";
 constexpr char CAPIO_DEFAULT_LOG_FOLDER[] = "capio_logs\0";
 
 // CAPIO common - shared memory constant names
