@@ -192,7 +192,8 @@ class CapioCLEngine {
                     fire      = std::get<3>(data);
                 }
             }
-
+            LOG("Adding file %s to _locations with commit=%s, and fire=%s", path.c_str(),
+                commit.c_str(), fire.c_str());
             _locations.emplace(path,
                                std::make_tuple(std::vector<std::string>(),
                                                std::vector<std::string>(), commit, fire, false,
@@ -270,7 +271,8 @@ class CapioCLEngine {
          */
         LOG("No entry found on map. checking globs. Creating new file from globs");
         this->newFile((path));
-        LOG("Returning DEFAULT Fire rule for file %s (update)", path.c_str());
+        LOG("Fire rule for file %s is  %s", path.c_str(),
+            std::get<3>(_locations.at((path))).c_str());
         return std::get<3>(_locations.at((path))) == CAPIO_FILE_MODE_NO_UPDATE;
     }
 
