@@ -188,8 +188,8 @@ class CapioCLEngine {
                 if (std::regex_match(path, std::get<10>(data)) && this->isDirectory(filename) &&
                     filename.length() > matchSize) {
                     matchSize = filename.length();
-                    commit    = this->getCommitRule(filename);
-                    fire      = this->getFireRule(filename);
+                    commit    = std::get<2>(data);
+                    fire      = std::get<3>(data);
                 }
             }
 
@@ -238,8 +238,16 @@ class CapioCLEngine {
             LOG("Commit rule: %s", std::get<2>(_locations.at(path)).c_str());
             return std::get<2>(itm->second);
         }
-        LOG("File not present in config file. Returning default rule.");
-        return CAPIO_FILE_COMMITTED_ON_TERMINATION;
+
+        /*
+         * For caching purpose, each new file is then added to the map if not found,
+         * with its data being instantiated from the metadata of the most likely matched glob
+         * TODO: check overhead of this
+         */
+        LOG("No entry found on map. checking globs. Creating new file from globs");
+        this->newFile((path));
+        LOG("Returning DEFAULT Fire rule for file %s (update)", path.c_str());
+        return std::get<2>(_locations.at((path)));
     }
 
     void setFireRule(const std::string &path, const std::string &fire_rule) {
@@ -249,14 +257,21 @@ class CapioCLEngine {
         }
     }
 
-    std::string getFireRule(const std::string &path) {
+    bool isFirable(const std::string &path) {
         START_LOG(gettid(), "call(path=%s)", path.c_str());
         if (const auto itm = _locations.find(path); itm != _locations.end()) {
             LOG("Fire rule for file %s is %s", path.c_str(), std::get<3>(itm->second).c_str());
-            return std::get<3>(itm->second);
+            return std::get<3>(itm->second) == CAPIO_FILE_MODE_NO_UPDATE;
         }
-        LOG("Fire rule for file %s is %s", path.c_str(), CAPIO_FILE_MODE_UPDATE);
-        return CAPIO_FILE_MODE_UPDATE;
+        /*
+         * For caching purpose, each new file is then added to the map if not found,
+         * with its data being instantiated from the metadata of the most likely matched glob
+         * TODO: check overhead of this
+         */
+        LOG("No entry found on map. checking globs. Creating new file from globs");
+        this->newFile((path));
+        LOG("Returning DEFAULT Fire rule for file %s (update)", path.c_str());
+        return std::get<3>(_locations.at((path))) == CAPIO_FILE_MODE_NO_UPDATE;
     }
 
     void setPermanent(const std::string &path, bool value) {
