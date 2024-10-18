@@ -187,6 +187,7 @@ class CapioCLEngine {
             for (const auto &[filename, data] : _locations) {
                 if (std::regex_match(path, std::get<10>(data)) && this->isDirectory(filename) &&
                     filename.length() > matchSize) {
+                    LOG("Found match with %s", filename.c_str());
                     matchSize = filename.length();
                     commit    = std::get<2>(data);
                     fire      = std::get<3>(data);
