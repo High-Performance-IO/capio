@@ -31,8 +31,7 @@ inline void read_handler(const char *const str) {
      */
     const uintmax_t file_size = CapioFileManager::get_file_size_if_exists(path);
     if (capio_cl_engine->isProducer(path, tid) ||
-        (capio_cl_engine->getFireRule(path_fs) == CAPIO_FILE_MODE_NO_UPDATE &&
-         file_size >= end_of_read)) {
+        (capio_cl_engine->isFirable(path_fs) && file_size >= end_of_read)) {
         LOG("File can be consumed as it is either the producer, or the fire rule is FNU and there "
             "is enough data");
         client_manager->reply_to_client(tid, file_size);
