@@ -252,8 +252,10 @@ class CapioCLEngine {
     std::string getFireRule(const std::string &path) {
         START_LOG(gettid(), "call(path=%s)", path.c_str());
         if (const auto itm = _locations.find(path); itm != _locations.end()) {
+            LOG("Fire rule for file %s is %s", path.c_str(), std::get<3>(itm->second).c_str());
             return std::get<3>(itm->second);
         }
+        LOG("Fire rule for file %s is %s", path.c_str(), CAPIO_FILE_MODE_UPDATE);
         return CAPIO_FILE_MODE_UPDATE;
     }
 
