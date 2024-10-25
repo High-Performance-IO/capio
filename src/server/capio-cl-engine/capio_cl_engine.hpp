@@ -160,6 +160,17 @@ class CapioCLEngine {
         return path.parent_path().string().rfind(get_capio_dir(), 0) == 0;
     };
 
+    /**
+     * Check whether the file is contained inside the location, either by direct name or by glob
+     * @param file
+     * @return
+     */
+    bool contains(const std::filesystem::path &file) {
+        return std::any_of(_locations.begin(), _locations.end(), [&](auto &itm) {
+            return std::regex_match(file.c_str(), std::get<10>(itm.second));
+        });
+    }
+
     void add(std::string &path, std::vector<std::string> &producers,
              std::vector<std::string> &consumers, const std::string &commit_rule,
              const std::string &fire_rule, bool permanent, bool exclude,
