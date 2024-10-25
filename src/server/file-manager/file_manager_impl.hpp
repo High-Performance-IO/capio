@@ -120,8 +120,7 @@ inline void CapioFileManager::_unlockThreadAwaitingData(
             LOG("Removing thread %ld from threads awaiting on data", item->first);
             item = pids_awaiting.erase(item);
 
-        } else if (capio_cl_engine->getFireRule(path) == CAPIO_FILE_MODE_NO_UPDATE &&
-                   filesize >= item->second) {
+        } else if (capio_cl_engine->isFirable(path) && filesize >= item->second) {
             /**
              * if is Fire No Update and there is enough data
              */

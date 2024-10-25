@@ -32,7 +32,7 @@ inline void consent_to_proceed_handler(const char *const str) {
         return;
     }
 
-    if (capio_cl_engine->getFireRule(path) == CAPIO_FILE_MODE_NO_UPDATE) {
+    if (capio_cl_engine->isFirable(path)) {
         LOG("Mode for file %s is no_update. allowing process to continue");
         client_manager->reply_to_client(tid, 1);
         return;
