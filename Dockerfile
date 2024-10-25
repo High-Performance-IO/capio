@@ -68,7 +68,6 @@ COPY --from=builder                                         \
     "/usr/local/include/gmoc[k]"                            \
     "/usr/local/include/gtes[t]"                            \
     "/usr/local/include/libsyscall_intercept_hook_point.h"  \
-    "/usr/local/include/simdjson.h"                         \
     /usr/local/include/
 
 # Libraries
