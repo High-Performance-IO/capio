@@ -1,5 +1,7 @@
 #include <gtest/gtest.h>
 
+std::string node_name;
+
 #include "../server/file-manager/CapioMemoryFile.hpp"
 
 constexpr size_t FILE_SIZE = 8 * 1024 * 1024;
