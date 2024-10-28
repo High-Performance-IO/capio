@@ -1,12 +1,12 @@
 #ifndef CAPIOMEMORYFILE_HPP
 #define CAPIOMEMORYFILE_HPP
 
+#include <algorithm>
 #include <fstream>
 #include <iostream>
 #include <map>
 #include <stdexcept>
 #include <vector>
-#include <algorithm>
 
 class CapioMemoryFile {
     std::map<std::size_t, std::vector<char>> memoryBlocks;
