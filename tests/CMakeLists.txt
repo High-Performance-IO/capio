@@ -18,5 +18,6 @@ include(GoogleTest)
 # Targets
 #####################################
 add_subdirectory(unit/posix)
+add_subdirectory(unit/server)
 add_subdirectory(unit/syscall)
 add_subdirectory(integration)
