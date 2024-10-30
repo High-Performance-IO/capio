@@ -5,7 +5,7 @@ char **build_args() {
 
     char const *command = std::getenv("CAPIO_SERVER_PATH");
     if (command == nullptr) {
-        command = "capio_server";
+        command = "/home/marco/Desktop/capio/cmake-build-debug/src/server/capio_server";
     }
 
     args[0] = strdup(command);

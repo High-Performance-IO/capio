@@ -1,5 +1,6 @@
 #ifndef CAPIO_EXIT_HPP
 #define CAPIO_EXIT_HPP
+#include <storage-service/capio_storage_service.hpp>
 
 /**
  * @brief Handle the exit systemcall
@@ -20,6 +21,7 @@ inline void exit_handler(const char *const str) {
      * close
      */
     CapioFileManager::setCommitted(tid);
+    storage_service->remove_client(client_manager->get_app_name(tid));
     client_manager->remove_client(tid);
 }
 

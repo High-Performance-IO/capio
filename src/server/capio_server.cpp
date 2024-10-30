@@ -34,6 +34,7 @@ char node_name[HOST_NAME_MAX];
 #include "utils/signals.hpp"
 
 #include "file-manager/file_manager.hpp"
+#include "storage-service/capio_storage_service.hpp"
 
 std::string parseCLI(int argc, char **argv) {
     Logger *log;
@@ -180,6 +181,7 @@ int main(int argc, char **argv) {
     shm_canary              = new CapioShmCanary(workflow_name);
     file_manager            = new CapioFileManager();
     fs_monitor              = new FileSystemMonitor();
+    storage_service         = new CapioStorageService();
     ctl_module              = new CapioCTLModule();
     request_handlers_engine = new RequestHandlerEngine();
 

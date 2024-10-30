@@ -3,7 +3,7 @@
 
 std::string node_name;
 
-#include "../server/file-manager/CapioMemoryFile.hpp"
+#include "../server/storage-service/CapioFile/CapioMemoryFile.hpp"
 
 constexpr size_t FILE_SIZE = 8 * 1024 * 1024;
 
