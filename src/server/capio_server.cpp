@@ -158,12 +158,8 @@ std::string parseCLI(int argc, char **argv) {
     }
 #endif
 
-    std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_INFO << " [ " << node_name << " ] "
-              << "server initialization completed!" << std::endl
-              << std::flush;
-
     if (config) {
-        return std::string(args::get(config).data());
+        return args::get(config);
     }
     return "";
 }
@@ -181,11 +177,16 @@ int main(int argc, char **argv) {
     shm_canary              = new CapioShmCanary(workflow_name);
     file_manager            = new CapioFileManager();
     fs_monitor              = new FileSystemMonitor();
-    storage_service         = new CapioStorageService();
     ctl_module              = new CapioCTLModule();
     request_handlers_engine = new RequestHandlerEngine();
+    storage_service         = new CapioStorageService();
 
     capio_cl_engine->print();
+
+    std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_INFO << " [ " << node_name << " ] "
+              << "server initialization completed!" << std::endl
+              << std::flush;
+
     request_handlers_engine->start();
 
     return 0;

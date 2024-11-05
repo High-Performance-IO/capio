@@ -26,29 +26,29 @@ inline void init_client() {
     buf_requests =
         new CircularBuffer<char>(SHM_COMM_CHAN_NAME, CAPIO_REQ_BUFF_CNT, CAPIO_REQ_MAX_SIZE);
     bufs_response = new CPBufResponse_t();
-
-    // TODO: use var to set cache size
-    // TODO: also enable multithreading
-    init_caches();
-}
-
-inline void attach_data_queue(const std::string &app_name) {
-    START_LOG(capio_syscall(SYS_gettid), "call(app_name=%s)", app_name.c_str());
-    cts_queue =
-        new SPSCQueue(app_name + ".cts", CAPIO_MAX_SPSQUEUE_ELEMS, CAPIO_MAX_SPSQUEUE_ELEMS);
-    stc_queue =
-        new SPSCQueue(app_name + ".stc", CAPIO_MAX_SPSQUEUE_ELEMS, CAPIO_MAX_SQSCQUEUE_ELEM_SIZE);
 }
 
 /**
- * Add a new response buffer for thread @param tid
+ * Perform handshake. server returns the amount of paths that needs to be obtained from the server
+ * to know which files are going to be treated during write and read operations inside memory
  * @param tid
- * @return
+ * @param pid
+ * @param app_name
  */
-inline void register_listener(long tid) {
-    auto *p_buf_response = new CircularBuffer<capio_off64_t>(
-        SHM_COMM_CHAN_NAME_RESP + std::to_string(tid), CAPIO_REQ_BUFF_CNT, sizeof(capio_off64_t));
-    bufs_response->insert(std::make_pair(tid, p_buf_response));
+inline void handshake_request(const long tid, const long pid, const std::string &app_name) {
+    START_LOG(capio_syscall(SYS_gettid), "call(tid=%ld, pid=%ld, app_name=%s)", tid, pid,
+              app_name.c_str());
+    char req[CAPIO_REQ_MAX_SIZE];
+    capio_off64_t files_to_read_from_queue = 0;
+    sprintf(req, "%04d %ld %ld %s", CAPIO_REQUEST_HANDSHAKE, tid, pid, app_name.c_str());
+    buf_requests->write(req, CAPIO_REQ_MAX_SIZE);
+    LOG("Sent handshake request");
+
+    cts_queue = new SPSCQueue("queue-" + app_name + ".cts", CAPIO_MAX_SPSQUEUE_ELEMS,
+                              CAPIO_MAX_SPSCQUEUE_ELEM_SIZE);
+    stc_queue = new SPSCQueue("queue-" + app_name + ".stc", CAPIO_MAX_SPSQUEUE_ELEMS,
+                              CAPIO_MAX_SPSCQUEUE_ELEM_SIZE);
+    LOG("Initialized data transfer queues");
 }
 
 // non blocking
@@ -75,63 +75,6 @@ inline void exit_group_request(const long tid) {
     char req[CAPIO_REQ_MAX_SIZE];
     sprintf(req, "%04d %ld", CAPIO_REQUEST_EXIT_GROUP, tid);
     buf_requests->write(req, CAPIO_REQ_MAX_SIZE);
-}
-
-/**
- * Perform handshake. server returns the amount of paths that needs to be obtained from the server
- * to know which files are going to be treated during write and read operations inside memory
- * @param tid
- * @param pid
- */
-inline void handshake_anonymous_request(const long tid, const long pid) {
-    START_LOG(capio_syscall(SYS_gettid), "call(tid=%ld, pid=%ld)", tid, pid);
-    char req[CAPIO_REQ_MAX_SIZE];
-    capio_off64_t files_to_read_from_queue;
-    sprintf(req, "%04d %ld %ld", CAPIO_REQUEST_HANDSHAKE_ANONYMOUS, tid, pid);
-    buf_requests->write(req, CAPIO_REQ_MAX_SIZE);
-    LOG("Sent handshake request");
-    attach_data_queue(CAPIO_DEFAULT_APP_NAME);
-    LOG("Reading number of paths to receive from server");
-    bufs_response->at(tid)->read(&files_to_read_from_queue, sizeof(files_to_read_from_queue));
-    LOG("Need to read %llu paths", files_to_read_from_queue);
-    paths_to_store_in_memory = new std::vector<std::string>;
-    for (int i = 0; i < files_to_read_from_queue; i++) {
-        LOG("Reading %d file", i);
-        auto file = new char[CAPIO_MAX_SQSCQUEUE_ELEM_SIZE]{};
-        stc_queue->read(file, CAPIO_MAX_SQSCQUEUE_ELEM_SIZE);
-        LOG("Obtained path %s", file);
-        paths_to_store_in_memory->emplace_back(file);
-        delete[] file;
-    }
-}
-/**
- * Perform handshake. server returns the amount of paths that needs to be obtained from the server
- * to know which files are going to be treated during write and read operations inside memory
- * @param tid
- * @param pid
- * @param app_name
- */
-inline void handshake_named_request(const long tid, const long pid, const std::string &app_name) {
-    START_LOG(capio_syscall(SYS_gettid), "call(tid=%ld, pid=%ld, app_name=%s)", tid, pid,
-              app_name.c_str());
-    char req[CAPIO_REQ_MAX_SIZE];
-    capio_off64_t files_to_read_from_queue;
-    sprintf(req, "%04d %ld %ld %s", CAPIO_REQUEST_HANDSHAKE_NAMED, tid, pid, app_name.c_str());
-    buf_requests->write(req, CAPIO_REQ_MAX_SIZE);
-    LOG("Sent handshake request");
-    attach_data_queue(app_name);
-    LOG("Reading number of paths to recive from server");
-    bufs_response->at(tid)->read(&files_to_read_from_queue, sizeof(files_to_read_from_queue));
-    LOG("Need to read %llu paths", files_to_read_from_queue);
-    paths_to_store_in_memory = new std::vector<std::string>;
-    for (int i = 0; i < files_to_read_from_queue; i++) {
-        LOG("Reading %d file", i);
-        auto file = new char[CAPIO_MAX_SQSCQUEUE_ELEM_SIZE]{};
-        stc_queue->read(file, CAPIO_MAX_SQSCQUEUE_ELEM_SIZE);
-        LOG("Obtained path %s", file);
-        paths_to_store_in_memory->emplace_back(file);
-        delete[] file;
-    }
 }
 
 // block until open is possible

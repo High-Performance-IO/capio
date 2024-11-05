@@ -49,23 +49,15 @@ class CapioStorageService {
         // TODO: implement this
     }
 
-    [[nodiscard]] capio_off64_t register_client(const std::string &app_name) const {
+    void register_client(const std::string &app_name) const {
         START_LOG(gettid(), "call(app_name=%s)", app_name.c_str());
-        auto cts_queue = new SPSCQueue(app_name + ".cts", CAPIO_MAX_SPSQUEUE_ELEMS,
-                                       CAPIO_MAX_SQSCQUEUE_ELEM_SIZE);
+        auto cts_queue = new SPSCQueue("queue-" + app_name + ".cts", CAPIO_MAX_SPSQUEUE_ELEMS,
+                                       CAPIO_MAX_SPSCQUEUE_ELEM_SIZE);
+        auto stc_queue = new SPSCQueue("queue-" + app_name + ".stc", CAPIO_MAX_SPSQUEUE_ELEMS,
+                                       CAPIO_MAX_SPSCQUEUE_ELEM_SIZE);
         _client_to_server_queue->emplace(app_name, cts_queue);
-        _server_to_clien_queue->emplace(
-            app_name,
-            new SPSCQueue(app_name + ".stc", CAPIO_MAX_SPSQUEUE_ELEMS, CAPIO_MAX_SPSQUEUE_ELEMS));
+        _server_to_clien_queue->emplace(app_name, stc_queue);
         LOG("Created communication queues");
-        auto files_to_store_in_mem = capio_cl_engine->getFileToStoreInMemory();
-        for (const auto &file : files_to_store_in_mem) {
-            LOG("Sending file %s", file.c_str());
-            cts_queue->write(file.c_str());
-        }
-
-        LOG("Return value=%llu", files_to_store_in_mem.size());
-        return files_to_store_in_mem.size();
     }
 
     void remove_client(const std::string &app_name) const {

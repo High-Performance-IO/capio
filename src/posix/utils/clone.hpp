@@ -34,15 +34,22 @@ inline void init_process(pid_t tid) {
 
     syscall_no_intercept_flag = true;
 
-    register_listener(tid);
+    auto *p_buf_response = new CircularBuffer<capio_off64_t>(
+        SHM_COMM_CHAN_NAME_RESP + std::to_string(tid), CAPIO_REQ_BUFF_CNT, sizeof(capio_off64_t));
+    bufs_response->insert(std::make_pair(tid, p_buf_response));
+
+    LOG("Created request response buffer with name: %s",
+        (SHM_COMM_CHAN_NAME_RESP + std::to_string(tid)).c_str());
 
     const char *capio_app_name = get_capio_app_name();
     auto pid                   = static_cast<pid_t>(syscall_no_intercept(SYS_gettid));
-    if (capio_app_name == nullptr) {
-        handshake_anonymous_request(tid, pid);
-    } else {
-        handshake_named_request(tid, pid, capio_app_name);
-    }
+
+    /**
+     * The previous if, for an anonymous handshake was present, however the get_capio_app_name()
+     * never returns a nullptr, as there is a default name, thus rendering the
+     * handshake_anonymous_request() useless
+     */
+    handshake_request(tid, pid, capio_app_name);
 
     syscall_no_intercept_flag = false;
 }

@@ -40,9 +40,10 @@ class ClientManager {
     inline void register_new_client(pid_t tid, const std::string &app_name) const {
         START_LOG(gettid(), "call(tid=%ld, app_name=%s)", tid, app_name.c_str());
         // TODO: replace numbers with constexpr
-        auto *p_buf_response =
-            new CircularBuffer<capio_off64_t>(SHM_COMM_CHAN_NAME_RESP + std::to_string(tid),
-                                              CAPIO_REQ_BUFF_CNT, sizeof(off_t), workflow_name);
+        auto *p_buf_response = new CircularBuffer<capio_off64_t>(
+            SHM_COMM_CHAN_NAME_RESP + std::to_string(tid), CAPIO_REQ_BUFF_CNT,
+            sizeof(capio_off64_t), workflow_name);
+
         bufs_response->insert(std::make_pair(tid, p_buf_response));
         app_names->emplace(tid, app_name);
         files_created_by_producer->emplace(tid, new std::vector<std::string>);
@@ -71,7 +72,11 @@ class ClientManager {
      */
     inline void reply_to_client(pid_t tid, capio_off64_t offset) const {
         START_LOG(gettid(), "call(tid=%ld, offset=%llu)", tid, offset);
-        bufs_response->at(tid)->write(&offset);
+        try {
+            bufs_response->at(tid)->write(&offset);
+        } catch (const std::string &ex) {
+            std::cout << "Unable to write: " << ex << std::endl;
+        }
     }
 
     /**

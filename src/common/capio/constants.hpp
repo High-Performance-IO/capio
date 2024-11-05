@@ -40,7 +40,7 @@ constexpr char CAPIO_SERVER_LOG_START_REQUEST_MSG[] = "\n+++++++++++++++++REQUES
 constexpr char CAPIO_SERVER_LOG_END_REQUEST_MSG[]   = "~~~~~~~~~~~~~~~END REQUEST~~~~~~~~~~~~~~~";
 constexpr int CAPIO_LOG_MAX_MSG_LEN                 = 4096;
 constexpr int CAPIO_MAX_SPSQUEUE_ELEMS              = 10;
-constexpr int CAPIO_MAX_SQSCQUEUE_ELEM_SIZE         = 1024 * 256;
+constexpr int CAPIO_MAX_SPSCQUEUE_ELEM_SIZE         = 1024 * 256;
 
 // CAPIO streaming semantics
 constexpr char CAPIO_FILE_MODE_NO_UPDATE[]           = "no_update";

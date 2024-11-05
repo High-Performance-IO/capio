@@ -31,17 +31,16 @@ class RequestHandlerEngine {
     static constexpr std::array<CSHandler_t, CAPIO_NR_REQUESTS> build_request_handlers_table() {
         std::array<CSHandler_t, CAPIO_NR_REQUESTS> _request_handlers{0};
 
-        _request_handlers[CAPIO_REQUEST_CONSENT]             = consent_to_proceed_handler;
-        _request_handlers[CAPIO_REQUEST_CLOSE]               = close_handler;
-        _request_handlers[CAPIO_REQUEST_CREATE]              = create_handler;
-        _request_handlers[CAPIO_REQUEST_EXIT_GROUP]          = exit_handler;
-        _request_handlers[CAPIO_REQUEST_HANDSHAKE_NAMED]     = handshake_named_handler;
-        _request_handlers[CAPIO_REQUEST_HANDSHAKE_ANONYMOUS] = handshake_anonymous_handler;
-        _request_handlers[CAPIO_REQUEST_MKDIR]               = create_handler;
-        _request_handlers[CAPIO_REQUEST_OPEN]                = open_handler;
-        _request_handlers[CAPIO_REQUEST_READ]                = read_handler;
-        _request_handlers[CAPIO_REQUEST_RENAME]              = rename_handler;
-        _request_handlers[CAPIO_REQUEST_WRITE]               = write_handler;
+        _request_handlers[CAPIO_REQUEST_CONSENT]    = consent_to_proceed_handler;
+        _request_handlers[CAPIO_REQUEST_CLOSE]      = close_handler;
+        _request_handlers[CAPIO_REQUEST_CREATE]     = create_handler;
+        _request_handlers[CAPIO_REQUEST_EXIT_GROUP] = exit_handler;
+        _request_handlers[CAPIO_REQUEST_HANDSHAKE]  = handshake_handler;
+        _request_handlers[CAPIO_REQUEST_MKDIR]      = create_handler;
+        _request_handlers[CAPIO_REQUEST_OPEN]       = open_handler;
+        _request_handlers[CAPIO_REQUEST_READ]       = read_handler;
+        _request_handlers[CAPIO_REQUEST_RENAME]     = rename_handler;
+        _request_handlers[CAPIO_REQUEST_WRITE]      = write_handler;
 
         return _request_handlers;
     }

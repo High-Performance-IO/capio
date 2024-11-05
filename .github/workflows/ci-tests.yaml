@@ -41,6 +41,7 @@ jobs:
           tags: alphaunito/capio:latest
       - name: "Run unit tests with Docker"
         run: |
+
           echo "Run CAPIO POSIX Unit tests"
           docker run --rm                         \
               --env CAPIO_DIR=/tmp                \
@@ -106,7 +107,8 @@ jobs:
             libopenmpi-dev \
             ninja-build \
             openmpi-bin \
-            pkg-config
+            pkg-config \
+            cmake
       - name: "Get compiler version"
         run: |
           IFS='-' read -r -a COMPILER <<< "${{ matrix.cxx }}"
@@ -151,6 +153,12 @@ jobs:
         run: |
           export LD_LIBRARY_PATH="/usr/local/lib:${LD_LIBRARY_PATH}"
           
+          echo "Run CAPIO syscall Unit tests"
+          LD_PRELOAD=libcapio_posix.so \
+          capio_syscall_unit_tests \
+            --gtest_break_on_failure \
+            --gtest_print_time=1
+          
           echo "Run CAPIO POSIX Unit tests"
           capio_posix_unit_tests \
             --gtest_break_on_failure \
@@ -158,12 +166,6 @@ jobs:
           
           echo "Run CAPIO SERVER unit tests"
           capio_server_unit_tests \
-            --gtest_break_on_failure \
-            --gtest_print_time=1
-          
-          echo "Run CAPIO syscall Unit tests"
-          LD_PRELOAD=libcapio_posix.so \
-          capio_syscall_unit_tests \
             --gtest_break_on_failure \
             --gtest_print_time=1
           
