@@ -9,6 +9,8 @@
 #include "filesystem.hpp"
 #include "types.hpp"
 
+inline thread_local std::vector<std::regex> *paths_to_store_in_memory;
+
 inline CircularBuffer<char> *buf_requests;
 inline CPBufResponse_t *bufs_response;
 
@@ -39,7 +41,6 @@ inline void handshake_request(const long tid, const long pid, const std::string 
     START_LOG(capio_syscall(SYS_gettid), "call(tid=%ld, pid=%ld, app_name=%s)", tid, pid,
               app_name.c_str());
     char req[CAPIO_REQ_MAX_SIZE];
-    capio_off64_t files_to_read_from_queue = 0;
     sprintf(req, "%04d %ld %ld %s", CAPIO_REQUEST_HANDSHAKE, tid, pid, app_name.c_str());
     buf_requests->write(req, CAPIO_REQ_MAX_SIZE);
     LOG("Sent handshake request");
@@ -49,6 +50,26 @@ inline void handshake_request(const long tid, const long pid, const std::string 
     stc_queue = new SPSCQueue("queue-" + app_name + ".stc", CAPIO_MAX_SPSQUEUE_ELEMS,
                               CAPIO_MAX_SPSCQUEUE_ELEM_SIZE);
     LOG("Initialized data transfer queues");
+}
+
+inline void file_in_memory_request(const long pid) {
+    START_LOG(capio_syscall(SYS_gettid), "call(pid=%ld)", pid);
+    char req[CAPIO_REQ_MAX_SIZE];
+    capio_off64_t files_to_read_from_queue = 0;
+    sprintf(req, "%04d %ld ", CAPIO_REQUEST_QUERY_MEM_FILE, pid);
+    buf_requests->write(req, CAPIO_REQ_MAX_SIZE);
+    LOG("Sent query for which file to store in memory");
+    bufs_response->at(pid)->read(&files_to_read_from_queue, sizeof(files_to_read_from_queue));
+    LOG("Need to read %llu files from data queues", files_to_read_from_queue);
+    paths_to_store_in_memory = new std::vector<std::regex>;
+    for (int i = 0; i < files_to_read_from_queue; i++) {
+        LOG("Reading %d file", i);
+        auto file = new char[CAPIO_MAX_SPSCQUEUE_ELEM_SIZE]{};
+        stc_queue->read(file, CAPIO_MAX_SPSCQUEUE_ELEM_SIZE);
+        LOG("Obtained path %s", file);
+        paths_to_store_in_memory->emplace_back(generateCapioRegex(file));
+        delete[] file;
+    }
 }
 
 // non blocking

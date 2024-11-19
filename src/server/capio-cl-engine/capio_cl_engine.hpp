@@ -3,6 +3,8 @@
 
 #include "client-manager/client_manager.hpp"
 #include <regex>
+
+#include "capio/filesystem.hpp"
 /**
  * @brief Class that stores the parsed configuration of the CAPIO-CL configuration file.
  *
@@ -26,43 +28,6 @@ class CapioCLEngine {
 
     static std::string truncateLastN(const std::string &str, const int n) {
         return str.length() > n ? "[..] " + str.substr(str.length() - n) : str;
-    }
-
-    /**
-     * Given a string, replace a single character with a string. This function is used
-     * when converting a CAPIO-CL wildcard into a C++ valid regular expression
-     * @param str
-     * @param symbol
-     * @param replacement
-     * @return
-     */
-    [[nodiscard]] static std::string replaceSymbol(const std::string &str, char symbol,
-                                                   const std::string &replacement) {
-        std::string result = str;
-        size_t pos         = 0;
-
-        // Find the symbol and replace it
-        while ((pos = result.find(symbol, pos)) != std::string::npos) {
-            result.replace(pos, 1, replacement);
-            pos += replacement.length(); // Move past the replacement
-        }
-
-        return result;
-    }
-
-    /**
-     * Convert a CAPIO-CL regular expression into a c++ valid regular expression
-     * @param capio_path String to convert
-     * @return std::regex compiled with the corresponding c++ regex
-     */
-    [[nodiscard]] static std::regex generateCapioRegex(const std::string &capio_path) {
-        START_LOG(gettid(), "call(capio_path=%s)", capio_path.c_str());
-        auto computed = replaceSymbol(capio_path, '.', "\\.");
-        computed      = CapioCLEngine::replaceSymbol(computed, '/', "\\/");
-        computed      = CapioCLEngine::replaceSymbol(computed, '*', R"([a-zA-Z0-9\/\.\-_]*)");
-        computed      = CapioCLEngine::replaceSymbol(computed, '+', ".");
-        LOG("Computed regex: %s", computed.c_str());
-        return std::regex(computed);
     }
 
   public:
@@ -191,7 +156,7 @@ class CapioCLEngine {
 
         _locations.emplace(path, std::make_tuple(producers, consumers, commit_rule, fire_rule,
                                                  permanent, exclude, true, -1, -1, dependencies,
-                                                 CapioCLEngine::generateCapioRegex(path), false));
+                                                 generateCapioRegex(path), false));
     }
 
     void newFile(const std::string &path) {
@@ -215,11 +180,10 @@ class CapioCLEngine {
             }
             LOG("Adding file %s to _locations with commit=%s, and fire=%s", path.c_str(),
                 commit.c_str(), fire.c_str());
-            _locations.emplace(path,
-                               std::make_tuple(std::vector<std::string>(),
-                                               std::vector<std::string>(), commit, fire, false,
-                                               false, true, -1, -1, std::vector<std::string>(),
-                                               CapioCLEngine::generateCapioRegex(path), false));
+            _locations.emplace(
+                path, std::make_tuple(std::vector<std::string>(), std::vector<std::string>(),
+                                      commit, fire, false, false, true, -1, -1,
+                                      std::vector<std::string>(), generateCapioRegex(path), false));
         }
     }
 
