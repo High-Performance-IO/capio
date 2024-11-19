@@ -1,8 +1,16 @@
 #ifndef CAPIOBACKEND_HPP
 #define CAPIOBACKEND_HPP
 
-class BackendInterface
-{
+class NotImplementedBackendMethod : public std::exception {
+  public:
+    const char *what() const noexcept override {
+        auto msg = new char[1024]{};
+        sprintf(msg, "The chosen backend does not implement method: %s", __func__);
+        return msg;
+    }
+};
+
+class BackendInterface {
 public:
     /**
      * @brief Send data to target
@@ -11,7 +19,9 @@ public:
      * @param buf pointer to data to sent
      * @param buf_size length of @param buf
      */
-    virtual void send(const std::string &target, char *buf, uint64_t buf_size) = 0;
+    virtual void send(const std::string &target, char *buf, uint64_t buf_size) {
+        throw NotImplementedBackendMethod();
+    };
 
     /**
      * @brief recive data
@@ -20,7 +30,9 @@ public:
      * @param buf_size size of @param buf
      * @return std::string hostname of sender
      */
-    virtual std::string &recive(char *buf, uint64_t buf_size) = 0;
+    virtual std::string &recive(char *buf, uint64_t buf_size) {
+        throw NotImplementedBackendMethod();
+    };
 };
 
 #endif // CAPIOBACKEND_HPP
