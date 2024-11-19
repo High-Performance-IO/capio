@@ -43,24 +43,12 @@ inline void handshake_request(const long tid, const long pid, const std::string 
     sprintf(req, "%04d %ld %ld %s", CAPIO_REQUEST_HANDSHAKE, tid, pid, app_name.c_str());
     buf_requests->write(req, CAPIO_REQ_MAX_SIZE);
     LOG("Sent handshake request");
-    LOG("Attached data queues. Reading number of paths to receive from server");
-    bufs_response->at(tid)->read(&files_to_read_from_queue);
 
     cts_queue = new SPSCQueue("queue-" + app_name + ".cts", CAPIO_MAX_SPSQUEUE_ELEMS,
                               CAPIO_MAX_SPSCQUEUE_ELEM_SIZE);
     stc_queue = new SPSCQueue("queue-" + app_name + ".stc", CAPIO_MAX_SPSQUEUE_ELEMS,
                               CAPIO_MAX_SPSCQUEUE_ELEM_SIZE);
-
-    LOG("Need to read %llu paths", files_to_read_from_queue);
-    paths_to_store_in_memory = new std::vector<std::string>;
-    for (int i = 0; i < files_to_read_from_queue; i++) {
-        LOG("Reading %d file", i);
-        auto file = new char[CAPIO_MAX_SPSCQUEUE_ELEM_SIZE]{};
-        stc_queue->read(file, CAPIO_MAX_SPSCQUEUE_ELEM_SIZE);
-        LOG("Obtained path %s", file);
-        paths_to_store_in_memory->emplace_back(file);
-        delete[] file;
-    }
+    LOG("Initialized data transfer queues");
 }
 
 // non blocking
