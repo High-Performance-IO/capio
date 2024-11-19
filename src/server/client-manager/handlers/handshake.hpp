@@ -17,7 +17,7 @@ inline void handshake_handler(const char *const str) {
     sscanf(str, "%d %d %s", &tid, &pid, app_name);
     START_LOG(gettid(), "call(tid=%ld, pid=%ld, app_name=%s)", tid, pid, app_name);
     client_manager->register_new_client(tid, app_name);
-    storage_service->register_client(app_name);
+    storage_service->register_client(app_name, pid);
 }
 
 #endif // HANDSHAKE_HPP

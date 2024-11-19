@@ -22,8 +22,6 @@ inline CPFilesPaths_t *capio_files_paths;
 inline std::unique_ptr<std::filesystem::path> current_dir;
 inline CPFiles_t *files;
 
-
-
 /**
  * Set the CLOEXEC property of a file descriptor in metadata structures
  * @param fd

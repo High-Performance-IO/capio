@@ -9,7 +9,7 @@
 #include "filesystem.hpp"
 #include "types.hpp"
 
-inline thread_local std::vector<std::string> *paths_to_store_in_memory;
+inline thread_local std::vector<std::regex> *paths_to_store_in_memory;
 
 inline CircularBuffer<char> *buf_requests;
 inline CPBufResponse_t *bufs_response;
@@ -61,13 +61,13 @@ inline void file_in_memory_request(const long pid) {
     LOG("Sent query for which file to store in memory");
     bufs_response->at(pid)->read(&files_to_read_from_queue, sizeof(files_to_read_from_queue));
     LOG("Need to read %llu files from data queues", files_to_read_from_queue);
-    paths_to_store_in_memory = new std::vector<std::string>;
+    paths_to_store_in_memory = new std::vector<std::regex>;
     for (int i = 0; i < files_to_read_from_queue; i++) {
         LOG("Reading %d file", i);
         auto file = new char[CAPIO_MAX_SPSCQUEUE_ELEM_SIZE]{};
         stc_queue->read(file, CAPIO_MAX_SPSCQUEUE_ELEM_SIZE);
         LOG("Obtained path %s", file);
-        paths_to_store_in_memory->emplace_back(file);
+        paths_to_store_in_memory->emplace_back(generateCapioRegex(file));
         delete[] file;
     }
 }

@@ -14,6 +14,7 @@
 #include "handlers/consent.hpp"
 #include "handlers/create.hpp"
 #include "handlers/exit.hpp"
+#include "handlers/files_in_memory.hpp"
 #include "handlers/handshake.hpp"
 #include "handlers/open.hpp"
 #include "handlers/read.hpp"
@@ -31,16 +32,17 @@ class RequestHandlerEngine {
     static constexpr std::array<CSHandler_t, CAPIO_NR_REQUESTS> build_request_handlers_table() {
         std::array<CSHandler_t, CAPIO_NR_REQUESTS> _request_handlers{0};
 
-        _request_handlers[CAPIO_REQUEST_CONSENT]    = consent_to_proceed_handler;
-        _request_handlers[CAPIO_REQUEST_CLOSE]      = close_handler;
-        _request_handlers[CAPIO_REQUEST_CREATE]     = create_handler;
-        _request_handlers[CAPIO_REQUEST_EXIT_GROUP] = exit_handler;
-        _request_handlers[CAPIO_REQUEST_HANDSHAKE]  = handshake_handler;
-        _request_handlers[CAPIO_REQUEST_MKDIR]      = create_handler;
-        _request_handlers[CAPIO_REQUEST_OPEN]       = open_handler;
-        _request_handlers[CAPIO_REQUEST_READ]       = read_handler;
-        _request_handlers[CAPIO_REQUEST_RENAME]     = rename_handler;
-        _request_handlers[CAPIO_REQUEST_WRITE]      = write_handler;
+        _request_handlers[CAPIO_REQUEST_CONSENT]        = consent_to_proceed_handler;
+        _request_handlers[CAPIO_REQUEST_CLOSE]          = close_handler;
+        _request_handlers[CAPIO_REQUEST_CREATE]         = create_handler;
+        _request_handlers[CAPIO_REQUEST_EXIT_GROUP]     = exit_handler;
+        _request_handlers[CAPIO_REQUEST_HANDSHAKE]      = handshake_handler;
+        _request_handlers[CAPIO_REQUEST_MKDIR]          = create_handler;
+        _request_handlers[CAPIO_REQUEST_OPEN]           = open_handler;
+        _request_handlers[CAPIO_REQUEST_READ]           = read_handler;
+        _request_handlers[CAPIO_REQUEST_RENAME]         = rename_handler;
+        _request_handlers[CAPIO_REQUEST_WRITE]          = write_handler;
+        _request_handlers[CAPIO_REQUEST_QUERY_MEM_FILE] = files_to_store_in_memory_handler;
 
         return _request_handlers;
     }

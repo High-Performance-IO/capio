@@ -1,21 +1,22 @@
 #ifndef CAPIO_STORAGE_SERVICE_H
 #define CAPIO_STORAGE_SERVICE_H
 
+#include "../../posix/utils/env.hpp"
 #include "CapioFile/CapioFile.hpp"
 #include "CapioFile/CapioMemoryFile.hpp"
 
 class CapioStorageService {
 
-    std::unordered_map<std::string, SPSCQueue *> *_client_to_server_queue;
-    std::unordered_map<std::string, SPSCQueue *> *_server_to_clien_queue;
+    std::unordered_map<pid_t, SPSCQueue *> *_client_to_server_queue;
+    std::unordered_map<pid_t, SPSCQueue *> *_server_to_clien_queue;
     std::unordered_map<std::string, CapioFile *> *_stored_files;
 
   public:
     CapioStorageService() {
         START_LOG(gettid(), "call()");
         _stored_files           = new std::unordered_map<std::string, CapioFile *>;
-        _client_to_server_queue = new std::unordered_map<std::string, SPSCQueue *>;
-        _server_to_clien_queue  = new std::unordered_map<std::string, SPSCQueue *>;
+        _client_to_server_queue = new std::unordered_map<pid_t, SPSCQueue *>;
+        _server_to_clien_queue  = new std::unordered_map<pid_t, SPSCQueue *>;
         std::cout << CAPIO_SERVER_CLI_LOG_SERVER << " [ " << node_name << " ] "
                   << "CapioStorageService initialization completed." << std::endl;
     }
@@ -49,20 +50,32 @@ class CapioStorageService {
         // TODO: implement this
     }
 
-    void register_client(const std::string &app_name) const {
+    void register_client(const std::string &app_name, const pid_t pid) const {
         START_LOG(gettid(), "call(app_name=%s)", app_name.c_str());
         auto cts_queue = new SPSCQueue("queue-" + app_name + ".cts", CAPIO_MAX_SPSQUEUE_ELEMS,
                                        CAPIO_MAX_SPSCQUEUE_ELEM_SIZE);
         auto stc_queue = new SPSCQueue("queue-" + app_name + ".stc", CAPIO_MAX_SPSQUEUE_ELEMS,
                                        CAPIO_MAX_SPSCQUEUE_ELEM_SIZE);
-        _client_to_server_queue->emplace(app_name, cts_queue);
-        _server_to_clien_queue->emplace(app_name, stc_queue);
+        _client_to_server_queue->emplace(pid, cts_queue);
+        _server_to_clien_queue->emplace(pid, stc_queue);
         LOG("Created communication queues");
     }
 
-    void remove_client(const std::string &app_name) const {
-        _client_to_server_queue->erase(app_name);
-        _server_to_clien_queue->erase(app_name);
+    void remove_client(const pid_t pid) const {
+        _client_to_server_queue->erase(pid);
+        _server_to_clien_queue->erase(pid);
+    }
+
+    [[nodiscard]] size_t sendFilesToStoreInMemory(const long pid) const {
+        START_LOG(gettid(), "call(pid=%d)", pid);
+        auto files_to_store_in_mem = capio_cl_engine->getFileToStoreInMemory();
+        for (const auto &file : files_to_store_in_mem) {
+            LOG("Sending file %s", file.c_str());
+            _server_to_clien_queue->at(pid)->write(file.c_str());
+        }
+
+        LOG("Return value=%llu", files_to_store_in_mem.size());
+        return files_to_store_in_mem.size();
     }
 };
 

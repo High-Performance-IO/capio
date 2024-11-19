@@ -21,7 +21,7 @@ inline void exit_handler(const char *const str) {
      * close
      */
     CapioFileManager::setCommitted(tid);
-    storage_service->remove_client(client_manager->get_app_name(tid));
+    storage_service->remove_client(tid);
     client_manager->remove_client(tid);
 }
 
