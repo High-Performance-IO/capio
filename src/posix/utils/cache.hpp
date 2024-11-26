@@ -1,7 +1,9 @@
 #ifndef CAPIO_CACHE_HPP
 #define CAPIO_CACHE_HPP
+#include "capio/requests.hpp"
+#include "env.hpp"
 
-class WriteRequestCache {
+class WriteRequestCacheFS {
 
     int current_fd         = -1;
     long long current_size = 0;
@@ -21,9 +23,9 @@ class WriteRequestCache {
     }
 
   public:
-    explicit WriteRequestCache() : _max_size(get_capio_write_cache_size()) {}
+    explicit WriteRequestCacheFS() : _max_size(get_capio_write_cache_size()) {}
 
-    ~WriteRequestCache() { this->flush(capio_syscall(SYS_gettid)); }
+    ~WriteRequestCacheFS() { this->flush(capio_syscall(SYS_gettid)); }
 
     void write_request(std::filesystem::path path, int tid, int fd, long count) {
         START_LOG(capio_syscall(SYS_gettid), "call(path=%s, tid=%ld, fd=%ld, count=%ld)",
@@ -53,7 +55,7 @@ class WriteRequestCache {
     }
 };
 
-class ReadRequestCache {
+class ReadRequestCacheFS {
     int current_fd         = -1;
     capio_off64_t max_read = 0;
     std::unordered_map<std::string, capio_off64_t> *available_read_cache;
@@ -76,11 +78,11 @@ class ReadRequestCache {
     }
 
   public:
-    explicit ReadRequestCache() {
+    explicit ReadRequestCacheFS() {
         available_read_cache = new std::unordered_map<std::string, capio_off64_t>;
     };
 
-    ~ReadRequestCache() { delete available_read_cache; };
+    ~ReadRequestCacheFS() { delete available_read_cache; };
 
     void read_request(std::filesystem::path path, long end_of_read, int tid, int fd) {
         START_LOG(capio_syscall(SYS_gettid), "[cache] call(path=%s, end_of_read=%ld, tid=%ld)",
@@ -171,20 +173,220 @@ class ConsentRequestCache {
     }
 };
 
-inline thread_local ConsentRequestCache *consent_request_cache;
-inline thread_local ReadRequestCache *read_request_cache;
-inline thread_local WriteRequestCache *write_request_cache;
+class ReadRequestCacheMEM {
+  private:
+    char *_cache;
+    long _tid;
+    int _last_fd;
+    capio_off64_t _max_line_size, _actual_size, _cache_offset;
+
+    void _read(void *buffer, capio_off64_t count) {
+        START_LOG(capio_syscall(SYS_gettid), "call(count=%ld)", count);
+
+        if (count > 0) {
+            memcpy(buffer, _cache + _cache_offset, count);
+            LOG("Read %ld. adding it to _cache_offset of value %ld", count, _cache_offset);
+            _cache_offset += count;
+        }
+    }
+
+    static capio_off64_t seek_request(const int fd, const capio_off64_t offset, const long tid) {
+        START_LOG(capio_syscall(SYS_gettid), "call(fd=%ld, offset=%ld, tid=%ld)", fd, offset, tid);
+        char req[CAPIO_REQ_MAX_SIZE];
+        sprintf(req, "%04d %ld %d %llu", -1, tid, fd, offset);
+        buf_requests->write(req, CAPIO_REQ_MAX_SIZE);
+        capio_off64_t res;
+        bufs_response->at(tid)->read(&res);
+        return res;
+    }
+
+    static capio_off64_t read_request(const int fd, const capio_off64_t count, const long tid) {
+        START_LOG(capio_syscall(SYS_gettid), "call(fd=%ld, count=%ld, tid=%ld)", fd, count, tid);
+        char req[CAPIO_REQ_MAX_SIZE];
+        sprintf(req, "%04d %ld %d %llu", CAPIO_REQUEST_READ_MEM, tid, fd, count);
+        LOG("Sending read request %s", req);
+        buf_requests->write(req, CAPIO_REQ_MAX_SIZE);
+        capio_off64_t res;
+        bufs_response->at(tid)->read(&res);
+        LOG("Response to request is %ld", res);
+        return res;
+    }
+
+  public:
+    explicit ReadRequestCacheMEM(const long lines                 = get_cache_lines(),
+                                 const long line_size             = get_cache_line_size(),
+                                 const std::string &workflow_name = get_capio_workflow_name())
+        : _cache(nullptr), _tid(capio_syscall(SYS_gettid)), _last_fd(-1), _max_line_size(line_size),
+          _actual_size(0), _cache_offset(0) {}
+
+    inline void flush() {
+        START_LOG(capio_syscall(SYS_gettid), "call()");
+
+        if (_cache_offset != _actual_size) {
+            _actual_size = _cache_offset = 0;
+            seek_request(_last_fd, get_capio_fd_offset(_last_fd), _tid);
+        }
+    }
+
+    inline capio_off64_t read(const int fd, void *buffer, off64_t count, bool is64bit) {
+        START_LOG(capio_syscall(SYS_gettid), "call(fd=%d, count=%ld, is_getdents=%s, is64bit=%s)",
+                  fd, count, is64bit ? "true" : "false");
+
+        if (_last_fd != fd) {
+            LOG("changed fd from %d to %d: flushing", _last_fd, fd);
+            flush();
+            _last_fd = fd;
+        }
+
+        const capio_off64_t remaining_bytes = _actual_size - _cache_offset;
+        const capio_off64_t file_offset     = get_capio_fd_offset(fd);
+        capio_off64_t bytes_read;
+
+        auto read_size = count - remaining_bytes;
+        LOG("Read() will need to read %ld bytes", read_size);
+
+        if (count <= remaining_bytes) {
+            LOG("count %ld <= remaining_bytes %ld", count, remaining_bytes);
+            _read(buffer, count);
+            bytes_read = count;
+        } else {
+            LOG("count %ld > remaining_bytes %llu", count, remaining_bytes);
+            _read(buffer, remaining_bytes);
+            buffer = static_cast<char *>(buffer) + remaining_bytes;
+
+            if (read_size > _max_line_size) {
+                LOG("count - remaining_bytes %ld > _max_line_size %ld", read_size, _max_line_size);
+                LOG("Reading exactly requested size");
+                const capio_off64_t end_of_read = read_request(fd, read_size, _tid);
+                bytes_read                      = end_of_read - file_offset;
+                stc_queue->read(static_cast<char *>(buffer), bytes_read);
+            } else {
+                LOG("count - remaining_bytes %ld <= _max_line_size %ld", read_size, _max_line_size);
+                LOG("Reading more to use pre fetching and caching");
+                const capio_off64_t end_of_read = read_request(fd, _max_line_size, _tid);
+                LOG("request return value is %ld", end_of_read);
+                _actual_size = end_of_read - file_offset - remaining_bytes;
+                LOG("ReaderCache actual size, after requested read is: %ld bytes", _actual_size);
+                _cache_offset = 0;
+                if (_actual_size > 0) {
+                    LOG("Fetching data from shm _queue");
+                    _cache = stc_queue->fetch();
+                }
+                if (read_size < _actual_size) {
+                    LOG("count - remaining_bytes %ld < _actual_size %ld", read_size, _actual_size);
+                    _read(buffer, read_size);
+                    bytes_read = count;
+                } else {
+                    LOG("count - remaining_bytes %ld >= _actual_size %ld", read_size, _actual_size);
+                    _read(buffer, _actual_size);
+                    bytes_read = remaining_bytes + _actual_size;
+                }
+            }
+        }
+        LOG("%ld bytes have been read. setting fd offset to %ld", bytes_read,
+            file_offset + bytes_read);
+        set_capio_fd_offset(fd, file_offset + bytes_read);
+        return bytes_read;
+    }
+};
+
+class WriteRequestCacheMEM {
+    char *_cache;
+    long _tid;
+    int _fd;
+    off64_t _max_line_size, _actual_size;
+
+    void _write(const off64_t count, const void *buffer) {
+        START_LOG(capio_syscall(SYS_gettid), "call(count=%ld)", count);
+
+        if (count > 0) {
+            if (_cache == nullptr) {
+                _cache = cts_queue->reserve();
+            }
+            memcpy(_cache + _actual_size, buffer, count);
+            _actual_size += count;
+            if (_actual_size == _max_line_size) {
+                flush();
+            }
+        }
+    }
+
+    void write_request(const off64_t count, const long tid, const long fd) const {
+        START_LOG(capio_syscall(SYS_gettid), "call(path=%s, count=%ld, tid=%ld)",
+                  get_capio_fd_path(_fd).c_str(), count, tid);
+        char req[CAPIO_REQ_MAX_SIZE];
+        sprintf(req, "%04d %ld %ld %s %ld", CAPIO_REQUEST_WRITE_MEM, tid, fd,
+                get_capio_fd_path(_fd).c_str(), count);
+        buf_requests->write(req, CAPIO_REQ_MAX_SIZE);
+    }
+
+  public:
+    explicit WriteRequestCacheMEM(off64_t line_size = get_cache_line_size())
+        : _cache(nullptr), _tid(capio_syscall(SYS_gettid)), _fd(-1), _max_line_size(line_size),
+          _actual_size(0) {}
+
+    void flush() {
+        START_LOG(capio_syscall(SYS_gettid), "call()");
+
+        if (_actual_size != 0) {
+            write_request(_fd, _actual_size, _tid);
+            _cache       = nullptr;
+            _actual_size = 0;
+        }
+    }
+
+    void write(int fd, const void *buffer, off64_t count) {
+        START_LOG(capio_syscall(SYS_gettid), "call(fd=%d, buffer=0x%08x, count=%ld)", fd, buffer,
+                  count);
+
+        if (_fd != fd) {
+            LOG("changed fd from %d to %d: flushing", _fd, fd);
+            flush();
+            _fd = fd;
+        }
+
+        if (count <= _max_line_size - _actual_size) {
+            LOG("count %ld <= _max_line_size - _actual_size %ld", count,
+                _max_line_size - _actual_size);
+            _write(count, buffer);
+        } else {
+            LOG("count %ld > _max_line_size - _actual_size %ld", count,
+                _max_line_size - _actual_size);
+            flush();
+            if (count - _actual_size > _max_line_size) {
+                LOG("count - _actual_size %ld > _max_line_size %ld", count - _actual_size,
+                    _max_line_size);
+                write_request(_fd, count, _tid);
+                cts_queue->write(static_cast<const char *>(buffer), count);
+            } else {
+                LOG("count - _actual_size %ld <= _max_line_size %ld", count - _actual_size,
+                    _max_line_size);
+                _write(count, buffer);
+            }
+        }
+
+        set_capio_fd_offset(fd, get_capio_fd_offset(fd) + count);
+    }
+};
+
+inline thread_local ConsentRequestCache *consent_request_cache_fs;
+inline thread_local ReadRequestCacheFS *read_request_cache_fs;
+inline thread_local WriteRequestCacheFS *write_request_cache_fs;
+inline thread_local WriteRequestCacheMEM write_request_cache_mem;
+inline thread_local ReadRequestCacheMEM read_request_cache_mem;
 
 inline void init_caches() {
-    write_request_cache   = new WriteRequestCache();
-    read_request_cache    = new ReadRequestCache();
-    consent_request_cache = new ConsentRequestCache();
+    START_LOG(capio_syscall(SYS_gettid), "call()");
+    write_request_cache_fs   = new WriteRequestCacheFS();
+    read_request_cache_fs    = new ReadRequestCacheFS();
+    consent_request_cache_fs = new ConsentRequestCache();
 }
 
 inline void delete_caches() {
-    delete write_request_cache;
-    delete read_request_cache;
-    delete consent_request_cache;
+    START_LOG(capio_syscall(SYS_gettid), "call()");
+    delete write_request_cache_fs;
+    delete read_request_cache_fs;
+    delete consent_request_cache_fs;
 }
 
 #endif // CAPIO_CACHE_HPP

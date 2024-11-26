@@ -35,8 +35,8 @@ inline bool in_dir(const std::string &path, const std::string &glob) {
 
 inline bool is_directory(int dirfd) {
     START_LOG(capio_syscall(SYS_gettid), "call(dirfd=%d)", dirfd);
+    struct stat path_stat{};
 
-    struct stat path_stat {};
     int tmp = fstat(dirfd, &path_stat);
     if (tmp != 0) {
         LOG("Error at is_directory(dirfd=%d) -> %d: %d (%s)", dirfd, tmp, errno,
