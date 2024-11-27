@@ -45,10 +45,10 @@ inline void handshake_request(const long tid, const long pid, const std::string 
     buf_requests->write(req, CAPIO_REQ_MAX_SIZE);
     LOG("Sent handshake request");
 
-    cts_queue = new SPSCQueue("queue-" + app_name + ".cts", CAPIO_MAX_SPSQUEUE_ELEMS,
-                              CAPIO_MAX_SPSCQUEUE_ELEM_SIZE);
-    stc_queue = new SPSCQueue("queue-" + app_name + ".stc", CAPIO_MAX_SPSQUEUE_ELEMS,
-                              CAPIO_MAX_SPSCQUEUE_ELEM_SIZE);
+    cts_queue = new SPSCQueue("queue-" + std::to_string(tid) + ".cts", get_cache_lines(),
+                              get_cache_line_size());
+    stc_queue = new SPSCQueue("queue-" + std::to_string(tid) + ".stc", get_cache_lines(),
+                              get_cache_line_size());
     LOG("Initialized data transfer queues");
 }
 

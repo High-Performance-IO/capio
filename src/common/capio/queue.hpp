@@ -84,15 +84,9 @@ template <class T, class Mutex> class Queue {
                   _first_elem_name.c_str(), _last_elem_name.c_str());
         if (require_cleanup) {
             LOG("Performing cleanup of allocated resources");
-#ifdef __CAPIO_POSIX
-            syscall_no_intercept_flag = true;
-#endif
             SHM_DESTROY_CHECK(_shm_name.c_str());
             SHM_DESTROY_CHECK(_first_elem_name.c_str());
             SHM_DESTROY_CHECK(_last_elem_name.c_str());
-#ifdef __CAPIO_POSIX
-            syscall_no_intercept_flag = false;
-#endif
         }
     }
 

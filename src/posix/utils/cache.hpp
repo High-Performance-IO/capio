@@ -179,9 +179,8 @@ class ReadRequestCacheMEM {
     long _tid;
     int _last_fd;
     capio_off64_t _max_line_size, _actual_size, _cache_offset;
-    SPSCQueue _queue;
 
-    inline void _read(void *buffer, capio_off64_t count) {
+    void _read(void *buffer, capio_off64_t count) {
         START_LOG(capio_syscall(SYS_gettid), "call(count=%ld)", count);
 
         if (count > 0) {
@@ -218,8 +217,7 @@ class ReadRequestCacheMEM {
                                  const long line_size             = get_cache_line_size(),
                                  const std::string &workflow_name = get_capio_workflow_name())
         : _cache(nullptr), _tid(capio_syscall(SYS_gettid)), _last_fd(-1), _max_line_size(line_size),
-          _actual_size(0), _cache_offset(0),
-          _queue(SHM_SPSC_PREFIX_READ + std::to_string(_tid), lines, line_size, workflow_name) {}
+          _actual_size(0), _cache_offset(0) {}
 
     inline void flush() {
         START_LOG(capio_syscall(SYS_gettid), "call()");
@@ -254,14 +252,14 @@ class ReadRequestCacheMEM {
         } else {
             LOG("count %ld > remaining_bytes %llu", count, remaining_bytes);
             _read(buffer, remaining_bytes);
-            buffer = reinterpret_cast<char *>(buffer) + remaining_bytes;
+            buffer = static_cast<char *>(buffer) + remaining_bytes;
 
             if (read_size > _max_line_size) {
                 LOG("count - remaining_bytes %ld > _max_line_size %ld", read_size, _max_line_size);
                 LOG("Reading exactly requested size");
                 const capio_off64_t end_of_read = read_request(fd, read_size, _tid);
                 bytes_read                      = end_of_read - file_offset;
-                _queue.read(static_cast<char *>(buffer), bytes_read);
+                stc_queue->read(static_cast<char *>(buffer), bytes_read);
             } else {
                 LOG("count - remaining_bytes %ld <= _max_line_size %ld", read_size, _max_line_size);
                 LOG("Reading more to use pre fetching and caching");
@@ -272,7 +270,7 @@ class ReadRequestCacheMEM {
                 _cache_offset = 0;
                 if (_actual_size > 0) {
                     LOG("Fetching data from shm _queue");
-                    _cache = _queue.fetch();
+                    _cache = stc_queue->fetch();
                 }
                 if (read_size < _actual_size) {
                     LOG("count - remaining_bytes %ld < _actual_size %ld", read_size, _actual_size);
@@ -293,19 +291,17 @@ class ReadRequestCacheMEM {
 };
 
 class WriteRequestCacheMEM {
-  private:
     char *_cache;
     long _tid;
     int _fd;
     off64_t _max_line_size, _actual_size;
-    SPSCQueue _queue;
 
-    inline void _write(off64_t count, const void *buffer) {
+    void _write(const off64_t count, const void *buffer) {
         START_LOG(capio_syscall(SYS_gettid), "call(count=%ld)", count);
 
         if (count > 0) {
             if (_cache == nullptr) {
-                _cache = _queue.reserve();
+                _cache = cts_queue->reserve();
             }
             memcpy(_cache + _actual_size, buffer, count);
             _actual_size += count;
@@ -315,7 +311,7 @@ class WriteRequestCacheMEM {
         }
     }
 
-    inline void write_request(const off64_t count, const long tid, const long fd) const {
+    void write_request(const off64_t count, const long tid, const long fd) const {
         START_LOG(capio_syscall(SYS_gettid), "call(path=%s, count=%ld, tid=%ld)",
                   get_capio_fd_path(_fd).c_str(), count, tid);
         char req[CAPIO_REQ_MAX_SIZE];
@@ -325,14 +321,11 @@ class WriteRequestCacheMEM {
     }
 
   public:
-    explicit WriteRequestCacheMEM(off64_t lines                    = get_cache_lines(),
-                                  off64_t line_size                = get_cache_line_size(),
-                                  const std::string &workflow_name = get_capio_workflow_name())
+    explicit WriteRequestCacheMEM(off64_t line_size = get_cache_line_size())
         : _cache(nullptr), _tid(capio_syscall(SYS_gettid)), _fd(-1), _max_line_size(line_size),
-          _actual_size(0),
-          _queue(SHM_SPSC_PREFIX_WRITE + std::to_string(_tid), lines, line_size, workflow_name) {}
+          _actual_size(0) {}
 
-    inline void flush() {
+    void flush() {
         START_LOG(capio_syscall(SYS_gettid), "call()");
 
         if (_actual_size != 0) {
@@ -342,7 +335,7 @@ class WriteRequestCacheMEM {
         }
     }
 
-    inline void write(int fd, const void *buffer, off64_t count) {
+    void write(int fd, const void *buffer, off64_t count) {
         START_LOG(capio_syscall(SYS_gettid), "call(fd=%d, buffer=0x%08x, count=%ld)", fd, buffer,
                   count);
 
@@ -364,7 +357,7 @@ class WriteRequestCacheMEM {
                 LOG("count - _actual_size %ld > _max_line_size %ld", count - _actual_size,
                     _max_line_size);
                 write_request(_fd, count, _tid);
-                _queue.write(reinterpret_cast<const char *>(buffer), count);
+                cts_queue->write(static_cast<const char *>(buffer), count);
             } else {
                 LOG("count - _actual_size %ld <= _max_line_size %ld", count - _actual_size,
                     _max_line_size);
@@ -379,16 +372,14 @@ class WriteRequestCacheMEM {
 inline thread_local ConsentRequestCache *consent_request_cache_fs;
 inline thread_local ReadRequestCacheFS *read_request_cache_fs;
 inline thread_local WriteRequestCacheFS *write_request_cache_fs;
-inline thread_local WriteRequestCacheMEM *write_request_cache_mem;
-inline thread_local ReadRequestCacheMEM *read_request_cache_mem;
+inline thread_local WriteRequestCacheMEM write_request_cache_mem;
+inline thread_local ReadRequestCacheMEM read_request_cache_mem;
 
 inline void init_caches() {
     START_LOG(capio_syscall(SYS_gettid), "call()");
     write_request_cache_fs   = new WriteRequestCacheFS();
     read_request_cache_fs    = new ReadRequestCacheFS();
     consent_request_cache_fs = new ConsentRequestCache();
-    write_request_cache_mem  = new WriteRequestCacheMEM();
-    read_request_cache_mem   = new ReadRequestCacheMEM();
 }
 
 inline void delete_caches() {
@@ -396,8 +387,6 @@ inline void delete_caches() {
     delete write_request_cache_fs;
     delete read_request_cache_fs;
     delete consent_request_cache_fs;
-    delete write_request_cache_mem;
-    delete read_request_cache_mem;
 }
 
 #endif // CAPIO_CACHE_HPP

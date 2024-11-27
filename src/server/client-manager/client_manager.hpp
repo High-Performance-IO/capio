@@ -37,7 +37,7 @@ class ClientManager {
      * @param tid
      * @return
      */
-    inline void register_new_client(pid_t tid, const std::string &app_name) const {
+    inline void register_client(const std::string &app_name, pid_t tid) const {
         START_LOG(gettid(), "call(tid=%ld, app_name=%s)", tid, app_name.c_str());
         // TODO: replace numbers with constexpr
         auto *p_buf_response = new CircularBuffer<capio_off64_t>(
