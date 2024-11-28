@@ -14,11 +14,9 @@
 #ifdef __CAPIO_POSIX
 
 #define SHM_DESTROY_CHECK(source_name)                                                             \
-    syscall_no_intercept_flag = true;                                                              \
     if (shm_unlink(source_name) == -1) {                                                           \
         ERR_EXIT("Unable to destroy shared mem:  %s. Error is %s", source_name, strerror(errno));  \
-    };                                                                                             \
-    syscall_no_intercept_flag = false;
+    };
 
 #define SHM_CREATE_CHECK(condition, source)                                                        \
     if (condition) {                                                                               \
@@ -73,8 +71,15 @@ class CapioShmCanary {
         std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_WARNING << " [ " << node_name << " ] "
                   << "Removing shared memory canary flag" << std::endl;
 #endif
+
+#ifdef __CAPIO_POSIX
+        syscall_no_intercept_flag = true;
+#endif
         close(_shm_id);
         SHM_DESTROY_CHECK(_canary_name.c_str());
+#ifdef __CAPIO_POSIX
+        syscall_no_intercept_flag = false;
+#endif
     }
 };
 
@@ -106,8 +111,8 @@ void *get_shm(const std::string &shm_name) {
     START_LOG(capio_syscall(SYS_gettid), "call(shm_name=%s)", shm_name.c_str());
 
     // if we are not creating a new object, mode is equals to 0
-    int fd = shm_open(shm_name.c_str(), O_RDWR, 0); // to be closed
-    struct stat sb{};
+    int fd         = shm_open(shm_name.c_str(), O_RDWR, 0); // to be closed
+    struct stat sb = {0};
     if (fd == -1) {
         ERR_EXIT("get_shm shm_open %s", shm_name.c_str());
     }
@@ -131,8 +136,8 @@ void *get_shm_if_exist(const std::string &shm_name) {
     START_LOG(capio_syscall(SYS_gettid), "call(shm_name=%s)", shm_name.c_str());
 
     // if we are not creating a new object, mode is equals to 0
-    int fd = shm_open(shm_name.c_str(), O_RDWR, 0); // to be closed
-    struct stat sb{};
+    int fd         = shm_open(shm_name.c_str(), O_RDWR, 0); // to be closed
+    struct stat sb = {0};
     if (fd == -1) {
         if (errno == ENOENT) {
             return nullptr;

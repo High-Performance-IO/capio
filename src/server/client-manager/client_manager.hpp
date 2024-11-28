@@ -42,7 +42,7 @@ class ClientManager {
         // TODO: replace numbers with constexpr
         auto *p_buf_response = new CircularBuffer<capio_off64_t>(
             SHM_COMM_CHAN_NAME_RESP + std::to_string(tid), CAPIO_REQ_BUFF_CNT,
-            sizeof(capio_off64_t), workflow_name);
+            sizeof(capio_off64_t), workflow_name, false);
 
         bufs_response->insert(std::make_pair(tid, p_buf_response));
         app_names->emplace(tid, app_name);

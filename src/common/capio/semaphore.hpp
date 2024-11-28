@@ -52,6 +52,9 @@ class NamedSemaphore {
     NamedSemaphore &operator=(const NamedSemaphore &) = delete;
     ~NamedSemaphore() {
         START_LOG(capio_syscall(SYS_gettid), "call()");
+#ifdef __CAPIO_POSIX
+        syscall_no_intercept_flag = true;
+#endif
         if (sem_destroy(_sem) != 0) {
             ERR_EXIT(" destruction of semaphore %s failed", _name.c_str());
         }
@@ -60,6 +63,9 @@ class NamedSemaphore {
             ERR_EXIT(" destruction of semaphore %s failed", _name.c_str());
         }
         LOG(" Unlinked shared semaphore %s", _name.c_str());
+#ifdef __CAPIO_POSIX
+        syscall_no_intercept_flag = false;
+#endif
     }
 
     inline void lock() {
@@ -100,9 +106,15 @@ class Semaphore {
     Semaphore &operator=(const Semaphore &) = delete;
     ~Semaphore() {
         START_LOG(capio_syscall(SYS_gettid), "call()");
+#ifdef __CAPIO_POSIX
+        syscall_no_intercept_flag = true;
+#endif
         if (sem_destroy(&_sem) != 0) {
             ERR_EXIT("destruction of unnamed semaphore failed");
         }
+#ifdef __CAPIO_POSIX
+        syscall_no_intercept_flag = false;
+#endif
     }
 
     inline void lock() {

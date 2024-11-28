@@ -146,7 +146,7 @@ jobs:
           sudo cmake --install ../build --prefix /usr/local
       - name: "Run tests"
         id: run-tests
-        timeout-minutes: 1
+        timeout-minutes: 2
         env:
           CAPIO_DIR: ${{ github.workspace }}
           CAPIO_LOG_LEVEL: -1
@@ -159,15 +159,21 @@ jobs:
             --gtest_break_on_failure \
             --gtest_print_time=1
           
+          rm -rf /dev/shm/*CAPIO*
+          
           echo "Run CAPIO POSIX Unit tests"
           capio_posix_unit_tests \
             --gtest_break_on_failure \
             --gtest_print_time=1
           
+          rm -rf /dev/shm/*CAPIO*
+          
           echo "Run CAPIO SERVER unit tests"
           capio_server_unit_tests \
             --gtest_break_on_failure \
             --gtest_print_time=1
+          
+          rm -rf /dev/shm/*CAPIO*
           
           echo "Run CAPIO integration tests"
           rm -rf /dev/shm/CAPIO*
