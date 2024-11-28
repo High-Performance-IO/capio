@@ -6,7 +6,7 @@
 #include "handlers/close.hpp"
 #include "handlers/dup.hpp"
 #include "handlers/execve.hpp"
-#include "handlers/exit_group.hpp"
+#include "handlers/exit.hpp"
 #include "handlers/fchmod.hpp"
 #include "handlers/fchown.hpp"
 #include "handlers/fcntl.hpp"

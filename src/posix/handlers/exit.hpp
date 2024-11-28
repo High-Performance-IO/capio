@@ -23,9 +23,20 @@ int exit_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg
         exit_group_request(tid);
         remove_capio_tid(tid);
     }
+
+    if (const auto itm = bufs_response->find(tid); itm != bufs_response->end()) {
+        delete itm->second;
+        bufs_response->erase(tid);
+        LOG("Removed response buffer");
+    }
+
     delete_caches();
+    LOG("Removed caches");
+
     delete stc_queue;
     delete cts_queue;
+    LOG("Removed data queues");
+
     return CAPIO_POSIX_SYSCALL_SKIP;
 }
 
