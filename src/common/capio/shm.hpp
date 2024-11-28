@@ -15,8 +15,13 @@
 
 #define SHM_DESTROY_CHECK(source_name)                                                             \
     if (shm_unlink(source_name) == -1) {                                                           \
-        ERR_EXIT("Unable to destroy shared mem:  %s. Error is %s", source_name, strerror(errno));  \
-    };
+        if (errno != ENOENT) {                                                                     \
+            ERR_EXIT("Unable to destroy shared mem:  %s. Error is %s", source_name,                \
+                     strerror(errno));                                                             \
+        } else {                                                                                   \
+            LOG("Warn: shm segment %s is not present on FS", source_name);                         \
+        }                                                                                          \
+    }
 
 #define SHM_CREATE_CHECK(condition, source)                                                        \
     if (condition) {                                                                               \
@@ -101,7 +106,6 @@ void *create_shm(const std::string &shm_name, const long int size) {
         ERR_EXIT("mmap create_shm %s", shm_name.c_str());
     }
     if (close(fd) == -1) {
-
         ERR_EXIT("close");
     }
     return p;
