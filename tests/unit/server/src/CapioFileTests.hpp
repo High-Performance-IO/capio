@@ -1,8 +1,5 @@
-#include <gtest/gtest.h>
-#include <thread>
-
-std::string node_name;
-
+#ifndef CAPIOFILETESTS_HPP
+#define CAPIOFILETESTS_HPP
 #include "../server/storage-service/CapioFile/CapioMemoryFile.hpp"
 
 constexpr size_t FILE_SIZE = 8 * 1024 * 1024;
@@ -52,7 +49,8 @@ TEST(CapioMemoryFileTest, TestHugeFileOnMultiplePages) {
     }
     EXPECT_TRUE(ok);
 
-    delete LONG_TEXT;
+    delete[] LONG_TEXT;
+    delete[] input_buffer4;
 }
 
 /*
@@ -111,7 +109,7 @@ TEST(CapioMemoryFileTest, TestWriteAndRead) {
     EXPECT_TRUE(ok);
 
     delete buffer;
-    delete buffer_read;
+    delete[] buffer_read;
 }
 
 TEST(CapioMemoryFileTest, TestWriteAndReadDifferentPageStartOffset) {
@@ -139,13 +137,13 @@ TEST(CapioMemoryFileTest, TestWriteAndReadDifferentPageStartOffset) {
     EXPECT_TRUE(ok);
 
     delete buffer;
-    delete buffer_read;
+    delete[] buffer_read;
 }
 
 TEST(CapioMemoryFileTest, TestThreadsSpscqueueAndCapioMemFile) {
 
-    SPSCQueue communication_queue("test.queue", CAPIO_CACHE_LINES_DEFAULT,
-                                  CAPIO_CACHE_LINE_SIZE_DEFAULT, "demo", true);
+    SPSCQueue *communication_queue = new SPSCQueue("test.queue", CAPIO_CACHE_LINES_DEFAULT,
+                                                   CAPIO_CACHE_LINE_SIZE_DEFAULT, "demo", true);
     CapioMemoryFile file_source("source.txt"), file_destination("destination.txt");
 
     // 8 MB buffer
@@ -156,11 +154,11 @@ TEST(CapioMemoryFileTest, TestThreadsSpscqueueAndCapioMemFile) {
 
     file_source.writeData(buffer, FILE_SIZE / 2, 10 * FILE_SIZE);
 
-    std::thread writer([&communication_queue, &file_source]() {
-        file_source.writeToQueue(communication_queue, FILE_SIZE / 2, 10 * FILE_SIZE);
+    std::thread writer([communication_queue, &file_source]() {
+        file_source.writeToQueue(*communication_queue, FILE_SIZE / 2, 10 * FILE_SIZE);
     });
 
-    file_destination.readFromQueue(communication_queue, FILE_SIZE / 2, 10 * FILE_SIZE);
+    file_destination.readFromQueue(*communication_queue, FILE_SIZE / 2, 10 * FILE_SIZE);
     writer.join();
 
     auto buffer_read = new char[10 * FILE_SIZE];
@@ -175,12 +173,9 @@ TEST(CapioMemoryFileTest, TestThreadsSpscqueueAndCapioMemFile) {
     }
     EXPECT_TRUE(ok);
 
-    delete buffer;
-    delete buffer_read;
+    delete[] buffer;
+    delete[] buffer_read;
+    delete communication_queue;
 }
 
-int main(int argc, char **argv) {
-    testing::InitGoogleTest(&argc, argv);
-
-    return RUN_ALL_TESTS();
-}
+#endif // CAPIOFILETESTS_HPP

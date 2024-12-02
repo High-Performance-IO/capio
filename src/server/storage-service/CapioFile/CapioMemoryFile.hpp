@@ -38,7 +38,7 @@ class CapioMemoryFile : public CapioFile {
         // compute the first write size. if the write operation is bigger than the size of the page
         // in bytes, then we need to perform the first write operation with size equals to the
         // distance between the write offset and the end of the page. otherwise it is possible to
-        // use the given length
+        // use the given length. The returned offset starts from mem_block_offset
         const auto first_write_size =
             length > _pageSizeBytes ? _pageSizeBytes - mem_block_offset : length;
 
@@ -111,7 +111,7 @@ class CapioMemoryFile : public CapioFile {
     std::size_t readData(char *buffer, std::size_t file_offset, std::size_t buffer_size) {
         std::size_t bytesRead = 0;
 
-        const auto &[map_offset, mem_block_offset_begin, mem_block_offset_end] =
+        const auto &[map_offset, mem_block_offset_begin, target_buffer_size] =
             compute_offsets(file_offset, buffer_size);
 
         // Traverse the memory blocks to read the requested data starting from the first block of
@@ -124,8 +124,9 @@ class CapioMemoryFile : public CapioFile {
             }
 
             // Copy the data to the buffer
-            std::size_t copyLength = mem_block_offset_end - mem_block_offset_begin;
-            std::copy(block.begin() + mem_block_offset_begin, block.begin() + mem_block_offset_end,
+            std::size_t copyLength = target_buffer_size - mem_block_offset_begin;
+            std::copy(block.begin() + mem_block_offset_begin,
+                      block.begin() + mem_block_offset_begin + target_buffer_size,
                       buffer + bytesRead);
 
             bytesRead += copyLength;
@@ -182,7 +183,7 @@ class CapioMemoryFile : public CapioFile {
                              std::size_t length) const override {
         std::size_t bytesRead = 0;
 
-        const auto &[map_offset, mem_block_offset_begin, mem_block_offset_end] =
+        const auto &[map_offset, mem_block_offset_begin, buffer_view_size] =
             compute_offsets(offset, length);
 
         // Traverse the memory blocks to read the requested data starting from the first block of
@@ -196,10 +197,9 @@ class CapioMemoryFile : public CapioFile {
             }
 
             // Copy the data to the buffer
-            std::size_t copyLength = mem_block_offset_end - mem_block_offset_begin;
-            queue.write(block.data() + mem_block_offset_begin, copyLength);
+            queue.write(block.data() + mem_block_offset_begin, buffer_view_size);
 
-            bytesRead += copyLength;
+            bytesRead += buffer_view_size;
         }
 
         return bytesRead;

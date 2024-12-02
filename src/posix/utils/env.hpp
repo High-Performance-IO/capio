@@ -60,4 +60,22 @@ inline long get_cache_line_size() {
     return data_bufs_count;
 }
 
+inline long get_posix_read_cache_line_size() {
+    START_LOG(capio_syscall(SYS_gettid), "call()");
+    static long data_bufs_count = -1;
+    if (data_bufs_count == -1) {
+        LOG("Value not set. getting value");
+        char *value = std::getenv("CAPIO_POSIX_CACHE_LINE_SIZE");
+        if (value != nullptr) {
+            LOG("Getting value from environment variable");
+            data_bufs_count = strtol(value, nullptr, 10);
+        } else {
+            LOG("Getting default value");
+            data_bufs_count = CAPIO_CACHE_LINE_SIZE_DEFAULT;
+        }
+    }
+    LOG("data_bufs_count=%ld", data_bufs_count);
+    return data_bufs_count;
+}
+
 #endif // CAPIO_POSIX_UTILS_ENV_HPP

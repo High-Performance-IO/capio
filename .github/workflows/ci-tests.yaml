@@ -18,6 +18,8 @@ jobs:
       - uses: actions/checkout@v4
       - name: "Run codespell"
         uses: codespell-project/actions-codespell@v2
+        with:
+          exclude_file: tests/unit/server/src/SourceText.hpp
   docker-check:
     name: "Check Docker image"
     runs-on: ubuntu-22.04
@@ -153,19 +155,19 @@ jobs:
         run: |
           export LD_LIBRARY_PATH="/usr/local/lib:${LD_LIBRARY_PATH}"
           
-          echo "Run CAPIO syscall Unit tests"
-          LD_PRELOAD=libcapio_posix.so \
-          capio_syscall_unit_tests \
+          echo "Run CAPIO SERVER unit tests"
+          capio_server_unit_tests \
             --gtest_break_on_failure \
             --gtest_print_time=1
-          
+                
           echo "Run CAPIO POSIX Unit tests"
           capio_posix_unit_tests \
             --gtest_break_on_failure \
             --gtest_print_time=1
           
-          echo "Run CAPIO SERVER unit tests"
-          capio_server_unit_tests \
+          echo "Run CAPIO syscall Unit tests"
+          LD_PRELOAD=libcapio_posix.so \
+          capio_syscall_unit_tests \
             --gtest_break_on_failure \
             --gtest_print_time=1
                
@@ -186,6 +188,7 @@ jobs:
         run: |
           pip install --upgrade gcovr
           gcovr \
+            --gcov-ignore-parse-errors \
             --exclude-throw-branches \
             --xml coverage.xml \
             --gcov-executable "${{ startsWith(matrix.cxx, 'clang-') && format('llvm-cov-{0} gcov', env.CXX_VERSION) || format('gcov-{0}', env.CXX_VERSION) }}" \
