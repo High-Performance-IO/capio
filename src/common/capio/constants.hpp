@@ -30,7 +30,9 @@ constexpr char CAPIO_SHM_CANARY_ERROR[] =
 constexpr int CAPIO_REQ_BUFF_CNT                     = 512; // Max number of elements inside buffers
 constexpr int CAPIO_CACHE_LINES_DEFAULT              = 10;
 constexpr int CAPIO_CACHE_LINE_SIZE_DEFAULT          = 4096;
-constexpr size_t CAPIO_REQ_MAX_SIZE                  = 256 * sizeof(char);
+// TODO: use that in communication only uses the file descriptor instead of the path to save on the
+// PATH_MAX
+constexpr size_t CAPIO_REQ_MAX_SIZE                  = (PATH_MAX + 256) * sizeof(char);
 constexpr char CAPIO_SERVER_CLI_LOG_SERVER[]         = "[ \033[1;32m SERVER \033[0m ] ";
 constexpr char CAPIO_SERVER_CLI_LOG_SERVER_WARNING[] = "[ \033[1;33m SERVER \033[0m ] ";
 constexpr char CAPIO_SERVER_CLI_LOG_SERVER_ERROR[]   = "[ \033[1;31m SERVER \033[0m ] ";
