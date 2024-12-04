@@ -310,12 +310,14 @@ class WriteRequestCacheMEM {
         }
     }
 
-    void write_request(const off64_t count, const long tid) const {
-        START_LOG(capio_syscall(SYS_gettid), "call(path=%s, count=%ld)",
-                  get_capio_fd_path(_fd).c_str(), count);
+  protected:
+    void write_request(const off64_t count, const long tid, const char *path,
+                       const capio_off64_t offset) const {
+        START_LOG(capio_syscall(SYS_gettid), "call(path=%s, count=%ld, offset=%llu)", path, count,
+                  offset);
         char req[CAPIO_REQ_MAX_SIZE];
-        sprintf(req, "%04d %ld %s %llu %ld", CAPIO_REQUEST_WRITE_MEM, tid,
-                get_capio_fd_path(_fd).c_str(), _last_write_begin, count);
+
+        sprintf(req, "%04d %ld %s %llu %ld", CAPIO_REQUEST_WRITE_MEM, tid, path, offset, count);
         buf_requests->write(req, CAPIO_REQ_MAX_SIZE);
     }
 
@@ -327,7 +329,7 @@ class WriteRequestCacheMEM {
     void flush() {
         START_LOG(capio_syscall(SYS_gettid), "call()");
         if (_actual_size != 0) {
-            write_request(_fd, _actual_size);
+            write_request(_fd, _actual_size, get_capio_fd_path(_fd).c_str(), _last_write_begin);
             _cache            = nullptr;
             _actual_size      = 0;
             _last_write_begin = get_capio_fd_offset(_fd) + _actual_size + 1;
@@ -363,7 +365,7 @@ class WriteRequestCacheMEM {
             if (count - _actual_size > _max_line_size) {
                 LOG("count - _actual_size %ld > _max_line_size %ld", count - _actual_size,
                     _max_line_size);
-                write_request(_fd, count);
+                write_request(_fd, count, get_capio_fd_path(_fd).c_str(), _last_write_begin);
                 cts_queue->write(static_cast<const char *>(buffer), count);
             } else {
                 LOG("count - _actual_size %ld <= _max_line_size %ld", count - _actual_size,

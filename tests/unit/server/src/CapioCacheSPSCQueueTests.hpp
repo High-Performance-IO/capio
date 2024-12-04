@@ -8,7 +8,7 @@
 
 inline SPSCQueue *cts_queue, *stc_queue;
 inline CPBufResponse_t *bufs_response;
-inline thread_local CircularBuffer<char> *buf_requests;
+inline CircularBuffer<char> *buf_requests;
 
 #include "../posix/utils/cache.hpp"
 #include "SourceText.hpp"
@@ -37,6 +37,14 @@ void delete_server_data_structures() {
     delete bufs_response;
     delete buf_requests;
 }
+
+class WriteMemReqWrapper : public WriteRequestCacheMEM {
+  public:
+    void request(const off64_t count, const long tid, const char *path,
+                 const capio_off64_t offset) const {
+        this->write_request(count, tid, path, offset);
+    }
+};
 
 TEST(CapioCacheSPSCQueue, TestCacheWithSpscQueueWrite) {
 
@@ -82,6 +90,54 @@ TEST(CapioCacheSPSCQueue, TestCacheSPSCQueueAndCapioFile) {
         delete[] readBuf;
         delete testFile;
     });
+
+    writeCache->write(test_fd, SOURCE_TEST_TEXT, long_test_length);
+    writeCache->flush();
+
+    server_thread.join();
+
+    delete_server_data_structures();
+}
+
+TEST(CapioCacheSPSCQueue, TestCacheSPSCQueueAndCapioFileWithRequest) {
+    unsigned long long_test_length = strlen(SOURCE_TEST_TEXT) + 1;
+    auto readBufSize               = 1024;
+
+    init_server_data_structures();
+
+    capio_files_descriptors->emplace(test_fd, test_file_name);
+    files->insert({test_fd, {std::make_shared<capio_off64_t>(0), 0, 0, false}});
+
+    std::thread server_thread([readBufSize] {
+        char *req = new char[CAPIO_REQ_MAX_SIZE];
+        int tid, fd, code;
+        char path[PATH_MAX];
+        off64_t write_size;
+        capio_off64_t offset;
+
+        buf_requests->read(req, CAPIO_REQ_MAX_SIZE);
+        sscanf(req, "%04d %d %s %llu %ld", &code, &tid, path, &offset, &write_size);
+
+        EXPECT_EQ(code, CAPIO_REQUEST_WRITE_MEM);
+        EXPECT_EQ(strcmp(path, test_file_name.c_str()), 0);
+
+        CapioMemoryFile *testFile = new CapioMemoryFile(path);
+        testFile->readFromQueue(*cts_queue, 0, write_size);
+
+        char *readBuf = new char[readBufSize]{};
+        for (auto offset = 0; offset < write_size; offset += readBufSize) {
+            testFile->readData(readBuf, offset, readBufSize);
+            EXPECT_EQ(strncmp(readBuf, SOURCE_TEST_TEXT + offset, readBufSize), 0);
+        }
+
+        delete[] readBuf;
+        delete[] req;
+        delete testFile;
+    });
+
+    WriteMemReqWrapper wrapper;
+
+    wrapper.request(long_test_length, gettid(), test_file_name.c_str(), 0);
 
     writeCache->write(test_fd, SOURCE_TEST_TEXT, long_test_length);
     writeCache->flush();
