@@ -111,7 +111,7 @@ class CapioMemoryFile : public CapioFile {
     std::size_t readData(char *buffer, std::size_t file_offset, std::size_t buffer_size) {
         std::size_t bytesRead = 0;
 
-        const auto &[map_offset, mem_block_offset_begin, mem_block_offset_end] =
+        const auto &[map_offset, mem_block_offset_begin, target_buffer_size] =
             compute_offsets(file_offset, buffer_size);
 
         // Traverse the memory blocks to read the requested data starting from the first block of
@@ -124,8 +124,9 @@ class CapioMemoryFile : public CapioFile {
             }
 
             // Copy the data to the buffer
-            std::size_t copyLength = mem_block_offset_end - mem_block_offset_begin;
-            std::copy(block.begin() + mem_block_offset_begin, block.begin() + mem_block_offset_end,
+            std::size_t copyLength = target_buffer_size - mem_block_offset_begin;
+            std::copy(block.begin() + mem_block_offset_begin,
+                      block.begin() + mem_block_offset_begin + target_buffer_size,
                       buffer + bytesRead);
 
             bytesRead += copyLength;

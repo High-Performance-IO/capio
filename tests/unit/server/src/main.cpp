@@ -3,9 +3,8 @@
 
 std::string node_name;
 
-#include "CapioFileTests.hpp"
-
 #include "CapioCacheSPSCQueueTests.hpp"
+#include "CapioFileTests.hpp"
 
 int main(int argc, char **argv) {
     testing::InitGoogleTest(&argc, argv);
