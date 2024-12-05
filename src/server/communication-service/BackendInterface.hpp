@@ -5,7 +5,7 @@
 
 class NotImplementedBackendMethod : public std::exception {
   public:
-    const char *what() const noexcept override {
+    [[nodiscard]] const char *what() const noexcept override {
         auto msg = new char[1024]{};
         sprintf(msg, "The chosen backend does not implement method: %s", __func__);
         return msg;
@@ -14,6 +14,7 @@ class NotImplementedBackendMethod : public std::exception {
 
 class BackendInterface {
 public:
+    virtual ~BackendInterface() = default;
     /**
      * @brief Send data to target
      *

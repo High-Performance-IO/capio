@@ -5,6 +5,7 @@ set(TARGET_NAME capio_server)
 set(TARGET_INCLUDE_FOLDER ${CMAKE_CURRENT_SOURCE_DIR})
 set(TARGET_SOURCES
         ${CMAKE_CURRENT_SOURCE_DIR}/capio_server.cpp
+        communication-service/CapioCommunicationService.h
 )
 
 #####################################
@@ -26,7 +27,7 @@ FetchContent_Declare(
         GIT_TAG fbd8aa924b916c6578963af315fdb5f10c3969ad
 )
 
-FetchContent_MakeAvailable( args simdjson mtcl)
+FetchContent_MakeAvailable(args simdjson mtcl)
 
 
 #####################################
