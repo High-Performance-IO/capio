@@ -181,6 +181,11 @@ class ReadRequestCacheMEM {
     capio_off64_t _max_line_size, _actual_size, _cache_offset;
     capio_off64_t _last_read_end;
 
+    /**
+     * Copy data from the cache internal buffer to target buffer
+     * @param buffer
+     * @param count
+     */
     void _read(void *buffer, capio_off64_t count) {
         START_LOG(capio_syscall(SYS_gettid), "call(count=%ld)", count);
 
@@ -191,6 +196,7 @@ class ReadRequestCacheMEM {
         }
     }
 
+  protected:
     static capio_off64_t read_request(const int fd, const capio_off64_t count, const long tid) {
         START_LOG(capio_syscall(SYS_gettid), "call(fd=%ld, count=%ld, tid=%ld)", fd, count, tid);
         char req[CAPIO_REQ_MAX_SIZE];
@@ -204,11 +210,14 @@ class ReadRequestCacheMEM {
     }
 
   public:
-    explicit ReadRequestCacheMEM(const long lines                 = get_cache_lines(),
-                                 const long line_size             = get_cache_line_size(),
+    explicit ReadRequestCacheMEM(const long line_size             = get_cache_line_size(),
                                  const std::string &workflow_name = get_capio_workflow_name())
         : _cache(nullptr), _tid(capio_syscall(SYS_gettid)), _fd(-1), _max_line_size(line_size),
-          _actual_size(0), _cache_offset(0), _last_read_end(-1) {}
+          _actual_size(0), _cache_offset(0), _last_read_end(-1) {
+        _cache = new char[_max_line_size];
+    }
+
+    ~ReadRequestCacheMEM() { delete[] _cache; }
 
     inline void flush() {
         START_LOG(capio_syscall(SYS_gettid), "call()");
@@ -218,9 +227,8 @@ class ReadRequestCacheMEM {
         }
     }
 
-    inline capio_off64_t read(const int fd, void *buffer, off64_t count, bool is64bit) {
-        START_LOG(capio_syscall(SYS_gettid), "call(fd=%d, count=%ld, is_getdents=%s, is64bit=%s)",
-                  fd, count, is64bit ? "true" : "false");
+    inline capio_off64_t read(const int fd, void *buffer, off64_t count) {
+        START_LOG(capio_syscall(SYS_gettid), "call(fd=%d, count=%ld, is_getdents=%s)", fd, count);
 
         if (_fd != fd) {
             LOG("changed fd from %d to %d: flushing", _fd, fd);
@@ -230,61 +238,39 @@ class ReadRequestCacheMEM {
 
         // Check if a seek has occurred before and in case in which case flush the cache
         // and update the offset to the new value
-        // the +1 value is used to check for contiguous write operations
-        if (_last_read_end != get_capio_fd_offset(_fd) + 1) {
+        if (_last_read_end != get_capio_fd_offset(_fd)) {
             flush();
+            _last_read_end = get_capio_fd_offset(_fd);
         }
 
-        const capio_off64_t remaining_bytes = _actual_size - _cache_offset;
-        const capio_off64_t file_offset     = get_capio_fd_offset(fd);
-        capio_off64_t bytes_read;
-
-        auto read_size = count - remaining_bytes;
-        LOG("Read() will need to read %ld bytes", read_size);
-
-        if (count <= remaining_bytes) {
-            LOG("count %ld <= remaining_bytes %ld", count, remaining_bytes);
+        if (count <= _max_line_size - _cache_offset) {
+            // There is enough data to perform a read
+            LOG("The requested amount of data can be served without performing a request");
             _read(buffer, count);
-            bytes_read = count;
-        } else {
-            LOG("count %ld > remaining_bytes %llu", count, remaining_bytes);
-            _read(buffer, remaining_bytes);
-            buffer = static_cast<char *>(buffer) + remaining_bytes;
+            _last_read_end = get_capio_fd_offset(_fd) + count;
 
-            if (read_size > _max_line_size) {
-                LOG("count - remaining_bytes %ld > _max_line_size %ld", read_size, _max_line_size);
-                LOG("Reading exactly requested size");
-                const capio_off64_t end_of_read = read_request(fd, read_size, _tid);
-                bytes_read                      = end_of_read - file_offset;
-                stc_queue->read(static_cast<char *>(buffer), bytes_read);
-            } else {
-                LOG("count - remaining_bytes %ld <= _max_line_size %ld", read_size, _max_line_size);
-                LOG("Reading more to use pre fetching and caching");
-                const capio_off64_t end_of_read = read_request(fd, _max_line_size, _tid);
-                LOG("request return value is %ld", end_of_read);
-                _actual_size = end_of_read - file_offset - remaining_bytes;
-                LOG("ReaderCache actual size, after requested read is: %ld bytes", _actual_size);
-                _cache_offset = 0;
-                if (_actual_size > 0) {
-                    LOG("Fetching data from shm _queue");
-                    _cache = stc_queue->fetch();
-                }
-                if (read_size < _actual_size) {
-                    LOG("count - remaining_bytes %ld < _actual_size %ld", read_size, _actual_size);
-                    _read(buffer, read_size);
-                    bytes_read = count;
-                } else {
-                    LOG("count - remaining_bytes %ld >= _actual_size %ld", read_size, _actual_size);
-                    _read(buffer, _actual_size);
-                    bytes_read = remaining_bytes + _actual_size;
-                }
+        } else {
+            // There is not enough data and I need to get more data
+            auto first_copy_size = _max_line_size - _cache_offset;
+            _read(buffer, first_copy_size);
+            auto remaining_size = count - first_copy_size;
+            while (remaining_size > 0) {
+                // richiedo una linea
+                read_request(_fd, count, _tid);
+                // mi salvo la linea
+                stc_queue->read(_cache, _max_line_size);
+                // mando la linea al client
+                _read(buffer, remaining_size > _max_line_size ? _max_line_size : remaining_size);
+
+                remaining_size -= _max_line_size;
             }
         }
-        LOG("%ld bytes have been read. setting fd offset to %ld", bytes_read,
-            file_offset + bytes_read);
-        _last_read_end = file_offset + bytes_read;
+
+        // questo probabilmente e' sbagliato
+        _last_read_end = get_capio_fd_offset(_fd) + count;
+
         set_capio_fd_offset(fd, _last_read_end);
-        return bytes_read;
+        return 0;
     }
 };
 

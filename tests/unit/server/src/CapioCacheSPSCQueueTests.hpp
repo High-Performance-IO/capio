@@ -46,7 +46,7 @@ class WriteMemReqWrapper : public WriteRequestCacheMEM {
     }
 };
 
-TEST(CapioCacheSPSCQueue, TestCacheWithSpscQueueWrite) {
+TEST(CapioCacheSPSCQueue, TestWriteCacheWithSpscQueueWrite) {
 
     unsigned long long_test_length = strlen(SOURCE_TEST_TEXT) + 1;
     auto tmp_buf                   = new std::unique_ptr<char>(new char[long_test_length]);
@@ -69,7 +69,7 @@ TEST(CapioCacheSPSCQueue, TestCacheWithSpscQueueWrite) {
     delete_server_data_structures();
 }
 
-TEST(CapioCacheSPSCQueue, TestCacheSPSCQueueAndCapioFile) {
+TEST(CapioCacheSPSCQueue, TestWriteCacheSPSCQueueAndCapioFile) {
     unsigned long long_test_length = strlen(SOURCE_TEST_TEXT) + 1;
     auto readBufSize               = 1024;
 
@@ -99,7 +99,7 @@ TEST(CapioCacheSPSCQueue, TestCacheSPSCQueueAndCapioFile) {
     delete_server_data_structures();
 }
 
-TEST(CapioCacheSPSCQueue, TestCacheSPSCQueueAndCapioFileWithRequest) {
+TEST(CapioCacheSPSCQueue, TestWriteCacheSPSCQueueAndCapioFileWithRequest) {
     unsigned long long_test_length = strlen(SOURCE_TEST_TEXT) + 1;
     auto readBufSize               = 1024;
 
@@ -151,7 +151,7 @@ TEST(CapioCacheSPSCQueue, TestCacheSPSCQueueAndCapioFileWithRequest) {
     delete_server_data_structures();
 }
 
-TEST(CapioCacheSPSCQueue, TestCacheSPSCQueueAndCapioFileWithRequestAndSeek) {
+TEST(CapioCacheSPSCQueue, TestWriteCacheSPSCQueueAndCapioFileWithRequestAndSeek) {
     unsigned long long_test_length = strlen(SOURCE_TEST_TEXT) + 1;
     auto readBufSize               = 1024;
 
