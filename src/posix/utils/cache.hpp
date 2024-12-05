@@ -330,9 +330,8 @@ class WriteRequestCacheMEM {
         START_LOG(capio_syscall(SYS_gettid), "call()");
         if (_actual_size != 0) {
             write_request(_fd, _actual_size, get_capio_fd_path(_fd).c_str(), _last_write_begin);
-            _cache            = nullptr;
-            _actual_size      = 0;
-            _last_write_begin = get_capio_fd_offset(_fd) + _actual_size + 1;
+            _cache       = nullptr;
+            _actual_size = 0;
         }
     }
 
@@ -349,9 +348,9 @@ class WriteRequestCacheMEM {
 
         // Check if a seek has occurred before and in case in which case flush the cache
         // and update the offset to the new value
-        // the +1 value is used to check for contiguous write operations
-        if (_last_write_end != get_capio_fd_offset(_fd) + 1) {
+        if (_last_write_end != get_capio_fd_offset(_fd)) {
             flush();
+            _last_write_begin = get_capio_fd_offset(_fd) + _actual_size;
         }
 
         if (count <= _max_line_size - _actual_size) {
@@ -365,7 +364,7 @@ class WriteRequestCacheMEM {
             if (count - _actual_size > _max_line_size) {
                 LOG("count - _actual_size %ld > _max_line_size %ld", count - _actual_size,
                     _max_line_size);
-                write_request(_fd, count, get_capio_fd_path(_fd).c_str(), _last_write_begin);
+                write_request(count, _tid, get_capio_fd_path(_fd).c_str(), _last_write_begin);
                 cts_queue->write(static_cast<const char *>(buffer), count);
             } else {
                 LOG("count - _actual_size %ld <= _max_line_size %ld", count - _actual_size,
