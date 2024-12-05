@@ -1,6 +1,8 @@
 #ifndef CAPIOBACKEND_HPP
 #define CAPIOBACKEND_HPP
 
+#include <mtcl.hpp>
+
 class NotImplementedBackendMethod : public std::exception {
   public:
     const char *what() const noexcept override {

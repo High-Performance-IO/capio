@@ -20,7 +20,14 @@ FetchContent_Declare(
         GIT_REPOSITORY https://github.com/simdjson/simdjson.git
         GIT_TAG v3.10.1
 )
-FetchContent_MakeAvailable(args simdjson)
+FetchContent_Declare(
+        mtcl
+        GIT_REPOSITORY https://github.com/ParaGroup/MTCL
+        GIT_TAG fbd8aa924b916c6578963af315fdb5f10c3969ad
+)
+
+FetchContent_MakeAvailable( args simdjson mtcl)
+
 
 #####################################
 # Target definition
@@ -40,6 +47,7 @@ target_include_directories(${TARGET_NAME} PRIVATE
         ${MPI_INCLUDE_PATH}
         ${args_SOURCE_DIR}
         ${simdjson_SOURCE_DIR}
+        ${mtcl_SOURCE_DIR}/include
 )
 
 #####################################
