@@ -19,7 +19,7 @@ class WriteRequestCacheFS {
         buf_requests->write(req, CAPIO_REQ_MAX_SIZE);
     }
 
-public:
+  public:
     explicit WriteRequestCacheFS() : _max_size(get_capio_write_cache_size()) {}
 
     ~WriteRequestCacheFS() { this->flush(capio_syscall(SYS_gettid)); }
@@ -52,4 +52,4 @@ public:
     }
 };
 
-#endif //WRITE_REQUEST_CACHE_FS_HPP
+#endif // WRITE_REQUEST_CACHE_FS_HPP

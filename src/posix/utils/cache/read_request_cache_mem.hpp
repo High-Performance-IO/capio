@@ -24,16 +24,24 @@ class ReadRequestCacheMEM {
     }
 
   protected:
-    static capio_off64_t read_request(const int fd, const capio_off64_t count, const long tid) {
+    [[nodiscard]] capio_off64_t read_request(const int fd, const capio_off64_t count,
+                                             const long tid) const {
         START_LOG(capio_syscall(SYS_gettid), "call(fd=%ld, count=%ld, tid=%ld)", fd, count, tid);
         char req[CAPIO_REQ_MAX_SIZE];
-        sprintf(req, "%04d %ld %d %llu", CAPIO_REQUEST_READ_MEM, tid, fd, count);
+
+        // send as last parameter to the server the maximum amount of data that can be read into a
+        // single line of cache
+        sprintf(req, "%04d %ld %d %llu %llu", CAPIO_REQUEST_READ_MEM, tid, fd, count,
+                _max_line_size);
         LOG("Sending read request %s", req);
         buf_requests->write(req, CAPIO_REQ_MAX_SIZE);
-        capio_off64_t res;
-        bufs_response->at(tid)->read(&res);
-        LOG("Response to request is %ld", res);
-        return res;
+        capio_off64_t stc_queue_read;
+        bufs_response->at(tid)->read(&stc_queue_read);
+        LOG("Response to request is %ld", stc_queue_read);
+        stc_queue->read(_cache, stc_queue_read);
+        LOG("Completed fetch of data from server");
+
+        return stc_queue_read;
     }
 
   public:
@@ -54,13 +62,14 @@ class ReadRequestCacheMEM {
         }
     }
 
-    inline capio_off64_t read(const int fd, void *buffer, off64_t count) {
+    void read(const int fd, void *buffer, off64_t count) {
         START_LOG(capio_syscall(SYS_gettid), "call(fd=%d, count=%ld, is_getdents=%s)", fd, count);
 
         if (_fd != fd) {
             LOG("changed fd from %d to %d: flushing", _fd, fd);
             flush();
-            _fd = fd;
+            _fd            = fd;
+            _last_read_end = _last_read_end = get_capio_fd_offset(_fd);
         }
 
         // Check if a seek has occurred before and in case in which case flush the cache
@@ -74,30 +83,31 @@ class ReadRequestCacheMEM {
             // There is enough data to perform a read
             LOG("The requested amount of data can be served without performing a request");
             _read(buffer, count);
-            _last_read_end = get_capio_fd_offset(_fd) + count;
 
         } else {
-            // There is not enough data and I need to get more data
-            auto first_copy_size = _max_line_size - _cache_offset;
+            // There could be some data available already on the cache. Copy that first and then
+            // proceed to request the other missing data
+            const auto first_copy_size = _max_line_size - _cache_offset;
             _read(buffer, first_copy_size);
+
+            // Compute the remaining amount of data to send to client
             auto remaining_size = count - first_copy_size;
             while (remaining_size > 0) {
-                // richiedo una linea
-                read_request(_fd, count, _tid);
-                // mi salvo la linea
-                stc_queue->read(_cache, _max_line_size);
-                // mando la linea al client
-                _read(buffer, remaining_size > _max_line_size ? _max_line_size : remaining_size);
 
-                remaining_size -= _max_line_size;
+                // request a line from the server component through a request
+                auto available_size = read_request(_fd, count, _tid);
+
+                // compute the amount of data that is going to be sent to the client application
+                auto size_to_send_to_client =
+                    remaining_size < available_size ? remaining_size : available_size;
+
+                _read(buffer, size_to_send_to_client);
+                remaining_size -= size_to_send_to_client;
             }
         }
 
-        // questo probabilmente e' sbagliato
         _last_read_end = get_capio_fd_offset(_fd) + count;
-
         set_capio_fd_offset(fd, _last_read_end);
-        return 0;
     }
 };
 #endif // READ_REQUEST_CACHE_MEM_HPP
