@@ -33,8 +33,6 @@ char node_name[HOST_NAME_MAX];
 #include "ctl-module/capio_ctl.hpp"
 #include "utils/signals.hpp"
 
-#include "communication-service/CapioBackend.hpp"
-
 #include "file-manager/file_manager.hpp"
 
 std::string parseCLI(int argc, char **argv) {
