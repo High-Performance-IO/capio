@@ -63,7 +63,7 @@ class ReadRequestCacheMEM {
     }
 
     void read(const int fd, void *buffer, off64_t count) {
-        START_LOG(capio_syscall(SYS_gettid), "call(fd=%d, count=%ld, is_getdents=%s)", fd, count);
+        START_LOG(capio_syscall(SYS_gettid), "call(fd=%d, count=%ld)", fd, count);
 
         if (_fd != fd) {
             LOG("changed fd from %d to %d: flushing", _fd, fd);
@@ -77,6 +77,10 @@ class ReadRequestCacheMEM {
         if (_last_read_end != get_capio_fd_offset(_fd)) {
             flush();
             _last_read_end = get_capio_fd_offset(_fd);
+        }
+
+        if (_actual_size == 0) {
+            read_request(_fd, count, _tid);
         }
 
         if (count <= _max_line_size - _cache_offset) {

@@ -14,16 +14,19 @@ inline CircularBuffer<char> *buf_requests;
 #include "SourceText.hpp"
 
 WriteRequestCacheMEM *writeCache;
+ReadRequestCacheMEM *readCache;
 
 int test_fd                = 0;
 std::string test_file_name = "test.dat";
 
 void init_server_data_structures() {
     writeCache              = new WriteRequestCacheMEM();
+    readCache               = new ReadRequestCacheMEM();
     bufs_response           = new CPBufResponse_t;
     files                   = new CPFiles_t();
     capio_files_descriptors = new CPFileDescriptors_t();
     cts_queue = new SPSCQueue("queue-tests.cts", get_cache_lines(), get_cache_line_size());
+    stc_queue = new SPSCQueue("queue-tests.stc", get_cache_lines(), get_cache_line_size());
     buf_requests =
         new CircularBuffer<char>(SHM_COMM_CHAN_NAME, CAPIO_REQ_BUFF_CNT, CAPIO_REQ_MAX_SIZE);
 }
@@ -32,6 +35,7 @@ void delete_server_data_structures() {
     delete cts_queue;
     delete stc_queue;
     delete writeCache;
+    delete readCache;
     delete files;
     delete capio_files_descriptors;
     delete bufs_response;
@@ -208,6 +212,28 @@ TEST(CapioCacheSPSCQueue, TestWriteCacheSPSCQueueAndCapioFileWithRequestAndSeek)
 
     // perform to write ad a different offset
     writeCache->write(test_fd, SOURCE_TEST_TEXT, long_test_length);
+
+    server_thread.join();
+
+    delete_server_data_structures();
+}
+
+TEST(CapioCacheSPSCQueue, TestReadCacheWithSpscQueueRead) {
+
+    unsigned long long_test_length = strlen(SOURCE_TEST_TEXT) + 1;
+    auto tmp_buf                   = new std::unique_ptr<char>(new char[long_test_length]);
+
+    init_server_data_structures();
+
+    capio_files_descriptors->emplace(test_fd, test_file_name);
+    files->insert({test_fd, {std::make_shared<capio_off64_t>(0), 0, 0, false}});
+
+    std::thread server_thread(
+        [long_test_length, tmp_buf] { stc_queue->write(SOURCE_TEST_TEXT, long_test_length); });
+
+    readCache->read(test_fd, tmp_buf->get(), long_test_length);
+
+    EXPECT_EQ(strcmp(SOURCE_TEST_TEXT, tmp_buf->get()), 0);
 
     server_thread.join();
 
