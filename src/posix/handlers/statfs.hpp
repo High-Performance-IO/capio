@@ -11,7 +11,7 @@ int fstatfs_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long 
     START_LOG(tid, "call(fd=%d)", fd);
 
     if (exists_capio_fd(fd)) {
-        consent_request_cache->consent_request(get_capio_fd_path(fd), tid, __FUNCTION__);
+        consent_request_cache_fs->consent_request(get_capio_fd_path(fd), tid, __FUNCTION__);
     }
     return CAPIO_POSIX_SYSCALL_SKIP;
 }

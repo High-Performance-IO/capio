@@ -9,12 +9,11 @@
  * (first parameter of the request)
  */
 inline void read_handler(const char *const str) {
-    pid_t tid;
+    long tid;
     int fd;
     capio_off64_t end_of_read;
     char path[PATH_MAX];
-
-    sscanf(str, "%s %d %d %llu", path, &tid, &fd, &end_of_read);
+    sscanf(str, "%ld %d %s %llu", &tid, &fd, path, &end_of_read);
     START_LOG(gettid(), "call(path=%s, tid=%ld, end_of_read=%llu)", path, tid, end_of_read);
 
     const std::filesystem::path path_fs(path);

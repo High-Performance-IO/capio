@@ -13,7 +13,7 @@
  */
 class NoLock {
   public:
-    NoLock(const std::string &name, unsigned int init_value) {
+    NoLock(const std::string &name, unsigned int init_value, bool cleanup) {
         START_LOG(capio_syscall(SYS_gettid), "call(name=%s, initial_value=%d)", name.c_str(),
                   init_value);
     }
@@ -36,11 +36,13 @@ class NamedSemaphore {
   private:
     const std::string _name;
     sem_t *_sem;
+    bool _require_cleanup;
 
   public:
-    NamedSemaphore(std::string name, unsigned int init_value) : _name(std::move(name)) {
-        START_LOG(capio_syscall(SYS_gettid), " call(name=%s, init_value=%d)", _name.c_str(),
-                  init_value);
+    NamedSemaphore(std::string name, unsigned int init_value, bool cleanup = true)
+        : _name(std::move(name)), _require_cleanup(cleanup) {
+        START_LOG(capio_syscall(SYS_gettid), " call(name=%s, init_value=%d, cleanup=%s)",
+                  _name.c_str(), init_value, _require_cleanup ? "true" : "false");
 
         _sem = sem_open(_name.c_str(), O_CREAT | O_RDWR, S_IRUSR | S_IWUSR, init_value);
         if (_sem == SEM_FAILED) {
@@ -52,14 +54,32 @@ class NamedSemaphore {
     NamedSemaphore &operator=(const NamedSemaphore &) = delete;
     ~NamedSemaphore() {
         START_LOG(capio_syscall(SYS_gettid), "call()");
-        if (sem_destroy(_sem) != 0) {
-            ERR_EXIT(" destruction of semaphore %s failed", _name.c_str());
+        if (_require_cleanup) {
+            LOG("Performing cleanup of shared semaphore!");
+#ifdef __CAPIO_POSIX
+            syscall_no_intercept_flag = true;
+#endif
+            if (sem_destroy(_sem) != 0) {
+                if (errno != ENOENT) {
+                    ERR_EXIT(" destruction of semaphore %s failed: %s", _name.c_str(),
+                             strerror(errno));
+                } else {
+                    LOG("Warn: no shuch file for sem %s", _name.c_str());
+                }
+            }
+            LOG(" Destroyed shared semaphore %s", _name.c_str());
+            if (sem_unlink(_name.c_str()) != 0) {
+                if (errno != ENOENT) {
+                    ERR_EXIT(" unlink of semaphore %s failed", _name.c_str());
+                } else {
+                    LOG("Warn: no shuch file for sem %s", _name.c_str());
+                }
+            }
+            LOG(" Unlinked shared semaphore %s", _name.c_str());
+#ifdef __CAPIO_POSIX
+            syscall_no_intercept_flag = false;
+#endif
         }
-        LOG(" Destroyed shared semaphore %s", _name.c_str());
-        if (sem_unlink(_name.c_str()) != 0) {
-            ERR_EXIT(" destruction of semaphore %s failed", _name.c_str());
-        }
-        LOG(" Unlinked shared semaphore %s", _name.c_str());
     }
 
     inline void lock() {
@@ -86,9 +106,10 @@ class NamedSemaphore {
 class Semaphore {
   private:
     sem_t _sem{};
+    bool _require_cleanup;
 
   public:
-    explicit Semaphore(unsigned int init_value) {
+    explicit Semaphore(unsigned int init_value, bool cleanup = true) {
         START_LOG(capio_syscall(SYS_gettid), "call(init_value=%d)", init_value);
 
         if (sem_init(&_sem, 0, init_value) != 0) {
@@ -100,8 +121,16 @@ class Semaphore {
     Semaphore &operator=(const Semaphore &) = delete;
     ~Semaphore() {
         START_LOG(capio_syscall(SYS_gettid), "call()");
-        if (sem_destroy(&_sem) != 0) {
-            ERR_EXIT("destruction of unnamed semaphore failed");
+        if (_require_cleanup) {
+#ifdef __CAPIO_POSIX
+            syscall_no_intercept_flag = true;
+#endif
+            if (sem_destroy(&_sem) != 0) {
+                ERR_EXIT("destruction of unnamed semaphore failed");
+            }
+#ifdef __CAPIO_POSIX
+            syscall_no_intercept_flag = false;
+#endif
         }
     }
 

@@ -3,6 +3,8 @@
 
 #include "client-manager/client_manager.hpp"
 #include <regex>
+
+#include "capio/filesystem.hpp"
 /**
  * @brief Class that stores the parsed configuration of the CAPIO-CL configuration file.
  *
@@ -20,48 +22,12 @@ class CapioCLEngine {
                                   int,  // commit on close number                            [7]
                                   long, // directory file count                              [8]
                                   std::vector<std::string>, // File dependencies             [9]
-                                  std::regex>> // Regex from name to match globs             [10]
+                                  std::regex, // Regex from name to match globs             [10]
+                                  bool>> // Store File in memory or on FS. true = memory    [11]
         _locations;
 
     static std::string truncateLastN(const std::string &str, const int n) {
         return str.length() > n ? "[..] " + str.substr(str.length() - n) : str;
-    }
-
-    /**
-     * Given a string, replace a single character with a string. This function is used
-     * when converting a CAPIO-CL wildcard into a C++ valid regular expression
-     * @param str
-     * @param symbol
-     * @param replacement
-     * @return
-     */
-    [[nodiscard]] static std::string replaceSymbol(const std::string &str, char symbol,
-                                                   const std::string &replacement) {
-        std::string result = str;
-        size_t pos         = 0;
-
-        // Find the symbol and replace it
-        while ((pos = result.find(symbol, pos)) != std::string::npos) {
-            result.replace(pos, 1, replacement);
-            pos += replacement.length(); // Move past the replacement
-        }
-
-        return result;
-    }
-
-    /**
-     * Convert a CAPIO-CL regular expression into a c++ valid regular expression
-     * @param capio_path String to convert
-     * @return std::regex compiled with the corresponding c++ regex
-     */
-    [[nodiscard]] static std::regex generateCapioRegex(const std::string &capio_path) {
-        START_LOG(gettid(), "call(capio_path=%s)", capio_path.c_str());
-        auto computed = replaceSymbol(capio_path, '.', "\\.");
-        computed      = CapioCLEngine::replaceSymbol(computed, '/', "\\/");
-        computed      = CapioCLEngine::replaceSymbol(computed, '*', R"([a-zA-Z0-9\/\.\-_]*)");
-        computed      = CapioCLEngine::replaceSymbol(computed, '+', ".");
-        LOG("Computed regex: %s", computed.c_str());
-        return std::regex(computed);
     }
 
   public:
@@ -76,6 +42,11 @@ class CapioCLEngine {
                   << "|     Parsed configuration file for workflow: \e[1;36m" << workflow_name
                   << std::setw(83 - workflow_name.length()) << "\e[0m |" << std::endl
                   << "|" << std::setw(124) << "|" << std::endl
+                  << "|     File color legend:     \e[48;5;034m  \e[0m File stored in memory"
+                  << std::setw(72) << "|" << std::endl
+                  << "|                            "
+                  << "\e[48;5;172m  \e[0m File stored on file system" << std::setw(67) << "|"
+                  << std::endl
                   << "|============================================================================"
                      "===============================================|"
                   << std::endl
@@ -89,9 +60,13 @@ class CapioCLEngine {
                      "============|============|===========|=========|"
                   << std::endl;
         for (auto itm : _locations) {
+            std::string color_preamble = std::get<11>(itm.second) ? "\e[38;5;034m" : "\e[38;5;172m";
+            std::string color_post     = "\e[0m";
+
             std::string name_trunc = truncateLastN(itm.first, 12);
             auto kind              = std::get<6>(itm.second) ? "F" : "D";
-            std::cout << "|   " << kind << "  | " << name_trunc << std::setfill(' ')
+            std::cout << "|   " << color_preamble << kind << color_post << "  | " << color_preamble
+                      << name_trunc << color_post << std::setfill(' ')
                       << std::setw(20 - name_trunc.length()) << "| ";
 
             auto producers = std::get<0>(itm.second);
@@ -181,7 +156,7 @@ class CapioCLEngine {
 
         _locations.emplace(path, std::make_tuple(producers, consumers, commit_rule, fire_rule,
                                                  permanent, exclude, true, -1, -1, dependencies,
-                                                 CapioCLEngine::generateCapioRegex(path)));
+                                                 generateCapioRegex(path), false));
     }
 
     void newFile(const std::string &path) {
@@ -205,11 +180,10 @@ class CapioCLEngine {
             }
             LOG("Adding file %s to _locations with commit=%s, and fire=%s", path.c_str(),
                 commit.c_str(), fire.c_str());
-            _locations.emplace(path,
-                               std::make_tuple(std::vector<std::string>(),
-                                               std::vector<std::string>(), commit, fire, false,
-                                               false, true, -1, -1, std::vector<std::string>(),
-                                               CapioCLEngine::generateCapioRegex(path)));
+            _locations.emplace(
+                path, std::make_tuple(std::vector<std::string>(), std::vector<std::string>(),
+                                      commit, fire, false, false, true, -1, -1,
+                                      std::vector<std::string>(), generateCapioRegex(path), false));
         }
     }
 
@@ -426,6 +400,38 @@ class CapioCLEngine {
             return std::get<9>(itm->second);
         }
         return {};
+    }
+
+    void setStoreFileInMemory(const std::filesystem::path &path) {
+        if (const auto itm = _locations.find(path); itm != _locations.end()) {
+            std::get<11>(itm->second) = true;
+        }
+    }
+
+    void setStoreFileInFileSystem(const std::filesystem::path &path) {
+        if (const auto itm = _locations.find(path); itm != _locations.end()) {
+            std::get<11>(itm->second) = false;
+        }
+    }
+
+    bool storeFileInMemory(const std::filesystem::path &path) {
+        if (const auto itm = _locations.find(path); itm != _locations.end()) {
+            return std::get<11>(itm->second);
+        }
+        return false;
+    }
+
+    std::vector<std::string> getFileToStoreInMemory() {
+        START_LOG(gettid(), "call()");
+        std::vector<std::string> files;
+
+        for (const auto &[path, file] : _locations) {
+            if (std::get<11>(file)) {
+                files.push_back(path);
+            }
+        }
+
+        return files;
     }
 };
 

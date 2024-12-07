@@ -4,7 +4,7 @@
 cmake_minimum_required(VERSION 3.15)
 
 # Define project name and description
-project(capio-fs
+project(capio
         LANGUAGES CXX
         DESCRIPTION "Cross-Application Programmable I/O"
         VERSION 1.0.0
@@ -77,7 +77,6 @@ ENDIF (CAPIO_LOG AND CMAKE_BUILD_TYPE STREQUAL "Debug")
 #####################################
 add_subdirectory(src/posix)
 add_subdirectory(src/server)
-add_subdirectory(src/capioctl)
 
 IF (CAPIO_BUILD_TESTS)
     message(STATUS "Building CAPIO test suite")

@@ -3,8 +3,6 @@
 
 #include <mutex>
 
-#include "CapioMemoryFile.hpp"
-
 inline std::mutex creation_mutex;
 inline std::mutex data_mutex;
 /**

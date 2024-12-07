@@ -64,7 +64,8 @@ class JsonParser {
         simdjson::padded_string json;
         simdjson::ondemand::document entries;
         simdjson::ondemand::array input_stream, output_stream, streaming, permanent_files,
-            exclude_files;
+            exclude_files, storage_memory, storage_fs;
+        simdjson::ondemand::object storage_section;
         simdjson::error_code error;
 
         try {
@@ -385,6 +386,48 @@ class JsonParser {
             std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_WARNING << " [ " << node_name << " ] "
                       << "Warning: capio does not support home node policies yet! skipping section "
                       << std::endl;
+        }
+
+        if (entries["storage"].get_object().get(storage_section)) {
+            std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_WARNING << " [ " << node_name << " ] "
+                      << "No storage section found for workflow: " << workflow_name << std::endl;
+            LOG("No storage section found for workflow: %s", std::string(workflow_name).c_str());
+        } else {
+            if (storage_section["memory"].get_array().get(storage_memory)) {
+                std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_WARNING << " [ " << node_name << " ] "
+                          << "No files listed in memory storage section for workflow: "
+                          << workflow_name << std::endl;
+                LOG("No files listed in memory storage section for workflow: %s",
+                    std::string(workflow_name).c_str());
+            } else {
+                for (auto file : storage_memory) {
+                    std::string_view file_str;
+                    file.get_string().get(file_str);
+                    std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_JSON << " [ " << node_name << " ] "
+                              << "Setting file " << file_str << " to be stored in memory"
+                              << std::endl;
+                    locations->setStoreFileInMemory(file_str);
+                }
+            }
+
+            if (storage_section["fs"].get_array().get(storage_fs)) {
+                std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_WARNING << " [ " << node_name << " ] "
+                          << "No files listed in fs storage section for workflow: " << workflow_name
+                          << std::endl;
+                LOG("No files listed in fs storage section for workflow: %s",
+                    std::string(workflow_name).c_str());
+            } else {
+                for (auto file : storage_fs) {
+                    std::string_view file_str;
+                    file.get_string().get(file_str);
+                    std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_JSON << " [ " << node_name << " ] "
+                              << "Setting file " << file_str << " to be stored on file system"
+                              << std::endl;
+                    locations->setStoreFileInFileSystem(file_str);
+                }
+            }
+            std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_JSON << " [ " << node_name << " ] "
+                      << "Completed parsing of memory storage directives" << std::endl;
         }
 
         std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_JSON << std::endl;

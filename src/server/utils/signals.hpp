@@ -34,9 +34,6 @@ inline void sig_term_handler(int signum, siginfo_t *info, void *ptr) {
     delete request_handlers_engine;
     std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_WARNING << " [ " << node_name << " ] "
               << "request_handlers_engine cleanup completed" << std::endl;
-    delete ctl_module;
-    std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_WARNING << " [ " << node_name << " ] "
-              << "ctl_module cleanup completed" << std::endl;
     delete fs_monitor;
     std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_WARNING << " [ " << node_name << " ] "
               << "fs_monitor cleanup completed" << std::endl;

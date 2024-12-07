@@ -148,7 +148,7 @@ inline void log_write_to(char *buffer, size_t bufflen) {
     }
 #else
     if (current_log_level < CAPIO_LOG_LEVEL || CAPIO_LOG_LEVEL < 0) {
-        logfile << buffer << "\n";
+        logfile << buffer << std::endl;
         logfile.flush();
     }
 

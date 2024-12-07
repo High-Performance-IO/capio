@@ -73,7 +73,7 @@ inline void add_capio_fd(pid_t tid, const std::string &path, int fd, capio_off64
  * @return
  */
 inline std::filesystem::path capio_posix_realpath(const std::filesystem::path &pathname) {
-    START_LOG(syscall_no_intercept(SYS_gettid), "call(path=%s)", pathname.c_str());
+    START_LOG(capio_syscall(SYS_gettid), "call(path=%s)", pathname.c_str());
     char *posix_real_path = capio_realpath((char *) pathname.c_str(), nullptr);
 
     // if capio_realpath fails, then it should be a capio_file
@@ -124,7 +124,7 @@ inline std::filesystem::path capio_absolute(const std::filesystem::path &path) {
  * @return
  */
 inline void delete_capio_fd(pid_t fd) {
-    START_LOG(syscall_no_intercept(SYS_gettid), "call(fd=%d)", fd);
+    START_LOG(capio_syscall(SYS_gettid), "call(fd=%d)", fd);
     auto &path = capio_files_descriptors->at(fd);
     capio_files_paths->at(path).erase(fd);
     capio_files_descriptors->erase(fd);
@@ -137,7 +137,7 @@ inline void delete_capio_fd(pid_t fd) {
  * @return
  */
 inline void delete_capio_path(const std::string &path) {
-    START_LOG(syscall_no_intercept(SYS_gettid), "call(path=%s)", path.c_str());
+    START_LOG(capio_syscall(SYS_gettid), "call(path=%s)", path.c_str());
     if (capio_files_paths->find(path) != capio_files_paths->end()) {
         auto it = capio_files_paths->at(path).begin();
         LOG("Proceeding to remove fds");
@@ -226,7 +226,7 @@ inline std::vector<int> get_capio_fds() {
  * @return the corresponding path
  */
 inline std::filesystem::path get_dir_path(int dirfd) {
-    START_LOG(syscall_no_intercept(SYS_gettid), "call(dirfd=%d)", dirfd);
+    START_LOG(capio_syscall(SYS_gettid), "call(dirfd=%d)", dirfd);
 
     auto it = capio_files_descriptors->find(dirfd);
     if (it != capio_files_descriptors->end()) {
@@ -237,7 +237,7 @@ inline std::filesystem::path get_dir_path(int dirfd) {
     char proclnk[128]           = {};
     char dir_pathname[PATH_MAX] = {};
     sprintf(proclnk, "/proc/self/fd/%d", dirfd);
-    if (syscall_no_intercept(SYS_readlink, proclnk, dir_pathname, PATH_MAX) < 0) {
+    if (capio_syscall(SYS_readlink, proclnk, dir_pathname, PATH_MAX) < 0) {
         LOG("failed to readlink\n");
         return {};
     }
@@ -251,7 +251,7 @@ inline std::filesystem::path get_dir_path(int dirfd) {
  */
 inline void init_filesystem() {
     std::unique_ptr<char[]> buf(new char[PATH_MAX]);
-    syscall_no_intercept(SYS_getcwd, buf.get(), PATH_MAX);
+    capio_syscall(SYS_getcwd, buf.get(), PATH_MAX);
     current_dir             = std::make_unique<std::filesystem::path>(buf.get());
     capio_files_descriptors = new CPFileDescriptors_t();
     capio_files_paths       = new CPFilesPaths_t();
@@ -265,7 +265,7 @@ inline void init_filesystem() {
  * @return
  */
 inline void rename_capio_path(const std::string &oldpath, const std::string &newpath) {
-    START_LOG(syscall_no_intercept(SYS_gettid), "call(oldpath=%s, newpath=%s)", oldpath.c_str(),
+    START_LOG(capio_syscall(SYS_gettid), "call(oldpath=%s, newpath=%s)", oldpath.c_str(),
               newpath.c_str());
     if (capio_files_paths->find(oldpath) != capio_files_paths->end()) {
         auto entry  = capio_files_paths->extract(oldpath);
