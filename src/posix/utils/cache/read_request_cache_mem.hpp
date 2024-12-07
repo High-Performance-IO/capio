@@ -25,28 +25,41 @@ class ReadRequestCacheMEM {
 
   protected:
     [[nodiscard]] capio_off64_t read_request(const int fd, const capio_off64_t count,
-                                             const long tid) const {
-        START_LOG(capio_syscall(SYS_gettid), "call(fd=%ld, count=%ld, tid=%ld)", fd, count, tid);
+                                             const long tid) {
+        START_LOG(capio_syscall(SYS_gettid), "call(fd=%ld, count=%llu, tid=%ld)", fd, count, tid);
         char req[CAPIO_REQ_MAX_SIZE];
 
         // send as last parameter to the server the maximum amount of data that can be read into a
         // single line of cache
-        sprintf(req, "%04d %ld %d %llu %llu", CAPIO_REQUEST_READ_MEM, tid, fd, count,
-                _max_line_size);
+
+        auto read_begin_offset = get_capio_fd_offset(fd);
+
+        sprintf(req, "%04d %ld %llu %llu %llu", CAPIO_REQUEST_READ_MEM, tid, read_begin_offset,
+                count, _max_line_size);
         LOG("Sending read request %s", req);
         buf_requests->write(req, CAPIO_REQ_MAX_SIZE);
         capio_off64_t stc_queue_read;
         bufs_response->at(tid)->read(&stc_queue_read);
         LOG("Response to request is %ld", stc_queue_read);
-        stc_queue->read(_cache, stc_queue_read);
+
+        // FIXME: if count > _max_line_size, a deadlock or SEGFAULT is foreseen Fix it asap.
+        // FIXME: still this might not occur as the read() method should protect from this event
+        auto read_size = count;
+        while (read_size > 0) {
+            const capio_off64_t tmp_read_size =
+                read_size > _max_line_size ? _max_line_size : read_size;
+            stc_queue->read(_cache, tmp_read_size);
+            _cache_offset = 0;
+            read_size -= tmp_read_size;
+        }
+
         LOG("Completed fetch of data from server");
 
         return stc_queue_read;
     }
 
   public:
-    explicit ReadRequestCacheMEM(const long line_size             = get_cache_line_size(),
-                                 const std::string &workflow_name = get_capio_workflow_name())
+    explicit ReadRequestCacheMEM(const long line_size = get_posix_read_cache_line_size())
         : _cache(nullptr), _tid(capio_syscall(SYS_gettid)), _fd(-1), _max_line_size(line_size),
           _actual_size(0), _cache_offset(0), _last_read_end(-1) {
         _cache = new char[_max_line_size];
@@ -69,7 +82,7 @@ class ReadRequestCacheMEM {
             LOG("changed fd from %d to %d: flushing", _fd, fd);
             flush();
             _fd            = fd;
-            _last_read_end = _last_read_end = get_capio_fd_offset(_fd);
+            _last_read_end = get_capio_fd_offset(_fd);
         }
 
         // Check if a seek has occurred before and in case in which case flush the cache
@@ -80,7 +93,8 @@ class ReadRequestCacheMEM {
         }
 
         if (_actual_size == 0) {
-            read_request(_fd, count, _tid);
+            const auto size = count < _max_line_size ? count : _max_line_size;
+            read_request(_fd, size, _tid);
         }
 
         if (count <= _max_line_size - _cache_offset) {
@@ -93,19 +107,22 @@ class ReadRequestCacheMEM {
             // proceed to request the other missing data
             const auto first_copy_size = _max_line_size - _cache_offset;
             _read(buffer, first_copy_size);
+            set_capio_fd_offset(fd, get_capio_fd_offset(fd) + first_copy_size);
 
             // Compute the remaining amount of data to send to client
-            auto remaining_size = count - first_copy_size;
-            while (remaining_size > 0) {
+            auto remaining_size       = count - first_copy_size;
+            capio_off64_t copy_offset = first_copy_size;
+            while (copy_offset < count) {
 
                 // request a line from the server component through a request
-                auto available_size = read_request(_fd, count, _tid);
+                auto available_size = read_request(_fd, remaining_size, _tid);
 
                 // compute the amount of data that is going to be sent to the client application
                 auto size_to_send_to_client =
                     remaining_size < available_size ? remaining_size : available_size;
 
-                _read(buffer, size_to_send_to_client);
+                _read(static_cast<char *>(buffer) + copy_offset, size_to_send_to_client);
+                copy_offset += size_to_send_to_client;
                 remaining_size -= size_to_send_to_client;
             }
         }

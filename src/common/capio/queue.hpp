@@ -32,7 +32,7 @@ template <class T, class Mutex> class Queue {
         _sem_num_elems.lock();
 
         std::lock_guard<Mutex> lg(_mutex);
-        memcpy(reinterpret_cast<char *>(buff_recv), reinterpret_cast<char *>(_shm) + *_first_elem,
+        memcpy(reinterpret_cast<char *>(buff_recv), static_cast<char *>(_shm) + *_first_elem,
                num_bytes);
         *_first_elem = (*_first_elem + _elem_size) % _buff_size;
 
@@ -43,7 +43,7 @@ template <class T, class Mutex> class Queue {
         _sem_num_empty.lock();
 
         std::lock_guard<Mutex> lg(_mutex);
-        memcpy(reinterpret_cast<char *>(_shm) + *_last_elem, reinterpret_cast<const char *>(data),
+        memcpy(static_cast<char *>(_shm) + *_last_elem, reinterpret_cast<const char *>(data),
                num_bytes);
         *_last_elem = (*_last_elem + _elem_size) % _buff_size;
 
@@ -128,7 +128,7 @@ template <class T, class Mutex> class Queue {
             _read(buff_rcv + i * _elem_size, _elem_size);
         }
         if (r) {
-            _read(buff_rcv + n_reads * _elem_size, r);
+            _read(buff_rcv + (n_reads * _elem_size), r);
         }
     }
 
