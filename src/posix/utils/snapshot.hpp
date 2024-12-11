@@ -21,7 +21,15 @@
  */
 
 inline int *get_fd_snapshot(long tid) {
-    return static_cast<int *>(get_shm_if_exist("capio_snapshot_" + std::to_string(tid)));
+#ifdef __CAPIO_POSIX
+    syscall_no_intercept_flag = true;
+#endif
+    const auto return_value =
+        static_cast<int *>(get_shm_if_exist("capio_snapshot_" + std::to_string(tid)));
+#ifdef __CAPIO_POSIX
+    syscall_no_intercept_flag = false;
+#endif
+    return return_value;
 }
 
 inline void initialize_from_snapshot(const int *fd_shm, pid_t tid) {
@@ -33,7 +41,9 @@ inline void initialize_from_snapshot(const int *fd_shm, pid_t tid) {
     char *path_shm;
 
     std::string pid = std::to_string(tid);
-
+#ifdef __CAPIO_POSIX
+    syscall_no_intercept_flag = true;
+#endif
     while ((fd = fd_shm[i]) != -1) {
         shm_name = "capio_snapshot_path_" + pid + "_" + std::to_string(fd);
         path_shm = static_cast<char *>(get_shm(shm_name));
@@ -62,6 +72,9 @@ inline void initialize_from_snapshot(const int *fd_shm, pid_t tid) {
     if (shm_unlink(shm_name.c_str()) == -1) {
         ERR_EXIT("shm_unlink snapshot %s", shm_name.c_str());
     }
+#ifdef __CAPIO_POSIX
+    syscall_no_intercept_flag = false;
+#endif
 }
 
 inline void create_snapshot(long tid) {
@@ -74,7 +87,9 @@ inline void create_snapshot(long tid) {
     if (fds.empty()) {
         return;
     }
-
+#ifdef __CAPIO_POSIX
+    syscall_no_intercept_flag = true;
+#endif
     int *fd_shm =
         static_cast<int *>(create_shm("capio_snapshot_" + pid, (fds.size() + 1) * sizeof(int)));
     int i = 0;
@@ -93,6 +108,9 @@ inline void create_snapshot(long tid) {
         ++i;
     }
     fd_shm[i] = -1;
+#ifdef __CAPIO_POSIX
+    syscall_no_intercept_flag = false;
+#endif
 }
 
 #endif // CAPIO_POSIX_UTILS_SNAPSHOT_HPP

@@ -30,7 +30,9 @@ constexpr char CAPIO_SHM_CANARY_ERROR[] =
 constexpr int CAPIO_REQ_BUFF_CNT                     = 512; // Max number of elements inside buffers
 constexpr int CAPIO_CACHE_LINES_DEFAULT              = 10;
 constexpr int CAPIO_CACHE_LINE_SIZE_DEFAULT          = 4096;
-constexpr size_t CAPIO_REQ_MAX_SIZE                  = 256 * sizeof(char);
+// TODO: use that in communication only uses the file descriptor instead of the path to save on the
+// PATH_MAX
+constexpr size_t CAPIO_REQ_MAX_SIZE                  = (PATH_MAX + 256) * sizeof(char);
 constexpr char CAPIO_SERVER_CLI_LOG_SERVER[]         = "[ \033[1;32m SERVER \033[0m ] ";
 constexpr char CAPIO_SERVER_CLI_LOG_SERVER_WARNING[] = "[ \033[1;33m SERVER \033[0m ] ";
 constexpr char CAPIO_SERVER_CLI_LOG_SERVER_ERROR[]   = "[ \033[1;31m SERVER \033[0m ] ";
@@ -39,6 +41,8 @@ constexpr char LOG_CAPIO_END_REQUEST[]               = "----------- END SYSCALL 
 constexpr char CAPIO_SERVER_LOG_START_REQUEST_MSG[] = "\n+++++++++++++++++REQUEST+++++++++++++++++";
 constexpr char CAPIO_SERVER_LOG_END_REQUEST_MSG[]   = "~~~~~~~~~~~~~~~END REQUEST~~~~~~~~~~~~~~~";
 constexpr int CAPIO_LOG_MAX_MSG_LEN                 = 4096;
+constexpr int CAPIO_MAX_SPSQUEUE_ELEMS              = 10;
+constexpr int CAPIO_MAX_SPSCQUEUE_ELEM_SIZE         = 1024 * 256;
 
 // CAPIO streaming semantics
 constexpr char CAPIO_FILE_MODE_NO_UPDATE[]           = "no_update";
@@ -54,7 +58,7 @@ constexpr int CAPIO_POSIX_SYSCALL_SKIP         = 1;
 constexpr int CAPIO_POSIX_SYSCALL_SUCCESS      = 0;
 
 // CAPIO logger - common
-constexpr char CAPIO_LOG_PRE_MSG[]        = "at[%.15lu][%.40s]: ";
+constexpr char CAPIO_LOG_PRE_MSG[]        = "at[%.15llu][%.40s]: ";
 constexpr char CAPIO_DEFAULT_LOG_FOLDER[] = "capio_logs\0";
 
 // CAPIO common - shared memory constant names

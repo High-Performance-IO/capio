@@ -62,6 +62,7 @@ class CapioServerEnvironment : public testing::Environment {
             ASSERT_GE(server_pid = fork(), 0);
             if (server_pid == 0) {
                 execvpe(args[0], args, envp);
+                std::cout << "Error: unable to start server" << std::endl;
                 _exit(127);
             } else {
                 sleep(5);

@@ -30,10 +30,10 @@ char node_name[HOST_NAME_MAX];
 #include "capio/semaphore.hpp"
 
 #include "client-manager/request_handler_engine.hpp"
-#include "ctl-module/capio_ctl.hpp"
 #include "utils/signals.hpp"
 
 #include "file-manager/file_manager.hpp"
+#include "storage-service/capio_storage_service.hpp"
 
 std::string parseCLI(int argc, char **argv) {
     Logger *log;
@@ -157,12 +157,8 @@ std::string parseCLI(int argc, char **argv) {
     }
 #endif
 
-    std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_INFO << " [ " << node_name << " ] "
-              << "server initialization completed!" << std::endl
-              << std::flush;
-
     if (config) {
-        return std::string(args::get(config).data());
+        return args::get(config);
     }
     return "";
 }
@@ -180,10 +176,15 @@ int main(int argc, char **argv) {
     shm_canary              = new CapioShmCanary(workflow_name);
     file_manager            = new CapioFileManager();
     fs_monitor              = new FileSystemMonitor();
-    ctl_module              = new CapioCTLModule();
     request_handlers_engine = new RequestHandlerEngine();
+    storage_service         = new CapioStorageService();
 
     capio_cl_engine->print();
+
+    std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_INFO << " [ " << node_name << " ] "
+              << "server initialization completed!" << std::endl
+              << std::flush;
+
     request_handlers_engine->start();
 
     return 0;

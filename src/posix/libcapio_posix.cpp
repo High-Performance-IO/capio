@@ -379,6 +379,9 @@ static __attribute__((constructor)) void init() {
     init_process(tid);
     register_capio_tid(tid);
 
+    // TODO: use var to set cache size
+    init_caches();
+
     intercept_hook_point_clone_child  = hook_clone_child;
     intercept_hook_point_clone_parent = hook_clone_parent;
     intercept_hook_point              = hook;
