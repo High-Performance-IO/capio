@@ -2,6 +2,7 @@
 # Target information
 #####################################
 set(TARGET_NAME capio_server_unit_tests)
+
 set(TARGET_INCLUDE_FOLDER "${PROJECT_SOURCE_DIR}/src/server")
 set(TARGET_SOURCES
         ${CMAKE_CURRENT_SOURCE_DIR}/src/main.cpp
@@ -13,6 +14,7 @@ set(TARGET_SOURCES
 add_executable(${TARGET_NAME} ${TARGET_SOURCES})
 
 #####################################
+
 # Include files and directories
 #####################################
 file(GLOB_RECURSE CAPIO_SERVER_HEADERS "${TARGET_INCLUDE_FOLDER}/*.hpp")
@@ -34,9 +36,11 @@ gtest_discover_tests(${TARGET_NAME}
         WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}
 )
 
+
 #####################################
 # Install rules
 #####################################
 install(TARGETS ${TARGET_NAME}
         LIBRARY DESTINATION ${CMAKE_INSTALL_BINDIR}
 )
+

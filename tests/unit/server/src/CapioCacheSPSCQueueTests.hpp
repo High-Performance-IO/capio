@@ -366,14 +366,18 @@ TEST(CapioCacheSPSCQueue, TestReadCacheWithSpscQueueReadWithCapioFileAndSeek) {
         }
     });
 
-    readCache->read(test_fd, tmp_buf->get(), 1000);
+    auto tmp_buf_ptr = tmp_buf->get();
+
+    readCache->read(test_fd, tmp_buf_ptr, 1000);
     EXPECT_EQ(strncmp(SOURCE_TEST_TEXT, tmp_buf->get(), 1000), 0);
 
     // emulate seek
-    set_capio_fd_offset(test_fd, get_capio_fd_offset(test_fd) + 1000);
+    auto new_offset = get_capio_fd_offset(test_fd) + 1000;
+    set_capio_fd_offset(test_fd, new_offset);
 
-    readCache->read(test_fd, tmp_buf->get() + 1000, 1000);
-    EXPECT_EQ(strncmp(SOURCE_TEST_TEXT + 1000, tmp_buf->get() + 1000, 1000), 0);
+    tmp_buf_ptr += new_offset;
+    readCache->read(test_fd, tmp_buf_ptr, 1000);
+    EXPECT_EQ(strncmp(SOURCE_TEST_TEXT + new_offset, tmp_buf->get() + new_offset, 1000), 0);
 
     server_thread.join();
     delete_server_data_structures();
