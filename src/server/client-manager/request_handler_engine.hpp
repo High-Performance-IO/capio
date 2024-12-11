@@ -43,7 +43,7 @@ class RequestHandlerEngine {
         _request_handlers[CAPIO_REQUEST_RENAME]         = rename_handler;
         _request_handlers[CAPIO_REQUEST_WRITE]          = write_handler;
         _request_handlers[CAPIO_REQUEST_QUERY_MEM_FILE] = files_to_store_in_memory_handler;
-        _request_handlers[CAPIO_REQUEST_READ_MEM]       = read_handler;  // TODO: correct
+        _request_handlers[CAPIO_REQUEST_READ_MEM]       = read_mem_handler;
         _request_handlers[CAPIO_REQUEST_WRITE_MEM]      = write_handler; // TODO:correct ahndler
 
         return _request_handlers;

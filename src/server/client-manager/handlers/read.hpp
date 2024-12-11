@@ -54,4 +54,16 @@ inline void read_handler(const char *const str) {
     file_manager->addThreadAwaitingData(path, tid, end_of_read);
 }
 
+inline void read_mem_handler(const char *const str) {
+    pid_t tid;
+    capio_off64_t read_size, client_cache_line_size, read_begin_offset;
+    char path[PATH_MAX];
+    sscanf(str, "%ld %llu %llu %llu %s", &tid, &read_begin_offset, &read_size,
+           &client_cache_line_size, path);
+    START_LOG(gettid(),
+              "call(tid=%d, read_begin_offset=%llu, read_size=%llu, client_cache_line_size=%llu, "
+              "path=%s)",
+              tid, read_begin_offset, read_size, client_cache_line_size, path);
+}
+
 #endif // READ_HPP
