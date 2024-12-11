@@ -6,6 +6,7 @@ on:
   pull_request:
     branches:
       - master
+      - capio-v2
 concurrency:
   group: build-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
@@ -17,6 +18,8 @@ jobs:
       - uses: actions/checkout@v4
       - name: "Run codespell"
         uses: codespell-project/actions-codespell@v2
+        with:
+          exclude_file: tests/unit/server/src/SourceText.hpp
   docker-check:
     name: "Check Docker image"
     runs-on: ubuntu-22.04
@@ -40,6 +43,7 @@ jobs:
           tags: alphaunito/capio:latest
       - name: "Run unit tests with Docker"
         run: |
+
           echo "Run CAPIO POSIX Unit tests"
           docker run --rm                         \
               --env CAPIO_DIR=/tmp                \
@@ -49,28 +53,7 @@ jobs:
             capio_posix_unit_tests                \
               --gtest_break_on_failure            \
               --gtest_print_time=1
-          
-          echo "Run CAPIO server Unit tests"
-          docker run --rm                         \
-              --env CAPIO_DIR=/tmp                \
-              --env CAPIO_LOG_LEVEL=-1            \
-              --name capio-docker                 \
-              alphaunito/capio:latest             \
-            capio_server_unit_tests               \
-              --gtest_break_on_failure            \
-              --gtest_print_time=1
-          
-          echo "Run CAPIO syscall Unit tests"
-          docker run --rm                         \
-              --env CAPIO_DIR=/tmp                \
-              --env CAPIO_LOG_LEVEL=-1            \
-              --env LD_PRELOAD=libcapio_posix.so  \
-              --name capio-docker                 \
-              alphaunito/capio:latest             \
-            capio_server_unit_tests               \
-              --gtest_break_on_failure            \
-              --gtest_print_time=1
-          
+
           echo "Run CAPIO integration tests"
             docker run --rm                     \
             --env CAPIO_DIR=/tmp                \
@@ -93,7 +76,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: "Run clang-format style check"
-        uses: jidicula/clang-format-action@v4.11.0
+        uses: jidicula/clang-format-action@v4.13.0
         with:
           clang-format-version: "16"
           check-path: "${{ matrix.path }}"
@@ -126,7 +109,8 @@ jobs:
             libopenmpi-dev \
             ninja-build \
             openmpi-bin \
-            pkg-config
+            pkg-config \
+            cmake
       - name: "Get compiler version"
         run: |
           IFS='-' read -r -a COMPILER <<< "${{ matrix.cxx }}"
@@ -164,19 +148,24 @@ jobs:
           sudo cmake --install ../build --prefix /usr/local
       - name: "Run tests"
         id: run-tests
-        timeout-minutes: 5
+        timeout-minutes: 2
         env:
           CAPIO_DIR: ${{ github.workspace }}
           CAPIO_LOG_LEVEL: -1
         run: |
           export LD_LIBRARY_PATH="/usr/local/lib:${LD_LIBRARY_PATH}"
           
+          echo "Run CAPIO SERVER unit tests"
+          capio_server_unit_tests \
+            --gtest_break_on_failure \
+            --gtest_print_time=1
+                
           echo "Run CAPIO POSIX Unit tests"
           capio_posix_unit_tests \
             --gtest_break_on_failure \
             --gtest_print_time=1
           
-          echo "Run CAPIO server Unit tests"
+          echo "Run CAPIO SERVER unit tests"
           capio_server_unit_tests \
             --gtest_break_on_failure \
             --gtest_print_time=1
@@ -186,7 +175,7 @@ jobs:
           capio_syscall_unit_tests \
             --gtest_break_on_failure \
             --gtest_print_time=1
-          
+               
           echo "Run CAPIO integration tests"
           rm -rf /dev/shm/CAPIO*
           LD_PRELOAD=libcapio_posix.so \
@@ -204,6 +193,7 @@ jobs:
         run: |
           pip install --upgrade gcovr
           gcovr \
+            --gcov-ignore-parse-errors \
             --exclude-throw-branches \
             --xml coverage.xml \
             --gcov-executable "${{ startsWith(matrix.cxx, 'clang-') && format('llvm-cov-{0} gcov', env.CXX_VERSION) || format('gcov-{0}', env.CXX_VERSION) }}" \

@@ -8,31 +8,23 @@
 
 #include "capio/queue.hpp"
 
-#include "utils/capio_file.hpp"
+/**
+ * @brief Typedef to store the map of response buffers indexed by process tid
+ *
+ */
+typedef std::unordered_map<int, CircularBuffer<capio_off64_t> *> CSBufResponse_t;
 
-#include "capio_file.hpp"
-
-typedef std::unordered_map<int, int> CSPidsMap_T;
-typedef std::unordered_map<int, std::string> CSAppsMap_t;
-typedef std::unordered_map<std::string, std::unordered_set<std::string>> CSFilesSentMap_t;
-typedef std::unordered_map<int, std::unordered_map<int, std::filesystem::path>>
-    CSProcessFileMetadataMap_t;
-typedef std::unordered_map<int, std::pair<SPSCQueue *, SPSCQueue *>> CSDataBufferMap_t;
-typedef std::unordered_map<std::string, CapioFile *> CSFilesMetadata_t;
-typedef std::unordered_map<
-    std::string, std::tuple<std::string, std::string, std::string, long int, bool, long int>>
-    CSMetadataConfMap_t;
-typedef std::vector<std::tuple<std::string, std::string, std::string, std::string, long int,
-                               long int, bool, long int>>
-    CSMetadataConfGlobs_t;
-typedef std::unordered_map<int, std::unordered_map<std::string, bool>> CSWritersMap_t;
-typedef std::unordered_map<std::string,
-                           std::list<std::tuple<const std::filesystem::path, size_t, std::string,
-                                                std::vector<std::string> *, Semaphore *>>>
-    CSClientsRemotePendingNFilesMap_t;
-typedef std::unordered_map<int, CircularBuffer<off_t> *> CSBufResponse_t;
+/**
+ * @brief Typedef for the shared memory queue object for incoming requests
+ *
+ */
 typedef CircularBuffer<char> CSBufRequest_t;
 
+/**
+ * @brief Typedef for the generic capio_server systemcall handler. Required to create direct access
+ * array of handlers with common interface
+ *
+ */
 typedef void (*CSHandler_t)(const char *const);
 
 #endif // CAPIO_SERVER_UTILS_TYPES_HPP

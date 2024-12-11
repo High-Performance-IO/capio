@@ -18,7 +18,7 @@ FetchContent_Declare(
 FetchContent_Declare(
         simdjson
         GIT_REPOSITORY https://github.com/simdjson/simdjson.git
-        GIT_TAG v3.3.0
+        GIT_TAG v3.10.1
 )
 FetchContent_MakeAvailable(args simdjson)
 
@@ -41,17 +41,6 @@ target_include_directories(${TARGET_NAME} PRIVATE
         ${args_SOURCE_DIR}
         ${simdjson_SOURCE_DIR}
 )
-
-#####################################
-# Target properties
-#####################################
-IF (MPI_COMPILE_FLAGS)
-    set_target_properties(${TARGET_NAME} PROPERTIES COMPILE_FLAGS "${MPI_COMPILE_FLAGS}")
-ENDIF (MPI_COMPILE_FLAGS)
-
-IF (MPI_LINK_FLAGS)
-    set_target_properties(${TARGET_NAME} PROPERTIES LINK_FLAGS "${MPI_LINK_FLAGS}")
-ENDIF (MPI_LINK_FLAGS)
 
 #####################################
 # Link libraries

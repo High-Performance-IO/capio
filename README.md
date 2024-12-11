@@ -2,11 +2,15 @@
 
 CAPIO (Cross-Application Programmable I/O), is a middleware aimed at injecting streaming capabilities to workflow steps
 without changing the application codebase. It has been proven to work with C/C++ binaries, Fortran Binaries, JAVA,
-python and bash. 
+python and bash.
 
 [![codecov](https://codecov.io/gh/High-Performance-IO/capio/graph/badge.svg?token=6ATRB5VJO3)](https://codecov.io/gh/High-Performance-IO/capio)
 ![CI-Tests](https://github.com/High-Performance-IO/capio/actions/workflows/ci-tests.yaml/badge.svg)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://raw.githubusercontent.com/High-Performance-IO/capio/master/LICENSE)
+
+> [!IMPORTANT]  
+> This version of CAPIO does not support writes to memory.
+> If you need it please refer to releases/v1.0.0
 
 ## Build and run tests
 
@@ -16,7 +20,6 @@ CAPIO depends on the following software that needs to be manually installed:
 
 - `cmake >=3.15`
 - `c++17` or newer
-- `openmpi`
 - `pthreads`
 
 The following dependencies are automatically fetched during cmake configuration phase, and compiled when required.
@@ -48,7 +51,7 @@ the first is optional).
    want to execute your program (one daemon for each node). If you desire to specify a custom folder
    for capio, set `CAPIO_DIR` as a environment variable.
    ```bash
-   [CAPIO_DIR=your_capiodir] [mpiexec -N 1 --hostfile your_hostfile] capio_server -c conf.json 
+   [CAPIO_DIR=your_capiodir] capio_server -c conf.json 
    ```
 
 > [!NOTE]
@@ -84,17 +87,13 @@ CAPIO can be controlled through the usage of environment variables. The availabl
 - `CAPIO_LOG_DIR` This environment variable is defined only for capio_posix applications and specifies the directory
   name to which capio will be created. If this variable is not defined, capio will log by default to `capio_logs`. An
   equivalent behaviour can be set on the capio server using the `-d` option;
-- `CAPIO_CACHE_LINES`: This environment variable controls how many lines of cache are presents between posix and server
-  applications. defaults to 10 lines;
 - `CAPIO_CACHE_LINE_SIZE`: This environment variable controls the size of a single cache line. defaults to 256KB;
 
 #### Server only environment variable
 
-- `CAPIO_FILE_INIT_SIZE`: This environment variable defines the default size of pre allocated memory for a new file
-  handled by capio. Defaults to 4MB. Bigger sizes will reduce the overhead of malloc but will fill faster node memory.
-  Value has to be expressed in bytes;
-- `CAPIO_PREFETCH_DATA_SIZE`: If this variable is set, then data transfers between nodes will be always, at least of the
-  given value in bytes;
+- `CAPIO_METADATA_DIR`: This environmental variable controls the location of the metadata files used by CAPIO. it
+  defaults to CAPIO_DIR. BE CAREFUL to put this folder on a path that is accessible by all instances of the running
+  CAPIO servers.
 
 #### Posix only environment variable
 
@@ -109,95 +108,33 @@ CAPIO can be controlled through the usage of environment variables. The availabl
 
 ## How to inject streaming capabilities into your workflow
 
-With CAPIO is possible to run the applications of your workflow that communicates through files concurrently. CAPIO will
-synchronize transparently the concurrent reads and writes on those files. If a file is never modified after it is closed
-you can set the streaming semantics equals to "on_close" on the configuration file. In this way, all the reads done on
-this file will hung until the writer closes the file, allowing the consumer application to read the file even if the
-producer is still running.
-Another supported file streaming semantics is "append" in which a read is satisfied when the producer writes the
-requested data. This is the most aggressive (and efficient) form of streaming semantics (because the consumer can start
-reading while the producer is writing the file). This semantic must be used only if the producer does not modify a piece
-of data after it is written.
-The streaming semantic on_termination tells CAPIO to not allowing streaming on that file. This is the default streaming
-semantics if a semantics for a file is not specified.
-The following is an example of a simple configuration:
+You can find documentation as well as examples, on the official documentation page at 
 
-```json
-{
-  "name": "my_workflow",
-  "IO_Graph": [
-    {
-      "name": "writer",
-      "output_stream": [
-        "file0.dat",
-        "file1.dat",
-        "file2.dat"
-      ],
-      "streaming": [
-        {
-          "name": ["file0.dat"],
-          "committed": "on_close"
-        },
-        {
-          "name": ["file1.dat"],
-          "committed": "on_close",
-          "mode": "no_update"
-        },
-        {
-          "name": ["file2.dat"],
-          "committed": "on_termination"
-        }
-      ]
-    },
-    {
-      "name": "reader",
-      "input_stream": [
-        "file0.dat",
-        "file1.dat",
-        "file2.dat"
-      ]
-    }
-  ]
-}
-```
+[Official documentation website](https://capio.hpc4ai.it/docs) 
 
-> [!NOTE]
-> We are working on an extension of the possible streaming semantics and in a detailed
-> documentation about the configuration file!
-
-## Examples
-
-The [examples](examples) folder contains some examples that shows how to use mpi_io with CAPIO.
-There are also examples on how to write JSON configuration files for the semantics implemented by CAPIO:
-
-- [on_close](https://github.com/High-Performance-IO/capio/wiki/Examples#on_close-semantic): A pipeline composed by a
-  producer and a consumer with "on_close" semantics
-- [no_update](https://github.com/High-Performance-IO/capio/wiki/Examples#noupdate-semantics): A pipeline composed by a
-  producer and a consumer with "no_update" semantics
-- [mix_semantics](https://github.com/High-Performance-IO/capio/wiki/Examples#mixed-semantics): A pipeline composed by a
-  producer and a consumer with mix semantics
 
 ## Report bugs + get help
 
 [Create a new issue](https://github.com/High-Performance-IO/capio/issues/new)
 
-[Get help](https://github.com/High-Performance-IO/capio/wiki)
+[Get help](capio.hpc4ai.it/docs)
 
-> [!TIP]
-> A [wiki](https://github.com/High-Performance-IO/capio/wiki) is in development! You might want to check the wiki to get
-> more in depth information about CAPIO!
 
 ## CAPIO Team
 
 Made with :heart: by:
 
-Alberto Riccardo Martinelli <albertoriccardo.martinelli@unito.it> (designer and maintainer) \
 Marco Edoardo Santimaria <marcoedoardo.santimaria@unito.it> (Designer and maintainer) \
 Iacopo Colonnelli <iacopo.colonnelli@unito.it> (Workflows expert and maintainer) \
 Massimo Torquati <massimo.torquati@unipi.it> (Designer) \
 Marco Aldinucci <marco.aldinucci@unito.it> (Designer)
 
+Former members:
+
+Alberto Riccardo Martinelli <albertoriccardo.martinelli@unito.it> (designer and maintainer) 
+
 ## Papers
+
 [![CAPIO](https://img.shields.io/badge/CAPIO-10.1109/HiPC58850.2023.00031-red)]([https://arxiv.org/abs/2206.10048](https://dx.doi.org/10.1109/HiPC58850.2023.00031))
 
 

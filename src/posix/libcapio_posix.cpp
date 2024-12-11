@@ -360,12 +360,12 @@ static int hook(long syscall_number, long arg0, long arg1, long arg2, long arg3,
         return 1;
     }
 
+    LOG("Handling syscall NO %ld (max num is %ld)", syscall_number, CAPIO_NR_SYSCALLS);
     return syscallTable[syscall_number](arg0, arg1, arg2, arg3, arg4, arg5, result);
 }
 
 static __attribute__((constructor)) void init() {
     init_client();
-    init_data_plane();
     init_filesystem();
     init_threading_support();
 
@@ -378,6 +378,9 @@ static __attribute__((constructor)) void init() {
 
     init_process(tid);
     register_capio_tid(tid);
+
+    // TODO: use var to set cache size
+    init_caches();
 
     intercept_hook_point_clone_child  = hook_clone_child;
     intercept_hook_point_clone_parent = hook_clone_parent;
