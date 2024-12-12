@@ -33,4 +33,17 @@ inline void write_handler(const char *const str) {
     // file_manager->checkAndUnlockThreadAwaitingData(path);
 }
 
+inline void write_mem_handler(const char *const str) {
+    pid_t tid;
+    char path[PATH_MAX];
+    off64_t write_size;
+    capio_off64_t offset;
+    sscanf(str, "%ld %s %llu %ld", &tid, path, &offset, &write_size);
+    START_LOG(gettid(), "call(tid=%d, path=%s, offset=%lld, write_size=%lld)", tid, path, offset,
+              write_size);
+
+    auto file = storage_service->getFile(path);
+    storage_service->recive_from_client(tid, *file, offset, write_size);
+}
+
 #endif // WRITE_HPP

@@ -22,12 +22,14 @@ class CapioStorageService {
     }
 
     ~CapioStorageService() {
+        // TODO: dump files to FS
         delete _stored_files;
         delete _client_to_server_queue;
         delete _server_to_clien_queue;
     }
 
     void createFile(const std::string &file_name) const {
+        // TODO: understand when is local or remte CapioFile
         _stored_files->emplace(file_name, new CapioMemoryFile(file_name));
     }
 
@@ -59,6 +61,19 @@ class CapioStorageService {
             pid, new SPSCQueue("queue-" + std::to_string(pid) + +".stc", CAPIO_MAX_SPSQUEUE_ELEMS,
                                CAPIO_MAX_SPSCQUEUE_ELEM_SIZE, get_capio_workflow_name(), false));
         LOG("Created communication queues");
+    }
+
+    void reply_to_client(pid_t pid, CapioFile &file, capio_off64_t offset,
+                         capio_off64_t size) const {
+        START_LOG(gettid(), "call(pid=%llu, file=%s, offset=%llu, size=%llu)", pid,
+                  file.getFileName().c_str(), offset, size);
+        file.writeToQueue(*_server_to_clien_queue->at(pid), offset, size);
+    }
+
+    void recive_from_client(pid_t tid, CapioFile &file, capio_off64_t offset, off64_t size) const {
+        START_LOG(gettid(), "call(tid=%d, file=%s, offset=%lld, size=%lld)", tid,
+                  file.getFileName().c_str(), offset, size);
+        file.readFromQueue(*_client_to_server_queue->at(tid), offset, size);
     }
 
     void remove_client(const pid_t pid) const {
