@@ -31,9 +31,14 @@ int write_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long ar
         return CAPIO_POSIX_SYSCALL_REQUEST_SKIP;
     }
 
-    auto write_result = store_file_in_memory(get_capio_fd_path(fd), tid)
-                            ? capio_write_mem(fd, buffer, count, tid)
-                            : capio_write_fs(fd, count, tid);
+    off64_t write_result;
+    if (store_in_memory_only()) {
+        write_result = capio_write_mem(fd, buffer, count, tid);
+    } else {
+        write_result = store_file_in_memory(get_capio_fd_path(fd), tid)
+                           ? capio_write_mem(fd, buffer, count, tid)
+                           : capio_write_fs(fd, count, tid);
+    }
 
     return posix_return_value(write_result, result);
 }
@@ -49,10 +54,14 @@ int writev_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long a
         return CAPIO_POSIX_SYSCALL_REQUEST_SKIP;
     }
 
-    auto write_result = store_file_in_memory(get_capio_fd_path(fd), tid)
-                            ? capio_write_mem(fd, buffer, iovcnt, tid)
-                            : capio_write_fs(fd, iovcnt, tid);
-
+    off64_t write_result;
+    if (store_in_memory_only()) {
+        write_result = capio_write_mem(fd, buffer, iovcnt, tid);
+    } else {
+        write_result = store_file_in_memory(get_capio_fd_path(fd), tid)
+                           ? capio_write_mem(fd, buffer, iovcnt, tid)
+                           : capio_write_fs(fd, iovcnt, tid);
+    }
     return posix_return_value(write_result, result);
 }
 

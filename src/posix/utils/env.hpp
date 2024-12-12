@@ -78,4 +78,22 @@ inline long get_posix_read_cache_line_size() {
     return data_bufs_count;
 }
 
+inline bool store_in_memory_only() {
+    START_LOG(capio_syscall(SYS_gettid), "call()");
+    static bool *store_in_memory = nullptr;
+
+    if (store_in_memory == nullptr) {
+        store_in_memory = new bool;
+        char *value     = std::getenv("CAPIO_STORE_ONLY_MEMORY");
+        if (value != nullptr) {
+            *store_in_memory = strcmp("ON", value) == 0;
+        } else {
+            *store_in_memory = false;
+        }
+    }
+
+    LOG("Store files exclusively in memory? %s", *store_in_memory ? "YES" : "NO");
+    return *store_in_memory;
+}
+
 #endif // CAPIO_POSIX_UTILS_ENV_HPP
