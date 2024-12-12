@@ -3,6 +3,7 @@
 #include "capio/env.hpp"
 #include "client-manager/client_manager.hpp"
 #include "file_manager.hpp"
+#include "storage-service/capio_storage_service.hpp"
 #include "utils/distributed_semaphore.hpp"
 
 /**
@@ -63,6 +64,7 @@ inline void CapioFileManager::_unlockThreadAwaitingCreation(const std::string &p
     START_LOG(gettid(), "call(path=%s)", path.c_str());
     for (const auto tid : pids) {
         client_manager->reply_to_client(tid, 1);
+        storage_service->createFile(path);
     }
 }
 

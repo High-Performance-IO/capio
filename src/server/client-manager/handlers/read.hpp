@@ -64,6 +64,20 @@ inline void read_mem_handler(const char *const str) {
               "call(tid=%d, read_begin_offset=%llu, read_size=%llu, client_cache_line_size=%llu, "
               "path=%s)",
               tid, read_begin_offset, read_size, client_cache_line_size, path);
+
+    auto file = storage_service->getFile(path);
+
+    if (file->getSize() < read_begin_offset + read_size) {
+        LOG("File is not yet ready to be consumed as there is not enough data");
+        // TODO: not enough data. implement waiting protocol
+        return;
+    }
+
+    auto size_to_send = read_size < client_cache_line_size ? read_size : client_cache_line_size;
+
+    LOG("Need to sent to client %llu bytes", size_to_send);
+    client_manager->reply_to_client(tid, size_to_send);
+    storage_service->reply_to_client(tid, *file, read_begin_offset, size_to_send);
 }
 
 #endif // READ_HPP
