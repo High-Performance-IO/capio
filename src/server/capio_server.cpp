@@ -36,7 +36,6 @@ char node_name[HOST_NAME_MAX];
 
 #include "file-manager/file_manager.hpp"
 
-
 std::string parseCLI(int argc, char **argv) {
     Logger *log;
 

@@ -42,8 +42,7 @@ inline void write_mem_handler(const char *const str) {
     START_LOG(gettid(), "call(tid=%d, path=%s, offset=%lld, write_size=%lld)", tid, path, offset,
               write_size);
 
-    auto file = storage_service->getFile(path);
-    storage_service->recive_from_client(tid, *file, offset, write_size);
+    storage_service->recive_from_client(tid, path, offset, write_size);
 }
 
 #endif // WRITE_HPP
