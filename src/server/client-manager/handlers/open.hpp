@@ -17,12 +17,14 @@ inline void open_handler(const char *const str) {
     if (capio_cl_engine->isProducer(path, tid)) {
         LOG("Thread is producer. allowing to continue with open");
         client_manager->reply_to_client(tid, 1);
+        storage_service->createFile(path);
         return;
     }
 
     if (std::filesystem::exists(path)) {
         LOG("File already exists! allowing to continue with open");
         client_manager->reply_to_client(tid, 1);
+        storage_service->createFile(path);
         return;
     }
 

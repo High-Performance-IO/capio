@@ -244,6 +244,7 @@ TEST(CapioCacheSPSCQueue, TestReadCacheWithSpscQueueRead) {
         while (total_data_sent < long_test_length) {
 
             char req[CAPIO_REQ_MAX_SIZE];
+            char file[1024];
             int code;
             pid_t tid;
             capio_off64_t read_size, client_cache_line_size, read_begin_offset;
@@ -254,7 +255,7 @@ TEST(CapioCacheSPSCQueue, TestReadCacheWithSpscQueueRead) {
             strcpy(req, ptr + 1);
             EXPECT_EQ(code, CAPIO_REQUEST_READ_MEM);
             sscanf(req, "%ld %llu %llu %llu", &tid, &read_begin_offset, &read_size,
-                   &client_cache_line_size);
+                   &client_cache_line_size, file);
 
             auto size_to_send =
                 read_size < client_cache_line_size ? read_size : client_cache_line_size;
@@ -294,6 +295,7 @@ TEST(CapioCacheSPSCQueue, TestReadCacheWithSpscQueueReadWithCapioFile) {
         while (total_data_sent < long_test_length) {
 
             char req[CAPIO_REQ_MAX_SIZE];
+            char file[1024];
             int code;
             pid_t tid;
             capio_off64_t read_size, client_cache_line_size, read_begin_offset;
@@ -304,7 +306,7 @@ TEST(CapioCacheSPSCQueue, TestReadCacheWithSpscQueueReadWithCapioFile) {
             strcpy(req, ptr + 1);
             EXPECT_EQ(code, CAPIO_REQUEST_READ_MEM);
             sscanf(req, "%ld %llu %llu %llu", &tid, &read_begin_offset, &read_size,
-                   &client_cache_line_size);
+                   &client_cache_line_size, file);
 
             auto size_to_send =
                 read_size < client_cache_line_size ? read_size : client_cache_line_size;
@@ -344,6 +346,7 @@ TEST(CapioCacheSPSCQueue, TestReadCacheWithSpscQueueReadWithCapioFileAndSeek) {
         while (total_data_sent < 2000) {
 
             char req[CAPIO_REQ_MAX_SIZE];
+            char file[1024];
             int code;
             pid_t tid;
             capio_off64_t read_size, client_cache_line_size, read_begin_offset;
@@ -353,8 +356,8 @@ TEST(CapioCacheSPSCQueue, TestReadCacheWithSpscQueueReadWithCapioFileAndSeek) {
             EXPECT_EQ(ec, std::errc());
             strcpy(req, ptr + 1);
             EXPECT_EQ(code, CAPIO_REQUEST_READ_MEM);
-            sscanf(req, "%ld %llu %llu %llu", &tid, &read_begin_offset, &read_size,
-                   &client_cache_line_size);
+            sscanf(req, "%ld %llu %llu %llu %s", &tid, &read_begin_offset, &read_size,
+                   &client_cache_line_size, file);
 
             auto size_to_send =
                 read_size < client_cache_line_size ? read_size : client_cache_line_size;

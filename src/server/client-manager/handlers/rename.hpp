@@ -16,6 +16,8 @@ inline void rename_handler(const char *const str) {
      * SEE write.hpp with the explanation on why the call below is commented away
      */
     // file_manager->unlockThreadAwaitingCreation(new_path);
+
+    // TODO: check what happen when old or new is to be handled in memory
 }
 
 #endif // CAPIO_RENAME_HPP

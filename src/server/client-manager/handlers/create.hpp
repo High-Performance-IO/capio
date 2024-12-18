@@ -1,5 +1,6 @@
 #ifndef CAPIO_CREATE_HPP
 #define CAPIO_CREATE_HPP
+#include "storage-service/capio_storage_service.hpp"
 
 /**
  * @brief Handle the create systemcall
@@ -22,6 +23,7 @@ inline void create_handler(const char *const str) {
 
     capio_cl_engine->addProducer(path, name);
     client_manager->register_produced_file(tid, path_str);
+    storage_service->createFile(path);
 }
 
 #endif // CAPIO_CREATE_HPP

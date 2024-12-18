@@ -34,8 +34,8 @@ class ReadRequestCacheMEM {
 
         auto read_begin_offset = get_capio_fd_offset(fd);
 
-        sprintf(req, "%04d %ld %llu %llu %llu", CAPIO_REQUEST_READ_MEM, tid, read_begin_offset,
-                count, _max_line_size);
+        sprintf(req, "%04d %ld %llu %llu %llu %s", CAPIO_REQUEST_READ_MEM, tid, read_begin_offset,
+                count, _max_line_size, get_capio_fd_path(fd).c_str());
         LOG("Sending read request %s", req);
         buf_requests->write(req, CAPIO_REQ_MAX_SIZE);
         capio_off64_t stc_queue_read;
