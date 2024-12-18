@@ -15,9 +15,9 @@ inline off64_t capio_write_fs(int fd, capio_off64_t count, pid_t tid) {
 }
 
 inline off64_t capio_write_mem(int fd, char *buffer, capio_off64_t count, pid_t tid) {
-
     START_LOG(tid, "call(fd=%d, count=%ld)", fd, count);
-    return 0;
+    write_request_cache_mem->write(fd, buffer, count);
+    return CAPIO_POSIX_SYSCALL_SUCCESS;
 }
 
 int write_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg5, long *result) {
