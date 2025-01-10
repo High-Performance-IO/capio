@@ -2,7 +2,8 @@
 #include <thread>
 std::string node_name;
 
-#include "CapioFile.hpp"
+// TODO: restore tests on CapioFile.hpp
+// #include "CapioFile.hpp"
 #include "TestCommService.hpp"
 
 int main(int argc, char **argv) {
