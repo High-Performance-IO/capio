@@ -4,10 +4,11 @@
 #include "../server/communication-service/CapioCommunicationService.hpp"
 
 TEST(CapioCommServiceTest, TestNumberOne) {
- /*   std::string port = "1234";
-    CapioCommunicationService CapioCommunicationService(port); // hostanmes non serve
-    uint64_t NumberBytes = 50;*/
 
+   std::string port = "1234";
+    CapioCommunicationService CapioCommunicationService(port); // hostanmes non serve
+    uint64_t NumberBytes = 50;
+    EXPECT_EQ();
     // parte del codice di chi vuole ricevere
     /*
 
