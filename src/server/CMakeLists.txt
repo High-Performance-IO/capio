@@ -7,6 +7,7 @@ set(TARGET_SOURCES
         ${CMAKE_CURRENT_SOURCE_DIR}/capio_server.cpp
         communication-service/CapioCommunicationService.h
 )
+add_executable( test communication-service/test.cpp)
 
 #####################################
 # External projects
