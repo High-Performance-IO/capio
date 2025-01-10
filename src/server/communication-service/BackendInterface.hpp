@@ -4,7 +4,7 @@
 #include <mtcl.hpp>
 
 class NotImplementedBackendMethod : public std::exception {
-  public:
+public:
     [[nodiscard]] const char *what() const noexcept override {
         auto msg = new char[1024]{};
         sprintf(msg, "The chosen backend does not implement method: %s", __func__);
@@ -28,7 +28,7 @@ public:
 
     /**
      * @brief recive data
-     * 
+     *
      * @param buf allocated data buffer
      * @param buf_size size of @param buf
      * @return std::string hostname of sender
