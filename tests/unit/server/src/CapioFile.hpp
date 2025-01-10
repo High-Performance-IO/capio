@@ -1,8 +1,3 @@
-#include <gtest/gtest.h>
-#include <thread>
-
-std::string node_name;
-
 #include "../server/file-manager/CapioMemoryFile.hpp"
 
 constexpr size_t FILE_SIZE = 8 * 1024 * 1024;
@@ -179,8 +174,3 @@ TEST(CapioMemoryFileTest, TestThreadsSpscqueueAndCapioMemFile) {
     delete buffer_read;
 }
 
-int main(int argc, char **argv) {
-    testing::InitGoogleTest(&argc, argv);
-
-    return RUN_ALL_TESTS();
-}

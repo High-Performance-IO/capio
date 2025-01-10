@@ -1,12 +1,14 @@
 #ifndef CAPIOCOMMUNICATIONSERVICE_H
 #define CAPIOCOMMUNICATIONSERVICE_H
 #include "BackendInterface.hpp"
-#include <mtcl.hpp>
+#include "capio/logger.hpp"
+
 #include <chrono>
 #include <climits>
 #include <filesystem>
 #include <fstream>
 #include <iostream>
+#include <mtcl.hpp>
 #include <netinet/in.h>
 #include <string>
 #include <sys/socket.h>
@@ -42,7 +44,7 @@ class CapioCommunicationService {
   public: // in questa versione hotname in input non serve
     explicit CapioCommunicationService(std::string port) {
 
-        //scrivi toke su file
+        // scrivi toke su file
         gethostname(ownHostname, HOST_NAME_MAX);
         ownHostnameString   = ownHostname;
         std::string MyToken = "TCP:" + ownHostnameString + ":" + port;
@@ -79,10 +81,13 @@ class CapioCommunicationService {
     }
 
     ~CapioCommunicationService() {
+        START_LOG(gettid(), "call()");
 
         Handler.close();
         MTCL::Manager::finalize();
         delete[] ownHostname;
+
+        LOG("Finalized MTCL backend");
 
         std::string path = std::filesystem::current_path();
         for (const auto &entry : std::filesystem::directory_iterator(path)) {
@@ -92,7 +97,6 @@ class CapioCommunicationService {
             }
         }
 
-        START_LOG(gettid(), "call()");
         *continue_execution = false;
         pthread_cancel(th->native_handle());
         th->join();
@@ -101,20 +105,19 @@ class CapioCommunicationService {
     }
 
     virtual std::string &recive(char *buf, uint64_t buf_size) {
-    std::cout << "sono "<< ownHostnameString << " e sono connesso con " << connectedHostname<< "\n";
+        std::cout << "sono " << ownHostnameString << " e sono connesso con " << connectedHostname
+                  << "\n";
 
-      	if (Handler.receive(buf, buf_size) != buf_size) {
-      		MTCL_ERROR(ownHostname, "ERROR receiving message\n");
-      	}
-         auto endChrono = std::chrono::system_clock::now(); //catch time
-      	const std::time_t endTime = std::chrono::system_clock::to_time_t(endChrono);
+        if (Handler.receive(buf, buf_size) != buf_size) {
+            MTCL_ERROR(ownHostname, "ERROR receiving message\n");
+        }
+        auto endChrono            = std::chrono::system_clock::now(); // catch time
+        const std::time_t endTime = std::chrono::system_clock::to_time_t(endChrono);
 
-      	void * PointerEndTime = (void *) &endTime;
-        Handler.send(PointerEndTime, sizeof(endTime)); //send time of recived message
+        void *PointerEndTime = (void *) &endTime;
+        Handler.send(PointerEndTime, sizeof(endTime)); // send time of recived message
 
-
-      	return connectedHostname;
-
+        return connectedHostname;
     }
 
     /**
@@ -125,24 +128,25 @@ class CapioCommunicationService {
      * @param offset
      */
     virtual void send(const std::string &target, char *buf, uint64_t buf_size) {
-         std::cout << "sono "<< ownHostnameString << " e sono connesso con " <<
-        buf_size<< "\n";
+        std::cout << "sono " << ownHostnameString << " e sono connesso con " << buf_size << "\n";
 
         auto startChrono            = std::chrono::system_clock::now(); // iniza timer
         const std::time_t startTime = std::chrono::system_clock::to_time_t(startChrono);
-        //sleep(2);
-        std::time_t * TimeEnd = new std::time_t[1];
+        // sleep(2);
+        std::time_t *TimeEnd        = new std::time_t[1];
         if (target.compare(connectedHostname) == 0) {
             if (Handler.send(buf, buf_size) != buf_size) {
                 MTCL_ERROR(ownHostname, "ERROR sending message\n");
             } else {
                 std::cout << "ho mandato: " << buf << "\n";
-                Handler.receive(TimeEnd, sizeof(TimeEnd));//rimane in attesta del tempo
-                std::time_t duration =(*TimeEnd) - startTime; //tempo in secondi
-                std::cout << "Il messaggio ci ha messo " << duration << " secondi \n" ;
-			    if (duration != 0) {
-                std::cout  << "Hai una banda di: " <<  buf_size / (duration)<< " Byte/s \n" ;
-                } else std::cout << "Hai una banda altissima  \n";
+                Handler.receive(TimeEnd, sizeof(TimeEnd));     // rimane in attesta del tempo
+                std::time_t duration = (*TimeEnd) - startTime; // tempo in secondi
+                std::cout << "Il messaggio ci ha messo " << duration << " secondi \n";
+                if (duration != 0) {
+                    std::cout << "Hai una banda di: " << buf_size / (duration) << " Byte/s \n";
+                } else {
+                    std::cout << "Hai una banda altissima  \n";
+                }
             }
 
         } else {
@@ -154,5 +158,3 @@ class CapioCommunicationService {
 inline CapioCommunicationService *capio_communication_service;
 
 #endif // CAPIOCOMMUNICATIONSERVICE_H
-
-
