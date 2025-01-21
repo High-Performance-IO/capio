@@ -1,7 +1,7 @@
 #ifndef CAPIOCOMMUNICATIONSERVICE_H
 #define CAPIOCOMMUNICATIONSERVICE_H
 #include "BackendInterface.hpp"
-#include "capio/logger.hpp"
+#include "capio/logger.hpp" //se lo tongo non vann i log
 
 #include <chrono>
 #include <climits>
@@ -14,7 +14,7 @@
 #include <sys/socket.h>
 #include <unistd.h>
 // CTRL + ALT + L PER FORMAT TEXTO SHIFT
-class CapioCommunicationService {
+class CapioCommunicationService : public BackendInterface { //CapioCommunicationService impemetns interface
 
   private:
     MTCL::HandleUser Handler{};
@@ -36,17 +36,19 @@ class CapioCommunicationService {
             if (!UserManager.isValid()) {
                 continue;
             }
-            std::cout << "server connesso! \n";
+            //std::cout << "server connesso! \n";
+            START_LOG(gettid(), " server connesso! \n");
             break;
         }
     }
 
-  public: // in questa versione hotname in input non serve
-    explicit CapioCommunicationService(std::string port) {
+  public: // hostname in input scritto solo per test hardcode
+    explicit CapioCommunicationService(std::string port, std::string own) {
 
         // scrivi toke su file
         gethostname(ownHostname, HOST_NAME_MAX);
-        ownHostnameString   = ownHostname;
+       // ownHostnameString   = ownHostname;
+        ownHostnameString = own;
         std::string MyToken = "TCP:" + ownHostnameString + ":" + port;
         std::string path    = std::filesystem::current_path();
         std::ofstream FilePort(ownHostnameString + ".txt");
@@ -65,7 +67,7 @@ class CapioCommunicationService {
                 if (entry.path().extension() == ".txt" && (TryHostName != ownHostnameString)) {
                     // prova a connetterti
                     MTCL::HandleUser UserManager =
-                        MTCL::Manager::connect("TCP:" + TryHostName + TryPort);
+                        MTCL::Manager::connect("TCP:" + TryHostName + ":" + TryPort);
                 }
             }
 
@@ -73,14 +75,14 @@ class CapioCommunicationService {
         }
 
         // rimani in attesa di connections
-        START_LOG(gettid(), "call()");
+        START_LOG(gettid(), "Waiting for connections");
         *continue_execution = true;
         th                  = new std::thread(waitConnect, std::ref(continue_execution), MyToken);
         std::cout << CAPIO_SERVER_CLI_LOG_SERVER << " [ " << node_name << " ] "
                   << "CapioCommunicationService initialization completed." << std::endl;
     }
 
-    ~CapioCommunicationService() {
+    ~CapioCommunicationService() override {
         START_LOG(gettid(), "call()");
 
         Handler.close();
@@ -104,7 +106,7 @@ class CapioCommunicationService {
         delete continue_execution;
     }
 
-    virtual std::string &recive(char *buf, uint64_t buf_size) {
+    std::string &recive(char *buf, uint64_t buf_size) override {
         std::cout << "sono " << ownHostnameString << " e sono connesso con " << connectedHostname
                   << "\n";
 
@@ -127,7 +129,7 @@ class CapioCommunicationService {
      * @param buffer_size
      * @param offset
      */
-    virtual void send(const std::string &target, char *buf, uint64_t buf_size) {
+    void send(const std::string &target, char *buf, uint64_t buf_size) override {
         std::cout << "sono " << ownHostnameString << " e sono connesso con " << buf_size << "\n";
 
         auto startChrono            = std::chrono::system_clock::now(); // iniza timer
