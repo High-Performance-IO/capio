@@ -6,14 +6,14 @@
 #include <gtest/gtest.h>
 void startFirst() {
     char recvBuff[1024];
-    CapioCommunicationService first("1234");
+    CapioCommunicationService first("1234", "fd-01");
     std::string receivedHostname = first.recive(recvBuff, 1024);
     EXPECT_STREQ(recvBuff, "ping");
-    EXPECT_EQ(receivedHostname, "localhost");
+    EXPECT_EQ(receivedHostname, "fd-02");
 }
 
 void startSecond() {
-    CapioCommunicationService second("1234");
+    CapioCommunicationService second("1234", "fd-02");
     char buff[5]{'p', 'i', 'n', 'g', '\0'};
     second.send("fd-01", buff, sizeof(buff));
 }
