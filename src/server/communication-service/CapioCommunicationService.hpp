@@ -14,7 +14,7 @@
 #include <sys/socket.h>
 #include <unistd.h>
 // CTRL + ALT + L PER FORMAT TEXTO SHIFT
-class CapioCommunicationService : public BackendInterface { //CapioCommunicationService impemetns interface
+class CapioCommunicationService : BackendInterface { //CapioCommunicationService impemetns interface
 
   private:
     MTCL::HandleUser Handler{};
@@ -42,8 +42,12 @@ class CapioCommunicationService : public BackendInterface { //CapioCommunication
         }
     }
 
-  public: // hostname in input scritto solo per test hardcode
-    explicit CapioCommunicationService(std::string port, std::string own) {
+  public:
+
+
+
+
+    explicit CapioCommunicationService(std::string port, std::string own) {// hostname in input scritto solo per test hardcode
 
         // scrivi toke su file
         gethostname(ownHostname, HOST_NAME_MAX);
@@ -82,7 +86,7 @@ class CapioCommunicationService : public BackendInterface { //CapioCommunication
                   << "CapioCommunicationService initialization completed." << std::endl;
     }
 
-    ~CapioCommunicationService() override {
+    ~CapioCommunicationService() {
         START_LOG(gettid(), "call()");
 
         Handler.close();
@@ -106,7 +110,7 @@ class CapioCommunicationService : public BackendInterface { //CapioCommunication
         delete continue_execution;
     }
 
-    std::string &recive(char *buf, uint64_t buf_size) override {
+    std::string &recive(char *buf, uint64_t buf_size) { //overdrive non serve
         std::cout << "sono " << ownHostnameString << " e sono connesso con " << connectedHostname
                   << "\n";
 
@@ -129,7 +133,7 @@ class CapioCommunicationService : public BackendInterface { //CapioCommunication
      * @param buffer_size
      * @param offset
      */
-    void send(const std::string &target, char *buf, uint64_t buf_size) override {
+    void send(const std::string &target, char *buf, uint64_t buf_size) { //overdrive non serve
         std::cout << "sono " << ownHostnameString << " e sono connesso con " << buf_size << "\n";
 
         auto startChrono            = std::chrono::system_clock::now(); // iniza timer
