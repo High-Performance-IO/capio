@@ -27,7 +27,7 @@ class CapioCommunicationService : BackendInterface { //CapioCommunicationService
     bool *continue_execution = new bool;
 
     //
-    static void waitConnect(const bool *continue_execution, std::string Token) {
+    static void waitConnect( bool *continue_execution, std::string Token) {
         START_LOG(gettid(), "INFO: instance of CapioCommunicationService");
         MTCL::Manager::listen(Token);
         MTCL::HandleUser UserManager = MTCL::Manager::getNext(std::chrono::microseconds(30));
