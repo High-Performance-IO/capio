@@ -28,7 +28,7 @@ class CapioCommunicationService : BackendInterface { //CapioCommunicationService
 
     //
     static void waitConnect( bool *continue_execution, std::string Token) {
-        START_LOG(gettid(), "INFO: instance of CapioCommunicationService");
+        START_LOG(gettid(), "rimani in attesa");
         MTCL::Manager::listen(Token);
         MTCL::HandleUser UserManager = MTCL::Manager::getNext(std::chrono::microseconds(30));
         while (*continue_execution) {
@@ -37,8 +37,8 @@ class CapioCommunicationService : BackendInterface { //CapioCommunicationService
                 continue;
             }
             //std::cout << "server connesso! \n";
-            START_LOG(gettid(), " server connesso! \n");
-            break;
+            LOG(" server connesso! \n");
+            //break;
         }
     }
 
@@ -48,12 +48,14 @@ class CapioCommunicationService : BackendInterface { //CapioCommunicationService
 
 
     explicit CapioCommunicationService(std::string port, std::string own) {// hostname in input scritto solo per test hardcode
-
+        START_LOG(gettid(), "INFO: instance of CapioCommunicationService");
         // scrivi toke su file
         gethostname(ownHostname, HOST_NAME_MAX);
        // ownHostnameString   = ownHostname;
         ownHostnameString = own;
+
         std::string MyToken = "TCP:" + ownHostnameString + ":" + port;
+        LOG(MyToken.c_str());
         std::string path    = std::filesystem::current_path();
         std::ofstream FilePort(ownHostnameString + ".txt");
         FilePort << port;
@@ -65,7 +67,7 @@ class CapioCommunicationService : BackendInterface { //CapioCommunicationService
             std::ifstream MyReadFile(entry.path().filename()); // apri file
             std::string TryHostName = entry.path().stem();
             std::string TryPort;
-
+            LOG(" INIZIO TEST CONNESIONE \n");
             while (getline(MyReadFile, TryPort)) { // SALVA PORTA
                 // NON FUNZIONA IN LOCAL
                 if (entry.path().extension() == ".txt" && (TryHostName != ownHostnameString)) {
@@ -145,6 +147,8 @@ class CapioCommunicationService : BackendInterface { //CapioCommunicationService
                 MTCL_ERROR(ownHostname, "ERROR sending message\n");
             } else {
                 std::cout << "ho mandato: " << buf << "\n";
+
+
                 Handler.receive(TimeEnd, sizeof(TimeEnd));     // rimane in attesta del tempo
                 std::time_t duration = (*TimeEnd) - startTime; // tempo in secondi
                 std::cout << "Il messaggio ci ha messo " << duration << " secondi \n";
