@@ -71,11 +71,13 @@ class CapioCommunicationService : BackendInterface { //CapioCommunicationService
             LOG(MyToken.c_str());
             LOG(TryHostName.c_str());
 
-            LOG(" INIZIO TEST CONNESIONE \n");
+            //LOG(" INIZIO TEST CONNESIONE \n");
             while (getline(MyReadFile, TryPort)) { // SALVA PORTA
                 // NON FUNZIONA IN LOCAL
-                if (entry.path().extension() == ".txt" && (TryHostName != ownHostnameString)) {
+
+                if (entry.path().extension() == ".txt" && (TryHostName != ownHostnameString && TryHostName != "CMakeLists")) {
                     // prova a connetterti
+                    LOG(" INIZIO TEST CONNESIONE \n");
                     MTCL::HandleUser UserManager =
                         MTCL::Manager::connect("TCP:" + TryHostName + ":" + TryPort);
                 }
@@ -85,7 +87,7 @@ class CapioCommunicationService : BackendInterface { //CapioCommunicationService
         }
 
         // rimani in attesa di connections
-        LOG( "Waiting for connections");
+
         *continue_execution = true;
         th                  = new std::thread(waitConnect, std::ref(continue_execution), MyToken);
         std::cout << CAPIO_SERVER_CLI_LOG_SERVER << " [ " << node_name << " ] "
@@ -96,7 +98,9 @@ class CapioCommunicationService : BackendInterface { //CapioCommunicationService
         START_LOG(gettid(), "END");
 
         Handler.close();
+        LOG("Finalized MTCL backend");
         MTCL::Manager::finalize();
+        LOG("Finalized MTCL backend");
         delete[] ownHostname;
 
         LOG("Finalized MTCL backend");
@@ -104,7 +108,7 @@ class CapioCommunicationService : BackendInterface { //CapioCommunicationService
         std::string path = std::filesystem::current_path();
         for (const auto &entry : std::filesystem::directory_iterator(path)) {
 
-            if (entry.path().extension() == ".txt") {
+            if (entry.path().extension() == ".txt" && (entry.path().stem() != "CMakeLists")) {
                 std::remove(entry.path().filename().c_str());
             }
         }
