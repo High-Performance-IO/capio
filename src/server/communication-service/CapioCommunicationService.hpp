@@ -98,7 +98,7 @@ class CapioCommunicationService : BackendInterface { //CapioCommunicationService
         START_LOG(gettid(), "END");
 
         // Set the flag to stop the connection thread
-        continue_execution = false;
+        *continue_execution = false;
         if (th->joinable()) {
             th->join();
         }
