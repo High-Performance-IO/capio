@@ -67,6 +67,10 @@ class CapioCommunicationService : BackendInterface { //CapioCommunicationService
             std::ifstream MyReadFile(entry.path().filename()); // apri file
             std::string TryHostName = entry.path().stem();
             std::string TryPort;
+            LOG(entry.path().filename().c_str());
+            LOG(MyToken.c_str());
+            LOG(TryHostName.c_str());
+
             LOG(" INIZIO TEST CONNESIONE \n");
             while (getline(MyReadFile, TryPort)) { // SALVA PORTA
                 // NON FUNZIONA IN LOCAL
@@ -89,7 +93,7 @@ class CapioCommunicationService : BackendInterface { //CapioCommunicationService
     }
 
     ~CapioCommunicationService() {
-        START_LOG(gettid(), "call()");
+        START_LOG(gettid(), "END");
 
         Handler.close();
         MTCL::Manager::finalize();
