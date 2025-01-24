@@ -28,7 +28,7 @@ class CapioCommunicationService : BackendInterface { //CapioCommunicationService
 
     //
     static void waitConnect( bool *continue_execution, std::string Token) {
-       // START_LOG(gettid(), "rimani in attesa");
+        START_LOG(gettid(), "rimani in attesa");
         MTCL::Manager::listen(Token);
         MTCL::HandleUser UserManager = MTCL::Manager::getNext(std::chrono::microseconds(30));
         while (*continue_execution) {
@@ -37,7 +37,7 @@ class CapioCommunicationService : BackendInterface { //CapioCommunicationService
                 continue;
             }
             //std::cout << "server connesso! \n";
-         //   LOG(" server connesso! \n");
+            LOG(" server connesso! \n");
             break;
         }
     }
@@ -95,15 +95,39 @@ class CapioCommunicationService : BackendInterface { //CapioCommunicationService
     }
 
     ~CapioCommunicationService() {
-       // START_LOG(gettid(), "END");
+        START_LOG(gettid(), "END");
+
+        // Set the flag to stop the connection thread
+        continue_execution = false;
+        if (th->joinable()) {
+            th->join();
+        }
+        delete th;
 
         Handler.close();
-        //LOG("Finalized MTCL backend");
+        LOG("Handler closed.");
+
+        std::string path = std::filesystem::current_path();
+        for (const auto& entry : std::filesystem::directory_iterator(path)) {
+            if (entry.path().extension() == ".txt" && (entry.path().stem() != "CMakeLists")) {
+                std::remove(entry.path().filename().c_str());
+            }
+        }
+
+        LOG("Finalizing MTCL backend");
         MTCL::Manager::finalize();
-       // LOG("Finalized MTCL backend");
+
+        delete[] ownHostname;
+        /*
+        START_LOG(gettid(), "END");
+
+        Handler.close();
+        LOG("Finalized MTCL backend");
+        MTCL::Manager::finalize();
+        LOG("Finalized MTCL backend");
         delete[] ownHostname;
 
-       // LOG("Finalized MTCL backend");
+        LOG("Finalized MTCL backend");
 
         std::string path = std::filesystem::current_path();
         for (const auto &entry : std::filesystem::directory_iterator(path)) {
@@ -117,7 +141,7 @@ class CapioCommunicationService : BackendInterface { //CapioCommunicationService
         pthread_cancel(th->native_handle());
         th->join();
         delete th;
-        delete continue_execution;
+        delete continue_execution;*/
     }
 
     std::string &recive(char *buf, uint64_t buf_size) { //overdrive non serve
