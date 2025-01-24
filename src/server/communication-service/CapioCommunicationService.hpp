@@ -38,7 +38,7 @@ class CapioCommunicationService : BackendInterface { //CapioCommunicationService
             }
             //std::cout << "server connesso! \n";
             LOG(" server connesso! \n");
-            //break;
+            break;
         }
     }
 
