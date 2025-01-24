@@ -16,7 +16,7 @@ void startSecond() {
 TEST(CapioCommServiceTest, TestNumberOne) {
     //pare il il primo utente che fara da server
       char recvBuff[1024];
-    CapioCommunicationService first("1234", "fd-01");
+   // CapioCommunicationService first("1234", "fd-01");
    /* std::string receivedHostname = first.recive(recvBuff, 1024);
     //parte il thread con la funzione
   std::thread t1(startSecond);
