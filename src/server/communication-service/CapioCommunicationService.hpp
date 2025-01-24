@@ -28,7 +28,7 @@ class CapioCommunicationService : BackendInterface { //CapioCommunicationService
 
     //
     static void waitConnect( bool *continue_execution, std::string Token) {
-        START_LOG(gettid(), "rimani in attesa");
+       // START_LOG(gettid(), "rimani in attesa");
         MTCL::Manager::listen(Token);
         MTCL::HandleUser UserManager = MTCL::Manager::getNext(std::chrono::microseconds(30));
         while (*continue_execution) {
@@ -37,7 +37,7 @@ class CapioCommunicationService : BackendInterface { //CapioCommunicationService
                 continue;
             }
             //std::cout << "server connesso! \n";
-            LOG(" server connesso! \n");
+         //   LOG(" server connesso! \n");
             break;
         }
     }
@@ -95,15 +95,15 @@ class CapioCommunicationService : BackendInterface { //CapioCommunicationService
     }
 
     ~CapioCommunicationService() {
-        START_LOG(gettid(), "END");
+       // START_LOG(gettid(), "END");
 
         Handler.close();
-        LOG("Finalized MTCL backend");
+        //LOG("Finalized MTCL backend");
         MTCL::Manager::finalize();
-        LOG("Finalized MTCL backend");
+       // LOG("Finalized MTCL backend");
         delete[] ownHostname;
 
-        LOG("Finalized MTCL backend");
+       // LOG("Finalized MTCL backend");
 
         std::string path = std::filesystem::current_path();
         for (const auto &entry : std::filesystem::directory_iterator(path)) {
