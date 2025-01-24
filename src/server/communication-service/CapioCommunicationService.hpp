@@ -81,7 +81,7 @@ class CapioCommunicationService : BackendInterface { //CapioCommunicationService
         }
 
         // rimani in attesa di connections
-        START_LOG(gettid(), "Waiting for connections");
+        LOG( "Waiting for connections");
         *continue_execution = true;
         th                  = new std::thread(waitConnect, std::ref(continue_execution), MyToken);
         std::cout << CAPIO_SERVER_CLI_LOG_SERVER << " [ " << node_name << " ] "
