@@ -77,6 +77,7 @@ class CapioCommunicationService : BackendInterface { //CapioCommunicationService
 
                 if (entry.path().extension() == ".txt" && (TryHostName != ownHostnameString && TryHostName != "CMakeLists")) {
                     // prova a connetterti
+                    connectedHostname = TryHostName;
                     LOG((" INIZIO TEST CONNESIONE con" + ownHostnameString).c_str());
                     MTCL::HandleUser UserManager =
                         MTCL::Manager::connect("TCP:" + TryHostName + ":" + TryPort);
