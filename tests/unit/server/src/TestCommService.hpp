@@ -18,7 +18,7 @@ TEST(CapioCommServiceTest, TestNumberOne) {
       char recvBuff[1024];
     CapioCommunicationService first("1234", "fd-01");
     CapioCommunicationService second("1234", "fd-02");
-    std::string receivedHostname = first.recive(recvBuff, 1024);
+    std::string receivedHostname = second.recive(recvBuff, 1024);
    /* EXPECT_EQ(receivedHostname, "fd-01");
     EXPECT_EQ(receivedHostname, "fd-02");*/
     //parte il thread con la funzione
