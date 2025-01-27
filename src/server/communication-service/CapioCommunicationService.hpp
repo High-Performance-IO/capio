@@ -115,8 +115,8 @@ class CapioCommunicationService : BackendInterface { //CapioCommunicationService
         }
 
 
-        MTCL::Manager::finalize();
- LOG("Finalizing MTCL backend");
+       /* MTCL::Manager::finalize();
+        LOG("Finalizing MTCL backend");*/
         delete[] ownHostname;
         LOG("Finalizing MTCL backend");
         /*
