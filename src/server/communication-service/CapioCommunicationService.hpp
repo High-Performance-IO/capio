@@ -77,7 +77,7 @@ class CapioCommunicationService : BackendInterface { //CapioCommunicationService
 
                 if (entry.path().extension() == ".txt" && (TryHostName != ownHostnameString && TryHostName != "CMakeLists")) {
                     // prova a connetterti
-                    LOG(" INIZIO TEST CONNESIONE \n");
+                    LOG((" INIZIO TEST CONNESIONE con" + ownHostnameString).c_str());
                     MTCL::HandleUser UserManager =
                         MTCL::Manager::connect("TCP:" + TryHostName + ":" + TryPort);
                 }
@@ -146,10 +146,11 @@ class CapioCommunicationService : BackendInterface { //CapioCommunicationService
     }
 
     std::string &recive(char *buf, uint64_t buf_size) { //overdrive non serve
-        std::cout << "sono " << ownHostnameString << " e sono connesso con " << connectedHostname
-                  << "\n";
+        START_LOG(gettid(), "inizio recv");
+        LOG ( ("sono " + ownHostnameString + " e sono connesso con " + connectedHostname).c_str());
 
         if (Handler.receive(buf, buf_size) != buf_size) {
+            LOG ("errore recv");
             MTCL_ERROR(ownHostname, "ERROR receiving message\n");
         }
         auto endChrono            = std::chrono::system_clock::now(); // catch time
