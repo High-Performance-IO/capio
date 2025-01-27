@@ -18,12 +18,14 @@ TEST(CapioCommServiceTest, TestNumberOne) {
       char recvBuff[1024];
     CapioCommunicationService first("3456", "fd-02");
     std::string receivedHostname = first.recive(recvBuff, 1024);
+    EXPECT_EQ(receivedHostname, "fd-01");
+    EXPECT_EQ(receivedHostname, "fd-02");
     //parte il thread con la funzione
-  std::thread t1(startSecond);
+ /* std::thread t1(startSecond);
     sleep(2); //aspetta che il secondo parta
     //EXPECT_STREQ(recvBuff, "ping");
-    EXPECT_EQ(receivedHostname, "fd-02");
-    t1.join();
+
+    t1.join();*/
 
 
 
