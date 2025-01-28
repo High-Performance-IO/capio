@@ -52,6 +52,9 @@ class CapioCommunicationService : BackendInterface { //CapioCommunicationService
 
     explicit CapioCommunicationService(std::string port, std::string own) {// hostname in input scritto solo per test hardcode
         START_LOG(gettid(), "INFO: instance of CapioCommunicationService");
+        if (MTCL::Manager::init(port) != 0) {
+            LOG("ERRORE");
+        }
         // scrivi toke su file
         gethostname(ownHostname, HOST_NAME_MAX);
        // ownHostnameString   = ownHostname;
@@ -63,18 +66,18 @@ class CapioCommunicationService : BackendInterface { //CapioCommunicationService
         std::ofstream FilePort(ownHostnameString + ".txt");
         FilePort << port;
         FilePort.close();
-        MTCL::Manager::init(port);
+
         // connettiti con tutti i file diponibili
         for (const auto &entry : std::filesystem::directory_iterator(path)) {
 
             std::ifstream MyReadFile(entry.path().filename()); // apri file
             std::string TryHostName = entry.path().stem();
             std::string TryPort;
-            //LOG(entry.path().filename().c_str());
-           // LOG(MyToken.c_str());
-           // LOG(TryHostName.c_str());
-           // MTCL::Manager::init(port);
-            //LOG(" INIZIO TEST CONNESIONE \n");
+            LOG(entry.path().filename().c_str());
+            LOG(MyToken.c_str());
+            LOG(TryHostName.c_str());
+
+
             while (getline(MyReadFile, TryPort)) { // SALVA PORTA
                 // NON FUNZIONA IN LOCAL
 
