@@ -17,6 +17,7 @@ TEST(CapioCommServiceTest, TestNumberOne) {
     //pare il il primo utente che fara da server
       char recvBuff[1024];
     CapioCommunicationService first("1234", "fd-01");
+    sleep(3);//aspetta che il primo si metta in wait
     CapioCommunicationService second("1234", "fd-02");
     std::string receivedHostname = second.recive(recvBuff, 1024);
    /* EXPECT_EQ(receivedHostname, "fd-01");
