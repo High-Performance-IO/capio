@@ -73,9 +73,9 @@ class CapioCommunicationService : BackendInterface { //CapioCommunicationService
             std::ifstream MyReadFile(entry.path().filename()); // apri file
             std::string TryHostName = entry.path().stem();
             std::string TryPort;
-            LOG(entry.path().filename().c_str());
-            LOG(MyToken.c_str());
-            LOG(TryHostName.c_str());
+           // LOG(entry.path().filename().c_str());
+           // LOG(MyToken.c_str());
+           // LOG(TryHostName.c_str());
 
 
             while (getline(MyReadFile, TryPort)) { // SALVA PORTA
