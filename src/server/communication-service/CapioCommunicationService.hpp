@@ -40,6 +40,7 @@ class CapioCommunicationService : BackendInterface { //CapioCommunicationService
             LOG(" server connesso! \n");
             break;
         }
+        LOG("  insuccesso \n");
     }
 
   public:
