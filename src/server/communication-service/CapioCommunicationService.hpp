@@ -63,7 +63,7 @@ class CapioCommunicationService : BackendInterface { //CapioCommunicationService
         std::ofstream FilePort(ownHostnameString + ".txt");
         FilePort << port;
         FilePort.close();
-
+        MTCL::Manager::init(port);
         // connettiti con tutti i file diponibili
         for (const auto &entry : std::filesystem::directory_iterator(path)) {
 
@@ -73,7 +73,7 @@ class CapioCommunicationService : BackendInterface { //CapioCommunicationService
             //LOG(entry.path().filename().c_str());
            // LOG(MyToken.c_str());
            // LOG(TryHostName.c_str());
-
+           // MTCL::Manager::init(port);
             //LOG(" INIZIO TEST CONNESIONE \n");
             while (getline(MyReadFile, TryPort)) { // SALVA PORTA
                 // NON FUNZIONA IN LOCAL
