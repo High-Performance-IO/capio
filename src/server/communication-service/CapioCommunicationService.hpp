@@ -30,7 +30,9 @@ class CapioCommunicationService : BackendInterface { //CapioCommunicationService
     static void waitConnect( bool *continue_execution, std::string Token) {
         START_LOG(gettid(), "rimani in attesa");
         MTCL::Manager::listen(Token);
+        LOG("  insuccesso \n");
         MTCL::HandleUser UserManager = MTCL::Manager::getNext(std::chrono::microseconds(30));
+        LOG("  insuccesso \n");
         while (*continue_execution) {
             UserManager = MTCL::Manager::getNext(std::chrono::microseconds(30));
             if (!UserManager.isValid()) {
