@@ -52,9 +52,9 @@ class CapioCommunicationService : BackendInterface { //CapioCommunicationService
 
     explicit CapioCommunicationService(std::string port, std::string own) {// hostname in input scritto solo per test hardcode
         START_LOG(gettid(), "INFO: instance of CapioCommunicationService");
-        if (MTCL::Manager::init(port) != 0) {
+        /*if (MTCL::Manager::init(port) != 0) {
             LOG("ERRORE");
-        }
+        }*/
         // scrivi toke su file
         gethostname(ownHostname, HOST_NAME_MAX);
        // ownHostnameString   = ownHostname;
