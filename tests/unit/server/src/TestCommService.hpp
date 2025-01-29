@@ -20,7 +20,7 @@ TEST(CapioCommServiceTest, TestNumberOne) {
     sleep(3);//aspetta che il primo si metta in wait
     CapioCommunicationService second("1234", "fd-02");
     sleep(3);
-   // std::string receivedHostname = second.recive(recvBuff, 1024);
+    std::string receivedHostname = second.recive(recvBuff, 1024);
    /* EXPECT_EQ(receivedHostname, "fd-01");
     EXPECT_EQ(receivedHostname, "fd-02");*/
     //parte il thread con la funzione
