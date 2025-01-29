@@ -120,12 +120,13 @@ class CapioCommunicationService : BackendInterface { //CapioCommunicationService
         Handler.close();
         LOG("Handler closed.");
 
-        std::string path = std::filesystem::current_path();
+       /* std::string path = std::filesystem::current_path();
         for (const auto& entry : std::filesystem::directory_iterator(path)) {
+
             if (entry.path().extension() == ".txt" && (entry.path().stem() != "CMakeLists")) {
                 std::remove(entry.path().filename().c_str());
             }
-        }
+        }*/
 
 
         //MTCL::Manager::finalize();
