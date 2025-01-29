@@ -111,9 +111,10 @@ class CapioCommunicationService : BackendInterface { //CapioCommunicationService
 
         // Set the flag to stop the connection thread
         *continue_execution = false;
-        if (th->joinable()) {
-            th->join();
+        while (!th->joinable()) {
+            //cicla in loop finche th non e' joinabe
         }
+        th->join();
         delete th;
 
         Handler.close();
