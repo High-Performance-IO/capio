@@ -29,16 +29,14 @@ class CapioCommunicationService : BackendInterface { //CapioCommunicationService
     //
     static void waitConnect( bool *continue_execution, std::string Token) {
         START_LOG(gettid(), (("rimani in attesa di una connection del tipo: " + Token).c_str()));
-        //MTCL::Manager::init(Token);
+        MTCL::Manager::init("1234");
         MTCL::Manager::listen(Token);
         LOG("  pre \n");
        // MTCL::HandleUser UserManager = MTCL::Manager::getNext(std::chrono::microseconds(30));
        // LOG("  pre \n");
         while (*continue_execution) {
             MTCL::HandleUser UserManager = MTCL::Manager::getNext(std::chrono::microseconds(30));
-
             if (!UserManager.isValid()) {
-                LOG("LOOP");
                 continue;
             }
             //std::cout << "server connesso! \n";
