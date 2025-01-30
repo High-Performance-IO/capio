@@ -36,11 +36,13 @@ class CapioCommunicationService : BackendInterface { //CapioCommunicationService
        // LOG("  pre \n");
         while (*continue_execution) {
             MTCL::HandleUser UserManager = MTCL::Manager::getNext(std::chrono::microseconds(30));
+
             if (!UserManager.isValid()) {
+                LOG("LOOP");
                 continue;
             }
             //std::cout << "server connesso! \n";
-           // LOG(" server connesso! \n");
+            LOG(" server connesso! \n");
             break;
         }
         LOG("  finished waiting for connections \n");
