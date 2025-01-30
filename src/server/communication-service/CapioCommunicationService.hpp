@@ -88,8 +88,7 @@ class CapioCommunicationService : BackendInterface { //CapioCommunicationService
                     // prova a connetterti
                     std::string TryToken = "TCP:" + TryHostName + ":" + port;
                     LOG((" INIZIO TEST CONNESIONE del tipo: " + TryToken).c_str());
-                    MTCL::HandleUser UserManager =
-                        MTCL::Manager::connect(TryToken);
+                    MTCL::HandleUser UserManager = MTCL::Manager::connect(TryToken);
                     if (UserManager.isValid()) {
                         LOG("CONNNESSO");
                         connectedHostname = TryHostName;
