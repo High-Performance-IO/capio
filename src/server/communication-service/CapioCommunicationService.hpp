@@ -55,10 +55,6 @@ class CapioCommunicationService : BackendInterface { //CapioCommunicationService
 
 
         START_LOG(gettid(), "INFO: instance of CapioCommunicationService");
-        if (MTCL::Manager::init("TCP:" + own + ":" + port) != 0) {
-            LOG("ERROR: Failed to initialize MTCL manager\n");
-            return;
-        }
         /*if (MTCL::Manager::init(port) != 0) { //manager already initialized
             LOG("ERRORE");
         }*/
@@ -90,10 +86,10 @@ class CapioCommunicationService : BackendInterface { //CapioCommunicationService
 
                 if (entry.path().extension() == ".txt" && (TryHostName != ownHostnameString && TryHostName != "CMakeLists")) {
                     // prova a connetterti
-
-                    LOG((" INIZIO TEST CONNESIONE del tipo: " + TryHostName + + ":" + TryPort).c_str());
+                    std::string TryToken = "TCP:" + TryHostName + ":" + port;
+                    LOG((" INIZIO TEST CONNESIONE del tipo: " + TryToken).c_str());
                     MTCL::HandleUser UserManager =
-                        MTCL::Manager::connect("TCP:" + TryHostName + ":" + TryPort);
+                        MTCL::Manager::connect(TryToken);
                     if (UserManager.isValid()) {
                         LOG("CONNNESSO");
                         connectedHostname = TryHostName;

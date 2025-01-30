@@ -21,15 +21,30 @@ TEST(CapioCommServiceTest, TestNumberOne) {
     CapioCommunicationService second("1234", "fd-02");
     sleep(3);
     std::string receivedHostname = second.recive(recvBuff, 1024);
-   /* EXPECT_EQ(receivedHostname, "fd-01");
-    EXPECT_EQ(receivedHostname, "fd-02");*/
-    //parte il thread con la funzione
- /* std::thread t1(startSecond);
-    sleep(2); //aspetta che il secondo parta
-    //EXPECT_STREQ(recvBuff, "ping");
 
-    t1.join();*/
+    /*
 
+    // Buffer to receive message
+    char recvBuff[1024];
+
+    // Initialize the first instance (acting as server)
+    CapioCommunicationService first("1234", "fd-01");
+
+    // Give some time for the first instance to initialize and wait for connections
+    std::this_thread::sleep_for(std::chrono::seconds(3));
+
+    // Start the second instance (acting as client) in a separate thread
+    std::thread t1(startSecondInstance);
+
+    // Receive message in the first instance
+    std::string receivedHostname = first.receive(recvBuff, 1024);
+
+    t1.join();  // Ensure the second instance thread completes
+
+    // Check the received message and hostname
+    EXPECT_STREQ(recvBuff, "ping");
+    EXPECT_EQ(receivedHostname, "fd-02");
+        */
 
 
 
