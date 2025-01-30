@@ -29,6 +29,7 @@ class CapioCommunicationService : BackendInterface { //CapioCommunicationService
     //
     static void waitConnect( bool *continue_execution, std::string Token) {
         START_LOG(gettid(), (("rimani in attesa di una connection del tipo: " + Token).c_str()));
+        MTCL::Manager::init(Token);
         MTCL::Manager::listen(Token);
         LOG("  pre \n");
         MTCL::HandleUser UserManager = MTCL::Manager::getNext(std::chrono::microseconds(30));
@@ -42,7 +43,7 @@ class CapioCommunicationService : BackendInterface { //CapioCommunicationService
            // LOG(" server connesso! \n");
             break;
         }
-        LOG("  insuccesso \n");
+        LOG("  insuccesso nell'attesa di una connnessione \n");
     }
 
   public:
@@ -83,12 +84,13 @@ class CapioCommunicationService : BackendInterface { //CapioCommunicationService
 
                 if (entry.path().extension() == ".txt" && (TryHostName != ownHostnameString && TryHostName != "CMakeLists")) {
                     // prova a connetterti
-                    connectedHostname = TryHostName;
+
                     LOG((" INIZIO TEST CONNESIONE del tipo: " + TryHostName + + ":" + TryPort).c_str());
                     MTCL::HandleUser UserManager =
                         MTCL::Manager::connect("TCP:" + TryHostName + ":" + TryPort);
                     if (UserManager.isValid()) {
                         LOG("CONNNESSO");
+                        connectedHostname = TryHostName;
                     } else {
                         LOG("non CONNNESSO");
                     }
@@ -120,13 +122,13 @@ class CapioCommunicationService : BackendInterface { //CapioCommunicationService
         Handler.close();
         LOG("Handler closed.");
 
-       /* std::string path = std::filesystem::current_path();
+        std::string path = std::filesystem::current_path();
         for (const auto& entry : std::filesystem::directory_iterator(path)) {
 
             if (entry.path().extension() == ".txt" && (entry.path().stem() != "CMakeLists")) {
                 std::remove(entry.path().filename().c_str());
             }
-        }*/
+        }
 
 
         //MTCL::Manager::finalize();
@@ -167,11 +169,12 @@ class CapioCommunicationService : BackendInterface { //CapioCommunicationService
             LOG ("errore recv");
             MTCL_ERROR(ownHostname, "ERROR receiving message\n");
         }
-        auto endChrono            = std::chrono::system_clock::now(); // catch time
+        LOG("SALTO TIME");
+        /*auto endChrono            = std::chrono::system_clock::now(); // catch time
         const std::time_t endTime = std::chrono::system_clock::to_time_t(endChrono);
 
         void *PointerEndTime = (void *) &endTime;
-        Handler.send(PointerEndTime, sizeof(endTime)); // send time of recived message
+        Handler.send(PointerEndTime, sizeof(endTime));*/ // send time of recived message
 
         return connectedHostname;
     }
