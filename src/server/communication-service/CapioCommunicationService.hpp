@@ -32,10 +32,10 @@ class CapioCommunicationService : BackendInterface { //CapioCommunicationService
         //MTCL::Manager::init(Token);
         MTCL::Manager::listen(Token);
         LOG("  pre \n");
-        MTCL::HandleUser UserManager = MTCL::Manager::getNext(std::chrono::microseconds(30));
-        LOG("  pre \n");
+       // MTCL::HandleUser UserManager = MTCL::Manager::getNext(std::chrono::microseconds(30));
+       // LOG("  pre \n");
         while (*continue_execution) {
-            UserManager = MTCL::Manager::getNext(std::chrono::microseconds(30));
+            MTCL::HandleUser UserManager = MTCL::Manager::getNext(std::chrono::microseconds(30));
             if (!UserManager.isValid()) {
                 continue;
             }
@@ -43,7 +43,7 @@ class CapioCommunicationService : BackendInterface { //CapioCommunicationService
            // LOG(" server connesso! \n");
             break;
         }
-        LOG("  insuccesso nell'attesa di una connnessione \n");
+        LOG("  finished waiting for connections \n");
     }
 
   public:
@@ -52,7 +52,13 @@ class CapioCommunicationService : BackendInterface { //CapioCommunicationService
 
 
     explicit CapioCommunicationService(std::string port, std::string own) {// hostname in input scritto solo per test hardcode
+
+
         START_LOG(gettid(), "INFO: instance of CapioCommunicationService");
+        if (MTCL::Manager::init("TCP:" + own + ":" + port) != 0) {
+            LOG("ERROR: Failed to initialize MTCL manager\n");
+            return;
+        }
         /*if (MTCL::Manager::init(port) != 0) { //manager already initialized
             LOG("ERRORE");
         }*/
@@ -131,7 +137,7 @@ class CapioCommunicationService : BackendInterface { //CapioCommunicationService
         }
 
 
-        //MTCL::Manager::finalize();
+        MTCL::Manager::finalize();
         LOG("Finalizing MTCL backend");
         delete[] ownHostname;
         LOG("Finalizing MTCL backend");
