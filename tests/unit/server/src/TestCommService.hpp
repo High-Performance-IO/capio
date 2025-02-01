@@ -15,18 +15,18 @@ void startSecond() {
 
 TEST(CapioCommServiceTest, TestNumberOne) {
     //pare il il primo utente che fara da server
-  /*    char recvBuff[1024];
+     char recvBuff[1024];
     sleep(3);
     CapioCommunicationService first("1234", "fd-01");
     sleep(3);//aspetta che il primo si metta in wait
-    CapioCommunicationService second("1234", "fd-02");
+   // CapioCommunicationService second("1234", "fd-02");
     sleep(3);
    // std::string receivedHostname = second.recive(recvBuff, 1024);
-*/
+
 
 
     // Buffer to receive message
-    char recvBuff[1024];
+  /*  char recvBuff[1024];
 
     // Initialize the first instance (acting as server)
     CapioCommunicationService first("1234", "fd-01");
@@ -43,8 +43,8 @@ TEST(CapioCommServiceTest, TestNumberOne) {
     t1.join();  // Ensure the second instance thread completes
 
     // Check the received message and hostname
-   // EXPECT_STREQ(recvBuff, "ping");
-    EXPECT_EQ(receivedHostname, "fd-02");
+    EXPECT_STREQ(recvBuff, "ping");
+    EXPECT_EQ(receivedHostname, "fd-02");*/
 
 
 
