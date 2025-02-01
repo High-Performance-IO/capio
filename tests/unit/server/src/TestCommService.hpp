@@ -8,8 +8,8 @@
 
 void startSecond() {
     CapioCommunicationService second("1234", "fd-02");
-    /*char buff[5]{'p', 'i', 'n', 'g', '\0'};
-    second.send("fd-01", buff, sizeof(buff));*/
+    char buff[5]{'p', 'i', 'n', 'g', '\0'};
+    second.send("fd-01", buff, sizeof(buff));
 }
 
 
