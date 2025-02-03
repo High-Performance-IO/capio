@@ -2,56 +2,54 @@
 #define TEST_CAPIOCOMMUNICATIONSERVICE_HPP
 
 #include "../server/communication-service/CapioCommunicationService.hpp"
-#include <thread>
 #include <gtest/gtest.h>
-
+#include <thread>
 
 void startSecond() {
     CapioCommunicationService second("1234", "fd-02");
-   /* char buff[5]{'p', 'i', 'n', 'g', '\0'};
-    second.send("fd-01", buff, sizeof(buff));*/
+    /* char buff[5]{'p', 'i', 'n', 'g', '\0'};
+     second.send("fd-01", buff, sizeof(buff));*/
 }
 
-
 TEST(CapioCommServiceTest, TestNumberOne) {
-    //pare il il primo utente che fara da server
+    // pare il il primo utente che fara da server
+    char hostname[HOST_NAME_MAX];
+    gethostname(hostname, HOST_NAME_MAX);
+
     char recvBuff[1024];
     sleep(3);
-    CapioCommunicationService first("1234", "fd-01");
-    sleep(3);//aspetta che il primo si metta in wait
-    CapioCommunicationService second("1234", "fd-02");
-    sleep(3);
-   std::string receivedHostname = second.recive(recvBuff, 1024);
+    CapioCommunicationService backend("1234", hostname);
+    sleep(3); // aspetta che il primo si metta in wait
 
+    const auto other_hostname = std::string("fd-01");
 
+    if (std::string(hostname) == "fd-00") {
+        backend.send(other_hostname, "Ciao tests 1234", 1024);
+    } else {
+        std::string receivedHostname = backend.recive(recvBuff, 1024);
+    }
 
     // Buffer to receive message
-  /*  char recvBuff[1024];
+    /*  char recvBuff[1024];
 
-    // Initialize the first instance (acting as server)
-    CapioCommunicationService first("1234", "fd-01");
+      // Initialize the first instance (acting as server)
+      CapioCommunicationService first("1234", "fd-01");
 
-    // Give some time for the first instance to initialize and wait for connections
-    //std::this_thread::sleep_for(std::chrono::seconds(3));
+      // Give some time for the first instance to initialize and wait for connections
+      //std::this_thread::sleep_for(std::chrono::seconds(3));
 
-    // Start the second instance (acting as client) in a separate thread
-    std::thread t1(startSecond);
-    sleep(3);
-    t1.join();
-    // Receive message in the first instance
-    std::string receivedHostname = first.recive(recvBuff, 1024);
+      // Start the second instance (acting as client) in a separate thread
+      std::thread t1(startSecond);
+      sleep(3);
+      t1.join();
+      // Receive message in the first instance
+      std::string receivedHostname = first.recive(recvBuff, 1024);
 
-     // Ensure the second instance thread completes
+       // Ensure the second instance thread completes
 
-    // Check the received message and hostname
-   // EXPECT_STREQ(recvBuff, "ping");
-    EXPECT_EQ(receivedHostname, "fd-02");*/
-
-
-
-
-
-
+      // Check the received message and hostname
+     // EXPECT_STREQ(recvBuff, "ping");
+      EXPECT_EQ(receivedHostname, "fd-02");*/
 }
 
 #endif // TEST_CAPIOCOMMUNICATIONSERVICE_HPP
