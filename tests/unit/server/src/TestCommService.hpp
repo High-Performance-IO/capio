@@ -4,12 +4,12 @@
 #include "../server/communication-service/CapioCommunicationService.hpp"
 #include <gtest/gtest.h>
 #include <thread>
-
+/*
 void startSecond() {
     CapioCommunicationService second("1234", "fd-02");
-    /* char buff[5]{'p', 'i', 'n', 'g', '\0'};
-     second.send("fd-01", buff, sizeof(buff));*/
-}
+    char buff[5]{'p', 'i', 'n', 'g', '\0'};
+     second.send("fd-01", buff, sizeof(buff));
+}*/
 
 TEST(CapioCommServiceTest, TestNumberOne) {
     // pare il il primo utente che fara da server
@@ -17,16 +17,21 @@ TEST(CapioCommServiceTest, TestNumberOne) {
     gethostname(hostname, HOST_NAME_MAX);
 
     char recvBuff[1024];
-    sleep(3);
-    CapioCommunicationService backend("1234", hostname);
-    sleep(3); // aspetta che il primo si metta in wait
+    CapioCommunicationService backend("1234");
+    //sleep(3); // aspetta che il primo si metta in wait
 
-    const auto other_hostname = std::string("fd-01");
+    const auto other_hostname = std::string("fd-06");
 
-    if (std::string(hostname) == "fd-00") {
+    if (std::string(hostname) == "fd-05") { //fd-05 fa una send a fd-06
+        std::cout << "prova send \n";
+        sleep(30);
         backend.send(other_hostname, "Ciao tests 1234", 1024);
-    } else {
+    } else { //chiunque altro fa una recive
+        std::cout << "prova revive \n";
+        sleep(30); //continuiamo a lasciare in funzione il thread in listen aspettando una connessione
         std::string receivedHostname = backend.recive(recvBuff, 1024);
+
+        //EXPECT_EQ(receivedHostname, "fd-05");
     }
 
     // Buffer to receive message
