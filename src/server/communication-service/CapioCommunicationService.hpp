@@ -29,12 +29,11 @@ class CapioCommunicationService : BackendInterface { // CapioCommunicationServic
 
     //
     static void waitConnect(bool *continue_execution, std::string Token) {
-      // std::cout << "listen to";
-       // std::cout << "wait parteeeee";
-       // std::cout <<  Token;
+        std::cout << "listen to";
+
        START_LOG(gettid(), (("rimani in attesa di una connection del tipo: " + Token).c_str()));
-      //  std::cout << "listen to";
-      //  std::cout << "listen to" << Token;
+
+       // std::cout << "listen to" << Token;
         // MTCL::Manager::init("1234");
         MTCL::Manager::listen(Token);
 
@@ -48,7 +47,7 @@ class CapioCommunicationService : BackendInterface { // CapioCommunicationServic
                 continue;
 
             }
-            // std::cout << "server connesso! \n";
+             std::cout << "server connesso! \n";
             LOG(" server connesso! \n");
             break;
         }
@@ -91,13 +90,13 @@ class CapioCommunicationService : BackendInterface { // CapioCommunicationServic
 
             while (getline(MyReadFile, TryPort)) { // SALVA PORTA
                                                    // NON FUNZIONA IN LOCAL
-/*
+
 #ifndef CAPIO_BUILD_TESTS
                 // Allow connections on loopback interface only when running tests
                 if (TryHostName != ownHostnameString)
 #endif
-                    */
-                    if (entry.path().extension() == ".txt" && TryHostName != "CMakeLists" && TryHostName != "CMakeCache" && TryHostName != ownHostnameString) {
+
+                    if (entry.path().extension() == ".txt" && TryHostName != "CMakeLists" && TryHostName != "CMakeCache" ) {
                         // prova a connetterti
                        // std::cout << entry.path().filename().c_str();
                         std::string TryToken = "TCP:" + TryHostName + ":" + port;

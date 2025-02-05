@@ -27,7 +27,7 @@ TEST(CapioCommServiceTest, TestNumberOne) {
         sleep(30);
         backend.send(other_hostname, "Ciao tests 1234", 1024);
     } else { //chiunque altro fa una recive
-        std::cout << "prova revive \n";
+       std::cout << "prova receive \n";
         sleep(30); //continuiamo a lasciare in funzione il thread in listen aspettando una connessione
         std::string receivedHostname = backend.recive(recvBuff, 1024);
 
