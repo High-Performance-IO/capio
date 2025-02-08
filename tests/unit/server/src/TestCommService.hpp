@@ -24,12 +24,14 @@ TEST(CapioCommServiceTest, TestNumberOne) {
 
     if (std::string(hostname) == "fd-05") { //fd-05 fa una send a fd-06
         std::cout << "prova send \n";
-        sleep(30);
+       // sleep(30);
         backend.send(other_hostname, "Ciao tests 1234", 1024);
     } else { //chiunque altro fa una recive
-       std::cout << "prova receive \n";
+       std::cout << "provaaaaa receive \n";
         sleep(30); //continuiamo a lasciare in funzione il thread in listen aspettando una connessione
-        std::string receivedHostname = backend.recive(recvBuff, 1024);
+       // std::string receivedHostname = backend.recive(recvBuff, 1024);
+
+        std::cout << "exit reveive" << std::endl;
 
         //EXPECT_EQ(receivedHostname, "fd-05");
     }

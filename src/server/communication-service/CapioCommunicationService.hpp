@@ -2,62 +2,76 @@
 #define CAPIOCOMMUNICATIONSERVICE_H
 #include "BackendInterface.hpp"
 #include "capio/logger.hpp" //se lo tongo non vann i log
-
+#include <future>
 #include <chrono>
 #include <climits>
 #include <filesystem>
 #include <fstream>
 #include <iostream>
+#include <list>
 #include <mtcl.hpp>
 #include <netinet/in.h>
 #include <string>
 #include <sys/socket.h>
 #include <unistd.h>
-// CTRL + ALT + L PER FORMAT TEXTO SHIFT
-class CapioCommunicationService : BackendInterface { // CapioCommunicationService impemetns
-                                                     // interface
 
-  private:
-    MTCL::HandleUser Handler{};
-    std::unordered_map<std::string, int> ConnectedHostnames; // mappa con hostname connesso e port
+// CTRL + ALT + L PER FORMAT TEXTO SHIFT
+class CapioCommunicationService : BackendInterface {
+    // CapioCommunicationService impemetns
+    // interface
+
+private:
+    //std::pmr::list<MTCL::HandleUser> Handlers ; //array of handlers
+    std::unordered_map<std::string, MTCL::HandleUser> ConnectedHostnames; // mappa con hostname connesso e port
     char *ownHostname = new char[HOST_NAME_MAX];
     std::string ownHostnameString;
     std::string connectedHostname;
-    std::thread *th;
+    MTCL::HandleUser Handler{};
+    static MTCL::HandleUser StaticHandler;
+    //std::promise<MTCL::HandleUser> ret;
+    //std::promise<MTCL::HandleUser> *retPointer;
 
+    std::thread *th;
     bool *continue_execution = new bool;
+    MTCL::HandleUser *HandlerPointer = new MTCL::HandleUser;
 
     //
-    static void waitConnect(bool *continue_execution, std::string Token) {
-        std::cout << "listen to";
+    static void waitConnect(bool *continue_execution, std::string Token, MTCL::HandleUser *handlepointer) {
 
-       START_LOG(gettid(), (("rimani in attesa di una connection del tipo: " + Token).c_str()));
+        std::cout << "RIMANI IN ATTESA FI UNA CONNESIONE EL TIPO: " << Token <<std::endl;
 
-       // std::cout << "listen to" << Token;
-        // MTCL::Manager::init("1234");
+        START_LOG(gettid(), (("rimani in attesa di una connection del tipo: " + Token).c_str()));
+
+        MTCL::Manager::init(Token);
         MTCL::Manager::listen(Token);
 
-       // LOG("  pre \n");
-         MTCL::HandleUser UserManager = MTCL::Manager::getNext(std::chrono::microseconds(30));
-         //LOG("  pre \n");
-        while (*continue_execution ) {
-           /* MTCL::HandleUser*/ UserManager = MTCL::Manager::getNext(std::chrono::microseconds(30));
-            if (!UserManager.isValid()) {
-               // std::cout << "no valid";
-                continue;
 
+        MTCL::HandleUser UserManager = MTCL::Manager::getNext(std::chrono::microseconds(30));
+        while (*continue_execution ) {
+            /* MTCL::HandleUser*/
+            UserManager = MTCL::Manager::getNext(std::chrono::microseconds(30));
+
+            if (!UserManager.isValid()) {
+                std::cout << "no valid";
+                continue;
             }
-             std::cout << "server connesso! \n";
+
+            *handlepointer = std::move(UserManager);
+            // r->set_value_at_thread_exit(UserManager);
+            //StaticHandler = std::move(UserManager);
+            std::cout << "server connesso!" << std::endl;
             LOG(" server connesso! \n");
             break;
         }
 
-        std::cout << "fine ";
-       LOG("  finished waiting for connections \n");
+        std::cout << "fine WAIT CONNECTION ";
+        LOG("  finished waiting for connections \n");
+
     }
 
-  public:
-    explicit CapioCommunicationService(std::string port) { // hostname in input scritto solo per test hardcode
+public:
+    explicit CapioCommunicationService(std::string port) {
+        // hostname in input scritto solo per test hardcode
 
         START_LOG(gettid(), "INFO: instance of CapioCommunicationService");
         /*if (MTCL::Manager::init(port) != 0) { //manager already initialized
@@ -65,11 +79,10 @@ class CapioCommunicationService : BackendInterface { // CapioCommunicationServic
         }*/
         // scrivi toke su file
         gethostname(ownHostname, HOST_NAME_MAX);
-         ownHostnameString   = ownHostname;
+        ownHostnameString = ownHostname;
         //ownHostnameString = own;
-
         std::string MyToken = "TCP:" + ownHostnameString + ":" + port;
-        std::cout << "sono "<< ownHostnameString << "\n";
+        std::cout << "sono " << ownHostnameString << "\n";
         LOG(MyToken.c_str());
         std::string path = std::filesystem::current_path();
         std::ofstream FilePort(ownHostnameString + ".txt");
@@ -79,8 +92,8 @@ class CapioCommunicationService : BackendInterface { // CapioCommunicationServic
         //CREATO FILE CON TOKEN INFO
 
         // connettiti con tutti i file diponibili
-        for (const auto &entry : std::filesystem::directory_iterator(path)) {
-
+        //APRI PULL REQUEST COMMUNICATION-SERVICE NON AGGIUNGERE
+        for (const auto &entry: std::filesystem::directory_iterator(path)) {
             std::ifstream MyReadFile(entry.path().filename()); // apri file
             std::string TryHostName = entry.path().stem();
             std::string TryPort;
@@ -88,27 +101,35 @@ class CapioCommunicationService : BackendInterface { // CapioCommunicationServic
             // LOG(MyToken.c_str());
             // LOG(TryHostName.c_str());
 
-            while (getline(MyReadFile, TryPort)) { // SALVA PORTA
-                                                   // NON FUNZIONA IN LOCAL
+            while (getline(MyReadFile, TryPort)) {
+                // SALVA PORTA
+                // NON FUNZIONA IN LOCAL
 
 #ifndef CAPIO_BUILD_TESTS
                 // Allow connections on loopback interface only when running tests
                 if (TryHostName != ownHostnameString)
 #endif
 
-                    if (entry.path().extension() == ".txt" && TryHostName != "CMakeLists" && TryHostName != "CMakeCache" ) {
+                    if (entry.path().extension() == ".txt" && TryHostName != "CMakeLists" && TryHostName !=
+                        "CMakeCache") {
                         // prova a connetterti
-                       // std::cout << entry.path().filename().c_str();
+                        // std::cout << entry.path().filename().c_str();
                         std::string TryToken = "TCP:" + TryHostName + ":" + port;
-                        std::cout << "IIZIO TEST CONNESIONE del tipo: " + TryToken;
-                       // LOG((" IIZIO TEST CONNESIONE del tipo: " + TryToken).c_str());
+                        std::cout << "TEST CONNESIONE del tipo: " << TryToken  << std::endl;
+                        // LOG((" IIZIO TEST CONNESIONE del tipo: " + TryToken).c_str());
                         MTCL::HandleUser UserManager = MTCL::Manager::connect(TryToken);
                         if (UserManager.isValid()) {
+                            std::cout << " connesso! \n";
                             LOG("CONNNESSO");
                             connectedHostname = TryHostName;
+                            Handler = std::move(UserManager);
+                            //   ConnectedHostnames[TryHostName] =std::move(UserManager);
+                            //  ConnectedHostnames.insert({ownHostnameString,  Handler});
+
+                            //Handlers.push_front(UserManager); //lavlue, ivalue different
                         } else {
                             std::cout << "non sono connesso \n";
-                           // LOG("non CONNNESSO");
+                            // LOG("non CONNNESSO");
                         }
                     }
             }
@@ -117,12 +138,19 @@ class CapioCommunicationService : BackendInterface { // CapioCommunicationServic
         }
 
         // rimani in attesa di connections
-
+        // std::future<MTCL::HandleUser> returnFuture= ret.get_future();
         *continue_execution = true;
-        th                  = new std::thread(waitConnect, std::ref(continue_execution), MyToken);
+
+        /*&ret*/
+        th = new std::thread(waitConnect, std::ref(continue_execution), MyToken, std::ref(HandlerPointer));
         std::cout << CAPIO_SERVER_CLI_LOG_SERVER << " [ " << node_name << " ] "
-                  << "CapioCommunicationService initialization completed." << std::endl;
-        std::cout << "parti connect\n";
+                << "CapioCommunicationService initialization completed." << std::endl;
+
+        //std::cout << "handler" << std::endl;
+        Handler = std::move(*HandlerPointer);
+
+        // Handler =ret.get_future().get();
+        std::cout << "fine main"  << std::endl;
     }
 
     ~CapioCommunicationService() {
@@ -141,9 +169,9 @@ class CapioCommunicationService : BackendInterface { // CapioCommunicationServic
         LOG("Handler closed.");
 
         std::string path = std::filesystem::current_path();
-        for (const auto &entry : std::filesystem::directory_iterator(path)) {
-
-            if (entry.path().extension() == ".txt" && (entry.path().stem() != "CMakeLists")) {
+        for (const auto &entry: std::filesystem::directory_iterator(path)) {
+            if (entry.path().extension() == ".txt" && (entry.path().stem() != "CMakeLists") && (
+                    entry.path().stem() != "CMakeCache")) {
                 std::remove(entry.path().filename().c_str());
             }
         }
@@ -152,6 +180,7 @@ class CapioCommunicationService : BackendInterface { // CapioCommunicationServic
         LOG("Finalizing MTCL backend");
         delete[] ownHostname;
         LOG("Finalizing MTCL backend");
+
         /*
         START_LOG(gettid(), "END");
 
@@ -179,12 +208,12 @@ class CapioCommunicationService : BackendInterface { // CapioCommunicationServic
     }
 
     std::string &recive(char *buf, uint64_t buf_size) {
-        std::cout << "sono " + ownHostnameString + " e sono connesso con " + connectedHostname;// overdrive non serve
+        // while  Handler.probe;
+        std::cout << "sono " << ownHostnameString << " e sono connesso con " << connectedHostname << std::endl;
         START_LOG(gettid(), "inizio recv");
         LOG(("sono " + ownHostnameString + " e sono connesso con " + connectedHostname).c_str());
-
         if (Handler.receive(buf, buf_size) != buf_size) {
-            std::cout << "errore!!";
+            std::cout << "errore!!" << std::endl;
             LOG("errore recv");
             MTCL_ERROR(ownHostname, "ERROR receiving message\n");
         }
@@ -205,20 +234,21 @@ class CapioCommunicationService : BackendInterface { // CapioCommunicationServic
      * @param buffer_size
      * @param offset
      */
-    void send(const std::string &target, char *buf, uint64_t buf_size) { // overdrive non serve
+    void send(const std::string &target, char *buf, uint64_t buf_size) {
+        // overdrive non serve
         std::cout << "sono " << ownHostnameString << " e sono connesso con " << target << "\n";
 
-        auto startChrono            = std::chrono::system_clock::now(); // iniza timer
+        auto startChrono = std::chrono::system_clock::now(); // iniza timer
         const std::time_t startTime = std::chrono::system_clock::to_time_t(startChrono);
         // sleep(2);
-        std::time_t *TimeEnd        = new std::time_t[1];
+        std::time_t *TimeEnd = new std::time_t[1];
         if (target.compare(connectedHostname) == 0) {
             if (Handler.send(buf, buf_size) != buf_size) {
                 MTCL_ERROR(ownHostname, "ERROR sending message\n");
             } else {
                 std::cout << "ho mandato: " << buf << "\n";
 
-                Handler.receive(TimeEnd, sizeof(TimeEnd));     // rimane in attesta del tempo
+                Handler.receive(TimeEnd, sizeof(TimeEnd)); // rimane in attesta del tempo
                 std::time_t duration = (*TimeEnd) - startTime; // tempo in secondi
                 std::cout << "Il messaggio ci ha messo " << duration << " secondi \n";
                 if (duration != 0) {
@@ -227,7 +257,6 @@ class CapioCommunicationService : BackendInterface { // CapioCommunicationServic
                     std::cout << "Hai una banda altissima  \n";
                 }
             }
-
         } else {
             std::cout << "host name non connnesso \n";
         }
