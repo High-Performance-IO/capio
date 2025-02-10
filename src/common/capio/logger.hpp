@@ -142,7 +142,7 @@ inline long long current_time_in_millis() {
 
 inline void log_write_to(char *buffer, size_t bufflen) {
 #ifdef __CAPIO_POSIX
-    if (current_log_level < CAPIO_MAX_LOG_LEVEL || CAPIO_MAX_LOG_LEVEL < 0) {
+    if (current_log_level < CAPIO_LOG_LEVEL || CAPIO_LOG_LEVEL < 0) {
         capio_syscall(SYS_write, logfileFD, buffer, bufflen);
         capio_syscall(SYS_write, logfileFD, "\n", 1);
     }
@@ -172,7 +172,6 @@ class SyscallLoggingSuspender {
  *
  */
 class Logger {
-  private:
     char invoker[256]{0};
     char file[256]{0};
     char format[CAPIO_LOG_MAX_MSG_LEN]{0};
