@@ -205,9 +205,8 @@ class Logger {
                 capio_syscall(SYS_write, fileno(stdout), strerror(errno), strlen(strerror(errno)));
                 capio_syscall(SYS_write, fileno(stdout), "\n", 1);
                 exit(EXIT_FAILURE);
-            } else {
-                logfileOpen = true;
             }
+            logfileOpen = true;
         }
 #endif
         strncpy(this->invoker, invoker, sizeof(this->invoker));
@@ -225,8 +224,15 @@ class Logger {
 
 #if defined(CAPIO_LOG) && defined(__CAPIO_POSIX)
         if (current_log_level == 0 && logging_syscall) {
-            int syscallNumber = va_arg(argp, int);
-            auto buf1         = reinterpret_cast<char *>(capio_syscall(
+            int syscallNumber;
+
+            if (strcmp(invoker, "hook_clone_child") == 0) {
+                syscallNumber = SYS_clone;
+            } else {
+                syscallNumber = va_arg(argp, int);
+            }
+
+            auto buf1 = reinterpret_cast<char *>(capio_syscall(
                 SYS_mmap, nullptr, 50, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0));
             sprintf(buf1, CAPIO_LOG_POSIX_SYSCALL_START, sys_num_to_string(syscallNumber),
                     syscallNumber);

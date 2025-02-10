@@ -56,12 +56,11 @@ inline void init_process(pid_t tid) {
 
 inline void hook_clone_child() {
     auto tid = static_cast<pid_t>(syscall_no_intercept(SYS_gettid));
-    START_LOG(tid, "call()");
+
 #ifdef __CAPIO_POSIX
     syscall_no_intercept_flag = true;
 #endif
     std::unique_lock<std::mutex> lock(clone_mutex);
-    LOG("Waiting initialization from parent thread");
     clone_cv.wait(lock, [&tid] { return tids->find(tid) != tids->end(); });
 
     /**
@@ -71,14 +70,16 @@ inline void hook_clone_child() {
      * is removed from the `tids` set only when the thread terminates.
      */
     lock.unlock();
-#ifdef __CAPIO_POSIX
-    syscall_no_intercept_flag = false;
-#endif
+    START_SYSCALL_LOGGING();
+    START_LOG(tid, "call()");
     LOG("Initializing child thread %d", tid);
     init_process(tid);
     LOG("Child thread %d initialized", tid);
     LOG("Starting child thread %d", tid);
     init_caches();
+#ifdef __CAPIO_POSIX
+    syscall_no_intercept_flag = false;
+#endif
 }
 
 inline void hook_clone_parent(long child_tid) {
