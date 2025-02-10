@@ -43,8 +43,14 @@ class NamedSemaphore {
         : _name(std::move(name)), _require_cleanup(cleanup) {
         START_LOG(capio_syscall(SYS_gettid), " call(name=%s, init_value=%d, cleanup=%s)",
                   _name.c_str(), init_value, _require_cleanup ? "true" : "false");
-
+#ifdef __CAPIO_POSIX
+        syscall_no_intercept_flag = true;
+#endif
         _sem = sem_open(_name.c_str(), O_CREAT | O_RDWR, S_IRUSR | S_IWUSR, init_value);
+#ifdef __CAPIO_POSIX
+        syscall_no_intercept_flag = false;
+#endif
+
         if (_sem == SEM_FAILED) {
             ERR_EXIT(" sem_open %s failed", _name.c_str());
         }
