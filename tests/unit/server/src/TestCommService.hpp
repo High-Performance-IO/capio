@@ -17,7 +17,7 @@ TEST(CapioCommServiceTest, TestNumberOne) {
     gethostname(hostname, HOST_NAME_MAX);
 
     char recvBuff[1024];
-    CapioCommunicationService backend("1234");
+    CapioCommunicationService backend("TCP","1234");
     //sleep(3); // aspetta che il primo si metta in wait
 
     const auto other_hostname = std::string("fd-06");

@@ -184,7 +184,7 @@ int main(int argc, char **argv) {
     fs_monitor                  = new FileSystemMonitor();
     ctl_module                  = new CapioCTLModule();
     request_handlers_engine     = new RequestHandlerEngine();
-    capio_communication_service = new CapioCommunicationService("1234"); //for hardcode purposes
+    capio_communication_service = new CapioCommunicationService("TCP", "1234"); //for hardcode purposes
 
     capio_cl_engine->print();
     request_handlers_engine->start();
