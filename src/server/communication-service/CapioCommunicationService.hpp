@@ -11,12 +11,13 @@
 #include <mtcl.hpp>
 #include <netinet/in.h>
 #include <queue>
+#include <random>
 #include <string>
 #include <sys/socket.h>
 #include <unistd.h>
 
 class TransportUnit {
-  public:
+public:
     char target[HOST_NAME_MAX];
     char source[HOST_NAME_MAX];
     char filepath[PATH_MAX];
@@ -27,13 +28,13 @@ class TransportUnit {
 
 class CapioCommunicationService : BackendInterface {
     typedef std::tuple<std::queue<TransportUnit> *, std::queue<TransportUnit> *, std::mutex *>
-        TransportUnitInterface;
+    TransportUnitInterface;
 
     std::unordered_map<std::string, TransportUnitInterface> connected_hostnames_map;
     std::string selfToken, connectedHostname, ownPort;
     char ownHostname[HOST_NAME_MAX] = {0};
-    int thread_sleep_times          = 0;
-    bool *continue_execution        = new bool;
+    int thread_sleep_times = 0;
+    bool *continue_execution = new bool;
     std::mutex *_guard;
     std::thread *th;
     std::vector<std::thread *> connection_threads;
@@ -100,7 +101,6 @@ class CapioCommunicationService : BackendInterface {
         const bool *continue_execution, int sleep_time,
         std::unordered_map<std::string, TransportUnitInterface> *open_connections,
         std::mutex *guard, std::vector<std::thread *> *_connection_threads) {
-
         START_LOG(gettid(), "call(sleep_time=%d)", sleep_time);
 
         while (*continue_execution) {
@@ -114,16 +114,18 @@ class CapioCommunicationService : BackendInterface {
             UserManager.receive(connected_hostname, HOST_NAME_MAX);
 
             std::cout << CAPIO_SERVER_CLI_LOG_SERVER << " [ " << node_name << " ] "
-                      << "Connected to " << connected_hostname << std::endl;
+                    << "Connected to " << connected_hostname << std::endl;
 
             LOG("Recived connection hostname: %s", connected_hostname);
 
             std::lock_guard lock(*guard);
 
             open_connections->insert(
-                {connected_hostname,
-                 std::make_tuple(new std::queue<TransportUnit>(), new std::queue<TransportUnit>(),
-                                 new std::mutex())});
+                {
+                    connected_hostname,
+                    std::make_tuple(new std::queue<TransportUnit>(), new std::queue<TransportUnit>(),
+                                    new std::mutex())
+                });
 
             _connection_threads->push_back(new std::thread(
                 server_connection_handler, std::move(UserManager), connected_hostname, sleep_time,
@@ -157,10 +159,9 @@ class CapioCommunicationService : BackendInterface {
         LOG("Removed token");
     }
 
-  public:
-    explicit CapioCommunicationService(std::string &proto, std::string &port, int sleep_time)
+public:
+    explicit CapioCommunicationService(std::string proto, std::string port, int sleep_time)
         : selfToken(proto + ":0.0.0.0:" + port), ownPort(port), thread_sleep_times(sleep_time) {
-
         START_LOG(gettid(), "INFO: instance of CapioCommunicationService");
 
         _guard = new std::mutex();
@@ -176,9 +177,8 @@ class CapioCommunicationService : BackendInterface {
         generate_aliveness_token(ownPort);
 
         auto dir_iterator = std::filesystem::directory_iterator(std::filesystem::current_path());
-        for (const auto &entry : dir_iterator) {
-
-            const auto& token_path = entry.path();
+        for (const auto &entry: dir_iterator) {
+            const auto &token_path = entry.path();
 
             if (!entry.is_regular_file() || token_path.extension() != ".alive_connection") {
                 continue;
@@ -199,24 +199,23 @@ class CapioCommunicationService : BackendInterface {
             MTCL::HandleUser UserManager = MTCL::Manager::connect(remoteToken);
             if (UserManager.isValid()) {
                 std::cout << CAPIO_SERVER_CLI_LOG_SERVER << " [ " << node_name << " ] "
-                          << "Connected to " << remoteToken << std::endl;
+                        << "Connected to " << remoteToken << std::endl;
                 LOG("Connected to: %s", remoteToken.c_str());
                 UserManager.send(ownHostname, HOST_NAME_MAX);
                 std::lock_guard lg(*_guard);
 
                 auto connection_tuple =
-                    std::make_tuple(new std::queue<TransportUnit>(),
-                                    new std::queue<TransportUnit>(), new std::mutex());
+                        std::make_tuple(new std::queue<TransportUnit>(),
+                                        new std::queue<TransportUnit>(), new std::mutex());
                 connected_hostnames_map.insert({remoteHost, connection_tuple});
 
                 connection_threads.push_back(
                     new std::thread(server_connection_handler, std::move(UserManager),
                                     remoteHost.c_str(), sleep_time, connection_tuple));
-
             } else {
                 std::cout << CAPIO_SERVER_CLI_LOG_SERVER_WARNING << " [ " << node_name << " ] "
-                          << "Warning: found token " << token_path.filename()
-                          << ", but connection is not valid" << std::endl;
+                        << "Warning: found token " << token_path.filename()
+                        << ", but connection is not valid" << std::endl;
             }
         }
 
@@ -227,14 +226,13 @@ class CapioCommunicationService : BackendInterface {
         th = new std::thread(incoming_connection_listener, std::ref(continue_execution), sleep_time,
                              &connected_hostnames_map, _guard, &connection_threads);
         std::cout << CAPIO_SERVER_CLI_LOG_SERVER << " [ " << node_name << " ] "
-                  << "CapioCommunicationService initialization completed." << std::endl;
+                << "CapioCommunicationService initialization completed." << std::endl;
     }
 
     ~CapioCommunicationService() override {
-
         START_LOG(gettid(), "call()");
 
-        for (auto thread : connection_threads) {
+        for (auto thread: connection_threads) {
             if (!thread->joinable()) {
                 pthread_cancel(thread->native_handle());
             }
@@ -256,54 +254,28 @@ class CapioCommunicationService : BackendInterface {
         LOG("Finalizing MTCL backend");
     }
 
-    std::string &recive(char *buf, uint64_t buf_size) override { /*
-        // while  Handler.probe;
-        std::cout << "sono " << ownHostname << " e sono connesso con " << connectedHostname
-                  << std::endl;
-        START_LOG(gettid(), "inizio recv");
-        LOG("Connected to %s", connectedHostname.c_str());
-        if (Handler.receive(buf, buf_size) != buf_size) {
-            std::cout << "errore!!" << std::endl;
-            LOG("errore recv");
-            MTCL_ERROR(ownHostname, "ERROR receiving message\n");
-        }
-        LOG("SALTO TIME");
-        /*auto endChrono            = std::chrono::system_clock::now(); // catch time
-        const std::time_t endTime = std::chrono::system_clock::to_time_t(endChrono);
 
-        void *PointerEndTime = (void *) &endTime;
-        Handler.send(PointerEndTime, sizeof(endTime));*/ // send time of recived message
+    std::string &recive(char *buf, uint64_t buf_size) override {
+        //TODO
         return connectedHostname;
     }
 
-    /**
-     */
+
     void send(const std::string &target, char *buf, uint64_t buf_size) override {
-        // overdrive non serve
-        /*   std::cout << "sono " << ownHostname << " e sono connesso con " << target << "\n";
+        START_LOG(gettid(), "Try send");
+        if (connected_hostnames_map.count(target)) {
+            TransportUnitInterface i = connected_hostnames_map.at(target);
+            LOG("found target");
+            std::queue<TransportUnit> *in = std::get<0>(i);
 
-           auto startChrono            = std::chrono::system_clock::now(); // iniza timer
-           const std::time_t startTime = std::chrono::system_clock::to_time_t(startChrono);
-           // sleep(2);
-           std::time_t *TimeEnd        = new std::time_t[1];
-           if (target.compare(connectedHostname) == 0) {
-               if (Handler.send(buf, buf_size) != buf_size) {
-                   MTCL_ERROR(ownHostname, "ERROR sending message\n");
-               } else {
-                   std::cout << "ho mandato: " << buf << "\n";
+            std::queue<TransportUnit> *out = std::get<1>(i);
+            std::lock_guard lg(*std::get<2>(i));
 
-                   Handler.receive(TimeEnd, sizeof(TimeEnd));     // rimane in attesta del tempo
-                   std::time_t duration = (*TimeEnd) - startTime; // tempo in secondi
-                   std::cout << "Il messaggio ci ha messo " << duration << " secondi \n";
-                   if (duration != 0) {
-                       std::cout << "Hai una banda di: " << buf_size / (duration) << " Byte/s \n";
-                   } else {
-                       std::cout << "Hai una banda altissima  \n";
-                   }
-               }
-           } else {
-               std::cout << "host name non connnesso \n";
-           }*/
+            TransportUnit TrasportOut{};
+            TrasportOut.buffer_size = buf_size;
+            TrasportOut.bytes = buf;
+            out->push(TrasportOut);
+        }
     }
 };
 
