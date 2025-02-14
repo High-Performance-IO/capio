@@ -41,24 +41,23 @@ class CapioCommunicationService : BackendInterface {
     /**
      * This thread will handle connections towards a single target.
      */
-    void static connect_thread_handler(MTCL::HandleUser HandlerPointer, const char *remote_hostname,
-                                       const int sleep_time, TransportUnitInterface interface) {
+    void static server_connection_handler(MTCL::HandleUser HandlerPointer,
+                                          const char *remote_hostname, const int sleep_time,
+                                          TransportUnitInterface interface) {
         START_LOG(gettid(), "call(remote_hostname=%s)", remote_hostname);
         // out = data to sent to others
         // in = data from others
         auto [in, out, mutex] = interface;
 
-        // execute up to N operation of send &/or recive, to avoid starvation due to semaphores.
-        constexpr int max_net_op = 10;
-
         while (HandlerPointer.isValid()) {
+            // execute up to N operation of send &/or recive, to avoid starvation due to semaphores.
+            constexpr int max_net_op = 10;
 
             std::lock_guard lg(*mutex);
             LOG("Locked semaphore");
 
             for (int completed_io_operations = 0;
-                 completed_io_operations < max_net_op && out->size() > 0;
-                 ++completed_io_operations) {
+                 completed_io_operations < max_net_op && !out->empty(); ++completed_io_operations) {
                 auto unit = out->front();
                 out->pop();
                 LOG("Sending %ld bytes of file %s to %s", unit.buffer_size, unit.filepath,
@@ -75,20 +74,21 @@ class CapioCommunicationService : BackendInterface {
                 HandlerPointer.send(unit.bytes, unit.buffer_size);
             }
 
-            // todo: check if loop is required
             size_t recive_size = 0;
             HandlerPointer.probe(recive_size, false);
             for (int completed_io_operations = 0;
                  completed_io_operations < max_net_op && recive_size > 0;
                  ++completed_io_operations, HandlerPointer.probe(recive_size, false)) {
-
-                TransportUnit unit;
+                LOG("Reciving data");
+                TransportUnit unit = {0};
                 HandlerPointer.receive(unit.bytes, PATH_MAX);
                 HandlerPointer.receive(&unit.buffer_size, sizeof(capio_off64_t));
                 HandlerPointer.receive(&unit.start_write_offset, sizeof(capio_off64_t));
                 unit.bytes = new char[unit.buffer_size];
                 HandlerPointer.receive(unit.bytes, unit.buffer_size);
                 memcpy(unit.source, remote_hostname, HOST_NAME_MAX);
+                LOG("Pushed %ld bytes from %s to be stored on file %s", unit.buffer_size,
+                    remote_hostname, unit.filepath);
                 out->push(unit);
             }
 
@@ -125,13 +125,13 @@ class CapioCommunicationService : BackendInterface {
                  std::make_tuple(new std::queue<TransportUnit>(), new std::queue<TransportUnit>(),
                                  new std::mutex())});
 
-            _connection_threads->push_back(
-                new std::thread(connect_thread_handler, std::move(UserManager), connected_hostname,
-                                sleep_time, open_connections->at(connected_hostname)));
+            _connection_threads->push_back(new std::thread(
+                server_connection_handler, std::move(UserManager), connected_hostname, sleep_time,
+                open_connections->at(connected_hostname)));
         }
     }
 
-    void generate_aliveness_token(std::string port) const {
+    void generate_aliveness_token(const std::string &port) const {
         START_LOG(gettid(), "call(port=%s)", port.c_str());
 
         std::string token_filename(ownHostname);
@@ -158,7 +158,7 @@ class CapioCommunicationService : BackendInterface {
     }
 
   public:
-    explicit CapioCommunicationService(std::string proto, std::string port, int sleep_time)
+    explicit CapioCommunicationService(std::string &proto, std::string &port, int sleep_time)
         : selfToken(proto + ":0.0.0.0:" + port), ownPort(port), thread_sleep_times(sleep_time) {
 
         START_LOG(gettid(), "INFO: instance of CapioCommunicationService");
@@ -178,7 +178,7 @@ class CapioCommunicationService : BackendInterface {
         auto dir_iterator = std::filesystem::directory_iterator(std::filesystem::current_path());
         for (const auto &entry : dir_iterator) {
 
-            auto token_path = entry.path();
+            const auto& token_path = entry.path();
 
             if (!entry.is_regular_file() || token_path.extension() != ".alive_connection") {
                 continue;
@@ -210,7 +210,7 @@ class CapioCommunicationService : BackendInterface {
                 connected_hostnames_map.insert({remoteHost, connection_tuple});
 
                 connection_threads.push_back(
-                    new std::thread(connect_thread_handler, std::move(UserManager),
+                    new std::thread(server_connection_handler, std::move(UserManager),
                                     remoteHost.c_str(), sleep_time, connection_tuple));
 
             } else {
@@ -230,7 +230,7 @@ class CapioCommunicationService : BackendInterface {
                   << "CapioCommunicationService initialization completed." << std::endl;
     }
 
-    ~CapioCommunicationService() {
+    ~CapioCommunicationService() override {
 
         START_LOG(gettid(), "call()");
 
@@ -256,7 +256,7 @@ class CapioCommunicationService : BackendInterface {
         LOG("Finalizing MTCL backend");
     }
 
-    std::string &recive(char *buf, uint64_t buf_size) {/*
+    std::string &recive(char *buf, uint64_t buf_size) override { /*
         // while  Handler.probe;
         std::cout << "sono " << ownHostname << " e sono connesso con " << connectedHostname
                   << std::endl;
@@ -277,13 +277,8 @@ class CapioCommunicationService : BackendInterface {
     }
 
     /**
-     *
-     * @param target
-     * @param buffer
-     * @param buffer_size
-     * @param offset
      */
-    void send(const std::string &target, char *buf, uint64_t buf_size) {
+    void send(const std::string &target, char *buf, uint64_t buf_size) override {
         // overdrive non serve
         /*   std::cout << "sono " << ownHostname << " e sono connesso con " << target << "\n";
 
