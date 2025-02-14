@@ -16,11 +16,18 @@
 #include <sys/socket.h>
 #include <unistd.h>
 
+#ifdef __CAPIO_BUILD_TESTS
+#define ALLOW_CONNECT_TO_SELF true
+#else
+#define ALLOW_CONNECT_TO_SELF false
+#endif
+
 class CapioCommunicationService : BackendInterface {
 
   private:
     std::unordered_map<std::string, MTCL::HandleUser> connected_hostnames_map;
-    std::string ownHostname, selfToken, connectedHostname;
+    std::string selfToken, connectedHostname, ownPort;
+    char ownHostname[HOST_NAME_MAX] = {0};
     MTCL::HandleUser Handler{};
     static MTCL::HandleUser StaticHandler;
 
@@ -43,21 +50,23 @@ class CapioCommunicationService : BackendInterface {
                 continue;
             }
             LOG("Handle user is valid");
+            char connected_hostname[HOST_NAME_MAX] = {0};
+            UserManager.receive(connected_hostname, HOST_NAME_MAX);
 
-            std::string connected_hostname;
-            connected_hostname.reserve(HOST_NAME_MAX);
-            UserManager.receive(connected_hostname.data(), HOST_NAME_MAX);
+            std::cout << CAPIO_SERVER_CLI_LOG_SERVER << " [ " << node_name << " ] "
+                      << "Connected to " << connected_hostname << std::endl;
 
-            LOG("Recived connection hostname: %s", connected_hostname.c_str());
+            LOG("Recived connection hostname: %s", connected_hostname);
 
             std::lock_guard lock(*guard);
             open_connections->insert({connected_hostname, std::move(UserManager)});
         }
     }
+
     void generate_aliveness_token(std::string port) const {
         START_LOG(gettid(), "call(port=%s)", port.c_str());
 
-        std::string token_filename(ownHostname.c_str());
+        std::string token_filename(ownHostname);
         token_filename += ".alive_connection";
 
         LOG("Creating alive token %s", token_filename.c_str());
@@ -69,20 +78,40 @@ class CapioCommunicationService : BackendInterface {
         LOG("Saved self token info to FS");
     }
 
+    void delete_aliveness_token(const std::string &port) const {
+        START_LOG(gettid(), "call(port=%s)", port.c_str());
+
+        std::string token_filename(ownHostname);
+        token_filename += ".alive_connection";
+
+        LOG("Removing alive token %s", token_filename.c_str());
+        std::filesystem::remove(token_filename);
+        LOG("Removed token");
+    }
+
   public:
     explicit CapioCommunicationService(std::string proto, std::string port)
-        : selfToken(proto + ":0.0.0.0:" + port) {
+        : selfToken(proto + ":0.0.0.0:" + port), ownPort(port) {
 
         START_LOG(gettid(), "INFO: instance of CapioCommunicationService");
 
         _guard = new std::mutex();
 
-        ownHostname.reserve(HOST_NAME_MAX);
-        gethostname(ownHostname.data(), HOST_NAME_MAX);
-        LOG("My hostname is %s. Starting to listen on connection %s", ownHostname.c_str(),
+        if (ALLOW_CONNECT_TO_SELF) {
+            std::cout << CAPIO_SERVER_CLI_LOG_SERVER_WARNING << " [ " << node_name << " ] "
+                      << "Warning: CAPIO has been build with tests: connections on loopback "
+                         "interfaces will be allowed";
+        }
+
+        gethostname(ownHostname, HOST_NAME_MAX);
+        LOG("My hostname is %s. Starting to listen on connection %s", ownHostname,
             selfToken.c_str());
 
-        generate_aliveness_token(port);
+        std::string hostname_id("server-");
+        hostname_id += ownHostname;
+        MTCL::Manager::init(hostname_id);
+
+        generate_aliveness_token(ownPort);
 
         // TODO: check folder against metadata folder....
         auto dir_iterator = std::filesystem::directory_iterator(std::filesystem::current_path());
@@ -90,6 +119,7 @@ class CapioCommunicationService : BackendInterface {
 
             auto token_path = entry.path();
 
+            // TODO: skip test on self
             if (!entry.is_regular_file() || token_path.extension() != ".alive_connection") {
                 continue;
             }
@@ -103,36 +133,27 @@ class CapioCommunicationService : BackendInterface {
             getline(MyReadFile, remotePort);
             MyReadFile.close();
 
-#ifndef CAPIO_BUILD_TESTS
-            // Allow connections on loopback interface only when running tests
-            if (remoteHost != ownHostname) {
-#endif
-                std::string remoteToken = proto + ":" + remoteHost + ":" + port;
-                LOG("Trying to connect on remote: %s", remoteToken.c_str());
+            std::string remoteToken = proto + ":" + remoteHost + ":" + ownPort;
+            LOG("Trying to connect on remote: %s", remoteToken.c_str());
 
-                MTCL::HandleUser UserManager = MTCL::Manager::connect(remoteToken);
-                if (UserManager.isValid()) {
-                    std::cout << CAPIO_SERVER_CLI_LOG_SERVER << "Connected to " << remoteToken
-                              << std::endl;
-                    LOG("Connected to: %s", remoteToken.c_str());
-                    std::lock_guard lg(*_guard);
-                    connected_hostnames_map.insert({remoteHost, std::move(UserManager)});
+            MTCL::HandleUser UserManager = MTCL::Manager::connect(remoteToken);
+            if (UserManager.isValid()) {
+                std::cout << CAPIO_SERVER_CLI_LOG_SERVER << " [ " << node_name << " ] "
+                          << "Connected to " << remoteToken << std::endl;
+                LOG("Connected to: %s", remoteToken.c_str());
+                UserManager.send(ownHostname, HOST_NAME_MAX);
+                std::lock_guard lg(*_guard);
+                connected_hostnames_map.insert({remoteHost, std::move(UserManager)});
 
-                } else {
-                    std::cout << CAPIO_SERVER_CLI_LOG_SERVER_WARNING << "Warning: found token "
-                              << token_path.filename() << ", but connection is not valid"
-                              << std::endl;
-                }
-
-#ifndef CAPIO_BUILD_TESTS
-                // Allow connections on loopback interface only when running tests
+            } else {
+                std::cout << CAPIO_SERVER_CLI_LOG_SERVER_WARNING << " [ " << node_name << " ] "
+                          << "Warning: found token " << token_path.filename()
+                          << ", but connection is not valid" << std::endl;
             }
-#endif
         }
 
         *continue_execution = true;
 
-        MTCL::Manager::init(selfToken);
         MTCL::Manager::listen(selfToken);
 
         th = new std::thread(waitConnect, std::ref(continue_execution), 30,
@@ -148,55 +169,22 @@ class CapioCommunicationService : BackendInterface {
     }
 
     ~CapioCommunicationService() {
-        START_LOG(gettid(), "END");
 
-        // Set the flag to stop the connection thread
-        *continue_execution = false;
-
-        while (!th->joinable()) {
-            // cicla in loop finche th non e' joinabe
-        }
-        th->join();
-        delete th;
-
-        Handler.close();
-        LOG("Handler closed.");
-
-        std::string path = std::filesystem::current_path();
-        for (const auto &entry : std::filesystem::directory_iterator(path)) {
-            if (entry.path().extension() == ".txt" && (entry.path().stem() != "CMakeLists") &&
-                (entry.path().stem() != "CMakeCache")) {
-                std::remove(entry.path().filename().c_str());
-            }
-        }
-
-        MTCL::Manager::finalize();
-        LOG("Finalizing MTCL backend");
-
-        /*
-        START_LOG(gettid(), "END");
-
-        Handler.close();
-        LOG("Finalized MTCL backend");
-        MTCL::Manager::finalize();
-        LOG("Finalized MTCL backend");
-        delete[] ownHostname;
-
-        LOG("Finalized MTCL backend");
-
-        std::string path = std::filesystem::current_path();
-        for (const auto &entry : std::filesystem::directory_iterator(path)) {
-
-            if (entry.path().extension() == ".txt" && (entry.path().stem() != "CMakeLists")) {
-                std::remove(entry.path().filename().c_str());
-            }
-        }
+        START_LOG(gettid(), "call()");
 
         *continue_execution = false;
         pthread_cancel(th->native_handle());
         th->join();
         delete th;
-        delete continue_execution;*/
+        delete continue_execution;
+
+        Handler.close();
+        LOG("Handler closed.");
+
+        delete_aliveness_token(ownPort);
+
+        MTCL::Manager::finalize();
+        LOG("Finalizing MTCL backend");
     }
 
     std::string &recive(char *buf, uint64_t buf_size) {
@@ -208,7 +196,7 @@ class CapioCommunicationService : BackendInterface {
         if (Handler.receive(buf, buf_size) != buf_size) {
             std::cout << "errore!!" << std::endl;
             LOG("errore recv");
-            MTCL_ERROR(ownHostname.c_str(), "ERROR receiving message\n");
+            MTCL_ERROR(ownHostname, "ERROR receiving message\n");
         }
         LOG("SALTO TIME");
         /*auto endChrono            = std::chrono::system_clock::now(); // catch time
@@ -237,7 +225,7 @@ class CapioCommunicationService : BackendInterface {
         std::time_t *TimeEnd        = new std::time_t[1];
         if (target.compare(connectedHostname) == 0) {
             if (Handler.send(buf, buf_size) != buf_size) {
-                MTCL_ERROR(ownHostname.c_str(), "ERROR sending message\n");
+                MTCL_ERROR(ownHostname, "ERROR sending message\n");
             } else {
                 std::cout << "ho mandato: " << buf << "\n";
 

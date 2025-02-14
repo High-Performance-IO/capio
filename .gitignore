@@ -55,4 +55,5 @@ debug
 build
 .devcontainer
 .DS_Store
+*.alive_connection
 

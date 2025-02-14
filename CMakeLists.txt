@@ -80,6 +80,7 @@ add_subdirectory(src/server)
 add_subdirectory(src/capioctl)
 
 IF (CAPIO_BUILD_TESTS)
+    add_compile_definitions(__CAPIO_BUILD_TESTS)
     message(STATUS "Building CAPIO test suite")
     add_subdirectory(tests)
 ENDIF (CAPIO_BUILD_TESTS)
