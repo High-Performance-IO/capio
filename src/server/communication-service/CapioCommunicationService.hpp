@@ -33,16 +33,15 @@ class TransportUnit {
     capio_off64_t start_write_offset;
 };
 
-typedef std::tuple<std::queue<TransportUnit> *, std::queue<TransportUnit> *, std::mutex *>
-    TransportUnitQueue;
-
 class CapioCommunicationService : BackendInterface {
+    typedef std::tuple<std::queue<TransportUnit> *, std::queue<TransportUnit> *, std::mutex *>
+        TransportUnitInterface;
 
-    std::unordered_map<std::string, TransportUnitQueue> connected_hostnames_map;
+    std::unordered_map<std::string, TransportUnitInterface> connected_hostnames_map;
     std::string selfToken, connectedHostname, ownPort;
     char ownHostname[HOST_NAME_MAX] = {0};
     static MTCL::HandleUser StaticHandler;
-
+    int thread_sleep_times = 0;
     std::thread *th;
     bool *continue_execution         = new bool;
     MTCL::HandleUser *HandlerPointer = new MTCL::HandleUser;
@@ -50,13 +49,53 @@ class CapioCommunicationService : BackendInterface {
 
     std::vector<std::thread *> connection_threads;
 
-    void static connect_thread_handler(MTCL::HandleUser HandlerPointer, TransportUnitQueue map) {
-        auto [in, out, mutex] = map;
+    /**
+     * This thread will handle connections towards a single target.
+     * @param HandlerPointer
+     * @param interface
+     */
+    void static connect_thread_handler(MTCL::HandleUser HandlerPointer, const char *remote_hostname,
+                                       const int sleep_time, TransportUnitInterface interface) {
+        START_LOG(gettid(), "call(remote_hostname=%s)", remote_hostname);
+        // out = data to sent to others
+        // in = data from others
+        auto [in, out, mutex] = interface;
+
+        while (HandlerPointer.isValid()) {
+            std::lock_guard lg(*mutex);
+
+            while (out->size() > 0) {
+                auto unit = out->front();
+                out->pop();
+                /**
+                 * step0: send recive buffer size
+                 * step1: send offset of write
+                 * step2: send data
+                 */
+                HandlerPointer.send(&unit.buffer_size, sizeof(capio_off64_t));
+                HandlerPointer.send(&unit.start_write_offset, sizeof(capio_off64_t));
+                HandlerPointer.send(unit.bytes, unit.buffer_size);
+            }
+
+            // todo: check if loop is required
+            size_t recive_size = 0;
+            HandlerPointer.probe(recive_size, false);
+            if (recive_size > 0) {
+                TransportUnit unit;
+                HandlerPointer.receive(&unit.buffer_size, sizeof(capio_off64_t));
+                HandlerPointer.receive(&unit.start_write_offset, sizeof(capio_off64_t));
+                unit.bytes = new char[unit.buffer_size];
+                HandlerPointer.receive(unit.bytes, unit.buffer_size);
+
+                out->push(unit);
+            }
+        }
     }
 
-    void static waitConnect(const bool *continue_execution, int sleep_time,
-                            std::unordered_map<std::string, TransportUnitQueue> *open_connections,
-                            std::mutex *guard, std::vector<std::thread *> *_connection_threads) {
+    void static waitConnect(
+        const bool *continue_execution, int sleep_time,
+        std::unordered_map<std::string, TransportUnitInterface> *open_connections,
+        std::mutex *guard, std::vector<std::thread *> *_connection_threads) {
 
         START_LOG(gettid(), "call(sleep_time=%d)", sleep_time);
 
@@ -83,8 +122,8 @@ class CapioCommunicationService : BackendInterface {
                                  new std::mutex())});
 
             _connection_threads->push_back(
-                new std::thread(connect_thread_handler, std::move(UserManager),
-                                open_connections->at(connected_hostname)));
+                new std::thread(connect_thread_handler, std::move(UserManager), connected_hostname,
+                                sleep_time, open_connections->at(connected_hostname)));
         }
     }
 
@@ -115,8 +154,8 @@ class CapioCommunicationService : BackendInterface {
     }
 
   public:
-    explicit CapioCommunicationService(std::string proto, std::string port)
-        : selfToken(proto + ":0.0.0.0:" + port), ownPort(port) {
+    explicit CapioCommunicationService(std::string proto, std::string port, int sleep_time)
+        : selfToken(proto + ":0.0.0.0:" + port), ownPort(port), thread_sleep_times(sleep_time) {
 
         START_LOG(gettid(), "INFO: instance of CapioCommunicationService");
 
@@ -173,7 +212,7 @@ class CapioCommunicationService : BackendInterface {
                 connected_hostnames_map.insert({remoteHost, connection_tuple});
 
                 connection_threads.push_back(new std::thread(
-                    connect_thread_handler, std::move(UserManager), connection_tuple));
+                    connect_thread_handler, std::move(UserManager), remoteHost.c_str(), sleep_time, connection_tuple));
 
             } else {
                 std::cout << CAPIO_SERVER_CLI_LOG_SERVER_WARNING << " [ " << node_name << " ] "
