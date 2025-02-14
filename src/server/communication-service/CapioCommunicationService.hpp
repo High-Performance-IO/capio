@@ -1,27 +1,19 @@
 #ifndef CAPIOCOMMUNICATIONSERVICE_H
 #define CAPIOCOMMUNICATIONSERVICE_H
 #include "BackendInterface.hpp"
-#include "capio/logger.hpp" //se lo tongo non vann i log
-#include <capio/semaphore.hpp>
+#include <capio/logger.hpp>
 #include <chrono>
 #include <climits>
 #include <filesystem>
 #include <fstream>
 #include <future>
 #include <iostream>
-#include <list>
 #include <mtcl.hpp>
 #include <netinet/in.h>
 #include <queue>
 #include <string>
 #include <sys/socket.h>
 #include <unistd.h>
-
-#ifdef __CAPIO_BUILD_TESTS
-#define ALLOW_CONNECT_TO_SELF true
-#else
-#define ALLOW_CONNECT_TO_SELF false
-#endif
 
 class TransportUnit {
   public:
@@ -40,19 +32,14 @@ class CapioCommunicationService : BackendInterface {
     std::unordered_map<std::string, TransportUnitInterface> connected_hostnames_map;
     std::string selfToken, connectedHostname, ownPort;
     char ownHostname[HOST_NAME_MAX] = {0};
-    static MTCL::HandleUser StaticHandler;
-    int thread_sleep_times = 0;
-    std::thread *th;
-    bool *continue_execution         = new bool;
-    MTCL::HandleUser *HandlerPointer = new MTCL::HandleUser;
+    int thread_sleep_times          = 0;
+    bool *continue_execution        = new bool;
     std::mutex *_guard;
-
+    std::thread *th;
     std::vector<std::thread *> connection_threads;
 
     /**
      * This thread will handle connections towards a single target.
-     * @param HandlerPointer
-     * @param interface
      */
     void static connect_thread_handler(MTCL::HandleUser HandlerPointer, const char *remote_hostname,
                                        const int sleep_time, TransportUnitInterface interface) {
@@ -61,17 +48,28 @@ class CapioCommunicationService : BackendInterface {
         // in = data from others
         auto [in, out, mutex] = interface;
 
-        while (HandlerPointer.isValid()) {
-            std::lock_guard lg(*mutex);
+        // execute up to N operation of send &/or recive, to avoid starvation due to semaphores.
+        constexpr int max_net_op = 10;
 
-            while (out->size() > 0) {
+        while (HandlerPointer.isValid()) {
+
+            std::lock_guard lg(*mutex);
+            LOG("Locked semaphore");
+
+            for (int completed_io_operations = 0;
+                 completed_io_operations < max_net_op && out->size() > 0;
+                 ++completed_io_operations) {
                 auto unit = out->front();
                 out->pop();
+                LOG("Sending %ld bytes of file %s to %s", unit.buffer_size, unit.filepath,
+                    unit.target);
                 /**
-                 * step0: send recive buffer size
+                 * step0: send file path
+                 * step1: send recive buffer size
                  * step1: send offset of write
                  * step2: send data
                  */
+                HandlerPointer.send(unit.filepath, PATH_MAX);
                 HandlerPointer.send(&unit.buffer_size, sizeof(capio_off64_t));
                 HandlerPointer.send(&unit.start_write_offset, sizeof(capio_off64_t));
                 HandlerPointer.send(unit.bytes, unit.buffer_size);
@@ -80,19 +78,25 @@ class CapioCommunicationService : BackendInterface {
             // todo: check if loop is required
             size_t recive_size = 0;
             HandlerPointer.probe(recive_size, false);
-            if (recive_size > 0) {
+            for (int completed_io_operations = 0;
+                 completed_io_operations < max_net_op && recive_size > 0;
+                 ++completed_io_operations, HandlerPointer.probe(recive_size, false)) {
+
                 TransportUnit unit;
+                HandlerPointer.receive(unit.bytes, PATH_MAX);
                 HandlerPointer.receive(&unit.buffer_size, sizeof(capio_off64_t));
                 HandlerPointer.receive(&unit.start_write_offset, sizeof(capio_off64_t));
                 unit.bytes = new char[unit.buffer_size];
                 HandlerPointer.receive(unit.bytes, unit.buffer_size);
-
+                memcpy(unit.source, remote_hostname, HOST_NAME_MAX);
                 out->push(unit);
             }
+
+            std::this_thread::sleep_for(std::chrono::milliseconds(sleep_time));
         }
     }
 
-    void static waitConnect(
+    void static incoming_connection_listener(
         const bool *continue_execution, int sleep_time,
         std::unordered_map<std::string, TransportUnitInterface> *open_connections,
         std::mutex *guard, std::vector<std::thread *> *_connection_threads) {
@@ -161,12 +165,6 @@ class CapioCommunicationService : BackendInterface {
 
         _guard = new std::mutex();
 
-        if (ALLOW_CONNECT_TO_SELF) {
-            std::cout << CAPIO_SERVER_CLI_LOG_SERVER_WARNING << " [ " << node_name << " ] "
-                      << "Warning: CAPIO has been build with tests: connections on loopback "
-                         "interfaces will be allowed";
-        }
-
         gethostname(ownHostname, HOST_NAME_MAX);
         LOG("My hostname is %s. Starting to listen on connection %s", ownHostname,
             selfToken.c_str());
@@ -211,8 +209,9 @@ class CapioCommunicationService : BackendInterface {
                                     new std::queue<TransportUnit>(), new std::mutex());
                 connected_hostnames_map.insert({remoteHost, connection_tuple});
 
-                connection_threads.push_back(new std::thread(
-                    connect_thread_handler, std::move(UserManager), remoteHost.c_str(), sleep_time, connection_tuple));
+                connection_threads.push_back(
+                    new std::thread(connect_thread_handler, std::move(UserManager),
+                                    remoteHost.c_str(), sleep_time, connection_tuple));
 
             } else {
                 std::cout << CAPIO_SERVER_CLI_LOG_SERVER_WARNING << " [ " << node_name << " ] "
@@ -225,7 +224,7 @@ class CapioCommunicationService : BackendInterface {
 
         MTCL::Manager::listen(selfToken);
 
-        th = new std::thread(waitConnect, std::ref(continue_execution), 30,
+        th = new std::thread(incoming_connection_listener, std::ref(continue_execution), sleep_time,
                              &connected_hostnames_map, _guard, &connection_threads);
         std::cout << CAPIO_SERVER_CLI_LOG_SERVER << " [ " << node_name << " ] "
                   << "CapioCommunicationService initialization completed." << std::endl;
@@ -234,6 +233,14 @@ class CapioCommunicationService : BackendInterface {
     ~CapioCommunicationService() {
 
         START_LOG(gettid(), "call()");
+
+        for (auto thread : connection_threads) {
+            if (!thread->joinable()) {
+                pthread_cancel(thread->native_handle());
+            }
+            thread->join();
+        }
+        LOG("Terminated connection threads");
 
         *continue_execution = false;
         pthread_cancel(th->native_handle());
