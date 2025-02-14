@@ -256,25 +256,43 @@ public:
 
 
     std::string &recive(char *buf, uint64_t buf_size) override {
-        //TODO
+
+        START_LOG(gettid(), "Try receive");
+        TransportUnitInterface i = connected_hostnames_map.at(ownHostname);
+        std::queue<TransportUnit> *in = std::get<0>(i);
+        std::lock_guard lg(*std::get<2>(i)); //when unlock?
+        int count = 0;
+        TransportUnit TopQueue = in->front();
+        //non while altrimenti mi sovrasrvie lo stesso buff
+        if (!in->empty() && TopQueue.buffer_size <= buf_size)  {
+            memcpy(&buf, &TopQueue, buf_size);
+            in->pop();
+        }
+
+
+        //Handle.receive al Handler associato ownhostname
         return connectedHostname;
+
+
     }
 
 
     void send(const std::string &target, char *buf, uint64_t buf_size) override {
         START_LOG(gettid(), "Try send");
-        if (connected_hostnames_map.count(target)) {
-            TransportUnitInterface i = connected_hostnames_map.at(target);
+        if (auto element = connected_hostnames_map.find(target); element != connected_hostnames_map.end()) {
+            TransportUnitInterface i = element->second;
             LOG("found target");
-            std::queue<TransportUnit> *in = std::get<0>(i);
 
             std::queue<TransportUnit> *out = std::get<1>(i);
             std::lock_guard lg(*std::get<2>(i));
 
-            TransportUnit TrasportOut{};
+            TransportUnit TrasportOut={0};
             TrasportOut.buffer_size = buf_size;
             TrasportOut.bytes = buf;
             out->push(TrasportOut);
+
+
+            //Handle.send al Handler associato a taget
         }
     }
 };
