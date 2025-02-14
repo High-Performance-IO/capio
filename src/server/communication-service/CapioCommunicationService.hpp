@@ -261,18 +261,16 @@ public:
         TransportUnitInterface i = connected_hostnames_map.at(ownHostname);
         std::queue<TransportUnit> *in = std::get<0>(i);
         std::lock_guard lg(*std::get<2>(i)); //when unlock?
-        int count = 0;
         TransportUnit TopQueue = in->front();
         //non while altrimenti mi sovrasrvie lo stesso buff
         if (!in->empty() && TopQueue.buffer_size <= buf_size)  {
+            //Handle.receive al Handler associato ownhostname
             memcpy(&buf, &TopQueue, buf_size);
             in->pop();
         }
 
 
-        //Handle.receive al Handler associato ownhostname
         return connectedHostname;
-
 
     }
 
