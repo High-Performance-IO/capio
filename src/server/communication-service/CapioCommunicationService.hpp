@@ -12,6 +12,7 @@
 #include <list>
 #include <mtcl.hpp>
 #include <netinet/in.h>
+#include <queue>
 #include <string>
 #include <sys/socket.h>
 #include <unistd.h>
@@ -22,24 +23,40 @@
 #define ALLOW_CONNECT_TO_SELF false
 #endif
 
+class TransportUnit {
+  public:
+    char target[HOST_NAME_MAX];
+    char source[HOST_NAME_MAX];
+    char filepath[PATH_MAX];
+    char *bytes;
+    capio_off64_t buffer_size;
+    capio_off64_t start_write_offset;
+};
+
+typedef std::tuple<std::queue<TransportUnit> *, std::queue<TransportUnit> *, std::mutex *>
+    TransportUnitQueue;
+
 class CapioCommunicationService : BackendInterface {
 
-  private:
-    std::unordered_map<std::string, MTCL::HandleUser> connected_hostnames_map;
+    std::unordered_map<std::string, TransportUnitQueue> connected_hostnames_map;
     std::string selfToken, connectedHostname, ownPort;
     char ownHostname[HOST_NAME_MAX] = {0};
-    MTCL::HandleUser Handler{};
     static MTCL::HandleUser StaticHandler;
 
     std::thread *th;
     bool *continue_execution         = new bool;
     MTCL::HandleUser *HandlerPointer = new MTCL::HandleUser;
-
     std::mutex *_guard;
 
+    std::vector<std::thread *> connection_threads;
+
+    void static connect_thread_handler(MTCL::HandleUser HandlerPointer, TransportUnitQueue map) {
+        auto [in, out, mutex] = map;
+    }
+
     void static waitConnect(const bool *continue_execution, int sleep_time,
-                            std::unordered_map<std::string, MTCL::HandleUser> *open_connections,
-                            std::mutex *guard) {
+                            std::unordered_map<std::string, TransportUnitQueue> *open_connections,
+                            std::mutex *guard, std::vector<std::thread *> *_connection_threads) {
 
         START_LOG(gettid(), "call(sleep_time=%d)", sleep_time);
 
@@ -59,7 +76,15 @@ class CapioCommunicationService : BackendInterface {
             LOG("Recived connection hostname: %s", connected_hostname);
 
             std::lock_guard lock(*guard);
-            open_connections->insert({connected_hostname, std::move(UserManager)});
+
+            open_connections->insert(
+                {connected_hostname,
+                 std::make_tuple(new std::queue<TransportUnit>(), new std::queue<TransportUnit>(),
+                                 new std::mutex())});
+
+            _connection_threads->push_back(
+                new std::thread(connect_thread_handler, std::move(UserManager),
+                                open_connections->at(connected_hostname)));
         }
     }
 
@@ -113,13 +138,11 @@ class CapioCommunicationService : BackendInterface {
 
         generate_aliveness_token(ownPort);
 
-        // TODO: check folder against metadata folder....
         auto dir_iterator = std::filesystem::directory_iterator(std::filesystem::current_path());
         for (const auto &entry : dir_iterator) {
 
             auto token_path = entry.path();
 
-            // TODO: skip test on self
             if (!entry.is_regular_file() || token_path.extension() != ".alive_connection") {
                 continue;
             }
@@ -143,7 +166,14 @@ class CapioCommunicationService : BackendInterface {
                 LOG("Connected to: %s", remoteToken.c_str());
                 UserManager.send(ownHostname, HOST_NAME_MAX);
                 std::lock_guard lg(*_guard);
-                connected_hostnames_map.insert({remoteHost, std::move(UserManager)});
+
+                auto connection_tuple =
+                    std::make_tuple(new std::queue<TransportUnit>(),
+                                    new std::queue<TransportUnit>(), new std::mutex());
+                connected_hostnames_map.insert({remoteHost, connection_tuple});
+
+                connection_threads.push_back(new std::thread(
+                    connect_thread_handler, std::move(UserManager), connection_tuple));
 
             } else {
                 std::cout << CAPIO_SERVER_CLI_LOG_SERVER_WARNING << " [ " << node_name << " ] "
@@ -157,15 +187,9 @@ class CapioCommunicationService : BackendInterface {
         MTCL::Manager::listen(selfToken);
 
         th = new std::thread(waitConnect, std::ref(continue_execution), 30,
-                             &connected_hostnames_map, _guard);
+                             &connected_hostnames_map, _guard, &connection_threads);
         std::cout << CAPIO_SERVER_CLI_LOG_SERVER << " [ " << node_name << " ] "
                   << "CapioCommunicationService initialization completed." << std::endl;
-
-        // std::cout << "handler" << std::endl;
-        Handler = std::move(*HandlerPointer);
-
-        // Handler =ret.get_future().get();
-        std::cout << "fine main" << std::endl;
     }
 
     ~CapioCommunicationService() {
@@ -178,7 +202,6 @@ class CapioCommunicationService : BackendInterface {
         delete th;
         delete continue_execution;
 
-        Handler.close();
         LOG("Handler closed.");
 
         delete_aliveness_token(ownPort);
@@ -187,7 +210,7 @@ class CapioCommunicationService : BackendInterface {
         LOG("Finalizing MTCL backend");
     }
 
-    std::string &recive(char *buf, uint64_t buf_size) {
+    std::string &recive(char *buf, uint64_t buf_size) {/*
         // while  Handler.probe;
         std::cout << "sono " << ownHostname << " e sono connesso con " << connectedHostname
                   << std::endl;
@@ -204,7 +227,6 @@ class CapioCommunicationService : BackendInterface {
 
         void *PointerEndTime = (void *) &endTime;
         Handler.send(PointerEndTime, sizeof(endTime));*/ // send time of recived message
-
         return connectedHostname;
     }
 
@@ -217,30 +239,30 @@ class CapioCommunicationService : BackendInterface {
      */
     void send(const std::string &target, char *buf, uint64_t buf_size) {
         // overdrive non serve
-        std::cout << "sono " << ownHostname << " e sono connesso con " << target << "\n";
+        /*   std::cout << "sono " << ownHostname << " e sono connesso con " << target << "\n";
 
-        auto startChrono            = std::chrono::system_clock::now(); // iniza timer
-        const std::time_t startTime = std::chrono::system_clock::to_time_t(startChrono);
-        // sleep(2);
-        std::time_t *TimeEnd        = new std::time_t[1];
-        if (target.compare(connectedHostname) == 0) {
-            if (Handler.send(buf, buf_size) != buf_size) {
-                MTCL_ERROR(ownHostname, "ERROR sending message\n");
-            } else {
-                std::cout << "ho mandato: " << buf << "\n";
+           auto startChrono            = std::chrono::system_clock::now(); // iniza timer
+           const std::time_t startTime = std::chrono::system_clock::to_time_t(startChrono);
+           // sleep(2);
+           std::time_t *TimeEnd        = new std::time_t[1];
+           if (target.compare(connectedHostname) == 0) {
+               if (Handler.send(buf, buf_size) != buf_size) {
+                   MTCL_ERROR(ownHostname, "ERROR sending message\n");
+               } else {
+                   std::cout << "ho mandato: " << buf << "\n";
 
-                Handler.receive(TimeEnd, sizeof(TimeEnd));     // rimane in attesta del tempo
-                std::time_t duration = (*TimeEnd) - startTime; // tempo in secondi
-                std::cout << "Il messaggio ci ha messo " << duration << " secondi \n";
-                if (duration != 0) {
-                    std::cout << "Hai una banda di: " << buf_size / (duration) << " Byte/s \n";
-                } else {
-                    std::cout << "Hai una banda altissima  \n";
-                }
-            }
-        } else {
-            std::cout << "host name non connnesso \n";
-        }
+                   Handler.receive(TimeEnd, sizeof(TimeEnd));     // rimane in attesta del tempo
+                   std::time_t duration = (*TimeEnd) - startTime; // tempo in secondi
+                   std::cout << "Il messaggio ci ha messo " << duration << " secondi \n";
+                   if (duration != 0) {
+                       std::cout << "Hai una banda di: " << buf_size / (duration) << " Byte/s \n";
+                   } else {
+                       std::cout << "Hai una banda altissima  \n";
+                   }
+               }
+           } else {
+               std::cout << "host name non connnesso \n";
+           }*/
     }
 };
 
