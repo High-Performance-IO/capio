@@ -269,7 +269,7 @@ class CapioCommunicationService : BackendInterface {
         while (true) {
             if (!in->empty()) {
                 TransportUnit TopQueue   = in->front();
-                strncpy(buf, TopQueue._bytes, *buf_size);
+                memcpy(buf, TopQueue._bytes, buf_size);
                 in->pop();
                 return  TopQueue._filepath;
             }
