@@ -9,6 +9,12 @@ set(TARGET_SOURCES
 )
 
 #####################################
+# Add MTCL dependencies
+#####################################
+find_package(ucx)
+
+
+#####################################
 # External projects
 #####################################
 FetchContent_Declare(
@@ -27,7 +33,14 @@ FetchContent_Declare(
         GIT_TAG fbd8aa924b916c6578963af315fdb5f10c3969ad
 )
 
+if(${ucx_FOUND})
+    target_compile_definitions(mtcl ENABLE_UCX)
+endif ()
+
 FetchContent_MakeAvailable(args simdjson mtcl)
+
+
+
 
 
 #####################################
