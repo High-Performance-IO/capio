@@ -265,16 +265,20 @@ class CapioCommunicationService : BackendInterface {
         START_LOG(gettid(), "In queue upload");
         TransportUnitInterface i      = connected_hostnames_map.at(ownHostname);
         std::queue<TransportUnit> *in = std::get<0>(i);
-        std::lock_guard lg(*std::get<2>(i));
-        while (true) {
-            if (!in->empty()) {
-                TransportUnit TopQueue   = in->front();
-                memcpy(buf, TopQueue._bytes, buf_size);
-                in->pop();
-                return  TopQueue._filepath;
-            }
+
+        while (in->empty()) {
+            std::this_thread::sleep_for(std::chrono::milliseconds(thread_sleep_times));
         }
 
+        std::lock_guard lg(*std::get<2>(i));
+        TransportUnit TopQueue = in->front();
+        in->pop();
+
+        *buf_size     = TopQueue._buffer_size;
+        *start_offset = TopQueue._start_write_offset;
+        memcpy(buf, TopQueue._bytes, *buf_size);
+
+        return TopQueue._filepath;
     }
 
     void send(const std::string &target, char *buf, uint64_t buf_size, const std::string &filepath,
