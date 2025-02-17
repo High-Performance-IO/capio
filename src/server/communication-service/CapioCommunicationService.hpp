@@ -266,19 +266,15 @@ class CapioCommunicationService : BackendInterface {
         TransportUnitInterface i      = connected_hostnames_map.at(ownHostname);
         std::queue<TransportUnit> *in = std::get<0>(i);
         std::lock_guard lg(*std::get<2>(i));
-        TransportUnit TopQueue   = in->front();
-        TransportUnit TrasportIn = {0};
-        if (!in->empty() && TopQueue.buffer_size <= buf_size) {
-            TrasportIn.buffer_size = buf_size;
-            TrasportIn.bytes       = buf;
-            strcpy(TrasportIn.target, ownHostname);
-            strcpy(TrasportIn.source, connectedHostname.c_str());
-            // filepath
-            // offset
-            in->push(TrasportIn);
+        while (true) {
+            if (!in->empty()) {
+                TransportUnit TopQueue   = in->front();
+                strncpy(buf, TopQueue._bytes, *buf_size);
+                in->pop();
+                return  TopQueue._filepath;
+            }
         }
 
-        return connectedHostname; // change return to void
     }
 
     void send(const std::string &target, char *buf, uint64_t buf_size, const std::string &filepath,
