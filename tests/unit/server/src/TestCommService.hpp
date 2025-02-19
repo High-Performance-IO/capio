@@ -16,29 +16,32 @@ TEST(CapioCommServiceTest, TestNumberOne) {
     char hostname[HOST_NAME_MAX];
     gethostname(hostname, HOST_NAME_MAX);
     CapioCommunicationService backend("TCP", "1234", 300);
-    const auto other_hostname = std::string("fd-coordinator");
 
     uint64_t size_send = 1024;
-    capio_off64_t size_revc = 1024;
+    capio_off64_t size_revc;
+    capio_off64_t offset;
+    std::vector<std::string> connections;
+    connections = backend.get_open_connections();
+    char ownHostname[HOST_NAME_MAX] = {0};
+    gethostname(ownHostname, HOST_NAME_MAX);
+    for (auto i: connections) {
+        std::cout << i << ownHostname;
 
-
-    if (std::string(hostname) == "fd-05") {
-        char buff[5]{'p', 'i', 'n', 'g', '\0'};
-        sleep(10);
-        std::cout << "waiting to send..." << std::endl;
-        backend.send("fd-coordinator", buff, size_send, "./test", 12);
-        std::cout << "end of send" << std::endl;
-    } else {
+        if (i.compare(ownHostname) < 0) {
+            //std::cout << i << ownHostname;
+            char buff[5]{'p', 'i', 'n', 'g', '\0'};
+          backend.send(i, buff, size_send, "./test", 0);
+            backend.recive(buff, &size_revc, &offset);
+            return;
+        }
         char recvBuff[1024];
-        sleep(5); //wait for connection
-        std::string receivedHostname = backend.recive(recvBuff, &size_revc, 0);
-
-        std::cout << "recive done sleep 20" << std::endl;
-        sleep(20);
-        //EXPECT_STREQ(recvBuff, "ping");
-        //EXPECT_EQ(receivedHostname, "fd-05");
+       /* std::string recivedPath =*/ backend.recive(recvBuff, &size_revc, &offset);
+     //   std::cout << recvBuff;
+       // std::cout << recivedPath;
+        backend.send(i, recvBuff, size_revc, "./test", 0);
+        return;
     }
-    std::cout << "end of test" << std::endl;
+
 
     // Buffer to receive message
     /*  char recvBuff[1024];

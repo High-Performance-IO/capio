@@ -66,7 +66,7 @@ class CapioCommunicationService : BackendInterface {
             for (int completed_io_operations = 0;
                  completed_io_operations < max_net_op && !out->empty(); ++completed_io_operations) {
                 auto unit = out->front();
-                out->pop();
+
                 LOG("Sending %ld bytes of file %s to %s", unit._buffer_size, unit._filepath.c_str(),
                     remote_hostname);
                 /**
@@ -81,6 +81,7 @@ class CapioCommunicationService : BackendInterface {
                 HandlerPointer.send(unit._bytes, unit._buffer_size);
                 HandlerPointer.send(&unit._start_write_offset, sizeof(capio_off64_t));
                 std::cout << "sent to handler" << std::endl;
+                out->pop();
             }
 
             // Recive phase
@@ -88,27 +89,34 @@ class CapioCommunicationService : BackendInterface {
             HandlerPointer.probe(recive_size, false);
             for (int completed_io_operations = 0;
                  completed_io_operations < max_net_op && recive_size > 0;
-                 ++completed_io_operations, HandlerPointer.probe(recive_size, false)) {
+                 /*++completed_io_operations, HandlerPointer.probe(recive_size, false)*/) {
+                std::cout << recive_size << std::endl;
                 LOG("Reciving data");
                 TransportUnit unit;
                 char filepath[PATH_MAX];
                 HandlerPointer.receive(filepath, PATH_MAX);
                 unit._filepath = filepath;
+                std::cout << unit._filepath << std::endl;
                 HandlerPointer.receive(&unit._buffer_size, sizeof(capio_off64_t));
                 unit._bytes = new char[unit._buffer_size];
                 HandlerPointer.receive(unit._bytes, PATH_MAX);
-
+                std::cout << unit._bytes << std::endl;
                 HandlerPointer.receive(&unit._start_write_offset, sizeof(capio_off64_t));
+                std::cout << unit._start_write_offset << std::endl;
 
                 LOG("Pushed %ld bytes to be stored on file %s", unit._buffer_size, unit._filepath);
                 in->push(unit);
+                recive_size = 0;
+                completed_io_operations++;
+                HandlerPointer.probe(recive_size, false);
                 std::cout << "pushed to queue in" << std::endl;
             }
 
             std::this_thread::sleep_for(std::chrono::milliseconds(sleep_time));
         }
     }
-
+//controllo pop non ditrugge elemeneto
+// pop alla fine
     void static incoming_connection_listener(
         const bool *continue_execution, int sleep_time,
         std::unordered_map<std::string, TransportUnitInterface> *open_connections,
@@ -285,16 +293,16 @@ public:
             }
             std::this_thread::sleep_for(std::chrono::milliseconds(thread_sleep_times));
         }
-        std::lock_guard lg(*std::get<2>(i));
+
+       std::lock_guard lg(*std::get<2>(i));
         TransportUnit TopQueue = in->front();
-        in->pop();
-       /* std::cout << "RETURN" << std::endl;
         *buf_size = TopQueue._buffer_size;
-        std::cout << "RETURN" << std::endl;
-        *start_offset = TopQueue._start_write_offset;*/
+        *start_offset = TopQueue._start_write_offset;
         memcpy(buf, TopQueue._bytes, *buf_size);
         std::cout << TopQueue._filepath << std::endl;
-        return TopQueue._filepath;
+        std::cout << "in pop" << std::endl;
+        in->pop(); //rimuovendo il pop risolve l'errore nella recv ma rimane in loop perche' la queue in sara sempre piena
+        return ownPort; //impossibile ritornare TopQueue._filepath dopo pop
 
 
         // return NULL;
@@ -341,7 +349,22 @@ public:
             std::cout << "can't find target" << std::endl;
         }
     }
+
+    std::vector<std::string> get_open_connections() {
+        std::vector<std::string> connections;
+        while (connected_hostnames_map.empty()) { //LOOP FINCHE NON C'E CONNESIONE
+            std::chrono::milliseconds(3);
+        }
+
+        for (auto x: connected_hostnames_map) {
+           connections.push_back( x.first);
+        }
+        return connections;
+
+
+    }
 };
+
 
 inline CapioCommunicationService *capio_communication_service;
 
