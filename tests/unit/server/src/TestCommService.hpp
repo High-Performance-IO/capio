@@ -15,26 +15,30 @@ TEST(CapioCommServiceTest, TestNumberOne) {
     // pare il il primo utente che fara da server
     char hostname[HOST_NAME_MAX];
     gethostname(hostname, HOST_NAME_MAX);
+    CapioCommunicationService backend("TCP", "1234", 300);
+    const auto other_hostname = std::string("fd-coordinator");
 
-    char recvBuff[1024];
-    CapioCommunicationService backend("TCP","1234");
-    //sleep(3); // aspetta che il primo si metta in wait
+    uint64_t size_send = 1024;
+    capio_off64_t size_revc = 1024;
 
-    const auto other_hostname = std::string("fd-06");
 
-    if (std::string(hostname) == "fd-05") { //fd-05 fa una send a fd-06
-        std::cout << "prova send \n";
-       // sleep(30);
-        backend.send(other_hostname, "Ciao tests 1234", 1024);
-    } else { //chiunque altro fa una recive
-       std::cout << "provaaaaa receive \n";
-        sleep(30); //continuiamo a lasciare in funzione il thread in listen aspettando una connessione
-       // std::string receivedHostname = backend.recive(recvBuff, 1024);
+    if (std::string(hostname) == "fd-05") {
+        char buff[5]{'p', 'i', 'n', 'g', '\0'};
+        sleep(10);
+        std::cout << "waiting to send..." << std::endl;
+        backend.send("fd-coordinator", buff, size_send, "./test", 12);
+        std::cout << "end of send" << std::endl;
+    } else {
+        char recvBuff[1024];
+        sleep(5); //wait for connection
+        std::string receivedHostname = backend.recive(recvBuff, &size_revc, 0);
 
-        std::cout << "exit reveive" << std::endl;
-
+        std::cout << "recive done sleep 20" << std::endl;
+        sleep(20);
+        //EXPECT_STREQ(recvBuff, "ping");
         //EXPECT_EQ(receivedHostname, "fd-05");
     }
+    std::cout << "end of test" << std::endl;
 
     // Buffer to receive message
     /*  char recvBuff[1024];

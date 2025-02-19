@@ -17,13 +17,13 @@
 #include <unistd.h>
 
 class TransportUnit {
-  protected:
+protected:
     std::string _filepath;
     char *_bytes;
     capio_off64_t _buffer_size;
     capio_off64_t _start_write_offset;
 
-  public:
+public:
     TransportUnit() = default;
 
     ~TransportUnit() { delete[] _bytes; }
@@ -33,12 +33,12 @@ class TransportUnit {
 
 class CapioCommunicationService : BackendInterface {
     typedef std::tuple<std::queue<TransportUnit> *, std::queue<TransportUnit> *, std::mutex *>
-        TransportUnitInterface;
+    TransportUnitInterface;
     std::unordered_map<std::string, TransportUnitInterface> connected_hostnames_map;
     std::string selfToken, connectedHostname, ownPort;
     char ownHostname[HOST_NAME_MAX] = {0};
-    int thread_sleep_times          = 0;
-    bool *continue_execution        = new bool;
+    int thread_sleep_times = 0;
+    bool *continue_execution = new bool;
     std::mutex *_guard;
     std::thread *th;
     std::vector<std::thread *> connection_threads; // utile solo per distruttore?
@@ -54,7 +54,8 @@ class CapioCommunicationService : BackendInterface {
         // in = data from others
         auto [in, out, mutex] = interface;
 
-        while (HandlerPointer.isValid()) { // finche' la connesisone e' stabile
+        while (HandlerPointer.isValid()) {
+            // finche' la connesisone e' stabile
             // execute up to N operation of send &/or recive, to avoid starvation due to semaphores.
             constexpr int max_net_op = 10;
 
@@ -74,10 +75,12 @@ class CapioCommunicationService : BackendInterface {
                  * step1: send offset of write
                  * step2: send data
                  */
+                std::cout << "out not empty" << std::endl;
                 HandlerPointer.send(unit._filepath.c_str(), PATH_MAX);
                 HandlerPointer.send(&unit._buffer_size, sizeof(capio_off64_t));
                 HandlerPointer.send(unit._bytes, unit._buffer_size);
                 HandlerPointer.send(&unit._start_write_offset, sizeof(capio_off64_t));
+                std::cout << "sent to handler" << std::endl;
             }
 
             // Recive phase
@@ -88,17 +91,18 @@ class CapioCommunicationService : BackendInterface {
                  ++completed_io_operations, HandlerPointer.probe(recive_size, false)) {
                 LOG("Reciving data");
                 TransportUnit unit;
-
                 char filepath[PATH_MAX];
                 HandlerPointer.receive(filepath, PATH_MAX);
                 unit._filepath = filepath;
                 HandlerPointer.receive(&unit._buffer_size, sizeof(capio_off64_t));
                 unit._bytes = new char[unit._buffer_size];
                 HandlerPointer.receive(unit._bytes, PATH_MAX);
+
                 HandlerPointer.receive(&unit._start_write_offset, sizeof(capio_off64_t));
 
                 LOG("Pushed %ld bytes to be stored on file %s", unit._buffer_size, unit._filepath);
                 in->push(unit);
+                std::cout << "pushed to queue in" << std::endl;
             }
 
             std::this_thread::sleep_for(std::chrono::milliseconds(sleep_time));
@@ -122,16 +126,18 @@ class CapioCommunicationService : BackendInterface {
             UserManager.receive(connected_hostname, HOST_NAME_MAX);
 
             std::cout << CAPIO_SERVER_CLI_LOG_SERVER << " [ " << node_name << " ] "
-                      << "Connected to " << connected_hostname << std::endl;
+                    << "Connected to " << connected_hostname << std::endl;
 
             LOG("Recived connection hostname: %s", connected_hostname);
 
             std::lock_guard lock(*guard);
 
             open_connections->insert(
-                {connected_hostname,
-                 std::make_tuple(new std::queue<TransportUnit>(), new std::queue<TransportUnit>(),
-                                 new std::mutex())});
+                {
+                    connected_hostname,
+                    std::make_tuple(new std::queue<TransportUnit>(), new std::queue<TransportUnit>(),
+                                    new std::mutex())
+                });
 
             _connection_threads->push_back(new std::thread(
                 server_connection_handler, std::move(UserManager), connected_hostname, sleep_time,
@@ -165,7 +171,7 @@ class CapioCommunicationService : BackendInterface {
         LOG("Removed token");
     }
 
-  public:
+public:
     explicit CapioCommunicationService(std::string proto, std::string port, int sleep_time)
         : selfToken(proto + ":0.0.0.0:" + port), ownPort(port), thread_sleep_times(sleep_time) {
         START_LOG(gettid(), "INFO: instance of CapioCommunicationService");
@@ -183,7 +189,7 @@ class CapioCommunicationService : BackendInterface {
         generate_aliveness_token(ownPort);
 
         auto dir_iterator = std::filesystem::directory_iterator(std::filesystem::current_path());
-        for (const auto &entry : dir_iterator) {
+        for (const auto &entry: dir_iterator) {
             const auto &token_path = entry.path();
 
             if (!entry.is_regular_file() || token_path.extension() != ".alive_connection") {
@@ -205,14 +211,14 @@ class CapioCommunicationService : BackendInterface {
             MTCL::HandleUser UserManager = MTCL::Manager::connect(remoteToken);
             if (UserManager.isValid()) {
                 std::cout << CAPIO_SERVER_CLI_LOG_SERVER << " [ " << node_name << " ] "
-                          << "Connected to " << remoteToken << std::endl;
+                        << "Connected to " << remoteToken << std::endl;
                 LOG("Connected to: %s", remoteToken.c_str());
                 UserManager.send(ownHostname, HOST_NAME_MAX);
                 std::lock_guard lg(*_guard);
 
                 auto connection_tuple =
-                    std::make_tuple(new std::queue<TransportUnit>(),
-                                    new std::queue<TransportUnit>(), new std::mutex());
+                        std::make_tuple(new std::queue<TransportUnit>(),
+                                        new std::queue<TransportUnit>(), new std::mutex());
                 connected_hostnames_map.insert({remoteHost, connection_tuple});
 
                 connection_threads.push_back(
@@ -220,8 +226,8 @@ class CapioCommunicationService : BackendInterface {
                                     remoteHost.c_str(), sleep_time, connection_tuple));
             } else {
                 std::cout << CAPIO_SERVER_CLI_LOG_SERVER_WARNING << " [ " << node_name << " ] "
-                          << "Warning: found token " << token_path.filename()
-                          << ", but connection is not valid" << std::endl;
+                        << "Warning: found token " << token_path.filename()
+                        << ", but connection is not valid" << std::endl;
             }
         }
 
@@ -232,13 +238,13 @@ class CapioCommunicationService : BackendInterface {
         th = new std::thread(incoming_connection_listener, std::ref(continue_execution), sleep_time,
                              &connected_hostnames_map, _guard, &connection_threads);
         std::cout << CAPIO_SERVER_CLI_LOG_SERVER << " [ " << node_name << " ] "
-                  << "CapioCommunicationService initialization completed." << std::endl;
+                << "CapioCommunicationService initialization completed." << std::endl;
     }
 
     ~CapioCommunicationService() override {
         START_LOG(gettid(), "call()");
 
-        for (auto thread : connection_threads) {
+        for (auto thread: connection_threads) {
             if (!thread->joinable()) {
                 pthread_cancel(thread->native_handle());
             }
@@ -261,45 +267,78 @@ class CapioCommunicationService : BackendInterface {
     }
 
     std::string &recive(char *buf, capio_off64_t *buf_size, capio_off64_t *start_offset) override {
-
         START_LOG(gettid(), "In queue upload");
-        TransportUnitInterface i      = connected_hostnames_map.at(ownHostname);
-        std::queue<TransportUnit> *in = std::get<0>(i);
+        std::cout << "revc queue in" << std::endl;
 
-        while (in->empty()) {
+        std::queue<TransportUnit> *in = nullptr;
+        TransportUnitInterface i;
+        bool found = false;
+        while (!found) {
+            for (auto x: connected_hostnames_map) {
+                i = x.second;
+                std::queue<TransportUnit> *TryIn = std::get<0>(i);
+
+                if (!TryIn->empty()) {
+                    in = TryIn;
+                    found = true;
+                }
+            }
             std::this_thread::sleep_for(std::chrono::milliseconds(thread_sleep_times));
         }
-
         std::lock_guard lg(*std::get<2>(i));
         TransportUnit TopQueue = in->front();
         in->pop();
-
-        *buf_size     = TopQueue._buffer_size;
-        *start_offset = TopQueue._start_write_offset;
+       /* std::cout << "RETURN" << std::endl;
+        *buf_size = TopQueue._buffer_size;
+        std::cout << "RETURN" << std::endl;
+        *start_offset = TopQueue._start_write_offset;*/
         memcpy(buf, TopQueue._bytes, *buf_size);
-
+        std::cout << TopQueue._filepath << std::endl;
         return TopQueue._filepath;
+
+
+        // return NULL;
+        //std::cout  << connectedHostname << std::endl;
+        /* std::cout  << ownHostname << std::endl;
+         TransportUnitInterface i      = connected_hostnames_map.at(ownHostname);
+         std::queue<TransportUnit> *in = std::get<0>(i);
+       ;
+         while (in->empty()) {
+             std::this_thread::sleep_for(std::chrono::milliseconds(thread_sleep_times));
+         }
+
+         std::cout << "in non vuoto" << std::endl;
+         std::lock_guard lg(*std::get<2>(i));
+         TransportUnit TopQueue = in->front();
+         in->pop();
+
+         *buf_size     = TopQueue._buffer_size;
+         *start_offset = TopQueue._start_write_offset;
+         memcpy(buf, TopQueue._bytes, *buf_size);
+
+         return TopQueue._filepath;*/
     }
 
     void send(const std::string &target, char *buf, uint64_t buf_size, const std::string &filepath,
               const capio_off64_t start_offset) override {
         START_LOG(gettid(), "Out queue upload");
+        std::cout << "send queue out" << std::endl;
         if (auto element = connected_hostnames_map.find(target);
             element != connected_hostnames_map.end()) {
             TransportUnitInterface i = element->second;
             LOG("found target");
-
+            std::cout << "found target" << std::endl;
             std::queue<TransportUnit> *out = std::get<1>(i);
             std::lock_guard lg(*std::get<2>(i));
-
             TransportUnit TrasportOut;
             TrasportOut._buffer_size = buf_size;
-            TrasportOut._bytes       = new char[buf_size];
+            TrasportOut._bytes = new char[buf_size];
             memcpy(TrasportOut._bytes, buf, buf_size);
-            TrasportOut._filepath           = filepath;
+            TrasportOut._filepath = filepath;
             TrasportOut._start_write_offset = start_offset;
-
             out->push(TrasportOut);
+        } else {
+            std::cout << "can't find target" << std::endl;
         }
     }
 };
