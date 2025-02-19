@@ -42,6 +42,12 @@ class BackendInterface {
     virtual std::string &recive(char *buf, capio_off64_t *buf_size, capio_off64_t *start_offset) {
         throw NotImplementedBackendMethod();
     };
+
+    /**
+     * 
+     * @return A vector of hostnames for which a connection exists
+     */
+    virtual std::vector<std::string> get_open_connections() { throw NotImplementedBackendMethod(); }
 };
 
 #endif // CAPIOBACKEND_HPP
