@@ -8,7 +8,7 @@
 constexpr char TEST_MESSAGE[]        = "hello world how is it going?";
 constexpr capio_off64_t BUFFER_SIZES = 1024;
 
-TEST(CapioCommServiceTest, TestNumberOne) {
+TEST(CapioCommServiceTest, TestPingPong) {
     // pare il il primo utente che fara da server
     gethostname(node_name.data(), HOST_NAME_MAX);
     CapioCommunicationService backend("TCP", "1234", 300);
@@ -21,15 +21,25 @@ TEST(CapioCommServiceTest, TestNumberOne) {
     for (auto i : connections) {
         if (i.compare(ownHostname) < 0) {
             std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_INFO << "Sending ping to: " << i << std::endl;
-            char buff[BUFFER_SIZES]{0};
+            char buff[BUFFER_SIZES]{0}, buff1[BUFFER_SIZES]{0};
             memcpy(buff, TEST_MESSAGE, strlen(TEST_MESSAGE));
             backend.send(i, buff, BUFFER_SIZES, "./test", 0);
-            backend.recive(buff, &size_revc, &offset);
+            std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_INFO << "sent ping to: " << i
+                      << ". Waiting for response" << std::endl;
+            backend.recive(buff1, &size_revc, &offset);
+            std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_INFO << "Recived ping response from : " << i
+                      << std::endl;
+            EXPECT_EQ(strcmp(buff, buff1), 0);
             return;
         }
+        std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_INFO << "Listening for ping from: " << i
+                  << std::endl;
         char recvBuff[BUFFER_SIZES];
         backend.recive(recvBuff, &size_revc, &offset);
+        std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_INFO << "Received ping from: " << i << std::endl;
         backend.send(i, recvBuff, size_revc, "./test", 0);
+        sleep(5);
+        std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_INFO << "Sent ping response to: " << i << std::endl;
         return;
     }
 }
