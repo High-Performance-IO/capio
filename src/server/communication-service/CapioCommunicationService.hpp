@@ -231,6 +231,7 @@ class CapioCommunicationService : BackendInterface {
             const auto &token_path = entry.path();
 
             if (!entry.is_regular_file() || token_path.extension() != ".alive_connection") {
+                LOG("Filename %s is not valid", entry.path().c_str());
                 continue;
             }
             LOG("Found token %s", token_path.c_str());
@@ -244,6 +245,12 @@ class CapioCommunicationService : BackendInterface {
             MyReadFile.close();
 
             std::string remoteToken = proto + ":" + remoteHost + ":" + ownPort;
+
+            if (remoteToken == selfToken || remoteToken == proto + ":" + ownHostname + ":" + port) {
+                LOG("Skipping to connect to self");
+                continue;
+            }
+
             LOG("Trying to connect on remote: %s", remoteToken.c_str());
 
             if (auto UserManager = MTCL::Manager::connect(remoteToken); UserManager.isValid()) {
@@ -322,8 +329,8 @@ class CapioCommunicationService : BackendInterface {
         LOG("Found incoming message");
         std::lock_guard lg(*std::get<2>(interface));
         const auto inputUnit = inQueue->front();
-        *buf_size           = inputUnit->_buffer_size;
-        *start_offset       = inputUnit->_start_write_offset;
+        *buf_size            = inputUnit->_buffer_size;
+        *start_offset        = inputUnit->_start_write_offset;
         memcpy(buf, inputUnit->_bytes, *buf_size);
         LOG("Received buffer: %s", inputUnit->_bytes);
         inQueue->pop();
