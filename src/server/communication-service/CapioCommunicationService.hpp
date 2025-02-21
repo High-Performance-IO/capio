@@ -9,19 +9,17 @@
 #include <future>
 #include <iostream>
 #include <mtcl.hpp>
-#include <netinet/in.h>
 #include <queue>
 #include <random>
 #include <string>
-#include <sys/socket.h>
 #include <unistd.h>
 
 class TransportUnit {
   protected:
     std::string _filepath;
-    char *_bytes;
-    capio_off64_t _buffer_size;
-    capio_off64_t _start_write_offset;
+    char *_bytes{};
+    capio_off64_t _buffer_size{};
+    capio_off64_t _start_write_offset{};
 
   public:
     TransportUnit() = default;
@@ -44,11 +42,10 @@ class CapioCommunicationService : BackendInterface {
     std::vector<std::thread *> connection_threads;
     bool *terminate;
 
-    static TransportUnit *recive_unit(MTCL::HandleUser *HandlerPointer) {
+    static TransportUnit *receive_unit(MTCL::HandleUser *HandlerPointer) {
         START_LOG(gettid(), "call()");
         size_t filepath_len;
-        TransportUnit *unit;
-        unit = new TransportUnit();
+        const auto unit = new TransportUnit();
         HandlerPointer->receive(&filepath_len, sizeof(size_t));
         unit->_filepath.reserve(filepath_len + 1);
         HandlerPointer->receive(unit->_filepath.data(), filepath_len);
@@ -57,11 +54,11 @@ class CapioCommunicationService : BackendInterface {
         HandlerPointer->receive(unit->_bytes, unit->_buffer_size);
         HandlerPointer->receive(&unit->_start_write_offset, sizeof(capio_off64_t));
         LOG("[recv] Receiving %ld bytes of file %s", unit->_buffer_size, unit->_filepath.c_str());
-        LOG("[recv] Offset of recived chunk is %ld", unit->_start_write_offset);
-
+        LOG("[recv] Offset of received chunk is %ld", unit->_start_write_offset);
         return unit;
     }
-    static void send_unit(MTCL::HandleUser *HandlerPointer, TransportUnit *unit) {
+
+    static void send_unit(MTCL::HandleUser *HandlerPointer, const TransportUnit *unit) {
         START_LOG(gettid(), "call()");
         LOG("[send] buffer=%s", unit->_bytes);
         /**
@@ -70,12 +67,15 @@ class CapioCommunicationService : BackendInterface {
          * step1: send offset of write
          * step2: send data
          */
-        size_t file_path_length = unit->_filepath.length();
+        const size_t file_path_length = unit->_filepath.length();
         HandlerPointer->send(&file_path_length, sizeof(size_t));
         HandlerPointer->send(unit->_filepath.c_str(), file_path_length);
         HandlerPointer->send(&unit->_buffer_size, sizeof(capio_off64_t));
         HandlerPointer->send(unit->_bytes, unit->_buffer_size);
         HandlerPointer->send(&unit->_start_write_offset, sizeof(capio_off64_t));
+        LOG("[send] Sent %ld bytes of file %s with offset of %ld", unit->_buffer_size,
+            unit->_filepath.c_str(), unit->_start_write_offset);
+        delete unit;
     }
 
     /**
@@ -83,7 +83,7 @@ class CapioCommunicationService : BackendInterface {
      */
     void static server_connection_handler(MTCL::HandleUser HandlerPointer,
                                           const std::string remote_hostname, const int sleep_time,
-                                          TransportUnitInterface interface, bool *terminate) {
+                                          TransportUnitInterface interface, const bool *terminate) {
         START_LOG(gettid(), "call(remote_hostname=%s)", remote_hostname.c_str());
         // out = data to sent to others
         // in = data from others
@@ -97,27 +97,24 @@ class CapioCommunicationService : BackendInterface {
             for (int completed_io_operations = 0;
                  completed_io_operations < max_net_op && !out->empty(); ++completed_io_operations) {
                 LOG("[send] Starting send section");
-                auto unit = out->front();
+                const auto unit = out->front();
 
                 LOG("[send] Sending %ld bytes of file %s to %s", unit->_buffer_size,
                     unit->_filepath.c_str(), remote_hostname.c_str());
                 send_unit(&HandlerPointer, unit);
                 LOG("[send] Message sent");
 
-                delete unit;
                 std::lock_guard lg(*mutex);
                 LOG("[send] Locked guard");
                 out->pop();
             }
 
-            // Recive phase
-            size_t recive_size = 0, completed_io_operations = 0;
-            HandlerPointer.probe(recive_size, false);
-            while (completed_io_operations < max_net_op && recive_size > 0) {
+            // Receive phase
+            size_t receive_size = 0, completed_io_operations = 0;
+            HandlerPointer.probe(receive_size, false);
+            while (completed_io_operations < max_net_op && receive_size > 0) {
                 LOG("[recv] Receiving data");
-
-                auto unit = recive_unit(&HandlerPointer);
-
+                auto unit = receive_unit(&HandlerPointer);
                 LOG("[recv] Lock guard");
                 std::lock_guard lg(*mutex);
                 in->push(unit);
@@ -125,27 +122,29 @@ class CapioCommunicationService : BackendInterface {
                     unit->_filepath.c_str());
 
                 ++completed_io_operations;
-                recive_size = 0;
-                HandlerPointer.probe(recive_size, false);
+                receive_size = 0;
+                HandlerPointer.probe(receive_size, false);
             }
 
+            // terminate phase
             if (*terminate) {
                 std::lock_guard lg(*mutex);
-                LOG("[ TERM ] Locked acces to queues");
+                LOG("[TERM PHASE] Locked access send and receive queues");
                 while (!out->empty()) {
-                    auto unit = out->front();
+                    const auto unit = out->front();
                     send_unit(&HandlerPointer, unit);
                     out->pop();
                 }
+                LOG("[TERM PHASE] Emptied queues. Closing connection");
                 HandlerPointer.close();
+                LOG("[TERM PHASE] Terminating thread server_connection_handler");
                 return;
             }
 
             std::this_thread::sleep_for(std::chrono::milliseconds(sleep_time));
         }
     }
-    // controllo pop non ditrugge elemeneto
-    //  pop alla fine
+
     void static incoming_connection_listener(
         const bool *continue_execution, int sleep_time,
         std::unordered_map<std::string, TransportUnitInterface> *open_connections,
@@ -165,7 +164,7 @@ class CapioCommunicationService : BackendInterface {
             std::cout << CAPIO_SERVER_CLI_LOG_SERVER << " [ " << node_name << " ] "
                       << "Connected to " << connected_hostname << std::endl;
 
-            LOG("Recived connection hostname: %s", connected_hostname);
+            LOG("Received connection hostname: %s", connected_hostname);
 
             std::lock_guard lock(*guard);
 
@@ -207,7 +206,8 @@ class CapioCommunicationService : BackendInterface {
     }
 
   public:
-    explicit CapioCommunicationService(std::string proto, std::string port, int sleep_time)
+    explicit CapioCommunicationService(const std::string &proto, const std::string &port,
+                                       int sleep_time)
         : selfToken(proto + ":0.0.0.0:" + port), ownPort(port), thread_sleep_times(sleep_time) {
         START_LOG(gettid(), "INFO: instance of CapioCommunicationService");
 
@@ -246,8 +246,7 @@ class CapioCommunicationService : BackendInterface {
             std::string remoteToken = proto + ":" + remoteHost + ":" + ownPort;
             LOG("Trying to connect on remote: %s", remoteToken.c_str());
 
-            MTCL::HandleUser UserManager = MTCL::Manager::connect(remoteToken);
-            if (UserManager.isValid()) {
+            if (auto UserManager = MTCL::Manager::connect(remoteToken); UserManager.isValid()) {
                 std::cout << CAPIO_SERVER_CLI_LOG_SERVER << " [ " << node_name << " ] "
                           << "Connected to " << remoteToken << std::endl;
                 LOG("Connected to: %s", remoteToken.c_str());
@@ -281,18 +280,19 @@ class CapioCommunicationService : BackendInterface {
 
     ~CapioCommunicationService() override {
         START_LOG(gettid(), "call()");
-        *terminate = true;
+        *terminate          = true;
+        *continue_execution = false;
 
-        for (auto thread : connection_threads) {
+        for (const auto thread : connection_threads) {
             thread->join();
         }
         LOG("Terminated connection threads");
 
-        *continue_execution = false;
         pthread_cancel(th->native_handle());
         th->join();
         delete th;
         delete continue_execution;
+        delete terminate;
 
         LOG("Handler closed.");
 
@@ -321,16 +321,16 @@ class CapioCommunicationService : BackendInterface {
         }
         LOG("Found incoming message");
         std::lock_guard lg(*std::get<2>(interface));
-        auto TopQueue = inQueue->front();
-        *buf_size     = TopQueue->_buffer_size;
-        *start_offset = TopQueue->_start_write_offset;
-        memcpy(buf, TopQueue->_bytes, *buf_size);
-        LOG("Recived buffer: %s", TopQueue->_bytes);
+        const auto inputUnit = inQueue->front();
+        *buf_size           = inputUnit->_buffer_size;
+        *start_offset       = inputUnit->_start_write_offset;
+        memcpy(buf, inputUnit->_bytes, *buf_size);
+        LOG("Received buffer: %s", inputUnit->_bytes);
         inQueue->pop();
 
-        std::string filename(TopQueue->_filepath);
+        std::string filename(inputUnit->_filepath);
 
-        delete inQueue;
+        delete inputUnit;
         return filename;
     }
 
@@ -339,37 +339,34 @@ class CapioCommunicationService : BackendInterface {
         START_LOG(gettid(), "call(target=%s, buf_size=%ld, file_path=%s, start_offset=%ld, buf=%s)",
                   target.c_str(), buf_size, filepath.c_str(), start_offset, buf);
 
-        if (auto element = connected_hostnames_map.find(target);
+        if (const auto element = connected_hostnames_map.find(target);
             element != connected_hostnames_map.end()) {
             LOG("Found alive connection for given target");
 
-            auto interface = element->second;
-            auto *out      = std::get<1>(interface);
+            const auto interface = element->second;
+            auto *out            = std::get<1>(interface);
 
-            auto TrasportOut                 = new TransportUnit();
-            TrasportOut->_buffer_size        = buf_size;
-            TrasportOut->_filepath           = filepath;
-            TrasportOut->_start_write_offset = start_offset;
-            TrasportOut->_bytes              = new char[buf_size];
-            memcpy(TrasportOut->_bytes, buf, buf_size);
-            LOG("Copied buffer: %s", TrasportOut->_bytes);
+            const auto outputUnit           = new TransportUnit();
+            outputUnit->_buffer_size        = buf_size;
+            outputUnit->_filepath           = filepath;
+            outputUnit->_start_write_offset = start_offset;
+            outputUnit->_bytes              = new char[buf_size];
+            memcpy(outputUnit->_bytes, buf, buf_size);
+            LOG("Copied buffer: %s", outputUnit->_bytes);
 
             std::lock_guard lg(*std::get<2>(interface));
             LOG("Pushing Transport unit to out queue");
-            out->push(TrasportOut);
+            out->push(outputUnit);
         } else {
             std::cout << "can't find target" << std::endl;
         }
     }
 
-    std::vector<std::string> get_open_connections() {
+    std::vector<std::string> get_open_connections() override {
         std::vector<std::string> connections;
-        while (connected_hostnames_map.empty()) { // LOOP FINCHE NON C'E CONNESIONE
-            std::chrono::milliseconds(3);
-        }
 
-        for (auto x : connected_hostnames_map) {
-            connections.push_back(x.first);
+        for (const auto &[hostname, _] : connected_hostnames_map) {
+            connections.push_back(hostname);
         }
         return connections;
     }

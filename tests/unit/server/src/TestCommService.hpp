@@ -13,12 +13,18 @@ TEST(CapioCommServiceTest, TestPingPong) {
     gethostname(node_name.data(), HOST_NAME_MAX);
     CapioCommunicationService backend("TCP", "1234", 300);
     capio_off64_t size_revc, offset;
-    auto connections = backend.get_open_connections();
+
+    std::vector<std::string> connections;
+
+    do {
+        connections = backend.get_open_connections();
+        std::this_thread::sleep_for(std::chrono::milliseconds(300));
+    } while (connections.empty());
 
     char ownHostname[HOST_NAME_MAX] = {0};
     gethostname(ownHostname, HOST_NAME_MAX);
 
-    for (auto i : connections) {
+    for (const auto &i : connections) {
         if (i.compare(ownHostname) < 0) {
             std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_INFO << "Sending ping to: " << i << std::endl;
             char buff[BUFFER_SIZES]{0}, buff1[BUFFER_SIZES]{0};
@@ -27,7 +33,7 @@ TEST(CapioCommServiceTest, TestPingPong) {
             std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_INFO << "sent ping to: " << i
                       << ". Waiting for response" << std::endl;
             backend.recive(buff1, &size_revc, &offset);
-            std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_INFO << "Recived ping response from : " << i
+            std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_INFO << "Received ping response from : " << i
                       << std::endl;
             EXPECT_EQ(strcmp(buff, buff1), 0);
             return;
