@@ -37,8 +37,8 @@ TEST(CapioCommServiceTest, TestPingPong) {
         char recvBuff[BUFFER_SIZES];
         backend.recive(recvBuff, &size_revc, &offset);
         std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_INFO << "Received ping from: " << i << std::endl;
+        EXPECT_EQ(strcmp(recvBuff, TEST_MESSAGE), 0);
         backend.send(i, recvBuff, size_revc, "./test", 0);
-        sleep(5);
         std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_INFO << "Sent ping response to: " << i << std::endl;
         return;
     }
