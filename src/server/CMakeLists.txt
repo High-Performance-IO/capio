@@ -3,15 +3,7 @@
 #####################################
 set(TARGET_NAME capio_server)
 set(TARGET_INCLUDE_FOLDER ${CMAKE_CURRENT_SOURCE_DIR})
-set(TARGET_SOURCES
-        ${CMAKE_CURRENT_SOURCE_DIR}/capio_server.cpp
-        communication-service/CapioCommunicationService.hpp
-)
-
-#####################################
-# Add MTCL dependencies
-#####################################
-find_package(ucx)
+set(TARGET_SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/capio_server.cpp)
 
 
 #####################################
@@ -33,14 +25,28 @@ FetchContent_Declare(
         GIT_TAG fbd8aa924b916c6578963af315fdb5f10c3969ad
 )
 
-if(${ucx_FOUND})
+#####################################
+# Add MTCL dependencies
+#####################################
+find_package(UCX)
+
+if (ucx_FOUND)
+    message(STATUS "Enabling UCX for MTCL backend")
     target_compile_definitions(mtcl ENABLE_UCX)
+else ()
+    message(STATUS "Warning: UCX has not been found, and as such it will not be an available MTCL backend.")
+endif ()
+
+
+find_package(MPI)
+if (MPI_FOUND)
+    message(STATUS "Enabling MPI for MTCL backend")
+    target_compile_definitions(mtcl ENABLE_MPI)
+else ()
+    message(STATUS "Warning: MPI has not been found, and as such it will not be an available MTCL backend.")
 endif ()
 
 FetchContent_MakeAvailable(args simdjson mtcl)
-
-
-
 
 
 #####################################
