@@ -52,7 +52,7 @@ class BackendInterface {
  * This class implements a placeholder for backend interface, whenever CAPIO is only providing IO
  * coordination
  */
-class NoBackend : public BackendInterface {
+class NoBackend final : public BackendInterface {
   public:
     void send(const std::string &target, char *buf, uint64_t buf_size, const std::string &filepath,
               capio_off64_t start_offset) override {

@@ -1,0 +1,17 @@
+services:
+  node1:
+    image: alpine
+    command: [ "hostname" ]
+    tty: true
+    volumes:
+      - shared_data:/shared
+
+  node2:
+    image: alpine
+    command: [ "hostname" ]
+    tty: true
+    volumes:
+      - shared_data:/shared
+
+volumes:
+  shared_data:
