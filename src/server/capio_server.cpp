@@ -36,6 +36,10 @@ char node_name[HOST_NAME_MAX];
 
 #include "file-manager/file_manager.hpp"
 
+#include "communication-service/BackendInterface.hpp"
+
+#include "communication-service/MTCL_backend.hpp"
+
 std::string parseCLI(int argc, char **argv) {
     Logger *log;
 
@@ -179,6 +183,7 @@ int main(int argc, char **argv) {
     fs_monitor              = new FileSystemMonitor();
     request_handlers_engine = new RequestHandlerEngine();
     storage_service         = new CapioStorageService();
+    capio_backend           = new MTCL_backend("TCP", "1234", 300);
 
     capio_cl_engine->print();
 
