@@ -30,14 +30,14 @@ class BackendInterface {
     };
 
     /**
-     * @brief recive data
+     * @brief receive data
      *
      * @param buf allocated data buffer
      * @param buf_size size of @param buf
      * @param start_offset
      * @return std::string hostname of sender
      */
-    virtual std::string &recive(char *buf, capio_off64_t *buf_size, capio_off64_t *start_offset) {
+    virtual std::string &receive(char *buf, capio_off64_t *buf_size, capio_off64_t *start_offset) {
         throw NotImplementedBackendMethod();
     };
 
@@ -46,6 +46,25 @@ class BackendInterface {
      * @return A vector of hostnames for which a connection exists
      */
     virtual std::vector<std::string> get_open_connections() { throw NotImplementedBackendMethod(); }
+};
+
+/*
+ * This class implements a placeholder for backend interface, whenever CAPIO is only providing IO
+ * coordination
+ */
+class NoBackend : public BackendInterface {
+  public:
+    void send(const std::string &target, char *buf, uint64_t buf_size, const std::string &filepath,
+              capio_off64_t start_offset) override {
+        return;
+    };
+
+    std::string &receive(char *buf, capio_off64_t *buf_size, capio_off64_t *start_offset) override {
+        auto s = std::string("no-backend");
+        return s;
+    }
+
+    std::vector<std::string> get_open_connections() override { return {}; }
 };
 
 inline BackendInterface *capio_backend;

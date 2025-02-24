@@ -47,7 +47,7 @@ FetchContent_Declare(
 #    message(STATUS "Warning: MPI has not been found, and as such it will not be an available MTCL backend.")
 #endif ()
 
-FetchContent_MakeAvailable(args simdjson mtcl )
+FetchContent_MakeAvailable(args simdjson mtcl)
 
 #####################################
 # Target definition

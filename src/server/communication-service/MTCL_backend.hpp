@@ -64,7 +64,7 @@ class MTCL_backend : public BackendInterface {
         LOG("[send] buffer=%s", unit->_bytes);
         /**
          * step0: send file path
-         * step1: send recive buffer size
+         * step1: send receive buffer size
          * step1: send offset of write
          * step2: send data
          */
@@ -91,7 +91,8 @@ class MTCL_backend : public BackendInterface {
         auto [in, out, mutex] = interface;
 
         while (HandlerPointer.isValid()) {
-            // execute up to N operation of send &/or recive, to avoid starvation due to semaphores.
+            // execute up to N operation of send &/or receive, to avoid starvation due to
+            // semaphores.
             constexpr int max_net_op = 10;
 
             // Send phase
@@ -309,7 +310,7 @@ class MTCL_backend : public BackendInterface {
         LOG("Finalizing MTCL backend");
     }
 
-    std::string &recive(char *buf, capio_off64_t *buf_size, capio_off64_t *start_offset) override {
+    std::string &receive(char *buf, capio_off64_t *buf_size, capio_off64_t *start_offset) override {
         START_LOG(gettid(), "call()");
 
         std::queue<TransportUnit *> *inQueue = nullptr;
