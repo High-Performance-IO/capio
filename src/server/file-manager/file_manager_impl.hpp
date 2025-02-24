@@ -3,6 +3,7 @@
 #include "capio/env.hpp"
 #include "client-manager/client_manager.hpp"
 #include "file_manager.hpp"
+#include "storage-service/capio_storage_service.hpp"
 #include "utils/distributed_semaphore.hpp"
 
 /**
@@ -63,6 +64,7 @@ inline void CapioFileManager::_unlockThreadAwaitingCreation(const std::string &p
     START_LOG(gettid(), "call(path=%s)", path.c_str());
     for (const auto tid : pids) {
         client_manager->reply_to_client(tid, 1);
+        storage_service->createFile(path);
     }
 }
 
@@ -78,6 +80,14 @@ inline void CapioFileManager::addThreadAwaitingData(const std::string &path, int
                                                     size_t expected_size) {
     START_LOG(gettid(), "call(path=%s, tid=%ld, expected_size=%ld)", path.c_str(), tid,
               expected_size);
+
+    // check if file needs to be handled by the storage service instead
+    if (capio_cl_engine->storeFileInMemory(path)) {
+        LOG("File is stored in memory. delegating storage_service to await for data");
+        storage_service->addThreadWaitingForData(tid, path, 0, expected_size);
+        return;
+    }
+
     std::lock_guard<std::mutex> lg(data_mutex);
     thread_awaiting_data[path].emplace(tid, expected_size);
 }
