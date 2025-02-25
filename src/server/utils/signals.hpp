@@ -1,6 +1,8 @@
 #ifndef CAPIO_SERVER_HANDLERS_SIGNALS_HPP
 #define CAPIO_SERVER_HANDLERS_SIGNALS_HPP
 
+#include "communication-service/BackendInterface.hpp"
+
 #include <csignal>
 
 #ifdef CAPIO_COVERAGE
@@ -37,6 +39,9 @@ inline void sig_term_handler(int signum, siginfo_t *info, void *ptr) {
     delete fs_monitor;
     std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_WARNING << " [ " << node_name << " ] "
               << "fs_monitor cleanup completed" << std::endl;
+    delete capio_backend;
+    std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_WARNING << " [ " << node_name << " ] "
+              << "capio_backend cleanup completed" << std::endl;
     delete shm_canary;
     std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_INFO << " [ " << node_name << " ] "
               << "shutdown completed" << std::endl;

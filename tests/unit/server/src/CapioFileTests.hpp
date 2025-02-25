@@ -54,7 +54,7 @@ TEST(CapioMemoryFileTest, TestHugeFileOnMultiplePages) {
 }
 
 /*
- * WARNING: This test uses files that are too ig to be handled by the CI/CD on github,
+ * WARNING: This test uses files that are too big to be handled by the CI/CD on github,
  * and as such it has been disabled. Nevertheless this test can be executed locally
  *
 TEST(CapioMemoryFileTest, TestHugeFileOnMultiplePagesThatStartOnDifferentOffset) {

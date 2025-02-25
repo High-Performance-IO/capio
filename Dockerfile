@@ -2,7 +2,7 @@ FROM debian:bookworm AS builder
 
 ARG CAPIO_BUILD_TESTS=OFF
 ARG CAPIO_LOG=OFF
-ARG CMAKE_BUILD_TYPE=Release
+ARG CMAKE_BUILD_TYPE=Debug
 
 RUN apt update                              \
  && apt install -y --no-install-recommends  \
@@ -93,6 +93,7 @@ COPY --from=builder                                         \
     "/usr/local/bin/capio_server_unit_test[s]"              \
     "/usr/local/bin/capio_syscall_unit_test[s]"             \
     "/usr/local/bin/capio_integration_test[s]"              \
+    "/usr/local/bin/capio_backend_unit_tests"               \
     /usr/local/bin/
 
 # Pkgconfig

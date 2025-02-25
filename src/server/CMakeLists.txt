@@ -20,7 +20,34 @@ FetchContent_Declare(
         GIT_REPOSITORY https://github.com/simdjson/simdjson.git
         GIT_TAG v3.10.1
 )
-FetchContent_MakeAvailable(args simdjson)
+FetchContent_Declare(
+        mtcl
+        GIT_REPOSITORY https://github.com/ParaGroup/MTCL
+        GIT_TAG fbd8aa924b916c6578963af315fdb5f10c3969ad
+)
+
+#####################################
+# Add MTCL dependencies
+#####################################
+#find_package(UCX)
+
+#if (ucx_FOUND)
+#    message(STATUS "Enabling UCX for MTCL backend")
+#    target_compile_definitions(mtcl ENABLE_UCX)
+#else ()
+#    message(STATUS "Warning: UCX has not been found, and as such it will not be an available MTCL backend.")
+#endif ()
+
+
+#find_package(MPI)
+#if (MPI_FOUND)
+#    message(STATUS "Enabling MPI for MTCL backend")
+#    target_compile_definitions(mtcl ENABLE_MPI)
+#else ()
+#    message(STATUS "Warning: MPI has not been found, and as such it will not be an available MTCL backend.")
+#endif ()
+
+FetchContent_MakeAvailable(args simdjson mtcl)
 
 #####################################
 # Target definition
@@ -40,6 +67,7 @@ target_include_directories(${TARGET_NAME} PRIVATE
         ${MPI_INCLUDE_PATH}
         ${args_SOURCE_DIR}
         ${simdjson_SOURCE_DIR}
+        ${mtcl_SOURCE_DIR}/include
 )
 
 #####################################

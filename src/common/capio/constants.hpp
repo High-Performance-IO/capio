@@ -137,6 +137,11 @@ constexpr char CAPIO_SERVER_ARG_PARSER_LOGILE_OPT_HELP[] =
     "Filename to which capio_server will log to, without extension";
 constexpr char CAPIO_SERVER_ARG_PARSER_CONFIG_OPT_HELP[] =
     "JSON Configuration file for capio_server";
+constexpr char CAPIO_SERVER_ARG_PARSER_BACKEND_OPT_HELP[] =
+    "Select a valid communication backend for CAPIO. current supported values are: [fs | tcp | mpi "
+    "| ucx | mqtt ]";
+constexpr char CAPIO_SERVER_ARG_PARSER_BACKEND_PORT_OPT_HELP[] =
+    "A valid PORT for the Communication backend";
 constexpr char CAPIO_SERVER_ARG_PARSER_CONFIG_NO_CONF_FILE_HELP[] =
     "If specified, server application will start without a config file, using default settings.";
 constexpr char CAPIO_SERVER_ARG_PARSER_CONFIG_NCONTINUE_ON_ERROR_HELP[] =
@@ -166,5 +171,10 @@ constexpr char CAPIO_LOG_SERVER_CLI_CONT_ON_ERR_WARNING[] =
 constexpr char CAPIO_SERVER_ARG_PARSER_CONFIG_BACKEND_HELP[] =
     "Backend used in CAPIO. The value [backend] can be one of the following implemented backends: "
     "\n\t> mpi (default)\n\t> mpisync";
+
+// CAPIO backend constant values
+
+constexpr int DEFAULT_CAPIO_BACKEND_PORT       = 2222;
+constexpr int CAPIO_BACKEND_DEFAULT_SLEEP_TIME = 300;
 
 #endif // CAPIO_COMMON_CONSTANTS_HPP
