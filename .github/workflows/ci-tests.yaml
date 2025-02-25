@@ -42,6 +42,7 @@ jobs:
           load: true
           tags: alphaunito/capio:latest
       - name: "Run unit tests with Docker"
+        working-directory: ${{ github.workspace }}
         run: |
 
           echo "Run CAPIO POSIX Unit tests"
@@ -64,6 +65,8 @@ jobs:
             capio_integration_tests             \
             --gtest_break_on_failure            \
             --gtest_print_time=1
+          
+          docker compose -f tests/docker-compose.yml up --abort-on-container-exit
 
   format-check:
     name: "Check ${{ matrix.path }} clang-format conformance"
@@ -145,7 +148,8 @@ jobs:
                 -B ../build \
                 -S ${GITHUB_WORKSPACE}
           cmake --build ../build -j $(nproc)
-          sudo cmake --install ../build --prefix /usr/local
+          sudo cmake --install ../build --prefix /usr/local          
+
       - name: "Run tests"
         id: run-tests
         timeout-minutes: 2
@@ -159,7 +163,7 @@ jobs:
           capio_server_unit_tests \
             --gtest_break_on_failure \
             --gtest_print_time=1
-                
+          
           echo "Run CAPIO POSIX Unit tests"
           capio_posix_unit_tests \
             --gtest_break_on_failure \
@@ -175,7 +179,7 @@ jobs:
           capio_syscall_unit_tests \
             --gtest_break_on_failure \
             --gtest_print_time=1
-               
+          
           echo "Run CAPIO integration tests"
           rm -rf /dev/shm/CAPIO*
           LD_PRELOAD=libcapio_posix.so \
