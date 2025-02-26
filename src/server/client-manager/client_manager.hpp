@@ -56,8 +56,7 @@ class ClientManager {
      */
     inline void remove_client(pid_t tid) const {
         START_LOG(gettid(), "call(tid=%ld)", tid);
-        auto it_resp = bufs_response->find(tid);
-        if (it_resp != bufs_response->end()) {
+        if (const auto it_resp = bufs_response->find(tid); it_resp != bufs_response->end()) {
             delete it_resp->second;
             bufs_response->erase(it_resp);
         }
@@ -70,13 +69,13 @@ class ClientManager {
      * @param offset
      * @return
      */
-    inline void reply_to_client(pid_t tid, capio_off64_t offset) const {
+    void reply_to_client(const pid_t tid, const capio_off64_t offset) const {
         START_LOG(gettid(), "call(tid=%ld, offset=%llu)", tid, offset);
-        try {
-            bufs_response->at(tid)->write(&offset);
-        } catch (const std::string &ex) {
-            std::cout << "Unable to write: " << ex << std::endl;
+        if (const auto out = bufs_response->find(tid); out != bufs_response->end()) {
+            out->second->write(&offset);
+            return;
         }
+        LOG("Err: no such buffer for provided tid");
     }
 
     /**
@@ -88,7 +87,12 @@ class ClientManager {
      */
     void register_produced_file(pid_t tid, std::string &path) const {
         START_LOG(gettid(), "call(tid=%ld, path=%s)", tid, path.c_str());
-        files_created_by_producer->at(tid)->emplace_back(path);
+        if (const auto itm = files_created_by_producer->find(tid);
+            itm != files_created_by_producer->end()) {
+            itm->second->emplace_back(path);
+            return;
+        }
+        LOG("Error: tis is not present in files_created_by_producers map");
     }
     /**
      * @brief Get the files that a given pid is waiting to be produced
@@ -98,8 +102,13 @@ class ClientManager {
      */
     [[nodiscard]] auto get_produced_files(pid_t tid) const {
         START_LOG(gettid(), "call(tid=%ld)", tid);
+        if (const auto itm = files_created_by_producer->find(tid);
+            itm == files_created_by_producer->end()) {
+            files_created_by_producer->emplace(tid, new std::vector<std::string>());
+        }
         return files_created_by_producer->at(tid);
     }
+
     /**
      * @brief Get the app name given a process pid
      *
@@ -108,7 +117,10 @@ class ClientManager {
      */
     [[nodiscard]] std::string get_app_name(pid_t tid) const {
         START_LOG(gettid(), "call(tid=%ld)", tid);
-        return app_names->at(tid);
+        if (const auto itm = app_names->find(tid); itm != app_names->end()) {
+            return itm->second;
+        }
+        return CAPIO_DEFAULT_APP_NAME;
     }
 };
 

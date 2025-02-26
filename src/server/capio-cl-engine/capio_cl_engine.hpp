@@ -277,8 +277,8 @@ class CapioCLEngine {
 
     void setDirectory(const std::string &path) {
         START_LOG(gettid(), "call(path=%s)", path.c_str());
-        if (_locations.find(path) != _locations.end()) {
-            std::get<6>(_locations.at(path)) = false;
+        if (const auto itm = _locations.find(path); itm != _locations.end()) {
+            std::get<6>(itm->second) = false;
         }
     }
 
