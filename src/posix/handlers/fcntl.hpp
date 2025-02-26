@@ -5,6 +5,7 @@
 
 #include "utils/requests.hpp"
 
+#if defined(SYS_fcntl) || defined(SYS_fcntl64)
 int fcntl_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg5, long *result) {
     auto fd  = static_cast<int>(arg0);
     auto cmd = static_cast<int>(arg1);
@@ -18,6 +19,7 @@ int fcntl_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long ar
     }
     return CAPIO_POSIX_SYSCALL_SKIP;
 }
+#endif
 
 #endif // SYS_fcntl
 #endif // CAPIO_POSIX_HANDLERS_FCNTL_HPP

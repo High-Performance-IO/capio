@@ -1,11 +1,10 @@
 #ifndef CAPIO_POSIX_HANDLERS_ACCESS_HPP
 #define CAPIO_POSIX_HANDLERS_ACCESS_HPP
 
-#if defined(SYS_access) || defined(SYS_faccessat) || defined(SYS_faccessat2)
-
 #include "utils/common.hpp"
 #include "utils/filesystem.hpp"
 
+#if defined(SYS_access)
 int access_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg5, long *result) {
     const std::string_view pathname(reinterpret_cast<const char *>(arg0));
     auto tid = static_cast<pid_t>(syscall_no_intercept(SYS_gettid));
@@ -23,7 +22,9 @@ int access_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long a
     consent_request_cache_fs->consent_request(path, tid, __FUNCTION__);
     return CAPIO_POSIX_SYSCALL_REQUEST_SKIP;
 }
+#endif // SYS_access
 
+#if defined(SYS_faccessat) || defined(SYS_faccessat2)
 int faccessat_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg5,
                       long *result) {
     auto dirfd = static_cast<int>(arg0);
@@ -60,6 +61,6 @@ int faccessat_handler(long arg0, long arg1, long arg2, long arg3, long arg4, lon
     consent_request_cache_fs->consent_request(path, tid, __FUNCTION__);
     return CAPIO_POSIX_SYSCALL_REQUEST_SKIP;
 }
+#endif // SYS_faccessat
 
-#endif // SYS_access || SYS_faccessat || SYS_faccessat2
 #endif // CAPIO_POSIX_HANDLERS_ACCESS_HPP

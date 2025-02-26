@@ -1,10 +1,9 @@
 #ifndef CAPIO_POSIX_HANDLERS_UNLINK_HPP
 #define CAPIO_POSIX_HANDLERS_UNLINK_HPP
 
-#if defined(SYS_unlink) || defined(SYS_unlinkat)
-
 #include "utils/common.hpp"
 
+#if defined(SYS_unlink)
 int unlink_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg5, long *result) {
     std::string_view pathname(reinterpret_cast<const char *>(arg0));
     auto tid = static_cast<pid_t>(syscall_no_intercept(SYS_gettid));
@@ -18,7 +17,9 @@ int unlink_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long a
 
     return CAPIO_POSIX_SYSCALL_SKIP;
 }
+#endif // SYS_unlink
 
+#if defined(SYS_unlinkat)
 int unlinkat_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg5,
                      long *result) {
     const std::string_view pathname(reinterpret_cast<const char *>(arg1));
@@ -33,6 +34,6 @@ int unlinkat_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long
 
     return CAPIO_POSIX_SYSCALL_SKIP;
 }
+#endif // SYS_unlinkat
 
-#endif // SYS_unlink || SYS_unlinkat
 #endif // CAPIO_POSIX_HANDLERS_UNLINK_HPP

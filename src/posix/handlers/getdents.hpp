@@ -1,8 +1,6 @@
 #ifndef CAPIO_POSIX_HANDLERS_GETDENTS_HPP
 #define CAPIO_POSIX_HANDLERS_GETDENTS_HPP
 
-#if defined(SYS_getdents) || defined(SYS_getdents64)
-
 // TODO: too similar to capio_read, refactoring needed
 inline int getdents_handler_impl(long arg0, long arg1, long arg2, long *result, bool is64bit) {
     auto fd      = static_cast<int>(arg0);
@@ -19,15 +17,18 @@ inline int getdents_handler_impl(long arg0, long arg1, long arg2, long *result, 
     return CAPIO_POSIX_SYSCALL_SKIP;
 }
 
+#if defined(SYS_getdents)
 inline int getdents_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg5,
                             long *result) {
     return getdents_handler_impl(arg0, arg1, arg2, result, false);
 }
+#endif // SYS_getdents
 
+#if defined(SYS_getdents64)
 inline int getdents64_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg5,
                               long *result) {
     return getdents_handler_impl(arg0, arg1, arg2, result, true);
 }
+#endif // SYS_getdents64
 
-#endif // SYS_getdents || SYS_getdents64
 #endif // CAPIO_POSIX_HANDLERS_GETDENTS_HPP

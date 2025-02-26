@@ -1,7 +1,7 @@
 #ifndef CAPIO_POSIX_HANDLERS_LSEEK_HPP
 #define CAPIO_POSIX_HANDLERS_LSEEK_HPP
 
-#if defined(SYS_lseek)
+#if defined(SYS_lseek) || defined(SYS_llseek)
 
 #include "utils/common.hpp"
 
@@ -29,5 +29,5 @@ int lseek_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long ar
     return CAPIO_POSIX_SYSCALL_REQUEST_SKIP;
 }
 
-#endif // SYS_lseek
+#endif // SYS_lseek || SYS_llseek
 #endif // CAPIO_POSIX_HANDLERS_LSEEK_HPP

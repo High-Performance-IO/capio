@@ -22,8 +22,8 @@ inline bool continue_on_error = false; // change behaviour of ERR_EXIT to contin
 #ifndef __CAPIO_POSIX
 #include <filesystem>
 thread_local std::ofstream logfile; // if building for server, self-contained logfile
-static std::string log_master_dir_name = CAPIO_DEFAULT_LOG_FOLDER;
-static std::string logfile_prefix      = CAPIO_SERVER_DEFAULT_LOG_FILE_PREFIX;
+std::string log_master_dir_name = CAPIO_DEFAULT_LOG_FOLDER;
+std::string logfile_prefix      = CAPIO_SERVER_DEFAULT_LOG_FILE_PREFIX;
 #else
 inline thread_local bool logfileOpen = false;
 inline thread_local int logfileFD    = -1;
@@ -190,12 +190,21 @@ class Logger {
         if (!logfileOpen) {
             setup_posix_log_filename();
             current_log_level = 0; // reset after clone log level, so to not inherit it
-
+#if defined(SYS_mkdir)
             capio_syscall(SYS_mkdir, get_log_dir(), 0755);
             capio_syscall(SYS_mkdir, get_posix_log_dir(), 0755);
             capio_syscall(SYS_mkdir, get_host_log_dir(), 0755);
-
+#elif defined(SYS_mkdirat)
+            capio_syscall(SYS_mkdirat, AT_FDCWD, get_log_dir(), 0755);
+            capio_syscall(SYS_mkdirat, AT_FDCWD, get_posix_log_dir(), 0755);
+            capio_syscall(SYS_mkdirat, AT_FDCWD, get_host_log_dir(), 0755);
+#endif
+#if defined(SYS_open)
             logfileFD = capio_syscall(SYS_open, logfile_path, O_CREAT | O_WRONLY | O_TRUNC, 0644);
+#elif defined(SYS_openat)
+            logfileFD = capio_syscall(SYS_openat, AT_FDCWD, logfile_path,
+                                      O_CREAT | O_WRONLY | O_TRUNC, 0644);
+#endif
 
             if (logfileFD == -1) {
                 capio_syscall(SYS_write, fileno(stdout),

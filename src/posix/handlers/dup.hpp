@@ -1,11 +1,10 @@
 #ifndef CAPIO_POSIX_HANDLERS_DUP_HPP
 #define CAPIO_POSIX_HANDLERS_DUP_HPP
 
-#if defined(SYS_dup) || defined(SYS_dup2) || defined(SYS_dup3)
-
 #include "capio/syscall.hpp"
 #include "utils/requests.hpp"
 
+#if defined(SYS_dup)
 int dup_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg5, long *result) {
     auto tid = static_cast<pid_t>(syscall_no_intercept(SYS_gettid));
     int fd   = static_cast<int>(arg0);
@@ -25,7 +24,9 @@ int dup_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg5
     }
     return CAPIO_POSIX_SYSCALL_SKIP;
 }
+#endif // SYS_dup
 
+#if defined(SYS_dup2)
 int dup2_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg5, long *result) {
     auto tid = static_cast<pid_t>(syscall_no_intercept(SYS_gettid));
     auto fd  = static_cast<int>(arg0);
@@ -47,7 +48,9 @@ int dup2_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg
     }
     return CAPIO_POSIX_SYSCALL_SKIP;
 }
+#endif // SYS_dup2
 
+#if defined(SYS_dup3)
 int dup3_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg5, long *result) {
     auto tid  = static_cast<pid_t>(syscall_no_intercept(SYS_gettid));
     int fd    = static_cast<int>(arg0);
@@ -77,6 +80,6 @@ int dup3_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg
     }
     return CAPIO_POSIX_SYSCALL_SKIP;
 }
+#endif // SYS_dup3
 
-#endif // SYS_dup || SYS_dup2 || SYS_dup3
 #endif // CAPIO_POSIX_HANDLERS_DUP_HPP

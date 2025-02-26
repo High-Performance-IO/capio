@@ -1,7 +1,7 @@
 #ifndef CAPIO_POSIX_HANDLERS_FCHMOD_HPP
 #define CAPIO_POSIX_HANDLERS_FCHMOD_HPP
 
-#if defined(SYS_chmod)
+#if defined(SYS_chmod) || defined(SYS_fchmod)
 
 int fchmod_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg5, long *result) {
     int fd   = static_cast<int>(arg0);
