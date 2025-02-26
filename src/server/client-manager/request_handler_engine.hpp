@@ -89,6 +89,8 @@ class RequestHandlerEngine {
 
         std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_WARNING << " [ " << node_name << " ] "
                   << "buf_requests cleanup completed" << std::endl;
+        std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_WARNING << " [ " << node_name << " ] "
+                  << "request_handlers_engine cleanup completed" << std::endl;
     }
 
     /**

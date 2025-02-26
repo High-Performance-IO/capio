@@ -48,10 +48,11 @@ class FileSystemMonitor {
     ~FileSystemMonitor() {
         START_LOG(gettid(), "call()");
         *continue_execution = false;
-        pthread_cancel(th->native_handle());
         th->join();
         delete th;
         delete continue_execution;
+        std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_WARNING << " [ " << node_name << " ] "
+                  << "fs_monitor cleanup completed" << std::endl;
     }
 };
 

@@ -308,6 +308,8 @@ class MTCL_backend : public BackendInterface {
 
         MTCL::Manager::finalize();
         LOG("Finalizing MTCL backend");
+        std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_WARNING << " [ " << node_name << " ] "
+                  << "MTCL backend correctly terminated" << std::endl;
     }
 
     std::string &receive(char *buf, capio_off64_t *buf_size, capio_off64_t *start_offset) override {
