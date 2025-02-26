@@ -80,6 +80,9 @@ static constexpr long CAPIO_NR_SYSCALLS = 1 + std::max({
 #ifdef SYS_fcntl
                                                   SYS_fcntl,
 #endif
+#ifdef SYS_fcntl64
+                                                  SYS_fcntl64,
+#endif
 #ifdef SYS_fgetxattr
                                                   SYS_fgetxattr,
 #endif
@@ -92,8 +95,20 @@ static constexpr long CAPIO_NR_SYSCALLS = 1 + std::max({
 #ifdef SYS_fstat
                                                   SYS_fstat,
 #endif
+#ifdef SYS_fstat64
+                                                  SYS_fstat64,
+#endif
+#ifdef SYS_fstatat
+                                                  SYS_fstatat,
+#endif
+#ifdef SYS_fstatat64
+                                                  SYS_fstatat64,
+#endif
 #ifdef SYS_fstatfs
                                                   SYS_fstatfs,
+#endif
+#ifdef SYS_fstatfs64
+                                                  SYS_fstatfs64,
 #endif
 #ifdef SYS_getcwd
                                                   SYS_getcwd,
@@ -116,8 +131,14 @@ static constexpr long CAPIO_NR_SYSCALLS = 1 + std::max({
 #ifdef SYS_lseek
                                                   SYS_lseek,
 #endif
+#ifdef SYS_llseek
+                                                  SYS_llseek,
+#endif
 #ifdef SYS_lstat
                                                   SYS_lstat,
+#endif
+#ifdef SYS_lstat64
+                                                  SYS_lstat64,
 #endif
 #ifdef SYS_mkdir
                                                   SYS_mkdir,
@@ -148,6 +169,9 @@ static constexpr long CAPIO_NR_SYSCALLS = 1 + std::max({
 #endif
 #ifdef SYS_stat
                                                   SYS_stat,
+#endif
+#ifdef SYS_stat64
+                                                  SYS_stat64,
 #endif
 #ifdef SYS_statx
                                                   SYS_statx,
@@ -230,6 +254,9 @@ static constexpr std::array<CPHandler_t, CAPIO_NR_SYSCALLS> build_syscall_table(
 #ifdef SYS_fcntl
     _syscallTable[SYS_fcntl] = fcntl_handler;
 #endif
+#ifdef SYS_fcntl64
+    _syscallTable[SYS_fcntl64] = fcntl_handler;
+#endif
 #ifdef SYS_fgetxattr
     _syscallTable[SYS_fgetxattr] = fgetxattr_handler;
 #endif
@@ -242,8 +269,20 @@ static constexpr std::array<CPHandler_t, CAPIO_NR_SYSCALLS> build_syscall_table(
 #ifdef SYS_fstat
     _syscallTable[SYS_fstat] = fstat_handler;
 #endif
+#ifdef SYS_fstat64
+    _syscallTable[SYS_fstat64] = fstat_handler;
+#endif
+#ifdef SYS_fstatat
+    _syscallTable[SYS_fstatat] = fstatat_handler;
+#endif
+#ifdef SYS_fstatat64
+    _syscallTable[SYS_fstatat64] = fstatat_handler;
+#endif
 #ifdef SYS_fstatfs
     _syscallTable[SYS_fstatfs] = fstatfs_handler;
+#endif
+#ifdef SYS_fstatfs64
+    _syscallTable[SYS_fstatfs64] = fstatfs_handler;
 #endif
 #ifdef SYS_getcwd
     _syscallTable[SYS_getcwd] = getcwd_handler;
@@ -266,8 +305,14 @@ static constexpr std::array<CPHandler_t, CAPIO_NR_SYSCALLS> build_syscall_table(
 #ifdef SYS_lseek
     _syscallTable[SYS_lseek] = lseek_handler;
 #endif
+#ifdef SYS_llseek
+    _syscallTable[SYS_llseek] = lseek_handler;
+#endif
 #ifdef SYS_lstat
     _syscallTable[SYS_lstat] = lstat_handler;
+#endif
+#ifdef SYS_lstat64
+    _syscallTable[SYS_lstat64] = lstat_handler;
 #endif
 #ifdef SYS_mkdir
     _syscallTable[SYS_mkdir] = mkdir_handler;
@@ -298,6 +343,9 @@ static constexpr std::array<CPHandler_t, CAPIO_NR_SYSCALLS> build_syscall_table(
 #endif
 #ifdef SYS_stat
     _syscallTable[SYS_stat] = stat_handler;
+#endif
+#ifdef SYS_stat64
+    _syscallTable[SYS_stat64] = stat_handler;
 #endif
 #ifdef SYS_statx
     _syscallTable[SYS_statx] = statx_handler;

@@ -237,7 +237,7 @@ inline std::filesystem::path get_dir_path(int dirfd) {
     char proclnk[128]           = {};
     char dir_pathname[PATH_MAX] = {};
     sprintf(proclnk, "/proc/self/fd/%d", dirfd);
-    if (capio_syscall(SYS_readlink, proclnk, dir_pathname, PATH_MAX) < 0) {
+    if (capio_syscall(SYS_readlinkat, AT_FDCWD, proclnk, dir_pathname, PATH_MAX) < 0) {
         LOG("failed to readlink\n");
         return {};
     }

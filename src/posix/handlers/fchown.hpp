@@ -2,7 +2,7 @@
 #define CAPIO_POSIX_HANDLERS_FCHOWN_HPP
 #include "utils/requests.hpp"
 
-#if defined(SYS_chown)
+#if defined(SYS_chown) || defined(SYS_fchown)
 
 int fchown_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg5, long *result) {
     int fd   = static_cast<int>(arg0);
