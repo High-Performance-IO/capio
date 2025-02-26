@@ -1,3 +1,6 @@
+#ifndef COMMON_HPP
+#define COMMON_HPP
+
 #include <gtest/gtest.h>
 
 #include <assert.h>
@@ -191,173 +194,98 @@ static char *getrandomphrase(char *buffer, size_t len) {
     return buffer;
 }
 
-int mergeFunction(ssize_t nfiles, char *sourcedir, char *destdir) {
+char **build_args() {
+    char **args = (char **) malloc(3 * sizeof(uintptr_t));
 
-    struct timeval before, after;
-    struct stat statbuf;
-    char *dataptr  = NULL;
-    size_t datalen = 0, datacapacity = 0;
-    gettimeofday(&before, NULL);
-
-    EXPECT_GT(nfiles, 0);
-
-    EXPECT_NE(stat(sourcedir, &statbuf), -1);
-    EXPECT_TRUE(S_ISDIR(statbuf.st_mode));
-
-    EXPECT_NE(stat(destdir, &statbuf), -1);
-    EXPECT_TRUE(S_ISDIR(statbuf.st_mode));
-
-    char filepath[strlen(sourcedir) + maxfilename];
-    for (int i = 0; i < nfiles; ++i) {
-        sprintf(filepath, fmtout, sourcedir, i);
-        FILE *fp = fopen(filepath, "r");
-        EXPECT_TRUE(fp);
-
-        char *ptr = readdata(fp, dataptr, &datalen, &datacapacity);
-        EXPECT_NE(ptr, nullptr);
-
-        dataptr = ptr;
-        fclose(fp);
+    char const *command = std::getenv("CAPIO_SERVER_PATH");
+    if (command == nullptr) {
+        command = "capio_server";
     }
 
-    char resultpath[strlen(destdir) + strlen("/result.dat")];
-    sprintf(resultpath, "%s/result.dat", destdir);
-    FILE *fp = fopen(resultpath, "w");
-    EXPECT_TRUE(fp);
+    args[0] = strdup(command);
+    args[1] = strdup("--no-config");
+    args[2] = (char *) nullptr;
 
-    EXPECT_EQ(fwrite(dataptr, 1, datalen, fp), datalen);
-
-    free(dataptr);
-
-    gettimeofday(&after, NULL);
-    double elapsed_time = diffmsec(after, before);
-    fprintf(stdout, "MERGE: elapsed time (ms) : %g\n", elapsed_time);
-
-    return 0;
+    return args;
 }
 
-int splitFunction(ssize_t nlines, ssize_t nfiles, char *dirname) {
-    struct timeval before, after;
-    gettimeofday(&before, NULL);
-    EXPECT_GT(nlines, 0);
-    EXPECT_GT(nfiles, 0);
-
-    // sanity check
-    EXPECT_LE(nfiles, maxnumfiles);
-
-    struct stat statbuf;
-    EXPECT_NE(stat(dirname, &statbuf), -1);
-    EXPECT_TRUE(S_ISDIR(statbuf.st_mode)); // not a directory
-
-    FILE **fp = (FILE **) calloc(sizeof(FILE *), nfiles);
-    EXPECT_TRUE(fp);
-
-    char **buffer = (char **) calloc(IO_BUFFER, nfiles);
-    EXPECT_TRUE(buffer);
-
-    int error = 0;
-    char filepath[strlen(dirname) + maxfilename];
-    // opening (truncating) all files
-    for (int i = 0; i < nfiles; ++i) {
-        sprintf(filepath, fmtin, dirname, i);
-        fp[i] = fopen(filepath, "w");
-
-        EXPECT_TRUE(fp[i]);
-        EXPECT_EQ(setvbuf(fp[i], buffer[i], _IOFBF, IO_BUFFER), 0);
-    }
-    if (!error) {
-        char *buffer = (char *) calloc(maxphraselen, 1);
-        if (!buffer) {
-            perror("malloc");
-            error = -1;
+char **build_env(char **envp) {
+    std::vector<int> vars;
+    for (int i = 0; envp[i] != nullptr; i++) {
+        const std::string_view var(envp[i]);
+        const std::string_view key = var.substr(0, var.find('='));
+        if (key != "LD_PRELOAD") {
+            vars.emplace_back(i);
         }
-        if (!error) {
-            size_t cnt = 0;
-            for (ssize_t i = 0; i < nlines; ++i) {
-                char *line = getrandomphrase(buffer, maxphraselen);
-                size_t n   = strlen(line);
-                if (fwrite(line, 1, n, fp[cnt]) != n) {
-                    perror("fwrite");
-                    error = -1;
-                    break;
-                }
-                cnt = (cnt + 1) % nfiles; // generiting one line for each file in a rr fashion
+    }
+
+    char **cleaned_env = (char **) malloc((vars.size() + 2) * sizeof(uintptr_t));
+    for (int i = 0; i < vars.size(); i++) {
+        cleaned_env[i] = strdup(envp[i]);
+    }
+    cleaned_env[vars.size()]     = strdup("LD_PRELOAD=");
+    cleaned_env[vars.size() + 1] = (char *) nullptr;
+
+    return cleaned_env;
+}
+
+class CapioServerEnvironment : public testing::Environment {
+  private:
+    char **args;
+    char **envp;
+    int server_pid;
+
+  public:
+    explicit CapioServerEnvironment(char **envp) : args(build_args()), envp(build_env(envp)) {
+        server_pid = -1;
+    };
+
+    ~CapioServerEnvironment() override {
+        for (int i = 0; args[i] != nullptr; i++) {
+            free(args[i]);
+        }
+        free(args);
+        for (int i = 0; envp[i] != nullptr; i++) {
+            free(envp[i]);
+        }
+        free(envp);
+    };
+
+    void SetUp() override {
+        if (server_pid < 0) {
+            ASSERT_NE(std::getenv("CAPIO_DIR"), nullptr);
+            ASSERT_GE(server_pid = fork(), 0);
+            if (server_pid == 0) {
+                execvpe(args[0], args, envp);
+                _exit(127);
+            } else {
+                sleep(5);
             }
         }
     }
 
-    // closing all files
-    for (int i = 0; i < nfiles; ++i) {
-        if (fp[i]) {
-            fclose(fp[i]);
+    void TearDown() override {
+        if (server_pid > 0) {
+            kill(server_pid, SIGTERM);
+            waitpid(server_pid, nullptr, 0);
+            server_pid = -1;
         }
     }
-    free(fp);
+};
 
-    gettimeofday(&after, NULL);
-    double elapsed_time = diffmsec(after, before);
-    fprintf(stdout, "SPLIT elapsed time (ms) : %g\n", elapsed_time);
+class CapioEnvironmentHandler : public testing::EmptyTestEventListener {
 
-    return error;
-}
+    CapioServerEnvironment *_env;
 
-int mapReduceFunction(char *sourcedirname, ssize_t sstart, ssize_t sfiles, char *destdirname,
-                      ssize_t dstart, ssize_t dfiles, float percent) {
-    struct timeval before, after;
-    struct stat statbuf;
-    char *dataptr       = NULL;
-    size_t datalen      = 0;
-    size_t datacapacity = 0;
-    gettimeofday(&before, NULL);
+    // Called before a test starts.
+    void OnTestStart(const testing::TestInfo &test_info) override { _env->SetUp(); }
 
-    EXPECT_NE(stat(sourcedirname, &statbuf), -1);
-    EXPECT_TRUE(S_ISDIR(statbuf.st_mode));
-    EXPECT_GE(sstart, 0);
-    EXPECT_GT(sfiles, 0);
-    EXPECT_NE(stat(destdirname, &statbuf), -1);
-    EXPECT_TRUE(S_ISDIR(statbuf.st_mode));
-    EXPECT_GE(dstart, 0);
-    EXPECT_GT(dfiles, 0);
-    EXPECT_GT(percent, 0);
-    EXPECT_LE(percent, 1);
+    // Called after a test ends.
+    void OnTestEnd(const testing::TestInfo &test_info) override { _env->TearDown(); }
 
-    char filepath[strlen(sourcedirname) + maxfilename];
-    // concatenating all files in memory (dataptr)
-    for (int i = 0 + sstart; i < (sfiles + sstart); ++i) {
-        sprintf(filepath, fmtin, sourcedirname, i);
+  public:
+    explicit CapioEnvironmentHandler(char **envp)
+        : testing::EmptyTestEventListener(), _env(new CapioServerEnvironment(envp)) {}
+};
 
-        FILE *fp = fopen(filepath, "r");
-        EXPECT_TRUE(fp);
-
-        char *ptr = readdata(fp, dataptr, &datalen, &datacapacity);
-        EXPECT_NE(ptr, nullptr);
-
-        dataptr = ptr;
-        fclose(fp);
-    }
-
-    int r = writedata(dataptr, datalen, percent, destdirname, dstart, dfiles);
-    free(dataptr);
-
-    gettimeofday(&after, NULL);
-    double elapsed_time = diffmsec(after, before);
-    fprintf(stdout, "MAPREDUCE: elapsed time (ms) : %g\n", elapsed_time);
-
-    EXPECT_EQ(r, 0);
-
-    return r;
-}
-
-TEST(integrationTests, RunTestSplitMergeAndMapReduceFunction) {
-
-    EXPECT_EQ(splitFunction(10, 10, std::getenv("CAPIO_DIR")), 0);
-    std::thread mapReducer1(mapReduceFunction, std::getenv("CAPIO_DIR"), 0, 5,
-                            std::getenv("CAPIO_DIR"), 0, 5, 0.3);
-    std::thread mapReducer2(mapReduceFunction, std::getenv("CAPIO_DIR"), 1, 5,
-                            std::getenv("CAPIO_DIR"), 1, 5, 0.3);
-
-    mapReducer1.join();
-    mapReducer2.join();
-
-    EXPECT_EQ(mergeFunction(2, std::getenv("CAPIO_DIR"), std::getenv("CAPIO_DIR")), 0);
-}
+#endif // COMMON_HPP
