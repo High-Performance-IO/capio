@@ -358,7 +358,7 @@ inline void CapioFileManager::checkFileAwaitingData() {
         // and as such, the file already exists
         // actual update, end eventual removal from map is handled by the
         // CapioFileManager class and not by the FileSystemMonitor class
-        CapioFileManager::_unlockThreadAwaitingData(iter->first, iter->second);
+        _unlockThreadAwaitingData(iter->first, iter->second);
 
         // cleanup of map while iterating over it
         if (iter->second.empty()) {

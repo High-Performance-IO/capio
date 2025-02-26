@@ -24,7 +24,6 @@ class CapioStorageService {
     [[nodiscard]] auto getFile(const std::string &file_name) const {
         if (_stored_files->find(file_name) == _stored_files->end()) {
             createFile(file_name);
-            return _stored_files->at(file_name);
         }
         return _stored_files->at(file_name);
     }
