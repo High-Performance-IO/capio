@@ -34,7 +34,7 @@ inline void consent_to_proceed_handler(const char *const str) {
     }
 
     if (capio_cl_engine->isFirable(path)) {
-        LOG("Mode for file %s is no_update. allowing process to continue");
+        LOG("Mode for file %s is no_update. allowing process to continue", path);
         client_manager->reply_to_client(tid, 1);
         return;
     }
