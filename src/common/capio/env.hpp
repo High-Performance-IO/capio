@@ -54,6 +54,8 @@ inline const std::filesystem::path &get_capio_metadata_path() {
 
         if (val == nullptr) {
             metadata_path = get_capio_dir() / ".capio_metadata";
+        } else {
+            metadata_path = std::filesystem::path(val) / ".capio_metadata";
         }
 
         if (!std::filesystem::exists(metadata_path)) {
