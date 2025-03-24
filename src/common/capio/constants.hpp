@@ -150,6 +150,8 @@ constexpr char CAPIO_SERVER_ARG_PARSER_CONFIG_NCONTINUE_ON_ERROR_HELP[] =
     "specified,  and a fatal termination point is reached, the behaviour of capio is undefined and "
     "should not  be taken as valid";
 
+constexpr char CAPIO_SERVER_ARG_PARSER_REDIS_OPT_HELP[] = "Use redis to store configurations. pass with option <address>:<port> of redis-server instance";
+
 constexpr char CAPIO_LOG_SERVER_CLI_CONT_ON_ERR_WARNING[] =
     "[ \033[1;33m SERVER \033[0m ]\033[1;31m "
     "|==================================================================|\033[0m\n"

@@ -15,9 +15,17 @@
 inline const std::filesystem::path &get_capio_dir() {
     static std::filesystem::path capio_dir{};
     START_LOG(capio_syscall(SYS_gettid), "call()");
-    // TODO: if CAPIO_DIR is not set, it should be left as null
 
     if (capio_dir.empty()) {
+
+#ifndef __CAPIO_POSIX
+        if (use_redis) {
+            capio_dir = redis_connector->get_capio_dir();
+            LOG("Used redis to fetch capio dir. CAPIO_DIR=%s", capio_dir.c_str());
+            return capio_dir;
+        }
+#endif
+
         const char *val = std::getenv("CAPIO_DIR");
         auto buf        = std::unique_ptr<char[]>(new char[PATH_MAX]);
 
@@ -39,9 +47,9 @@ inline const std::filesystem::path &get_capio_dir() {
                 ERR_EXIT("CAPIO_DIR inside %s file system is not supported", forbidden_path);
             }
         }
-    }
-    LOG("CAPIO_DIR=%s", capio_dir.c_str());
 
+        LOG("CAPIO_DIR=%s", capio_dir.c_str());
+    }
     return capio_dir;
 }
 
@@ -49,6 +57,13 @@ inline const std::filesystem::path &get_capio_metadata_path() {
     static std::filesystem::path metadata_path{};
     START_LOG(capio_syscall(SYS_gettid), "call()");
     if (metadata_path.empty()) {
+
+        if (use_redis) {
+            metadata_path =
+                std::filesystem::path(redis_connector->get_metadata_path()) / ".capio_metadata";
+            return metadata_path;
+        }
+
         const char *val = std::getenv("CAPIO_METADATA_DIR");
         auto buf        = std::unique_ptr<char[]>(new char[PATH_MAX]);
 
@@ -70,6 +85,14 @@ inline const std::filesystem::path &get_capio_metadata_path() {
 inline int get_capio_log_level() {
     static int level = -2;
     if (level == -2) {
+
+#ifndef __CAPIO_POSIX
+        if (use_redis) {
+            level = std::stoi(redis_connector->get_log_level());
+            return level;
+        }
+#endif
+
         char *log_level = std::getenv("CAPIO_LOG_LEVEL");
         if (log_level == nullptr) {
             level = 0;
@@ -84,8 +107,18 @@ inline int get_capio_log_level() {
 }
 
 inline std::string get_capio_workflow_name() {
+    START_LOG(capio_syscall(SYS_gettid), "call()");
     static std::string name;
     if (name.empty()) {
+
+#ifndef __CAPIO_POSIX
+        if (use_redis) {
+            name = redis_connector->get_workflow_name();
+            LOG("Used redis to fetch workflow name. CAPIO_WORKFLOW_NAME=%s", name.c_str());
+            return name;
+        }
+#endif
+
         auto tmp = std::getenv("CAPIO_WORKFLOW_NAME");
         if (tmp != nullptr) {
             name = tmp;

@@ -26,6 +26,14 @@ FetchContent_Declare(
         GIT_TAG fbd8aa924b916c6578963af315fdb5f10c3969ad
 )
 
+FetchContent_Declare(
+        hiredis
+        GIT_REPOSITORY https://github.com/redis/hiredis.git
+        GIT_TAG v1.2.0
+        GIT_SHALLOW TRUE
+        GIT_PROGRESS TRUE
+)
+
 #####################################
 # Add MTCL dependencies
 #####################################
@@ -47,7 +55,7 @@ FetchContent_Declare(
 #    message(STATUS "Warning: MPI has not been found, and as such it will not be an available MTCL backend.")
 #endif ()
 
-FetchContent_MakeAvailable(args simdjson mtcl)
+FetchContent_MakeAvailable(args simdjson mtcl hiredis)
 
 #####################################
 # Target definition
@@ -68,12 +76,13 @@ target_include_directories(${TARGET_NAME} PRIVATE
         ${args_SOURCE_DIR}
         ${simdjson_SOURCE_DIR}
         ${mtcl_SOURCE_DIR}/include
+        ${hiredis_SOURCE_DIR}
 )
 
 #####################################
 # Link libraries
 #####################################
-target_link_libraries(${TARGET_NAME} PRIVATE ${MPI_LIBRARIES} pthread rt stdc++fs)
+target_link_libraries(${TARGET_NAME} PRIVATE ${MPI_LIBRARIES} pthread rt stdc++fs hiredis)
 
 #####################################
 # Install rules

@@ -22,7 +22,9 @@
 
 std::string workflow_name;
 char node_name[HOST_NAME_MAX];
+bool use_redis = false;
 
+#include "utils/redis.hpp"
 #include "utils/types.hpp"
 
 #include "capio/env.hpp"
@@ -65,6 +67,9 @@ std::string parseCLI(int argc, char **argv) {
     args::ValueFlag<int> backend_port(arguments, "port",
                                       CAPIO_SERVER_ARG_PARSER_BACKEND_PORT_OPT_HELP, {'p', "port"});
 
+    args::ValueFlag<std::string> redis(arguments, "server:port",
+                                       CAPIO_SERVER_ARG_PARSER_REDIS_OPT_HELP, {"use-redis"});
+
     args::Flag continueOnErrorFlag(arguments, "continue-on-error",
                                    CAPIO_SERVER_ARG_PARSER_CONFIG_NCONTINUE_ON_ERROR_HELP,
                                    {"continue-on-error"});
@@ -82,6 +87,14 @@ std::string parseCLI(int argc, char **argv) {
         std::cerr << e.what() << std::endl;
         std::cerr << parser;
         exit(EXIT_FAILURE);
+    }
+
+    if (redis) {
+        use_redis       = true;
+        auto endpoint   = args::get(redis);
+        auto ip         = endpoint.substr(0, endpoint.find(":"));
+        auto port       = std::stoi(endpoint.substr(endpoint.find(":") + 1, endpoint.size()));
+        redis_connector = new RedisConnector(ip, port);
     }
 
     if (continueOnErrorFlag) {
@@ -138,8 +151,7 @@ std::string parseCLI(int argc, char **argv) {
         std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_WARNING << " [ " << node_name << " ] "
                   << "skipping config file parsing." << std::endl
                   << CAPIO_LOG_SERVER_CLI_LEVEL_WARNING << " [ " << node_name << " ] "
-                  << "Obtained from environment variable current workflow name: "
-                  << workflow_name.data() << std::endl;
+                  << "Obtained current workflow name: " << workflow_name.data() << std::endl;
 
     } else {
         std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_ERROR << " [ " << node_name << " ] "
