@@ -20,7 +20,7 @@ class WriteRequestCacheFS {
     }
 
   public:
-    explicit WriteRequestCacheFS() : _max_size(get_capio_write_cache_size()) {}
+    explicit WriteRequestCacheFS() : _max_size(capio_config->CAPIO_WRITE_CACHE_SIZE) {}
 
     ~WriteRequestCacheFS() { this->flush(capio_syscall(SYS_gettid)); }
 

@@ -8,5 +8,7 @@ std::string node_name;
 int main(int argc, char **argv) {
     testing::InitGoogleTest(&argc, argv);
 
+    capio_config = new CapioConfig();
+
     return RUN_ALL_TESTS();
 }

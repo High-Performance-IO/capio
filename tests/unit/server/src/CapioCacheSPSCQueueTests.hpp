@@ -1,7 +1,9 @@
 #ifndef CAPIOCACHESPSCQUEUETESTS_HPP
 #define CAPIOCACHESPSCQUEUETESTS_HPP
 
-#include "../posix/utils/env.hpp"
+#include <charconv>
+
+#include "../common/capio/config.hpp"
 #include "../posix/utils/filesystem.hpp"
 #include "../posix/utils/types.hpp"
 #include "storage-service/CapioFile/CapioMemoryFile.hpp"
@@ -25,8 +27,10 @@ void init_server_data_structures() {
     bufs_response           = new CPBufResponse_t;
     files                   = new CPFiles_t();
     capio_files_descriptors = new CPFileDescriptors_t();
-    cts_queue = new SPSCQueue("queue-tests.cts", get_cache_lines(), get_cache_line_size());
-    stc_queue = new SPSCQueue("queue-tests.stc", get_cache_lines(), get_cache_line_size());
+    cts_queue               = new SPSCQueue("queue-tests.cts", capio_config->CAPIO_CACHE_LINES,
+                                            capio_config->CAPIO_CACHE_LINE_SIZE);
+    stc_queue               = new SPSCQueue("queue-tests.stc", capio_config->CAPIO_CACHE_LINES,
+                                            capio_config->CAPIO_CACHE_LINE_SIZE);
     buf_requests =
         new CircularBuffer<char>(SHM_COMM_CHAN_NAME, CAPIO_REQ_BUFF_CNT, CAPIO_REQ_MAX_SIZE);
 

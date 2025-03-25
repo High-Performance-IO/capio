@@ -3,7 +3,6 @@
 
 #include <sys/vfs.h>
 
-#include "capio/env.hpp"
 
 #include "utils/common.hpp"
 #include "utils/filesystem.hpp"

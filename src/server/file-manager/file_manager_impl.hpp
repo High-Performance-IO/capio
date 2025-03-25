@@ -1,6 +1,6 @@
 #ifndef FILE_MANAGER_HPP
 #define FILE_MANAGER_HPP
-#include "capio/env.hpp"
+
 #include "client-manager/client_manager.hpp"
 #include "file_manager.hpp"
 #include "storage-service/capio_storage_service.hpp"
@@ -20,7 +20,8 @@ inline std::string CapioFileManager::getAndCreateMetadataPath(const std::string 
     static std::unordered_map<std::string, std::string> metadata_paths;
     if (metadata_paths.find(path) == metadata_paths.end()) {
         std::filesystem::path result =
-            get_capio_metadata_path() / (path.substr(path.find(get_capio_dir()) + 1) + ".capio");
+            std::filesystem::path(capio_config->CAPIO_METADATA_DIR) /
+            (path.substr(path.find(capio_config->CAPIO_DIR) + 1) + ".capio");
         metadata_paths.emplace(path, result);
         LOG("Creating metadata directory (%s)", result.parent_path().c_str());
         std::filesystem::create_directories(result.parent_path());

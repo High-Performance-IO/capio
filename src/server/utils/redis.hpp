@@ -1,6 +1,8 @@
 #ifndef REDIS_HPP
 #define REDIS_HPP
 
+bool use_redis = false;
+
 #include "capio/logger.hpp"
 
 #include <hiredis.h>

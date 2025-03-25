@@ -5,7 +5,6 @@
 
 #include "capio/requests.hpp"
 
-#include "env.hpp"
 #include "filesystem.hpp"
 #include "types.hpp"
 
@@ -45,10 +44,10 @@ inline void handshake_request(const long tid, const long pid, const std::string 
     buf_requests->write(req, CAPIO_REQ_MAX_SIZE);
     LOG("Sent handshake request");
 
-    cts_queue = new SPSCQueue("queue-" + std::to_string(tid) + ".cts", get_cache_lines(),
-                              get_cache_line_size());
-    stc_queue = new SPSCQueue("queue-" + std::to_string(tid) + ".stc", get_cache_lines(),
-                              get_cache_line_size());
+    cts_queue = new SPSCQueue("queue-" + std::to_string(tid) + ".cts",
+                              capio_config->CAPIO_CACHE_LINES, capio_config->CAPIO_CACHE_LINE_SIZE);
+    stc_queue = new SPSCQueue("queue-" + std::to_string(tid) + ".stc",
+                              capio_config->CAPIO_CACHE_LINES, capio_config->CAPIO_CACHE_LINE_SIZE);
     LOG("Initialized data transfer queues");
 }
 

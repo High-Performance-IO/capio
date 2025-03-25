@@ -10,7 +10,6 @@
 
 #include <sys/stat.h>
 
-#include "env.hpp"
 #include "logger.hpp"
 #include "syscall.hpp"
 
@@ -61,7 +60,7 @@ inline bool is_forbidden_path(const std::string_view &path) {
 inline bool is_capio_dir(const std::filesystem::path &path_to_check) {
     START_LOG(capio_syscall(SYS_gettid), "call(path_to_check=%s)", path_to_check.c_str());
 
-    const auto res = get_capio_dir().compare(path_to_check) == 0;
+    const auto res = capio_config->CAPIO_DIR.compare(path_to_check) == 0;
     LOG("is_capio_dir:%s", res ? "yes" : "no");
     return res;
 }
@@ -70,7 +69,7 @@ inline bool is_capio_path(const std::filesystem::path &path_to_check) {
     START_LOG(capio_syscall(SYS_gettid), "call(path_to_check=%s)", path_to_check.c_str());
 
     // check if path_to_check begins with CAPIO_DIR
-    const auto res = is_prefix(get_capio_dir(), path_to_check);
+    const auto res = is_prefix(capio_config->CAPIO_DIR, path_to_check);
     LOG("is_capio_path:%s", res ? "yes" : "no");
     return res;
 }

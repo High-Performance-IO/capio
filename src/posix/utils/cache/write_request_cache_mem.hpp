@@ -34,7 +34,7 @@ class WriteRequestCacheMEM {
     }
 
   public:
-    explicit WriteRequestCacheMEM(off64_t line_size = get_cache_line_size())
+    explicit WriteRequestCacheMEM(off64_t line_size = capio_config->CAPIO_CACHE_LINE_SIZE)
         : _cache(nullptr), _tid(capio_syscall(SYS_gettid)), _fd(-1), _max_line_size(line_size),
           _actual_size(0), _last_write_end(-1), _last_write_begin(0) {}
 

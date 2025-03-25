@@ -7,6 +7,8 @@
 #include <array>
 #include <string>
 
+#include "capio/config.hpp"
+
 #include "capio/syscall.hpp"
 
 #include "utils/clone.hpp"
@@ -389,10 +391,6 @@ static int hook(long syscall_number, long arg0, long arg1, long arg2, long arg3,
         return 1;
     }
 
-#ifdef CAPIO_LOG
-    CAPIO_LOG_LEVEL = get_capio_log_level();
-#endif
-
     START_LOG(syscall_no_intercept(SYS_gettid), "call(syscall_number=%ld)", syscall_number);
 
     // If the syscall_number is higher than the maximum
@@ -413,6 +411,9 @@ static int hook(long syscall_number, long arg0, long arg1, long arg2, long arg3,
 }
 
 static __attribute__((constructor)) void init() {
+
+    capio_config = new CapioConfig();
+
     init_client();
     init_filesystem();
     init_threading_support();
