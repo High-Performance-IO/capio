@@ -34,18 +34,11 @@ inline void sig_term_handler(int signum, siginfo_t *info, void *ptr) {
 #endif
 
     delete request_handlers_engine;
-    std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_WARNING << " [ " << node_name << " ] "
-              << "request_handlers_engine cleanup completed" << std::endl;
     delete fs_monitor;
-    std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_WARNING << " [ " << node_name << " ] "
-              << "fs_monitor cleanup completed" << std::endl;
     delete capio_backend;
-    std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_WARNING << " [ " << node_name << " ] "
-              << "capio_backend cleanup completed" << std::endl;
     delete shm_canary;
     std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_INFO << " [ " << node_name << " ] "
-              << "shutdown completed" << std::endl;
-
+              << "Bye!" << std::endl;
     exit(EXIT_SUCCESS);
 }
 

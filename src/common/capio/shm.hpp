@@ -85,6 +85,11 @@ class CapioShmCanary {
 #ifdef __CAPIO_POSIX
         syscall_no_intercept_flag = false;
 #endif
+
+#ifndef __CAPIO_POSIX
+        std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_INFO << " [ " << node_name << " ] "
+                  << "shutdown completed" << std::endl;
+#endif
     }
 };
 
