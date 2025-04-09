@@ -56,6 +56,11 @@ class JsonParser {
                   capio_dir.c_str());
 
         locations->newFile(get_capio_dir());
+        locations->setDirectory(get_capio_dir());
+        if (StoreOnlyInMemory) {
+            locations->setStoreFileInMemory(get_capio_dir());
+        }
+
         if (source.empty()) {
             return locations;
         }
@@ -321,7 +326,8 @@ class JsonParser {
                   << "Completed parsing of io_graph" << std::endl;
         LOG("Completed parsing of io_graph");
 
-        if (entries["permanent"].get_array().get(permanent_files)) { // PARSING PERMANENT FILES
+        if (entries["permanent"].get_array().get(permanent_files)) {
+            // PARSING PERMANENT FILES
             std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_WARNING << " [ " << node_name << " ] "
                       << "No permanent section found for workflow: " << workflow_name << std::endl;
             LOG("No permanent section found for workflow: %s", std::string(workflow_name).c_str());
@@ -351,7 +357,8 @@ class JsonParser {
 
         std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_JSON << " [ " << node_name << " ] " << std::endl;
 
-        if (entries["exclude"].get_array().get(exclude_files)) { // PARSING PERMANENT FILES
+        if (entries["exclude"].get_array().get(exclude_files)) {
+            // PARSING PERMANENT FILES
             std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_WARNING << " [ " << node_name << " ] "
                       << "No exclude section found for workflow: " << workflow_name << std::endl;
             LOG("No exclude section found for workflow: %s", std::string(workflow_name).c_str());

@@ -15,10 +15,23 @@ inline CircularBuffer<char> *buf_requests;
 #include "../posix/utils/cache.hpp"
 #include "SourceText.hpp"
 
+auto checkStringEquality = [](const std::string &a, const std::string &b) {
+    size_t minLen = std::min(a.size(), b.size());
+    for (size_t i = 0; i < minLen; ++i) {
+        if (a[i] != b[i]) {
+            std::cout << "Difference at offset " << i << ": '" << a[i] << "' vs '" << b[i] << "'\n";
+        }
+    }
+    if (a.size() != b.size()) {
+        std::cout << "Strings have different lengths. input: " << a.size()
+                  << ". check: " << b.size() << std::endl;
+    }
+};
+
 WriteRequestCacheMEM *writeCache;
 ReadRequestCacheMEM *readCache;
 
-int test_fd                = 0;
+int test_fd                = -1;
 std::string test_file_name = "test.dat";
 
 void init_server_data_structures() {
@@ -69,16 +82,27 @@ TEST(CapioCacheSPSCQueue, TestWriteCacheWithSpscQueueWrite) {
     capio_files_descriptors->emplace(test_fd, test_file_name);
     files->insert({test_fd, {std::make_shared<capio_off64_t>(0), 0, 0, false}});
 
-    std::thread t1([long_test_length, tmp_buf] {
-        cts_queue->read(tmp_buf->get(), long_test_length);
-        EXPECT_TRUE(strncmp(tmp_buf->get(), SOURCE_TEST_TEXT, long_test_length) == 0);
-    });
-
     writeCache->write(test_fd, SOURCE_TEST_TEXT, long_test_length);
     writeCache->flush();
 
+    std::thread t1([long_test_length, tmp_buf] {
+        cts_queue->read(tmp_buf->get(), long_test_length);
+
+        // In the event a flush is triggered with a write of size 0, read again
+        if (strlen(tmp_buf->get()) == 0) {
+            cts_queue->read(tmp_buf->get(), long_test_length);
+        }
+
+        if (strncmp(tmp_buf->get(), SOURCE_TEST_TEXT, long_test_length) != 0) {
+            checkStringEquality(std::string(tmp_buf->get()), std::string(SOURCE_TEST_TEXT));
+        }
+
+        EXPECT_EQ(strncmp(tmp_buf->get(), SOURCE_TEST_TEXT, long_test_length), 0);
+    });
+
     t1.join();
 
+    delete tmp_buf;
     delete_server_data_structures();
 }
 
@@ -90,6 +114,9 @@ TEST(CapioCacheSPSCQueue, TestWriteCacheSPSCQueueAndCapioFile) {
 
     capio_files_descriptors->emplace(test_fd, test_file_name);
     files->insert({test_fd, {std::make_shared<capio_off64_t>(0), 0, 0, false}});
+
+    writeCache->write(test_fd, SOURCE_TEST_TEXT, long_test_length);
+    writeCache->flush();
 
     std::thread t2([long_test_length, readBufSize] {
         CapioMemoryFile *testFile = new CapioMemoryFile(test_file_name);
@@ -103,9 +130,6 @@ TEST(CapioCacheSPSCQueue, TestWriteCacheSPSCQueueAndCapioFile) {
         delete[] readBuf;
         delete testFile;
     });
-
-    writeCache->write(test_fd, SOURCE_TEST_TEXT, long_test_length);
-    writeCache->flush();
 
     t2.join();
 
@@ -221,6 +245,9 @@ TEST(CapioCacheSPSCQueue, TestWriteCacheSPSCQueueAndCapioFileWithRequestAndSeek)
 
     // perform to write ad a different offset
     writeCache->write(test_fd, SOURCE_TEST_TEXT, long_test_length);
+
+    // simulate Close on file
+    writeCache->flush();
 
     t3.join();
 
@@ -338,31 +365,37 @@ TEST(CapioCacheSPSCQueue, TestReadCacheWithSpscQueueReadWithCapioFileAndSeek) {
     files->insert({test_fd, {std::make_shared<capio_off64_t>(0), 0, 0, false}});
 
     std::thread server_thread([long_test_length, response_tid] {
+        START_LOG(gettid(), "call(server_instance)");
         int iteration = 0;
         CapioMemoryFile testFile(test_file_name);
 
         testFile.writeData(SOURCE_TEST_TEXT, 0, long_test_length);
+        LOG("Wrote data to server test file");
 
         capio_off64_t total_data_sent = 0;
         while (total_data_sent < 2000) {
 
-            char req[CAPIO_REQ_MAX_SIZE];
+            char req[CAPIO_REQ_MAX_SIZE]{0};
             char file[1024];
-            int code;
+            int code, use_cache;
             pid_t tid;
             capio_off64_t read_size, client_cache_line_size, read_begin_offset;
+
             buf_requests->read(req, CAPIO_REQ_MAX_SIZE);
-
-            auto [ptr, ec] = std::from_chars(req, req + 4, code);
-            EXPECT_EQ(ec, std::errc());
-            strcpy(req, ptr + 1);
+            LOG("Received request: %s", req);
+            sscanf(req, "%d %ld %llu %llu %llu %d %s", &code, &tid, &read_begin_offset, &read_size,
+                   &client_cache_line_size, &use_cache, file);
             EXPECT_EQ(code, CAPIO_REQUEST_READ_MEM);
-            sscanf(req, "%ld %llu %llu %llu %s", &tid, &read_begin_offset, &read_size,
-                   &client_cache_line_size, file);
-
+            LOG("code: %d", code);
+            LOG("tid: %ld", tid);
+            LOG("read_begin_offset: %lld", read_begin_offset);
+            LOG("read_size: %lld", read_size);
+            LOG("client_cache_line_size: %lld", client_cache_line_size);
+            LOG("use_cache: %lld", use_cache);
+            LOG("file: %s", file);
             auto size_to_send =
                 read_size < client_cache_line_size ? read_size : client_cache_line_size;
-
+            LOG("Sending %ld data", size_to_send);
             bufs_response->at(response_tid)->write(size_to_send);
             testFile.writeToQueue(*stc_queue, read_begin_offset, size_to_send);
             total_data_sent += size_to_send;
@@ -381,6 +414,7 @@ TEST(CapioCacheSPSCQueue, TestReadCacheWithSpscQueueReadWithCapioFileAndSeek) {
 
     tmp_buf_ptr += new_offset;
     readCache->read(test_fd, tmp_buf_ptr, 1000);
+    // checkStringEquality(SOURCE_TEST_TEXT + new_offset, tmp_buf->get() + new_offset);
     EXPECT_EQ(strncmp(SOURCE_TEST_TEXT + new_offset, tmp_buf->get() + new_offset, 1000), 0);
 
     server_thread.join();

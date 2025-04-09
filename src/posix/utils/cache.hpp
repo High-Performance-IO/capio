@@ -31,6 +31,11 @@ inline void delete_caches() {
     delete consent_request_cache_fs;
     delete write_request_cache_mem;
     delete read_request_cache_mem;
+
+    delete cts_queue;
+    LOG("Removed cts_queue");
+    delete stc_queue;
+    LOG("Removed stc_queue");
 }
 
 #endif // CAPIO_CACHE_HPP

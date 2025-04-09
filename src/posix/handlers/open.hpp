@@ -79,6 +79,9 @@ int open_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg
             LOG("not O_CREAT");
             open_request(-1, path.data(), tid);
         }
+    } else {
+        LOG("Not a CAPIO path. skipping...");
+        return CAPIO_POSIX_SYSCALL_REQUEST_SKIP;
     }
 
     int fd = static_cast<int>(syscall_no_intercept(SYS_open, arg0, arg1, arg2, arg3, arg4, arg5));
@@ -112,6 +115,9 @@ int openat_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long a
             LOG("not O_CREAT");
             open_request(-1, path.data(), tid);
         }
+    } else {
+        LOG("Not a CAPIO path. skipping...");
+        return CAPIO_POSIX_SYSCALL_REQUEST_SKIP;
     }
 
     int fd = static_cast<int>(syscall_no_intercept(SYS_openat, arg0, arg1, arg2, arg3, arg4, arg5));

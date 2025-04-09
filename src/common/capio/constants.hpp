@@ -29,7 +29,7 @@ constexpr char CAPIO_SHM_CANARY_ERROR[] =
 // CAPIO communication constants
 constexpr int CAPIO_REQ_BUFF_CNT                     = 512; // Max number of elements inside buffers
 constexpr int CAPIO_CACHE_LINES_DEFAULT              = 10;
-constexpr int CAPIO_CACHE_LINE_SIZE_DEFAULT          = 4096;
+constexpr int CAPIO_CACHE_LINE_SIZE_DEFAULT          = 32768; // 32K of default size for cache lines
 // TODO: use that in communication only uses the file descriptor instead of the path to save on the
 // PATH_MAX
 constexpr size_t CAPIO_REQ_MAX_SIZE                  = (PATH_MAX + 256) * sizeof(char);
@@ -144,6 +144,9 @@ constexpr char CAPIO_SERVER_ARG_PARSER_BACKEND_PORT_OPT_HELP[] =
     "A valid PORT for the Communication backend";
 constexpr char CAPIO_SERVER_ARG_PARSER_CONFIG_NO_CONF_FILE_HELP[] =
     "If specified, server application will start without a config file, using default settings.";
+constexpr char CAPIO_SERVER_ARG_PARSER_MEM_STORAGE_ONLY_HELP[] =
+    "If set, all files will be stored inside the home node server memory and never on file system "
+    "(unless memory limit is reached, or server instance terminates).";
 constexpr char CAPIO_SERVER_ARG_PARSER_CONFIG_NCONTINUE_ON_ERROR_HELP[] =
     "If specified, Capio will try to continue its execution to continue even if it has reached a "
     "fatal termination point. This flag should be used only to debug capio. If this flag is "

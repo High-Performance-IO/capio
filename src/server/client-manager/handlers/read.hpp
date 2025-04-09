@@ -57,24 +57,46 @@ inline void read_handler(const char *const str) {
 inline void read_mem_handler(const char *const str) {
     pid_t tid;
     capio_off64_t read_size, client_cache_line_size, read_begin_offset;
+    int use_cache;
     char path[PATH_MAX];
-    sscanf(str, "%ld %llu %llu %llu %s", &tid, &read_begin_offset, &read_size,
-           &client_cache_line_size, path);
+    sscanf(str, "%ld %llu %llu %llu %d %s", &tid, &read_begin_offset, &read_size,
+           &client_cache_line_size, &use_cache, path);
     START_LOG(gettid(),
               "call(tid=%d, read_begin_offset=%llu, read_size=%llu, client_cache_line_size=%llu, "
-              "path=%s)",
-              tid, read_begin_offset, read_size, client_cache_line_size, path);
+              "use_cache=%s, path=%s)",
+              tid, read_begin_offset, read_size, client_cache_line_size,
+              use_cache ? "true" : "false", path);
 
-    if (storage_service->sizeOf(path) < read_begin_offset + read_size) {
-        LOG("File is not yet ready to be consumed as there is not enough data");
+    if (storage_service->sizeOf(path) < read_begin_offset + read_size &&
+        !file_manager->isCommitted(path)) {
+        LOG("File is not yet ready to be consumed as there is not enough data, and is not "
+            "committed");
         storage_service->addThreadWaitingForData(tid, path, read_begin_offset, read_size);
         return;
     }
 
-    auto size_to_send = read_size < client_cache_line_size ? read_size : client_cache_line_size;
+    capio_off64_t size_to_send = storage_service->sizeOf(path);
+    if (use_cache) {
+        LOG("Computing size of data to send: minimum between:");
+        LOG("client_cache_line_size: %llu", client_cache_line_size);
+        LOG("file_size:%llu - read_begin_offset=%llu = %llu", size_to_send, read_begin_offset,
+            size_to_send - read_begin_offset);
+        size_to_send = std::min({client_cache_line_size, (size_to_send - read_begin_offset)});
+    }
 
-    LOG("Need to sent to client %llu bytes", size_to_send);
-    client_manager->reply_to_client(tid, size_to_send);
+    LOG("Sending to posix app the offset up to which read.");
+    if (file_manager->isCommitted(path) &&
+        read_begin_offset + size_to_send >= storage_service->sizeOf(path)) {
+        LOG("File is committed, and end of read >= than file size."
+            " signaling it to posix application by setting offset MSB to 1");
+        LOG("Sending offset: %llu", 0x8000000000000000 | size_to_send);
+        client_manager->reply_to_client(tid, 0x8000000000000000 | size_to_send);
+    } else {
+        LOG("File is not committed. Sending offset: %llu", size_to_send);
+        client_manager->reply_to_client(tid, size_to_send);
+    }
+
+    LOG("Need to sent to client %llu bytes, asking storage service to send data", size_to_send);
     storage_service->reply_to_client(tid, path, read_begin_offset, size_to_send);
 }
 

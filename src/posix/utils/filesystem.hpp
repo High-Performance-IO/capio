@@ -83,16 +83,16 @@ inline std::filesystem::path capio_posix_realpath(const std::filesystem::path &p
         if (pathname.is_absolute()) {
             LOG("Path=%s is already absolute", pathname.c_str());
             return {pathname};
-        } else {
-            std::filesystem::path new_path = (*current_dir / pathname).lexically_normal();
-            if (is_capio_path(new_path)) {
-                LOG("Computed absolute path = %s", new_path.c_str());
-                return new_path;
-            } else {
-                LOG("file %s is not a posix file, nor a capio file!", pathname.c_str());
-                return {};
-            }
         }
+
+        std::filesystem::path new_path = (*current_dir / pathname).lexically_normal();
+        if (is_capio_path(new_path)) {
+            LOG("Computed absolute path = %s", new_path.c_str());
+            return new_path;
+        }
+
+        LOG("file %s is not a posix file, nor a capio file!", pathname.c_str());
+        return {};
     }
 
     // if not, then check for realpath through libc implementation
@@ -286,7 +286,10 @@ inline void rename_capio_path(const std::string &oldpath, const std::string &new
  * @return
  */
 inline void set_capio_fd_offset(int fd, capio_off64_t offset) {
+    START_LOG(capio_syscall(SYS_gettid), "call(fd=%d, offset=%lld)", fd, offset);
+    LOG("Previous offset = %lld", *std::get<0>(files->at(fd)));
     *std::get<0>(files->at(fd)) = offset;
+    LOG("New offset = %lld", *std::get<0>(files->at(fd)));
 }
 
 /**
