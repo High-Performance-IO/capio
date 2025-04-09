@@ -403,15 +403,13 @@ class CapioCLEngine {
     }
 
     void setStoreFileInMemory(const std::filesystem::path &path) {
-        if (const auto itm = _locations.find(path); itm != _locations.end()) {
-            std::get<11>(itm->second) = true;
-        }
+        this->newFile(path);
+        std::get<11>(_locations.at(path)) = true;
     }
 
     void setStoreFileInFileSystem(const std::filesystem::path &path) {
-        if (const auto itm = _locations.find(path); itm != _locations.end()) {
-            std::get<11>(itm->second) = false;
-        }
+        this->newFile(path);
+        std::get<11>(_locations.at(path)) = false;
     }
 
     bool storeFileInMemory(const std::filesystem::path &path) {

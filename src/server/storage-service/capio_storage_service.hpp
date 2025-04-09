@@ -115,10 +115,10 @@ class CapioStorageService {
         START_LOG(gettid(), "call(app_name=%s)", app_name.c_str());
         _client_to_server_queue->emplace(
             pid, new SPSCQueue("queue-" + std::to_string(pid) + +".cts", CAPIO_MAX_SPSQUEUE_ELEMS,
-                               CAPIO_MAX_SPSCQUEUE_ELEM_SIZE, get_capio_workflow_name(), false));
+                               CAPIO_MAX_SPSCQUEUE_ELEM_SIZE, workflow_name, false));
         _server_to_clien_queue->emplace(
             pid, new SPSCQueue("queue-" + std::to_string(pid) + +".stc", CAPIO_MAX_SPSQUEUE_ELEMS,
-                               CAPIO_MAX_SPSCQUEUE_ELEM_SIZE, get_capio_workflow_name(), false));
+                               CAPIO_MAX_SPSCQUEUE_ELEM_SIZE, workflow_name, false));
         LOG("Created communication queues");
     }
 
@@ -168,7 +168,9 @@ class CapioStorageService {
         auto files_to_store_in_mem = capio_cl_engine->getFileToStoreInMemory();
         for (const auto &file : files_to_store_in_mem) {
             LOG("Sending file %s", file.c_str());
-            _server_to_clien_queue->at(pid)->write(file.c_str());
+            char f[PATH_MAX+1]{0};
+            memcpy(f, file.c_str(), file.size());
+            _server_to_clien_queue->at(pid)->write(f, PATH_MAX);
         }
 
         LOG("Return value=%llu", files_to_store_in_mem.size());

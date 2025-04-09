@@ -65,9 +65,9 @@ inline std::vector<std::regex> *file_in_memory_request(const long pid) {
     LOG("Need to read %llu files from data queues", files_to_read_from_queue);
     const auto regex_vector = new std::vector<std::regex>;
     for (int i = 0; i < files_to_read_from_queue; i++) {
-        LOG("Reading %d file", i);
-        auto file = new char[CAPIO_MAX_SPSCQUEUE_ELEM_SIZE]{};
-        stc_queue->read(file, CAPIO_MAX_SPSCQUEUE_ELEM_SIZE);
+        LOG("Reading file number %d", i);
+        auto file = new char[PATH_MAX]{};
+        stc_queue->read(file, PATH_MAX);
         LOG("Obtained path %s", file);
         regex_vector->emplace_back(generateCapioRegex(file));
         delete[] file;
