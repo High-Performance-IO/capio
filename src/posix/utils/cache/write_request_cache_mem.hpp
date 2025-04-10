@@ -41,7 +41,7 @@ class WriteRequestCacheMEM {
     void flush() {
         START_LOG(capio_syscall(SYS_gettid), "call()");
         if (_actual_size != 0) {
-            write_request(_fd, _actual_size, get_capio_fd_path(_fd).c_str(), _last_write_begin);
+            write_request(_actual_size, _tid, get_capio_fd_path(_fd).c_str(), _last_write_begin);
             _cache       = nullptr;
             _actual_size = 0;
         }

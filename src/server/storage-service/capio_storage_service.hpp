@@ -148,8 +148,9 @@ class CapioStorageService {
                             off64_t size) const {
         START_LOG(gettid(), "call(tid=%d, file=%s, offset=%lld, size=%lld)", tid, file.c_str(),
                   offset, size);
-
-        getFile(file)->readFromQueue(*_client_to_server_queue->at(tid), offset, size);
+        const auto f = getFile(file);
+        const auto queue = _client_to_server_queue->at(tid);
+        f->readFromQueue(*queue, offset, size);
     }
 
     void remove_client(const pid_t pid) const {
@@ -168,7 +169,7 @@ class CapioStorageService {
         auto files_to_store_in_mem = capio_cl_engine->getFileToStoreInMemory();
         for (const auto &file : files_to_store_in_mem) {
             LOG("Sending file %s", file.c_str());
-            char f[PATH_MAX+1]{0};
+            char f[PATH_MAX + 1]{0};
             memcpy(f, file.c_str(), file.size());
             _server_to_clien_queue->at(pid)->write(f, PATH_MAX);
         }
