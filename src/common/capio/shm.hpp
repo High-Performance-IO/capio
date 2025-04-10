@@ -25,7 +25,7 @@
 
 #define SHM_CREATE_CHECK(condition, source)                                                        \
     if (condition) {                                                                               \
-        ERR_EXIT("Unable to open shm: %s", source);                                                \
+        ERR_EXIT("Unable to open shm: %s: %s", source, strerror(errno));                           \
     };
 
 #else
@@ -42,7 +42,7 @@
         LOG("error while creating %s", source);                                                    \
         std::cout << CAPIO_SERVER_CLI_LOG_SERVER_ERROR << " [ " << node_name << " ] "              \
                   << "Unable to create shm: " << source << std::endl;                              \
-        ERR_EXIT("Unable to open shm: %s", source);                                                \
+        ERR_EXIT("Unable to open shm %s: %s", source, strerror(errno));                            \
     };
 
 #endif
@@ -133,7 +133,12 @@ void *get_shm(const std::string &shm_name) {
     }
     void *p = mmap(nullptr, sb.st_size, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
     if (p == MAP_FAILED) {
-        ERR_EXIT("mmap get_shm %s", shm_name.c_str());
+        LOG("ERROR MMAP arg dump:");
+        LOG("mmap-size:  %ld", sb.st_size);
+        LOG("mmap-prot:  %ld", PROT_READ | PROT_WRITE);
+        LOG("mmap-flags: %ld", MAP_SHARED);
+        LOG("mmap-fd:    %ld", fd);
+        ERR_EXIT("ERROR: mmap failed at get_shm(%s): %s", shm_name.c_str(), strerror(errno));
     }
     if (close(fd) == -1) {
         ERR_EXIT("close");
@@ -151,7 +156,7 @@ void *get_shm_if_exist(const std::string &shm_name) {
         if (errno == ENOENT) {
             return nullptr;
         }
-        ERR_EXIT("get_shm shm_open %s", shm_name.c_str());
+        ERR_EXIT("ERROR: unable to open shared memory %s: %s", shm_name.c_str(), strerror(errno));
     }
     /* Open existing object */
     /* Use shared memory object size as length argument for mmap()
@@ -161,7 +166,13 @@ void *get_shm_if_exist(const std::string &shm_name) {
     }
     void *p = mmap(nullptr, sb.st_size, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
     if (p == MAP_FAILED) {
-        ERR_EXIT("mmap get_shm %s", shm_name.c_str());
+        LOG("ERROR MMAP arg dump:");
+        LOG("mmap-size:  %ld", sb.st_size);
+        LOG("mmap-prot:  %ld", PROT_READ | PROT_WRITE);
+        LOG("mmap-flags: %ld", MAP_SHARED);
+        LOG("mmap-fd:    %ld", fd);
+        ERR_EXIT("ERROR: mmap failed at get_shm_if_exist(%s): %s", shm_name.c_str(),
+                 strerror(errno));
     }
     if (close(fd) == -1) {
         ERR_EXIT("close");

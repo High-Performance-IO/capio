@@ -18,13 +18,17 @@ inline bool is_capio_tid(const pid_t tid) {
 }
 
 inline void register_capio_tid(const pid_t tid) {
+    START_LOG(syscall_no_intercept(SYS_gettid), "call(tid=%ld)", tid);
     const std::lock_guard<std::mutex> lg(clone_mutex);
     tids->insert(tid);
 }
 
 inline void remove_capio_tid(const pid_t tid) {
+    START_LOG(syscall_no_intercept(SYS_gettid), "call(tid=%ld)", tid);
     const std::lock_guard<std::mutex> lg(clone_mutex);
-    tids->erase(tid);
+    if (tids->find(tid) != tids->end()) {
+        tids->erase(tid);
+    }
 }
 
 inline void init_threading_support() { tids = new std::unordered_set<pid_t>{}; }
@@ -59,6 +63,21 @@ inline void hook_clone_child() {
 
 #ifdef __CAPIO_POSIX
     syscall_no_intercept_flag = true;
+
+    /*
+     * This piece of code is aimed at addressing issues with applications that spawn several
+     * thousand threads that only do computations. When this occurs, under some circumstances CAPIO
+     * might fail to allocate shared memory objects. As such, if child threads ONLY do computation,
+     * we can safely ignore them with CAPIO.
+     */
+    thread_local char *skip_child = std::getenv("CAPIO_IGNORE_CHILD_THREADS");
+    if (skip_child != nullptr) {
+        auto skip_child_str = std::string(skip_child);
+        if (skip_child_str == "ON" || skip_child_str == "TRUE" || skip_child_str == "YES") {
+            return;
+        }
+    }
+
 #endif
     std::unique_lock<std::mutex> lock(clone_mutex);
     clone_cv.wait(lock, [&tid] { return tids->find(tid) != tids->end(); });
