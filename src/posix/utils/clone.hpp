@@ -18,13 +18,17 @@ inline bool is_capio_tid(const pid_t tid) {
 }
 
 inline void register_capio_tid(const pid_t tid) {
+    START_LOG(syscall_no_intercept(SYS_gettid), "call(tid=%ld)", tid);
     const std::lock_guard<std::mutex> lg(clone_mutex);
     tids->insert(tid);
 }
 
 inline void remove_capio_tid(const pid_t tid) {
+    START_LOG(syscall_no_intercept(SYS_gettid), "call(tid=%ld)", tid);
     const std::lock_guard<std::mutex> lg(clone_mutex);
-    tids->erase(tid);
+    if (tids->find(tid) != tids->end()) {
+        tids->erase(tid);
+    }
 }
 
 inline void init_threading_support() { tids = new std::unordered_set<pid_t>{}; }
