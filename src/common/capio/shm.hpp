@@ -25,7 +25,7 @@
 
 #define SHM_CREATE_CHECK(condition, source)                                                        \
     if (condition) {                                                                               \
-        ERR_EXIT("Unable to open shm: %s", source);                                                \
+        ERR_EXIT("Unable to open shm: %s: %s", source, strerror(errno));                           \
     };
 
 #else
