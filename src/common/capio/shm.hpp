@@ -133,6 +133,11 @@ void *get_shm(const std::string &shm_name) {
     }
     void *p = mmap(nullptr, sb.st_size, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
     if (p == MAP_FAILED) {
+        LOG("ERROR MMAP arg dump:");
+        LOG("mmap-size:  %ld", sb.st_size);
+        LOG("mmap-prot:  %ld", PROT_READ | PROT_WRITE);
+        LOG("mmap-flags: %ld", MAP_SHARED);
+        LOG("mmap-fd:    %ld", fd);
         ERR_EXIT("ERROR: mmap failed at get_shm(%s): %s", shm_name.c_str(), strerror(errno));
     }
     if (close(fd) == -1) {
