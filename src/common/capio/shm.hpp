@@ -133,7 +133,7 @@ void *get_shm(const std::string &shm_name) {
     }
     void *p = mmap(nullptr, sb.st_size, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
     if (p == MAP_FAILED) {
-        ERR_EXIT("mmap get_shm %s", shm_name.c_str());
+        ERR_EXIT("ERROR: mmap failed at get_shm(%s): %s", shm_name.c_str(), strerror(errno));
     }
     if (close(fd) == -1) {
         ERR_EXIT("close");
@@ -161,7 +161,8 @@ void *get_shm_if_exist(const std::string &shm_name) {
     }
     void *p = mmap(nullptr, sb.st_size, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
     if (p == MAP_FAILED) {
-        ERR_EXIT("mmap get_shm %s", shm_name.c_str());
+        ERR_EXIT("ERROR: mmap failed at get_shm_if_exist(%s): %s", shm_name.c_str(),
+                 strerror(errno));
     }
     if (close(fd) == -1) {
         ERR_EXIT("close");
