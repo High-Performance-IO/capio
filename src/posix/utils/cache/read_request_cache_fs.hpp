@@ -16,8 +16,7 @@ class ReadRequestCacheFS {
         sprintf(req, "%04d %ld %ld %s %ld", CAPIO_REQUEST_READ, tid, fd, path.c_str(), end_of_Read);
         LOG("Sending read request %s", req);
         buf_requests->write(req, CAPIO_REQ_MAX_SIZE);
-        capio_off64_t res;
-        bufs_response->at(tid)->read(&res);
+        const capio_off64_t res = bufs_response->at(tid)->read();
         LOG("Response to request is %llu", res);
         return res;
     }
@@ -29,7 +28,7 @@ class ReadRequestCacheFS {
 
     ~ReadRequestCacheFS() { delete available_read_cache; };
 
-    void read_request(std::filesystem::path path, long end_of_read, int tid, int fd) {
+    void read_request(std::filesystem::path path, const long end_of_read, int tid, const int fd) {
         START_LOG(capio_syscall(SYS_gettid), "[cache] call(path=%s, end_of_read=%ld, tid=%ld)",
                   path.c_str(), end_of_read, tid);
         if (fd != current_fd || path.compare(current_path) != 0) {
@@ -38,8 +37,8 @@ class ReadRequestCacheFS {
             current_path = std::move(path);
             current_fd   = fd;
 
-            auto item = available_read_cache->find(current_path);
-            if (item != available_read_cache->end()) {
+            if (const auto item = available_read_cache->find(current_path);
+                item != available_read_cache->end()) {
                 LOG("[cache] Found file entry in cache");
                 max_read = item->second;
             } else {

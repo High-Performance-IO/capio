@@ -14,8 +14,7 @@ class ConsentRequestCache {
         sprintf(req, "%04d %ld %s %s", CAPIO_REQUEST_CONSENT, tid, path.c_str(),
                 source_func.c_str());
         buf_requests->write(req, CAPIO_REQ_MAX_SIZE);
-        capio_off64_t res;
-        bufs_response->at(tid)->read(&res);
+        capio_off64_t res = bufs_response->at(tid)->read();
         LOG("Obtained from server %llu", res);
         return res;
     }
