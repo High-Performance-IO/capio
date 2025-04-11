@@ -70,9 +70,12 @@ inline void hook_clone_child() {
      * might fail to allocate shared memory objects. As such, if child threads ONLY do computation,
      * we can safely ignore them with CAPIO.
      */
-    if (thread_local char *skip_child = std::getenv("CAPIO_IGNORE_CHILD_THREADS");
-        std::string(skip_child) == "ON") {
-        return;
+    thread_local char *skip_child = std::getenv("CAPIO_IGNORE_CHILD_THREADS");
+    if (skip_child != nullptr) {
+        auto skip_child_str = std::string(skip_child);
+        if (skip_child_str == "ON" || skip_child_str == "TRUE" || skip_child_str == "YES") {
+            return;
+        }
     }
 
 #endif
