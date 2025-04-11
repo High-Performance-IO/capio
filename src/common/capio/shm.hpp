@@ -42,7 +42,7 @@
         LOG("error while creating %s", source);                                                    \
         std::cout << CAPIO_SERVER_CLI_LOG_SERVER_ERROR << " [ " << node_name << " ] "              \
                   << "Unable to create shm: " << source << std::endl;                              \
-        ERR_EXIT("Unable to open shm: %s", source);                                                \
+        ERR_EXIT("Unable to open shm %s: %s", source, strerror(errno));                            \
     };
 
 #endif

@@ -63,6 +63,18 @@ inline void hook_clone_child() {
 
 #ifdef __CAPIO_POSIX
     syscall_no_intercept_flag = true;
+
+    /*
+     * This piece of code is aimed at addressing issues with applications that spawn several
+     * thousand threads that only do computations. When this occurs, under some circumstances CAPIO
+     * might fail to allocate shared memory objects. As such, if child threads ONLY do computation,
+     * we can safely ignore them with CAPIO.
+     */
+    if (thread_local char *skip_child = std::getenv("CAPIO_IGNORE_CHILD_THREADS");
+        std::string(skip_child) == "ON") {
+        return;
+    }
+
 #endif
     std::unique_lock<std::mutex> lock(clone_mutex);
     clone_cv.wait(lock, [&tid] { return tids->find(tid) != tids->end(); });
