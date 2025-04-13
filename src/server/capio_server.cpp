@@ -23,9 +23,11 @@
 std::string workflow_name;
 char node_name[HOST_NAME_MAX];
 
+#include "capio/config.hpp"
+
+#include "utils/redis.hpp"
 #include "utils/types.hpp"
 
-#include "capio/env.hpp"
 #include "capio/logger.hpp"
 #include "capio/semaphore.hpp"
 
@@ -65,6 +67,9 @@ std::string parseCLI(int argc, char **argv) {
     args::ValueFlag<int> backend_port(arguments, "port",
                                       CAPIO_SERVER_ARG_PARSER_BACKEND_PORT_OPT_HELP, {'p', "port"});
 
+    args::ValueFlag<std::string> redis(arguments, "server:port",
+                                       CAPIO_SERVER_ARG_PARSER_REDIS_OPT_HELP, {"use-redis"});
+
     args::Flag continueOnErrorFlag(arguments, "continue-on-error",
                                    CAPIO_SERVER_ARG_PARSER_CONFIG_NCONTINUE_ON_ERROR_HELP,
                                    {"continue-on-error"});
@@ -82,6 +87,14 @@ std::string parseCLI(int argc, char **argv) {
         std::cerr << e.what() << std::endl;
         std::cerr << parser;
         exit(EXIT_FAILURE);
+    }
+
+    if (redis) {
+        use_redis       = true;
+        auto endpoint   = args::get(redis);
+        auto ip         = endpoint.substr(0, endpoint.find(":"));
+        auto port       = std::stoi(endpoint.substr(endpoint.find(":") + 1, endpoint.size()));
+        redis_connector = new RedisConnector(ip, port);
     }
 
     if (continueOnErrorFlag) {
@@ -134,12 +147,11 @@ std::string parseCLI(int argc, char **argv) {
                   << "parsing config file: " << token << std::endl;
         // TODO: pass config file path
     } else if (noConfigFile) {
-        workflow_name = std::string_view(get_capio_workflow_name());
+        workflow_name = std::string_view(capio_config->CAPIO_WORKFLOW_NAME);
         std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_WARNING << " [ " << node_name << " ] "
                   << "skipping config file parsing." << std::endl
                   << CAPIO_LOG_SERVER_CLI_LEVEL_WARNING << " [ " << node_name << " ] "
-                  << "Obtained from environment variable current workflow name: "
-                  << workflow_name.data() << std::endl;
+                  << "Obtained current workflow name: " << workflow_name.data() << std::endl;
 
     } else {
         std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_ERROR << " [ " << node_name << " ] "
@@ -152,14 +164,13 @@ std::string parseCLI(int argc, char **argv) {
     }
 
     std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_INFO << " [ " << node_name << " ] "
-              << "CAPIO_DIR=" << get_capio_dir().c_str() << std::endl;
+              << "CAPIO_DIR=" << capio_config->CAPIO_DIR << std::endl;
 
 #ifdef CAPIO_LOG
-    CAPIO_LOG_LEVEL = get_capio_log_level();
     std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_INFO << " [ " << node_name << " ] "
-              << "LOG_LEVEL set to: " << CAPIO_LOG_LEVEL << std::endl;
+              << "LOG_LEVEL set to: " << capio_config->CAPIO_LOG_LEVEL << std::endl;
     std::cout << CAPIO_LOG_SERVER_CLI_LOGGING_ENABLED_WARNING;
-    log->log("LOG_LEVEL set to: %d", CAPIO_LOG_LEVEL);
+    log->log("LOG_LEVEL set to: %d", capio_config->CAPIO_LOG_LEVEL);
     delete log;
 #else
     if (std::getenv("CAPIO_LOG_LEVEL") != nullptr) {
@@ -218,6 +229,7 @@ int main(int argc, char **argv) {
 
     std::cout << CAPIO_LOG_SERVER_BANNER;
     gethostname(node_name, HOST_NAME_MAX);
+    capio_config                  = new CapioConfig();
     const std::string config_path = parseCLI(argc, argv);
 
     START_LOG(gettid(), "call()");

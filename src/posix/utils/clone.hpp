@@ -45,7 +45,7 @@ inline void init_process(pid_t tid) {
     LOG("Created request response buffer with name: %s",
         (SHM_COMM_CHAN_NAME_RESP + std::to_string(tid)).c_str());
 
-    const char *capio_app_name = get_capio_app_name();
+    const char *capio_app_name = capio_config->CAPIO_APP_NAME.c_str();
     auto pid                   = static_cast<pid_t>(syscall_no_intercept(SYS_gettid));
 
     /**

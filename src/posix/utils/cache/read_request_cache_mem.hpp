@@ -59,7 +59,7 @@ class ReadRequestCacheMEM {
     }
 
   public:
-    explicit ReadRequestCacheMEM(const long line_size = get_posix_read_cache_line_size())
+    explicit ReadRequestCacheMEM(const long line_size = capio_config->CAPIO_POSIX_CACHE_LINE_SIZE)
         : _cache(nullptr), _tid(capio_syscall(SYS_gettid)), _fd(-1), _max_line_size(line_size),
           _actual_size(0), _cache_offset(0), _last_read_end(-1) {
         _cache = new char[_max_line_size];

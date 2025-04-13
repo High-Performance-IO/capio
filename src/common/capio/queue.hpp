@@ -6,7 +6,6 @@
 
 #include <semaphore.h>
 
-#include "capio/env.hpp"
 #include "capio/logger.hpp"
 #include "capio/semaphore.hpp"
 #include "capio/shm.hpp"
@@ -52,7 +51,7 @@ template <class T, class Mutex> class Queue {
 
   public:
     Queue(const std::string &shm_name, const long int max_num_elems, const long int elem_size,
-          const std::string &workflow_name = get_capio_workflow_name(), bool cleanup = true)
+          const std::string &workflow_name = capio_config->CAPIO_WORKFLOW_NAME, bool cleanup = true)
         : _max_num_elems(max_num_elems), _elem_size(elem_size),
           _buff_size(_max_num_elems * _elem_size), _shm_name(workflow_name + "_" + shm_name),
           _first_elem_name(workflow_name + SHM_FIRST_ELEM + shm_name),

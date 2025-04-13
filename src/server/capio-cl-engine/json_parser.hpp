@@ -50,12 +50,11 @@ class JsonParser {
      */
     static CapioCLEngine *parse(const std::filesystem::path &source) {
         auto locations        = new CapioCLEngine();
-        const auto &capio_dir = get_capio_dir();
+        const auto &capio_dir = capio_config->CAPIO_DIR.c_str();
 
-        START_LOG(gettid(), "call(config_file='%s', capio_dir='%s')", source.c_str(),
-                  capio_dir.c_str());
+        START_LOG(gettid(), "call(config_file='%s', capio_dir='%s')", source.c_str(), capio_dir);
 
-        locations->newFile(get_capio_dir());
+        locations->newFile(capio_config->CAPIO_DIR);
         if (source.empty()) {
             return locations;
         }
@@ -112,7 +111,8 @@ class JsonParser {
                     std::filesystem::path file(itm.get_string().take_value());
                     std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_JSON << " [ " << node_name << " ] "
                               << "Found file : " << file << std::endl;
-                    if (file.is_relative() || first_is_subpath_of_second(file, get_capio_dir())) {
+                    if (file.is_relative() ||
+                        first_is_subpath_of_second(file, capio_config->CAPIO_DIR)) {
                         std::string appname(app_name);
                         std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_JSON << " [ " << node_name << " ] "
                                   << "File : " << file << " added to app: " << app_name
@@ -143,7 +143,8 @@ class JsonParser {
             } else {
                 for (auto itm : output_stream) {
                     std::filesystem::path file(itm.get_string().take_value());
-                    if (file.is_relative() || first_is_subpath_of_second(file, get_capio_dir())) {
+                    if (file.is_relative() ||
+                        first_is_subpath_of_second(file, capio_config->CAPIO_DIR)) {
                         std::string appname(app_name);
                         std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_JSON << " [ " << node_name << " ] "
                                   << "Adding file: " << file << " to app: " << app_name
@@ -195,7 +196,7 @@ class JsonParser {
                         LOG("Found name: %s", std::string(elem).c_str());
                         std::filesystem::path file_fs(elem);
                         if (file_fs.is_relative() ||
-                            first_is_subpath_of_second(file_fs, get_capio_dir())) {
+                            first_is_subpath_of_second(file_fs, capio_config->CAPIO_DIR)) {
                             LOG("Saving file %s to locations", std::string(elem).c_str());
                             streaming_names.emplace_back(elem);
                         }
@@ -250,7 +251,8 @@ class JsonParser {
                             name_tmp = itm.get_string().value();
                             std::filesystem::path computed_path(name_tmp);
                             computed_path = computed_path.is_relative()
-                                                ? (get_capio_dir() / computed_path)
+                                                ? (std::filesystem::path(capio_config->CAPIO_DIR) /
+                                                   computed_path)
                                                 : computed_path;
                             std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_JSON << " [ " << node_name
                                       << " ] "
@@ -340,7 +342,7 @@ class JsonParser {
                     path = (capio_dir / path).lexically_normal();
                 }
                 // TODO: check for globs
-                if (first_is_subpath_of_second(path, get_capio_dir())) {
+                if (first_is_subpath_of_second(path, capio_config->CAPIO_DIR)) {
                     locations->setPermanent(name.data(), true);
                 }
             }
@@ -370,7 +372,7 @@ class JsonParser {
                     path = (capio_dir / path).lexically_normal();
                 }
                 // TODO: check for globs
-                if (first_is_subpath_of_second(path, get_capio_dir())) {
+                if (first_is_subpath_of_second(path, capio_config->CAPIO_DIR)) {
                     locations->setExclude(name.data(), true);
                 }
             }

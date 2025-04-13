@@ -10,7 +10,6 @@
 
 #include <unistd.h>
 
-#include "capio/env.hpp"
 #include "capio/filesystem.hpp"
 #include "capio/logger.hpp"
 #include "capio/syscall.hpp"

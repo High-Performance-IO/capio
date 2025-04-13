@@ -1,7 +1,6 @@
 #ifndef CAPIO_STORAGE_SERVICE_H
 #define CAPIO_STORAGE_SERVICE_H
 
-#include "../../posix/utils/env.hpp"
 #include "CapioFile/CapioFile.hpp"
 #include "CapioFile/CapioMemoryFile.hpp"
 
@@ -114,11 +113,13 @@ class CapioStorageService {
     void register_client(const std::string &app_name, const pid_t pid) const {
         START_LOG(gettid(), "call(app_name=%s)", app_name.c_str());
         _client_to_server_queue->emplace(
-            pid, new SPSCQueue("queue-" + std::to_string(pid) + +".cts", CAPIO_MAX_SPSQUEUE_ELEMS,
-                               CAPIO_MAX_SPSCQUEUE_ELEM_SIZE, get_capio_workflow_name(), false));
+            pid,
+            new SPSCQueue("queue-" + std::to_string(pid) + +".cts", CAPIO_MAX_SPSQUEUE_ELEMS,
+                          CAPIO_MAX_SPSCQUEUE_ELEM_SIZE, capio_config->CAPIO_WORKFLOW_NAME, false));
         _server_to_clien_queue->emplace(
-            pid, new SPSCQueue("queue-" + std::to_string(pid) + +".stc", CAPIO_MAX_SPSQUEUE_ELEMS,
-                               CAPIO_MAX_SPSCQUEUE_ELEM_SIZE, get_capio_workflow_name(), false));
+            pid,
+            new SPSCQueue("queue-" + std::to_string(pid) + +".stc", CAPIO_MAX_SPSQUEUE_ELEMS,
+                          CAPIO_MAX_SPSCQUEUE_ELEM_SIZE, capio_config->CAPIO_WORKFLOW_NAME, false));
         LOG("Created communication queues");
     }
 

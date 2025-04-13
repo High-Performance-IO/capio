@@ -1,7 +1,6 @@
 #ifndef CAPIO_CACHE_HPP
 #define CAPIO_CACHE_HPP
 #include "capio/requests.hpp"
-#include "env.hpp"
 
 #include "cache/consent_request_cache.hpp"
 #include "cache/read_request_cache_fs.hpp"
