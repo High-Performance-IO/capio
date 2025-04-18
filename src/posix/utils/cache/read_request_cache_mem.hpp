@@ -38,8 +38,7 @@ class ReadRequestCacheMEM {
                 count, _max_line_size, get_capio_fd_path(fd).c_str());
         LOG("Sending read request %s", req);
         buf_requests->write(req, CAPIO_REQ_MAX_SIZE);
-        capio_off64_t stc_queue_read;
-        bufs_response->at(tid)->read(&stc_queue_read);
+        capio_off64_t stc_queue_read = bufs_response->at(tid)->read();
         LOG("Response to request is %ld", stc_queue_read);
 
         // FIXME: if count > _max_line_size, a deadlock or SEGFAULT is foreseen Fix it asap.

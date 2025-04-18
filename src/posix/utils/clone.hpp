@@ -38,8 +38,7 @@ inline void init_process(pid_t tid) {
 
     syscall_no_intercept_flag = true;
 
-    auto *p_buf_response = new CircularBuffer<capio_off64_t>(
-        SHM_COMM_CHAN_NAME_RESP + std::to_string(tid), CAPIO_REQ_BUFF_CNT, sizeof(capio_off64_t));
+    auto *p_buf_response = new ResponseQueue(SHM_COMM_CHAN_NAME_RESP + std::to_string(tid));
     bufs_response->insert(std::make_pair(tid, p_buf_response));
 
     LOG("Created request response buffer with name: %s",

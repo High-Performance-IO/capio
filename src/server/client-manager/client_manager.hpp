@@ -1,11 +1,12 @@
 #ifndef CLIENT_MANAGER_HPP
 #define CLIENT_MANAGER_HPP
+#include <capio/response_queue.hpp>
 
 /**
  * @brief Class to handle libcapio_posix clients applications
  */
 class ClientManager {
-    CSBufResponse_t *bufs_response;
+    std::unordered_map<long, ResponseQueue *> *bufs_response;
     std::unordered_map<int, const std::string> *app_names;
 
     /**
@@ -16,7 +17,7 @@ class ClientManager {
   public:
     ClientManager() {
         START_LOG(gettid(), "call()");
-        bufs_response             = new CSBufResponse_t();
+        bufs_response             = new std::unordered_map<long, ResponseQueue *>();
         app_names                 = new std::unordered_map<int, const std::string>;
         files_created_by_producer = new std::unordered_map<pid_t, std::vector<std::string> *>;
         std::cout << CAPIO_SERVER_CLI_LOG_SERVER << " [ " << node_name << " ] "
@@ -40,9 +41,8 @@ class ClientManager {
     inline void register_client(const std::string &app_name, pid_t tid) const {
         START_LOG(gettid(), "call(tid=%ld, app_name=%s)", tid, app_name.c_str());
         // TODO: replace numbers with constexpr
-        auto *p_buf_response = new CircularBuffer<capio_off64_t>(
-            SHM_COMM_CHAN_NAME_RESP + std::to_string(tid), CAPIO_REQ_BUFF_CNT,
-            sizeof(capio_off64_t), workflow_name, false);
+        auto *p_buf_response =
+            new ResponseQueue(SHM_COMM_CHAN_NAME_RESP + std::to_string(tid), false);
 
         bufs_response->insert(std::make_pair(tid, p_buf_response));
         app_names->emplace(tid, app_name);
@@ -72,7 +72,7 @@ class ClientManager {
     void reply_to_client(const pid_t tid, const capio_off64_t offset) const {
         START_LOG(gettid(), "call(tid=%ld, offset=%llu)", tid, offset);
         if (const auto out = bufs_response->find(tid); out != bufs_response->end()) {
-            out->second->write(&offset);
+            out->second->write(offset);
             return;
         }
         LOG("Err: no such buffer for provided tid");

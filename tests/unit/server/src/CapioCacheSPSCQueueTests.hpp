@@ -1,13 +1,15 @@
 #ifndef CAPIOCACHESPSCQUEUETESTS_HPP
 #define CAPIOCACHESPSCQUEUETESTS_HPP
 
+#include "../common/capio/response_queue.hpp"
 #include "../posix/utils/env.hpp"
 #include "../posix/utils/filesystem.hpp"
 #include "../posix/utils/types.hpp"
+
 #include "storage-service/CapioFile/CapioMemoryFile.hpp"
 
 inline SPSCQueue *cts_queue, *stc_queue;
-inline CPBufResponse_t *bufs_response;
+inline std::unordered_map<long, ResponseQueue *> *bufs_response;
 inline CircularBuffer<char> *buf_requests;
 
 #include "../posix/utils/cache.hpp"
@@ -22,7 +24,7 @@ std::string test_file_name = "test.dat";
 void init_server_data_structures() {
     writeCache              = new WriteRequestCacheMEM();
     readCache               = new ReadRequestCacheMEM();
-    bufs_response           = new CPBufResponse_t;
+    bufs_response           = new std::unordered_map<long, ResponseQueue *>();
     files                   = new CPFiles_t();
     capio_files_descriptors = new CPFileDescriptors_t();
     cts_queue = new SPSCQueue("queue-tests.cts", get_cache_lines(), get_cache_line_size());
@@ -31,9 +33,8 @@ void init_server_data_structures() {
         new CircularBuffer<char>(SHM_COMM_CHAN_NAME, CAPIO_REQ_BUFF_CNT, CAPIO_REQ_MAX_SIZE);
 
     auto tid = gettid();
-    bufs_response->insert(std::make_pair(
-        tid, new CircularBuffer<capio_off64_t>(SHM_COMM_CHAN_NAME_RESP + std::to_string(tid),
-                                               CAPIO_REQ_BUFF_CNT, sizeof(capio_off64_t))));
+    bufs_response->insert(
+        std::make_pair(tid, new ResponseQueue(SHM_COMM_CHAN_NAME_RESP + std::to_string(tid))));
 }
 
 void delete_server_data_structures() {
@@ -260,7 +261,7 @@ TEST(CapioCacheSPSCQueue, TestReadCacheWithSpscQueueRead) {
             auto size_to_send =
                 read_size < client_cache_line_size ? read_size : client_cache_line_size;
 
-            bufs_response->at(response_tid)->write(&size_to_send, sizeof(capio_off64_t));
+            bufs_response->at(response_tid)->write(size_to_send);
             stc_queue->write(SOURCE_TEST_TEXT + read_begin_offset, size_to_send);
             total_data_sent += size_to_send;
             iteration++;
@@ -311,7 +312,7 @@ TEST(CapioCacheSPSCQueue, TestReadCacheWithSpscQueueReadWithCapioFile) {
             auto size_to_send =
                 read_size < client_cache_line_size ? read_size : client_cache_line_size;
 
-            bufs_response->at(response_tid)->write(&size_to_send, sizeof(capio_off64_t));
+            bufs_response->at(response_tid)->write(size_to_send);
             testFile.writeToQueue(*stc_queue, read_begin_offset, size_to_send);
             total_data_sent += size_to_send;
             iteration++;
@@ -362,7 +363,7 @@ TEST(CapioCacheSPSCQueue, TestReadCacheWithSpscQueueReadWithCapioFileAndSeek) {
             auto size_to_send =
                 read_size < client_cache_line_size ? read_size : client_cache_line_size;
 
-            bufs_response->at(response_tid)->write(&size_to_send, sizeof(capio_off64_t));
+            bufs_response->at(response_tid)->write(size_to_send);
             testFile.writeToQueue(*stc_queue, read_begin_offset, size_to_send);
             total_data_sent += size_to_send;
             iteration++;
