@@ -66,8 +66,11 @@ std::string parseCLI(int argc, char **argv) {
                                       CAPIO_SERVER_ARG_PARSER_BACKEND_PORT_OPT_HELP, {'p', "port"});
 
     args::Flag continueOnErrorFlag(arguments, "continue-on-error",
-                                   CAPIO_SERVER_ARG_PARSER_CONFIG_NCONTINUE_ON_ERROR_HELP,
+                                   CAPIO_SERVER_ARG_PARSER_MEM_STORAGE_ONLY_HELP,
                                    {"continue-on-error"});
+
+    args::Flag memStorageOnly(arguments, "mem-storage-only",
+                              CAPIO_SERVER_ARG_PARSER_CONFIG_NCONTINUE_ON_ERROR_HELP, {"mem-only"});
 
     try {
         parser.ParseCLI(argc, argv);
@@ -94,6 +97,12 @@ std::string parseCLI(int argc, char **argv) {
                      "is ignored."
                   << std::endl;
 #endif
+    }
+
+    if (memStorageOnly) {
+        StoreOnlyInMemory = true;
+        std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_INFO << " [ " << node_name << " ] "
+                  << "All files will be stored in memory whenever possible." << std::endl;
     }
 
     if (logfile_folder) {

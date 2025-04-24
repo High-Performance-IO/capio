@@ -144,6 +144,9 @@ constexpr char CAPIO_SERVER_ARG_PARSER_BACKEND_PORT_OPT_HELP[] =
     "A valid PORT for the Communication backend";
 constexpr char CAPIO_SERVER_ARG_PARSER_CONFIG_NO_CONF_FILE_HELP[] =
     "If specified, server application will start without a config file, using default settings.";
+constexpr char CAPIO_SERVER_ARG_PARSER_MEM_STORAGE_ONLY_HELP[] =
+    "If set, all files will be stored inside the home node server memory and never on file system "
+    "(unless memory limit is reached, or server instance terminates).";
 constexpr char CAPIO_SERVER_ARG_PARSER_CONFIG_NCONTINUE_ON_ERROR_HELP[] =
     "If specified, Capio will try to continue its execution to continue even if it has reached a "
     "fatal termination point. This flag should be used only to debug capio. If this flag is "

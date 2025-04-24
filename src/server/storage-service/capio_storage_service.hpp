@@ -148,7 +148,7 @@ class CapioStorageService {
                             off64_t size) const {
         START_LOG(gettid(), "call(tid=%d, file=%s, offset=%lld, size=%lld)", tid, file.c_str(),
                   offset, size);
-        const auto f = getFile(file);
+        const auto f     = getFile(file);
         const auto queue = _client_to_server_queue->at(tid);
         f->readFromQueue(*queue, offset, size);
     }
@@ -166,6 +166,18 @@ class CapioStorageService {
      */
     [[nodiscard]] size_t sendFilesToStoreInMemory(const long pid) const {
         START_LOG(gettid(), "call(pid=%d)", pid);
+
+        if (StoreOnlyInMemory) {
+            LOG("All files should be handled in memory. sending * wildcard");
+            char f[PATH_MAX + 1]{0};
+            auto c_dir = get_capio_dir().string();
+            memcpy(f, c_dir.c_str(), c_dir.length());
+            memcpy(f + c_dir.size(), "/*", 2);
+            _server_to_clien_queue->at(pid)->write(f, PATH_MAX);
+            LOG("Return value=%llu", 1);
+            return 1;
+        }
+
         auto files_to_store_in_mem = capio_cl_engine->getFileToStoreInMemory();
         for (const auto &file : files_to_store_in_mem) {
             LOG("Sending file %s", file.c_str());
