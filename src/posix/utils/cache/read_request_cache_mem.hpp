@@ -76,7 +76,7 @@ class ReadRequestCacheMEM {
         }
     }
 
-    void read(const int fd, void *buffer, off64_t count) {
+    long read(const int fd, void *buffer, off64_t count) {
         START_LOG(capio_syscall(SYS_gettid), "call(fd=%d, count=%ld)", fd, count);
         if (_fd != fd) {
             LOG("changed fd from %d to %d: flushing", _fd, fd);
@@ -132,6 +132,7 @@ class ReadRequestCacheMEM {
 
         _last_read_end = get_capio_fd_offset(_fd) + count;
         set_capio_fd_offset(fd, _last_read_end);
+        return _last_read_end;
     }
 };
 #endif // READ_REQUEST_CACHE_MEM_HPP

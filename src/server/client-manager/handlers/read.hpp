@@ -65,8 +65,10 @@ inline void read_mem_handler(const char *const str) {
               "path=%s)",
               tid, read_begin_offset, read_size, client_cache_line_size, path);
 
-    if (storage_service->sizeOf(path) < read_begin_offset + read_size) {
-        LOG("File is not yet ready to be consumed as there is not enough data");
+    if (storage_service->sizeOf(path) < read_begin_offset + read_size &&
+        !file_manager->isCommitted(path)) {
+        LOG("File is not yet ready to be consumed as there is not enough data, and is not "
+            "committed");
         storage_service->addThreadWaitingForData(tid, path, read_begin_offset, read_size);
         return;
     }

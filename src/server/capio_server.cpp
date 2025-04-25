@@ -20,7 +20,12 @@
 #include <unordered_set>
 #include <vector>
 
+/*
+ * Variables required to be globally available
+ * to all classes and subclasses.
+ */
 std::string workflow_name;
+inline bool StoreOnlyInMemory = false;
 char node_name[HOST_NAME_MAX];
 
 #include "utils/types.hpp"

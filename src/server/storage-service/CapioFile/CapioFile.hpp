@@ -1,8 +1,6 @@
 #ifndef CAPIOFILE_HPP
 #define CAPIOFILE_HPP
 
-inline bool StoreOnlyInMemory = false;
-
 class CapioFile {
   protected:
     const std::string fileName;

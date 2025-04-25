@@ -56,6 +56,11 @@ class JsonParser {
                   capio_dir.c_str());
 
         locations->newFile(get_capio_dir());
+        locations->setDirectory(get_capio_dir());
+        if (StoreOnlyInMemory) {
+            locations->setStoreFileInMemory(get_capio_dir());
+        }
+
         if (source.empty()) {
             return locations;
         }
