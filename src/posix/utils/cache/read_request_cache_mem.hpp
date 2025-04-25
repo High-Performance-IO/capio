@@ -64,7 +64,10 @@ class ReadRequestCacheMEM {
         _cache = new char[_max_line_size];
     }
 
-    ~ReadRequestCacheMEM() { delete[] _cache; }
+    ~ReadRequestCacheMEM() {
+        START_LOG(capio_syscall(SYS_gettid), "call()");
+        delete[] _cache;
+    }
 
     inline void flush() {
         START_LOG(capio_syscall(SYS_gettid), "call()");

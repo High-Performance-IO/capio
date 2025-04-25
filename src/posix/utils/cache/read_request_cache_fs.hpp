@@ -26,7 +26,10 @@ class ReadRequestCacheFS {
         available_read_cache = new std::unordered_map<std::string, capio_off64_t>;
     };
 
-    ~ReadRequestCacheFS() { delete available_read_cache; };
+    ~ReadRequestCacheFS() {
+        START_LOG(capio_syscall(SYS_gettid), "call()");
+        delete available_read_cache;
+    };
 
     void read_request(std::filesystem::path path, const long end_of_read, int tid, const int fd) {
         START_LOG(capio_syscall(SYS_gettid), "[cache] call(path=%s, end_of_read=%ld, tid=%ld)",

@@ -22,7 +22,10 @@ class WriteRequestCacheFS {
   public:
     explicit WriteRequestCacheFS() : _max_size(get_capio_write_cache_size()) {}
 
-    ~WriteRequestCacheFS() { this->flush(capio_syscall(SYS_gettid)); }
+    ~WriteRequestCacheFS() {
+        START_LOG(capio_syscall(SYS_gettid), "call()");
+        this->flush(capio_syscall(SYS_gettid));
+    }
 
     void write_request(std::filesystem::path path, int tid, int fd, long count) {
         START_LOG(capio_syscall(SYS_gettid), "call(path=%s, tid=%ld, fd=%ld, count=%ld)",

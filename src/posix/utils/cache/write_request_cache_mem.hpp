@@ -38,13 +38,20 @@ class WriteRequestCacheMEM {
         : _cache(nullptr), _tid(capio_syscall(SYS_gettid)), _fd(-1), _max_line_size(line_size),
           _actual_size(0), _last_write_end(-1), _last_write_begin(0) {}
 
+    ~WriteRequestCacheMEM() {
+        START_LOG(capio_syscall(SYS_gettid), "call()");
+        this->flush();
+    }
+
     void flush() {
         START_LOG(capio_syscall(SYS_gettid), "call()");
         if (_actual_size != 0) {
+            LOG("Actual size: %ld", _actual_size);
             write_request(_actual_size, _tid, get_capio_fd_path(_fd).c_str(), _last_write_begin);
             _cache       = nullptr;
             _actual_size = 0;
         }
+        LOG("Flush completed");
     }
 
     void write(int fd, const void *buffer, off64_t count) {
