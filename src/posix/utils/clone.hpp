@@ -57,7 +57,7 @@ inline void init_process(pid_t tid) {
     /*
      * Request which files need to be handled in memory instead of file system
      */
-    file_in_memory_request(tid);
+    paths_to_store_in_memory = file_in_memory_request(tid);
 
     syscall_no_intercept_flag = false;
 }

@@ -133,8 +133,8 @@ std::string parseCLI(int argc, char **argv) {
 #ifdef CAPIO_LOG
     auto logname = open_server_logfile();
     log          = new Logger(__func__, __FILE__, __LINE__, gettid(), "Created new log file");
-    std::cout << CAPIO_SERVER_CLI_LOG_SERVER << "started logging to logfile " << logname
-              << std::endl;
+    std::cout << CAPIO_SERVER_CLI_LOG_SERVER << " [ " << node_name << " ] "
+              << "started logging to logfile " << logname << std::endl;
 #endif
 
     if (config) {
