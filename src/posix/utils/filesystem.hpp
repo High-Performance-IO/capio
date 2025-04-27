@@ -83,16 +83,16 @@ inline std::filesystem::path capio_posix_realpath(const std::filesystem::path &p
         if (pathname.is_absolute()) {
             LOG("Path=%s is already absolute", pathname.c_str());
             return {pathname};
-        } else {
-            std::filesystem::path new_path = (*current_dir / pathname).lexically_normal();
-            if (is_capio_path(new_path)) {
-                LOG("Computed absolute path = %s", new_path.c_str());
-                return new_path;
-            } else {
-                LOG("file %s is not a posix file, nor a capio file!", pathname.c_str());
-                return {};
-            }
         }
+
+        std::filesystem::path new_path = (*current_dir / pathname).lexically_normal();
+        if (is_capio_path(new_path)) {
+            LOG("Computed absolute path = %s", new_path.c_str());
+            return new_path;
+        }
+
+        LOG("file %s is not a posix file, nor a capio file!", pathname.c_str());
+        return {};
     }
 
     // if not, then check for realpath through libc implementation

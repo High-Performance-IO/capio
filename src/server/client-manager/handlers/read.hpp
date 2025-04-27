@@ -75,9 +75,16 @@ inline void read_mem_handler(const char *const str) {
 
     auto size_to_send = read_size < client_cache_line_size ? read_size : client_cache_line_size;
 
-    LOG("Need to sent to client %llu bytes", size_to_send);
-    client_manager->reply_to_client(tid, size_to_send);
+    LOG("Need to sent to client %llu bytes, asking storage service to send data", size_to_send);
     storage_service->reply_to_client(tid, path, read_begin_offset, size_to_send);
+
+    LOG("Sending to posix app the offset up to which read.");
+    if (file_manager->isCommitted(path)) {
+        LOG("File is committed. signaling it to posix application by setting offset MSB to 1");
+        size_to_send = 0x8000000000000000 | size_to_send;
+    }
+    LOG("Sending offset: %llu", size_to_send);
+    client_manager->reply_to_client(tid, size_to_send);
 }
 
 #endif // READ_HPP
