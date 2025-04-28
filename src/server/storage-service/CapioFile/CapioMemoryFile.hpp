@@ -16,8 +16,8 @@ class CapioMemoryFile : public CapioFile {
     std::map<std::size_t, std::vector<char>> memoryBlocks;
 
     // maps for bits
-    static constexpr u_int32_t _pageSizeMB    = 4;
-    static constexpr u_int64_t _pageMask      = 0xFFFFF;
+    static constexpr u_int32_t _pageSizeMB = 4;
+    static constexpr u_int64_t _pageMask = 0xFFFFF;
     static constexpr u_int64_t _pageSizeBytes = _pageSizeMB * 1024 * 1024;
 
     /**
@@ -56,8 +56,9 @@ class CapioMemoryFile : public CapioFile {
         return block;
     }
 
-  public:
-    explicit CapioMemoryFile(const std::string &filePath) : CapioFile(filePath) {}
+public:
+    explicit CapioMemoryFile(const std::string &filePath) : CapioFile(filePath) {
+    }
 
     /**
      * Write data to a file stored inside the memory
@@ -101,6 +102,7 @@ class CapioMemoryFile : public CapioFile {
         totalSize = std::max(totalSize, buffer_offset);
         return totalSize;
     }
+
     /**
      * Read from Capio File
      * @param buffer Buffer to read to
@@ -146,18 +148,20 @@ class CapioMemoryFile : public CapioFile {
 
         const auto &[map_offset, write_offset, first_write_size] = compute_offsets(offset, length);
 
+        auto remaining_bytes = length;
+
         auto &block = memoryBlocks[map_offset];
         block.resize(_pageSizeBytes); // reserve 4MB of space
 
         queue.read(block.data() + write_offset, first_write_size);
         // update remaining bytes to write
-        length -= first_write_size;
+        remaining_bytes -= first_write_size;
         size_t map_count = 1; // start from map following the one obtained from the first write
 
         // Variable to store the read offset of the input buffer
         auto buffer_offset = first_write_size;
 
-        while (length > 0) {
+        while (remaining_bytes > 0) {
             auto &next_block = memoryBlocks[map_offset + map_count];
             next_block.resize(_pageSizeBytes); // reserve 4MB of space
             // Compute the actual size of the current write
@@ -166,7 +170,7 @@ class CapioMemoryFile : public CapioFile {
             queue.read(next_block.data(), write_size);
             buffer_offset += write_size;
             map_count++;
-            length -= _pageSizeBytes;
+            remaining_bytes -= _pageSizeBytes;
         }
 
         totalSize = std::max(totalSize, offset + length);

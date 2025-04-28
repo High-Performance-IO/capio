@@ -2,15 +2,20 @@
 #define CAPIOFILE_HPP
 
 class CapioFile {
-  protected:
+protected:
     const std::string fileName;
     std::size_t totalSize;
 
-  public:
-    explicit CapioFile(const std::string &filePath) : fileName(filePath), totalSize(0){};
+public:
+    explicit CapioFile(const std::string &filePath) : fileName(filePath), totalSize(0) {
+    };
     virtual ~CapioFile() = default;
 
-    [[nodiscard]] std::size_t getSize() const { return totalSize; }
+    [[nodiscard]] std::size_t getSize() const {
+        START_LOG(gettid(), "call()");
+        return totalSize;
+    }
+
     [[nodiscard]] const std::string &getFileName() const { return fileName; }
 
     /**
@@ -29,7 +34,7 @@ class CapioFile {
      * @return number of bytes read from CapioMemoryFile
      */
     virtual std::size_t readData(char *buffer, std::size_t file_offset,
-                                 std::size_t buffer_size)    = 0;
+                                 std::size_t buffer_size) = 0;
 
     /**
      * Store data inside the CapioMemoryFile by reading it from a SPSCQueue object. Behaves just
