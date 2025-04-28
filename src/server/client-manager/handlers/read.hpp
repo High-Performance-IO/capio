@@ -85,8 +85,10 @@ inline void read_mem_handler(const char *const str) {
     storage_service->reply_to_client(tid, path, read_begin_offset, size_to_send);
 
     LOG("Sending to posix app the offset up to which read.");
-    if (file_manager->isCommitted(path)) {
-        LOG("File is committed. signaling it to posix application by setting offset MSB to 1");
+    if (file_manager->isCommitted(path) && read_begin_offset + size_to_send >= storage_service->
+        sizeOf(path)) {
+        LOG("File is committed, and end of read >= than file size."
+            " signaling it to posix application by setting offset MSB to 1");
         size_to_send = 0x8000000000000000 | size_to_send;
     }
     LOG("Sending offset: %llu", size_to_send);
