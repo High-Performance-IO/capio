@@ -48,9 +48,9 @@ inline void handshake_request(const long tid, const long pid, const std::string 
     LOG("Sent handshake request");
 
     cts_queue = new SPSCQueue("queue-" + std::to_string(tid) + ".cts", get_cache_lines(),
-                              get_cache_line_size());
+                              get_cache_line_size(), get_capio_workflow_name(), true);
     stc_queue = new SPSCQueue("queue-" + std::to_string(tid) + ".stc", get_cache_lines(),
-                              get_cache_line_size());
+                              get_cache_line_size(), get_capio_workflow_name(), true);
     LOG("Initialized data transfer queues");
 }
 

@@ -234,7 +234,7 @@ inline std::filesystem::path get_dir_path(int dirfd) {
         return it->second;
     }
     LOG("dirfd %d not found. Computing it through proclnk", dirfd);
-    char proclnk[128]           = {};
+    char proclnk[128] = {};
     char dir_pathname[PATH_MAX] = {};
     sprintf(proclnk, "/proc/self/fd/%d", dirfd);
     if (capio_syscall(SYS_readlinkat, AT_FDCWD, proclnk, dir_pathname, PATH_MAX) < 0) {
@@ -252,10 +252,10 @@ inline std::filesystem::path get_dir_path(int dirfd) {
 inline void init_filesystem() {
     std::unique_ptr<char[]> buf(new char[PATH_MAX]);
     capio_syscall(SYS_getcwd, buf.get(), PATH_MAX);
-    current_dir             = std::make_unique<std::filesystem::path>(buf.get());
+    current_dir = std::make_unique<std::filesystem::path>(buf.get());
     capio_files_descriptors = new CPFileDescriptors_t();
-    capio_files_paths       = new CPFilesPaths_t();
-    files                   = new CPFiles_t();
+    capio_files_paths = new CPFilesPaths_t();
+    files = new CPFiles_t();
 }
 
 /**
@@ -268,7 +268,7 @@ inline void rename_capio_path(const std::string &oldpath, const std::string &new
     START_LOG(capio_syscall(SYS_gettid), "call(oldpath=%s, newpath=%s)", oldpath.c_str(),
               newpath.c_str());
     if (capio_files_paths->find(oldpath) != capio_files_paths->end()) {
-        auto entry  = capio_files_paths->extract(oldpath);
+        auto entry = capio_files_paths->extract(oldpath);
         entry.key() = newpath;
         capio_files_paths->insert(std::move(entry));
         for (auto fd : capio_files_paths->at(newpath)) {
@@ -286,7 +286,10 @@ inline void rename_capio_path(const std::string &oldpath, const std::string &new
  * @return
  */
 inline void set_capio_fd_offset(int fd, capio_off64_t offset) {
+    START_LOG(capio_syscall(SYS_gettid), "call(fd=%d, offset=%lld)", fd, offset);
+    LOG("Previous offset = %lld", *std::get<0>(files->at(fd)));
     *std::get<0>(files->at(fd)) = offset;
+    LOG("New offset = %lld", *std::get<0>(files->at(fd)));
 }
 
 /**
