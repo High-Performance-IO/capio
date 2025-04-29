@@ -44,7 +44,7 @@ protected:
         capio_off64_t stc_queue_read = bufs_response->at(tid)->read();
         LOG("Response to request is %llu", stc_queue_read);
 
-        if (stc_queue_read > 0x8000000000000000) {
+        if (stc_queue_read >= 0x8000000000000000) {
             committed = true;
             stc_queue_read -= 0x8000000000000000;
             _end_of_file_committed_offset = stc_queue_read;
