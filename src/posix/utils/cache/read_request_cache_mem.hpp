@@ -118,7 +118,8 @@ public:
             return 0;
         }
 
-        if (_actual_size == 0) {
+        // Check if cache is empty or if all the content of the cache has been already consumed
+        if (_actual_size == 0 || _actual_size == _cache_offset) {
             LOG("No data is present locally. performing request.");
             const auto size = count < _max_line_size ? count : _max_line_size;
             _actual_size = read_request(_fd, size, _tid);
