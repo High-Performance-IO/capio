@@ -8,11 +8,11 @@ class ReadRequestCacheMEM {
     long _tid;
     int _fd;
     capio_off64_t _max_line_size, _actual_size, _cache_offset;
-    capio_off64_t _last_read_end, _end_of_file_committed_offset;
+    capio_off64_t _last_read_end, _real_file_size_commmitted;
     bool committed = false;
 
     /**
-     * Copy data from the cache internal buffer to target buffer
+     * Copy data from the cache internal buffer to the target buffer
      * @param buffer
      * @param count
      */
@@ -32,7 +32,7 @@ protected:
         START_LOG(capio_syscall(SYS_gettid), "call(fd=%ld, count=%llu, tid=%ld)", fd, count, tid);
         char req[CAPIO_REQ_MAX_SIZE];
 
-        // send as last parameter to the server the maximum amount of data that can be read into a
+        // send as the last parameter to the server the maximum amount of data that can be read into a
         // single line of cache
 
         auto read_begin_offset = get_capio_fd_offset(fd);
@@ -47,20 +47,23 @@ protected:
         if (stc_queue_read >= 0x8000000000000000) {
             committed = true;
             stc_queue_read -= 0x8000000000000000;
-            _end_of_file_committed_offset = stc_queue_read;
+            _real_file_size_commmitted = stc_queue_read;
             LOG("File is commited. Actual offset is: %ld", stc_queue_read);
         }
 
         // FIXME: if count > _max_line_size, a deadlock or SEGFAULT is foreseen Fix it asap.
         // FIXME: still this might not occur as the read() method should protect from this event
-        auto read_size = stc_queue_read;
+        /*auto read_size = stc_queue_read;
         while (read_size > 0) {
             const capio_off64_t tmp_read_size =
                 read_size > _max_line_size ? _max_line_size : read_size;
             stc_queue->read(_cache, tmp_read_size);
             _cache_offset = 0;
             read_size -= tmp_read_size;
-        }
+        }*/
+
+        stc_queue->read(_cache, stc_queue_read);
+        _cache_offset = 0;
 
         LOG("Completed fetch of data from server");
 
@@ -85,19 +88,19 @@ public:
             _actual_size = _cache_offset = 0;
         }
         committed = false;
-        _end_of_file_committed_offset = -1;
+        _real_file_size_commmitted = -1;
     }
 
     long read(const int fd, void *buffer, off64_t count) {
         START_LOG(capio_syscall(SYS_gettid), "call(fd=%d, count=%ld)", fd, count);
 
-        long actual_read_size = 0;
+        long actual_read_size = 0;\
 
         if (_fd != fd) {
             LOG("changed fd from %d to %d: flushing", _fd, fd);
             flush();
             _fd = fd;
-            _last_read_end = get_capio_fd_offset(_fd);
+            _last_read_end = get_capio_fd_offset(fd);
         }
 
         // Check if a seek has occurred before and in case in which case flush the cache
@@ -110,7 +113,7 @@ public:
             _last_read_end = get_capio_fd_offset(_fd);
         }
 
-        if (committed && _end_of_file_committed_offset == _last_read_end) {
+        if (committed && _real_file_size_commmitted == _last_read_end) {
             LOG("All file content has been read. Returning 0");
             return 0;
         }
@@ -133,11 +136,12 @@ public:
             // There could be some data available already on the cache. Copy that first and then
             // proceed to request the other missing data
 
-            const auto first_copy_size = std::min(_max_line_size - _cache_offset, _actual_size);
+            const auto first_copy_size = std::min(_actual_size - _cache_offset,
+                                                  static_cast<capio_off64_t>(count));
 
             LOG("Data (or part of it) might be already present. performing first copy of"
-                " std::min(_max_line_size(%llu) - _cache_offset(%llu), _actual_size(%llu) = %ld",
-                _max_line_size, _cache_offset, _actual_size, first_copy_size);
+                " std::min(_actual_size(%llu) - _cache_offset(%llu), count(%llu) = %ld",
+                _actual_size, _cache_offset, count, first_copy_size);
 
             _read(buffer, first_copy_size);
             _last_read_end = get_capio_fd_offset(_fd) + first_copy_size;
@@ -175,6 +179,7 @@ public:
                 _last_read_end = get_capio_fd_offset(_fd) + size_to_send_to_client;
                 set_capio_fd_offset(fd, _last_read_end);
             }
+
         }
 
         LOG("Read return value: %ld (_last_Read_end = %llu)", actual_read_size, _last_read_end);
