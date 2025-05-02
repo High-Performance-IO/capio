@@ -19,6 +19,8 @@ class CapioMemoryFile : public CapioFile {
     static constexpr u_int32_t _pageSizeMB    = 4;
     static constexpr u_int64_t _pageSizeBytes = _pageSizeMB * 1024 * 1024;
 
+    char *cross_page_buffer_view;
+
     /**
      * Compute the offsets required to handle write operations onto CapioMemoryFile
      * @param offset Offset from the start of the file, on which the write operation will begin
@@ -58,7 +60,13 @@ class CapioMemoryFile : public CapioFile {
     }
 
   public:
-    explicit CapioMemoryFile(const std::string &filePath) : CapioFile(filePath) {}
+    explicit CapioMemoryFile(const std::string &filePath) : CapioFile(filePath) {
+        cross_page_buffer_view = new char[_pageSizeBytes];
+    }
+
+    ~CapioMemoryFile() override {
+        delete[] cross_page_buffer_view;
+    }
 
     /**
      * Write data to a file stored inside the memory
@@ -201,7 +209,6 @@ class CapioMemoryFile : public CapioFile {
              * is not frequent.
              */
 
-            auto buffer_view = new char[length];
 
             for (auto it = memoryBlocks.lower_bound(map_offset);
                  it != memoryBlocks.end() && bytesRead < length; ++it) {
@@ -212,7 +219,7 @@ class CapioMemoryFile : public CapioFile {
                 }
 
                 // Copy the data to the temporary buffer
-                memcpy(buffer_view + bytesRead, block.data() + mem_block_offset_begin,
+                memcpy(cross_page_buffer_view + bytesRead, block.data() + mem_block_offset_begin,
                        buffer_view_size);
 
                 bytesRead += buffer_view_size;
@@ -225,9 +232,8 @@ class CapioMemoryFile : public CapioFile {
             }
 
             // send the temporary buffer to the application
-            queue.write(buffer_view, bytesRead);
+            queue.write(cross_page_buffer_view, bytesRead);
 
-            delete[] buffer_view;
             return bytesRead;
         }
 
