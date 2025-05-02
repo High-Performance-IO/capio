@@ -68,22 +68,8 @@ void readFromFile(const std::string& expectedContent) {
 }
 
 int main(int argc, char* argv[]) {
-    if (argc != 2) {
-        std::cout << "Usage: " << argv[0] << " --write | --read\n";
-        return 1;
-    }
-
     std::string longText = generateLongText();
-    std::string option = argv[1];
-
-    if (option == "--write") {
-        writeToFile(longText);
-    } else if (option == "--read") {
-        readFromFile(longText);
-    } else {
-        std::cout << "Invalid option. Use --write or --read.\n";
-        return 1;
-    }
-
+    writeToFile(longText);
+    readFromFile(longText);
     return 0;
 }

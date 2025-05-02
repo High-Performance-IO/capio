@@ -16,7 +16,7 @@ class CapioMemoryFile : public CapioFile {
     std::map<std::size_t, std::vector<char>> memoryBlocks;
 
     // Static file sizes of file pages
-    static constexpr u_int32_t _pageSizeMB = 4;
+    static constexpr u_int32_t _pageSizeMB    = 4;
     static constexpr u_int64_t _pageSizeBytes = _pageSizeMB * 1024 * 1024;
 
     /**
@@ -26,6 +26,8 @@ class CapioMemoryFile : public CapioFile {
      * @return tuple
      */
     static auto compute_offsets(const std::size_t offset, std::size_t length) {
+
+        START_LOG(gettid(), "call(offset=%llu, length=%llu)", offset, length);
         // Compute the offset of the memoryBlocks component.
         const auto map_offset = offset / _pageSizeBytes;
 
@@ -37,8 +39,10 @@ class CapioMemoryFile : public CapioFile {
         // distance between the write offset and the end of the page. otherwise it is possible to
         // use the given length. The returned offset starts from mem_block_offset
         const auto first_write_size =
-            length > _pageSizeBytes ? _pageSizeBytes - mem_block_offset : length;
+            length > _pageSizeBytes - mem_block_offset ? _pageSizeBytes - mem_block_offset : length;
 
+        LOG("Computed offsets. map_offset=%llu, mem_block_offset=%llu, first_write_size=%llu",
+            map_offset, mem_block_offset, first_write_size);
         return std::tuple(map_offset, mem_block_offset, first_write_size);
     }
 
@@ -53,9 +57,8 @@ class CapioMemoryFile : public CapioFile {
         return block;
     }
 
-public:
-    explicit CapioMemoryFile(const std::string &filePath) : CapioFile(filePath) {
-    }
+  public:
+    explicit CapioMemoryFile(const std::string &filePath) : CapioFile(filePath) {}
 
     /**
      * Write data to a file stored inside the memory
@@ -184,17 +187,58 @@ public:
                              std::size_t length) const override {
         std::size_t bytesRead = 0;
 
-        const auto &[map_offset, mem_block_offset_begin, buffer_view_size] =
-            compute_offsets(offset, length);
+        const auto offsets                   = compute_offsets(offset, length);
+        unsigned long map_offset             = std::get<0>(offsets);
+        unsigned long mem_block_offset_begin = std::get<1>(offsets);
+        unsigned long buffer_view_size       = std::get<2>(offsets);
 
-        // Traverse the memory blocks to read the requested data starting from the first block of
-        // date
-        for (auto it = memoryBlocks.lower_bound(map_offset);
-             it != memoryBlocks.end() && bytesRead < length; ++it) {
+        if (buffer_view_size != length) {
+            /*
+             * In this case, we have requested a view that spansa over different memory blocks and
+             * cannot be served in a contiguos manner. We allocate a temporary buffer that is used
+             * to overlap the two memory block region and then write the temporary buffer.
+             * This requires more memcpy but it is invoked only when the view overlaps and as such
+             * is not frequent.
+             */
+
+            auto buffer_view = new char[length];
+
+            for (auto it = memoryBlocks.lower_bound(map_offset);
+                 it != memoryBlocks.end() && bytesRead < length; ++it) {
+                auto &[blockOffset, block] = *it;
+
+                if (blockOffset >= offset + length) {
+                    break; // Past the requested range
+                }
+
+                // Copy the data to the temporary buffer
+                memcpy(buffer_view + bytesRead, block.data() + mem_block_offset_begin,
+                       buffer_view_size);
+
+                bytesRead += buffer_view_size;
+
+                const auto updated_offsets =
+                    compute_offsets(offset + bytesRead, length - bytesRead);
+                map_offset             = std::get<0>(updated_offsets);
+                mem_block_offset_begin = std::get<1>(updated_offsets);
+                buffer_view_size       = std::get<2>(updated_offsets);
+            }
+
+            // send the temporary buffer to the application
+            queue.write(buffer_view, bytesRead);
+
+            delete[] buffer_view;
+            return bytesRead;
+        }
+
+        /*
+         * Here we have requested a read that spans over a single memory block.
+         */
+        if (const auto it = memoryBlocks.lower_bound(map_offset); it != memoryBlocks.end()) {
             auto &[blockOffset, block] = *it;
 
             if (blockOffset >= offset + length) {
-                break; // Past the requested range
+                return bytesRead; // Past the requested range
             }
 
             // Copy the data to the buffer

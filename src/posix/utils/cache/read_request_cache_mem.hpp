@@ -1,7 +1,7 @@
 #ifndef READ_REQUEST_CACHE_MEM_HPP
 #define READ_REQUEST_CACHE_MEM_HPP
 
-//TODO: REFACTOR THIS MESS OF CODE
+// TODO: REFACTOR THIS MESS OF CODE
 
 class ReadRequestCacheMEM {
     char *_cache;
@@ -26,14 +26,14 @@ class ReadRequestCacheMEM {
         }
     }
 
-protected:
+  protected:
     [[nodiscard]] capio_off64_t read_request(const int fd, const capio_off64_t count,
                                              const long tid) {
         START_LOG(capio_syscall(SYS_gettid), "call(fd=%ld, count=%llu, tid=%ld)", fd, count, tid);
         char req[CAPIO_REQ_MAX_SIZE];
 
-        // send as the last parameter to the server the maximum amount of data that can be read into a
-        // single line of cache
+        // send as the last parameter to the server the maximum amount of data that can be read into
+        // a single line of cache
 
         auto read_begin_offset = get_capio_fd_offset(fd);
 
@@ -51,8 +51,8 @@ protected:
             LOG("File is commited. Actual offset is: %ld", stc_queue_read);
         }
 
-        // FIXME: if count > _max_line_size, a deadlock or SEGFAULT is foreseen Fix it asap.
-        // FIXME: still this might not occur as the read() method should protect from this event
+        // TODO: this code is not needed as the read size is allways at maximum the size of the
+        // cache line
         /*auto read_size = stc_queue_read;
         while (read_size > 0) {
             const capio_off64_t tmp_read_size =
@@ -70,7 +70,7 @@ protected:
         return stc_queue_read;
     }
 
-public:
+  public:
     explicit ReadRequestCacheMEM(const long line_size = get_posix_read_cache_line_size())
         : _cache(nullptr), _tid(capio_syscall(SYS_gettid)), _fd(-1), _max_line_size(line_size),
           _actual_size(0), _cache_offset(0), _last_read_end(-1) {
@@ -87,27 +87,27 @@ public:
         if (_cache_offset != _actual_size) {
             _actual_size = _cache_offset = 0;
         }
-        committed = false;
+        committed                  = false;
         _real_file_size_commmitted = -1;
     }
 
     long read(const int fd, void *buffer, off64_t count) {
         START_LOG(capio_syscall(SYS_gettid), "call(fd=%d, count=%ld)", fd, count);
 
-        long actual_read_size = 0;\
+        long actual_read_size = 0;
 
         if (_fd != fd) {
             LOG("changed fd from %d to %d: flushing", _fd, fd);
             flush();
-            _fd = fd;
+            _fd            = fd;
             _last_read_end = get_capio_fd_offset(fd);
         }
 
         // Check if a seek has occurred before and in case in which case flush the cache
         // and update the offset to the new value
         if (_last_read_end != get_capio_fd_offset(_fd)) {
-            LOG(
-                "A seek() has occurred (_last_read_end=%llu, get_capio_fd_offset=%llu). Performing flush().",
+            LOG("A seek() has occurred (_last_read_end=%llu, get_capio_fd_offset=%llu). Performing "
+                "flush().",
                 _last_read_end, get_capio_fd_offset(_fd));
             flush();
             _last_read_end = get_capio_fd_offset(_fd);
@@ -122,7 +122,7 @@ public:
         if (_actual_size == 0 || _actual_size == _cache_offset) {
             LOG("No data is present locally. performing request.");
             const auto size = count < _max_line_size ? count : _max_line_size;
-            _actual_size = read_request(_fd, size, _tid);
+            _actual_size    = read_request(_fd, size, _tid);
         }
 
         if (count <= _max_line_size - _cache_offset) {
@@ -130,15 +130,15 @@ public:
             LOG("The requested amount of data can be served without performing a request");
             _read(buffer, count);
             actual_read_size = count;
-            _last_read_end = get_capio_fd_offset(_fd) + count;
+            _last_read_end   = get_capio_fd_offset(_fd) + count;
             set_capio_fd_offset(fd, _last_read_end);
 
         } else {
             // There could be some data available already on the cache. Copy that first and then
             // proceed to request the other missing data
 
-            const auto first_copy_size = std::min(_actual_size - _cache_offset,
-                                                  static_cast<capio_off64_t>(count));
+            const auto first_copy_size =
+                std::min(_actual_size - _cache_offset, static_cast<capio_off64_t>(count));
 
             LOG("Data (or part of it) might be already present. performing first copy of"
                 " std::min(_actual_size(%llu) - _cache_offset(%llu), count(%llu) = %ld",
@@ -151,7 +151,7 @@ public:
             LOG("actual_read_size incremented to: %ld", actual_read_size);
 
             // Compute the remaining amount of data to send to client
-            auto remaining_size = count - first_copy_size;
+            auto remaining_size       = count - first_copy_size;
             capio_off64_t copy_offset = first_copy_size;
 
             while (copy_offset < count && !committed) {
@@ -180,7 +180,6 @@ public:
                 _last_read_end = get_capio_fd_offset(_fd) + size_to_send_to_client;
                 set_capio_fd_offset(fd, _last_read_end);
             }
-
         }
 
         LOG("Read return value: %ld (_last_Read_end = %llu)", actual_read_size, _last_read_end);
