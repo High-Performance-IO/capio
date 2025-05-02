@@ -1,8 +1,6 @@
 #ifndef READ_REQUEST_CACHE_MEM_HPP
 #define READ_REQUEST_CACHE_MEM_HPP
 
-// TODO: REFACTOR THIS MESS OF CODE
-
 class ReadRequestCacheMEM {
     char *_cache;
     long _tid;
@@ -123,6 +121,10 @@ class ReadRequestCacheMEM {
             LOG("No data is present locally. performing request.");
             const auto size = count < _max_line_size ? count : _max_line_size;
             _actual_size    = read_request(_fd, size, _tid);
+
+            // Update count for current request. If count exceeds _actual_size, resize it to not
+            // exceeds the available size on posix application
+            count = std::min(static_cast<capio_off64_t>(count), _actual_size);
         }
 
         if (count <= _max_line_size - _cache_offset) {
