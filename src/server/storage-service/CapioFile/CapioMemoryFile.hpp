@@ -15,9 +15,8 @@
 class CapioMemoryFile : public CapioFile {
     std::map<std::size_t, std::vector<char>> memoryBlocks;
 
-    // maps for bits
+    // Static file sizes of file pages
     static constexpr u_int32_t _pageSizeMB = 4;
-    static constexpr u_int64_t _pageMask = 0xFFFFF;
     static constexpr u_int64_t _pageSizeBytes = _pageSizeMB * 1024 * 1024;
 
     /**
@@ -28,12 +27,10 @@ class CapioMemoryFile : public CapioFile {
      */
     static auto compute_offsets(const std::size_t offset, std::size_t length) {
         // Compute the offset of the memoryBlocks component.
-        // This is done by first obtaining the MB component of the address
-        // and then dividing it by the size in megabyte of the address
-        const auto map_offset = (offset >> 20) / _pageSizeMB;
+        const auto map_offset = offset / _pageSizeBytes;
 
         // Compute the first write offset relative to the first block of memory
-        const auto mem_block_offset = offset & _pageMask;
+        const auto mem_block_offset = offset % _pageSizeBytes;
 
         // compute the first write size. if the write operation is bigger than the size of the page
         // in bytes, then we need to perform the first write operation with size equals to the
