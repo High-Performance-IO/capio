@@ -16,7 +16,7 @@ class CapioMemoryFile : public CapioFile {
     std::map<std::size_t, std::vector<char>> memoryBlocks;
 
     // Static file sizes of file pages
-    static constexpr u_int32_t _pageSizeMB    = 4;
+    static constexpr u_int32_t _pageSizeMB = 4;
     static constexpr u_int64_t _pageSizeBytes = _pageSizeMB * 1024 * 1024;
 
     char *cross_page_buffer_view;
@@ -59,7 +59,7 @@ class CapioMemoryFile : public CapioFile {
         return block;
     }
 
-  public:
+public:
     explicit CapioMemoryFile(const std::string &filePath) : CapioFile(filePath) {
         cross_page_buffer_view = new char[_pageSizeBytes];
     }
@@ -195,64 +195,23 @@ class CapioMemoryFile : public CapioFile {
                              std::size_t length) const override {
         std::size_t bytesRead = 0;
 
-        const auto offsets                   = compute_offsets(offset, length);
-        unsigned long map_offset             = std::get<0>(offsets);
-        unsigned long mem_block_offset_begin = std::get<1>(offsets);
-        unsigned long buffer_view_size       = std::get<2>(offsets);
+        while (bytesRead < length) {
+            const auto [map_offset,mem_block_offset_begin , buffer_view_size] =
+                compute_offsets(offset, length);
 
-        if (buffer_view_size != length) {
-            /*
-             * In this case, we have requested a view that spansa over different memory blocks and
-             * cannot be served in a contiguos manner. We allocate a temporary buffer that is used
-             * to overlap the two memory block region and then write the temporary buffer.
-             * This requires more memcpy but it is invoked only when the view overlaps and as such
-             * is not frequent.
-             */
-
-
-            for (auto it = memoryBlocks.lower_bound(map_offset);
-                 it != memoryBlocks.end() && bytesRead < length; ++it) {
+            if (const auto it = memoryBlocks.lower_bound(map_offset); it != memoryBlocks.end()) {
                 auto &[blockOffset, block] = *it;
 
                 if (blockOffset >= offset + length) {
-                    break; // Past the requested range
+                    return bytesRead; // Past the requested range
                 }
 
-                // Copy the data to the temporary buffer
-                memcpy(cross_page_buffer_view + bytesRead, block.data() + mem_block_offset_begin,
-                       buffer_view_size);
+                // Copy the data to the buffer
+                queue.write(block.data() + mem_block_offset_begin, buffer_view_size);
 
                 bytesRead += buffer_view_size;
-
-                const auto updated_offsets =
-                    compute_offsets(offset + bytesRead, length - bytesRead);
-                map_offset             = std::get<0>(updated_offsets);
-                mem_block_offset_begin = std::get<1>(updated_offsets);
-                buffer_view_size       = std::get<2>(updated_offsets);
             }
-
-            // send the temporary buffer to the application
-            queue.write(cross_page_buffer_view, bytesRead);
-
-            return bytesRead;
         }
-
-        /*
-         * Here we have requested a read that spans over a single memory block.
-         */
-        if (const auto it = memoryBlocks.lower_bound(map_offset); it != memoryBlocks.end()) {
-            auto &[blockOffset, block] = *it;
-
-            if (blockOffset >= offset + length) {
-                return bytesRead; // Past the requested range
-            }
-
-            // Copy the data to the buffer
-            queue.write(block.data() + mem_block_offset_begin, buffer_view_size);
-
-            bytesRead += buffer_view_size;
-        }
-
         return bytesRead;
     }
 };

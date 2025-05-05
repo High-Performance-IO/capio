@@ -24,10 +24,11 @@ class ReadRequestCacheMEM {
         }
     }
 
-  protected:
+protected:
     [[nodiscard]] capio_off64_t read_request(const int fd, const capio_off64_t count,
-                                             const long tid) {
-        START_LOG(capio_syscall(SYS_gettid), "call(fd=%ld, count=%llu, tid=%ld)", fd, count, tid);
+                                             const long tid, bool use_cache = true) {
+        START_LOG(capio_syscall(SYS_gettid), "call(fd=%ld, count=%llu, tid=%ld, load_data=%s)", fd,
+                  count, tid, use_cache ? "true" : "false");
         char req[CAPIO_REQ_MAX_SIZE];
 
         // send as the last parameter to the server the maximum amount of data that can be read into
@@ -35,8 +36,8 @@ class ReadRequestCacheMEM {
 
         auto read_begin_offset = get_capio_fd_offset(fd);
 
-        sprintf(req, "%04d %ld %llu %llu %llu %s", CAPIO_REQUEST_READ_MEM, tid, read_begin_offset,
-                count, _max_line_size, get_capio_fd_path(fd).c_str());
+        sprintf(req, "%04d %ld %llu %llu %llu %d %s", CAPIO_REQUEST_READ_MEM, tid,
+                read_begin_offset, count, _max_line_size, use_cache, get_capio_fd_path(fd).c_str());
         LOG("Sending read request %s", req);
         buf_requests->write(req, CAPIO_REQ_MAX_SIZE);
         capio_off64_t stc_queue_read = bufs_response->at(tid)->read();
@@ -49,26 +50,21 @@ class ReadRequestCacheMEM {
             LOG("File is commited. Actual offset is: %ld", stc_queue_read);
         }
 
-        // TODO: this code is not needed as the read size is allways at maximum the size of the
-        // cache line
-        /*auto read_size = stc_queue_read;
-        while (read_size > 0) {
-            const capio_off64_t tmp_read_size =
-                read_size > _max_line_size ? _max_line_size : read_size;
-            stc_queue->read(_cache, tmp_read_size);
+        if (use_cache) {
+            stc_queue->read(_cache, stc_queue_read);
             _cache_offset = 0;
-            read_size -= tmp_read_size;
-        }*/
-
-        stc_queue->read(_cache, stc_queue_read);
-        _cache_offset = 0;
-
-        LOG("Completed fetch of data from server");
+            LOG("Completed fetch of data from server");
+        } else {
+            _actual_size = 0;
+            _cache_offset = 0;
+            LOG("Data has not been loaded from server, as load_data==false."
+                " Load will occur indipendently");
+        }
 
         return stc_queue_read;
     }
 
-  public:
+public:
     explicit ReadRequestCacheMEM(const long line_size = get_posix_read_cache_line_size())
         : _cache(nullptr), _tid(capio_syscall(SYS_gettid)), _fd(-1), _max_line_size(line_size),
           _actual_size(0), _cache_offset(0), _last_read_end(-1) {
@@ -85,7 +81,7 @@ class ReadRequestCacheMEM {
         if (_cache_offset != _actual_size) {
             _actual_size = _cache_offset = 0;
         }
-        committed                  = false;
+        committed = false;
         _real_file_size_commmitted = -1;
     }
 
@@ -97,7 +93,7 @@ class ReadRequestCacheMEM {
         if (_fd != fd) {
             LOG("changed fd from %d to %d: flushing", _fd, fd);
             flush();
-            _fd            = fd;
+            _fd = fd;
             _last_read_end = get_capio_fd_offset(fd);
         }
 
@@ -116,11 +112,22 @@ class ReadRequestCacheMEM {
             return 0;
         }
 
+        /*
+         * Check: if read size is greater than the capability of the cache line, bypass
+         * the cache and perform a read directly to the provided buffer
+         */
+        if (count > _max_line_size) {
+            LOG("count > _max_line_size. Bypassing cache. Performing read() directly to buffer.");
+            const auto _read_size = read_request(_fd, count, _tid, false);
+            stc_queue->read(static_cast<char *>(buffer), _read_size);
+            return _read_size;
+        }
+
         // Check if cache is empty or if all the content of the cache has been already consumed
         if (_actual_size == 0 || _actual_size == _cache_offset) {
             LOG("No data is present locally. performing request.");
             const auto size = count < _max_line_size ? count : _max_line_size;
-            _actual_size    = read_request(_fd, size, _tid);
+            _actual_size = read_request(_fd, size, _tid);
 
             // Update count for current request. If count exceeds _actual_size, resize it to not
             // exceeds the available size on posix application
@@ -132,7 +139,7 @@ class ReadRequestCacheMEM {
             LOG("The requested amount of data can be served without performing a request");
             _read(buffer, count);
             actual_read_size = count;
-            _last_read_end   = get_capio_fd_offset(_fd) + count;
+            _last_read_end = get_capio_fd_offset(_fd) + count;
             set_capio_fd_offset(fd, _last_read_end);
 
         } else {
@@ -153,7 +160,7 @@ class ReadRequestCacheMEM {
             LOG("actual_read_size incremented to: %ld", actual_read_size);
 
             // Compute the remaining amount of data to send to client
-            auto remaining_size       = count - first_copy_size;
+            auto remaining_size = count - first_copy_size;
             capio_off64_t copy_offset = first_copy_size;
 
             while (copy_offset < count && !committed) {

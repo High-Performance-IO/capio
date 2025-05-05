@@ -10,7 +10,7 @@ class CapioStorageService {
     // TODO: put all of this conde on a different thread
 
     std::unordered_map<pid_t, SPSCQueue *> *_client_to_server_queue;
-    std::unordered_map<pid_t, SPSCQueue *> *_server_to_clien_queue;
+    std::unordered_map<pid_t, SPSCQueue *> *_server_to_client_queue;
     std::unordered_map<std::string, CapioFile *> *_stored_files;
 
     std::unordered_map<std::string, std::vector<std::tuple<capio_off64_t, capio_off64_t, pid_t>>>
@@ -33,7 +33,7 @@ public:
         START_LOG(gettid(), "call()");
         _stored_files = new std::unordered_map<std::string, CapioFile *>;
         _client_to_server_queue = new std::unordered_map<pid_t, SPSCQueue *>;
-        _server_to_clien_queue = new std::unordered_map<pid_t, SPSCQueue *>;
+        _server_to_client_queue = new std::unordered_map<pid_t, SPSCQueue *>;
         _threads_waiting_for_memory_data =
             new std::unordered_map<std::string,
                                    std::vector<std::tuple<capio_off64_t, capio_off64_t, pid_t>>>;
@@ -45,7 +45,7 @@ public:
         // TODO: dump files to FS
         delete _stored_files;
         delete _client_to_server_queue;
-        delete _server_to_clien_queue;
+        delete _server_to_client_queue;
         delete _threads_waiting_for_memory_data;
     }
 
@@ -116,7 +116,7 @@ public:
         _client_to_server_queue->emplace(
             pid, new SPSCQueue("queue-" + std::to_string(pid) + +".cts", get_cache_lines(),
                                get_cache_line_size(), workflow_name, false));
-        _server_to_clien_queue->emplace(
+        _server_to_client_queue->emplace(
             pid, new SPSCQueue("queue-" + std::to_string(pid) + +".stc", get_cache_lines(),
                                get_cache_line_size(), workflow_name, false));
         LOG("Created communication queues");
@@ -134,7 +134,7 @@ public:
         START_LOG(gettid(), "call(pid=%llu, file=%s, offset=%llu, size=%llu)", pid, file.c_str(),
                   offset, size);
 
-        getFile(file)->writeToQueue(*_server_to_clien_queue->at(pid), offset, size);
+        getFile(file)->writeToQueue(*_server_to_client_queue->at(pid), offset, size);
     }
 
     /**
@@ -155,7 +155,7 @@ public:
 
     void remove_client(const pid_t pid) const {
         _client_to_server_queue->erase(pid);
-        _server_to_clien_queue->erase(pid);
+        _server_to_client_queue->erase(pid);
     }
 
     /**
@@ -173,7 +173,7 @@ public:
             auto c_dir = get_capio_dir().string();
             memcpy(f, c_dir.c_str(), c_dir.length());
             memcpy(f + c_dir.size(), "/*", 2);
-            _server_to_clien_queue->at(pid)->write(f, PATH_MAX);
+            _server_to_client_queue->at(pid)->write(f, PATH_MAX);
             LOG("Return value=%llu", 1);
             return 1;
         }
@@ -183,7 +183,7 @@ public:
             LOG("Sending file %s", file.c_str());
             char f[PATH_MAX + 1]{0};
             memcpy(f, file.c_str(), file.size());
-            _server_to_clien_queue->at(pid)->write(f, PATH_MAX);
+            _server_to_client_queue->at(pid)->write(f, PATH_MAX);
         }
 
         LOG("Return value=%llu", files_to_store_in_mem.size());
