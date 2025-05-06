@@ -47,7 +47,7 @@ protected:
             committed = true;
             stc_queue_read -= 0x8000000000000000;
             _real_file_size_commmitted = stc_queue_read;
-            LOG("File is commited. Actual offset is: %ld", stc_queue_read);
+            LOG("File is committed. Actual offset is: %ld", stc_queue_read);
         }
 
         if (use_cache) {
@@ -58,7 +58,7 @@ protected:
             _actual_size = 0;
             _cache_offset = 0;
             LOG("Data has not been loaded from server, as load_data==false."
-                " Load will occur indipendently");
+                " Load will occur independently");
         }
 
         return stc_queue_read;

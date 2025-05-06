@@ -54,11 +54,6 @@ inline void init_process(pid_t tid) {
      */
     handshake_request(tid, pid, capio_app_name);
 
-    /*
-     * Request which files need to be handled in memory instead of file system
-     */
-    paths_to_store_in_memory = file_in_memory_request(tid);
-
     syscall_no_intercept_flag = false;
 }
 
