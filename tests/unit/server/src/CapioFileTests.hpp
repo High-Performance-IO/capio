@@ -53,36 +53,6 @@ TEST(CapioMemoryFileTest, TestHugeFileOnMultiplePages) {
     delete[] input_buffer4;
 }
 
-/*
- * WARNING: This test uses files that are too big to be handled by the CI/CD on github,
- * and as such it has been disabled. Nevertheless this test can be executed locally
- *
-TEST(CapioMemoryFileTest, TestHugeFileOnMultiplePagesThatStartOnDifferentOffset) {
-    CapioMemoryFile file1("test.txt");
-    capio_off64_t LONG_TEXT_SIZE = 1024 * 1024 * 16;
-    auto LONG_TEXT               = new char[LONG_TEXT_SIZE]{}; // 16 MB string
-    for (capio_off64_t i = 0; i < LONG_TEXT_SIZE; i++) {
-        LONG_TEXT[i] = 'A' + (random() % 26);
-    }
-
-    auto input_buffer4     = new char[LONG_TEXT_SIZE + 1]{};
-    bool write_count_match = file1.writeData(LONG_TEXT, 2048, LONG_TEXT_SIZE) == LONG_TEXT_SIZE;
-    EXPECT_TRUE(write_count_match);
-
-    file1.readData(input_buffer4, 2048, LONG_TEXT_SIZE);
-
-    bool ok = true;
-    for (capio_off64_t i = 0; i < LONG_TEXT_SIZE && ok; i++) {
-        ok &= (LONG_TEXT[i] == input_buffer4[i]);
-        if (!ok) {
-            std::cout << "Check failed at byte " << i << " out of " << LONG_TEXT_SIZE << std::endl;
-        }
-    }
-    EXPECT_TRUE(ok);
-
-    delete LONG_TEXT;
-}
-*/
 
 TEST(CapioMemoryFileTest, TestWriteAndRead) {
     CapioMemoryFile file("test.txt");
