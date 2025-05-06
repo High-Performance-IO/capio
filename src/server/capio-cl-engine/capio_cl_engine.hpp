@@ -10,64 +10,64 @@
  *
  */
 class CapioCLEngine {
-  private:
-    std::unordered_map<std::string,                         // path name
+private:
+    std::unordered_map<std::string, // path name
                        std::tuple<std::vector<std::string>, // Vector for producers          [0]
                                   std::vector<std::string>, // Vector for consumers          [1]
-                                  std::string,              // commit rule                   [2]
-                                  std::string,              // fire_rule                     [3]
-                                  bool,                     // permanent                     [4]
-                                  bool,                     // exclude                       [5]
+                                  std::string, // commit rule                   [2]
+                                  std::string, // fire_rule                     [3]
+                                  bool, // permanent                     [4]
+                                  bool, // exclude                       [5]
                                   bool, // is_file (if true yes otherwise it is a directory) [6]
-                                  int,  // commit on close number                            [7]
+                                  int, // commit on close number                            [7]
                                   long, // directory file count                              [8]
                                   std::vector<std::string>, // File dependencies             [9]
                                   std::regex, // Regex from name to match globs             [10]
                                   bool>> // Store File in memory or on FS. true = memory    [11]
-        _locations;
+    _locations;
 
     static std::string truncateLastN(const std::string &str, const int n) {
         return str.length() > n ? "[..] " + str.substr(str.length() - n) : str;
     }
 
-  public:
+public:
     void print() const {
         std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_JSON << " [ " << node_name << " ] "
-                  << "Composition of expected CAPIO FS: " << std::endl
-                  << std::endl
-                  << "|============================================================================"
-                     "===============================================|"
-                  << std::endl
-                  << "|" << std::setw(124) << "|" << std::endl
-                  << "|     Parsed configuration file for workflow: \e[1;36m" << workflow_name
-                  << std::setw(83 - workflow_name.length()) << "\e[0m |" << std::endl
-                  << "|" << std::setw(124) << "|" << std::endl
-                  << "|     File color legend:     \e[48;5;034m  \e[0m File stored in memory"
-                  << std::setw(72) << "|" << std::endl
-                  << "|                            "
-                  << "\e[48;5;172m  \e[0m File stored on file system" << std::setw(67) << "|"
-                  << std::endl
-                  << "|============================================================================"
-                     "===============================================|"
-                  << std::endl
-                  << "|======|===================|===================|====================|========"
-                     "============|============|===========|=========|"
-                  << std::endl
-                  << "| Kind | Filename          | Producer step     | Consumer step      |  "
-                     "Commit Rule       |  Fire Rule | Permanent | Exclude |"
-                  << std::endl
-                  << "|======|===================|===================|====================|========"
-                     "============|============|===========|=========|"
-                  << std::endl;
+            << "Composition of expected CAPIO FS: " << std::endl
+            << std::endl
+            << "|============================================================================"
+            "===============================================|"
+            << std::endl
+            << "|" << std::setw(124) << "|" << std::endl
+            << "|     Parsed configuration file for workflow: \e[1;36m" << workflow_name
+            << std::setw(83 - workflow_name.length()) << "\e[0m |" << std::endl
+            << "|" << std::setw(124) << "|" << std::endl
+            << "|     File color legend:     \e[48;5;034m  \e[0m File stored in memory"
+            << std::setw(72) << "|" << std::endl
+            << "|                            "
+            << "\e[48;5;172m  \e[0m File stored on file system" << std::setw(67) << "|"
+            << std::endl
+            << "|============================================================================"
+            "===============================================|"
+            << std::endl
+            << "|======|===================|===================|====================|========"
+            "============|============|===========|=========|"
+            << std::endl
+            << "| Kind | Filename          | Producer step     | Consumer step      |  "
+            "Commit Rule       |  Fire Rule | Permanent | Exclude |"
+            << std::endl
+            << "|======|===================|===================|====================|========"
+            "============|============|===========|=========|"
+            << std::endl;
         for (auto itm : _locations) {
             std::string color_preamble = std::get<11>(itm.second) ? "\e[38;5;034m" : "\e[38;5;172m";
-            std::string color_post     = "\e[0m";
+            std::string color_post = "\e[0m";
 
             std::string name_trunc = truncateLastN(itm.first, 12);
-            auto kind              = std::get<6>(itm.second) ? "F" : "D";
+            auto kind = std::get<6>(itm.second) ? "F" : "D";
             std::cout << "|   " << color_preamble << kind << color_post << "  | " << color_preamble
-                      << name_trunc << color_post << std::setfill(' ')
-                      << std::setw(20 - name_trunc.length()) << "| ";
+                << name_trunc << color_post << std::setfill(' ')
+                << std::setw(20 - name_trunc.length()) << "| ";
 
             auto producers = std::get<0>(itm.second);
             auto consumers = std::get<1>(itm.second);
@@ -83,7 +83,7 @@ class CapioCLEngine {
                 if (i < producers.size()) {
                     auto prod1 = truncateLastN(producers.at(i), 12);
                     std::cout << prod1 << std::setfill(' ') << std::setw(20 - prod1.length())
-                              << " | ";
+                        << " | ";
                 } else {
                     std::cout << std::setfill(' ') << std::setw(20) << " | ";
                 }
@@ -91,31 +91,31 @@ class CapioCLEngine {
                 if (i < consumers.size()) {
                     auto cons1 = truncateLastN(consumers.at(i), 12);
                     std::cout << " " << cons1 << std::setfill(' ') << std::setw(20 - cons1.length())
-                              << " | ";
+                        << " | ";
                 } else {
                     std::cout << std::setfill(' ') << std::setw(21) << " | ";
                 }
 
                 if (i == 0) {
                     std::string commit_rule = std::get<2>(itm.second),
-                                fire_rule   = std::get<3>(itm.second);
+                                fire_rule = std::get<3>(itm.second);
                     bool exclude = std::get<4>(itm.second), permanent = std::get<5>(itm.second);
 
                     std::cout << " " << commit_rule << std::setfill(' ')
-                              << std::setw(20 - commit_rule.length()) << " | " << fire_rule
-                              << std::setfill(' ') << std::setw(13 - fire_rule.length()) << " | "
-                              << "    " << (permanent ? "YES" : "NO ") << "   |   "
-                              << (exclude ? "YES" : "NO ") << "   |" << std::endl;
+                        << std::setw(20 - commit_rule.length()) << " | " << fire_rule
+                        << std::setfill(' ') << std::setw(13 - fire_rule.length()) << " | "
+                        << "    " << (permanent ? "YES" : "NO ") << "   |   "
+                        << (exclude ? "YES" : "NO ") << "   |" << std::endl;
                 } else {
                     std::cout << std::setfill(' ') << std::setw(20) << "|" << std::setfill(' ')
-                              << std::setw(13) << "|" << std::setfill(' ') << std::setw(12) << "|"
-                              << std::setfill(' ') << std::setw(10) << "|" << std::endl;
+                        << std::setw(13) << "|" << std::setfill(' ') << std::setw(12) << "|"
+                        << std::setfill(' ') << std::setw(10) << "|" << std::endl;
                 }
             }
             std::cout << "*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~"
-                         "~~~~~~~"
-                         "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*"
-                      << std::endl;
+                "~~~~~~~"
+                "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*"
+                << std::endl;
         }
         std::cout << std::endl;
     };
@@ -163,7 +163,7 @@ class CapioCLEngine {
         START_LOG(gettid(), "call(path=%s)", path.c_str());
         if (_locations.find(path) == _locations.end()) {
             std::string commit = CAPIO_FILE_COMMITTED_ON_TERMINATION;
-            std::string fire   = CAPIO_FILE_MODE_UPDATE;
+            std::string fire = CAPIO_FILE_MODE_UPDATE;
 
             /*
              * Inherit commit and fire rules from LPM directory
@@ -174,8 +174,8 @@ class CapioCLEngine {
                 if (std::regex_match(path, std::get<10>(data)) && filename.length() > matchSize) {
                     LOG("Found match with %s", filename.c_str());
                     matchSize = filename.length();
-                    commit    = std::get<2>(data);
-                    fire      = std::get<3>(data);
+                    commit = std::get<2>(data);
+                    fire = std::get<3>(data);
                 }
             }
             LOG("Adding file %s to _locations with commit=%s, and fire=%s", path.c_str(),
@@ -351,9 +351,9 @@ class CapioCLEngine {
             std::vector<std::string> producers = std::get<0>(itm->second);
             DBG(gettid(), [&](const std::vector<std::string> &arr) {
                 for (auto elem : arr) {
-                    LOG("producer: %s", elem.c_str());
+                LOG("producer: %s", elem.c_str());
                 }
-            }(producers));
+                }(producers));
             return std::find(producers.begin(), producers.end(), app_name) != producers.end();
         }
         LOG("No exact match found in locations. checking for globs");
@@ -364,9 +364,9 @@ class CapioCLEngine {
                 std::vector<std::string> producers = std::get<0>(entry);
                 DBG(gettid(), [&](const std::vector<std::string> &arr) {
                     for (auto itm : arr) {
-                        LOG("producer: %s", itm.c_str());
+                    LOG("producer: %s", itm.c_str());
                     }
-                }(producers));
+                    }(producers));
                 return std::find(producers.begin(), producers.end(), app_name) != producers.end();
             }
         }

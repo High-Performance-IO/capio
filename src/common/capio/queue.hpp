@@ -18,10 +18,10 @@
  * @tparam Mutex Type of semaphore
  */
 template <class T, class Mutex> class Queue {
-  private:
+private:
     void *_shm;
     const long int _max_num_elems, _elem_size; // elements size in bytes
-    long int _buff_size;                       // buffer size in bytes
+    long int _buff_size; // buffer size in bytes
     long int *_first_elem = nullptr, *_last_elem = nullptr;
     const std::string _shm_name, _first_elem_name, _last_elem_name;
     bool require_cleanup;
@@ -50,7 +50,7 @@ template <class T, class Mutex> class Queue {
         _sem_num_elems.unlock();
     }
 
-  public:
+public:
     Queue(const std::string &shm_name, const long int max_num_elems, const long int elem_size,
           const std::string &workflow_name = get_capio_workflow_name(), bool cleanup = true)
         : _max_num_elems(max_num_elems), _elem_size(elem_size),
@@ -69,20 +69,21 @@ template <class T, class Mutex> class Queue {
         syscall_no_intercept_flag = true;
 #endif
         _first_elem = (long int *) create_shm(_first_elem_name, sizeof(long int));
-        _last_elem  = (long int *) create_shm(_last_elem_name, sizeof(long int));
-        _shm        = get_shm_if_exist(_shm_name);
+        _last_elem = (long int *) create_shm(_last_elem_name, sizeof(long int));
+        _shm = get_shm_if_exist(_shm_name);
         if (_shm == nullptr) {
             *_first_elem = 0;
-            *_last_elem  = 0;
-            _shm         = create_shm(_shm_name, _buff_size);
+            *_last_elem = 0;
+            _shm = create_shm(_shm_name, _buff_size);
         }
 #ifdef __CAPIO_POSIX
         syscall_no_intercept_flag = false;
 #endif
     }
 
-    Queue(const Queue &)            = delete;
+    Queue(const Queue &) = delete;
     Queue &operator=(const Queue &) = delete;
+
     ~Queue() {
         START_LOG(capio_syscall(SYS_gettid),
                   "call(_shm_name=%s, _first_elem_name=%s, _last_elem_name=%s)", _shm_name.c_str(),
@@ -107,7 +108,7 @@ template <class T, class Mutex> class Queue {
         _sem_num_elems.lock();
 
         std::lock_guard<Mutex> lg(_mutex);
-        T *segment   = reinterpret_cast<char *>(_shm) + *_first_elem;
+        T *segment = reinterpret_cast<char *>(_shm) + *_first_elem;
         *_first_elem = (*_first_elem + _elem_size) % _buff_size;
 
         _sem_num_empty.unlock();
@@ -122,7 +123,7 @@ template <class T, class Mutex> class Queue {
                   num_bytes);
 
         off64_t n_reads = num_bytes / _elem_size;
-        size_t r        = num_bytes % _elem_size;
+        size_t r = num_bytes % _elem_size;
 
         for (int i = 0; i < n_reads; i++) {
             _read(buff_rcv + i * _elem_size, _elem_size);
@@ -143,7 +144,7 @@ template <class T, class Mutex> class Queue {
         _sem_num_empty.lock();
 
         std::lock_guard<Mutex> lg(_mutex);
-        T *segment  = reinterpret_cast<char *>(_shm) + *_last_elem;
+        T *segment = reinterpret_cast<char *>(_shm) + *_last_elem;
         *_last_elem = (*_last_elem + _elem_size) % _buff_size;
 
         _sem_num_elems.unlock();
@@ -155,7 +156,7 @@ template <class T, class Mutex> class Queue {
         START_LOG(capio_syscall(SYS_gettid), "call(data=0x%08x, num_bytes=%llu)", data, num_bytes);
 
         off64_t n_writes = num_bytes / _elem_size;
-        size_t r         = num_bytes % _elem_size;
+        size_t r = num_bytes % _elem_size;
 
         for (int i = 0; i < n_writes; i++) {
             _write(data + i * _elem_size, _elem_size);
