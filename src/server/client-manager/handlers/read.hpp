@@ -90,10 +90,12 @@ inline void read_mem_handler(const char *const str) {
         read_begin_offset + size_to_send >= storage_service->sizeOf(path)) {
         LOG("File is committed, and end of read >= than file size."
             " signaling it to posix application by setting offset MSB to 1");
-        size_to_send = 0x8000000000000000 | size_to_send;
+        LOG("Sending offset: %llu", 0x8000000000000000 |size_to_send);
+        client_manager->reply_to_client(tid, 0x8000000000000000 | size_to_send);
+    } else {
+        LOG("File is not committed. Sending offset: %llu", size_to_send);
+        client_manager->reply_to_client(tid, size_to_send);
     }
-    LOG("Sending offset: %llu", size_to_send);
-    client_manager->reply_to_client(tid, size_to_send);
 
     LOG("Need to sent to client %llu bytes, asking storage service to send data", size_to_send);
     storage_service->reply_to_client(tid, path, read_begin_offset, size_to_send);

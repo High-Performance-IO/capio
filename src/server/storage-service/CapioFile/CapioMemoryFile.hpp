@@ -193,11 +193,12 @@ public:
      */
     std::size_t writeToQueue(SPSCQueue &queue, std::size_t offset,
                              std::size_t length) const override {
+        START_LOG(gettid(), "call(offset=%llu, length=%llu)", offset, length);
         std::size_t bytesRead = 0;
 
         while (bytesRead < length) {
             const auto [map_offset,mem_block_offset_begin , buffer_view_size] =
-                compute_offsets(offset, length);
+                compute_offsets(offset, length - bytesRead);
 
             if (const auto it = memoryBlocks.lower_bound(map_offset); it != memoryBlocks.end()) {
                 auto &[blockOffset, block] = *it;
@@ -210,6 +211,7 @@ public:
                 queue.write(block.data() + mem_block_offset_begin, buffer_view_size);
 
                 bytesRead += buffer_view_size;
+                offset += buffer_view_size;
             }
         }
         return bytesRead;
