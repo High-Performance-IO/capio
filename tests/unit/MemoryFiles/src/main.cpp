@@ -39,7 +39,8 @@ char **build_env(char **envp) {
     for (int i = 0; i < vars.size(); i++) {
         cleaned_env[i] = strdup(envp[i]);
     }
-    cleaned_env[vars.size()] = strdup("LD_PRELOAD=");
+
+    cleaned_env[vars.size()]     = strdup("LD_PRELOAD=");
     cleaned_env[vars.size() + 1] = (char *) nullptr;
 
     return cleaned_env;
