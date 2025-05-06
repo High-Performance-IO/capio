@@ -1,14 +1,13 @@
-#include <cstdint>
-#include <cstdlib>
-#include <string.h>
-#include <string_view>
-#include <vector>
-#include <iostream>
-#include <fstream>
-#include <string>
-
 #include <gtest/gtest.h>
 
+#include <cstdint>
+#include <cstdlib>
+#include <cstring>
+#include <fstream>
+#include <iostream>
+#include <string>
+#include <string_view>
+#include <vector>
 
 char **build_args() {
     char **args = (char **) malloc(4 * sizeof(uintptr_t));
@@ -91,13 +90,12 @@ public:
     }
 };
 
-
 const std::string filename = "hello.txt";
 constexpr size_t textSize = 32 * 1024 * 1024; // 32 MBB
 
-
 inline std::string generateLongText() {
-    std::string pattern = "Lorem ipsum dolor sit amet, consectetur adipiscing elit.\n";
+    std::string pattern =
+        "Lorem ipsum dolor sit amet, consectetur adipiscing elit.\n";
     std::string longText;
     while (longText.size() + pattern.size() <= textSize) {
         longText += pattern;
@@ -108,7 +106,6 @@ inline std::string generateLongText() {
     }
     return longText;
 }
-
 
 TEST(CapioMemoryFileTest, TestReadAndWrite32MBFile) {
     std::string longText = generateLongText();
@@ -130,9 +127,7 @@ TEST(CapioMemoryFileTest, TestReadAndWrite32MBFile) {
     for (size_t i = 0; i < longText.size(); ++i) {
         EXPECT_EQ(fileContent[i], longText[i]);
     }
-
 }
-
 
 int main(int argc, char **argv, char **envp) {
     testing::InitGoogleTest(&argc, argv);
