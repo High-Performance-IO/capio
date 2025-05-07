@@ -47,15 +47,14 @@ char **build_env(char **envp) {
 }
 
 class CapioServerEnvironment : public testing::Environment {
-private:
+  private:
     char **args;
     char **envp;
     int server_pid;
 
-public:
+  public:
     explicit CapioServerEnvironment(char **envp)
-        : args(build_args()), envp(build_env(envp)), server_pid(-1) {
-    };
+        : args(build_args()), envp(build_env(envp)), server_pid(-1) {};
 
     ~CapioServerEnvironment() override {
         for (int i = 0; args[i] != nullptr; i++) {
@@ -92,11 +91,10 @@ public:
 };
 
 const std::string filename = "hello.txt";
-constexpr size_t textSize = 32 * 1024 * 1024; // 32 MBB
+constexpr size_t textSize  = 32 * 1024 * 1024; // 32 MBB
 
 inline std::string generateLongText() {
-    std::string pattern =
-        "Lorem ipsum dolor sit amet, consectetur adipiscing elit.\n";
+    std::string pattern = "Lorem ipsum dolor sit amet, consectetur adipiscing elit.\n";
     std::string longText;
     while (longText.size() + pattern.size() <= textSize) {
         longText += pattern;
@@ -117,10 +115,11 @@ TEST(CapioMemoryFileTest, TestReadAndWrite32MBFile) {
     outFile.close();
 
     std::string fileContent(textSize, ' ');
-
     std::ifstream inFile(filename, std::ios::in | std::ios::binary);
+
     EXPECT_TRUE(inFile.is_open());
     EXPECT_TRUE(inFile.read(fileContent.data(), fileContent.size()));
+
     inFile.close();
 
     EXPECT_EQ(fileContent.size(), longText.size());

@@ -19,9 +19,7 @@ int exit_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg
     START_LOG(tid, "call()");
 
     syscall_no_intercept_flag = true;
-
-    delete_caches();
-    LOG("Removed caches");
+    LOG("syscall_no_intercept_flag = true");
 
     if (is_capio_tid(tid)) {
         LOG("Thread %d is a CAPIO thread: clean up", tid);
@@ -29,17 +27,16 @@ int exit_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg
         remove_capio_tid(tid);
     }
 
+    delete_caches();
+    LOG("Removed caches");
+
     if (const auto itm = bufs_response->find(tid); itm != bufs_response->end()) {
         delete itm->second;
         bufs_response->erase(tid);
         LOG("Removed response buffer");
     }
-
-    delete stc_queue;
-    delete cts_queue;
-    LOG("Removed data queues");
-
     syscall_no_intercept_flag = false;
+    LOG("syscall_no_intercept_flag = false");
 
     return CAPIO_POSIX_SYSCALL_SKIP;
 }

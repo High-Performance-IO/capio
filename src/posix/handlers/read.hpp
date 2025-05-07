@@ -39,13 +39,16 @@ int read_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg
     auto tid = static_cast<pid_t>(syscall_no_intercept(SYS_gettid));
 
     START_LOG(capio_syscall(SYS_gettid), "call(fd=%d, tid=%d, count=%ld)", fd, tid, count);
+    if (exists_capio_fd(fd)) {
+        auto read_result = store_file_in_memory(get_capio_fd_path(fd), tid)
+                               ? capio_read_mem(fd, count, buffer, result)
+                               : capio_read_fs(fd, count, tid);
 
-    auto read_result = store_file_in_memory(get_capio_fd_path(fd), tid)
-                           ? capio_read_mem(fd, count, buffer, result)
-                           : capio_read_fs(fd, count, tid);
-
-    LOG("read result: %ld", read_result);
-    return read_result;
+        LOG("read result: %ld", read_result);
+        return read_result;
+    }
+    LOG("Not a CAPIO fd... skipping...");
+    return CAPIO_POSIX_SYSCALL_REQUEST_SKIP;
 }
 #endif // SYS_read
 

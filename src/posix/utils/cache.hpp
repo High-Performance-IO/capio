@@ -17,11 +17,11 @@ inline thread_local ReadRequestCacheMEM *read_request_cache_mem;
 
 inline void init_caches() {
     START_LOG(capio_syscall(SYS_gettid), "call()");
-    write_request_cache_fs   = new WriteRequestCacheFS();
-    read_request_cache_fs    = new ReadRequestCacheFS();
+    write_request_cache_fs = new WriteRequestCacheFS();
+    read_request_cache_fs = new ReadRequestCacheFS();
     consent_request_cache_fs = new ConsentRequestCache();
-    write_request_cache_mem  = new WriteRequestCacheMEM();
-    read_request_cache_mem   = new ReadRequestCacheMEM();
+    write_request_cache_mem = new WriteRequestCacheMEM();
+    read_request_cache_mem = new ReadRequestCacheMEM();
 }
 
 inline void delete_caches() {
@@ -31,6 +31,11 @@ inline void delete_caches() {
     delete consent_request_cache_fs;
     delete write_request_cache_mem;
     delete read_request_cache_mem;
+
+    delete cts_queue;
+    LOG("Removed cts_queue");
+    delete stc_queue;
+    LOG("Removed stc_queue");
 }
 
 #endif // CAPIO_CACHE_HPP

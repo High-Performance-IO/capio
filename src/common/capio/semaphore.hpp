@@ -12,15 +12,18 @@
  *
  */
 class NoLock {
-  public:
+public:
     NoLock(const std::string &name, unsigned int init_value, bool cleanup) {
         START_LOG(capio_syscall(SYS_gettid), "call(name=%s, initial_value=%d)", name.c_str(),
                   init_value);
     }
 
-    NoLock(const NoLock &)            = delete;
+    NoLock(const NoLock &) = delete;
     NoLock &operator=(const NoLock &) = delete;
-    ~NoLock()                         = default;
+
+    ~NoLock() {
+        START_LOG(capio_syscall(SYS_gettid), "call()");
+    };
 
     static inline void lock() { START_LOG(capio_syscall(SYS_gettid), "call()"); };
 
@@ -33,12 +36,12 @@ class NoLock {
  *
  */
 class NamedSemaphore {
-  private:
+private:
     const std::string _name;
     sem_t *_sem;
     bool _require_cleanup;
 
-  public:
+public:
     NamedSemaphore(std::string name, unsigned int init_value, bool cleanup = true)
         : _name(std::move(name)), _require_cleanup(cleanup) {
         START_LOG(capio_syscall(SYS_gettid), " call(name=%s, init_value=%d, cleanup=%s)",
@@ -56,8 +59,9 @@ class NamedSemaphore {
         }
     }
 
-    NamedSemaphore(const NamedSemaphore &)            = delete;
+    NamedSemaphore(const NamedSemaphore &) = delete;
     NamedSemaphore &operator=(const NamedSemaphore &) = delete;
+
     ~NamedSemaphore() {
         START_LOG(capio_syscall(SYS_gettid), "call()");
         if (_require_cleanup) {
@@ -110,11 +114,11 @@ class NamedSemaphore {
  *
  */
 class Semaphore {
-  private:
+private:
     sem_t _sem{};
     bool _require_cleanup;
 
-  public:
+public:
     explicit Semaphore(unsigned int init_value, bool cleanup = true) {
         START_LOG(capio_syscall(SYS_gettid), "call(init_value=%d)", init_value);
 
@@ -123,8 +127,9 @@ class Semaphore {
         }
     }
 
-    Semaphore(const Semaphore &)            = delete;
+    Semaphore(const Semaphore &) = delete;
     Semaphore &operator=(const Semaphore &) = delete;
+
     ~Semaphore() {
         START_LOG(capio_syscall(SYS_gettid), "call()");
         if (_require_cleanup) {
