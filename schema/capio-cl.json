@@ -1,0 +1,209 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "CAPIO-CL Configuration Schema",
+  "type": "object",
+  "properties": {
+    "name": {
+      "type": "string",
+      "description": "Identifies the application workflow."
+    },
+    "aliases": {
+      "type": "array",
+      "description": "Groups files or directories under a convenient name.",
+      "items": {
+        "type": "object",
+        "properties": {
+          "group_name": {
+            "type": "string",
+            "description": "The alias identifier."
+          },
+          "files": {
+            "type": "array",
+            "description": "An array of file names.",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "group_name",
+          "files"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "IO_Graph": {
+      "type": "array",
+      "description": "Describes file data dependencies among application modules.",
+      "items": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "The name of the application module."
+          },
+          "input_stream": {
+            "type": "array",
+            "description": "Input files and directories the module is expected to read.",
+            "items": {
+              "type": "string"
+            }
+          },
+          "output_stream": {
+            "type": "array",
+            "description": "Files and directories the module is expected to produce.",
+            "items": {
+              "type": "string"
+            }
+          },
+          "streaming": {
+            "type": "array",
+            "description": "Defines streaming semantics for files and directories.",
+            "items": {
+              "oneOf": [
+                {
+                  "type": "object",
+                  "properties": {
+                    "name": {
+                      "type": "array",
+                      "description": "Filenames to which the rule applies.",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "committed": {
+                      "type": "string",
+                      "description": "Commit rule associated with the files.",
+                      "pattern": "^(on_close(:\\d+)?|on_termination|on_file:.+)$"
+                    },
+                    "mode": {
+                      "type": "string",
+                      "description": "Firing rule associated with the files.",
+                      "enum": [
+                        "update",
+                        "no_update"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "name"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "dirname": {
+                      "type": "array",
+                      "description": "Directory name to which the rule applies.",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "committed": {
+                      "type": "string",
+                      "description": "Commit rule associated with the directory.",
+                      "pattern": "^(n_files(:\\d+)?|on_termination|on_file:.+)$"
+                    },
+                    "mode": {
+                      "type": "string",
+                      "description": "Firing rule associated with the content of the directory.",
+                      "enum": [
+                        "update",
+                        "no_update"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "dirname"
+                  ],
+                  "additionalProperties": false
+                }
+              ]
+            }
+          }
+        },
+        "required": [
+          "name"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "permanent": {
+      "type": "array",
+      "description": "Files to be kept on permanent storage at the end of the workflow execution.",
+      "items": {
+        "type": "string"
+      }
+    },
+    "exclude": {
+      "type": "array",
+      "description": "Files and directories not handled by the CAPIO-CL implementation.",
+      "items": {
+        "type": "string"
+      }
+    },
+    "home_node_policies": {
+      "type": "object",
+      "description": "Defines file mapping policies for CAPIO-CL servers.",
+      "properties": {
+        "create": {
+          "description": "Patterns to which the create policy applies",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "hashing": {
+          "description": "Patterns to which the hashing policy applies",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "manual": {
+          "description": "Patterns to which the manual policy applies",
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "app_node": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      }
+    },
+    "storage": {
+      "type": "object",
+      "properties": {
+        "memory": {
+          "description": "Patterns that the CAPIO-CL implementation will store in the node memory",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "fs": {
+          "type": "array",
+          "description": "Patterns that the CAPIO-CL implementation will store in the File System (hence only IO coordination will occur).",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "required": [
+      "name",
+      "IO_Graph"
+    ],
+    "additionalProperties": false
+  }
+}
