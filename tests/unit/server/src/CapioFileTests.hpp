@@ -53,7 +53,6 @@ TEST(CapioMemoryFileTest, TestHugeFileOnMultiplePages) {
     delete[] input_buffer4;
 }
 
-
 TEST(CapioMemoryFileTest, TestWriteAndRead) {
     CapioMemoryFile file("test.txt");
 
