@@ -24,7 +24,10 @@ class ConsentRequestCache {
         available_consent = new std::unordered_map<std::string, capio_off64_t>;
     };
 
-    ~ConsentRequestCache() { delete available_consent; };
+    ~ConsentRequestCache() {
+        START_LOG(capio_syscall(SYS_gettid), "call()");
+        delete available_consent;
+    };
 
     void consent_request(const std::filesystem::path &path, long tid,
                          const std::string &source_func) const {

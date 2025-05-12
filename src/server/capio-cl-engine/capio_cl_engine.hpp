@@ -12,18 +12,18 @@
 class CapioCLEngine {
   private:
     std::unordered_map<std::string,                         // path name
-                       std::tuple<std::vector<std::string>, // Vector for producers          [0]
-                                  std::vector<std::string>, // Vector for consumers          [1]
-                                  std::string,              // commit rule                   [2]
-                                  std::string,              // fire_rule                     [3]
-                                  bool,                     // permanent                     [4]
-                                  bool,                     // exclude                       [5]
-                                  bool, // is_file (if true yes otherwise it is a directory) [6]
-                                  int,  // commit on close number                            [7]
-                                  long, // directory file count                              [8]
-                                  std::vector<std::string>, // File dependencies             [9]
-                                  std::regex, // Regex from name to match globs             [10]
-                                  bool>> // Store File in memory or on FS. true = memory    [11]
+                       std::tuple<std::vector<std::string>, // Vector for producers            [0]
+                                  std::vector<std::string>, // Vector for consumers            [1]
+                                  std::string,              // commit rule                     [2]
+                                  std::string,              // fire_rule                       [3]
+                                  bool,                     // permanent                       [4]
+                                  bool,                     // exclude                         [5]
+                                  bool,                     // is_file (false = directory)     [6]
+                                  int,                      // commit on close number          [7]
+                                  long,                     // directory file count            [8]
+                                  std::vector<std::string>, // File dependencies               [9]
+                                  std::regex,               // Regex to match globs            [10]
+                                  bool>>                    // Store File on FS. true = memory [11]
         _locations;
 
     static std::string truncateLastN(const std::string &str, const int n) {
@@ -403,15 +403,13 @@ class CapioCLEngine {
     }
 
     void setStoreFileInMemory(const std::filesystem::path &path) {
-        if (const auto itm = _locations.find(path); itm != _locations.end()) {
-            std::get<11>(itm->second) = true;
-        }
+        this->newFile(path);
+        std::get<11>(_locations.at(path)) = true;
     }
 
     void setStoreFileInFileSystem(const std::filesystem::path &path) {
-        if (const auto itm = _locations.find(path); itm != _locations.end()) {
-            std::get<11>(itm->second) = false;
-        }
+        this->newFile(path);
+        std::get<11>(_locations.at(path)) = false;
     }
 
     bool storeFileInMemory(const std::filesystem::path &path) {

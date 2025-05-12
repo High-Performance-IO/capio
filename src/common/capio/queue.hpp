@@ -18,7 +18,6 @@
  * @tparam Mutex Type of semaphore
  */
 template <class T, class Mutex> class Queue {
-  private:
     void *_shm;
     const long int _max_num_elems, _elem_size; // elements size in bytes
     long int _buff_size;                       // buffer size in bytes
@@ -83,6 +82,7 @@ template <class T, class Mutex> class Queue {
 
     Queue(const Queue &)            = delete;
     Queue &operator=(const Queue &) = delete;
+
     ~Queue() {
         START_LOG(capio_syscall(SYS_gettid),
                   "call(_shm_name=%s, _first_elem_name=%s, _last_elem_name=%s)", _shm_name.c_str(),
@@ -93,8 +93,11 @@ template <class T, class Mutex> class Queue {
             syscall_no_intercept_flag = true;
 #endif
             SHM_DESTROY_CHECK(_shm_name.c_str());
+            LOG("Removed %s", _shm_name.c_str());
             SHM_DESTROY_CHECK(_first_elem_name.c_str());
+            LOG("Removed %s", _first_elem_name.c_str());
             SHM_DESTROY_CHECK(_last_elem_name.c_str());
+            LOG("Removed %s", _last_elem_name.c_str());
 #ifdef __CAPIO_POSIX
             syscall_no_intercept_flag = false;
 #endif

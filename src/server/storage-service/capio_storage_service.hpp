@@ -10,7 +10,7 @@ class CapioStorageService {
     // TODO: put all of this conde on a different thread
 
     std::unordered_map<pid_t, SPSCQueue *> *_client_to_server_queue;
-    std::unordered_map<pid_t, SPSCQueue *> *_server_to_clien_queue;
+    std::unordered_map<pid_t, SPSCQueue *> *_server_to_client_queue;
     std::unordered_map<std::string, CapioFile *> *_stored_files;
 
     std::unordered_map<std::string, std::vector<std::tuple<capio_off64_t, capio_off64_t, pid_t>>>
@@ -33,7 +33,7 @@ class CapioStorageService {
         START_LOG(gettid(), "call()");
         _stored_files           = new std::unordered_map<std::string, CapioFile *>;
         _client_to_server_queue = new std::unordered_map<pid_t, SPSCQueue *>;
-        _server_to_clien_queue  = new std::unordered_map<pid_t, SPSCQueue *>;
+        _server_to_client_queue = new std::unordered_map<pid_t, SPSCQueue *>;
         _threads_waiting_for_memory_data =
             new std::unordered_map<std::string,
                                    std::vector<std::tuple<capio_off64_t, capio_off64_t, pid_t>>>;
@@ -45,7 +45,7 @@ class CapioStorageService {
         // TODO: dump files to FS
         delete _stored_files;
         delete _client_to_server_queue;
-        delete _server_to_clien_queue;
+        delete _server_to_client_queue;
         delete _threads_waiting_for_memory_data;
     }
 
@@ -114,11 +114,11 @@ class CapioStorageService {
     void register_client(const std::string &app_name, const pid_t pid) const {
         START_LOG(gettid(), "call(app_name=%s)", app_name.c_str());
         _client_to_server_queue->emplace(
-            pid, new SPSCQueue("queue-" + std::to_string(pid) + +".cts", CAPIO_MAX_SPSQUEUE_ELEMS,
-                               CAPIO_MAX_SPSCQUEUE_ELEM_SIZE, get_capio_workflow_name(), false));
-        _server_to_clien_queue->emplace(
-            pid, new SPSCQueue("queue-" + std::to_string(pid) + +".stc", CAPIO_MAX_SPSQUEUE_ELEMS,
-                               CAPIO_MAX_SPSCQUEUE_ELEM_SIZE, get_capio_workflow_name(), false));
+            pid, new SPSCQueue("queue-" + std::to_string(pid) + +".cts", get_cache_lines(),
+                               get_cache_line_size(), workflow_name, false));
+        _server_to_client_queue->emplace(
+            pid, new SPSCQueue("queue-" + std::to_string(pid) + +".stc", get_cache_lines(),
+                               get_cache_line_size(), workflow_name, false));
         LOG("Created communication queues");
     }
 
@@ -134,7 +134,7 @@ class CapioStorageService {
         START_LOG(gettid(), "call(pid=%llu, file=%s, offset=%llu, size=%llu)", pid, file.c_str(),
                   offset, size);
 
-        getFile(file)->writeToQueue(*_server_to_clien_queue->at(pid), offset, size);
+        getFile(file)->writeToQueue(*_server_to_client_queue->at(pid), offset, size);
     }
 
     /**
@@ -148,13 +148,14 @@ class CapioStorageService {
                             off64_t size) const {
         START_LOG(gettid(), "call(tid=%d, file=%s, offset=%lld, size=%lld)", tid, file.c_str(),
                   offset, size);
-
-        getFile(file)->readFromQueue(*_client_to_server_queue->at(tid), offset, size);
+        const auto f     = getFile(file);
+        const auto queue = _client_to_server_queue->at(tid);
+        f->readFromQueue(*queue, offset, size);
     }
 
     void remove_client(const pid_t pid) const {
         _client_to_server_queue->erase(pid);
-        _server_to_clien_queue->erase(pid);
+        _server_to_client_queue->erase(pid);
     }
 
     /**
@@ -165,10 +166,24 @@ class CapioStorageService {
      */
     [[nodiscard]] size_t sendFilesToStoreInMemory(const long pid) const {
         START_LOG(gettid(), "call(pid=%d)", pid);
+
+        if (StoreOnlyInMemory) {
+            LOG("All files should be handled in memory. sending * wildcard");
+            char f[PATH_MAX + 1]{0};
+            auto c_dir = get_capio_dir().string();
+            memcpy(f, c_dir.c_str(), c_dir.length());
+            memcpy(f + c_dir.size(), "/*", 2);
+            _server_to_client_queue->at(pid)->write(f, PATH_MAX);
+            LOG("Return value=%llu", 1);
+            return 1;
+        }
+
         auto files_to_store_in_mem = capio_cl_engine->getFileToStoreInMemory();
         for (const auto &file : files_to_store_in_mem) {
             LOG("Sending file %s", file.c_str());
-            _server_to_clien_queue->at(pid)->write(file.c_str());
+            char f[PATH_MAX + 1]{0};
+            memcpy(f, file.c_str(), file.size());
+            _server_to_client_queue->at(pid)->write(f, PATH_MAX);
         }
 
         LOG("Return value=%llu", files_to_store_in_mem.size());

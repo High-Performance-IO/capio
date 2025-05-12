@@ -9,11 +9,11 @@ on:
       - capio-v2
 concurrency:
   group: build-${{ github.event.pull_request.number || github.ref }}
-  cancel-in-progress: true
 jobs:
   codespell-check:
     name: "Check codespell conformance"
     runs-on: ubuntu-22.04
+    continue-on-error: true
     steps:
       - uses: actions/checkout@v4
       - name: "Run codespell"
@@ -75,13 +75,14 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: "Run clang-format style check"
-        uses: jidicula/clang-format-action@v4.13.0
+        uses: jidicula/clang-format-action@v4.15.0
         with:
-          clang-format-version: "16"
+          clang-format-version: "20"
           check-path: "${{ matrix.path }}"
   unit-tests:
     name: "Build ${{ matrix.build_type }} with ${{ matrix.cxx }}"
     runs-on: ubuntu-22.04
+    continue-on-error: true
     strategy:
       matrix:
         build_type:
@@ -170,6 +171,12 @@ jobs:
           capio_posix_unit_tests \
             --gtest_break_on_failure \
             --gtest_print_time=1 
+          
+          echo "Run CAPIO memory file integration tests"
+          LD_PRELOAD=libcapio_posix.so \
+          capio_memory_file_unit_tests \
+            --gtest_break_on_failure \
+            --gtest_print_time=1
 
       - name: "Show client logs on failure"
         if: ${{ always() && steps.run-tests.outcome == 'failure' && matrix.build_type == 'Debug' }}

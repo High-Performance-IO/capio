@@ -15,10 +15,11 @@
 class CapioMemoryFile : public CapioFile {
     std::map<std::size_t, std::vector<char>> memoryBlocks;
 
-    // maps for bits
+    // Static file sizes of file pages
     static constexpr u_int32_t _pageSizeMB    = 4;
-    static constexpr u_int64_t _pageMask      = 0xFFFFF;
     static constexpr u_int64_t _pageSizeBytes = _pageSizeMB * 1024 * 1024;
+
+    char *cross_page_buffer_view;
 
     /**
      * Compute the offsets required to handle write operations onto CapioMemoryFile
@@ -27,21 +28,23 @@ class CapioMemoryFile : public CapioFile {
      * @return tuple
      */
     static auto compute_offsets(const std::size_t offset, std::size_t length) {
+
+        START_LOG(gettid(), "call(offset=%llu, length=%llu)", offset, length);
         // Compute the offset of the memoryBlocks component.
-        // This is done by first obtaining the MB component of the address
-        // and then dividing it by the size in megabyte of the address
-        const auto map_offset = (offset >> 20) / _pageSizeMB;
+        const auto map_offset = offset / _pageSizeBytes;
 
         // Compute the first write offset relative to the first block of memory
-        const auto mem_block_offset = offset & _pageMask;
+        const auto mem_block_offset = offset % _pageSizeBytes;
 
         // compute the first write size. if the write operation is bigger than the size of the page
         // in bytes, then we need to perform the first write operation with size equals to the
         // distance between the write offset and the end of the page. otherwise it is possible to
         // use the given length. The returned offset starts from mem_block_offset
         const auto first_write_size =
-            length > _pageSizeBytes ? _pageSizeBytes - mem_block_offset : length;
+            length > _pageSizeBytes - mem_block_offset ? _pageSizeBytes - mem_block_offset : length;
 
+        LOG("Computed offsets. map_offset=%llu, mem_block_offset=%llu, first_write_size=%llu",
+            map_offset, mem_block_offset, first_write_size);
         return std::tuple(map_offset, mem_block_offset, first_write_size);
     }
 
@@ -57,7 +60,11 @@ class CapioMemoryFile : public CapioFile {
     }
 
   public:
-    explicit CapioMemoryFile(const std::string &filePath) : CapioFile(filePath) {}
+    explicit CapioMemoryFile(const std::string &filePath) : CapioFile(filePath) {
+        cross_page_buffer_view = new char[_pageSizeBytes];
+    }
+
+    ~CapioMemoryFile() override { delete[] cross_page_buffer_view; }
 
     /**
      * Write data to a file stored inside the memory
@@ -101,6 +108,7 @@ class CapioMemoryFile : public CapioFile {
         totalSize = std::max(totalSize, buffer_offset);
         return totalSize;
     }
+
     /**
      * Read from Capio File
      * @param buffer Buffer to read to
@@ -146,18 +154,20 @@ class CapioMemoryFile : public CapioFile {
 
         const auto &[map_offset, write_offset, first_write_size] = compute_offsets(offset, length);
 
+        auto remaining_bytes = length;
+
         auto &block = memoryBlocks[map_offset];
         block.resize(_pageSizeBytes); // reserve 4MB of space
 
         queue.read(block.data() + write_offset, first_write_size);
         // update remaining bytes to write
-        length -= first_write_size;
+        remaining_bytes -= first_write_size;
         size_t map_count = 1; // start from map following the one obtained from the first write
 
         // Variable to store the read offset of the input buffer
         auto buffer_offset = first_write_size;
 
-        while (length > 0) {
+        while (remaining_bytes > 0) {
             auto &next_block = memoryBlocks[map_offset + map_count];
             next_block.resize(_pageSizeBytes); // reserve 4MB of space
             // Compute the actual size of the current write
@@ -166,7 +176,7 @@ class CapioMemoryFile : public CapioFile {
             queue.read(next_block.data(), write_size);
             buffer_offset += write_size;
             map_count++;
-            length -= _pageSizeBytes;
+            remaining_bytes -= _pageSizeBytes;
         }
 
         totalSize = std::max(totalSize, offset + length);
@@ -181,27 +191,27 @@ class CapioMemoryFile : public CapioFile {
      */
     std::size_t writeToQueue(SPSCQueue &queue, std::size_t offset,
                              std::size_t length) const override {
+        START_LOG(gettid(), "call(offset=%llu, length=%llu)", offset, length);
         std::size_t bytesRead = 0;
 
-        const auto &[map_offset, mem_block_offset_begin, buffer_view_size] =
-            compute_offsets(offset, length);
+        while (bytesRead < length) {
+            const auto [map_offset, mem_block_offset_begin, buffer_view_size] =
+                compute_offsets(offset, length - bytesRead);
 
-        // Traverse the memory blocks to read the requested data starting from the first block of
-        // date
-        for (auto it = memoryBlocks.lower_bound(map_offset);
-             it != memoryBlocks.end() && bytesRead < length; ++it) {
-            auto &[blockOffset, block] = *it;
+            if (const auto it = memoryBlocks.lower_bound(map_offset); it != memoryBlocks.end()) {
+                auto &[blockOffset, block] = *it;
 
-            if (blockOffset >= offset + length) {
-                break; // Past the requested range
+                if (blockOffset >= offset + length) {
+                    return bytesRead; // Past the requested range
+                }
+
+                // Copy the data to the buffer
+                queue.write(block.data() + mem_block_offset_begin, buffer_view_size);
+
+                bytesRead += buffer_view_size;
+                offset += buffer_view_size;
             }
-
-            // Copy the data to the buffer
-            queue.write(block.data() + mem_block_offset_begin, buffer_view_size);
-
-            bytesRead += buffer_view_size;
         }
-
         return bytesRead;
     }
 };

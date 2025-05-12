@@ -20,7 +20,8 @@ class NoLock {
 
     NoLock(const NoLock &)            = delete;
     NoLock &operator=(const NoLock &) = delete;
-    ~NoLock()                         = default;
+
+    ~NoLock() { START_LOG(capio_syscall(SYS_gettid), "call()"); };
 
     static inline void lock() { START_LOG(capio_syscall(SYS_gettid), "call()"); };
 
@@ -58,6 +59,7 @@ class NamedSemaphore {
 
     NamedSemaphore(const NamedSemaphore &)            = delete;
     NamedSemaphore &operator=(const NamedSemaphore &) = delete;
+
     ~NamedSemaphore() {
         START_LOG(capio_syscall(SYS_gettid), "call()");
         if (_require_cleanup) {
@@ -125,6 +127,7 @@ class Semaphore {
 
     Semaphore(const Semaphore &)            = delete;
     Semaphore &operator=(const Semaphore &) = delete;
+
     ~Semaphore() {
         START_LOG(capio_syscall(SYS_gettid), "call()");
         if (_require_cleanup) {

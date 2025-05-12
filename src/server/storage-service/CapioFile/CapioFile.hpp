@@ -7,10 +7,14 @@ class CapioFile {
     std::size_t totalSize;
 
   public:
-    explicit CapioFile(const std::string &filePath) : fileName(filePath), totalSize(0){};
+    explicit CapioFile(const std::string &filePath) : fileName(filePath), totalSize(0) {};
     virtual ~CapioFile() = default;
 
-    [[nodiscard]] std::size_t getSize() const { return totalSize; }
+    [[nodiscard]] std::size_t getSize() const {
+        START_LOG(gettid(), "call()");
+        return totalSize;
+    }
+
     [[nodiscard]] const std::string &getFileName() const { return fileName; }
 
     /**

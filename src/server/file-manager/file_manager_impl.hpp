@@ -233,6 +233,7 @@ inline bool CapioFileManager::isCommitted(const std::filesystem::path &path) {
     static std::unordered_map<std::string, bool> committed_files;
 
     if (committed_files.find(path) != committed_files.end()) {
+        LOG("Committed: TRUE");
         return true;
     }
 
@@ -253,8 +254,10 @@ inline bool CapioFileManager::isCommitted(const std::filesystem::path &path) {
 
         if (count >= file_count) {
             committed_files[path] = true;
+            LOG("Committed: TRUE");
             return true;
         }
+        LOG("Committed: FALSE");
         return false;
     }
 
@@ -277,6 +280,7 @@ inline bool CapioFileManager::isCommitted(const std::filesystem::path &path) {
         if (commit_computed) {
             committed_files[path] = true;
         }
+        LOG("Committed: %s", commit_computed ? "TRUE" : "FALSE");
         return commit_computed;
     }
 
@@ -284,7 +288,8 @@ inline bool CapioFileManager::isCommitted(const std::filesystem::path &path) {
         LOG("Commit rule is ON_CLOSE");
 
         if (!std::filesystem::exists(metadata_computed_path)) {
-            LOG("Commit file does not yet exists. returning false");
+            LOG("Commit file does not yet exists.");
+            LOG("Committed: FALSE");
             return false;
         }
 
@@ -292,6 +297,7 @@ inline bool CapioFileManager::isCommitted(const std::filesystem::path &path) {
         LOG("Expected close count is: %d", commit_count);
         if (commit_count == -1) {
             LOG("File needs to be closed exactly once and token exists. returning");
+            LOG("Committed: TRUE");
             return true;
         }
 
@@ -308,7 +314,9 @@ inline bool CapioFileManager::isCommitted(const std::filesystem::path &path) {
         if (actual_commit_count >= commit_count) {
             committed_files[path] = true;
             return true;
+            LOG("Committed: TRUE");
         }
+        LOG("Committed: FALSE");
         return false;
     }
 
@@ -317,8 +325,10 @@ inline bool CapioFileManager::isCommitted(const std::filesystem::path &path) {
 
     if (std::filesystem::exists(metadata_computed_path)) {
         committed_files[path] = true;
+        LOG("Committed: TRUE");
         return true;
     }
+    LOG("Committed: FALSE");
     return false;
 }
 
