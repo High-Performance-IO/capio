@@ -35,8 +35,8 @@ std::string compute_abs_path(char *pathname, int dirfd) {
 #if defined(SYS_creat)
 int creat_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg5, long *result) {
     std::string pathname(reinterpret_cast<const char *>(arg0));
-    auto tid = static_cast<pid_t>(syscall_no_intercept(SYS_gettid));
-    int flags = O_CREAT | O_WRONLY | O_TRUNC;
+    auto tid    = static_cast<pid_t>(syscall_no_intercept(SYS_gettid));
+    int flags   = O_CREAT | O_WRONLY | O_TRUNC;
     mode_t mode = static_cast<int>(arg2);
     START_LOG(tid, "call(path=%s, flags=%d, mode=%d)", pathname.data(), flags, mode);
 
@@ -64,9 +64,9 @@ int creat_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long ar
 #if defined(SYS_open)
 int open_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg5, long *result) {
     std::string pathname(reinterpret_cast<const char *>(arg0));
-    int flags = static_cast<int>(arg1);
+    int flags   = static_cast<int>(arg1);
     mode_t mode = static_cast<int>(arg2);
-    auto tid = static_cast<pid_t>(syscall_no_intercept(SYS_gettid));
+    auto tid    = static_cast<pid_t>(syscall_no_intercept(SYS_gettid));
     START_LOG(tid, "call(path=%s, flags=%d, mode=%d)", pathname.data(), flags, mode);
 
     std::string path = compute_abs_path(pathname.data(), -1);
@@ -100,9 +100,9 @@ int open_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg
 int openat_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg5, long *result) {
     int dirfd = static_cast<int>(arg0);
     std::string pathname(reinterpret_cast<const char *>(arg1));
-    int flags = static_cast<int>(arg2);
+    int flags   = static_cast<int>(arg2);
     mode_t mode = static_cast<int>(arg3);
-    auto tid = static_cast<pid_t>(syscall_no_intercept(SYS_gettid));
+    auto tid    = static_cast<pid_t>(syscall_no_intercept(SYS_gettid));
     START_LOG(tid, "call(path=%s, flags=%d, mode=%d)", pathname.data(), flags, mode);
 
     std::string path = compute_abs_path(pathname.data(), dirfd);
