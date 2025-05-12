@@ -23,7 +23,7 @@ class WriteRequestCacheMEM {
         }
     }
 
-protected:
+  protected:
     void write_request(const off64_t count, const long tid, const char *path,
                        const capio_off64_t offset) const {
         START_LOG(capio_syscall(SYS_gettid), "call(path=%s, count=%ld, offset=%llu)", path, count,
@@ -34,11 +34,10 @@ protected:
         buf_requests->write(req, CAPIO_REQ_MAX_SIZE);
     }
 
-public:
+  public:
     explicit WriteRequestCacheMEM(off64_t line_size = get_cache_line_size())
         : _cache(nullptr), _tid(capio_syscall(SYS_gettid)), _fd(-1), _max_line_size(line_size),
-          _actual_size(0), _last_write_end(-1), _last_write_begin(0) {
-    }
+          _actual_size(0), _last_write_end(-1), _last_write_begin(0) {}
 
     ~WriteRequestCacheMEM() {
         START_LOG(capio_syscall(SYS_gettid), "call()");
@@ -50,7 +49,7 @@ public:
         if (_actual_size != 0) {
             LOG("Actual size: %ld", _actual_size);
             write_request(_actual_size, _tid, get_capio_fd_path(_fd).c_str(), _last_write_begin);
-            _cache = nullptr;
+            _cache       = nullptr;
             _actual_size = 0;
         }
         LOG("Flush completed");
@@ -63,7 +62,7 @@ public:
         if (_fd != fd) {
             LOG("changed fd from %d to %d: flushing", _fd, fd);
             flush();
-            _fd = fd;
+            _fd             = fd;
             _last_write_end = -1;
         }
 

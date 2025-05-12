@@ -111,7 +111,7 @@ inline void CapioFileManager::_unlockThreadAwaitingData(
          * should be triggered only if the file is a directory and the rule specified on it is
          * Fire No Update
          */
-        const bool is_directory = std::filesystem::is_directory(path);
+        const bool is_directory  = std::filesystem::is_directory(path);
         const uintmax_t filesize = is_directory ? ULLONG_MAX : get_file_size_if_exists(path);
         /*
          * Check for file size only if it is directory, otherwise,
@@ -167,8 +167,8 @@ inline void CapioFileManager::_unlockThreadAwaitingData(
  */
 inline void CapioFileManager::increaseCloseCount(const std::filesystem::path &path) {
     START_LOG(gettid(), "call(path=%s)", path.c_str());
-    auto metadata_path = getAndCreateMetadataPath(path);
-    const auto lock = new DistributedSemaphore(metadata_path + ".lock", 300);
+    auto metadata_path    = getAndCreateMetadataPath(path);
+    const auto lock       = new DistributedSemaphore(metadata_path + ".lock", 300);
     long long close_count = 0;
     LOG("Gained mutual exclusive access to token file %s", (metadata_path + ".lock").c_str());
 

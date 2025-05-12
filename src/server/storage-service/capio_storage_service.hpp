@@ -14,7 +14,7 @@ class CapioStorageService {
     std::unordered_map<std::string, CapioFile *> *_stored_files;
 
     std::unordered_map<std::string, std::vector<std::tuple<capio_off64_t, capio_off64_t, pid_t>>>
-    *_threads_waiting_for_memory_data;
+        *_threads_waiting_for_memory_data;
 
     /**
      * Return a file if exists. if not, create it and then return it
@@ -28,17 +28,17 @@ class CapioStorageService {
         return _stored_files->at(file_name);
     }
 
-public:
+  public:
     CapioStorageService() {
         START_LOG(gettid(), "call()");
-        _stored_files = new std::unordered_map<std::string, CapioFile *>;
+        _stored_files           = new std::unordered_map<std::string, CapioFile *>;
         _client_to_server_queue = new std::unordered_map<pid_t, SPSCQueue *>;
         _server_to_client_queue = new std::unordered_map<pid_t, SPSCQueue *>;
         _threads_waiting_for_memory_data =
             new std::unordered_map<std::string,
                                    std::vector<std::tuple<capio_off64_t, capio_off64_t, pid_t>>>;
         std::cout << CAPIO_SERVER_CLI_LOG_SERVER << " [ " << node_name << " ] "
-            << "CapioStorageService initialization completed." << std::endl;
+                  << "CapioStorageService initialization completed." << std::endl;
     }
 
     ~CapioStorageService() {
@@ -148,7 +148,7 @@ public:
                             off64_t size) const {
         START_LOG(gettid(), "call(tid=%d, file=%s, offset=%lld, size=%lld)", tid, file.c_str(),
                   offset, size);
-        const auto f = getFile(file);
+        const auto f     = getFile(file);
         const auto queue = _client_to_server_queue->at(tid);
         f->readFromQueue(*queue, offset, size);
     }

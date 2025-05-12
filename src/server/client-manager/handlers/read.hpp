@@ -79,10 +79,9 @@ inline void read_mem_handler(const char *const str) {
     if (use_cache) {
         LOG("Computing size of data to send: minimum between:");
         LOG("client_cache_line_size: %llu", client_cache_line_size);
-        LOG("file_size:%llu - read_begin_offset=%llu = %llu", size_to_send,
-            read_begin_offset, size_to_send - read_begin_offset);
-        size_to_send =
-            std::min({client_cache_line_size, (size_to_send - read_begin_offset)});
+        LOG("file_size:%llu - read_begin_offset=%llu = %llu", size_to_send, read_begin_offset,
+            size_to_send - read_begin_offset);
+        size_to_send = std::min({client_cache_line_size, (size_to_send - read_begin_offset)});
     }
 
     LOG("Sending to posix app the offset up to which read.");
@@ -90,7 +89,7 @@ inline void read_mem_handler(const char *const str) {
         read_begin_offset + size_to_send >= storage_service->sizeOf(path)) {
         LOG("File is committed, and end of read >= than file size."
             " signaling it to posix application by setting offset MSB to 1");
-        LOG("Sending offset: %llu", 0x8000000000000000 |size_to_send);
+        LOG("Sending offset: %llu", 0x8000000000000000 | size_to_send);
         client_manager->reply_to_client(tid, 0x8000000000000000 | size_to_send);
     } else {
         LOG("File is not committed. Sending offset: %llu", size_to_send);

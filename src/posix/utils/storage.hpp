@@ -9,8 +9,8 @@ inline bool store_file_in_memory(const std::filesystem::path &file_name, const l
     START_LOG(capio_syscall(SYS_gettid), "call(path=%s, pid=%ld)", file_name.c_str(), pid);
     if (paths_to_store_in_memory == nullptr) {
         /*
-        * Request which files need to be handled in memory instead of file system
-        */
+         * Request which files need to be handled in memory instead of file system
+         */
         LOG("Vector is empty and not allocated. performing request");
         paths_to_store_in_memory = file_in_memory_request(pid);
     }

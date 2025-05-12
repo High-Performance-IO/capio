@@ -24,7 +24,7 @@ class ReadRequestCacheMEM {
         }
     }
 
-protected:
+  protected:
     [[nodiscard]] capio_off64_t read_request(const int fd, const capio_off64_t count,
                                              const long tid, bool use_cache = true) {
         START_LOG(capio_syscall(SYS_gettid), "call(fd=%ld, count=%llu, tid=%ld, load_data=%s)", fd,
@@ -55,7 +55,7 @@ protected:
             _cache_offset = 0;
             LOG("Completed fetch of data from server");
         } else {
-            _actual_size = 0;
+            _actual_size  = 0;
             _cache_offset = 0;
             LOG("Data has not been loaded from server, as load_data==false."
                 " Load will occur independently");
@@ -64,7 +64,7 @@ protected:
         return stc_queue_read;
     }
 
-public:
+  public:
     explicit ReadRequestCacheMEM(const long line_size = get_posix_read_cache_line_size())
         : _cache(nullptr), _tid(capio_syscall(SYS_gettid)), _fd(-1), _max_line_size(line_size),
           _actual_size(0), _cache_offset(0), _last_read_end(-1) {
@@ -81,7 +81,7 @@ public:
         if (_cache_offset != _actual_size) {
             _actual_size = _cache_offset = 0;
         }
-        committed = false;
+        committed                  = false;
         _real_file_size_commmitted = -1;
     }
 
@@ -93,7 +93,7 @@ public:
         if (_fd != fd) {
             LOG("changed fd from %d to %d: flushing", _fd, fd);
             flush();
-            _fd = fd;
+            _fd            = fd;
             _last_read_end = get_capio_fd_offset(fd);
         }
 
@@ -127,7 +127,7 @@ public:
         if (_actual_size == 0 || _actual_size == _cache_offset) {
             LOG("No data is present locally. performing request.");
             const auto size = count < _max_line_size ? count : _max_line_size;
-            _actual_size = read_request(_fd, size, _tid);
+            _actual_size    = read_request(_fd, size, _tid);
 
             // Update count for current request. If count exceeds _actual_size, resize it to not
             // exceeds the available size on posix application
@@ -139,7 +139,7 @@ public:
             LOG("The requested amount of data can be served without performing a request");
             _read(buffer, count);
             actual_read_size = count;
-            _last_read_end = get_capio_fd_offset(_fd) + count;
+            _last_read_end   = get_capio_fd_offset(_fd) + count;
             set_capio_fd_offset(fd, _last_read_end);
 
         } else {
@@ -160,7 +160,7 @@ public:
             LOG("actual_read_size incremented to: %ld", actual_read_size);
 
             // Compute the remaining amount of data to send to client
-            auto remaining_size = count - first_copy_size;
+            auto remaining_size       = count - first_copy_size;
             capio_off64_t copy_offset = first_copy_size;
 
             while (copy_offset < count && !committed) {

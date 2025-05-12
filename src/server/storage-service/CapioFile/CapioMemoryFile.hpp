@@ -16,7 +16,7 @@ class CapioMemoryFile : public CapioFile {
     std::map<std::size_t, std::vector<char>> memoryBlocks;
 
     // Static file sizes of file pages
-    static constexpr u_int32_t _pageSizeMB = 4;
+    static constexpr u_int32_t _pageSizeMB    = 4;
     static constexpr u_int64_t _pageSizeBytes = _pageSizeMB * 1024 * 1024;
 
     char *cross_page_buffer_view;
@@ -59,14 +59,12 @@ class CapioMemoryFile : public CapioFile {
         return block;
     }
 
-public:
+  public:
     explicit CapioMemoryFile(const std::string &filePath) : CapioFile(filePath) {
         cross_page_buffer_view = new char[_pageSizeBytes];
     }
 
-    ~CapioMemoryFile() override {
-        delete[] cross_page_buffer_view;
-    }
+    ~CapioMemoryFile() override { delete[] cross_page_buffer_view; }
 
     /**
      * Write data to a file stored inside the memory
@@ -197,7 +195,7 @@ public:
         std::size_t bytesRead = 0;
 
         while (bytesRead < length) {
-            const auto [map_offset,mem_block_offset_begin , buffer_view_size] =
+            const auto [map_offset, mem_block_offset_begin, buffer_view_size] =
                 compute_offsets(offset, length - bytesRead);
 
             if (const auto it = memoryBlocks.lower_bound(map_offset); it != memoryBlocks.end()) {

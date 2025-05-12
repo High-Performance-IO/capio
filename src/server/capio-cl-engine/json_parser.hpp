@@ -41,7 +41,7 @@ class JsonParser {
         return mismatch_pair.second == base.end();
     }
 
-public:
+  public:
     /**
      * @brief Perform the parsing of the capio_server configuration file
      *
@@ -49,7 +49,7 @@ public:
      * @return CapioCLEngine instance with the information provided by the config file
      */
     static CapioCLEngine *parse(const std::filesystem::path &source) {
-        auto locations = new CapioCLEngine();
+        auto locations        = new CapioCLEngine();
         const auto &capio_dir = get_capio_dir();
 
         START_LOG(gettid(), "call(config_file='%s', capio_dir='%s')", source.c_str(),
@@ -69,7 +69,7 @@ public:
         simdjson::padded_string json;
         simdjson::ondemand::document entries;
         simdjson::ondemand::array input_stream, output_stream, streaming, permanent_files,
-                                  exclude_files, storage_memory, storage_fs;
+            exclude_files, storage_memory, storage_fs;
         simdjson::ondemand::object storage_section;
         simdjson::error_code error;
 
@@ -77,7 +77,7 @@ public:
             json = simdjson::padded_string::load(source.c_str());
         } catch (const simdjson::simdjson_error &e) {
             std::cerr << CAPIO_LOG_SERVER_CLI_LEVEL_ERROR << " [ " << node_name << " ] "
-                << "Exception thrown while opening config file: " << e.what() << std::endl;
+                      << "Exception thrown while opening config file: " << e.what() << std::endl;
             LOG("Exception thrown while opening config file: %s", e.what());
             ERR_EXIT("Exception thrown while opening config file: %s", e.what());
         }
@@ -90,7 +90,7 @@ public:
         }
         workflow_name = std::string(wf_name);
         std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_JSON << " [ " << node_name << " ] "
-            << "Parsing configuration for workflow: " << workflow_name << std::endl;
+                  << "Parsing configuration for workflow: " << workflow_name << std::endl;
         LOG("Parsing configuration for workflow: %s", std::string(workflow_name).c_str());
 
         std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_JSON << " [ " << node_name << " ] " << std::endl;
@@ -105,23 +105,23 @@ public:
             }
 
             std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_JSON << " [ " << node_name << " ] "
-                << "Parsing config for app " << app_name << std::endl;
+                      << "Parsing config for app " << app_name << std::endl;
             LOG("Parsing config for app %s", std::string(app_name).c_str());
 
             if (app["input_stream"].get_array().get(input_stream)) {
                 std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_ERROR << " [ " << node_name << " ] "
-                    << "No input_stream section found for app " << app_name << std::endl;
+                          << "No input_stream section found for app " << app_name << std::endl;
                 ERR_EXIT("No input_stream section found for app %s", std::string(app_name).c_str());
             } else {
                 for (auto itm : input_stream) {
                     std::filesystem::path file(itm.get_string().take_value());
                     std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_JSON << " [ " << node_name << " ] "
-                        << "Found file : " << file << std::endl;
+                              << "Found file : " << file << std::endl;
                     if (file.is_relative() || first_is_subpath_of_second(file, get_capio_dir())) {
                         std::string appname(app_name);
                         std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_JSON << " [ " << node_name << " ] "
-                            << "File : " << file << " added to app: " << app_name
-                            << std::endl;
+                                  << "File : " << file << " added to app: " << app_name
+                                  << std::endl;
                         if (file.is_relative()) {
                             file = capio_dir / file;
                         }
@@ -129,20 +129,20 @@ public:
                         locations->addConsumer(file, appname);
                     } else {
                         std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_WARNING << " [ " << node_name
-                            << " ] "
-                            << "File : " << file
-                            << " is not relative to CAPIO_DIR. Ignoring..." << std::endl;
+                                  << " ] "
+                                  << "File : " << file
+                                  << " is not relative to CAPIO_DIR. Ignoring..." << std::endl;
                     }
                 }
 
                 std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_JSON << " [ " << node_name << " ] "
-                    << "Completed input_stream parsing for app: " << app_name << std::endl;
+                          << "Completed input_stream parsing for app: " << app_name << std::endl;
                 LOG("Completed input_stream parsing for app: %s", std::string(app_name).c_str());
             }
 
             if (app["output_stream"].get_array().get(output_stream)) {
                 std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_ERROR << " [ " << node_name << " ] "
-                    << "No output_stream section found for app " << app_name << std::endl;
+                          << "No output_stream section found for app " << app_name << std::endl;
                 ERR_EXIT("No output_stream section found for app %s",
                          std::string(app_name).c_str());
             } else {
@@ -151,8 +151,8 @@ public:
                     if (file.is_relative() || first_is_subpath_of_second(file, get_capio_dir())) {
                         std::string appname(app_name);
                         std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_JSON << " [ " << node_name << " ] "
-                            << "Adding file: " << file << " to app: " << app_name
-                            << std::endl;
+                                  << "Adding file: " << file << " to app: " << app_name
+                                  << std::endl;
                         if (file.is_relative()) {
                             file = capio_dir / file;
                         }
@@ -161,14 +161,14 @@ public:
                     }
                 }
                 std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_JSON << " [ " << node_name << " ] "
-                    << "Completed output_stream parsing for app: " << app_name << std::endl;
+                          << "Completed output_stream parsing for app: " << app_name << std::endl;
                 LOG("Completed output_stream parsing for app: %s", std::string(app_name).c_str());
             }
 
             // PARSING STREAMING FILES
             if (app["streaming"].get_array().get(streaming)) {
                 std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_WARNING << " [ " << node_name << " ] "
-                    << "No streaming section found for app: " << app_name << std::endl;
+                          << "No streaming section found for app: " << app_name << std::endl;
                 LOG("No streaming section found for app: %s", std::string(app_name).c_str());
             } else {
                 LOG("Began parsing streaming section for app %s", std::string(app_name).c_str());
@@ -210,7 +210,7 @@ public:
                     error = file["committed"].get_string().get(committed);
                     if (error) {
                         std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_ERROR << " [ " << node_name << " ] "
-                            << "commit rule is mandatory in streaming section" << std::endl;
+                                  << "commit rule is mandatory in streaming section" << std::endl;
                         ERR_EXIT("error commit rule is mandatory in streaming section");
                     } else {
                         auto pos = committed.find(':');
@@ -218,8 +218,8 @@ public:
                             commit_rule = committed.substr(0, pos);
                             if (commit_rule != CAPIO_FILE_COMMITTED_ON_CLOSE) {
                                 std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_ERROR << " [ " << node_name
-                                    << " ] "
-                                    << "commit rule " << commit_rule << std::endl;
+                                          << " ] "
+                                          << "commit rule " << commit_rule << std::endl;
                                 ERR_EXIT("error commit rule: %s", std::string(commit_rule).c_str());
                             }
 
@@ -227,8 +227,8 @@ public:
 
                             if (!is_int(n_close_str)) {
                                 std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_ERROR << " [ " << node_name
-                                    << " ] "
-                                    << "commit rule on_close invalid number" << std::endl;
+                                          << " ] "
+                                          << "commit rule on_close invalid number" << std::endl;
                                 ERR_EXIT("error commit rule on_close invalid number: !is_int()");
                             }
                             n_close = std::stol(n_close_str);
@@ -244,9 +244,9 @@ public:
 
                         if (error) {
                             std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_ERROR << " [ " << node_name
-                                << " ] "
-                                << "commit rule is on_file but no file_deps section found"
-                                << std::endl;
+                                      << " ] "
+                                      << "commit rule is on_file but no file_deps section found"
+                                      << std::endl;
                             ERR_EXIT("commit rule is on_file but no file_deps section found");
                         }
 
@@ -258,9 +258,9 @@ public:
                                                 ? (get_capio_dir() / computed_path)
                                                 : computed_path;
                             std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_JSON << " [ " << node_name
-                                << " ] "
-                                << "Adding file: " << computed_path
-                                << " to file dependencies: " << std::endl;
+                                      << " ] "
+                                      << "Adding file: " << computed_path
+                                      << " to file dependencies: " << std::endl;
                             file_deps.emplace_back(computed_path);
                         }
                     }
@@ -287,8 +287,8 @@ public:
                     LOG("batch_size: %d", batch_size);
                     for (auto path : streaming_names) {
                         std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_JSON << " [ " << node_name << " ] "
-                            << " [ " << node_name << " ] "
-                            << "Updating metadata for path:  " << path << std::endl;
+                                  << " [ " << node_name << " ] "
+                                  << "Updating metadata for path:  " << path << std::endl;
                         if (path.is_relative()) {
                             path = (capio_dir / path).lexically_normal();
                         }
@@ -298,9 +298,9 @@ public:
                         std::string commit(commit_rule), firerule(mode);
                         if (n_files != -1) {
                             std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_JSON << " [ " << node_name
-                                << " ] "
-                                << "Setting path:  " << path << " n_files to " << n_files
-                                << std::endl;
+                                      << " ] "
+                                      << "Setting path:  " << path << " n_files to " << n_files
+                                      << std::endl;
                             locations->setDirectoryFileCount(path, n_files);
                         }
 
@@ -313,23 +313,23 @@ public:
                 }
 
                 std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_JSON << " [ " << node_name << " ] "
-                    << "completed parsing of streaming section for app: " << app_name
-                    << std::endl;
+                          << "completed parsing of streaming section for app: " << app_name
+                          << std::endl;
                 LOG("completed parsing of streaming section for app: %s",
                     std::string(app_name).c_str());
             } // END PARSING STREAMING FILES
             std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_JSON << " [ " << node_name << " ] "
-                << std::endl;
+                      << std::endl;
         } // END OF APP MAIN LOOPS
         LOG("Completed parsing of io_graph app main loops");
         std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_JSON << " [ " << node_name << " ] "
-            << "Completed parsing of io_graph" << std::endl;
+                  << "Completed parsing of io_graph" << std::endl;
         LOG("Completed parsing of io_graph");
 
         if (entries["permanent"].get_array().get(permanent_files)) {
             // PARSING PERMANENT FILES
             std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_WARNING << " [ " << node_name << " ] "
-                << "No permanent section found for workflow: " << workflow_name << std::endl;
+                      << "No permanent section found for workflow: " << workflow_name << std::endl;
             LOG("No permanent section found for workflow: %s", std::string(workflow_name).c_str());
         } else {
             for (auto file : permanent_files) {
@@ -351,7 +351,7 @@ public:
                 }
             }
             std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_JSON << " [ " << node_name << " ] "
-                << "Completed parsing of permanent files" << std::endl;
+                      << "Completed parsing of permanent files" << std::endl;
             LOG("Completed parsing of permanent files");
         } // END PARSING PERMANENT FILES
 
@@ -360,7 +360,7 @@ public:
         if (entries["exclude"].get_array().get(exclude_files)) {
             // PARSING PERMANENT FILES
             std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_WARNING << " [ " << node_name << " ] "
-                << "No exclude section found for workflow: " << workflow_name << std::endl;
+                      << "No exclude section found for workflow: " << workflow_name << std::endl;
             LOG("No exclude section found for workflow: %s", std::string(workflow_name).c_str());
         } else {
             for (auto file : exclude_files) {
@@ -382,7 +382,7 @@ public:
                 }
             }
             std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_JSON << " [ " << node_name << " ] "
-                << "Completed parsing of exclude files" << std::endl;
+                      << "Completed parsing of exclude files" << std::endl;
             LOG("Completed parsing of exclude files");
         } // END PARSING PERMANENT FILES
 
@@ -391,19 +391,19 @@ public:
         auto home_node_policies = entries["home_node_policy"].error();
         if (!home_node_policies) {
             std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_WARNING << " [ " << node_name << " ] "
-                << "Warning: capio does not support home node policies yet! skipping section "
-                << std::endl;
+                      << "Warning: capio does not support home node policies yet! skipping section "
+                      << std::endl;
         }
 
         if (entries["storage"].get_object().get(storage_section)) {
             std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_WARNING << " [ " << node_name << " ] "
-                << "No storage section found for workflow: " << workflow_name << std::endl;
+                      << "No storage section found for workflow: " << workflow_name << std::endl;
             LOG("No storage section found for workflow: %s", std::string(workflow_name).c_str());
         } else {
             if (storage_section["memory"].get_array().get(storage_memory)) {
                 std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_WARNING << " [ " << node_name << " ] "
-                    << "No files listed in memory storage section for workflow: "
-                    << workflow_name << std::endl;
+                          << "No files listed in memory storage section for workflow: "
+                          << workflow_name << std::endl;
                 LOG("No files listed in memory storage section for workflow: %s",
                     std::string(workflow_name).c_str());
             } else {
@@ -411,16 +411,16 @@ public:
                     std::string_view file_str;
                     file.get_string().get(file_str);
                     std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_JSON << " [ " << node_name << " ] "
-                        << "Setting file " << file_str << " to be stored in memory"
-                        << std::endl;
+                              << "Setting file " << file_str << " to be stored in memory"
+                              << std::endl;
                     locations->setStoreFileInMemory(file_str);
                 }
             }
 
             if (storage_section["fs"].get_array().get(storage_fs)) {
                 std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_WARNING << " [ " << node_name << " ] "
-                    << "No files listed in fs storage section for workflow: " << workflow_name
-                    << std::endl;
+                          << "No files listed in fs storage section for workflow: " << workflow_name
+                          << std::endl;
                 LOG("No files listed in fs storage section for workflow: %s",
                     std::string(workflow_name).c_str());
             } else {
@@ -428,13 +428,13 @@ public:
                     std::string_view file_str;
                     file.get_string().get(file_str);
                     std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_JSON << " [ " << node_name << " ] "
-                        << "Setting file " << file_str << " to be stored on file system"
-                        << std::endl;
+                              << "Setting file " << file_str << " to be stored on file system"
+                              << std::endl;
                     locations->setStoreFileInFileSystem(file_str);
                 }
             }
             std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_JSON << " [ " << node_name << " ] "
-                << "Completed parsing of memory storage directives" << std::endl;
+                      << "Completed parsing of memory storage directives" << std::endl;
         }
 
         std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_JSON << std::endl;
