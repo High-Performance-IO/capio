@@ -52,9 +52,11 @@ class CapioShmCanary {
     std::string _canary_name;
 
   public:
-    explicit CapioShmCanary(std::string capio_workflow_name) : _canary_name(capio_workflow_name) {
+    explicit CapioShmCanary(std::string capio_workflow_name = CAPIO_DEFAULT_WORKFLOW_NAME)
+        : _canary_name(get_capio_workflow_name()) {
         START_LOG(capio_syscall(SYS_gettid), "call(capio_workflow_name: %s)", _canary_name.data());
         if (_canary_name.empty()) {
+            LOG("Empty _canary_name");
             _canary_name = get_capio_workflow_name();
         }
         _shm_id = shm_open(_canary_name.data(), O_CREAT | O_EXCL, S_IRUSR | S_IWUSR);

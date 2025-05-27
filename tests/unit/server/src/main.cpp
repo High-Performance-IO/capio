@@ -1,5 +1,8 @@
+#include "capio/constants.hpp"
 #include <gtest/gtest.h>
 #include <thread>
+
+std::string workflow_name = CAPIO_DEFAULT_WORKFLOW_NAME;
 
 std::string node_name;
 

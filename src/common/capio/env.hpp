@@ -85,14 +85,29 @@ inline int get_capio_log_level() {
 
 inline std::string get_capio_workflow_name() {
     static std::string name;
+
+    START_LOG(capio_syscall(SYS_gettid), "call()");
+
     if (name.empty()) {
+        LOG("name is empty");
+#ifdef __CAPIO_POSIX
+        LOG("Fetching name from std::env");
         auto tmp = std::getenv("CAPIO_WORKFLOW_NAME");
         if (tmp != nullptr) {
             name = tmp;
         } else {
             name = CAPIO_DEFAULT_WORKFLOW_NAME;
         }
+#else
+        LOG("fetching name from workflow_name");
+        name = workflow_name;
+        if (name.size() == 0) {
+            LOG("Falling back to default workflow name");
+            name = CAPIO_DEFAULT_WORKFLOW_NAME;
+        }
+#endif
     }
+
     return name;
 }
 
