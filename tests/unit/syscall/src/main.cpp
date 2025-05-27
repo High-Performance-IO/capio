@@ -1,4 +1,7 @@
+#include "capio/constants.hpp"
 #include <gtest/gtest.h>
+
+std::string workflow_name = CAPIO_DEFAULT_WORKFLOW_NAME;
 
 char **build_args() {
     char **args = (char **) malloc(3 * sizeof(uintptr_t));
