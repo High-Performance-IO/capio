@@ -8,9 +8,9 @@
 #include <string.h>
 
 // Map &DIR -> <dir_path, files already served>
-std::unordered_map<unsigned long int, std::pair<std::string, int>> opened_directory;
+inline std::unordered_map<unsigned long int, std::pair<std::string, int>> opened_directory;
 
-std::unordered_map<std::string, std::vector<dirent64 *> *> *directory_items;
+inline std::unordered_map<std::string, std::vector<dirent64 *> *> *directory_items;
 
 int count_files_in_directory(const char *path) {
     static struct dirent64 *(*real_readdir64)(DIR *) = NULL;
@@ -41,18 +41,20 @@ int count_files_in_directory(const char *path) {
         auto entry_realpath = (strcmp(entry->d_name, ".") == 0 || strcmp(entry->d_name, "..") == 0)
                                   ? entry->d_name
                                   : capio_absolute(entry->d_name);
+        char realp_dir_path[PATH_MAX];
+        capio_realpath(path, realp_dir_path);
 
         if (auto directory_object = directory_items->find(entry_realpath);
             directory_object == directory_items->end()) {
-            LOG("Directory vector not present");
-            directory_items->emplace(entry_realpath, new std::vector<dirent64 *>());
+            LOG("Directory vector not present. Adding it at path %s", realp_dir_path);
+            directory_items->emplace(realp_dir_path, new std::vector<dirent64 *>());
         }
 
-        auto directory_object = directory_items->at(entry_realpath);
+        auto directory_object = directory_items->at(realp_dir_path);
 
         auto itm = std::find_if(directory_object->begin(), directory_object->end(),
                                 [&](const dirent64 *_scope_entry) {
-                                    return std::string(entry_realpath) == _scope_entry->d_name;
+                                    return std::string(entry->d_name) == _scope_entry->d_name;
                                 });
 
         if (itm == directory_object->end()) {
@@ -166,17 +168,27 @@ struct dirent *readdir(DIR *dirp) {
 
         while (count_files_in_directory(dir_path_name.c_str()) <= capio_internal_offset) {
             LOG("Not enough files... waiting");
+            syscall_no_intercept_flag = true;
             sleep(1);
+            syscall_no_intercept_flag = false;
         }
 
-        std::get<1>(item->second)++;
-    }
+        LOG("Returning item %d", std::get<1>(item->second));
 
+        char real_path[PATH_MAX];
+        capio_realpath(dir_path_name.c_str(), real_path);
+
+        LOG("Getting files inside directory %s", real_path);
+
+        auto return_value =
+            (dirent *) directory_items->at(real_path)->at(std::get<1>(item->second));
+        std::get<1>(item->second)++;
+        return return_value;
+    }
     return real_readdir(dirp);
 }
 
 struct dirent64 *readdir64(DIR *dirp) {
-
     START_LOG(capio_syscall(SYS_gettid), "call(dir=%ld)", dirp);
 
     static struct dirent64 *(*real_readdir64)(DIR *) = NULL;
@@ -200,11 +212,17 @@ struct dirent64 *readdir64(DIR *dirp) {
             syscall_no_intercept_flag = false;
         }
 
+        LOG("Returning item %d", std::get<1>(item->second));
+
+        char real_path[PATH_MAX];
+        capio_realpath(dir_path_name.c_str(), real_path);
+
+        LOG("Getting files inside directory %s", real_path);
+
+        auto return_value = directory_items->at(real_path)->at(std::get<1>(item->second));
         std::get<1>(item->second)++;
-
-        return directory_items->at(dir_path_name.c_str())->at(std::get<1>(item->second));
+        return return_value;
     }
-
     return real_readdir64(dirp);
 }
 
