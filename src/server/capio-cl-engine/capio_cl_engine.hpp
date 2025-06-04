@@ -141,6 +141,7 @@ class CapioCLEngine {
      * @return
      */
     bool contains(const std::filesystem::path &file) {
+        START_LOG(gettid(), "call(file=%s)", file.c_str());
         return std::any_of(_locations.begin(), _locations.end(), [&](auto &itm) {
             return std::regex_match(file.c_str(), std::get<10>(itm.second));
         });
@@ -377,6 +378,12 @@ class CapioCLEngine {
     void setFileDeps(const std::filesystem::path &path,
                      const std::vector<std::string> &dependencies) {
         START_LOG(gettid(), "call()");
+        if (dependencies.empty()) {
+            return;
+        }
+        if (_locations.find(path) == _locations.end()) {
+            this->newFile(path);
+        }
         std::get<9>(_locations.at(path)) = dependencies;
         for (const auto &itm : dependencies) {
             LOG("Creating new fie (if it exists) for path %s", itm.c_str());
@@ -430,6 +437,13 @@ class CapioCLEngine {
         }
 
         return files;
+    }
+
+    std::vector<std::string> getPathsInConfig() {
+        std::vector<std::string> paths;
+        std::transform(_locations.begin(), _locations.end(), std::back_inserter(paths),
+                       [](auto pair) { return pair.first; });
+        return paths;
     }
 };
 
