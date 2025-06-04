@@ -8,36 +8,34 @@
 #include <string.h>
 
 // Map &DIR -> <dir_path, files already served>
-inline std::unordered_map<unsigned long int, std::pair<std::string, int>> opened_directory;
+inline std::unordered_map<unsigned long int, std::pair<std::string, int> > opened_directory;
 
 inline std::unordered_map<std::string, std::vector<dirent64 *> *> *directory_items;
 
-int count_files_in_directory(const char *path) {
+inline int count_files_in_directory(const char *path) {
     static struct dirent64 *(*real_readdir64)(DIR *) = NULL;
-    static DIR *(*real_opendir)(const char *)        = NULL;
-    static int (*real_closedir)(DIR *)               = NULL;
+    static DIR *(*real_opendir)(const char *) = NULL;
+    static int (*real_closedir)(DIR *) = NULL;
 
     START_LOG(capio_syscall(SYS_gettid), "call()");
     syscall_no_intercept_flag = true;
     if (!real_readdir64) {
-        real_readdir64 = (struct dirent64 * (*) (DIR *) ) dlsym(RTLD_NEXT, "readdir64");
+        real_readdir64 = (struct dirent64 * (*)(DIR *)) dlsym(RTLD_NEXT, "readdir64");
     }
 
     if (!real_opendir) {
-        real_opendir = (DIR * (*) (const char *) ) dlsym(RTLD_NEXT, "opendir");
+        real_opendir = (DIR * (*)(const char *)) dlsym(RTLD_NEXT, "opendir");
     }
 
     if (!real_closedir) {
-
         real_closedir = (int (*)(DIR *)) dlsym(RTLD_NEXT, "closedir");
     }
 
     struct dirent64 *entry;
-    DIR *dir  = real_opendir(path);
+    DIR *dir = real_opendir(path);
     int count = 0;
 
     while ((entry = real_readdir64(dir)) != NULL) {
-
         auto entry_realpath = (strcmp(entry->d_name, ".") == 0 || strcmp(entry->d_name, "..") == 0)
                                   ? entry->d_name
                                   : capio_absolute(entry->d_name);
@@ -60,12 +58,12 @@ int count_files_in_directory(const char *path) {
         if (itm == directory_object->end()) {
             LOG("Item %s is not stored within internal capio data structure. adding it",
                 entry_realpath.c_str());
-            dirent64 *new_entry = new dirent64();
+            auto *new_entry = new dirent64();
             memcpy(new_entry->d_name, entry->d_name, sizeof(entry->d_name));
-            new_entry->d_ino    = entry->d_ino;
-            new_entry->d_off    = entry->d_off;
+            new_entry->d_ino = entry->d_ino;
+            new_entry->d_off = entry->d_off;
             new_entry->d_reclen = entry->d_reclen;
-            new_entry->d_type   = entry->d_type;
+            new_entry->d_type = entry->d_type;
             directory_object->emplace_back(new_entry);
         }
         count++;
@@ -87,7 +85,7 @@ DIR *opendir(const char *name) {
 
     if (!real_opendir) {
         syscall_no_intercept_flag = true;
-        real_opendir              = (DIR * (*) (const char *) ) dlsym(RTLD_NEXT, "opendir");
+        real_opendir = (DIR * (*)(const char *)) dlsym(RTLD_NEXT, "opendir");
         syscall_no_intercept_flag = false;
         if (!real_opendir) {
             ERR_EXIT("Failed to find original opendir: %s\n", dlerror());
@@ -109,7 +107,7 @@ DIR *opendir(const char *name) {
     consent_request_cache_fs->consent_request(realpath, gettid(), __FUNCTION__);
 
     syscall_no_intercept_flag = true;
-    auto dir                  = real_opendir(realpath);
+    auto dir = real_opendir(realpath);
     syscall_no_intercept_flag = false;
 
     LOG("Opened directory with offset %ld", dir);
@@ -125,7 +123,7 @@ int closedir(DIR *dirp) {
     static int (*real_closedir)(DIR *) = NULL;
     if (!real_closedir) {
         syscall_no_intercept_flag = true;
-        real_closedir             = (int (*)(DIR *)) dlsym(RTLD_NEXT, "closedir");
+        real_closedir = (int (*)(DIR *)) dlsym(RTLD_NEXT, "closedir");
         syscall_no_intercept_flag = false;
         if (!real_closedir) {
             ERR_EXIT("Failed to find original closedir: %s\n", dlerror());
@@ -134,7 +132,6 @@ int closedir(DIR *dirp) {
 
     if (const auto pos = opened_directory.find(reinterpret_cast<unsigned long int>(dirp));
         pos != opened_directory.end()) {
-
         if (auto pos1 = directory_items->find(pos->second.first); pos1 != directory_items->end()) {
             directory_items->erase(pos1);
         }
@@ -142,7 +139,7 @@ int closedir(DIR *dirp) {
         LOG("removed dir from map of opened files");
     }
     syscall_no_intercept_flag = true;
-    auto return_code          = real_closedir(dirp);
+    auto return_code = real_closedir(dirp);
     syscall_no_intercept_flag = false;
     LOG("Return code of closedir = %d", return_code);
 
@@ -156,14 +153,13 @@ struct dirent *readdir(DIR *dirp) {
     if (!real_readdir) {
         LOG("Loading real glibc method");
         syscall_no_intercept_flag = true;
-        real_readdir              = (struct dirent * (*) (DIR *) ) dlsym(RTLD_NEXT, "readdir");
+        real_readdir = (struct dirent * (*)(DIR *)) dlsym(RTLD_NEXT, "readdir");
         syscall_no_intercept_flag = false;
     }
 
-    auto item = opened_directory.find((unsigned long int) dirp);
-    if (item != opened_directory.end()) {
+    if (auto item = opened_directory.find((unsigned long int) dirp); item != opened_directory.end()) {
         LOG("Found dirp.");
-        auto dir_path_name         = std::get<0>(item->second);
+        auto dir_path_name = std::get<0>(item->second);
         auto capio_internal_offset = std::get<1>(item->second);
 
         while (count_files_in_directory(dir_path_name.c_str()) <= capio_internal_offset) {
@@ -180,8 +176,8 @@ struct dirent *readdir(DIR *dirp) {
 
         LOG("Getting files inside directory %s", real_path);
 
-        auto return_value =
-            (dirent *) directory_items->at(real_path)->at(std::get<1>(item->second));
+        const auto return_value =
+                reinterpret_cast<dirent *>(directory_items->at(real_path)->at(std::get<1>(item->second)));
         std::get<1>(item->second)++;
         return return_value;
     }
@@ -195,14 +191,13 @@ struct dirent64 *readdir64(DIR *dirp) {
     if (!real_readdir64) {
         LOG("Loading real glibc method");
         syscall_no_intercept_flag = true;
-        real_readdir64            = (struct dirent64 * (*) (DIR *) ) dlsym(RTLD_NEXT, "readdir64");
+        real_readdir64 = (struct dirent64 * (*)(DIR *)) dlsym(RTLD_NEXT, "readdir64");
         syscall_no_intercept_flag = false;
     }
 
-    auto item = opened_directory.find((unsigned long int) dirp);
-    if (item != opened_directory.end()) {
+    if (auto item = opened_directory.find((unsigned long int) dirp); item != opened_directory.end()) {
         LOG("Found dirp.");
-        auto dir_path_name         = std::get<0>(item->second);
+        auto dir_path_name = std::get<0>(item->second);
         auto capio_internal_offset = std::get<1>(item->second);
 
         while (count_files_in_directory(dir_path_name.c_str()) <= capio_internal_offset) {
@@ -219,7 +214,7 @@ struct dirent64 *readdir64(DIR *dirp) {
 
         LOG("Getting files inside directory %s", real_path);
 
-        auto return_value = directory_items->at(real_path)->at(std::get<1>(item->second));
+        const auto return_value = directory_items->at(real_path)->at(std::get<1>(item->second));
         std::get<1>(item->second)++;
         return return_value;
     }
