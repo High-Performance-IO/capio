@@ -6,6 +6,7 @@
 #include <dlfcn.h>
 #include <stdio.h>
 #include <string.h>
+#include <utils/requests.hpp>
 
 // Map &DIR -> <dir_path, files already served>
 inline std::unordered_map<unsigned long int, std::pair<std::string, int> > opened_directory;
@@ -157,13 +158,23 @@ struct dirent *readdir(DIR *dirp) {
         syscall_no_intercept_flag = false;
     }
 
-    if (auto item = opened_directory.find((unsigned long int) dirp); item != opened_directory.end()) {
+    const bool dir_committed = posix_directory_committed(
+        capio_syscall(SYS_gettid),
+        std::get<0>(opened_directory.at(reinterpret_cast<unsigned long int>(dirp))));
+
+    if (const auto item = opened_directory.find(reinterpret_cast<unsigned long int>(dirp));
+        item != opened_directory.end() || dir_committed) {
         LOG("Found dirp.");
-        auto dir_path_name = std::get<0>(item->second);
-        auto capio_internal_offset = std::get<1>(item->second);
+        const auto dir_path_name = std::get<0>(item->second);
+        const auto capio_internal_offset = std::get<1>(item->second);
 
         while (count_files_in_directory(dir_path_name.c_str()) <= capio_internal_offset) {
             LOG("Not enough files... waiting");
+            if (posix_directory_committed(
+                capio_syscall(SYS_gettid),
+                std::get<0>(opened_directory.at(reinterpret_cast<unsigned long int>(dirp))))) {
+                return real_readdir(dirp);
+            }
             syscall_no_intercept_flag = true;
             sleep(1);
             syscall_no_intercept_flag = false;
@@ -184,6 +195,7 @@ struct dirent *readdir(DIR *dirp) {
     return real_readdir(dirp);
 }
 
+/*
 struct dirent64 *readdir64(DIR *dirp) {
     START_LOG(capio_syscall(SYS_gettid), "call(dir=%ld)", dirp);
 
@@ -195,7 +207,7 @@ struct dirent64 *readdir64(DIR *dirp) {
         syscall_no_intercept_flag = false;
     }
 
-    if (auto item = opened_directory.find((unsigned long int) dirp); item != opened_directory.end()) {
+    if (auto item = opened_directory.find(reinterpret_cast<unsigned long int>(dirp)); item != opened_directory.end()) {
         LOG("Found dirp.");
         auto dir_path_name = std::get<0>(item->second);
         auto capio_internal_offset = std::get<1>(item->second);
@@ -220,5 +232,6 @@ struct dirent64 *readdir64(DIR *dirp) {
     }
     return real_readdir64(dirp);
 }
+*/
 
 #endif // POSIX_READDIR_HPP

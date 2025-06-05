@@ -26,9 +26,8 @@ inline thread_local SPSCQueue *stc_queue;
  * @return
  */
 inline void init_client() {
-
     buf_requests =
-        new CircularBuffer<char>(SHM_COMM_CHAN_NAME, CAPIO_REQ_BUFF_CNT, CAPIO_REQ_MAX_SIZE);
+            new CircularBuffer<char>(SHM_COMM_CHAN_NAME, CAPIO_REQ_BUFF_CNT, CAPIO_REQ_MAX_SIZE);
     bufs_response = new std::unordered_map<long, ResponseQueue *>();
 }
 
@@ -73,6 +72,19 @@ inline std::vector<std::regex> *file_in_memory_request(const long pid) {
         delete[] file;
     }
     return regex_vector;
+}
+
+inline bool posix_directory_committed(const long pid, const std::filesystem::path &path) {
+    START_LOG(capio_syscall(SYS_gettid), "call(path=%s)", path.c_str());
+    char req[CAPIO_REQ_MAX_SIZE];
+
+    sprintf(req, "%04d %s ", CAPIO_REQUEST_POSIX_DIR_COMMITTED, path.c_str());
+    buf_requests->write(req, CAPIO_REQ_MAX_SIZE);
+    LOG("Sent query for directory committement");
+    capio_off64_t committed = bufs_response->at(pid)->read();
+    LOG("Directory %s is %s", path.c_str(), committed ? "committed" : "not yet committed");
+
+    return committed == 1;
 }
 
 // non blocking
