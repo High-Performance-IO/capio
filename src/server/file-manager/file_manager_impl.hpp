@@ -390,12 +390,12 @@ inline void CapioFileManager::checkFileAwaitingData() {
  * @brief commit firectories that have NFILES inside them if their commit rule is n_files
  */
 inline void CapioFileManager::checkDirectoriesNFiles() const {
-    START_LOG(gettid(), "call()");
+
     for (const auto &path_config : capio_cl_engine->getPathsInConfig()) {
         if (!capio_cl_engine->isDirectory(path_config)) {
             continue;
         }
-
+        START_LOG(gettid(), "call()");
         auto n_files = capio_cl_engine->getDirectoryFileCount(path_config);
         if (n_files > 0) {
             LOG("Directory %s needs $ld files before being committed", path_config.c_str(),

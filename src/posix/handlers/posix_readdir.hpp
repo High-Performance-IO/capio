@@ -6,6 +6,7 @@
 #include <dlfcn.h>
 #include <stdio.h>
 #include <string.h>
+#include <thread>
 #include <utils/requests.hpp>
 
 // Map &DIR -> <dir_path, files already served>
@@ -149,18 +150,8 @@ int closedir(DIR *dirp) {
     return return_code;
 }
 
-struct dirent *readdir(DIR *dirp) {
-    long pid = capio_syscall(SYS_gettid);
-    START_LOG(pid, "call(dir=%ld)", dirp);
-
-    static struct dirent *(*real_readdir)(DIR *) = NULL;
-    if (!real_readdir) {
-        LOG("Loading real glibc method");
-        syscall_no_intercept_flag = true;
-        real_readdir              = (struct dirent * (*) (DIR *) ) dlsym(RTLD_NEXT, "readdir");
-        syscall_no_intercept_flag = false;
-    }
-
+bool capio_internal_Readdir(DIR *dirp, long pid, struct dirent64 *&value1) {
+    START_LOG(pid, "call()");
     const auto directory_path =
         std::get<0>(opened_directory.at(reinterpret_cast<unsigned long int>(dirp)));
 
@@ -181,48 +172,11 @@ struct dirent *readdir(DIR *dirp) {
         while (count_files_in_directory(dir_path_name.c_str()) <= capio_internal_offset) {
             LOG("Not enough files... waiting");
             if (std::filesystem::exists(token_path)) {
-                return NULL;
+                value1 = NULL;
+                return true;
             }
             syscall_no_intercept_flag = true;
-            sleep(1);
-            syscall_no_intercept_flag = false;
-        }
-
-        LOG("Returning item %d", std::get<1>(item->second));
-
-        char real_path[PATH_MAX];
-        capio_realpath(dir_path_name.c_str(), real_path);
-
-        LOG("Getting files inside directory %s", real_path);
-
-        const auto return_value = reinterpret_cast<dirent *>(
-            directory_items->at(real_path)->at(std::get<1>(item->second)));
-        std::get<1>(item->second)++;
-        return return_value;
-    }
-    return real_readdir(dirp);
-}
-
-/*
-struct dirent64 *readdir64(DIR *dirp) {
-    START_LOG(capio_syscall(SYS_gettid), "call(dir=%ld)", dirp);
-
-    static struct dirent64 *(*real_readdir64)(DIR *) = NULL;
-    if (!real_readdir64) {
-        LOG("Loading real glibc method");
-        syscall_no_intercept_flag = true;
-        real_readdir64 = (struct dirent64 * (*)(DIR *)) dlsym(RTLD_NEXT, "readdir64");
-        syscall_no_intercept_flag = false;
-    }
-
-    if (auto item = opened_directory.find(reinterpret_cast<unsigned long int>(dirp)); item !=
-opened_directory.end()) { LOG("Found dirp."); auto dir_path_name = std::get<0>(item->second); auto
-capio_internal_offset = std::get<1>(item->second);
-
-        while (count_files_in_directory(dir_path_name.c_str()) <= capio_internal_offset) {
-            LOG("Not enough files... waiting");
-            syscall_no_intercept_flag = true;
-            sleep(1);
+            std::this_thread::sleep_for(std::chrono::milliseconds(100));
             syscall_no_intercept_flag = false;
         }
 
@@ -235,10 +189,49 @@ capio_internal_offset = std::get<1>(item->second);
 
         const auto return_value = directory_items->at(real_path)->at(std::get<1>(item->second));
         std::get<1>(item->second)++;
-        return return_value;
+        value1 = return_value;
+        return true;
     }
+    return false;
+}
+
+struct dirent *readdir(DIR *dirp) {
+    long pid = capio_syscall(SYS_gettid);
+    START_LOG(pid, "call(dir=%ld)", dirp);
+
+    static struct dirent *(*real_readdir)(DIR *) = NULL;
+    if (!real_readdir) {
+        LOG("Loading real glibc method");
+        syscall_no_intercept_flag = true;
+        real_readdir              = (struct dirent * (*) (DIR *) ) dlsym(RTLD_NEXT, "readdir");
+        syscall_no_intercept_flag = false;
+    }
+    struct dirent64 *capio_internal_dirent64;
+    if (capio_internal_Readdir(dirp, pid, capio_internal_dirent64)) {
+        return reinterpret_cast<dirent *>(capio_internal_dirent64);
+    }
+
+    return real_readdir(dirp);
+}
+
+struct dirent64 *readdir64(DIR *dirp) {
+    long pid = capio_syscall(SYS_gettid);
+    START_LOG(pid, "call(dir=%ld)", dirp);
+
+    static struct dirent64 *(*real_readdir64)(DIR *) = NULL;
+    if (!real_readdir64) {
+        LOG("Loading real glibc method");
+        syscall_no_intercept_flag = true;
+        real_readdir64            = (struct dirent64 * (*) (DIR *) ) dlsym(RTLD_NEXT, "readdir64");
+        syscall_no_intercept_flag = false;
+    }
+
+    struct dirent64 *capio_internal_dirent64;
+    if (capio_internal_Readdir(dirp, pid, capio_internal_dirent64)) {
+        return capio_internal_dirent64;
+    }
+
     return real_readdir64(dirp);
 }
-*/
 
 #endif // POSIX_READDIR_HPP
