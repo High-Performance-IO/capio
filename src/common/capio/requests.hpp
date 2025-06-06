@@ -16,6 +16,6 @@ constexpr const int CAPIO_REQUEST_WRITE_MEM = 11;
 constexpr const int CAPIO_REQUEST_QUERY_MEM_FILE = 12;
 constexpr const int CAPIO_REQUEST_POSIX_DIR_COMMITTED = 13;
 
-constexpr const int CAPIO_NR_REQUESTS = 13;
+constexpr const int CAPIO_NR_REQUESTS = 14;
 
 #endif // CAPIO_COMMON_REQUESTS_HPP

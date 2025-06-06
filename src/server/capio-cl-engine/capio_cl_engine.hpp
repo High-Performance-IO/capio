@@ -431,6 +431,13 @@ class CapioCLEngine {
 
         return files;
     }
+
+    std::vector<std::string> getPathsInConfig() {
+        std::vector<std::string> paths;
+        std::transform(_locations.begin(), _locations.end(), std::back_inserter(paths),
+                       [](auto pair) { return pair.first; });
+        return paths;
+    }
 };
 
 inline CapioCLEngine *capio_cl_engine;

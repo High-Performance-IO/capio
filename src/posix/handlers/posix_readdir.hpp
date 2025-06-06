@@ -9,23 +9,25 @@
 #include <utils/requests.hpp>
 
 // Map &DIR -> <dir_path, files already served>
-inline std::unordered_map<unsigned long int, std::pair<std::string, int> > opened_directory;
+inline std::unordered_map<unsigned long int, std::pair<std::string, int>> opened_directory;
 
 inline std::unordered_map<std::string, std::vector<dirent64 *> *> *directory_items;
 
+inline std::unordered_map<std::string, std::string> directory_commit_token_path;
+
 inline int count_files_in_directory(const char *path) {
     static struct dirent64 *(*real_readdir64)(DIR *) = NULL;
-    static DIR *(*real_opendir)(const char *) = NULL;
-    static int (*real_closedir)(DIR *) = NULL;
+    static DIR *(*real_opendir)(const char *)        = NULL;
+    static int (*real_closedir)(DIR *)               = NULL;
 
     START_LOG(capio_syscall(SYS_gettid), "call()");
     syscall_no_intercept_flag = true;
     if (!real_readdir64) {
-        real_readdir64 = (struct dirent64 * (*)(DIR *)) dlsym(RTLD_NEXT, "readdir64");
+        real_readdir64 = (struct dirent64 * (*) (DIR *) ) dlsym(RTLD_NEXT, "readdir64");
     }
 
     if (!real_opendir) {
-        real_opendir = (DIR * (*)(const char *)) dlsym(RTLD_NEXT, "opendir");
+        real_opendir = (DIR * (*) (const char *) ) dlsym(RTLD_NEXT, "opendir");
     }
 
     if (!real_closedir) {
@@ -33,7 +35,7 @@ inline int count_files_in_directory(const char *path) {
     }
 
     struct dirent64 *entry;
-    DIR *dir = real_opendir(path);
+    DIR *dir  = real_opendir(path);
     int count = 0;
 
     while ((entry = real_readdir64(dir)) != NULL) {
@@ -61,10 +63,10 @@ inline int count_files_in_directory(const char *path) {
                 entry_realpath.c_str());
             auto *new_entry = new dirent64();
             memcpy(new_entry->d_name, entry->d_name, sizeof(entry->d_name));
-            new_entry->d_ino = entry->d_ino;
-            new_entry->d_off = entry->d_off;
+            new_entry->d_ino    = entry->d_ino;
+            new_entry->d_off    = entry->d_off;
             new_entry->d_reclen = entry->d_reclen;
-            new_entry->d_type = entry->d_type;
+            new_entry->d_type   = entry->d_type;
             directory_object->emplace_back(new_entry);
         }
         count++;
@@ -86,7 +88,7 @@ DIR *opendir(const char *name) {
 
     if (!real_opendir) {
         syscall_no_intercept_flag = true;
-        real_opendir = (DIR * (*)(const char *)) dlsym(RTLD_NEXT, "opendir");
+        real_opendir              = (DIR * (*) (const char *) ) dlsym(RTLD_NEXT, "opendir");
         syscall_no_intercept_flag = false;
         if (!real_opendir) {
             ERR_EXIT("Failed to find original opendir: %s\n", dlerror());
@@ -108,7 +110,7 @@ DIR *opendir(const char *name) {
     consent_request_cache_fs->consent_request(realpath, gettid(), __FUNCTION__);
 
     syscall_no_intercept_flag = true;
-    auto dir = real_opendir(realpath);
+    auto dir                  = real_opendir(realpath);
     syscall_no_intercept_flag = false;
 
     LOG("Opened directory with offset %ld", dir);
@@ -124,7 +126,7 @@ int closedir(DIR *dirp) {
     static int (*real_closedir)(DIR *) = NULL;
     if (!real_closedir) {
         syscall_no_intercept_flag = true;
-        real_closedir = (int (*)(DIR *)) dlsym(RTLD_NEXT, "closedir");
+        real_closedir             = (int (*)(DIR *)) dlsym(RTLD_NEXT, "closedir");
         syscall_no_intercept_flag = false;
         if (!real_closedir) {
             ERR_EXIT("Failed to find original closedir: %s\n", dlerror());
@@ -140,7 +142,7 @@ int closedir(DIR *dirp) {
         LOG("removed dir from map of opened files");
     }
     syscall_no_intercept_flag = true;
-    auto return_code = real_closedir(dirp);
+    auto return_code          = real_closedir(dirp);
     syscall_no_intercept_flag = false;
     LOG("Return code of closedir = %d", return_code);
 
@@ -148,32 +150,38 @@ int closedir(DIR *dirp) {
 }
 
 struct dirent *readdir(DIR *dirp) {
-    START_LOG(capio_syscall(SYS_gettid), "call(dir=%ld)", dirp);
+    long pid = capio_syscall(SYS_gettid);
+    START_LOG(pid, "call(dir=%ld)", dirp);
 
     static struct dirent *(*real_readdir)(DIR *) = NULL;
     if (!real_readdir) {
         LOG("Loading real glibc method");
         syscall_no_intercept_flag = true;
-        real_readdir = (struct dirent * (*)(DIR *)) dlsym(RTLD_NEXT, "readdir");
+        real_readdir              = (struct dirent * (*) (DIR *) ) dlsym(RTLD_NEXT, "readdir");
         syscall_no_intercept_flag = false;
     }
 
-    const bool dir_committed = posix_directory_committed(
-        capio_syscall(SYS_gettid),
-        std::get<0>(opened_directory.at(reinterpret_cast<unsigned long int>(dirp))));
+    const auto directory_path =
+        std::get<0>(opened_directory.at(reinterpret_cast<unsigned long int>(dirp)));
+
+    if (directory_commit_token_path.find(directory_path) == directory_commit_token_path.end()) {
+        char token_path[PATH_MAX];
+        posix_directory_committed_request(pid, directory_path.c_str(), token_path);
+        directory_commit_token_path.insert({directory_path, token_path});
+    }
+
+    const auto token_path = directory_commit_token_path.at(directory_path);
 
     if (const auto item = opened_directory.find(reinterpret_cast<unsigned long int>(dirp));
-        item != opened_directory.end() || dir_committed) {
+        item != opened_directory.end() || std::filesystem::exists(token_path)) {
         LOG("Found dirp.");
-        const auto dir_path_name = std::get<0>(item->second);
+        const auto dir_path_name         = std::get<0>(item->second);
         const auto capio_internal_offset = std::get<1>(item->second);
 
         while (count_files_in_directory(dir_path_name.c_str()) <= capio_internal_offset) {
             LOG("Not enough files... waiting");
-            if (posix_directory_committed(
-                capio_syscall(SYS_gettid),
-                std::get<0>(opened_directory.at(reinterpret_cast<unsigned long int>(dirp))))) {
-                return real_readdir(dirp);
+            if (std::filesystem::exists(token_path)) {
+                return NULL;
             }
             syscall_no_intercept_flag = true;
             sleep(1);
@@ -187,8 +195,8 @@ struct dirent *readdir(DIR *dirp) {
 
         LOG("Getting files inside directory %s", real_path);
 
-        const auto return_value =
-                reinterpret_cast<dirent *>(directory_items->at(real_path)->at(std::get<1>(item->second)));
+        const auto return_value = reinterpret_cast<dirent *>(
+            directory_items->at(real_path)->at(std::get<1>(item->second)));
         std::get<1>(item->second)++;
         return return_value;
     }
@@ -207,10 +215,9 @@ struct dirent64 *readdir64(DIR *dirp) {
         syscall_no_intercept_flag = false;
     }
 
-    if (auto item = opened_directory.find(reinterpret_cast<unsigned long int>(dirp)); item != opened_directory.end()) {
-        LOG("Found dirp.");
-        auto dir_path_name = std::get<0>(item->second);
-        auto capio_internal_offset = std::get<1>(item->second);
+    if (auto item = opened_directory.find(reinterpret_cast<unsigned long int>(dirp)); item !=
+opened_directory.end()) { LOG("Found dirp."); auto dir_path_name = std::get<0>(item->second); auto
+capio_internal_offset = std::get<1>(item->second);
 
         while (count_files_in_directory(dir_path_name.c_str()) <= capio_internal_offset) {
             LOG("Not enough files... waiting");

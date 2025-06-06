@@ -32,6 +32,7 @@ class FileSystemMonitor {
 
             file_manager->checkFilesAwaitingCreation();
             file_manager->checkFileAwaitingData();
+            file_manager->checkDirectoriesNFiles();
 
             nanosleep(&sleep, nullptr);
         }
