@@ -106,7 +106,7 @@ inline bool is_capio_path(const std::filesystem::path &path_to_check) {
     START_LOG(gettid(), "call(capio_path=%s)", capio_path.c_str());
     auto computed = replaceSymbol(capio_path, '.', "\\.");
     computed      = replaceSymbol(computed, '/', "\\/");
-    computed      = replaceSymbol(computed, '*', R"([a-zA-Z0-9\/\.\-_]*)");
+    computed      = replaceSymbol(computed, '*', R"([a-zA-Z0-9\/\.\-_:]*)");
     computed      = replaceSymbol(computed, '+', ".");
     LOG("Computed regex: %s", computed.c_str());
     return std::regex(computed);

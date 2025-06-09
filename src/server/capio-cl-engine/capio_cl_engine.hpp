@@ -141,6 +141,7 @@ class CapioCLEngine {
      * @return
      */
     bool contains(const std::filesystem::path &file) {
+        START_LOG(gettid(), "call(file=%s)", file.c_str());
         return std::any_of(_locations.begin(), _locations.end(), [&](auto &itm) {
             return std::regex_match(file.c_str(), std::get<10>(itm.second));
         });

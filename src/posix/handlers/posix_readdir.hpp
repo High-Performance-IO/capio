@@ -151,7 +151,14 @@ int closedir(DIR *dirp) {
 }
 
 bool capio_internal_Readdir(DIR *dirp, long pid, struct dirent64 *&value1) {
-    START_LOG(pid, "call()");
+    START_LOG(pid, "call(dirp=%ld)", dirp);
+
+    if (opened_directory.find(reinterpret_cast<unsigned long int>(dirp)) ==
+        opened_directory.end()) {
+        LOG("Directory is not handled by CAPIO. Returning false");
+        return false;
+    }
+
     const auto directory_path =
         std::get<0>(opened_directory.at(reinterpret_cast<unsigned long int>(dirp)));
 
@@ -206,6 +213,7 @@ struct dirent *readdir(DIR *dirp) {
         real_readdir              = (struct dirent * (*) (DIR *) ) dlsym(RTLD_NEXT, "readdir");
         syscall_no_intercept_flag = false;
     }
+
     struct dirent64 *capio_internal_dirent64;
     if (capio_internal_Readdir(dirp, pid, capio_internal_dirent64)) {
         return reinterpret_cast<dirent *>(capio_internal_dirent64);

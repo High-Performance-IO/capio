@@ -398,7 +398,7 @@ inline void CapioFileManager::checkDirectoriesNFiles() const {
         START_LOG(gettid(), "call()");
         auto n_files = capio_cl_engine->getDirectoryFileCount(path_config);
         if (n_files > 0) {
-            LOG("Directory %s needs $ld files before being committed", path_config.c_str(),
+            LOG("Directory %s needs %ld files before being committed", path_config.c_str(),
                 n_files);
             // There must be n_files inside the directory to commit the file
             long count = 0;
