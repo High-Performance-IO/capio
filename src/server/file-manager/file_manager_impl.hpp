@@ -402,8 +402,11 @@ inline void CapioFileManager::checkDirectoriesNFiles() const {
                 n_files);
             // There must be n_files inside the directory to commit the file
             long count = 0;
-            for (const auto &entry : std::filesystem::directory_iterator(path_config)) {
-                ++count;
+            if (std::filesystem::exists(path_config)) {
+                auto iterator = std::filesystem::directory_iterator(path_config);
+                for (const auto &entry : iterator) {
+                    ++count;
+                }
             }
 
             LOG("Directory %s has %ld files inside", path_config.c_str(), count);

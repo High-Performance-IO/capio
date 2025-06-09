@@ -377,6 +377,12 @@ class CapioCLEngine {
     void setFileDeps(const std::filesystem::path &path,
                      const std::vector<std::string> &dependencies) {
         START_LOG(gettid(), "call()");
+        if (dependencies.empty()) {
+            return;
+        }
+        if (_locations.find(path) == _locations.end()) {
+            this->newFile(path);
+        }
         std::get<9>(_locations.at(path)) = dependencies;
         for (const auto &itm : dependencies) {
             LOG("Creating new fie (if it exists) for path %s", itm.c_str());
