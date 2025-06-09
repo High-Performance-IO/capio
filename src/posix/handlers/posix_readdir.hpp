@@ -21,7 +21,7 @@ inline int count_files_in_directory(const char *path) {
     static DIR *(*real_opendir)(const char *)        = NULL;
     static int (*real_closedir)(DIR *)               = NULL;
 
-    START_LOG(capio_syscall(SYS_gettid), "call()");
+    START_LOG(capio_syscall(SYS_gettid), "call(path=%s)", path);
     syscall_no_intercept_flag = true;
     if (!real_readdir64) {
         real_readdir64 = (struct dirent64 * (*) (DIR *) ) dlsym(RTLD_NEXT, "readdir64");
@@ -40,19 +40,20 @@ inline int count_files_in_directory(const char *path) {
     int count = 0;
 
     while ((entry = real_readdir64(dir)) != NULL) {
-        auto entry_realpath = (strcmp(entry->d_name, ".") == 0 || strcmp(entry->d_name, "..") == 0)
-                                  ? entry->d_name
-                                  : capio_absolute(entry->d_name);
-        char realp_dir_path[PATH_MAX];
-        capio_realpath(path, realp_dir_path);
+        if (strcmp(entry->d_name, ".") == 0 || strcmp(entry->d_name, "..") == 0) {
+            LOG("Entry name is %s... skipping", entry->d_name);
+            continue;
+        }
+        auto dir_abs_path = std::string(path) + "/" + entry->d_name;
+        LOG("Directory abs path = %s", dir_abs_path.c_str());
 
-        if (auto directory_object = directory_items->find(entry_realpath);
+        if (auto directory_object = directory_items->find(dir_abs_path.c_str());
             directory_object == directory_items->end()) {
-            LOG("Directory vector not present. Adding it at path %s", realp_dir_path);
-            directory_items->emplace(realp_dir_path, new std::vector<dirent64 *>());
+            LOG("Directory vector not present. Adding it at path %s", path);
+            directory_items->emplace(path, new std::vector<dirent64 *>());
         }
 
-        auto directory_object = directory_items->at(realp_dir_path);
+        auto directory_object = directory_items->at(path);
 
         auto itm = std::find_if(directory_object->begin(), directory_object->end(),
                                 [&](const dirent64 *_scope_entry) {
@@ -61,7 +62,7 @@ inline int count_files_in_directory(const char *path) {
 
         if (itm == directory_object->end()) {
             LOG("Item %s is not stored within internal capio data structure. adding it",
-                entry_realpath.c_str());
+                dir_abs_path.c_str());
             auto *new_entry = new dirent64();
             memcpy(new_entry->d_name, entry->d_name, sizeof(entry->d_name));
             new_entry->d_ino    = entry->d_ino;
@@ -182,9 +183,11 @@ bool capio_internal_Readdir(DIR *dirp, long pid, struct dirent64 *&value1) {
                 value1 = NULL;
                 return true;
             }
-            syscall_no_intercept_flag = true;
-            std::this_thread::sleep_for(std::chrono::milliseconds(100));
-            syscall_no_intercept_flag = false;
+
+            struct timespec req;
+            req.tv_sec  = 0;
+            req.tv_nsec = 100 * 1000000L; // 100 ms
+            syscall_no_intercept(SYS_nanosleep, &req, NULL);
         }
 
         LOG("Returning item %d", std::get<1>(item->second));
