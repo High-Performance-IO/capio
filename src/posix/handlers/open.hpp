@@ -103,7 +103,8 @@ int openat_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long a
     int flags   = static_cast<int>(arg2);
     mode_t mode = static_cast<int>(arg3);
     auto tid    = static_cast<pid_t>(syscall_no_intercept(SYS_gettid));
-    START_LOG(tid, "call(path=%s, flags=%d, mode=%d)", pathname.data(), flags, mode);
+    START_LOG(tid, "call(dirfd=%ld, path=%s, flags=%d, mode=%d)", dirfd, pathname.data(), flags,
+              mode);
 
     std::string path = compute_abs_path(pathname.data(), dirfd);
 
