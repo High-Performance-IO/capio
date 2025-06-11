@@ -74,8 +74,9 @@ inline std::vector<std::regex> *file_in_memory_request(const long pid) {
     return regex_vector;
 }
 
-inline capio_off64_t posix_directory_committed_request(const long pid, const std::filesystem::path &path,
-                                               char *token_path) {
+inline capio_off64_t posix_directory_committed_request(const long pid,
+                                                       const std::filesystem::path &path,
+                                                       char *token_path) {
     START_LOG(capio_syscall(SYS_gettid), "call(path=%s)", path.c_str());
     char req[CAPIO_REQ_MAX_SIZE];
 

@@ -366,8 +366,6 @@ static constexpr std::array<CPHandler_t, CAPIO_NR_SYSCALLS> build_syscall_table(
     return _syscallTable;
 }
 
-
-
 static int hook(long syscall_number, long arg0, long arg1, long arg2, long arg3, long arg4,
                 long arg5, long *result) {
     static constexpr std::array<CPHandler_t, CAPIO_NR_SYSCALLS> syscallTable =
