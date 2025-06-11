@@ -26,7 +26,6 @@ inline thread_local SPSCQueue *stc_queue;
  * @return
  */
 inline void init_client() {
-
     buf_requests =
         new CircularBuffer<char>(SHM_COMM_CHAN_NAME, CAPIO_REQ_BUFF_CNT, CAPIO_REQ_MAX_SIZE);
     bufs_response = new std::unordered_map<long, ResponseQueue *>();
@@ -73,6 +72,23 @@ inline std::vector<std::regex> *file_in_memory_request(const long pid) {
         delete[] file;
     }
     return regex_vector;
+}
+
+inline capio_off64_t posix_directory_committed_request(const long pid,
+                                                       const std::filesystem::path &path,
+                                                       char *token_path) {
+    START_LOG(capio_syscall(SYS_gettid), "call(path=%s)", path.c_str());
+    char req[CAPIO_REQ_MAX_SIZE];
+
+    sprintf(req, "%04d %ld %s ", CAPIO_REQUEST_POSIX_DIR_COMMITTED, pid, path.c_str());
+    buf_requests->write(req, CAPIO_REQ_MAX_SIZE);
+    LOG("Sent query for directory committement");
+    capio_off64_t path_len = bufs_response->at(pid)->read();
+    LOG("Directory %s has the token length of %llu", path.c_str(), path_len);
+
+    stc_queue->read(token_path, path_len);
+    LOG("commit token path will exist at %s", token_path);
+    return path_len;
 }
 
 // non blocking

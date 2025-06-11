@@ -31,6 +31,7 @@ class CapioFileManager {
     ~CapioFileManager() { START_LOG(gettid(), "call()"); }
 
     static uintmax_t get_file_size_if_exists(const std::filesystem::path &path);
+    static std::string getMetadataPath(const std::string &path);
     static void increaseCloseCount(const std::filesystem::path &path);
     static bool isCommitted(const std::filesystem::path &path);
     static void setCommitted(const std::filesystem::path &path);
@@ -39,6 +40,7 @@ class CapioFileManager {
     void addThreadAwaitingCreation(const std::string &path, pid_t tid);
     void checkFilesAwaitingCreation();
     void checkFileAwaitingData();
+    void checkDirectoriesNFiles() const;
 };
 
 inline CapioFileManager *file_manager;

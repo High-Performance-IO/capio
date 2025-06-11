@@ -1,6 +1,10 @@
 #ifndef CAPIO_POSIX_HANDLERS_HPP
 #define CAPIO_POSIX_HANDLERS_HPP
 
+/********************/
+// SYSCALL HANDLERS //
+/********************/
+
 #include "handlers/access.hpp"
 #include "handlers/chdir.hpp"
 #include "handlers/close.hpp"
@@ -25,5 +29,11 @@
 #include "handlers/statx.hpp"
 #include "handlers/unlink.hpp"
 #include "handlers/write.hpp"
+
+/********************/
+// POSIX  HANDLERS  //
+/********************/
+
+#include "handlers/posix_readdir.hpp"
 
 #endif // CAPIO_POSIX_HANDLERS_HPP

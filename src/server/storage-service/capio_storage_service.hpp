@@ -138,6 +138,16 @@ class CapioStorageService {
     }
 
     /**
+     * Send raw data to client without fetching from the storage manager itself
+     * @param pid
+     * @param data
+     * @param len
+     */
+    void reply_to_client_raw(pid_t pid, const char *data, const capio_off64_t len) const {
+        _server_to_client_queue->at(pid)->write(data, len);
+    }
+
+    /**
      * Receive the file content from the client application
      * @param tid
      * @param file

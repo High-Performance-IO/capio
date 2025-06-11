@@ -6,10 +6,14 @@
 #include "storage-service/capio_storage_service.hpp"
 #include "utils/distributed_semaphore.hpp"
 
+inline std::string CapioFileManager::getMetadataPath(const std::string &path) {
+    return get_capio_metadata_path() / (path.substr(path.find(get_capio_dir()) + 1) + ".capio");
+}
+
 /**
  * @brief Creates the directory structure for the metadata file and proceed to return the path
  * pointing to the metadata token file. For improvements in performances, a hash map is included to
- * cache the computed paths. For thread safety conserns, see
+ * cache the computed paths. For thread safety concerns, see
  * https://en.cppreference.com/w/cpp/container#Thread_safety
  *
  * @param path real path of the file
@@ -19,8 +23,8 @@ inline std::string CapioFileManager::getAndCreateMetadataPath(const std::string 
     START_LOG(gettid(), "call(path=%s)", path.c_str());
     static std::unordered_map<std::string, std::string> metadata_paths;
     if (metadata_paths.find(path) == metadata_paths.end()) {
-        std::filesystem::path result =
-            get_capio_metadata_path() / (path.substr(path.find(get_capio_dir()) + 1) + ".capio");
+        std::filesystem::path result = getMetadataPath(path);
+
         metadata_paths.emplace(path, result);
         LOG("Creating metadata directory (%s)", result.parent_path().c_str());
         std::filesystem::create_directories(result.parent_path());
@@ -379,6 +383,38 @@ inline void CapioFileManager::checkFileAwaitingData() {
             ++iter;
         }
         LOG("Completed handling.");
+    }
+}
+
+/**
+ * @brief commit firectories that have NFILES inside them if their commit rule is n_files
+ */
+inline void CapioFileManager::checkDirectoriesNFiles() const {
+
+    for (const auto &path_config : capio_cl_engine->getPathsInConfig()) {
+        if (!capio_cl_engine->isDirectory(path_config)) {
+            continue;
+        }
+        START_LOG(gettid(), "call()");
+        auto n_files = capio_cl_engine->getDirectoryFileCount(path_config);
+        if (n_files > 0) {
+            LOG("Directory %s needs %ld files before being committed", path_config.c_str(),
+                n_files);
+            // There must be n_files inside the directory to commit the file
+            long count = 0;
+            if (std::filesystem::exists(path_config)) {
+                auto iterator = std::filesystem::directory_iterator(path_config);
+                for (const auto &entry : iterator) {
+                    ++count;
+                }
+            }
+
+            LOG("Directory %s has %ld files inside", path_config.c_str(), count);
+            if (count >= n_files) {
+                LOG("Committing directory");
+                this->setCommitted(path_config);
+            }
+        }
     }
 }
 
