@@ -172,14 +172,8 @@ int closedir(DIR *dirp) {
     return return_code;
 }
 
-bool capio_internal_Readdir(DIR *dirp, long pid, struct dirent64 *value1) {
+inline struct dirent64 *capio_internal_readdir(DIR *dirp, long pid) {
     START_LOG(pid, "call(dirp=%ld)", dirp);
-
-    if (opened_directory.find(reinterpret_cast<unsigned long int>(dirp)) ==
-        opened_directory.end()) {
-        LOG("Directory is not handled by CAPIO. Returning false");
-        return false;
-    }
 
     const auto directory_path =
         std::get<0>(opened_directory.at(reinterpret_cast<unsigned long int>(dirp)));
@@ -211,11 +205,11 @@ bool capio_internal_Readdir(DIR *dirp, long pid, struct dirent64 *value1) {
             LOG("File %s committed", is_committed ? "is" : "is not");
             if (is_committed) {
                 LOG("Returning NULL as result");
-                value1 = NULL;
-                return true;
+                errno = 0;
+                return NULL;
             }
 
-            struct timespec req;
+            struct timespec req{0};
             req.tv_sec  = 0;
             req.tv_nsec = 100 * 1000000L; // 100 ms
             syscall_no_intercept(SYS_nanosleep, &req, NULL);
@@ -232,16 +226,18 @@ bool capio_internal_Readdir(DIR *dirp, long pid, struct dirent64 *value1) {
 
         const auto return_value = directory_items->at(real_path)->at(std::get<1>(item->second));
         std::get<1>(item->second)++;
-        value1 = return_value;
+
         LOG("Returned dirent structure:");
-        LOG("dirent.d_name   = %s", value1->d_name);
-        LOG("dirent.d_type   = %d", value1->d_type);
-        LOG("dirent.d_ino    = %d", value1->d_ino);
-        LOG("dirent.d_off    = %d", value1->d_off);
-        LOG("dirent.d_reclen = %d", value1->d_reclen);
-        return true;
+        LOG("dirent.d_name   = %s", return_value->d_name);
+        LOG("dirent.d_type   = %d", return_value->d_type);
+        LOG("dirent.d_ino    = %d", return_value->d_ino);
+        LOG("dirent.d_off    = %d", return_value->d_off);
+        LOG("dirent.d_reclen = %d", return_value->d_reclen);
+        return return_value;
     }
-    return false;
+    LOG("Reached end of branch... something might be amiss.. returning EOS");
+    errno = 0;
+    return NULL;
 }
 
 struct dirent *readdir(DIR *dirp) {
@@ -256,16 +252,19 @@ struct dirent *readdir(DIR *dirp) {
         syscall_no_intercept_flag = false;
     }
 
-    struct dirent64 *capio_internal_dirent64;
-    if (capio_internal_Readdir(dirp, pid, capio_internal_dirent64)) {
-        return reinterpret_cast<dirent *>(capio_internal_dirent64);
+    if (opened_directory.find(reinterpret_cast<unsigned long int>(dirp)) ==
+        opened_directory.end()) {
+        LOG("Directory is not handled by CAPIO. Returning false");
+        syscall_no_intercept_flag = true;
+        auto result               = real_readdir(dirp);
+        syscall_no_intercept_flag = false;
+
+        return result;
     }
 
-    syscall_no_intercept_flag = true;
-    auto result               = real_readdir(dirp);
-    syscall_no_intercept_flag = false;
-
-    return result;
+    struct dirent64 *capio_internal_dirent64 = capio_internal_readdir(dirp, pid);
+    LOG("return value == NULL ? %s", capio_internal_dirent64 == NULL ? "TRUE" : "FALSE");
+    return reinterpret_cast<dirent *>(capio_internal_dirent64);
 }
 
 struct dirent64 *readdir64(DIR *dirp) {
@@ -280,16 +279,19 @@ struct dirent64 *readdir64(DIR *dirp) {
         syscall_no_intercept_flag = false;
     }
 
-    struct dirent64 *capio_internal_dirent64;
-    if (capio_internal_Readdir(dirp, pid, capio_internal_dirent64)) {
-        return capio_internal_dirent64;
+    if (opened_directory.find(reinterpret_cast<unsigned long int>(dirp)) ==
+        opened_directory.end()) {
+        LOG("Directory is not handled by CAPIO. Returning false");
+        syscall_no_intercept_flag = true;
+        auto result               = real_readdir64(dirp);
+        syscall_no_intercept_flag = false;
+
+        return result;
     }
 
-    syscall_no_intercept_flag = true;
-    auto result               = real_readdir64(dirp);
-    syscall_no_intercept_flag = false;
-
-    return result;
+    auto capio_internal_dirent64 = capio_internal_readdir(dirp, pid);
+    LOG("return value == NULL ? %s", capio_internal_dirent64 == NULL ? "TRUE" : "FALSE");
+    return capio_internal_dirent64;
 }
 
 #endif // POSIX_READDIR_HPP
