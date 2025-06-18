@@ -1,6 +1,7 @@
 #!python3
 import subprocess
 
+from Importer import Importer
 from parser import parse_json
 import argparse
 import generators.BashGenerator as bashGenerator
@@ -25,59 +26,44 @@ parser.add_argument("--server-args", default="", help="CAPIO Server arguments (e
 parser.add_argument("--capio-cl", default="--no-config", help="CAPIO-CL configuration file path")
 parser.add_argument("--libcapio", default="libcapio_posix.so", help="CAPIO intercept library path")
 parser.add_argument("--target", "-t", help="Kind of submission files to generate", default="bash")
-args = parser.parse_args()
 
-if not args.workflow:
-    logger.critical("No workflow provided")
-    exit(-11)
+if __name__ == "__main__":
 
-workflow = parse_json(args.workflow)
-CAPIO_DIR = workflow['capio-dir']
-logger.info(f"CAPIO_DIR={workflow['capio-dir']}")
+    args = parser.parse_args()
+    if not args.workflow:
+        logger.critical("No workflow provided")
+        exit(-11)
 
-steps = workflow['steps']
-logger.info(f"Loaded {len(steps)} steps for the workflow {workflow['workflow-name']}")
+    workflow = parse_json(args.workflow)
+    CAPIO_DIR = workflow['capio-dir']
+    logger.info(f"CAPIO_DIR={workflow['capio-dir']}")
 
-jobs_to_submit = {}
-for name, step_options in workflow['steps'].items():
-    logger.info(f"Generating step executor for step {name}")
+    importer = Importer(steps = workflow['steps'], capio_dir=CAPIO_DIR, workflow_name=workflow['workflow-name'])
 
-    location = step_options["location"]
+    jobs_to_submit = importer.import_steps()
 
-    if location not in jobs_to_submit:
-        jobs_to_submit[location] = []
+    generator = None
 
-    jobs_to_submit[location].append({
-        "env": f"CAPIO_DIR={CAPIO_DIR} \\\n"
-               f"CAPIO_APP_NAME={name} \\\n"
-               f"CAPIO_WORKFLOW_NAME={workflow['workflow-name']} ",
-        "runnable": f"{step_options['exec']} {step_options['args']} &",
-        "stepname": name,
-    })
+    if "bash" in args.target:
+        logger.info(f"Using BASH generator")
+        generator = bashGenerator.BashGenerator(workflow)
+    elif "slurm" in args.target:
+        logger.info(f"Using SLURM generator")
+    else:
+        logger.critical("Error: requested generator does not exist")
 
-generator = None
+    if generator is None:
+        logger.critical("Error: requested generator is not instantiated")
+        exit(-1)
 
-if "bash" in args.target:
-    logger.info(f"Using BASH generator")
-    generator = bashGenerator.BashGenerator(workflow)
-elif "slurm" in args.target:
-    logger.info(f"Using SLURM generator")
+    master_script_path = generator.generate(
+        jobs_to_submit,
+        capio_dir=CAPIO_DIR,
+        server_path=args.server,
+        server_args=args.server_args,
+        server_config_path=args.capio_cl,
+        intercept_path=args.libcapio
+    )
+    logger.success(f"Generated submission scripts. Starting workflow")
 
-else:
-    logger.critical("Error: requested generator does not exist")
-
-if generator is None:
-    logger.critical("Error: requested generator is not instantiated")
-    exit(-1)
-
-master_script_path = generator.generate(
-    jobs_to_submit,
-    capio_dir=CAPIO_DIR,
-    server_path=args.server,
-    server_args=args.server_args,
-    server_config_path=args.capio_cl,
-    intercept_path=args.libcapio
-)
-logger.success(f"Generated submission scripts. Starting workflow")
-
-subprocess.run(["bash", master_script_path])
+    subprocess.run(["bash", master_script_path])
