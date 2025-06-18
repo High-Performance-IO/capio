@@ -1,3 +1,83 @@
-#!/usr/bin/python3
+#!python3
+import subprocess
 
+from parser import parse_json
+import argparse
+import generators.BashGenerator as bashGenerator
 
+from loguru import logger
+
+logger.remove()
+logger.add(
+    sink=lambda msg: print(msg, end=''),  # or use sys.stdout
+    format="<green>{time:DD/MM/YYYY HH:mm:ss}</green> | <cyan>{name}</cyan> | <level>{level: <8}</level> | <level>{message}</level>",
+    colorize=True
+)
+
+CAPIO_DIR = ""
+
+parser = argparse.ArgumentParser(prog='capiorun', description='Automate the execution of workflows running with CAPIO',
+                                 epilog='Developed by Marco Edoardo Santimaria')
+
+parser.add_argument("-w", "--workflow", help="JSON file containing the workflow description")
+parser.add_argument("--server", default="capio_server", help="CAPIO Server executable path")
+parser.add_argument("--server-args", default="", help="CAPIO Server arguments (excluding CAPIO-CL configuration flags)")
+parser.add_argument("--capio-cl", default="--no-config", help="CAPIO-CL configuration file path")
+parser.add_argument("--libcapio", default="libcapio_posix.so", help="CAPIO intercept library path")
+parser.add_argument("--target", "-t", help="Kind of submission files to generate", default="bash")
+args = parser.parse_args()
+
+if not args.workflow:
+    logger.critical("No workflow provided")
+    exit(-11)
+
+workflow = parse_json(args.workflow)
+CAPIO_DIR = workflow['capio-dir']
+logger.info(f"CAPIO_DIR={workflow['capio-dir']}")
+
+steps = workflow['steps']
+logger.info(f"Loaded {len(steps)} steps for the workflow {workflow['workflow-name']}")
+
+jobs_to_submit = {}
+for name, step_options in workflow['steps'].items():
+    logger.info(f"Generating step executor for step {name}")
+
+    location = step_options["location"]
+
+    if location not in jobs_to_submit:
+        jobs_to_submit[location] = []
+
+    jobs_to_submit[location].append({
+        "env": f"CAPIO_DIR={CAPIO_DIR} \\\n"
+               f"CAPIO_APP_NAME={name} \\\n"
+               f"CAPIO_WORKFLOW_NAME={workflow['workflow-name']} ",
+        "runnable": f"{step_options['exec']} {step_options['args']} &",
+        "stepname": name,
+    })
+
+generator = None
+
+if "bash" in args.target:
+    logger.info(f"Using BASH generator")
+    generator = bashGenerator.BashGenerator(workflow)
+elif "slurm" in args.target:
+    logger.info(f"Using SLURM generator")
+
+else:
+    logger.critical("Error: requested generator does not exist")
+
+if generator is None:
+    logger.critical("Error: requested generator is not instantiated")
+    exit(-1)
+
+master_script_path = generator.generate(
+    jobs_to_submit,
+    capio_dir=CAPIO_DIR,
+    server_path=args.server,
+    server_args=args.server_args,
+    server_config_path=args.capio_cl,
+    intercept_path=args.libcapio
+)
+logger.success(f"Generated submission scripts. Starting workflow")
+
+subprocess.run(["bash", master_script_path])

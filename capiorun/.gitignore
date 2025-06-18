@@ -1,2 +1,6 @@
 .venv
 .idea
+*.json
+*.sh
+__pycache__
+pippo
