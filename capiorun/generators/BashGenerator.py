@@ -1,4 +1,5 @@
 from loguru import logger
+import subprocess
 
 logger.remove()
 logger.add(
@@ -11,6 +12,7 @@ logger.add(
 class BashGenerator:
     def __init__(self, workflow):
         self.workflow = workflow
+        self.master_script_path = None
         logger.info(f"Initializing BashGenerator with workflow {self.workflow['workflow-name']}")
 
     def _generate_master_script(self, generated_scripts):
@@ -53,7 +55,14 @@ class BashGenerator:
                 f.write(f"\nwait {' '.join(waitpids)}\n")
                 f.write("kill $SERVERPID\n")
 
-        master_script_path = self._generate_master_script(generated_scripts)
+        self.master_script_path = self._generate_master_script(generated_scripts)
         logger.info("Generated master script")
 
-        return master_script_path
+
+
+    def run(self):
+        logger.info("Starting workflow execution")
+        if self.master_script_path is None:
+            logger.critical("No master script found")
+            exit(1)
+        subprocess.run(["bash", self.master_script_path])

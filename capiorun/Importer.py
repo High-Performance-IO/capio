@@ -29,7 +29,7 @@ class Importer:
                 "env": f"CAPIO_DIR={self.capio_dir} \\\n"
                        f"CAPIO_APP_NAME={name} \\\n"
                        f"CAPIO_WORKFLOW_NAME={self.workflow_name} ",
-                "runnable": f"{step_options['exec']} {step_options['args']} &",
+                "runnable": f"{step_options['command']}  &",
                 "stepname": name,
             })
 
