@@ -1,19 +1,9 @@
-# CAPIORUN: autmated submission of CAPIO workflows
-To execute workflows, capiorun requires a json file containing the description 
-of the workflow steps to execute.
+# capiorun: Simplified launch of CAPIO applications
 
-```json
-{
-  "capiocl-file" : "capio_cl config path name",
-  "capio-dir" : "dir",
-  "workflow-name" : "name of the workflow",
-  "steps" : {
-    "workflow_step_name": {
-      "exec": "bin path",
-      "args": "args",
-      "location": "logic location. used to tell which steps should go in the same submission script"
-    },
-    ...
-  }
-}
-```
+## Parameters 
+- capio-dir dir
+- capio-app-name app name
+- capio-workflow-name workflowname
+- capio-log-level (opt)
+- executable
+

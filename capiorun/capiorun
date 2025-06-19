@@ -1,71 +1,86 @@
-#!python3
-from Importer import Importer
-from parser import parse_json
-import argparse
-import generators.BashGenerator as bashGenerator
+#!/usr/bin/env python3
+
+import os, subprocess, argparse, time, sys
+import signal
 
 from loguru import logger
 
 logger.remove()
 logger.add(
     sink=lambda msg: print(msg, end=''),  # or use sys.stdout
-    format="<green>{time:DD/MM/YYYY HH:mm:ss}</green> | <cyan>{name}</cyan> | <level>{level: <8}</level> | <level>{message}</level>",
+    format="<green>{time:DD/MM/YYYY HH:mm:ss}</green> | <cyan>capiorun</cyan> | <level>{level: <8}</level> | <level>{message}</level>",
     colorize=True
 )
 
-parser = argparse.ArgumentParser(prog='capiorun', description='Automate the execution of workflows running with CAPIO',
+parser = argparse.ArgumentParser(prog='capiorun', description='Simplify the execution of workflows running with CAPIO',
                                  epilog='Developed by Marco Edoardo Santimaria')
 
-parser.add_argument("-w", "--workflow", default="capiorun.json", help="JSON file containing the workflow description")
-parser.add_argument("--capio-cl", default="capiorun-cl.json", help="CAPIO-CL configuration file path")
-parser.add_argument("--no-capio-cl", default=False, action="store_true", help="CAPIO-CL configuration file path")
-parser.add_argument("--server", default="capio_server", help="CAPIO Server executable path")
-parser.add_argument("--server-args", default="", help="CAPIO Server arguments (excluding CAPIO-CL configuration flags)")
-parser.add_argument("--libcapio", default="libcapio_posix.so", help="CAPIO intercept library path")
-parser.add_argument("--target", "-t", help="Kind of submission files to generate", default="bash")
-parser.add_argument("--no-execute",
-                    action="store_false",
-                    default=True,
-                    help="Generate only workflow scripts, but do not start it")
+parser.add_argument("-d", "--capio-dir", required=True, help="CAPIO virtual mount point")
+parser.add_argument("-w", "--workflow-name", default="CAPIO", help="Name of the workflow")
+parser.add_argument("-n", "--app-name", required=True, help="CAPIO Application step name")
+parser.add_argument("-L", "--log-level", default="-1", help="CAPIO log level when running in debug mode")
+parser.add_argument("-l", "--libcapio", default="libcapio_posix.so", help="Absolute path to libcapio_poix.so")
+parser.add_argument("-s", "--server", default="capio_server", help="Absolute path to capio_server")
+parser.add_argument("-c", "--capiocl", default="--no-config", help="Absolute path to the CAPIO-CL configuration file")
+parser.add_argument('args', nargs=argparse.REMAINDER, help="Command to launch with capio")
+
+server_process = None
+step_process = None
 
 if __name__ == "__main__":
-
     args = parser.parse_args()
-    if not args.workflow:
-        logger.critical("No workflow provided")
-        exit(-11)
 
-    workflow = parse_json(args.workflow)
-    CAPIO_DIR = workflow['capio-dir']
-    logger.info(f"CAPIO_DIR={workflow['capio-dir']}")
+    if not os.path.exists(f"/dev/shm/{args.workflow_name}"):
+        logger.info(f"Starting capio server with config file: {args.capiocl}")
+        logger.info(f"CAPIO_LOG_LEVEL     = {args.log_level}")
+        logger.info(f"CAPIO_WORKFLOW_NAME = {args.workflow_name}")
+        logger.info(f"CAPIO_APP_NAME      = {args.app_name}")
+        logger.info(f"CAPIO_DIR           = {args.capio_dir}")
+        logger.info(f"CAPIO-CL CONFIG     = {args.capiocl}")
+        if not os.path.exists(args.capiocl):
+            logger.critical(f"File {args.capiocl} does not exists. aborting execution...")
+            exit(1)
+        server_env = os.environ.copy()
+        server_env["CAPIO_DIR"] = args.capio_dir
+        server_env["CAPIO_LOG_LEVEL"] = args.log_level
+        server_process = subprocess.Popen(
+            [args.server, ("--config " + args.capiocl) if args.capiocl != "--no-config" else args.capiocl],
+            env=server_env,
+            stdout=sys.stdout, stderr=sys.stderr)
 
-    importer = Importer(steps=workflow['steps'], capio_dir=CAPIO_DIR, workflow_name=workflow['workflow-name'])
+        logger.debug(f"capio_server PID: {server_process.pid}")
+        time.sleep(1)
 
-    jobs_to_submit = importer.import_steps()
-
-    generator = None
-
-    if "bash" in args.target:
-        logger.info(f"Using BASH generator")
-        generator = bashGenerator.BashGenerator(workflow)
-    elif "slurm" in args.target:
-        logger.info(f"Using SLURM generator")
     else:
-        logger.critical("Error: requested generator does not exist")
+        logger.debug(f"An instance of capio_server with workflow name {args.workflow_name} already exists!")
 
-    if generator is None:
-        logger.critical("Error: requested generator is not instantiated")
-        exit(-1)
+    step_env = os.environ.copy()
+    step_env["CAPIO_WORKFLOW_NAME"] = args.workflow_name
+    step_env["CAPIO_APP_NAME"] = args.app_name
+    step_env["CAPIO_DIR"] = args.capio_dir
+    step_env["CAPIO_LOG_LEVEL"] = args.log_level
+    step_env["LD_PRELOAD"] = args.libcapio
 
-    master_script_path = generator.generate(
-        jobs_to_submit,
-        capio_dir=CAPIO_DIR,
-        server_path=args.server,
-        server_args=args.server_args,
-        server_config_path=("-c " + args.capio_cl),
-        intercept_path=args.libcapio
-    )
-    logger.success(f"Generated submission scripts")
+    logger.info(f"Starting workflow steps with following environment variables:")
+    logger.info(f"CAPIO_LOG_LEVEL     = {args.log_level}")
+    logger.info(f"CAPIO_WORKFLOW_NAME = {args.workflow_name}")
+    logger.info(f"CAPIO_APP_NAME      = {args.app_name}")
+    logger.info(f"CAPIO_DIR           = {args.capio_dir}")
+    logger.info(f"LD_PRELOAD          = {args.libcapio}")
+    logger.info(f"command             = {" ".join(args.args)}")
+    try:
+        step_process = subprocess.Popen(
+            args.args,
+            env=step_env,
+            stdout=sys.stdout, stderr=sys.stderr
+        )
 
-    if args.no_execute:
-        generator.run()
+        step_process.wait()
+    except Exception as e:
+        logger.critical("An error occurred in startup of workflow app: {}".format(e))
+
+    if server_process is not None:
+        logger.info(f"Terminating instance of capio_server")
+        server_process.send_signal(signal.SIGTERM)
+        time.sleep(2)
+        logger.success("Terminated CAPIO server instance")
