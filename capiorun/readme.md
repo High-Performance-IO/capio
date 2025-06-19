@@ -27,3 +27,16 @@ You can also explicitly specify the locations of both `libcapio_posix.so` and th
 |------|-------------|
 | `--libcapio` | Path to the `libcapio_posix.so` shared library. |
 | `--server` | Path to the `capio_server` executable. |
+
+---
+
+## 🧪 **Advanced Configuration**
+
+These optional flags allow fine-tuned control over CAPIO runtime behavior:
+
+| Flag | Description |
+|------|-------------|
+| `--log-dir` | Directory where CAPIO should store log files. |
+| `--log-prefix` | Prefix to prepend to CAPIO-generated log files. |
+| `--cache-lines` | Number of cache lines to be used by CAPIO. Useful for performance tuning. |
+| `--init-file-size` | Initial size of CAPIO-managed files upon creation. |

@@ -26,7 +26,33 @@ parser.add_argument("-L", "--log-level", default="-1", help="CAPIO log level whe
 parser.add_argument("-l", "--libcapio", default="libcapio_posix.so", help="Absolute path to libcapio_poix.so")
 parser.add_argument("-s", "--server", default="capio_server", help="Absolute path to capio_server")
 parser.add_argument("-c", "--capiocl", default="--no-config", help="Absolute path to the CAPIO-CL configuration file")
+
+parser.add_argument("--log-dir", default="", help="Set custom log directory")
+parser.add_argument("--log-prefix", default="", help="Set custom log filename prefix")
+parser.add_argument("--cache-lines", default="", help="Set the number of default CAPIO shm-queues lines")
+parser.add_argument("--init-file-size", default="",
+                    help="Set the default size for a new file, when pre-allocating memory")
+
 parser.add_argument('args', nargs=argparse.REMAINDER, help="Command to launch with capio")
+
+
+def build_env(args):
+    env = os.environ.copy()
+    if args.log_dir:
+        env["CAPIO_LOG_DIR"] = args.log_dir
+    if args.log_prefix:
+        env["CAPIO_LOG_PREFIX"] = args.log_prefix
+    if args.cache_lines:
+        env["CAPIO_CACHE_LINES"] = args.cache_lines
+    if args.init_file_size:
+        env["CAPIO_FILE_INIT_SIZE"] = args.init_file_size
+
+    env["CAPIO_DIR"] = args.capio_dir
+    env["CAPIO_LOG_LEVEL"] = args.log_level
+    step_env["CAPIO_WORKFLOW_NAME"] = args.workflow_name
+
+    return env
+
 
 server_process = None
 step_process = None
@@ -44,9 +70,8 @@ if __name__ == "__main__":
         if not os.path.exists(args.capiocl) and args.capiocl != "--no-config":
             logger.critical(f"File {args.capiocl} does not exists. aborting execution...")
             exit(1)
-        server_env = os.environ.copy()
-        server_env["CAPIO_DIR"] = args.capio_dir
-        server_env["CAPIO_LOG_LEVEL"] = args.log_level
+        server_env = build_env(args)
+
         server_process = subprocess.Popen(
             [args.server, ("--config " + args.capiocl) if args.capiocl != "--no-config" else args.capiocl],
             env=server_env,
@@ -58,11 +83,8 @@ if __name__ == "__main__":
     else:
         logger.debug(f"An instance of capio_server with workflow name {args.workflow_name} already exists!")
 
-    step_env = os.environ.copy()
-    step_env["CAPIO_WORKFLOW_NAME"] = args.workflow_name
+    step_env = build_env(args)
     step_env["CAPIO_APP_NAME"] = args.app_name
-    step_env["CAPIO_DIR"] = args.capio_dir
-    step_env["CAPIO_LOG_LEVEL"] = args.log_level
     step_env["LD_PRELOAD"] = args.libcapio
 
     logger.info(f"Starting workflow steps with following environment variables:")
