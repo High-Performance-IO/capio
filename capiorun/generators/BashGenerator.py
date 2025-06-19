@@ -51,7 +51,7 @@ class BashGenerator:
                         f"{step['env']} \\\nLD_PRELOAD={intercept_path} \\\n{step['runnable']} PID{step['stepname']}=$!\n\n")
                     waitpids.append(f"$PID{step['stepname']}")
                 f.write(f"\nwait {' '.join(waitpids)}\n")
-                f.write("killall $SERVERPID\n")
+                f.write("kill $SERVERPID\n")
 
         master_script_path = self._generate_master_script(generated_scripts)
         logger.info("Generated master script")
