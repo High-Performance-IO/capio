@@ -1,6 +1,11 @@
 #!/usr/bin/env python3
 
-import os, subprocess, argparse, time, sys, signal
+import argparse
+import os
+import signal
+import subprocess
+import sys
+import time
 
 try:
     from loguru import logger
@@ -8,7 +13,8 @@ try:
     logger.remove()
     logger.add(
         sink=lambda msg: print(msg, end=''),  # or use sys.stdout
-        format="<green>{time:DD/MM/YYYY HH:mm:ss}</green> | <cyan>capiorun</cyan> | <level>{level: <8}</level> | <level>{message}</level>",
+        format="<green>{time:DD/MM/YYYY HH:mm:ss}</green> | <cyan>capiorun</cyan> | "
+               "<level>{level: <8}</level> | <level>{message}</level>",
         colorize=True
     )
 except ImportError:
@@ -16,23 +22,59 @@ except ImportError:
 
     logger = logging.getLogger(__name__)
 
-parser = argparse.ArgumentParser(prog='capiorun', description='Simplify the execution of workflows running with CAPIO',
-                                 epilog='Developed by Marco Edoardo Santimaria')
+parser = argparse.ArgumentParser(
+    prog="capiorun",
+    description="""
+capiorun - Simplified launcher for CAPIO-based applications.
 
-parser.add_argument("-d", "--capio-dir", required=True, help="CAPIO virtual mount point")
-parser.add_argument("-w", "--workflow-name", default="CAPIO", help="Name of the workflow")
-parser.add_argument("-n", "--app-name", required=True, help="CAPIO Application step name")
-parser.add_argument("-L", "--log-level", default="-1", help="CAPIO log level when running in debug mode")
-parser.add_argument("-l", "--libcapio", default="libcapio_posix.so", help="Absolute path to libcapio_poix.so")
-parser.add_argument("-s", "--server", default="capio_server", help="Absolute path to capio_server")
-parser.add_argument("-c", "--capiocl", default="--no-config", help="Absolute path to the CAPIO-CL configuration file")
+This utility streamlines the setup and execution of CAPIO workflows by automatically configuring
+the environment and managing capio_server instances. It allows running specific application steps
+defined in a CAPIO-CL configuration without manual setup of environment variables.
 
-parser.add_argument("--log-dir", default="", help="Set custom log directory")
-parser.add_argument("--log-prefix", default="", help="Set custom log filename prefix")
-parser.add_argument("--cache-lines", default="", help="Set the number of default CAPIO shm-queues lines")
+Typical usage:
+    capiorun -d /mnt/capio -n myapp -c config.json -- <app> <app options>
+""",
+    epilog="""
+Developed by Marco Edoardo Santimaria <marcoedoardo.santimaria@unito.it>
+
+For more information, refer to the CAPIO documentation or repository.
+""",
+    formatter_class=argparse.RawTextHelpFormatter
+)
+
+# Required arguments
+parser.add_argument("-d", "--capio-dir", required=True,
+                    help="CAPIO virtual mount point (e.g., /mnt/capio)")
+parser.add_argument("-n", "--app-name", required=True,
+                    help="Name of the CAPIO application step to launch. Must match an entry in the CAPIO-CL config.")
+
+# Optional but commonly used
+parser.add_argument("-w", "--workflow-name", default="CAPIO",
+                    help="Workflow name. Should match the name in the CAPIO-CL configuration (default: CAPIO)")
+parser.add_argument("-c", "--capiocl", default="--no-config",
+                    help="Path to the CAPIO-CL configuration file (default: --no-config)")
+
+# Debug and logging
+parser.add_argument("-L", "--log-level", default="-1",
+                    help="CAPIO log level. Useful when running in debug mode (default: -1)")
+parser.add_argument("--log-dir", default="",
+                    help="Custom directory for CAPIO log output")
+parser.add_argument("--log-prefix", default="",
+                    help="Prefix for CAPIO log files")
+
+# Tuning and advanced
+parser.add_argument("--cache-lines", default="",
+                    help="Number of CAPIO shm-queue cache lines (optional tuning parameter)")
 parser.add_argument("--init-file-size", default="",
-                    help="Set the default size for a new file, when pre-allocating memory")
+                    help="Default file size (in bytes) when pre-allocating memory for new files")
 
+# Binary locations
+parser.add_argument("-l", "--libcapio", default="libcapio_posix.so",
+                    help="Path to libcapio_posix.so shared library (default: libcapio_posix.so)")
+parser.add_argument("-s", "--server", default="capio_server",
+                    help="Path to capio_server executable (default: capio_server)")
+
+# Positional arguments
 parser.add_argument('args', nargs=argparse.REMAINDER, help="Command to launch with capio")
 
 
@@ -49,7 +91,7 @@ def build_env(args):
 
     env["CAPIO_DIR"] = args.capio_dir
     env["CAPIO_LOG_LEVEL"] = args.log_level
-    step_env["CAPIO_WORKFLOW_NAME"] = args.workflow_name
+    env["CAPIO_WORKFLOW_NAME"] = args.workflow_name
 
     return env
 
@@ -102,8 +144,9 @@ if __name__ == "__main__":
         )
 
         step_process.wait()
+        logger.success(f"Step {args.app_name} terminated successfully")
     except Exception as e:
-        logger.critical("An error occurred in startup of workflow app: {}".format(e))
+        logger.critical(f"An error occurred in startup/execution of workflow app <{args.app_name}>: {e}")
 
     if server_process is not None:
         logger.info(f"Terminating instance of capio_server")
