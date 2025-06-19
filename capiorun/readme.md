@@ -6,6 +6,7 @@ of the workflow steps to execute.
 {
   "capiocl-file" : "capio_cl config path name",
   "capio-dir" : "dir",
+  "workflow-name" : "name of the workflow",
   "steps" : {
     "workflow_step_name": {
       "exec": "bin path",
