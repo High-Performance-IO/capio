@@ -16,10 +16,11 @@ logger.add(
 parser = argparse.ArgumentParser(prog='capiorun', description='Automate the execution of workflows running with CAPIO',
                                  epilog='Developed by Marco Edoardo Santimaria')
 
-parser.add_argument("-w", "--workflow", help="JSON file containing the workflow description")
+parser.add_argument("-w", "--workflow", default="capiorun.json", help="JSON file containing the workflow description")
+parser.add_argument("--capio-cl", default="capiorun-cl.json", help="CAPIO-CL configuration file path")
+parser.add_argument("--no-capio-cl", default=False, action="store_true", help="CAPIO-CL configuration file path")
 parser.add_argument("--server", default="capio_server", help="CAPIO Server executable path")
 parser.add_argument("--server-args", default="", help="CAPIO Server arguments (excluding CAPIO-CL configuration flags)")
-parser.add_argument("--capio-cl", default="", help="CAPIO-CL configuration file path")
 parser.add_argument("--libcapio", default="libcapio_posix.so", help="CAPIO intercept library path")
 parser.add_argument("--target", "-t", help="Kind of submission files to generate", default="bash")
 parser.add_argument("--no-execute",
@@ -61,7 +62,7 @@ if __name__ == "__main__":
         capio_dir=CAPIO_DIR,
         server_path=args.server,
         server_args=args.server_args,
-        server_config_path=("-c " + args.capio_cl if args.capio_cl else "--no-config"),
+        server_config_path=("-c " + args.capio_cl),
         intercept_path=args.libcapio
     )
     logger.success(f"Generated submission scripts")
