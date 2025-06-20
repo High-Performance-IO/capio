@@ -96,6 +96,13 @@ def build_env(args):
     return env
 
 
+def count_files_starting_with(prefix):
+    return sum(
+        1 for filename in os.listdir("/dev/shm")
+        if os.path.isfile(os.path.join("/dev/shm", filename)) and filename.startswith(prefix)
+    )
+
+
 server_process = None
 step_process = None
 
@@ -149,7 +156,20 @@ if __name__ == "__main__":
         logger.critical(f"An error occurred in startup/execution of workflow app <{args.app_name}>: {e}")
 
     if server_process is not None:
-        logger.info(f"Terminating instance of capio_server")
-        server_process.send_signal(signal.SIGTERM)
-        time.sleep(2)
-        logger.success("Terminated CAPIO server instance")
+        if count_files_starting_with(args.workflow_name) > 6:
+            logger.debug("Server instance is used by other applications... skipping server termination")
+        else:
+            logger.info(f"Terminating instance of capio_server")
+            server_process.send_signal(signal.SIGTERM)
+            time.sleep(2)
+            logger.success("Terminated CAPIO server instance")
+    else:
+        if count_files_starting_with(args.workflow_name) <= 6:
+            logger.info("Terminating instance of capio_server started by other capiorun command")
+            result = subprocess.run(["killall", "capio_server"], stdout=sys.stdout, stderr=sys.stderr)
+            if result.returncode == 0:
+                logger.success("Terminated CAPIO server instance")
+            else:
+                logger.critical("Error terminating capio_server instance!")
+        else:
+            logger.debug("Skipping termination of capio_server")
