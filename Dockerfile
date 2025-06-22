@@ -20,6 +20,7 @@ COPY CMakeLists.txt /opt/capio/
 COPY scripts /opt/capio/scripts
 COPY src /opt/capio/src
 COPY tests /opt/capio/tests
+COPY capiorun /opt/capio/capiorun
 
 RUN mkdir -p /opt/capio/build                     \
  && cmake                                         \
@@ -97,6 +98,7 @@ COPY --from=builder                                         \
     "/usr/local/bin/capio_integration_test_map"             \
     "/usr/local/bin/capio_integration_test_merge"           \
     "/usr/local/bin/capio_integration_test_split"           \
+    "/opt/capio/capiorun/capiorun"                          \
     /usr/local/bin/
 
 # Pkgconfig
