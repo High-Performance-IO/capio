@@ -1,0 +1,175 @@
+#!/usr/bin/env python3
+
+import argparse
+import os
+import signal
+import subprocess
+import sys
+import time
+
+try:
+    from loguru import logger
+
+    logger.remove()
+    logger.add(
+        sink=lambda msg: print(msg, end=''),  # or use sys.stdout
+        format="<green>{time:DD/MM/YYYY HH:mm:ss}</green> | <cyan>capiorun</cyan> | "
+               "<level>{level: <8}</level> | <level>{message}</level>",
+        colorize=True
+    )
+except ImportError:
+    import logging
+
+    logger = logging.getLogger(__name__)
+
+parser = argparse.ArgumentParser(
+    prog="capiorun",
+    description="""
+capiorun - Simplified launcher for CAPIO-based applications.
+
+This utility streamlines the setup and execution of CAPIO workflows by automatically configuring
+the environment and managing capio_server instances. It allows running specific application steps
+defined in a CAPIO-CL configuration without manual setup of environment variables.
+
+Typical usage:
+    capiorun -d /mnt/capio -n myapp -c config.json -- <app> <app options>
+""",
+    epilog="""
+Developed by Marco Edoardo Santimaria <marcoedoardo.santimaria@unito.it>
+
+For more information, refer to the CAPIO documentation or repository.
+""",
+    formatter_class=argparse.RawTextHelpFormatter
+)
+
+# Required arguments
+parser.add_argument("-d", "--capio-dir", required=True,
+                    help="CAPIO virtual mount point (e.g., /mnt/capio)")
+parser.add_argument("-n", "--app-name", required=True,
+                    help="Name of the CAPIO application step to launch. Must match an entry in the CAPIO-CL config.")
+
+# Optional but commonly used
+parser.add_argument("-w", "--workflow-name", default="CAPIO",
+                    help="Workflow name. Should match the name in the CAPIO-CL configuration (default: CAPIO)")
+parser.add_argument("-c", "--capiocl", default="--no-config",
+                    help="Path to the CAPIO-CL configuration file (default: --no-config)")
+
+# Debug and logging
+parser.add_argument("-L", "--log-level", default="-1",
+                    help="CAPIO log level. Useful when running in debug mode (default: -1)")
+parser.add_argument("--log-dir", default="",
+                    help="Custom directory for CAPIO log output")
+parser.add_argument("--log-prefix", default="",
+                    help="Prefix for CAPIO log files")
+
+# Tuning and advanced
+parser.add_argument("--cache-lines", default="",
+                    help="Number of CAPIO shm-queue cache lines (optional tuning parameter)")
+parser.add_argument("--init-file-size", default="",
+                    help="Default file size (in bytes) when pre-allocating memory for new files")
+
+# Binary locations
+parser.add_argument("-l", "--libcapio", default="libcapio_posix.so",
+                    help="Path to libcapio_posix.so shared library (default: libcapio_posix.so)")
+parser.add_argument("-s", "--server", default="capio_server",
+                    help="Path to capio_server executable (default: capio_server)")
+
+# Positional arguments
+parser.add_argument('args', nargs=argparse.REMAINDER, help="Command to launch with capio")
+
+
+def build_env(args):
+    env = os.environ.copy()
+    if args.log_dir:
+        env["CAPIO_LOG_DIR"] = args.log_dir
+    if args.log_prefix:
+        env["CAPIO_LOG_PREFIX"] = args.log_prefix
+    if args.cache_lines:
+        env["CAPIO_CACHE_LINES"] = args.cache_lines
+    if args.init_file_size:
+        env["CAPIO_FILE_INIT_SIZE"] = args.init_file_size
+
+    env["CAPIO_DIR"] = args.capio_dir
+    env["CAPIO_LOG_LEVEL"] = args.log_level
+    env["CAPIO_WORKFLOW_NAME"] = args.workflow_name
+
+    return env
+
+
+def count_files_starting_with(prefix):
+    return sum(
+        1 for filename in os.listdir("/dev/shm")
+        if os.path.isfile(os.path.join("/dev/shm", filename)) and filename.startswith(prefix)
+    )
+
+
+server_process = None
+step_process = None
+
+if __name__ == "__main__":
+    args = parser.parse_args()
+
+    if not os.path.exists(f"/dev/shm/{args.workflow_name}"):
+        logger.info(f"Starting capio server with config file: {args.capiocl}")
+        logger.info(f"CAPIO_LOG_LEVEL     = {args.log_level}")
+        logger.info(f"CAPIO_WORKFLOW_NAME = {args.workflow_name}")
+        logger.info(f"CAPIO_APP_NAME      = {args.app_name}")
+        logger.info(f"CAPIO_DIR           = {args.capio_dir}")
+        logger.info(f"CAPIO-CL CONFIG     = {args.capiocl}")
+        if not os.path.exists(args.capiocl) and args.capiocl != "--no-config":
+            logger.critical(f"File {args.capiocl} does not exists. aborting execution...")
+            exit(1)
+        server_env = build_env(args)
+
+        server_process = subprocess.Popen(
+            [args.server, ("--config " + args.capiocl) if args.capiocl != "--no-config" else args.capiocl],
+            env=server_env,
+            stdout=sys.stdout, stderr=sys.stderr)
+
+        logger.debug(f"capio_server PID: {server_process.pid}")
+        time.sleep(1)
+
+    else:
+        logger.debug(f"An instance of capio_server with workflow name {args.workflow_name} already exists!")
+
+    step_env = build_env(args)
+    step_env["CAPIO_APP_NAME"] = args.app_name
+    step_env["LD_PRELOAD"] = args.libcapio
+
+    logger.info(f"Starting workflow steps with following environment variables:")
+    logger.info(f"CAPIO_LOG_LEVEL     = {args.log_level}")
+    logger.info(f"CAPIO_WORKFLOW_NAME = {args.workflow_name}")
+    logger.info(f"CAPIO_APP_NAME      = {args.app_name}")
+    logger.info(f"CAPIO_DIR           = {args.capio_dir}")
+    logger.info(f"LD_PRELOAD          = {args.libcapio}")
+    logger.info(f"command             = {" ".join(args.args)}")
+    try:
+        step_process = subprocess.Popen(
+            args.args,
+            env=step_env,
+            stdout=sys.stdout, stderr=sys.stderr
+        )
+
+        step_process.wait()
+        logger.success(f"Step {args.app_name} terminated successfully")
+    except Exception as e:
+        logger.critical(f"An error occurred in startup/execution of workflow app <{args.app_name}>: {e}")
+
+    if server_process is not None:
+        if count_files_starting_with(args.workflow_name) > 6:
+            logger.debug("Server instance is used by other applications... skipping server termination")
+        else:
+            logger.info(f"Terminating instance of capio_server")
+            server_process.send_signal(signal.SIGTERM)
+            time.sleep(2)
+            logger.success("Terminated CAPIO server instance")
+    else:
+        if count_files_starting_with(args.workflow_name) <= 6:
+            logger.info("Terminating instance of capio_server started by other capiorun command")
+            result = subprocess.run(["killall", "capio_server"], stdout=sys.stdout, stderr=sys.stderr)
+            if result.returncode == 0:
+                logger.success("Terminated CAPIO server instance")
+            else:
+                logger.critical("Error terminating capio_server instance!")
+        else:
+            logger.debug("Skipping termination of capio_server")

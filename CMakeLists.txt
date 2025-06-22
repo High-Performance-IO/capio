@@ -78,6 +78,23 @@ ENDIF (CAPIO_LOG AND CMAKE_BUILD_TYPE STREQUAL "Debug")
 add_subdirectory(src/posix)
 add_subdirectory(src/server)
 
+#####################################
+# Install capiorun
+#####################################
+install(
+        FILES ${PROJECT_SOURCE_DIR}/capiorun/capiorun
+        DESTINATION ${CMAKE_INSTALL_BINDIR}
+        PERMISSIONS
+        OWNER_READ
+        OWNER_WRITE
+        OWNER_EXECUTE
+        GROUP_READ
+        GROUP_EXECUTE
+        WORLD_READ
+        WORLD_EXECUTE
+)
+
+
 IF (CAPIO_BUILD_TESTS)
     message(STATUS "Building CAPIO test suite")
     add_subdirectory(tests)
