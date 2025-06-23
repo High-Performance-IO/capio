@@ -58,7 +58,7 @@ the [CAPIO-CL Docs](https://capio.hpc4ai.it/docs/coord-language/) for details.
 
 To launch your workflow with capio you can follow two routes:
 
-#### A) Use `capiorun` for simplfied operations
+#### A) Use `capiorun` for simplified operations
 
 You can simplify the execution of workflow steps with CAPIO using the `capiorun` utility. See the
 [`capiorun` documentation](capiorun/readme.md) for usage and examples. `capiorun` provides an easier way to manage

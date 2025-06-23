@@ -21,6 +21,7 @@ inline void register_capio_tid(const pid_t tid) {
     START_LOG(syscall_no_intercept(SYS_gettid), "call(tid=%ld)", tid);
     const std::lock_guard<std::mutex> lg(clone_mutex);
     tids->insert(tid);
+    LOG("Pid inserted ? %s", tids->find(tid) == tids->end() ? "NO" : "YES");
 }
 
 inline void remove_capio_tid(const pid_t tid) {
@@ -79,7 +80,7 @@ inline void hook_clone_child() {
 
 #endif
     std::unique_lock<std::mutex> lock(clone_mutex);
-    clone_cv.wait(lock, [&tid] { return tids->find(tid) != tids->end(); });
+    clone_cv.wait(lock, [] { return true; });
 
     /**
      * Freeing memory here through `tids.erase()` can cause a SIGSEGV error
@@ -88,6 +89,20 @@ inline void hook_clone_child() {
      * is removed from the `tids` set only when the thread terminates.
      */
     lock.unlock();
+
+#ifdef CAPIO_LOG
+    /*
+     * Needed to enable logging when SYS_clone is called with child_stack==NULL.
+     * In this case, the thread_local variables are initialized and not set to a nullptr.
+     * For this reason we reset them here
+     */
+    if (logfileOpen) {
+        logfileOpen = false;
+        logfileFD   = -1;
+        bzero(logfile_path, PATH_MAX);
+    }
+#endif
+
     START_SYSCALL_LOGGING();
     START_LOG(tid, "call()");
     LOG("Initializing child thread %d", tid);

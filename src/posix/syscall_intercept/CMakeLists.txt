@@ -14,11 +14,12 @@ include(ExternalProject)
 # Import external project from git
 #####################################
 ExternalProject_Add(syscall_intercept
-        GIT_REPOSITORY https://github.com/pmem/syscall_intercept.git
-        GIT_TAG ca4b13531f883597c2f04a40e095f76f6c3a6d22
+        GIT_REPOSITORY https://github.com/alpha-unito/syscall_intercept
+        GIT_TAG 3e8695cdf62d17af041eaee987bb26fcee2691ff
         PREFIX ${CMAKE_CURRENT_BINARY_DIR}
         CMAKE_ARGS
         -DBUILD_TESTS=OFF
+        -DSTATIC_CAPSTONE=ON
         -DBUILD_EXAMPLES=OFF
         -DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE}
         -DCMAKE_INSTALL_PREFIX:PATH=<INSTALL_DIR>
