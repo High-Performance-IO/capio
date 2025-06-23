@@ -71,6 +71,7 @@ template <class T, class Mutex> class Queue {
         _last_elem  = (long int *) create_shm(_last_elem_name, sizeof(long int));
         _shm        = get_shm_if_exist(_shm_name);
         if (_shm == nullptr) {
+            LOG("Creating shared memory");
             *_first_elem = 0;
             *_last_elem  = 0;
             _shm         = create_shm(_shm_name, _buff_size);

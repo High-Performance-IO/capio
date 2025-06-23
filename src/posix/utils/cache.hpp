@@ -31,7 +31,10 @@ inline void delete_caches() {
     delete consent_request_cache_fs;
     delete write_request_cache_mem;
     delete read_request_cache_mem;
+}
 
+inline void delete_queues() {
+    START_LOG(capio_syscall(SYS_gettid), "call()");
     delete cts_queue;
     LOG("Removed cts_queue");
     delete stc_queue;

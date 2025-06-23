@@ -26,9 +26,13 @@ inline thread_local SPSCQueue *stc_queue;
  * @return
  */
 inline void init_client() {
+    START_LOG(capio_syscall(SYS_gettid), "call()");
+
     buf_requests =
         new CircularBuffer<char>(SHM_COMM_CHAN_NAME, CAPIO_REQ_BUFF_CNT, CAPIO_REQ_MAX_SIZE);
+    LOG("Initialized buf_requests");
     bufs_response = new std::unordered_map<long, ResponseQueue *>();
+    LOG("Initialized bufs_response");
 }
 
 /**

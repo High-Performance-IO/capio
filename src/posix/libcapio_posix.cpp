@@ -408,6 +408,16 @@ static int hook(long syscall_number, long arg0, long arg1, long arg2, long arg3,
         return 1;
     }
 
+    if (syscall_number == SYS_clone
+#ifdef SYS_clone3
+    || syscall_number == SYS_clone3
+#endif
+    ) {
+        clone_after_null_child_stack = arg1 == 0;
+        LOG("Clone will occur with child_stack == NULL ?  %s ",
+            clone_after_null_child_stack ? "true" : "false");
+    }
+
     LOG("Handling syscall NO %ld (max num is %ld)", syscall_number, CAPIO_NR_SYSCALLS);
     try {
         return syscallTable[syscall_number](arg0, arg1, arg2, arg3, arg4, arg5, result);
