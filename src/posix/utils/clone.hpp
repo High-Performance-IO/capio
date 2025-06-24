@@ -106,8 +106,6 @@ inline void hook_clone_child() {
 #endif
         // We cannot perform delete, as it will destroy also shm objects. put ptr to nullptr
         // and accept a small memory leak
-        bufs_response            = nullptr;
-        buf_requests             = nullptr;
         stc_queue                = nullptr;
         cts_queue                = nullptr;
         write_request_cache_fs   = nullptr;
@@ -115,8 +113,8 @@ inline void hook_clone_child() {
         consent_request_cache_fs = nullptr;
         write_request_cache_mem  = nullptr;
         read_request_cache_mem   = nullptr;
-        init_client();
         clone_after_null_child_stack = false;
+
     }
 
     START_SYSCALL_LOGGING();
