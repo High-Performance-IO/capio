@@ -116,14 +116,15 @@ inline void hook_clone_child() {
 #endif
         // We cannot perform delete, as it will destroy also shm objects. put ptr to nullptr
         // and accept a small memory leak
-        stc_queue                    = nullptr;
-        cts_queue                    = nullptr;
-        write_request_cache_fs       = nullptr;
-        read_request_cache_fs        = nullptr;
-        consent_request_cache_fs     = nullptr;
-        write_request_cache_mem      = nullptr;
-        read_request_cache_mem       = nullptr;
-        clone_after_null_child_stack = false;
+        stc_queue                = nullptr;
+        cts_queue                = nullptr;
+        write_request_cache_fs   = nullptr;
+        read_request_cache_fs    = nullptr;
+        consent_request_cache_fs = nullptr;
+        write_request_cache_mem  = nullptr;
+        read_request_cache_mem   = nullptr;
+        START_SYSCALL_LOGGING();
+        return;
     }
 
     START_SYSCALL_LOGGING();

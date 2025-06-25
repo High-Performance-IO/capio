@@ -392,8 +392,8 @@ static int hook(long syscall_number, long arg0, long arg1, long arg2, long arg3,
 #ifdef CAPIO_LOG
     CAPIO_LOG_LEVEL = get_capio_log_level();
 #endif
-
-    START_LOG(syscall_no_intercept(SYS_gettid), "call(syscall_number=%ld)", syscall_number);
+    long tid = syscall_no_intercept(SYS_gettid);
+    START_LOG(tid, "call(syscall_number=%ld)", syscall_number);
 
     // If the syscall_number is higher than the maximum
     // syscall captured by CAPIO, simply return
@@ -406,6 +406,18 @@ static int hook(long syscall_number, long arg0, long arg1, long arg2, long arg3,
     if (capio_dir == nullptr) {
         LOG("CAPIO_DIR env var not set. returning control to kernel");
         return 1;
+    }
+
+    if (clone_after_null_child_stack) {
+
+        LOG("Initializing bufs_response to new empty object.");
+        bufs_response = new std::unordered_map<long, ResponseQueue *>();
+        LOG("Inizializing process");
+        init_process(tid);
+        LOG("Child thread %d initialized", tid);
+        LOG("Starting child thread %d", tid);
+        init_caches();
+        clone_after_null_child_stack = false;
     }
 
     if (syscall_number == SYS_clone
