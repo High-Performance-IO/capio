@@ -42,8 +42,18 @@ inline void init_process(pid_t tid) {
     syscall_no_intercept_flag = true;
 
     auto *p_buf_response = new ResponseQueue(SHM_COMM_CHAN_NAME_RESP + std::to_string(tid));
-    LOG("Created buf response");
-    bufs_response->insert({tid, p_buf_response});
+
+    DBG(tid, [](auto bufs_response, auto tid) {
+        START_LOG(tid, "call(DBG)");
+        LOG("Created buf response. buf_response map initialized ? %s",
+            bufs_response != nullptr ? "YES" : "NO");
+        LOG("buf_Response size for tid %d: %ld", tid, bufs_response->size());
+        for (auto &[fst, snd] : *bufs_response) {
+            LOG("Found entry for tid %ld", fst);
+        }
+    }(bufs_response, tid));
+
+    bufs_response->insert(std::make_pair(tid, p_buf_response));
     LOG("Created request response buffer with name: %s",
         (SHM_COMM_CHAN_NAME_RESP + std::to_string(tid)).c_str());
 
@@ -106,15 +116,14 @@ inline void hook_clone_child() {
 #endif
         // We cannot perform delete, as it will destroy also shm objects. put ptr to nullptr
         // and accept a small memory leak
-        stc_queue                = nullptr;
-        cts_queue                = nullptr;
-        write_request_cache_fs   = nullptr;
-        read_request_cache_fs    = nullptr;
-        consent_request_cache_fs = nullptr;
-        write_request_cache_mem  = nullptr;
-        read_request_cache_mem   = nullptr;
+        stc_queue                    = nullptr;
+        cts_queue                    = nullptr;
+        write_request_cache_fs       = nullptr;
+        read_request_cache_fs        = nullptr;
+        consent_request_cache_fs     = nullptr;
+        write_request_cache_mem      = nullptr;
+        read_request_cache_mem       = nullptr;
         clone_after_null_child_stack = false;
-
     }
 
     START_SYSCALL_LOGGING();

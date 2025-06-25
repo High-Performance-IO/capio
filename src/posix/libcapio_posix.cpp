@@ -410,7 +410,7 @@ static int hook(long syscall_number, long arg0, long arg1, long arg2, long arg3,
 
     if (syscall_number == SYS_clone
 #ifdef SYS_clone3
-    || syscall_number == SYS_clone3
+        || syscall_number == SYS_clone3
 #endif
     ) {
         clone_after_null_child_stack = arg1 == 0;
