@@ -10,7 +10,8 @@
 #include <utils/requests.hpp>
 
 // Map &DIR -> <dir_path, files already served>
-inline std::unordered_map<unsigned long int, std::pair<std::string, int>> opened_directory;
+inline std::unordered_map<unsigned long int, std::pair<std::string, int>> *opened_directory =
+    nullptr;
 
 inline std::unordered_map<std::string, std::vector<dirent64 *> *> *directory_items;
 
@@ -49,8 +50,7 @@ inline int count_files_in_directory(const char *path) {
             LOG("Directory abs path = %s", dir_abs_path.c_str());
         }
 
-        if (auto directory_object = directory_items->find(dir_abs_path.c_str());
-            directory_object == directory_items->end()) {
+        if (directory_items->find(path) == directory_items->end()) {
             LOG("Directory vector not present. Adding it at path %s", path);
             directory_items->emplace(path, new std::vector<dirent64 *>());
         }
@@ -108,6 +108,10 @@ DIR *opendir(const char *name) {
         directory_items = new std::unordered_map<std::string, std::vector<dirent64 *> *>();
     }
 
+    if (opened_directory == nullptr) {
+        opened_directory = new std::unordered_map<unsigned long, std::pair<std::string, int>>();
+    }
+
     if (!is_capio_path(absolute_path)) {
         LOG("Not a CAPIO path. continuing execution");
         syscall_no_intercept_flag = true;
@@ -125,7 +129,7 @@ DIR *opendir(const char *name) {
     syscall_no_intercept_flag = false;
 
     LOG("Opened directory with offset %ld", dir);
-    opened_directory.insert(
+    opened_directory->insert(
         {reinterpret_cast<unsigned long int>(dir), {std::string(absolute_path), 0}});
     directory_items->emplace(std::string(absolute_path), new std::vector<dirent64 *>());
 
@@ -150,9 +154,10 @@ int closedir(DIR *dirp) {
         }
     }
 
-    if (const auto pos = opened_directory.find(reinterpret_cast<unsigned long int>(dirp));
-        pos != opened_directory.end()) {
-
+    if (const auto pos = opened_directory->find(reinterpret_cast<unsigned long int>(dirp));
+        pos != opened_directory->end()) {
+        LOG("Closing directory with path %s", pos->second.first.c_str());
+        close_request(pos->second.first.c_str(), capio_syscall(SYS_gettid));
         syscall_no_intercept_flag = true;
         delete_capio_fd(dirfd(dirp));
         syscall_no_intercept_flag = false;
@@ -160,7 +165,7 @@ int closedir(DIR *dirp) {
         if (auto pos1 = directory_items->find(pos->second.first); pos1 != directory_items->end()) {
             directory_items->erase(pos1);
         }
-        opened_directory.erase(pos);
+        opened_directory->erase(pos);
         LOG("removed dir from map of opened files");
     }
 
@@ -175,20 +180,21 @@ int closedir(DIR *dirp) {
 inline struct dirent64 *capio_internal_readdir(DIR *dirp, long pid) {
     START_LOG(pid, "call(dirp=%ld)", dirp);
 
-    const auto directory_path =
-        std::get<0>(opened_directory.at(reinterpret_cast<unsigned long int>(dirp)));
+    auto directory_path =
+        std::get<0>(opened_directory->at(reinterpret_cast<unsigned long int>(dirp)));
 
     if (directory_commit_token_path.find(directory_path) == directory_commit_token_path.end()) {
-        char token_path[PATH_MAX]{0};
-        posix_directory_committed_request(pid, directory_path.c_str(), token_path);
+        LOG("Commit token path was not found for path %s", directory_path.c_str());
+        auto token_path = new char[PATH_MAX]{0};
+        posix_directory_committed_request(pid, directory_path, token_path);
         LOG("Inserting token path %s", token_path);
         directory_commit_token_path.insert({directory_path, token_path});
     }
 
     const auto token_path = directory_commit_token_path.at(directory_path);
 
-    if (const auto item = opened_directory.find(reinterpret_cast<unsigned long int>(dirp));
-        item != opened_directory.end() || std::filesystem::exists(token_path)) {
+    if (const auto item = opened_directory->find(reinterpret_cast<unsigned long int>(dirp));
+        item != opened_directory->end() || std::filesystem::exists(token_path)) {
         LOG("Found dirp.");
         const auto dir_path_name         = std::get<0>(item->second);
         const auto capio_internal_offset = std::get<1>(item->second);
@@ -252,8 +258,8 @@ struct dirent *readdir(DIR *dirp) {
         syscall_no_intercept_flag = false;
     }
 
-    if (opened_directory.find(reinterpret_cast<unsigned long int>(dirp)) ==
-        opened_directory.end()) {
+    if (opened_directory->find(reinterpret_cast<unsigned long int>(dirp)) ==
+        opened_directory->end()) {
         LOG("Directory is not handled by CAPIO. Returning false");
         syscall_no_intercept_flag = true;
         auto result               = real_readdir(dirp);
@@ -279,8 +285,8 @@ struct dirent64 *readdir64(DIR *dirp) {
         syscall_no_intercept_flag = false;
     }
 
-    if (opened_directory.find(reinterpret_cast<unsigned long int>(dirp)) ==
-        opened_directory.end()) {
+    if (opened_directory->find(reinterpret_cast<unsigned long int>(dirp)) ==
+        opened_directory->end()) {
         LOG("Directory is not handled by CAPIO. Returning false");
         syscall_no_intercept_flag = true;
         auto result               = real_readdir64(dirp);

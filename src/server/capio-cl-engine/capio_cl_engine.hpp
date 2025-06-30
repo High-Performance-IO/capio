@@ -291,7 +291,6 @@ class CapioCLEngine {
     }
 
     bool isFile(const std::string &path) const {
-        START_LOG(gettid(), "call(path=%s)", path.c_str());
         if (const auto itm = _locations.find(path); itm != _locations.end()) {
             return std::get<6>(itm->second);
         }

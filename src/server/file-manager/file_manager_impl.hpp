@@ -343,18 +343,20 @@ inline bool CapioFileManager::isCommitted(const std::filesystem::path &path) {
 inline void CapioFileManager::checkFilesAwaitingCreation() {
     // NOTE: do not put inside here log code as it will generate a lot of useless log
     std::lock_guard<std::mutex> lg(creation_mutex);
+    std::vector<std::string> path_to_delete;
 
-    for (auto element = thread_awaiting_file_creation.begin();
-         element != thread_awaiting_file_creation.end();) {
-        if (std::filesystem::exists(element->first)) {
+    for (auto element : thread_awaiting_file_creation) {
+        if (std::filesystem::exists(element.first)) {
             START_LOG(gettid(), "\n\ncall()");
-            LOG("File %s exists. Unlocking thread awaiting for creation", element->first.c_str());
-            CapioFileManager::_unlockThreadAwaitingCreation(element->first, element->second);
+            LOG("File %s exists. Unlocking thread awaiting for creation", element.first.c_str());
+            CapioFileManager::_unlockThreadAwaitingCreation(element.first, element.second);
             LOG("Completed handling.");
-            element = thread_awaiting_file_creation.erase(element);
-        } else {
-            ++element;
+            path_to_delete.push_back(element.first);
         }
+    }
+
+    for (auto path : path_to_delete) {
+        thread_awaiting_file_creation.erase(path);
     }
 }
 
@@ -387,17 +389,18 @@ inline void CapioFileManager::checkFileAwaitingData() {
 }
 
 /**
- * @brief commit firectories that have NFILES inside them if their commit rule is n_files
+ * @brief commit directories that have NFILES inside them if their commit rule is n_files
  */
 inline void CapioFileManager::checkDirectoriesNFiles() const {
 
     for (const auto &path_config : capio_cl_engine->getPathsInConfig()) {
-        if (!capio_cl_engine->isDirectory(path_config)) {
+        if (capio_cl_engine->isFile(path_config)) {
             continue;
         }
-        START_LOG(gettid(), "call()");
+
         auto n_files = capio_cl_engine->getDirectoryFileCount(path_config);
         if (n_files > 0) {
+            START_LOG(gettid(), "call()");
             LOG("Directory %s needs %ld files before being committed", path_config.c_str(),
                 n_files);
             // There must be n_files inside the directory to commit the file
