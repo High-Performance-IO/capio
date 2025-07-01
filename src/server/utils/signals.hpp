@@ -33,10 +33,10 @@ inline void sig_term_handler(int signum, siginfo_t *info, void *ptr) {
     __gcov_dump();
 #endif
 
-    delete request_handlers_engine;
-    delete fs_monitor;
-    delete capio_backend;
-    delete shm_canary;
+    capio_delete(&request_handlers_engine);
+    capio_delete(&fs_monitor);
+    capio_delete(&capio_backend);
+    capio_delete(&shm_canary);
     std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_INFO << " [ " << node_name << " ] "
               << "Bye!" << std::endl;
     exit(EXIT_SUCCESS);

@@ -69,7 +69,7 @@ inline std::vector<std::regex> *file_in_memory_request(const long pid) {
         stc_queue->read(file, PATH_MAX);
         LOG("Obtained path %s", file);
         regex_vector->emplace_back(generateCapioRegex(file));
-        delete[] file;
+        capio_delete_vec(&file);
     }
     return regex_vector;
 }

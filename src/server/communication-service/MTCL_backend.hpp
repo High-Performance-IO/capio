@@ -25,7 +25,7 @@ class TransportUnit {
   public:
     TransportUnit() = default;
 
-    ~TransportUnit() { delete[] _bytes; }
+    ~TransportUnit() { capio_delete_vec(&_bytes); }
 
     friend class MTCL_backend;
 };
@@ -76,7 +76,7 @@ class MTCL_backend : public BackendInterface {
         HandlerPointer->send(&unit->_start_write_offset, sizeof(capio_off64_t));
         LOG("[send] Sent %ld bytes of file %s with offset of %ld", unit->_buffer_size,
             unit->_filepath.c_str(), unit->_start_write_offset);
-        delete unit;
+        capio_delete(&unit);
     }
 
     /**
@@ -298,9 +298,9 @@ class MTCL_backend : public BackendInterface {
 
         pthread_cancel(th->native_handle());
         th->join();
-        delete th;
-        delete continue_execution;
-        delete terminate;
+        capio_delete(&th);
+        capio_delete(&continue_execution);
+        capio_delete(&terminate);
 
         LOG("Handler closed.");
 
@@ -331,16 +331,16 @@ class MTCL_backend : public BackendInterface {
         }
         LOG("Found incoming message");
         std::lock_guard lg(*std::get<2>(interface));
-        const auto inputUnit = inQueue->front();
-        *buf_size            = inputUnit->_buffer_size;
-        *start_offset        = inputUnit->_start_write_offset;
+        auto inputUnit = inQueue->front();
+        *buf_size      = inputUnit->_buffer_size;
+        *start_offset  = inputUnit->_start_write_offset;
         memcpy(buf, inputUnit->_bytes, *buf_size);
         LOG("Received buffer: %s", inputUnit->_bytes);
         inQueue->pop();
 
         std::string filename(inputUnit->_filepath);
 
-        delete inputUnit;
+        capio_delete(&inputUnit);
         return filename;
     }
 

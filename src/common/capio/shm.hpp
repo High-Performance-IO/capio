@@ -66,7 +66,7 @@ class CapioShmCanary {
             auto message = new char[strlen(CAPIO_SHM_CANARY_ERROR)];
             sprintf(message, CAPIO_SHM_CANARY_ERROR, _canary_name.data());
             std::cout << CAPIO_SERVER_CLI_LOG_SERVER_ERROR << message << std::endl;
-            delete[] message;
+            capio_delete_vec(&message);
 #endif
             ERR_EXIT("ERR: shm canary flag already exists");
         }

@@ -172,7 +172,7 @@ inline void CapioFileManager::_unlockThreadAwaitingData(
 inline void CapioFileManager::increaseCloseCount(const std::filesystem::path &path) {
     START_LOG(gettid(), "call(path=%s)", path.c_str());
     auto metadata_path    = getAndCreateMetadataPath(path);
-    const auto lock       = new DistributedSemaphore(metadata_path + ".lock", 300);
+    auto lock       = new DistributedSemaphore(metadata_path + ".lock", 300);
     long long close_count = 0;
     LOG("Gained mutual exclusive access to token file %s", (metadata_path + ".lock").c_str());
 
@@ -189,7 +189,7 @@ inline void CapioFileManager::increaseCloseCount(const std::filesystem::path &pa
 
     LOG("Updated close count to %llu", close_count);
 
-    delete lock;
+    capio_delete(&lock);
 }
 
 /**

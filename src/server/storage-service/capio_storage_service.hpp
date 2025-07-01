@@ -43,10 +43,10 @@ class CapioStorageService {
 
     ~CapioStorageService() {
         // TODO: dump files to FS
-        delete _stored_files;
-        delete _client_to_server_queue;
-        delete _server_to_client_queue;
-        delete _threads_waiting_for_memory_data;
+        capio_delete(&_stored_files);
+        capio_delete(&_client_to_server_queue);
+        capio_delete(&_server_to_client_queue);
+        capio_delete(&_threads_waiting_for_memory_data);
     }
 
     void createFile(const std::string &file_name) const {
