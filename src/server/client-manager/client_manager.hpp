@@ -26,9 +26,9 @@ class ClientManager {
 
     ~ClientManager() {
         START_LOG(gettid(), "call()");
-        capio_delete(&bufs_response);
-        capio_delete(&app_names);
-        capio_delete(&files_created_by_producer);
+        delete bufs_response;
+        delete app_names;
+        delete files_created_by_producer;
         std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_WARNING << " [ " << node_name << " ] "
                   << "buf_response cleanup completed" << std::endl;
     }
@@ -57,7 +57,7 @@ class ClientManager {
     inline void remove_client(pid_t tid) const {
         START_LOG(gettid(), "call(tid=%ld)", tid);
         if (const auto it_resp = bufs_response->find(tid); it_resp != bufs_response->end()) {
-            capio_delete(&it_resp->second);
+            delete it_resp->second;
             bufs_response->erase(it_resp);
         }
         files_created_by_producer->erase(tid);

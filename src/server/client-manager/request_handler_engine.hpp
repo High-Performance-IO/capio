@@ -93,7 +93,7 @@ class RequestHandlerEngine {
 
     ~RequestHandlerEngine() {
         START_LOG(gettid(), "call()");
-        capio_delete(&buf_requests);
+        delete buf_requests;
 
         std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_WARNING << " [ " << node_name << " ] "
                   << "buf_requests cleanup completed" << std::endl;

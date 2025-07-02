@@ -31,7 +31,7 @@ int exit_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg
     LOG("Removed caches");
 
     if (const auto itm = bufs_response->find(tid); itm != bufs_response->end()) {
-        capio_delete(&itm->second);
+        delete itm->second;
         bufs_response->erase(tid);
         LOG("Removed response buffer");
     }

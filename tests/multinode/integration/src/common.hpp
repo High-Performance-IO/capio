@@ -1,6 +1,5 @@
 #ifndef COMMON_HPP
 #define COMMON_HPP
-#include <capio/utils.h>
 #include <gtest/gtest.h>
 
 #include <assert.h>

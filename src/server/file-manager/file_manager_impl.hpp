@@ -189,7 +189,7 @@ inline void CapioFileManager::increaseCloseCount(const std::filesystem::path &pa
 
     LOG("Updated close count to %llu", close_count);
 
-    capio_delete(&lock);
+    delete lock;
 }
 
 /**

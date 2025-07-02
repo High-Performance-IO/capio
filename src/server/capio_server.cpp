@@ -28,8 +28,6 @@ std::string workflow_name;
 inline bool StoreOnlyInMemory = false;
 char node_name[HOST_NAME_MAX];
 
-#include <capio/utils.h>
-
 #include "utils/types.hpp"
 
 #include "capio/env.hpp"
@@ -176,7 +174,7 @@ std::string parseCLI(int argc, char **argv) {
               << "LOG_LEVEL set to: " << CAPIO_LOG_LEVEL << std::endl;
     std::cout << CAPIO_LOG_SERVER_CLI_LOGGING_ENABLED_WARNING;
     log->log("LOG_LEVEL set to: %d", CAPIO_LOG_LEVEL);
-    capio_delete(&log);
+    delete log;
 #else
     if (std::getenv("CAPIO_LOG_LEVEL") != nullptr) {
         std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_WARNING << " [ " << node_name << " ] "

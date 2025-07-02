@@ -25,7 +25,7 @@ class TransportUnit {
   public:
     TransportUnit() = default;
 
-    ~TransportUnit() { capio_delete_vec(&_bytes); }
+    ~TransportUnit() { delete[] _bytes; }
 
     friend class MTCL_backend;
 };
@@ -76,7 +76,7 @@ class MTCL_backend : public BackendInterface {
         HandlerPointer->send(&unit->_start_write_offset, sizeof(capio_off64_t));
         LOG("[send] Sent %ld bytes of file %s with offset of %ld", unit->_buffer_size,
             unit->_filepath.c_str(), unit->_start_write_offset);
-        capio_delete(&unit);
+        delete unit;
     }
 
     /**
@@ -298,9 +298,9 @@ class MTCL_backend : public BackendInterface {
 
         pthread_cancel(th->native_handle());
         th->join();
-        capio_delete(&th);
-        capio_delete(&continue_execution);
-        capio_delete(&terminate);
+        delete th;
+        delete continue_execution;
+        delete terminate;
 
         LOG("Handler closed.");
 
@@ -340,7 +340,7 @@ class MTCL_backend : public BackendInterface {
 
         std::string filename(inputUnit->_filepath);
 
-        capio_delete(&inputUnit);
+        delete inputUnit;
         return filename;
     }
 
