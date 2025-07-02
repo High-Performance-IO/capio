@@ -25,7 +25,7 @@ class TransportUnit {
   public:
     TransportUnit() = default;
 
-    ~TransportUnit() { delete[] _bytes; }
+    ~TransportUnit() { capio_delete_vec(&_bytes); }
 
     friend class MTCL_backend;
 };
@@ -76,7 +76,7 @@ class MTCL_backend : public BackendInterface {
         HandlerPointer->send(&unit->_start_write_offset, sizeof(capio_off64_t));
         LOG("[send] Sent %ld bytes of file %s with offset of %ld", unit->_buffer_size,
             unit->_filepath.c_str(), unit->_start_write_offset);
-        delete unit;
+        capio_delete(&unit);
     }
 
     /**
@@ -106,7 +106,7 @@ class MTCL_backend : public BackendInterface {
                 send_unit(&HandlerPointer, unit);
                 LOG("[send] Message sent");
 
-                std::lock_guard lg(*mutex);
+                lockguard_guard(const std::lock_guard lg(*mutex));
                 LOG("[send] Locked guard");
                 out->pop();
             }
@@ -118,7 +118,7 @@ class MTCL_backend : public BackendInterface {
                 LOG("[recv] Receiving data");
                 auto unit = receive_unit(&HandlerPointer);
                 LOG("[recv] Lock guard");
-                std::lock_guard lg(*mutex);
+                lockguard_guard(const std::lock_guard lg(*mutex));
                 in->push(unit);
                 LOG("[recv] Pushed %ld bytes to be stored on file %s", unit->_buffer_size,
                     unit->_filepath.c_str());
@@ -130,7 +130,7 @@ class MTCL_backend : public BackendInterface {
 
             // terminate phase
             if (*terminate) {
-                std::lock_guard lg(*mutex);
+                lockguard_guard(const std::lock_guard lg(*mutex));
                 LOG("[TERM PHASE] Locked access send and receive queues");
                 while (!out->empty()) {
                     const auto unit = out->front();
@@ -168,7 +168,7 @@ class MTCL_backend : public BackendInterface {
 
             LOG("Received connection hostname: %s", connected_hostname);
 
-            std::lock_guard lock(*guard);
+            lockguard_guard(const std::lock_guard lock(*guard));
 
             open_connections->insert(
                 {connected_hostname,
@@ -259,7 +259,7 @@ class MTCL_backend : public BackendInterface {
                           << "Connected to " << remoteToken << std::endl;
                 LOG("Connected to: %s", remoteToken.c_str());
                 UserManager.send(ownHostname, HOST_NAME_MAX);
-                std::lock_guard lg(*_guard);
+                lockguard_guard(const std::lock_guard lg(*_guard));
 
                 auto connection_tuple =
                     std::make_tuple(new std::queue<TransportUnit *>(),
@@ -298,9 +298,9 @@ class MTCL_backend : public BackendInterface {
 
         pthread_cancel(th->native_handle());
         th->join();
-        delete th;
-        delete continue_execution;
-        delete terminate;
+        capio_delete(&th);
+        capio_delete(&continue_execution);
+        capio_delete(&terminate);
 
         LOG("Handler closed.");
 
@@ -312,7 +312,7 @@ class MTCL_backend : public BackendInterface {
                   << "MTCL backend correctly terminated" << std::endl;
     }
 
-    std::string &receive(char *buf, capio_off64_t *buf_size, capio_off64_t *start_offset) override {
+    std::string receive(char *buf, capio_off64_t *buf_size, capio_off64_t *start_offset) override {
         START_LOG(gettid(), "call()");
 
         std::queue<TransportUnit *> *inQueue = nullptr;
@@ -330,17 +330,17 @@ class MTCL_backend : public BackendInterface {
             }
         }
         LOG("Found incoming message");
-        std::lock_guard lg(*std::get<2>(interface));
-        const auto inputUnit = inQueue->front();
-        *buf_size            = inputUnit->_buffer_size;
-        *start_offset        = inputUnit->_start_write_offset;
+        lockguard_guard(const std::lock_guard lg(*std::get<2>(interface)));
+        auto inputUnit = inQueue->front();
+        *buf_size      = inputUnit->_buffer_size;
+        *start_offset  = inputUnit->_start_write_offset;
         memcpy(buf, inputUnit->_bytes, *buf_size);
         LOG("Received buffer: %s", inputUnit->_bytes);
         inQueue->pop();
 
         std::string filename(inputUnit->_filepath);
 
-        delete inputUnit;
+        capio_delete(&inputUnit);
         return filename;
     }
 
@@ -364,7 +364,7 @@ class MTCL_backend : public BackendInterface {
             memcpy(outputUnit->_bytes, buf, buf_size);
             LOG("Copied buffer: %s", outputUnit->_bytes);
 
-            std::lock_guard lg(*std::get<2>(interface));
+            lockguard_guard(const std::lock_guard lg(*std::get<2>(interface)));
             LOG("Pushing Transport unit to out queue");
             out->push(outputUnit);
         } else {

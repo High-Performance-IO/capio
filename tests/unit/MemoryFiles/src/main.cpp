@@ -1,3 +1,4 @@
+#include <capio/utils.h>
 #include <gtest/gtest.h>
 
 #include <cstdint>

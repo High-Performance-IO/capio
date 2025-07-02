@@ -26,15 +26,15 @@ inline void init_caches() {
 
 inline void delete_caches() {
     START_LOG(capio_syscall(SYS_gettid), "call()");
-    delete write_request_cache_fs;
-    delete read_request_cache_fs;
-    delete consent_request_cache_fs;
-    delete write_request_cache_mem;
-    delete read_request_cache_mem;
+    capio_delete(&write_request_cache_fs);
+    capio_delete(&read_request_cache_fs);
+    capio_delete(&consent_request_cache_fs);
+    capio_delete(&write_request_cache_mem);
+    capio_delete(&read_request_cache_mem);
 
-    delete cts_queue;
+    capio_delete(&cts_queue);
     LOG("Removed cts_queue");
-    delete stc_queue;
+    capio_delete(&stc_queue);
     LOG("Removed stc_queue");
 }
 

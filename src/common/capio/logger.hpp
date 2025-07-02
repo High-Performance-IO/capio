@@ -55,7 +55,7 @@ inline auto open_server_logfile() {
                                                std::to_string(capio_syscall(SYS_gettid)) + ".log";
 
     logfile.open(logfile_name, std::ofstream::out);
-    delete[] hostname;
+    capio_delete_vec(&hostname);
 
     return logfile_name;
 }

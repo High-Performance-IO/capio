@@ -37,7 +37,7 @@ class BackendInterface {
      * @param start_offset
      * @return std::string hostname of sender
      */
-    virtual std::string &receive(char *buf, capio_off64_t *buf_size, capio_off64_t *start_offset) {
+    virtual std::string receive(char *buf, capio_off64_t *buf_size, capio_off64_t *start_offset) {
         throw NotImplementedBackendMethod();
     };
 
@@ -59,9 +59,8 @@ class NoBackend final : public BackendInterface {
         return;
     };
 
-    std::string &receive(char *buf, capio_off64_t *buf_size, capio_off64_t *start_offset) override {
-        auto s = std::string("no-backend");
-        return s;
+    std::string receive(char *buf, capio_off64_t *buf_size, capio_off64_t *start_offset) override {
+        return {"no-backend"};
     }
 
     std::vector<std::string> get_open_connections() override { return {}; }

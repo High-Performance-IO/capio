@@ -109,7 +109,7 @@ template <class T, class Mutex> class Queue {
 
         _sem_num_elems.lock();
 
-        std::lock_guard<Mutex> lg(_mutex);
+        const std::lock_guard<Mutex> lg(_mutex);
         T *segment   = reinterpret_cast<char *>(_shm) + *_first_elem;
         *_first_elem = (*_first_elem + _elem_size) % _buff_size;
 
@@ -145,7 +145,7 @@ template <class T, class Mutex> class Queue {
 
         _sem_num_empty.lock();
 
-        std::lock_guard<Mutex> lg(_mutex);
+        const std::lock_guard<Mutex> lg(_mutex);
         T *segment  = reinterpret_cast<char *>(_shm) + *_last_elem;
         *_last_elem = (*_last_elem + _elem_size) % _buff_size;
 

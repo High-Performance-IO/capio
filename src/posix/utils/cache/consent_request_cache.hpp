@@ -26,7 +26,7 @@ class ConsentRequestCache {
 
     ~ConsentRequestCache() {
         START_LOG(capio_syscall(SYS_gettid), "call()");
-        delete available_consent;
+        capio_delete(&available_consent);
     };
 
     void consent_request(const std::filesystem::path &path, long tid,

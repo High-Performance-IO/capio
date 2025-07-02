@@ -1,8 +1,8 @@
+#include <fcntl.h>
+#include <filesystem>
 #include <gtest/gtest.h>
 
-#include <filesystem>
-
-#include <fcntl.h>
+#include <capio/utils.h>
 
 #include "utils/filesystem.hpp"
 

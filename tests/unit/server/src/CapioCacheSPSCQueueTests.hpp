@@ -1,6 +1,8 @@
 #ifndef CAPIOCACHESPSCQUEUETESTS_HPP
 #define CAPIOCACHESPSCQUEUETESTS_HPP
 
+#include <thread>
+
 #include "../common/capio/response_queue.hpp"
 #include "../posix/utils/env.hpp"
 #include "../posix/utils/filesystem.hpp"

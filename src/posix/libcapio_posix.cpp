@@ -4,6 +4,8 @@
  * logs up to CAPIO_MAX_LOG_LEVEL function calls
  */
 
+#include <capio/utils.h>
+
 #include <array>
 #include <string>
 
