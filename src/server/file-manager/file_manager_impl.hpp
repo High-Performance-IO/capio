@@ -53,7 +53,7 @@ inline uintmax_t CapioFileManager::get_file_size_if_exists(const std::filesystem
  */
 inline void CapioFileManager::addThreadAwaitingCreation(const std::string &path, pid_t tid) {
     START_LOG(gettid(), "call(path=%s, tid=%ld)", path.c_str(), tid);
-    lockguard_guard(const std::lock_guard lg(creation_mutex));
+    const std::lock_guard lg(creation_mutex);
     thread_awaiting_file_creation[path].push_back(tid);
 }
 
@@ -92,7 +92,7 @@ inline void CapioFileManager::addThreadAwaitingData(const std::string &path, int
         return;
     }
 
-    lockguard_guard(const std::lock_guard lg(data_mutex));
+    const std::lock_guard lg(data_mutex);
     thread_awaiting_data[path].emplace(tid, expected_size);
 }
 
@@ -342,7 +342,7 @@ inline bool CapioFileManager::isCommitted(const std::filesystem::path &path) {
  */
 inline void CapioFileManager::checkFilesAwaitingCreation() {
     // NOTE: do not put inside here log code as it will generate a lot of useless log
-    lockguard_guard(const std::lock_guard lg(creation_mutex));
+    const std::lock_guard lg(creation_mutex);
     std::vector<std::string> path_to_delete;
 
     for (auto element : thread_awaiting_file_creation) {
@@ -367,7 +367,7 @@ inline void CapioFileManager::checkFilesAwaitingCreation() {
  */
 inline void CapioFileManager::checkFileAwaitingData() {
     // NOTE: do not put inside here log code as it will generate a lot of useless log
-    lockguard_guard(const std::lock_guard lg(data_mutex));
+    const std::lock_guard lg(data_mutex);
     for (auto iter = thread_awaiting_data.begin(); iter != thread_awaiting_data.end();) {
         START_LOG(gettid(), "\n\ncall()");
         // no need to check if file exists as this method is called only by read_handler

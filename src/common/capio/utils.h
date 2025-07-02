@@ -34,15 +34,4 @@ template <typename T> void capio_delete_vec(T **ptr) {
 #endif
 }
 
-#define lockguard_guard(expr)                                                                      \
-    try {                                                                                          \
-        expr;                                                                                      \
-    } catch (const std::system_error &e) {                                                         \
-        char nodename[HOST_NAME_MAX]{0};                                                           \
-        gethostname(nodename, HOST_NAME_MAX);                                                      \
-        std::cout << CAPIO_SERVER_CLI_LOG_SERVER_WARNING << " [ " << nodename << " ] "             \
-                  << "Danger! caught possible deadlock due to already acquired semaphore"          \
-                  << std::endl;                                                                    \
-    }
-
 #endif // UTILS_H

@@ -106,7 +106,7 @@ class MTCL_backend : public BackendInterface {
                 send_unit(&HandlerPointer, unit);
                 LOG("[send] Message sent");
 
-                lockguard_guard(const std::lock_guard lg(*mutex));
+                const std::lock_guard lg(*mutex);
                 LOG("[send] Locked guard");
                 out->pop();
             }
@@ -118,7 +118,7 @@ class MTCL_backend : public BackendInterface {
                 LOG("[recv] Receiving data");
                 auto unit = receive_unit(&HandlerPointer);
                 LOG("[recv] Lock guard");
-                lockguard_guard(const std::lock_guard lg(*mutex));
+                const std::lock_guard lg(*mutex);
                 in->push(unit);
                 LOG("[recv] Pushed %ld bytes to be stored on file %s", unit->_buffer_size,
                     unit->_filepath.c_str());
@@ -130,7 +130,7 @@ class MTCL_backend : public BackendInterface {
 
             // terminate phase
             if (*terminate) {
-                lockguard_guard(const std::lock_guard lg(*mutex));
+                const std::lock_guard lg(*mutex);
                 LOG("[TERM PHASE] Locked access send and receive queues");
                 while (!out->empty()) {
                     const auto unit = out->front();
@@ -168,7 +168,7 @@ class MTCL_backend : public BackendInterface {
 
             LOG("Received connection hostname: %s", connected_hostname);
 
-            lockguard_guard(const std::lock_guard lock(*guard));
+            const std::lock_guard lock(*guard);
 
             open_connections->insert(
                 {connected_hostname,
@@ -259,7 +259,7 @@ class MTCL_backend : public BackendInterface {
                           << "Connected to " << remoteToken << std::endl;
                 LOG("Connected to: %s", remoteToken.c_str());
                 UserManager.send(ownHostname, HOST_NAME_MAX);
-                lockguard_guard(const std::lock_guard lg(*_guard));
+                const std::lock_guard lg(*_guard);
 
                 auto connection_tuple =
                     std::make_tuple(new std::queue<TransportUnit *>(),
@@ -330,7 +330,7 @@ class MTCL_backend : public BackendInterface {
             }
         }
         LOG("Found incoming message");
-        lockguard_guard(const std::lock_guard lg(*std::get<2>(interface)));
+        const std::lock_guard lg(*std::get<2>(interface));
         auto inputUnit = inQueue->front();
         *buf_size      = inputUnit->_buffer_size;
         *start_offset  = inputUnit->_start_write_offset;
@@ -364,7 +364,7 @@ class MTCL_backend : public BackendInterface {
             memcpy(outputUnit->_bytes, buf, buf_size);
             LOG("Copied buffer: %s", outputUnit->_bytes);
 
-            lockguard_guard(const std::lock_guard lg(*std::get<2>(interface)));
+            const std::lock_guard lg(*std::get<2>(interface));
             LOG("Pushing Transport unit to out queue");
             out->push(outputUnit);
         } else {
