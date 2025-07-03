@@ -83,7 +83,7 @@ class FileSystemMonitor {
         *continue_execution = false;
         try {
             th->join();
-        }catch (const std::system_error &exception) {
+        } catch (const std::system_error &exception) {
             print_message_error("~FileSystemMonitor()::th->joing()", exception);
         }
 

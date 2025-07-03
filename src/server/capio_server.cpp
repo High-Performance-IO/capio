@@ -233,7 +233,7 @@ int main(int argc, char **argv) {
 
     std::cout << CAPIO_LOG_SERVER_BANNER;
     gethostname(node_name, HOST_NAME_MAX);
-    CAPIO_SERVER_MAIN_PID = getpid();
+    CAPIO_SERVER_MAIN_PID = gettid();
     std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_INFO << " [ " << node_name << " ] "
               << "Started server with PID: " << CAPIO_SERVER_MAIN_PID << std::endl;
     const std::string config_path = parseCLI(argc, argv);
