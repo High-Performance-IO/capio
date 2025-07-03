@@ -117,7 +117,7 @@ class RequestHandlerEngine {
                 request_handlers[code](str.get());
             } catch (const std::exception &exception) {
                 std::cout << std::endl
-                          << "~~~~~~~~~~~~~~[\033[31mlibcapio_posix.so: FATAL "
+                          << "~~~~~~~~~~~~~~[\033[31mRequestHandlerEngine::start(): FATAL "
                              "EXCEPTION\033[0m]~~~~~~~~~~~~~~"
                           << std::endl
                           << "|  Exception thrown while handling request number: " << code << " : "
@@ -129,7 +129,7 @@ class RequestHandlerEngine {
                           << "|  `" << typeid(exception).name() << ": " << exception.what()
                           << std::endl
                           << "|" << std::endl
-                          << "~~~~~~~~~~~~~~[\033[31mlibcapio_posix.so: FATAL "
+                          << "~~~~~~~~~~~~~~[\033[31mRequestHandlerEngine::start(): FATAL "
                              "EXCEPTION\033[0m]~~~~~~~~~~~~~~"
                           << std::endl
                           << std::endl;
