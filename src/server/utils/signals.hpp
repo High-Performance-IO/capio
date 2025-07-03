@@ -17,6 +17,9 @@ extern "C" void __gcov_dump(void);
  * @param ptr
  */
 inline void sig_term_handler(int signum, siginfo_t *info, void *ptr) {
+    if (getpid() != CAPIO_SERVER_MAIN_PID) {
+        return;
+    }
     START_LOG(gettid(), "call(signal=[%d] (%s) from process with pid=%ld)", signum,
               strsignal(signum), info != nullptr ? info->si_pid : -1);
 

@@ -25,6 +25,7 @@
  * to all classes and subclasses.
  */
 std::string workflow_name;
+pid_t CAPIO_SERVER_MAIN_PID;
 inline bool StoreOnlyInMemory = false;
 char node_name[HOST_NAME_MAX];
 
@@ -232,6 +233,9 @@ int main(int argc, char **argv) {
 
     std::cout << CAPIO_LOG_SERVER_BANNER;
     gethostname(node_name, HOST_NAME_MAX);
+    CAPIO_SERVER_MAIN_PID = getpid();
+    std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_INFO << " [ " << node_name << " ] "
+              << "Started server with PID: " << CAPIO_SERVER_MAIN_PID << std::endl;
     const std::string config_path = parseCLI(argc, argv);
 
     START_LOG(gettid(), "call()");
