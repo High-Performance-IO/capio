@@ -133,6 +133,8 @@ void *get_shm(const std::string &shm_name) {
     if (fstat(fd, &sb) == -1) {
         ERR_EXIT("fstat %s", shm_name.c_str());
     }
+    LOG("STATBUF SIZE: %ld", sb.st_size);
+
     void *p = mmap(nullptr, sb.st_size, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
     if (p == MAP_FAILED) {
         LOG("ERROR MMAP arg dump:");
