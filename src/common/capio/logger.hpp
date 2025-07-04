@@ -356,19 +356,23 @@ class Logger {
 #else
 
 #ifdef __CAPIO_POSIX
-#define ERR_EXIT(message, ...)                                                                     \
+#define ERR_EXIT(fmt, ...)                                                                         \
     if (!continue_on_error) {                                                                      \
         syscall_no_intercept_flag = true;                                                          \
-        std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_ERROR << " [ libcapio_posix.so ] " << message      \
-                  << std::endl;                                                                    \
-        exit(EXIT_FAILURE);                                                                        \
+        char tmp_buf[1024];                                                                        \
+        std::sprintf(tmp_buf, fmt, ##__VA_ARGS__);                                                 \
+        char node_name[HOST_NAME_MAX]{0};                                                          \
+        gethostname(node_name, HOST_NAME_MAX);                                                     \
+        std::printf("%s [ %s ] %s\n", CAPIO_LOG_SERVER_CLI_LEVEL_ERROR, node_name, tmp_buf);       \
+        std::exit(EXIT_FAILURE);                                                                   \
     }
 #else
-#define ERR_EXIT(message, ...)                                                                     \
+#define ERR_EXIT(fmt, ...)                                                                         \
     if (!continue_on_error) {                                                                      \
-        std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_ERROR << " [ " << node_name << " ] " << message    \
-                  << std::endl;                                                                    \
-        exit(EXIT_FAILURE);                                                                        \
+        char tmp_buf[1024];                                                                        \
+        std::sprintf(tmp_buf, fmt, ##__VA_ARGS__);                                                 \
+        std::printf("%s [ %s ] %s\n", CAPIO_LOG_SERVER_CLI_LEVEL_ERROR, node_name, tmp_buf);       \
+        std::exit(EXIT_FAILURE);                                                                   \
     }
 #endif
 #define LOG(message, ...)
