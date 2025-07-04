@@ -62,7 +62,7 @@ class FileSystemMonitor {
             }
 
             try {
-                // file_manager->checkDirectoriesNFiles();
+                file_manager->checkDirectoriesNFiles();
             } catch (const std::exception &exception) {
                 print_message_error("file_manager->checkDirectoriesNFiles()", exception);
             }

@@ -444,6 +444,8 @@ class CapioCLEngine {
                        [](auto pair) { return pair.first; });
         return paths;
     }
+
+    const auto *getLocations() const { return &_locations; }
 };
 
 inline CapioCLEngine *capio_cl_engine;

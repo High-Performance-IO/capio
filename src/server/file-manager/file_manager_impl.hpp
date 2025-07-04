@@ -392,14 +392,24 @@ inline void CapioFileManager::checkFileAwaitingData() {
  * @brief commit directories that have NFILES inside them if their commit rule is n_files
  */
 inline void CapioFileManager::checkDirectoriesNFiles() const {
+    /*
+     * WARN: this function directly access the _location internal structure in read only mode to
+     * avoid race conditions. Since we do not update locations, get the pointer only at the
+     * beginning and then use it.
+     */
+    static const auto loc = capio_cl_engine->getLocations();
 
-    for (const auto &path_config : capio_cl_engine->getPathsInConfig()) {
-        if (capio_cl_engine->isFile(path_config)) {
+    for (const auto &[path_config, config] : *loc) {
+
+        if (std::get<6>(config)) {
+            /*
+             * In this case we are trying to check for a file.
+             * skip this check and go to the next path.
+             */
             continue;
         }
 
-        auto n_files = capio_cl_engine->getDirectoryFileCount(path_config);
-        if (n_files > 0) {
+        if (auto n_files = std::get<8>(config); n_files > 0) {
             START_LOG(gettid(), "call()");
             LOG("Directory %s needs %ld files before being committed", path_config.c_str(),
                 n_files);
