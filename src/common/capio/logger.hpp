@@ -355,7 +355,10 @@ class Logger {
 
 #else
 
-#ifdef __CAPIO_POSIX
+#ifndef __CAPIO_POSIX
+inline bool syscall_no_intercept_flag = false;
+#endif
+
 #define ERR_EXIT(fmt, ...)                                                                         \
     if (!continue_on_error) {                                                                      \
         syscall_no_intercept_flag = true;                                                          \
@@ -366,15 +369,7 @@ class Logger {
         std::printf("%s [ %s ] %s\n", CAPIO_LOG_SERVER_CLI_LEVEL_ERROR, node_name, tmp_buf);       \
         std::exit(EXIT_FAILURE);                                                                   \
     }
-#else
-#define ERR_EXIT(fmt, ...)                                                                         \
-    if (!continue_on_error) {                                                                      \
-        char tmp_buf[1024];                                                                        \
-        std::sprintf(tmp_buf, fmt, ##__VA_ARGS__);                                                 \
-        std::printf("%s [ %s ] %s\n", CAPIO_LOG_SERVER_CLI_LEVEL_ERROR, node_name, tmp_buf);       \
-        std::exit(EXIT_FAILURE);                                                                   \
-    }
-#endif
+
 #define LOG(message, ...)
 #define START_LOG(tid, message, ...)
 #define START_SYSCALL_LOGGING()
