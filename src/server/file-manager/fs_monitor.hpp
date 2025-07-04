@@ -12,6 +12,7 @@ class FileSystemMonitor {
     bool *continue_execution = new bool;
 
     static void print_message_error(const std::string &func, const std::exception &exception) {
+        START_LOG(gettid(), "call()");
         std::cout << std::endl
                   << "~~~~~~~~~~~~~~[\033[31mFileSystemMonitor: FATAL "
                      "EXCEPTION\033[0m]~~~~~~~~~~~~~~"
@@ -28,7 +29,7 @@ class FileSystemMonitor {
                   << std::endl
                   << std::endl;
 
-        exit(EXIT_FAILURE);
+        ERR_EXIT("%s", exception.what());
     }
 
   public:

@@ -134,7 +134,7 @@ class RequestHandlerEngine {
                           << std::endl
                           << std::endl;
 
-                exit(EXIT_FAILURE);
+                ERR_EXIT("%s", exception.what());
             }
 
             LOG(CAPIO_LOG_SERVER_REQUEST_END);

@@ -319,7 +319,12 @@ class Logger {
 #define ERR_EXIT(message, ...)                                                                     \
     log.log(message, ##__VA_ARGS__);                                                               \
     if (!continue_on_error) {                                                                      \
-        exit(EXIT_FAILURE);                                                                        \
+        char tmp_buf[1024];                                                                        \
+        std::sprintf(tmp_buf, message, ##__VA_ARGS__);                                             \
+        char node_name[HOST_NAME_MAX]{0};                                                          \
+        gethostname(node_name, HOST_NAME_MAX);                                                     \
+        std::printf("%s [ %s ] %s\n", CAPIO_LOG_SERVER_CLI_LEVEL_ERROR, node_name, tmp_buf);       \
+        std::exit(EXIT_FAILURE);                                                                   \
     }
 #define LOG(message, ...) log.log(message, ##__VA_ARGS__)
 #define START_LOG(tid, message, ...)                                                               \

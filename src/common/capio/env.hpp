@@ -36,7 +36,7 @@ inline const std::filesystem::path &get_capio_dir() {
         capio_dir = std::filesystem::path(buf.get());
         for (auto &forbidden_path : CAPIO_DIR_FORBIDDEN_PATHS) {
             if (capio_dir.native().rfind(forbidden_path, 0) == 0) {
-                ERR_EXIT("CAPIO_DIR inside %s file system is not supported", forbidden_path);
+                ERR_EXIT("CAPIO_DIR inside %s file system is not supported", forbidden_path.data());
             }
         }
     }

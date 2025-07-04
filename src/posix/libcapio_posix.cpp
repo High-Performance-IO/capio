@@ -429,7 +429,7 @@ static int hook(long syscall_number, long arg0, long arg1, long arg2, long arg3,
             << std::endl
             << std::endl;
 
-        exit(EXIT_FAILURE);
+        ERR_EXIT("%s", exception.what());
     }
 }
 

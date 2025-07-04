@@ -84,13 +84,15 @@ std::string parseCLI(int argc, char **argv) {
         std::cout << CAPIO_SERVER_ARG_PARSER_PRE_COMMAND << parser;
         exit(EXIT_SUCCESS);
     } catch (args::ParseError &e) {
+        START_LOG(gettid(), "call()");
         std::cerr << e.what() << std::endl;
         std::cerr << parser;
-        exit(EXIT_FAILURE);
+        ERR_EXIT("%s", e.what());
     } catch (args::ValidationError &e) {
+        START_LOG(gettid(), "call()");
         std::cerr << e.what() << std::endl;
         std::cerr << parser;
-        exit(EXIT_FAILURE);
+        ERR_EXIT("%s", e.what());
     }
 
     if (continueOnErrorFlag) {
@@ -157,13 +159,11 @@ std::string parseCLI(int argc, char **argv) {
                   << workflow_name.data() << std::endl;
 
     } else {
+        START_LOG(gettid(), "call()");
         std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_ERROR << " [ " << node_name << " ] "
                   << "Error: no config file provided. To skip config file use --no-config option!"
                   << std::endl;
-#ifdef CAPIO_LOG
-        log->log("no config file provided, and  --no-config not provided");
-#endif
-        exit(EXIT_FAILURE);
+        ERR_EXIT("no config file provided, and  --no-config not provided");
     }
 
     std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_INFO << " [ " << node_name << " ] "
@@ -212,10 +212,11 @@ std::string parseCLI(int argc, char **argv) {
                       << "Selected backend is File System" << std::endl;
             capio_backend = new NoBackend();
         } else {
+            START_LOG(gettid(), "call()");
             std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_ERROR << " [ " << node_name << " ] "
                       << "Provided communication backend " << backend_name << " is invalid"
                       << std::endl;
-            exit(EXIT_FAILURE);
+            ERR_EXIT("No valid backend was provided");
         }
     } else {
         std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_INFO << " [ " << node_name << " ] "
