@@ -133,7 +133,21 @@ void *get_shm(const std::string &shm_name) {
     if (fstat(fd, &sb) == -1) {
         ERR_EXIT("fstat %s", shm_name.c_str());
     }
-    LOG("STATBUF SIZE: %ld", sb.st_size);
+    LOG("========== STATBUF DUMP (%s) ==========", shm_name.c_str());
+    LOG("STATBUF st_dev: %ld", sb.st_dev);
+    LOG("STATBUF st_ino: %ld", sb.st_ino);
+    LOG("STATBUF st_mode: %o", sb.st_mode);
+    LOG("STATBUF st_nlink: %ld", sb.st_nlink);
+    LOG("STATBUF st_uid: %d", sb.st_uid);
+    LOG("STATBUF st_gid: %d", sb.st_gid);
+    LOG("STATBUF st_rdev: %ld", sb.st_rdev);
+    LOG("STATBUF st_size: %ld", sb.st_size);
+    LOG("STATBUF st_blksize: %ld", sb.st_blksize);
+    LOG("STATBUF st_blocks: %ld", sb.st_blocks);
+    LOG("STATBUF st_atime: %ld", sb.st_atime);
+    LOG("STATBUF st_mtime: %ld", sb.st_mtime);
+    LOG("STATBUF st_ctime: %ld", sb.st_ctime);
+    LOG("==========STATBUF DUMP==========");
 
     void *p = mmap(nullptr, sb.st_size, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
     if (p == MAP_FAILED) {
