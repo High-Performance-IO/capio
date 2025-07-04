@@ -355,9 +355,22 @@ class Logger {
 
 #else
 
+#ifdef __CAPIO_POSIX
 #define ERR_EXIT(message, ...)                                                                     \
-    if (!continue_on_error)                                                                        \
-    exit(EXIT_FAILURE)
+    if (!continue_on_error) {                                                                      \
+        syscall_no_intercept_flag = true;                                                          \
+        std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_ERROR << " [ libcapio_posix.so ] " << message      \
+                  << std::endl;                                                                    \
+        exit(EXIT_FAILURE);                                                                        \
+    }
+#else
+#define ERR_EXIT(message, ...)                                                                     \
+    if (!continue_on_error) {                                                                      \
+        std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_ERROR << " [ " << node_name << " ] " << message    \
+                  << std::endl;                                                                    \
+        exit(EXIT_FAILURE);                                                                        \
+    }
+#endif
 #define LOG(message, ...)
 #define START_LOG(tid, message, ...)
 #define START_SYSCALL_LOGGING()
