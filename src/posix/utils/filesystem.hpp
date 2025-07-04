@@ -158,7 +158,7 @@ inline void destroy_filesystem() {
     current_dir.reset();
     delete capio_files_descriptors;
     delete capio_files_paths;
-    delete &files;
+    delete files;
 }
 
 /**
