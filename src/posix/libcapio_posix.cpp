@@ -431,6 +431,7 @@ static int hook(long syscall_number, long arg0, long arg1, long arg2, long arg3,
 
         ERR_EXIT("%s", exception.what());
     }
+    return 1;
 }
 
 static __attribute__((constructor)) void init() {
