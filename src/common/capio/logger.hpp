@@ -55,7 +55,7 @@ inline auto open_server_logfile() {
                                                std::to_string(capio_syscall(SYS_gettid)) + ".log";
 
     logfile.open(logfile_name, std::ofstream::out);
-    capio_delete_vec(&hostname);
+    delete[] hostname;
 
     return logfile_name;
 }
@@ -319,6 +319,12 @@ class Logger {
 #define ERR_EXIT(message, ...)                                                                     \
     log.log(message, ##__VA_ARGS__);                                                               \
     if (!continue_on_error) {                                                                      \
+        char tmp_buf[1024];                                                                        \
+        sprintf(tmp_buf, message, ##__VA_ARGS__);                                                  \
+        char node_name[HOST_NAME_MAX]{0};                                                          \
+        gethostname(node_name, HOST_NAME_MAX);                                                     \
+        printf("%s [ %s ] %s\n", CAPIO_LOG_SERVER_CLI_LEVEL_ERROR, node_name, tmp_buf);            \
+        fflush(stdout);                                                                            \
         exit(EXIT_FAILURE);                                                                        \
     }
 #define LOG(message, ...) log.log(message, ##__VA_ARGS__)
@@ -355,9 +361,22 @@ class Logger {
 
 #else
 
-#define ERR_EXIT(message, ...)                                                                     \
-    if (!continue_on_error)                                                                        \
-    exit(EXIT_FAILURE)
+#ifndef __CAPIO_POSIX
+inline bool syscall_no_intercept_flag = false;
+#endif
+
+#define ERR_EXIT(fmt, ...)                                                                         \
+    if (!continue_on_error) {                                                                      \
+        syscall_no_intercept_flag = true;                                                          \
+        char tmp_buf[1024];                                                                        \
+        sprintf(tmp_buf, fmt, ##__VA_ARGS__);                                                      \
+        char node_name[HOST_NAME_MAX]{0};                                                          \
+        gethostname(node_name, HOST_NAME_MAX);                                                     \
+        printf("%s [ %s ] %s\n", CAPIO_LOG_SERVER_CLI_LEVEL_ERROR, node_name, tmp_buf);            \
+        fflush(stdout);                                                                            \
+        exit(EXIT_FAILURE);                                                                        \
+    }
+
 #define LOG(message, ...)
 #define START_LOG(tid, message, ...)
 #define START_SYSCALL_LOGGING()

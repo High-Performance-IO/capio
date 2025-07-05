@@ -13,19 +13,19 @@ inline std::condition_variable clone_cv;
 inline std::unordered_set<pid_t> *tids;
 
 inline bool is_capio_tid(const pid_t tid) {
-    lockguard_guard(const std::lock_guard lg(clone_mutex));
+    const std::lock_guard lg(clone_mutex);
     return tids->find(tid) != tids->end();
 }
 
 inline void register_capio_tid(const pid_t tid) {
     START_LOG(syscall_no_intercept(SYS_gettid), "call(tid=%ld)", tid);
-    lockguard_guard(const std::lock_guard lg(clone_mutex));
+    const std::lock_guard lg(clone_mutex);
     tids->insert(tid);
 }
 
 inline void remove_capio_tid(const pid_t tid) {
     START_LOG(syscall_no_intercept(SYS_gettid), "call(tid=%ld)", tid);
-    lockguard_guard(std::lock_guard lg(clone_mutex));
+    std::lock_guard lg(clone_mutex);
     if (tids->find(tid) != tids->end()) {
         tids->erase(tid);
     }

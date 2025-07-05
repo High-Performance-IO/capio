@@ -93,7 +93,7 @@ class RequestHandlerEngine {
 
     ~RequestHandlerEngine() {
         START_LOG(gettid(), "call()");
-        capio_delete(&buf_requests);
+        delete buf_requests;
 
         std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_WARNING << " [ " << node_name << " ] "
                   << "buf_requests cleanup completed" << std::endl;
@@ -113,7 +113,30 @@ class RequestHandlerEngine {
         while (true) {
             LOG(CAPIO_LOG_SERVER_REQUEST_START);
             int code = read_next_request(str.get());
-            request_handlers[code](str.get());
+            try {
+                request_handlers[code](str.get());
+            } catch (const std::exception &exception) {
+                std::cout << std::endl
+                          << "~~~~~~~~~~~~~~[\033[31mRequestHandlerEngine::start(): FATAL "
+                             "EXCEPTION\033[0m]~~~~~~~~~~~~~~"
+                          << std::endl
+                          << "|  Exception thrown while handling request number: " << code << " : "
+                          << str.get() << std::endl
+                          << "|  TID of offending thread: " << gettid() << std::endl
+                          << "|  PID of offending thread: " << getpid() << std::endl
+                          << "|  PPID of offending thread: " << getppid() << std::endl
+                          << "|  " << std::endl
+                          << "|  `" << typeid(exception).name() << ": " << exception.what()
+                          << std::endl
+                          << "|" << std::endl
+                          << "~~~~~~~~~~~~~~[\033[31mRequestHandlerEngine::start(): FATAL "
+                             "EXCEPTION\033[0m]~~~~~~~~~~~~~~"
+                          << std::endl
+                          << std::endl;
+
+                ERR_EXIT("%s", exception.what());
+            }
+
             LOG(CAPIO_LOG_SERVER_REQUEST_END);
         }
     }

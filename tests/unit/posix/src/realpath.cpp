@@ -2,8 +2,6 @@
 #include <filesystem>
 #include <gtest/gtest.h>
 
-#include <capio/utils.h>
-
 #include "utils/filesystem.hpp"
 
 class RealpathPosixTest : public testing::Test {

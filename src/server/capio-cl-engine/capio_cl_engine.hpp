@@ -10,6 +10,8 @@
  *
  */
 class CapioCLEngine {
+    friend class CapioFileManager;
+
   private:
     std::unordered_map<std::string,                         // path name
                        std::tuple<std::vector<std::string>, // Vector for producers            [0]
@@ -438,12 +440,8 @@ class CapioCLEngine {
         return files;
     }
 
-    std::vector<std::string> getPathsInConfig() {
-        std::vector<std::string> paths;
-        std::transform(_locations.begin(), _locations.end(), std::back_inserter(paths),
-                       [](auto pair) { return pair.first; });
-        return paths;
-    }
+  protected:
+    const auto *getLocations() const { return &_locations; }
 };
 
 inline CapioCLEngine *capio_cl_engine;

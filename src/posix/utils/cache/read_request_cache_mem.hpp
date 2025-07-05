@@ -73,7 +73,7 @@ class ReadRequestCacheMEM {
 
     ~ReadRequestCacheMEM() {
         START_LOG(capio_syscall(SYS_gettid), "call()");
-        capio_delete_vec(&_cache);
+        delete[] _cache;
     }
 
     void flush() {

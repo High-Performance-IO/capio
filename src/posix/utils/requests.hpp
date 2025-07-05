@@ -41,16 +41,17 @@ inline void init_client() {
 inline void handshake_request(const long tid, const long pid, const std::string &app_name) {
     START_LOG(capio_syscall(SYS_gettid), "call(tid=%ld, pid=%ld, app_name=%s)", tid, pid,
               app_name.c_str());
-    char req[CAPIO_REQ_MAX_SIZE];
-    sprintf(req, "%04d %ld %ld %s", CAPIO_REQUEST_HANDSHAKE, tid, pid, app_name.c_str());
-    buf_requests->write(req, CAPIO_REQ_MAX_SIZE);
-    LOG("Sent handshake request");
 
     cts_queue = new SPSCQueue("queue-" + std::to_string(tid) + ".cts", get_cache_lines(),
                               get_cache_line_size(), get_capio_workflow_name(), true);
     stc_queue = new SPSCQueue("queue-" + std::to_string(tid) + ".stc", get_cache_lines(),
                               get_cache_line_size(), get_capio_workflow_name(), true);
     LOG("Initialized data transfer queues");
+
+    char req[CAPIO_REQ_MAX_SIZE];
+    sprintf(req, "%04d %ld %ld %s", CAPIO_REQUEST_HANDSHAKE, tid, pid, app_name.c_str());
+    buf_requests->write(req, CAPIO_REQ_MAX_SIZE);
+    LOG("Sent handshake request");
 }
 
 inline std::vector<std::regex> *file_in_memory_request(const long pid) {
@@ -69,7 +70,7 @@ inline std::vector<std::regex> *file_in_memory_request(const long pid) {
         stc_queue->read(file, PATH_MAX);
         LOG("Obtained path %s", file);
         regex_vector->emplace_back(generateCapioRegex(file));
-        capio_delete_vec(&file);
+        delete[] file;
     }
     return regex_vector;
 }

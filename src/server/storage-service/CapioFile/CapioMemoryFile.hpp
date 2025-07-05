@@ -64,7 +64,7 @@ class CapioMemoryFile : public CapioFile {
         cross_page_buffer_view = new char[_pageSizeBytes];
     }
 
-    ~CapioMemoryFile() override { capio_delete_vec(&cross_page_buffer_view); }
+    ~CapioMemoryFile() override { delete[] cross_page_buffer_view; }
 
     /**
      * Write data to a file stored inside the memory

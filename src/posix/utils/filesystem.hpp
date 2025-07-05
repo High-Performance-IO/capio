@@ -156,9 +156,9 @@ inline void delete_capio_path(const std::string &path) {
  */
 inline void destroy_filesystem() {
     current_dir.reset();
-    capio_delete(&capio_files_descriptors);
-    capio_delete(&capio_files_paths);
-    capio_delete(&files);
+    delete capio_files_descriptors;
+    delete capio_files_paths;
+    delete files;
 }
 
 /**

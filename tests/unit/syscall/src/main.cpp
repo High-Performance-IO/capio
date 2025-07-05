@@ -1,5 +1,3 @@
-#include <capio/utils.h>
-
 #include "capio/constants.hpp"
 #include <gtest/gtest.h>
 
