@@ -139,7 +139,7 @@ auto get_shm_size(int shm_fd, const char *shm_name) {
         }
     }
 
-    LOG("Size of shm obkect %s : %ld", shm_name.c_str(), size);
+    LOG("Size of shm object %s : %ld", shm_name, sb.st_size);
     return sb.st_size;
 }
 
