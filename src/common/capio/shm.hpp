@@ -118,41 +118,46 @@ void *create_shm(const std::string &shm_name, const long int size) {
     return p;
 }
 
+auto get_shm_size(int shm_fd, const char *shm_name) {
+    START_LOG(capio_syscall(SYS_gettid), "call(fd=%ld)", shm_fd);
+    struct stat sb = {0};
+    /* Open existing object */
+    /* Use shared memory object size as length argument for mmap()
+    and as number of bytes to write() */
+    if (fstat(shm_fd, &sb) == -1) {
+        ERR_EXIT("fstat %s", shm_name);
+    }
+
+    if (sb.st_size <= 0) {
+        LOG("WARN: size of stat is %ld. Retry once.", sb.st_size);
+        if (fstat(shm_fd, &sb) == -1) {
+            ERR_EXIT("fstat %s", shm_name);
+        }
+        if (sb.st_size <= 0) {
+            LOG("WARN: retry no. 2 gave a size of %ld", sb.st_size);
+            ERR_EXIT("FATAL: unable to obtain size of shm object %s after two tries...", shm_name);
+        }
+    }
+
+    LOG("Size of shm obkect %s : %ld", shm_name.c_str(), size);
+    return sb.st_size;
+}
+
 void *get_shm(const std::string &shm_name) {
     START_LOG(capio_syscall(SYS_gettid), "call(shm_name=%s)", shm_name.c_str());
 
     // if we are not creating a new object, mode is equals to 0
-    int fd         = shm_open(shm_name.c_str(), O_RDWR, 0); // to be closed
-    struct stat sb = {0};
+    int fd = shm_open(shm_name.c_str(), O_RDWR, 0); // to be closed
     if (fd == -1) {
         ERR_EXIT("get_shm shm_open %s", shm_name.c_str());
     }
-    /* Open existing object */
-    /* Use shared memory object size as length argument for mmap()
-    and as number of bytes to write() */
-    if (fstat(fd, &sb) == -1) {
-        ERR_EXIT("fstat %s", shm_name.c_str());
-    }
-    LOG("========== STATBUF DUMP (%s) ==========", shm_name.c_str());
-    LOG("STATBUF st_dev: %ld", sb.st_dev);
-    LOG("STATBUF st_ino: %ld", sb.st_ino);
-    LOG("STATBUF st_mode: %o", sb.st_mode);
-    LOG("STATBUF st_nlink: %ld", sb.st_nlink);
-    LOG("STATBUF st_uid: %d", sb.st_uid);
-    LOG("STATBUF st_gid: %d", sb.st_gid);
-    LOG("STATBUF st_rdev: %ld", sb.st_rdev);
-    LOG("STATBUF st_size: %ld", sb.st_size);
-    LOG("STATBUF st_blksize: %ld", sb.st_blksize);
-    LOG("STATBUF st_blocks: %ld", sb.st_blocks);
-    LOG("STATBUF st_atime: %ld", sb.st_atime);
-    LOG("STATBUF st_mtime: %ld", sb.st_mtime);
-    LOG("STATBUF st_ctime: %ld", sb.st_ctime);
-    LOG("==========STATBUF DUMP==========");
 
-    void *p = mmap(nullptr, sb.st_size, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
+    auto size = get_shm_size(fd, shm_name.c_str());
+
+    void *p = mmap(nullptr, size, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
     if (p == MAP_FAILED) {
         LOG("ERROR MMAP arg dump:");
-        LOG("mmap-size:  %ld", sb.st_size);
+        LOG("mmap-size:  %ld", size);
         LOG("mmap-prot:  %ld", PROT_READ | PROT_WRITE);
         LOG("mmap-flags: %ld", MAP_SHARED);
         LOG("mmap-fd:    %ld", fd);
@@ -168,39 +173,21 @@ void *get_shm_if_exist(const std::string &shm_name) {
     START_LOG(capio_syscall(SYS_gettid), "call(shm_name=%s)", shm_name.c_str());
 
     // if we are not creating a new object, mode is equals to 0
-    int fd         = shm_open(shm_name.c_str(), O_RDWR, 0); // to be closed
-    struct stat sb = {0};
+    int fd = shm_open(shm_name.c_str(), O_RDWR, 0); // to be closed
+
     if (fd == -1) {
         if (errno == ENOENT) {
             return nullptr;
         }
         ERR_EXIT("ERROR: unable to open shared memory %s: %s", shm_name.c_str(), strerror(errno));
     }
-    /* Open existing object */
-    /* Use shared memory object size as length argument for mmap()
-    and as number of bytes to write() */
-    if (fstat(fd, &sb) == -1) {
-        ERR_EXIT("fstat %s", shm_name.c_str());
-    }
 
-    if (sb.st_size <= 0) {
-        LOG("WARN: size of stat is %ld. Retry once.", sb.st_size);
-        if (fstat(fd, &sb) == -1) {
-            ERR_EXIT("fstat %s", shm_name.c_str());
-        }
-        if (sb.st_size <= 0) {
-            LOG("WARN: retry no. 2 gave a size of %ld", sb.st_size);
-            ERR_EXIT("FATAL: unable to obtain size of shm object %s after two tries...",
-                     shm_name.c_str());
-        }
-    }
+    auto size = get_shm_size(fd, shm_name.c_str());
 
-    LOG("Size of shm obkect %s : %ld", shm_name.c_str(), sb.st_size);
-
-    void *p = mmap(nullptr, sb.st_size, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
+    void *p = mmap(nullptr, size, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
     if (p == MAP_FAILED) {
         LOG("ERROR MMAP arg dump:");
-        LOG("mmap-size:  %ld", sb.st_size);
+        LOG("mmap-size:  %ld", size);
         LOG("mmap-prot:  %ld", PROT_READ | PROT_WRITE);
         LOG("mmap-flags: %ld", MAP_SHARED);
         LOG("mmap-fd:    %ld", fd);
