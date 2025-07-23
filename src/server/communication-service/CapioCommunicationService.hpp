@@ -4,6 +4,7 @@
 #include "BackendInterface.hpp"
 #include "MTCL_backend.hpp"
 
+#include <filesystem>
 #include <algorithm>
 
 class CapioCommunicationService {
@@ -46,7 +47,7 @@ class CapioCommunicationService {
     static void find_new_server_from_fs_token_thread(const bool *continue_execution) {
         START_LOG(gettid(), "call()");
 
-        std::vector<std::string> handled_tokens;
+        std::vector<std::filesystem::path> handled_tokens;
 
         if (!continue_execution) {
             LOG("Terminating execution");
@@ -55,14 +56,14 @@ class CapioCommunicationService {
 
         auto dir_iterator = std::filesystem::directory_iterator(std::filesystem::current_path());
         for (const auto &entry : dir_iterator) {
-            const auto &token_path = entry.path();
+            const auto token_path = entry.path();
 
             if (!entry.is_regular_file() || token_path.extension() != ".alive_connection") {
                 LOG("Filename %s is not valid", entry.path().c_str());
                 continue;
             }
 
-            if (std::find(handled_tokens.begin(), handled_tokens.end(), entry.path()) !=
+            if (std::find(handled_tokens.begin(), handled_tokens.end(), token_path) !=
                 handled_tokens.end()) {
                 LOG("Token already handled... skipping it!");
                 continue;
