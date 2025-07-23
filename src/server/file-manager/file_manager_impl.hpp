@@ -68,7 +68,7 @@ inline void CapioFileManager::_unlockThreadAwaitingCreation(const std::string &p
     START_LOG(gettid(), "call(path=%s)", path.c_str());
     for (const auto tid : pids) {
         client_manager->reply_to_client(tid, 1);
-        storage_service->createFile(path);
+        storage_service->createMemoryFile(path);
     }
 }
 

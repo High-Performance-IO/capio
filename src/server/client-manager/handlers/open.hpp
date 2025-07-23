@@ -17,14 +17,19 @@ inline void open_handler(const char *const str) {
     if (capio_cl_engine->isProducer(path, tid)) {
         LOG("Thread is producer. allowing to continue with open");
         client_manager->reply_to_client(tid, 1);
-        storage_service->createFile(path);
+        storage_service->createMemoryFile(path);
         return;
     }
 
     if (std::filesystem::exists(path)) {
         LOG("File already exists! allowing to continue with open");
         client_manager->reply_to_client(tid, 1);
-        storage_service->createFile(path);
+
+        /*
+         * At this point, the file that needs to be created more likely than not is not local to the
+         * machine. As such, we call the creation of a new CapioRemoteFile
+         */
+        storage_service->createRemoteFile(path);
         return;
     }
 

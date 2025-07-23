@@ -4,6 +4,7 @@
 #include "../../posix/utils/env.hpp"
 #include "CapioFile/CapioFile.hpp"
 #include "CapioFile/CapioMemoryFile.hpp"
+#include "CapioFile/CapioRemoteFile.hpp"
 
 class CapioStorageService {
 
@@ -23,7 +24,7 @@ class CapioStorageService {
      */
     [[nodiscard]] auto getFile(const std::string &file_name) const {
         if (_stored_files->find(file_name) == _stored_files->end()) {
-            createFile(file_name);
+            createMemoryFile(file_name);
         }
         return _stored_files->at(file_name);
     }
@@ -49,9 +50,21 @@ class CapioStorageService {
         delete _threads_waiting_for_memory_data;
     }
 
-    void createFile(const std::string &file_name) const {
-        // TODO: understand when is local or remte CapioFile
+    void createMemoryFile(const std::string &file_name) const {
         _stored_files->emplace(file_name, new CapioMemoryFile(file_name));
+    }
+
+    void createRemoteFile(const std::string &file_name) const {
+        /*
+         * First we check that the file associate does not yet exists, as it might be produced
+         * by another app running under the same server instance. if it is not found, we create
+         * the file
+         */
+        START_LOG(gettid(), "call(file_name=%s)", file_name.c_str());
+        if (_stored_files->find(file_name) == _stored_files->end()) {
+            LOG("File not found. Creating a new remote file");
+            _stored_files->emplace(file_name, new CapioRemoteFile(file_name));
+        }
     }
 
     void deleteFile(const std::string &file_name) const { _stored_files->erase(file_name); }
