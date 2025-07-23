@@ -186,15 +186,20 @@ class MTCL_backend : public BackendInterface {
     }
 
   public:
-    void connect_to(std::string remoteHost, const std::string &remotePort) override {
-        START_LOG(gettid(), "call( remoteHost=%s, remotePort=%s)", remoteHost.c_str(),
-                  remotePort.c_str());
+    void connect_to(std::string hostname_port) override {
+        START_LOG(gettid(), "call( hostname_port=%s)", hostname_port.c_str());
+        std::string remoteHost        = hostname_port.substr(0, hostname_port.find_last_of(':'));
+        const std::string remoteToken = usedProtocol + ":" + hostname_port;
 
-        const std::string remoteToken = usedProtocol + ":" + remoteHost + ":" + remotePort;
-
-        if (remoteToken == selfToken ||
-            remoteToken == usedProtocol + ":" + ownHostname + ":" + remotePort) {
+        if (remoteToken == selfToken ||                                     // skip on 0.0.0.0
+            remoteToken == usedProtocol + ":" + ownHostname + ":" + ownPort // skip on my real IP
+        ) {
             LOG("Skipping to connect to self");
+            return;
+        }
+
+        if (connected_hostnames_map.find(remoteToken) != connected_hostnames_map.end()) {
+            LOG("Remote host %s is already connected", remoteHost.c_str());
             return;
         }
 
