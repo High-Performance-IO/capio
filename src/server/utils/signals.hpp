@@ -2,6 +2,7 @@
 #define CAPIO_SERVER_HANDLERS_SIGNALS_HPP
 
 #include "communication-service/BackendInterface.hpp"
+#include "communication-service/CapioCommunicationService.hpp"
 
 #include <csignal>
 
@@ -38,7 +39,7 @@ inline void sig_term_handler(int signum, siginfo_t *info, void *ptr) {
 
     delete request_handlers_engine;
     delete fs_monitor;
-    delete capio_backend;
+    delete capio_communication_service;
     delete shm_canary;
     std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_INFO << " [ " << node_name << " ] "
               << "Bye!" << std::endl;

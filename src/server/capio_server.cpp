@@ -42,9 +42,7 @@ char node_name[HOST_NAME_MAX];
 
 #include "file-manager/file_manager.hpp"
 
-#include "communication-service/BackendInterface.hpp"
-
-#include "communication-service/MTCL_backend.hpp"
+#include "communication-service/CapioCommunicationService.hpp"
 
 #include <utils/parser.hpp>
 

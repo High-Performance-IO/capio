@@ -15,6 +15,11 @@ class NotImplementedBackendMethod : public std::exception {
 class BackendInterface {
   public:
     virtual ~BackendInterface() = default;
+
+    virtual void connect_to(std::string remoteHost, const std::string &remotePort) {
+        throw NotImplementedBackendMethod();
+    };
+
     /**
      * @brief Send data to target
      *
@@ -54,6 +59,8 @@ class BackendInterface {
  */
 class NoBackend final : public BackendInterface {
   public:
+    void connect_to(std::string remoteHost, const std::string &remotePort) override { return; };
+
     void send(const std::string &target, char *buf, uint64_t buf_size, const std::string &filepath,
               capio_off64_t start_offset) override {
         return;

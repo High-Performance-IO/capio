@@ -147,32 +147,8 @@ std::string parseCLI(int argc, char **argv) {
             port = args::get(backend_port);
         }
 
-        if (backend_name == "MQTT" || backend_name == "MPI") {
-            std::cout
-                << CAPIO_LOG_SERVER_CLI_LEVEL_WARNING << " [ " << node_name << " ] "
-                << "Warn: selected backend is not yet officially supported. Setting backend to TCP"
-                << std::endl;
-            backend_name = "TCP";
-        }
+        capio_communication_service = new CapioCommunicationService(backend_name, port);
 
-        if (backend_name == "TCP" || backend_name == "UCX") {
-            std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_INFO << " [ " << node_name << " ] "
-                      << "Selected backend is: " << backend_name << std::endl;
-            std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_INFO << " [ " << node_name << " ] "
-                      << "Selected backend port is: " << port << std::endl;
-            capio_backend = new MTCL_backend(backend_name, std::to_string(port),
-                                             CAPIO_BACKEND_DEFAULT_SLEEP_TIME);
-        } else if (backend_name == "FS") {
-            std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_INFO << " [ " << node_name << " ] "
-                      << "Selected backend is File System" << std::endl;
-            capio_backend = new NoBackend();
-        } else {
-            START_LOG(gettid(), "call()");
-            std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_ERROR << " [ " << node_name << " ] "
-                      << "Provided communication backend " << backend_name << " is invalid"
-                      << std::endl;
-            ERR_EXIT("No valid backend was provided");
-        }
     } else {
         std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_INFO << " [ " << node_name << " ] "
                   << "Selected backend is File System" << std::endl;
