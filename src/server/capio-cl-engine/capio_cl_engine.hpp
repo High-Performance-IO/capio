@@ -446,7 +446,7 @@ class CapioCLEngine {
         if (const auto location = _locations.find(path); location == _locations.end()) {
             LOG("No rule for home node. Returning create home node");
             return node_name;
-        }else{
+        } else {
             LOG("Found location entry");
         }
         return node_name;

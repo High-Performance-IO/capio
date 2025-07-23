@@ -54,6 +54,11 @@ class CapioStorageService {
         _stored_files->emplace(file_name, new CapioMemoryFile(file_name));
     }
 
+    /**
+     * Create a CapioRemoteFile, after checking that an instance of CapioMemoryFile (meaning a local
+     * file) is not present
+     * @param file_name file path
+     */
     void createRemoteFile(const std::string &file_name) const {
         /*
          * First we check that the file associate does not yet exists, as it might be produced
