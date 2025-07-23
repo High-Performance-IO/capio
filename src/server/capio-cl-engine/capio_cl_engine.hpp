@@ -440,6 +440,18 @@ class CapioCLEngine {
         return files;
     }
 
+    auto get_home_node(const std::string &path) {
+        // TODO: understand here how to get the home node policy.
+        START_LOG(gettid(), "call(path=%s)", path.c_str());
+        if (const auto location = _locations.find(path); location == _locations.end()) {
+            LOG("No rule for home node. Returning create home node");
+            return node_name;
+        } else {
+            LOG("Found location entry");
+        }
+        return node_name;
+    }
+
   protected:
     const auto *getLocations() const { return &_locations; }
 };

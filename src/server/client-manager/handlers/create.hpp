@@ -23,7 +23,7 @@ inline void create_handler(const char *const str) {
 
     capio_cl_engine->addProducer(path, name);
     client_manager->register_produced_file(tid, path_str);
-    storage_service->createFile(path);
+    storage_service->createMemoryFile(path);
 }
 
 #endif // CAPIO_CREATE_HPP
