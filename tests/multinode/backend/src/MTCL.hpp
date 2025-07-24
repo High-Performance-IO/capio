@@ -12,9 +12,9 @@ constexpr capio_off64_t BUFFER_SIZES = 1024;
 TEST(CapioCommServiceTest, TestPingPong) {
     START_LOG(gettid(), "INFO: TestPingPong");
     gethostname(node_name.data(), HOST_NAME_MAX);
-    const int port    = 1234;
-    std::string proto = "TCP";
-    CapioCommunicationService communication_service(proto, port);
+    const int port             = 1234;
+    std::string proto          = "TCP";
+    auto communication_service = new CapioCommunicationService(proto, port, "multicast");
     capio_off64_t size_revc, offset;
 
     std::vector<std::string> connections;
@@ -39,6 +39,7 @@ TEST(CapioCommServiceTest, TestPingPong) {
             std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_INFO << "Received ping response from : " << i
                       << std::endl;
             EXPECT_EQ(strcmp(buff, buff1), 0);
+            delete communication_service;
             return;
         }
         std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_INFO << "Listening for ping from: " << i
@@ -49,6 +50,7 @@ TEST(CapioCommServiceTest, TestPingPong) {
         EXPECT_EQ(strcmp(recvBuff, TEST_MESSAGE), 0);
         capio_backend->send(i, recvBuff, size_revc, "./test", 0);
         std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_INFO << "Sent ping response to: " << i << std::endl;
+        delete communication_service;
         return;
     }
 }

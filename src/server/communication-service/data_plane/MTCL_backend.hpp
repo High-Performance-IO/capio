@@ -168,7 +168,7 @@ class MTCL_backend : public BackendInterface {
             UserManager.receive(connected_hostname, HOST_NAME_MAX);
 
             std::cout << CAPIO_SERVER_CLI_LOG_SERVER << " [ " << ownHostname << " ] "
-                      << "Connected to " << connected_hostname << std::endl;
+                      << "Connected from " << connected_hostname << std::endl;
 
             LOG("Received connection hostname: %s", connected_hostname);
 
