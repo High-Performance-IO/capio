@@ -146,6 +146,9 @@ class MulticastControlPlane : public CapioControlPlane {
         thread = new std::thread(multicast_server_aliveness_detector_thread,
                                  std::ref(continue_execution), &token_used_to_connect,
                                  token_used_to_connect_mutex, backend_port);
+        std::cout << CAPIO_SERVER_CLI_LOG_SERVER << " [ " << ownHostname << " ] "
+                  << "Multicast discovery service @ " << MULTICAST_DISCOVERY_ADDR << ":"
+                  << MULTICAST_DISCOVERY_PORT << std::endl;
     }
 
     ~MulticastControlPlane() override {

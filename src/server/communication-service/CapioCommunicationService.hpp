@@ -60,6 +60,9 @@ class CapioCommunicationService {
                       << "Starting file system control plane" << std::endl;
             capio_control_plane = new FSControlPlane(port);
         }
+
+        std::cout << CAPIO_SERVER_CLI_LOG_SERVER << " [ " << ownHostname << " ] "
+                  << "CapioCommunicationService initialization completed." << std::endl;
     }
 };
 

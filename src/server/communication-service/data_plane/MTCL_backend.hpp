@@ -251,7 +251,7 @@ class MTCL_backend : public BackendInterface {
         th = new std::thread(incoming_connection_listener, std::ref(continue_execution), sleep_time,
                              &connected_hostnames_map, _guard, &connection_threads, terminate);
         std::cout << CAPIO_SERVER_CLI_LOG_SERVER << " [ " << ownHostname << " ] "
-                  << "CapioCommunicationService initialization completed." << std::endl;
+                  << "MTCL data plane initialization completed." << std::endl;
     }
 
     ~MTCL_backend() override {

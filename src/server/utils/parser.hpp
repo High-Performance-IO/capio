@@ -33,6 +33,10 @@ std::string parseCLI(int argc, char **argv) {
     args::Flag memStorageOnly(arguments, "mem-storage-only",
                               CAPIO_SERVER_ARG_PARSER_CONFIG_NCONTINUE_ON_ERROR_HELP, {"mem-only"});
 
+    args::ValueFlag<std::string> controlPlaneBackend(
+        arguments, "backend", CAPIO_SERVER_ARG_PARSER_CONFIG_CONTROL_PLANE_BACKEND,
+        {"control-backend"});
+
     try {
         parser.ParseCLI(argc, argv);
     } catch (args::Help &) {
@@ -147,7 +151,22 @@ std::string parseCLI(int argc, char **argv) {
             port = args::get(backend_port);
         }
 
-        capio_communication_service = new CapioCommunicationService(backend_name, port);
+        std::string constrol_backend_name = "multicast";
+        if (controlPlaneBackend) {
+            auto tmp = args::get(controlPlaneBackend);
+            if (tmp != "multicast" && tmp != "fs") {
+                std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_WARNING << " [ " << node_name << " ] "
+                          << "Unknown control plane backend " << tmp << std::endl;
+            } else {
+                constrol_backend_name = tmp;
+            }
+        }
+
+        std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_INFO << " [ " << node_name << " ] "
+                  << "Using control plane backend: " << constrol_backend_name << std::endl;
+
+        capio_communication_service =
+            new CapioCommunicationService(backend_name, port, constrol_backend_name);
 
     } else {
         std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_INFO << " [ " << node_name << " ] "
