@@ -20,6 +20,7 @@ inline std::unordered_map<std::string, std::string> directory_commit_token_path;
 inline timespec dirent_await_sleep_time{0, 100 * 1000000L}; // 100ms
 
 inline dirent64 *(*real_readdir64)(DIR *) = nullptr;
+inline dirent *(*real_readdir)(DIR *)     = nullptr;
 inline DIR *(*real_opendir)(const char *) = nullptr;
 inline int (*real_closedir)(DIR *)        = nullptr;
 
@@ -30,15 +31,23 @@ inline void init_posix_dirent() {
     START_LOG(capio_syscall(SYS_gettid), "call()");
     syscall_no_intercept_flag = true;
     if (!real_readdir64) {
+        LOG("Loading real readdir64 method");
         real_readdir64 = (dirent64 * (*) (DIR *) ) dlsym(RTLD_NEXT, "readdir64");
     }
 
     if (!real_opendir) {
+        LOG("Loading real opendir method");
         real_opendir = (DIR * (*) (const char *) ) dlsym(RTLD_NEXT, "opendir");
     }
 
     if (!real_closedir) {
+        LOG("Loading real closedir method");
         real_closedir = (int (*)(DIR *)) dlsym(RTLD_NEXT, "closedir");
+    }
+
+    if (!real_readdir) {
+        LOG("Loading real readdir method");
+        real_readdir = (dirent * (*) (DIR *) ) dlsym(RTLD_NEXT, "readdir");
     }
 
     dirent_curr_dir   = new dirent64();
@@ -173,7 +182,7 @@ DIR *opendir(const char *name) {
     if (is_forbidden_path(name)) {
         LOG("Path %s is forbidden: skip", name);
         syscall_no_intercept_flag = true;
-        auto res = real_opendir(name);
+        auto res                  = real_opendir(name);
         syscall_no_intercept_flag = false;
         return res;
     }
@@ -181,17 +190,6 @@ DIR *opendir(const char *name) {
     auto absolute_path = capio_absolute(name);
 
     LOG("Resolved absolute path = %s", absolute_path.c_str());
-
-    static DIR *(*real_opendir)(const char *) = NULL;
-
-    if (!real_opendir) {
-        syscall_no_intercept_flag = true;
-        real_opendir              = (DIR * (*) (const char *) ) dlsym(RTLD_NEXT, "opendir");
-        syscall_no_intercept_flag = false;
-        if (!real_opendir) {
-            ERR_EXIT("Failed to find original opendir: %s\n", dlerror());
-        }
-    }
 
     if (directory_items == nullptr) {
         directory_items = new std::unordered_map<std::string, std::vector<dirent64 *> *>();
@@ -278,14 +276,6 @@ struct dirent *readdir(DIR *dirp) {
     long pid = capio_syscall(SYS_gettid);
     START_LOG(pid, "call(dir=%ld)", dirp);
 
-    static dirent *(*real_readdir)(DIR *) = nullptr;
-    if (!real_readdir) {
-        LOG("Loading real glibc method");
-        syscall_no_intercept_flag = true;
-        real_readdir              = (dirent * (*) (DIR *) ) dlsym(RTLD_NEXT, "readdir");
-        syscall_no_intercept_flag = false;
-    }
-
     if (opened_directory->find(reinterpret_cast<unsigned long int>(dirp)) ==
         opened_directory->end()) {
         LOG("Directory is not handled by CAPIO. Returning read readdir");
@@ -304,14 +294,6 @@ struct dirent *readdir(DIR *dirp) {
 struct dirent64 *readdir64(DIR *dirp) {
     long pid = capio_syscall(SYS_gettid);
     START_LOG(pid, "call(dir=%ld)", dirp);
-
-    static struct dirent64 *(*real_readdir64)(DIR *) = NULL;
-    if (!real_readdir64) {
-        LOG("Loading real glibc method");
-        syscall_no_intercept_flag = true;
-        real_readdir64            = (struct dirent64 * (*) (DIR *) ) dlsym(RTLD_NEXT, "readdir64");
-        syscall_no_intercept_flag = false;
-    }
 
     if (opened_directory->find(reinterpret_cast<unsigned long int>(dirp)) ==
         opened_directory->end()) {
