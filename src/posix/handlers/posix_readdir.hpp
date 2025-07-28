@@ -19,12 +19,14 @@ inline std::unordered_map<std::string, std::string> directory_commit_token_path;
 
 inline timespec dirent_await_sleep_time{0, 100 * 1000000L}; // 100ms
 
-inline int load_files_from_directory(const char *path) {
-    static dirent64 *(*real_readdir64)(DIR *) = nullptr;
-    static DIR *(*real_opendir)(const char *) = nullptr;
-    static int (*real_closedir)(DIR *)        = nullptr;
+static dirent64 *(*real_readdir64)(DIR *) = nullptr;
+static DIR *(*real_opendir)(const char *) = nullptr;
+static int (*real_closedir)(DIR *)        = nullptr;
 
-    START_LOG(capio_syscall(SYS_gettid), "call(path=%s)", path);
+inline dirent64 *dirent_curr_dir;
+inline dirent64 *dirent_parent_dir;
+
+inline void init_posix_dirent() {
     syscall_no_intercept_flag = true;
     if (!real_readdir64) {
         real_readdir64 = (dirent64 * (*) (DIR *) ) dlsym(RTLD_NEXT, "readdir64");
@@ -38,24 +40,45 @@ inline int load_files_from_directory(const char *path) {
         real_closedir = (int (*)(DIR *)) dlsym(RTLD_NEXT, "closedir");
     }
 
+    dirent_curr_dir   = new dirent64();
+    dirent_parent_dir = new dirent64();
+
+    dirent_curr_dir->d_type   = DT_DIR;
+    dirent_parent_dir->d_type = DT_DIR;
+
+    memcpy(dirent_curr_dir->d_name, ".\0", 2);
+    memcpy(dirent_parent_dir->d_name, "..\0", 3);
+
+    syscall_no_intercept_flag = false;
+}
+
+inline int load_files_from_directory(const char *path) {
+
+    START_LOG(capio_syscall(SYS_gettid), "call(path=%s)", path);
+
+    syscall_no_intercept_flag = true;
     dirent64 *entry;
     DIR *dir  = real_opendir(path);
     int count = 0;
 
-    while ((entry = real_readdir64(dir)) != NULL) {
+    if (directory_items->find(path) == directory_items->end()) {
+        LOG("Directory vector not present. Adding it at path %s", path);
+        directory_items->emplace(path, new std::vector<dirent64 *>());
+        directory_items->at(path)->emplace_back(dirent_curr_dir);
+        directory_items->at(path)->emplace_back(dirent_parent_dir);
+    }
 
+    while ((entry = real_readdir64(dir)) != NULL) {
         std::filesystem::path dir_abs_path(entry->d_name);
 
-        if (!(strcmp(entry->d_name, ".") == 0 || strcmp(entry->d_name, "..") == 0)) {
-            LOG("Entry name is %s. computing absolute path", entry->d_name);
-            dir_abs_path = std::filesystem::path(path) / entry->d_name;
-            LOG("Directory abs path = %s", dir_abs_path.c_str());
+        if (strcmp(entry->d_name, ".") == 0 || strcmp(entry->d_name, "..") == 0) {
+            LOG("Skipping entry %s", entry->d_name);
+            continue;
         }
 
-        if (directory_items->find(path) == directory_items->end()) {
-            LOG("Directory vector not present. Adding it at path %s", path);
-            directory_items->emplace(path, new std::vector<dirent64 *>());
-        }
+        LOG("Entry name is %s. computing absolute path", entry->d_name);
+        dir_abs_path = std::filesystem::path(path) / entry->d_name;
+        LOG("Directory abs path = %s", dir_abs_path.c_str());
 
         auto directory_object = directory_items->at(path);
 
@@ -67,12 +90,8 @@ inline int load_files_from_directory(const char *path) {
         if (itm == directory_object->end()) {
             LOG("Item %s is not stored within internal capio data structure. adding it",
                 dir_abs_path.c_str());
-            auto *new_entry = new dirent64();
-            memcpy(new_entry->d_name, entry->d_name, sizeof(entry->d_name));
-            new_entry->d_ino    = entry->d_ino;
-            new_entry->d_off    = entry->d_off;
-            new_entry->d_reclen = entry->d_reclen;
-            new_entry->d_type   = entry->d_type;
+            auto new_entry = new dirent64();
+            memcpy(new_entry, entry, sizeof(dirent64));
             directory_object->emplace_back(new_entry);
         }
         count++;

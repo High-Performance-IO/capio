@@ -438,6 +438,7 @@ static __attribute__((constructor)) void init() {
     init_client();
     init_filesystem();
     init_threading_support();
+    init_posix_dirent();
 
     long tid = syscall_no_intercept(SYS_gettid);
 
