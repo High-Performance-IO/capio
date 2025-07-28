@@ -73,7 +73,7 @@ class RequestHandlerEngine {
                       << "Received invalid code: " << code << std::endl;
             std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_ERROR << " [ " << node_name << " ] "
                       << "Offending request: " << ptr << " / " << req << std::endl;
-            ERR_EXIT("Invalid request %d%s", code, ptr);
+            ERR_EXIT("Invalid request %d:%s", code, ptr);
         }
         return code;
     }
