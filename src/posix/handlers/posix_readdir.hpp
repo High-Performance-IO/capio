@@ -19,14 +19,15 @@ inline std::unordered_map<std::string, std::string> directory_commit_token_path;
 
 inline timespec dirent_await_sleep_time{0, 100 * 1000000L}; // 100ms
 
-static dirent64 *(*real_readdir64)(DIR *) = nullptr;
-static DIR *(*real_opendir)(const char *) = nullptr;
-static int (*real_closedir)(DIR *)        = nullptr;
+inline dirent64 *(*real_readdir64)(DIR *) = nullptr;
+inline DIR *(*real_opendir)(const char *) = nullptr;
+inline int (*real_closedir)(DIR *)        = nullptr;
 
 inline dirent64 *dirent_curr_dir;
 inline dirent64 *dirent_parent_dir;
 
 inline void init_posix_dirent() {
+    START_LOG(capio_syscall(SYS_gettid), "call()");
     syscall_no_intercept_flag = true;
     if (!real_readdir64) {
         real_readdir64 = (dirent64 * (*) (DIR *) ) dlsym(RTLD_NEXT, "readdir64");
