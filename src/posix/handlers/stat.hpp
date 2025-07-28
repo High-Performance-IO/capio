@@ -63,28 +63,27 @@ inline int capio_fstatat(int dirfd, const std::string_view &pathname, struct sta
     if (path.empty() && (flags & AT_EMPTY_PATH) == AT_EMPTY_PATH) {
         if (dirfd == AT_FDCWD) { // operate on currdir
             return capio_lstat(get_current_dir().native(), statbuf, tid);
-        } else { // operate on dirfd. in this case dirfd can refer to any type of file
-            return capio_fstat(dirfd, statbuf, tid);
         }
-    } else if (path.is_relative()) {
+        // operate on dirfd. in this case dirfd can refer to any type of file
+        return capio_fstat(dirfd, statbuf, tid);
+    }
+    if (path.is_relative()) {
         if (dirfd == AT_FDCWD) {
             // pathname is interpreted relative to currdir
             return capio_lstat_wrapper(path.native(), statbuf, tid);
-        } else {
-            if (!is_directory(dirfd)) {
-                errno = ENOTDIR;
-                return CAPIO_POSIX_SYSCALL_ERRNO;
-            }
-            const std::filesystem::path dir_path = get_dir_path(dirfd);
-            if (dir_path.empty()) {
-                return CAPIO_POSIX_SYSCALL_REQUEST_SKIP;
-            }
-            path = (dir_path / path).lexically_normal();
-            return capio_lstat(path.native(), statbuf, tid);
         }
-    } else {
+        if (!is_directory(dirfd)) {
+            errno = ENOTDIR;
+            return CAPIO_POSIX_SYSCALL_ERRNO;
+        }
+        const std::filesystem::path dir_path = get_dir_path(dirfd);
+        if (dir_path.empty()) {
+            return CAPIO_POSIX_SYSCALL_REQUEST_SKIP;
+        }
+        path = (dir_path / path).lexically_normal();
         return capio_lstat(path.native(), statbuf, tid);
     }
+    return capio_lstat(path.native(), statbuf, tid);
 }
 
 #if defined(SYS_fstat) || defined(SYS_fstat64)
