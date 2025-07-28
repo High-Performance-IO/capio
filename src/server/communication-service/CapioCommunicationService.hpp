@@ -4,6 +4,8 @@
 #include "BackendInterface.hpp"
 #include "MTCL_backend.hpp"
 
+#include <algorithm>
+
 class CapioCommunicationService {
 
     char ownHostname[HOST_NAME_MAX] = {0};
