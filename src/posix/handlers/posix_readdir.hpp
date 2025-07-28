@@ -50,6 +50,9 @@ inline void init_posix_dirent() {
         real_readdir = (dirent * (*) (DIR *) ) dlsym(RTLD_NEXT, "readdir");
     }
 
+    directory_items  = new std::unordered_map<std::string, std::vector<dirent64 *> *>();
+    opened_directory = new std::unordered_map<unsigned long, std::pair<std::string, int>>();
+
     dirent_curr_dir   = new dirent64();
     dirent_parent_dir = new dirent64();
 
@@ -175,9 +178,7 @@ inline struct dirent64 *capio_internal_readdir(DIR *dirp, long pid) {
 
 DIR *opendir(const char *name) {
 
-    auto tmp = std::string(name);
-
-    START_LOG(capio_syscall(SYS_gettid), "call(path=%s)", tmp.c_str());
+    START_LOG(capio_syscall(SYS_gettid), "call(path=%s)", name);
 
     if (is_forbidden_path(name)) {
         LOG("Path %s is forbidden: skip", name);
@@ -190,14 +191,6 @@ DIR *opendir(const char *name) {
     auto absolute_path = capio_absolute(name);
 
     LOG("Resolved absolute path = %s", absolute_path.c_str());
-
-    if (directory_items == nullptr) {
-        directory_items = new std::unordered_map<std::string, std::vector<dirent64 *> *>();
-    }
-
-    if (opened_directory == nullptr) {
-        opened_directory = new std::unordered_map<unsigned long, std::pair<std::string, int>>();
-    }
 
     if (!is_capio_path(absolute_path)) {
         LOG("Not a CAPIO path. continuing execution");
