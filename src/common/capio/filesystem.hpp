@@ -51,10 +51,13 @@ inline bool is_prefix(const std::filesystem::path &path_1, const std::filesystem
     return !relpath.empty() && relpath.native().rfind("..", 0) != 0;
 }
 
+/*
+ * Returns true if any of the paths in the list contains any of the forbidden paths.
+ */
 inline bool is_forbidden_path(const std::string_view &path) {
     return std::any_of(CAPIO_DIR_FORBIDDEN_PATHS.cbegin(), CAPIO_DIR_FORBIDDEN_PATHS.cend(),
                        [&path](const std::string_view &forbidden_path) {
-                           return path.rfind(forbidden_path, 0) == 0;
+                           return path.find(forbidden_path) != std::string_view::npos;
                        });
 }
 
