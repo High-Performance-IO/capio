@@ -17,43 +17,81 @@ inline std::unordered_map<std::string, std::vector<dirent64 *> *> *directory_ite
 
 inline std::unordered_map<std::string, std::string> directory_commit_token_path;
 
-inline int count_files_in_directory(const char *path) {
-    static struct dirent64 *(*real_readdir64)(DIR *) = NULL;
-    static DIR *(*real_opendir)(const char *)        = NULL;
-    static int (*real_closedir)(DIR *)               = NULL;
+inline timespec dirent_await_sleep_time{0, 100 * 1000000L}; // 100ms
 
-    START_LOG(capio_syscall(SYS_gettid), "call(path=%s)", path);
+inline dirent64 *(*real_readdir64)(DIR *) = nullptr;
+inline dirent *(*real_readdir)(DIR *)     = nullptr;
+inline DIR *(*real_opendir)(const char *) = nullptr;
+inline int (*real_closedir)(DIR *)        = nullptr;
+
+inline dirent64 *dirent_curr_dir;
+inline dirent64 *dirent_parent_dir;
+
+inline void init_posix_dirent() {
+    START_LOG(capio_syscall(SYS_gettid), "call()");
     syscall_no_intercept_flag = true;
     if (!real_readdir64) {
-        real_readdir64 = (struct dirent64 * (*) (DIR *) ) dlsym(RTLD_NEXT, "readdir64");
+        LOG("Loading real readdir64 method");
+        real_readdir64 = (dirent64 * (*) (DIR *) ) dlsym(RTLD_NEXT, "readdir64");
     }
 
     if (!real_opendir) {
+        LOG("Loading real opendir method");
         real_opendir = (DIR * (*) (const char *) ) dlsym(RTLD_NEXT, "opendir");
     }
 
     if (!real_closedir) {
+        LOG("Loading real closedir method");
         real_closedir = (int (*)(DIR *)) dlsym(RTLD_NEXT, "closedir");
     }
 
-    struct dirent64 *entry;
+    if (!real_readdir) {
+        LOG("Loading real readdir method");
+        real_readdir = (dirent * (*) (DIR *) ) dlsym(RTLD_NEXT, "readdir");
+    }
+
+    directory_items  = new std::unordered_map<std::string, std::vector<dirent64 *> *>();
+    opened_directory = new std::unordered_map<unsigned long, std::pair<std::string, int>>();
+
+    dirent_curr_dir   = new dirent64();
+    dirent_parent_dir = new dirent64();
+
+    dirent_curr_dir->d_type   = DT_DIR;
+    dirent_parent_dir->d_type = DT_DIR;
+
+    memcpy(dirent_curr_dir->d_name, ".\0", 2);
+    memcpy(dirent_parent_dir->d_name, "..\0", 3);
+
+    syscall_no_intercept_flag = false;
+}
+
+inline int load_files_from_directory(const char *path) {
+
+    START_LOG(capio_syscall(SYS_gettid), "call(path=%s)", path);
+
+    syscall_no_intercept_flag = true;
+    dirent64 *entry;
     DIR *dir  = real_opendir(path);
     int count = 0;
 
-    while ((entry = real_readdir64(dir)) != NULL) {
+    if (directory_items->find(path) == directory_items->end()) {
+        LOG("Directory vector not present. Adding it at path %s", path);
+        directory_items->emplace(path, new std::vector<dirent64 *>());
+        directory_items->at(path)->emplace_back(dirent_curr_dir);
+        directory_items->at(path)->emplace_back(dirent_parent_dir);
+    }
 
+    while ((entry = real_readdir64(dir)) != NULL) {
         std::filesystem::path dir_abs_path(entry->d_name);
 
-        if (!(strcmp(entry->d_name, ".") == 0 || strcmp(entry->d_name, "..") == 0)) {
-            LOG("Entry name is %s. computing absolute path", entry->d_name);
-            dir_abs_path = std::filesystem::path(path) / entry->d_name;
-            LOG("Directory abs path = %s", dir_abs_path.c_str());
+        if (strcmp(entry->d_name, ".") == 0 || strcmp(entry->d_name, "..") == 0) {
+            LOG("Skipping entry %s", entry->d_name);
+            continue;
         }
 
-        if (directory_items->find(path) == directory_items->end()) {
-            LOG("Directory vector not present. Adding it at path %s", path);
-            directory_items->emplace(path, new std::vector<dirent64 *>());
-        }
+        LOG("Entry name is %s. computing absolute path", entry->d_name);
+        dir_abs_path = std::filesystem::path(path) / entry->d_name;
+        LOG("Directory abs path = %s", dir_abs_path.c_str());
 
         auto directory_object = directory_items->at(path);
 
@@ -65,12 +103,8 @@ inline int count_files_in_directory(const char *path) {
         if (itm == directory_object->end()) {
             LOG("Item %s is not stored within internal capio data structure. adding it",
                 dir_abs_path.c_str());
-            auto *new_entry = new dirent64();
-            memcpy(new_entry->d_name, entry->d_name, sizeof(entry->d_name));
-            new_entry->d_ino    = entry->d_ino;
-            new_entry->d_off    = entry->d_off;
-            new_entry->d_reclen = entry->d_reclen;
-            new_entry->d_type   = entry->d_type;
+            auto new_entry = new dirent64();
+            memcpy(new_entry, entry, sizeof(dirent64));
             directory_object->emplace_back(new_entry);
         }
         count++;
@@ -89,54 +123,44 @@ inline struct dirent64 *capio_internal_readdir(DIR *dirp, long pid) {
     auto directory_path =
         std::get<0>(opened_directory->at(reinterpret_cast<unsigned long int>(dirp)));
 
-    if (directory_commit_token_path.find(directory_path) == directory_commit_token_path.end()) {
-        LOG("Commit token path was not found for path %s", directory_path.c_str());
-        auto token_path = new char[PATH_MAX]{0};
-        posix_directory_committed_request(pid, directory_path, token_path);
-        LOG("Inserting token path %s", token_path);
-        directory_commit_token_path.insert({directory_path, token_path});
-    }
-
-    const auto token_path = directory_commit_token_path.at(directory_path);
+    const auto &committed_directory_toke_path = directory_commit_token_path.at(directory_path);
 
     if (const auto item = opened_directory->find(reinterpret_cast<unsigned long int>(dirp));
-        item != opened_directory->end() || std::filesystem::exists(token_path)) {
+        item != opened_directory->end() || std::filesystem::exists(committed_directory_toke_path)) {
         LOG("Found dirp.");
         const auto dir_path_name         = std::get<0>(item->second);
         const auto capio_internal_offset = std::get<1>(item->second);
 
-        auto files_in_directory = count_files_in_directory(dir_path_name.c_str());
-        LOG("There are %ld files inside %s", files_in_directory, dir_path_name.c_str());
-        while (files_in_directory <= capio_internal_offset) {
-            LOG("Not enough files: expected %ld, got %ld... waiting", files_in_directory,
-                capio_internal_offset);
-            LOG("Checking for commit token existence (%s)", token_path.c_str());
-            syscall_no_intercept_flag = true;
-            bool is_committed         = std::filesystem::exists(token_path);
-            syscall_no_intercept_flag = false;
-            LOG("File %s committed", is_committed ? "is" : "is not");
-            if (is_committed) {
-                LOG("Returning NULL as result");
-                errno = 0;
-                return NULL;
-            }
+        LOG("Getting files inside directory %s", dir_path_name.c_str());
 
-            struct timespec req{0};
-            req.tv_sec  = 0;
-            req.tv_nsec = 100 * 1000000L; // 100 ms
-            syscall_no_intercept(SYS_nanosleep, &req, NULL);
-            files_in_directory = count_files_in_directory(dir_path_name.c_str());
-            LOG("There are %ld files inside %s", files_in_directory, dir_path_name.c_str());
+        if (capio_internal_offset >= directory_items->at(dir_path_name)->size()) {
+            LOG("Internal offset for dir reached end of vector. Loading files from FS.");
+            auto loaded_files = load_files_from_directory(dir_path_name.c_str());
+            LOG("There are %ld files inside %s", loaded_files, dir_path_name.c_str());
+            while (loaded_files <= capio_internal_offset) {
+                LOG("Not enough files: expected %ld, got %ld... waiting", loaded_files,
+                    capio_internal_offset);
+                LOG("Checking for commit token existence (%s)",
+                    committed_directory_toke_path.c_str());
+                syscall_no_intercept_flag = true;
+                bool is_committed         = std::filesystem::exists(committed_directory_toke_path);
+                syscall_no_intercept_flag = false;
+                LOG("File %s committed", is_committed ? "is" : "is not");
+                if (is_committed) {
+                    LOG("Returning NULL as result");
+                    errno = 0;
+                    return NULL;
+                }
+
+                syscall_no_intercept(SYS_nanosleep, &dirent_await_sleep_time, NULL);
+                loaded_files = load_files_from_directory(dir_path_name.c_str());
+                LOG("There are %ld files inside %s", loaded_files, dir_path_name.c_str());
+            }
         }
 
         LOG("Returning item %d", std::get<1>(item->second));
 
-        char real_path[PATH_MAX];
-        capio_realpath(dir_path_name.c_str(), real_path);
-
-        LOG("Getting files inside directory %s", real_path);
-
-        const auto return_value = directory_items->at(real_path)->at(std::get<1>(item->second));
+        const auto return_value = directory_items->at(dir_path_name)->at(std::get<1>(item->second));
         std::get<1>(item->second)++;
 
         LOG("Returned dirent structure:");
@@ -154,32 +178,19 @@ inline struct dirent64 *capio_internal_readdir(DIR *dirp, long pid) {
 
 DIR *opendir(const char *name) {
 
-    auto tmp = std::string(name);
+    START_LOG(capio_syscall(SYS_gettid), "call(path=%s)", name);
 
-    START_LOG(capio_syscall(SYS_gettid), "call(path=%s)", tmp.c_str());
+    if (is_forbidden_path(name)) {
+        LOG("Path %s is forbidden: skip", name);
+        syscall_no_intercept_flag = true;
+        auto res                  = real_opendir(name);
+        syscall_no_intercept_flag = false;
+        return res;
+    }
 
     auto absolute_path = capio_absolute(name);
 
     LOG("Resolved absolute path = %s", absolute_path.c_str());
-
-    static DIR *(*real_opendir)(const char *) = NULL;
-
-    if (!real_opendir) {
-        syscall_no_intercept_flag = true;
-        real_opendir              = (DIR * (*) (const char *) ) dlsym(RTLD_NEXT, "opendir");
-        syscall_no_intercept_flag = false;
-        if (!real_opendir) {
-            ERR_EXIT("Failed to find original opendir: %s\n", dlerror());
-        }
-    }
-
-    if (directory_items == nullptr) {
-        directory_items = new std::unordered_map<std::string, std::vector<dirent64 *> *>();
-    }
-
-    if (opened_directory == nullptr) {
-        opened_directory = new std::unordered_map<unsigned long, std::pair<std::string, int>>();
-    }
 
     if (!is_capio_path(absolute_path)) {
         LOG("Not a CAPIO path. continuing execution");
@@ -196,6 +207,14 @@ DIR *opendir(const char *name) {
     syscall_no_intercept_flag = true;
     auto dir                  = real_opendir(absolute_path.c_str());
     syscall_no_intercept_flag = false;
+
+    if (directory_commit_token_path.find(absolute_path) == directory_commit_token_path.end()) {
+        LOG("Commit token path was not found for path %s", absolute_path.c_str());
+        auto token_path = new char[PATH_MAX]{0};
+        posix_directory_committed_request(capio_syscall(SYS_gettid), absolute_path, token_path);
+        LOG("Inserting token path %s", token_path);
+        directory_commit_token_path.insert({absolute_path, token_path});
+    }
 
     LOG("Opened directory with offset %ld", dir);
     opened_directory->insert(
@@ -250,25 +269,17 @@ struct dirent *readdir(DIR *dirp) {
     long pid = capio_syscall(SYS_gettid);
     START_LOG(pid, "call(dir=%ld)", dirp);
 
-    static struct dirent *(*real_readdir)(DIR *) = NULL;
-    if (!real_readdir) {
-        LOG("Loading real glibc method");
-        syscall_no_intercept_flag = true;
-        real_readdir              = (struct dirent * (*) (DIR *) ) dlsym(RTLD_NEXT, "readdir");
-        syscall_no_intercept_flag = false;
-    }
-
     if (opened_directory->find(reinterpret_cast<unsigned long int>(dirp)) ==
         opened_directory->end()) {
-        LOG("Directory is not handled by CAPIO. Returning false");
+        LOG("Directory is not handled by CAPIO. Returning read readdir");
         syscall_no_intercept_flag = true;
-        auto result               = real_readdir(dirp);
+        const auto result         = real_readdir(dirp);
         syscall_no_intercept_flag = false;
 
         return result;
     }
 
-    struct dirent64 *capio_internal_dirent64 = capio_internal_readdir(dirp, pid);
+    dirent64 *capio_internal_dirent64 = capio_internal_readdir(dirp, pid);
     LOG("return value == NULL ? %s", capio_internal_dirent64 == NULL ? "TRUE" : "FALSE");
     return reinterpret_cast<dirent *>(capio_internal_dirent64);
 }
@@ -277,17 +288,9 @@ struct dirent64 *readdir64(DIR *dirp) {
     long pid = capio_syscall(SYS_gettid);
     START_LOG(pid, "call(dir=%ld)", dirp);
 
-    static struct dirent64 *(*real_readdir64)(DIR *) = NULL;
-    if (!real_readdir64) {
-        LOG("Loading real glibc method");
-        syscall_no_intercept_flag = true;
-        real_readdir64            = (struct dirent64 * (*) (DIR *) ) dlsym(RTLD_NEXT, "readdir64");
-        syscall_no_intercept_flag = false;
-    }
-
     if (opened_directory->find(reinterpret_cast<unsigned long int>(dirp)) ==
         opened_directory->end()) {
-        LOG("Directory is not handled by CAPIO. Returning false");
+        LOG("Directory is not handled by CAPIO. Returning read readdir");
         syscall_no_intercept_flag = true;
         auto result               = real_readdir64(dirp);
         syscall_no_intercept_flag = false;

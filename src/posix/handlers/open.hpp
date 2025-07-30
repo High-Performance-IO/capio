@@ -40,6 +40,11 @@ int creat_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long ar
     mode_t mode = static_cast<int>(arg2);
     START_LOG(tid, "call(path=%s, flags=%d, mode=%d)", pathname.data(), flags, mode);
 
+    if (is_forbidden_path(pathname)) {
+        LOG("Path %s is forbidden: skip", pathname.data());
+        return CAPIO_POSIX_SYSCALL_REQUEST_SKIP;
+    }
+
     std::string path = compute_abs_path(pathname.data(), -1);
 
     if (is_capio_path(path)) {
@@ -68,6 +73,11 @@ int open_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg
     mode_t mode = static_cast<int>(arg2);
     auto tid    = static_cast<pid_t>(syscall_no_intercept(SYS_gettid));
     START_LOG(tid, "call(path=%s, flags=%d, mode=%d)", pathname.data(), flags, mode);
+
+    if (is_forbidden_path(pathname)) {
+        LOG("Path %s is forbidden: skip", pathname.data());
+        return CAPIO_POSIX_SYSCALL_REQUEST_SKIP;
+    }
 
     std::string path = compute_abs_path(pathname.data(), -1);
 
@@ -105,6 +115,11 @@ int openat_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long a
     auto tid    = static_cast<pid_t>(syscall_no_intercept(SYS_gettid));
     START_LOG(tid, "call(dirfd=%ld, path=%s, flags=%d, mode=%d)", dirfd, pathname.data(), flags,
               mode);
+
+    if (is_forbidden_path(pathname)) {
+        LOG("Path %s is forbidden: skip", pathname.data());
+        return CAPIO_POSIX_SYSCALL_REQUEST_SKIP;
+    }
 
     std::string path = compute_abs_path(pathname.data(), dirfd);
 
