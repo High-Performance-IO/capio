@@ -48,14 +48,19 @@ class MTCL_backend : public BackendInterface {
         size_t filepath_len;
         const auto unit = new TransportUnit();
         HandlerPointer->receive(&filepath_len, sizeof(size_t));
+        LOG("Incoming path of length %ld", filepath_len);
         unit->_filepath.reserve(filepath_len + 1);
         HandlerPointer->receive(unit->_filepath.data(), filepath_len);
+        LOG("Received message! Path : %s", unit->_filepath.c_str());
         HandlerPointer->receive(&unit->_buffer_size, sizeof(capio_off64_t));
+        LOG("Buffer size for incoming data is %ld", unit->_buffer_size);
         unit->_bytes = new char[unit->_buffer_size];
+        LOG("Allocated space for incoming data");
         HandlerPointer->receive(unit->_bytes, unit->_buffer_size);
+        LOG("Received file buffer data");
         HandlerPointer->receive(&unit->_start_write_offset, sizeof(capio_off64_t));
-        LOG("[recv] Receiving %ld bytes of file %s", unit->_buffer_size, unit->_filepath.c_str());
-        LOG("[recv] Offset of received chunk is %ld", unit->_start_write_offset);
+        LOG("Received chunk of data should be stored on offset %ld of file %s",
+            unit->_start_write_offset, unit->_filepath.c_str());
         return unit;
     }
 
@@ -69,14 +74,27 @@ class MTCL_backend : public BackendInterface {
          * step2: send data
          */
         const size_t file_path_length = unit->_filepath.length();
+
         HandlerPointer->send(&file_path_length, sizeof(size_t));
+        LOG("Size of path that is being sent: %ld", file_path_length);
+
         HandlerPointer->send(unit->_filepath.c_str(), file_path_length);
+        LOG("Sent file path: %s", unit->_filepath.c_str());
+
         HandlerPointer->send(&unit->_buffer_size, sizeof(capio_off64_t));
+        LOG("Size of file buffer to be sent: %ld", unit->_buffer_size);
+
         HandlerPointer->send(unit->_bytes, unit->_buffer_size);
+        LOG("Sent %ld bytes of data chunk", unit->_buffer_size);
+
         HandlerPointer->send(&unit->_start_write_offset, sizeof(capio_off64_t));
-        LOG("[send] Sent %ld bytes of file %s with offset of %ld", unit->_buffer_size,
-            unit->_filepath.c_str(), unit->_start_write_offset);
+        LOG("Sent start write offset : %ld", unit->_start_write_offset);
+
+        delete unit->_bytes;
+        LOG("Freed transfer unit _bytes buffer");
+
         delete unit;
+        LOG("Deleted transfer unit");
     }
 
     /**
