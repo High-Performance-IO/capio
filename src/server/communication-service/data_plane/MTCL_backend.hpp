@@ -31,6 +31,7 @@ class TransportUnit {
 };
 
 class MTCL_backend : public BackendInterface {
+    typedef enum { FROM_REMOTE, TO_REMOTE } CONN_HANDLER_ORIGIN;
     typedef std::tuple<std::queue<TransportUnit *> *, std::queue<TransportUnit *> *, std::mutex *>
         TransportUnitInterface;
     std::unordered_map<std::string, TransportUnitInterface> connected_hostnames_map;
@@ -102,8 +103,10 @@ class MTCL_backend : public BackendInterface {
      */
     void static server_connection_handler(MTCL::HandleUser HandlerPointer,
                                           const std::string remote_hostname, const int sleep_time,
-                                          TransportUnitInterface interface, const bool *terminate) {
-        START_LOG(gettid(), "call(remote_hostname=%s)", remote_hostname.c_str());
+                                          TransportUnitInterface interface, const bool *terminate,
+                                          CONN_HANDLER_ORIGIN source) {
+        START_LOG(gettid(), "call(remote_hostname=%s, kind=%s)", remote_hostname.c_str(),
+                  source == FROM_REMOTE ? "from remote server" : "to remote server");
         // out = data to sent to others
         // in = data from others
         auto [in, out, mutex] = interface;
@@ -199,7 +202,7 @@ class MTCL_backend : public BackendInterface {
 
             _connection_threads->push_back(new std::thread(
                 server_connection_handler, std::move(UserManager), connected_hostname, sleep_time,
-                open_connections->at(connected_hostname), terminate));
+                open_connections->at(connected_hostname), terminate, FROM_REMOTE));
         }
     }
 
@@ -236,7 +239,7 @@ class MTCL_backend : public BackendInterface {
 
             connection_threads.push_back(new std::thread(
                 server_connection_handler, std::move(UserManager), remoteHost.c_str(),
-                thread_sleep_times, connection_tuple, terminate));
+                thread_sleep_times, connection_tuple, terminate, TO_REMOTE));
         } else {
             std::cout << CAPIO_SERVER_CLI_LOG_SERVER_WARNING << " [ " << ownHostname << " ] "
                       << "Warning: found token " << remoteHost << ".alive_token"
@@ -307,6 +310,7 @@ class MTCL_backend : public BackendInterface {
                 inQueue   = std::get<0>(data);
                 interface = data;
                 found     = !inQueue->empty();
+                LOG("Hostname %s, %s incoming data", hostname.c_str(), found ? "has" : "has not");
             }
             if (!found) {
                 LOG("No incoming messages. Putting thread to sleep");

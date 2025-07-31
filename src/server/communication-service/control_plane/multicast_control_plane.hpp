@@ -15,7 +15,8 @@ class MulticastControlPlane : public CapioControlPlane {
     std::mutex *token_used_to_connect_mutex;
     char ownHostname[HOST_NAME_MAX] = {0};
 
-    static void send_multicast_alive_token(const int backend_port) {
+    static void send_multicast_alive_token(const int data_plane_backend_port) {
+        START_LOG(gettid(), "call(data_plane_backend_port=%d)", data_plane_backend_port);
         char hostname[HOST_NAME_MAX];
         gethostname(hostname, HOST_NAME_MAX);
 
@@ -35,7 +36,7 @@ class MulticastControlPlane : public CapioControlPlane {
         addr.sin_port        = htons(MULTICAST_DISCOVERY_PORT);
 
         char message[MULTICAST_ALIVE_TOKEN_MESSAGE_SIZE];
-        sprintf(message, "%s:%d", hostname, backend_port);
+        sprintf(message, "%s:%d", hostname, data_plane_backend_port);
 
         if (sendto(transmission_socket, message, strlen(message), 0,
                    reinterpret_cast<sockaddr *>(&addr), sizeof(addr)) < 0) {
@@ -43,16 +44,25 @@ class MulticastControlPlane : public CapioControlPlane {
                       << "WARNING: unable to send alive token(" << message
                       << ") to multicast address!: " << strerror(errno) << std::endl;
         }
+        LOG("Sent multicast token");
         close(transmission_socket);
     }
 
-    static void multicast_server_aliveness_detector_thread(
-        const bool *continue_execution, std::vector<std::string> *token_used_to_connect,
-        std::mutex *token_used_to_connect_mutex, const int backend_port) {
+    static void multicast_server_aliveness_thread(const bool *continue_execution,
+                                                  std::vector<std::string> *token_used_to_connect,
+                                                  std::mutex *token_used_to_connect_mutex,
+                                                  const int data_plane_backend_port) {
 
-        char incomingMessage[MULTICAST_ALIVE_TOKEN_MESSAGE_SIZE];
-        char ownHostname[HOST_NAME_MAX];
+        START_LOG(gettid(), "call(data_plane_backend_port=%d)", data_plane_backend_port);
+
+        char incomingMessage[MULTICAST_ALIVE_TOKEN_MESSAGE_SIZE], ownHostname[HOST_NAME_MAX];
         gethostname(ownHostname, HOST_NAME_MAX);
+
+        int loopback                          = 0; // disable receive loopback messages
+        u_int multiple_socket_on_same_address = 1; // enable multiple sockets on same address
+
+        const std::string SELF_TOKEN =
+            std::string(ownHostname) + ":" + std::to_string(data_plane_backend_port);
 
         int discovery_socket = socket(AF_INET, SOCK_DGRAM, 0);
         if (discovery_socket < 0) {
@@ -63,8 +73,8 @@ class MulticastControlPlane : public CapioControlPlane {
                       << "Execution will continue only with FS discovery support" << std::endl;
             return;
         }
+        LOG("Created socket");
 
-        u_int multiple_socket_on_same_address = 1;
         if (setsockopt(discovery_socket, SOL_SOCKET, SO_REUSEADDR,
                        (char *) &multiple_socket_on_same_address,
                        sizeof(multiple_socket_on_same_address)) < 0) {
@@ -75,12 +85,25 @@ class MulticastControlPlane : public CapioControlPlane {
                       << "Execution will continue only with FS discovery support" << std::endl;
             return;
         }
+        LOG("Set IP address to accept multiple sockets on same address");
 
-        struct sockaddr_in addr = {};
-        addr.sin_family         = AF_INET;
-        addr.sin_addr.s_addr    = htonl(INADDR_ANY);
-        addr.sin_port           = htons(MULTICAST_DISCOVERY_PORT);
-        socklen_t addrlen       = sizeof(addr);
+        if (setsockopt(discovery_socket, IPPROTO_IP, IP_MULTICAST_LOOP, &loopback,
+                       sizeof(loopback)) < 0) {
+            std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_ERROR << " [ " << ownHostname << " ] "
+                      << "WARNING: unable to filter out loopback incoming messages: "
+                      << strerror(errno) << std::endl;
+            std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_WARNING << " [ " << ownHostname << " ] "
+                      << "Execution will continue only with FS discovery support" << std::endl;
+            return;
+        }
+        LOG("Disabled reception of loopback messages from socket");
+
+        sockaddr_in addr     = {};
+        addr.sin_family      = AF_INET;
+        addr.sin_addr.s_addr = htonl(INADDR_ANY);
+        addr.sin_port        = htons(MULTICAST_DISCOVERY_PORT);
+        socklen_t addrlen    = sizeof(addr);
+        LOG("Set socket on IP: %s - PORT: %d", MULTICAST_DISCOVERY_ADDR, MULTICAST_DISCOVERY_PORT);
 
         // bind to receive address
         if (bind(discovery_socket, reinterpret_cast<struct sockaddr *>(&addr), sizeof(addr)) < 0) {
@@ -92,8 +115,9 @@ class MulticastControlPlane : public CapioControlPlane {
                       << "Execution will continue only with FS discovery support" << std::endl;
             return;
         }
+        LOG("Binded socket");
 
-        struct ip_mreq mreq;
+        ip_mreq mreq{};
         mreq.imr_multiaddr.s_addr = inet_addr(MULTICAST_DISCOVERY_ADDR);
         mreq.imr_interface.s_addr = htonl(INADDR_ANY);
         if (setsockopt(discovery_socket, IPPROTO_IP, IP_ADD_MEMBERSHIP, &mreq, sizeof(mreq)) < 0) {
@@ -104,31 +128,36 @@ class MulticastControlPlane : public CapioControlPlane {
                       << "Execution will continue only with FS discovery support" << std::endl;
             return;
         }
+        LOG("Successfully joined multicast group");
 
         while (*continue_execution) {
             bzero(incomingMessage, sizeof(incomingMessage));
-            send_multicast_alive_token(backend_port);
-            if (recvfrom(discovery_socket, incomingMessage, MULTICAST_ALIVE_TOKEN_MESSAGE_SIZE, 0,
-                         reinterpret_cast<sockaddr *>(&addr), &addrlen) < 0) {
-                std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_ERROR << " [ " << ownHostname << " ] "
-                          << "WARNING: recvied < 0 bytes from multicast: " << strerror(errno)
-                          << std::endl;
-                std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_WARNING << " [ " << ownHostname << " ] "
-                          << "Execution will continue only with FS discovery support" << std::endl;
-                return;
-            }
+            send_multicast_alive_token(data_plane_backend_port);
+            LOG("Waiting for incoming token...");
 
-            if (std::string(incomingMessage) ==
-                std::string(ownHostname) + ":" + std::to_string(backend_port)) {
-                // skip myself
-                continue;
-            }
+            do {
+                const auto recv_sice =
+                    recvfrom(discovery_socket, incomingMessage, MULTICAST_ALIVE_TOKEN_MESSAGE_SIZE,
+                             0, reinterpret_cast<sockaddr *>(&addr), &addrlen);
+                LOG("Received multicast data of size %ld and content %s", recv_sice,
+                    incomingMessage);
+                if (recv_sice < 0) {
+                    std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_ERROR << " [ " << ownHostname << " ] "
+                              << "WARNING: received < 0 bytes from multicast: " << strerror(errno)
+                              << std::endl;
+                    std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_WARNING << " [ " << ownHostname << " ] "
+                              << "Execution will continue only with FS discovery support"
+                              << std::endl;
+                    return;
+                }
+            } while (std::string(incomingMessage) == SELF_TOKEN);
 
             std::lock_guard lg(*token_used_to_connect_mutex);
             if (std::find(token_used_to_connect->begin(), token_used_to_connect->end(),
                           incomingMessage) == token_used_to_connect->end()) {
                 std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_INFO << " [ " << ownHostname << " ] "
                           << "Multicast adv: " << incomingMessage << std::endl;
+                LOG("Received message: %s", incomingMessage);
                 token_used_to_connect->push_back(incomingMessage);
                 capio_backend->connect_to(incomingMessage);
             }
@@ -143,9 +172,8 @@ class MulticastControlPlane : public CapioControlPlane {
         continue_execution          = new bool(true);
         token_used_to_connect_mutex = new std::mutex();
 
-        thread = new std::thread(multicast_server_aliveness_detector_thread,
-                                 std::ref(continue_execution), &token_used_to_connect,
-                                 token_used_to_connect_mutex, backend_port);
+        thread = new std::thread(multicast_server_aliveness_thread, std::ref(continue_execution),
+                                 &token_used_to_connect, token_used_to_connect_mutex, backend_port);
         std::cout << CAPIO_SERVER_CLI_LOG_SERVER << " [ " << ownHostname << " ] "
                   << "Multicast discovery service @ " << MULTICAST_DISCOVERY_ADDR << ":"
                   << MULTICAST_DISCOVERY_PORT << std::endl;
