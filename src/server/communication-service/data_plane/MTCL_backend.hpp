@@ -91,9 +91,9 @@ class MTCL_backend : public BackendInterface {
         HandlerPointer->send(&unit->_start_write_offset, sizeof(capio_off64_t));
         LOG("Sent start write offset : %ld", unit->_start_write_offset);
 
-        // DO NOT DELETE unit: here just afterwards, the unit experiences a pop() which
-        // effectively calls a delete on the container. If I delete it here, a double delete is raised
-
+        // DO NOT DELETE unit: here just afterward, the unit experiences a pop() which
+        // effectively calls delete on the container. If I delete it here, a double delete is
+        // raised
     }
 
     /**
