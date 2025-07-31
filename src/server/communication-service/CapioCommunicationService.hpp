@@ -1,103 +1,26 @@
 #ifndef CAPIOCOMMUNICATIONSERVICE_HPP
 #define CAPIOCOMMUNICATIONSERVICE_HPP
 
-#include "BackendInterface.hpp"
-#include "MTCL_backend.hpp"
+#include "control_plane/capio_control_plane.hpp"
+#include "data_plane/BackendInterface.hpp"
 
-#include <algorithm>
+#include "control_plane/fs_control_plane.hpp"
+#include "control_plane/multicast_control_plane.hpp"
+#include "data_plane/MTCL_backend.hpp"
 
 class CapioCommunicationService {
 
     char ownHostname[HOST_NAME_MAX] = {0};
-    bool *continue_execution        = new bool;
-    std::thread *thread_server_finder_fs;
-
-    void generate_aliveness_token(const int port) const {
-        START_LOG(gettid(), "call(port=d)", port);
-
-        std::string token_filename(ownHostname);
-        token_filename += ".alive_connection";
-
-        LOG("Creating alive token %s", token_filename.c_str());
-
-        std::ofstream FilePort(token_filename);
-        FilePort << port;
-        FilePort.close();
-
-        LOG("Saved self token info to FS");
-        std::cout << CAPIO_SERVER_CLI_LOG_SERVER << " [ " << ownHostname << " ] "
-                  << "Generated token at " << token_filename << std::endl;
-    }
-
-    void delete_aliveness_token() const {
-        START_LOG(gettid(), "call()");
-
-        std::string token_filename(ownHostname);
-        token_filename += ".alive_connection";
-
-        LOG("Removing alive token %s", token_filename.c_str());
-        std::filesystem::remove(token_filename);
-        LOG("Removed token");
-    }
-
-    /*
-     * Monitor the file system for the presence of tokens.
-     */
-    static void find_new_server_from_fs_token_thread(const bool *continue_execution) {
-        START_LOG(gettid(), "call()");
-
-        std::vector<std::string> handled_tokens;
-
-        if (!continue_execution) {
-            LOG("Terminating execution");
-            return;
-        }
-
-        auto dir_iterator = std::filesystem::directory_iterator(std::filesystem::current_path());
-        for (const auto &entry : dir_iterator) {
-            const auto &token_path = entry.path();
-
-            if (!entry.is_regular_file() || token_path.extension() != ".alive_connection") {
-                LOG("Filename %s is not valid", entry.path().c_str());
-                continue;
-            }
-
-            if (std::find(handled_tokens.begin(), handled_tokens.end(), entry.path()) !=
-                handled_tokens.end()) {
-                LOG("Token already handled... skipping it!");
-                continue;
-            };
-
-            LOG("Found token %s", token_path.c_str());
-            // TODO: as of now we will not connect with servers
-            // TODO: that terminates and then comes back up online...
-            handled_tokens.push_back(entry.path());
-
-            std::ifstream MyReadFile(token_path.filename());
-            std::string remoteHost = entry.path().stem(), remotePort;
-            LOG("Testing for file: %s (hostname: %s, port=%s)", entry.path().filename().c_str(),
-                remoteHost.c_str(), remotePort.c_str());
-
-            getline(MyReadFile, remotePort);
-            MyReadFile.close();
-
-            capio_backend->connect_to(remoteHost, remotePort);
-        }
-        LOG("Terminated loop. sleeping one second");
-        sleep(1);
-    }
 
   public:
     ~CapioCommunicationService() {
-        *continue_execution = false;
-        thread_server_finder_fs->join();
-        delete_aliveness_token();
+        delete capio_control_plane;
         delete capio_backend;
     };
 
-    CapioCommunicationService(std::string &backend_name, const int port) {
+    CapioCommunicationService(std::string &backend_name, const int port,
+                              const std::string &control_plane_backend = "multicast") {
         START_LOG(gettid(), "call(backend_name=%s)", backend_name.c_str());
-        *continue_execution = true;
         gethostname(ownHostname, HOST_NAME_MAX);
         LOG("My hostname is %s. Starting to listen on connection", ownHostname);
 
@@ -127,9 +50,19 @@ class CapioCommunicationService {
                       << std::endl;
             ERR_EXIT("No valid backend was provided");
         }
-        generate_aliveness_token(port);
-        thread_server_finder_fs =
-            new std::thread(find_new_server_from_fs_token_thread, std::ref(continue_execution));
+
+        if (control_plane_backend == "multicast") {
+            std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_INFO << " [ " << ownHostname << " ] "
+                      << "Starting multicast control plane" << std::endl;
+            capio_control_plane = new MulticastControlPlane(port);
+        } else {
+            std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_INFO << " [ " << ownHostname << " ] "
+                      << "Starting file system control plane" << std::endl;
+            capio_control_plane = new FSControlPlane(port);
+        }
+
+        std::cout << CAPIO_SERVER_CLI_LOG_SERVER << " [ " << ownHostname << " ] "
+                  << "CapioCommunicationService initialization completed." << std::endl;
     }
 };
 

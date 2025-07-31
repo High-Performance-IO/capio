@@ -31,6 +31,7 @@ class TransportUnit {
 };
 
 class MTCL_backend : public BackendInterface {
+    typedef enum { FROM_REMOTE, TO_REMOTE } CONN_HANDLER_ORIGIN;
     typedef std::tuple<std::queue<TransportUnit *> *, std::queue<TransportUnit *> *, std::mutex *>
         TransportUnitInterface;
     std::unordered_map<std::string, TransportUnitInterface> connected_hostnames_map;
@@ -48,14 +49,19 @@ class MTCL_backend : public BackendInterface {
         size_t filepath_len;
         const auto unit = new TransportUnit();
         HandlerPointer->receive(&filepath_len, sizeof(size_t));
+        LOG("Incoming path of length %ld", filepath_len);
         unit->_filepath.reserve(filepath_len + 1);
         HandlerPointer->receive(unit->_filepath.data(), filepath_len);
+        LOG("Received message! Path : %s", unit->_filepath.c_str());
         HandlerPointer->receive(&unit->_buffer_size, sizeof(capio_off64_t));
+        LOG("Buffer size for incoming data is %ld", unit->_buffer_size);
         unit->_bytes = new char[unit->_buffer_size];
+        LOG("Allocated space for incoming data");
         HandlerPointer->receive(unit->_bytes, unit->_buffer_size);
+        LOG("Received file buffer data");
         HandlerPointer->receive(&unit->_start_write_offset, sizeof(capio_off64_t));
-        LOG("[recv] Receiving %ld bytes of file %s", unit->_buffer_size, unit->_filepath.c_str());
-        LOG("[recv] Offset of received chunk is %ld", unit->_start_write_offset);
+        LOG("Received chunk of data should be stored on offset %ld of file %s",
+            unit->_start_write_offset, unit->_filepath.c_str());
         return unit;
     }
 
@@ -69,14 +75,25 @@ class MTCL_backend : public BackendInterface {
          * step2: send data
          */
         const size_t file_path_length = unit->_filepath.length();
+
         HandlerPointer->send(&file_path_length, sizeof(size_t));
+        LOG("Size of path that is being sent: %ld", file_path_length);
+
         HandlerPointer->send(unit->_filepath.c_str(), file_path_length);
+        LOG("Sent file path: %s", unit->_filepath.c_str());
+
         HandlerPointer->send(&unit->_buffer_size, sizeof(capio_off64_t));
+        LOG("Size of file buffer to be sent: %ld", unit->_buffer_size);
+
         HandlerPointer->send(unit->_bytes, unit->_buffer_size);
+        LOG("Sent %ld bytes of data chunk", unit->_buffer_size);
+
         HandlerPointer->send(&unit->_start_write_offset, sizeof(capio_off64_t));
-        LOG("[send] Sent %ld bytes of file %s with offset of %ld", unit->_buffer_size,
-            unit->_filepath.c_str(), unit->_start_write_offset);
-        delete unit;
+        LOG("Sent start write offset : %ld", unit->_start_write_offset);
+
+        // DO NOT DELETE unit: here just afterward, the unit experiences a pop() which
+        // effectively calls delete on the container. If I delete it here, a double delete is
+        // raised
     }
 
     /**
@@ -84,8 +101,10 @@ class MTCL_backend : public BackendInterface {
      */
     void static server_connection_handler(MTCL::HandleUser HandlerPointer,
                                           const std::string remote_hostname, const int sleep_time,
-                                          TransportUnitInterface interface, const bool *terminate) {
-        START_LOG(gettid(), "call(remote_hostname=%s)", remote_hostname.c_str());
+                                          TransportUnitInterface interface, const bool *terminate,
+                                          CONN_HANDLER_ORIGIN source) {
+        START_LOG(gettid(), "call(remote_hostname=%s, kind=%s)", remote_hostname.c_str(),
+                  source == FROM_REMOTE ? "from remote server" : "to remote server");
         // out = data to sent to others
         // in = data from others
         auto [in, out, mutex] = interface;
@@ -168,7 +187,7 @@ class MTCL_backend : public BackendInterface {
             UserManager.receive(connected_hostname, HOST_NAME_MAX);
 
             std::cout << CAPIO_SERVER_CLI_LOG_SERVER << " [ " << ownHostname << " ] "
-                      << "Connected to " << connected_hostname << std::endl;
+                      << "Connected from " << connected_hostname << std::endl;
 
             LOG("Received connection hostname: %s", connected_hostname);
 
@@ -181,20 +200,25 @@ class MTCL_backend : public BackendInterface {
 
             _connection_threads->push_back(new std::thread(
                 server_connection_handler, std::move(UserManager), connected_hostname, sleep_time,
-                open_connections->at(connected_hostname), terminate));
+                open_connections->at(connected_hostname), terminate, FROM_REMOTE));
         }
     }
 
   public:
-    void connect_to(std::string remoteHost, const std::string &remotePort) override {
-        START_LOG(gettid(), "call( remoteHost=%s, remotePort=%s)", remoteHost.c_str(),
-                  remotePort.c_str());
+    void connect_to(std::string hostname_port) override {
+        START_LOG(gettid(), "call( hostname_port=%s)", hostname_port.c_str());
+        std::string remoteHost        = hostname_port.substr(0, hostname_port.find_last_of(':'));
+        const std::string remoteToken = usedProtocol + ":" + hostname_port;
 
-        const std::string remoteToken = usedProtocol + ":" + remoteHost + ":" + remotePort;
-
-        if (remoteToken == selfToken ||
-            remoteToken == usedProtocol + ":" + ownHostname + ":" + remotePort) {
+        if (remoteToken == selfToken ||                                     // skip on 0.0.0.0
+            remoteToken == usedProtocol + ":" + ownHostname + ":" + ownPort // skip on my real IP
+        ) {
             LOG("Skipping to connect to self");
+            return;
+        }
+
+        if (connected_hostnames_map.find(remoteToken) != connected_hostnames_map.end()) {
+            LOG("Remote host %s is already connected", remoteHost.c_str());
             return;
         }
 
@@ -213,7 +237,7 @@ class MTCL_backend : public BackendInterface {
 
             connection_threads.push_back(new std::thread(
                 server_connection_handler, std::move(UserManager), remoteHost.c_str(),
-                thread_sleep_times, connection_tuple, terminate));
+                thread_sleep_times, connection_tuple, terminate, TO_REMOTE));
         } else {
             std::cout << CAPIO_SERVER_CLI_LOG_SERVER_WARNING << " [ " << ownHostname << " ] "
                       << "Warning: found token " << remoteHost << ".alive_token"
@@ -246,7 +270,7 @@ class MTCL_backend : public BackendInterface {
         th = new std::thread(incoming_connection_listener, std::ref(continue_execution), sleep_time,
                              &connected_hostnames_map, _guard, &connection_threads, terminate);
         std::cout << CAPIO_SERVER_CLI_LOG_SERVER << " [ " << ownHostname << " ] "
-                  << "CapioCommunicationService initialization completed." << std::endl;
+                  << "MTCL data plane initialization completed." << std::endl;
     }
 
     ~MTCL_backend() override {
@@ -284,6 +308,7 @@ class MTCL_backend : public BackendInterface {
                 inQueue   = std::get<0>(data);
                 interface = data;
                 found     = !inQueue->empty();
+                LOG("Hostname %s, %s incoming data", hostname.c_str(), found ? "has" : "has not");
             }
             if (!found) {
                 LOG("No incoming messages. Putting thread to sleep");
@@ -301,7 +326,6 @@ class MTCL_backend : public BackendInterface {
 
         std::string filename(inputUnit->_filepath);
 
-        delete inputUnit;
         return filename;
     }
 

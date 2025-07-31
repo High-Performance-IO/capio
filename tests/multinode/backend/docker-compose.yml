@@ -5,10 +5,13 @@ services:
     working_dir: /shared
     volumes:
       - shared_data:/shared
-    command: |
-      capio_backend_unit_tests \
-            --gtest_break_on_failure \
-            --gtest_print_time=1
+    networks:
+      capio_net:
+        aliases:
+          - node1
+    environment:
+      - CAPIO_LOG_LEVEL=-1
+    command: capio_backend_unit_tests  --gtest_break_on_failure --gtest_print_time=1
 
   node2:
     image: alphaunito/capio:latest
@@ -16,7 +19,17 @@ services:
     working_dir: /shared
     volumes:
       - shared_data:/shared
-    command: bash -c "sleep 5 && capio_backend_unit_tests  --gtest_break_on_failure  --gtest_print_time=1"
+    networks:
+      capio_net:
+        aliases:
+          - node2
+    environment:
+      - CAPIO_LOG_LEVEL=-1
+    command: bash -c "sleep 5 && capio_backend_unit_tests --gtest_break_on_failure --gtest_print_time=1"
 
 volumes:
   shared_data:
+
+networks:
+  capio_net:
+    driver: bridge

@@ -1,7 +1,7 @@
 #ifndef CAPIO_SERVER_HANDLERS_SIGNALS_HPP
 #define CAPIO_SERVER_HANDLERS_SIGNALS_HPP
 
-#include "communication-service/BackendInterface.hpp"
+#include "../communication-service/data_plane/BackendInterface.hpp"
 #include "communication-service/CapioCommunicationService.hpp"
 
 #include <csignal>

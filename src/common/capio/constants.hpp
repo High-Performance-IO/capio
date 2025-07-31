@@ -155,6 +155,9 @@ constexpr char CAPIO_SERVER_ARG_PARSER_CONFIG_NCONTINUE_ON_ERROR_HELP[] =
     "specified,  and a fatal termination point is reached, the behaviour of capio is undefined and "
     "should not  be taken as valid";
 
+constexpr char CAPIO_SERVER_ARG_PARSER_CONFIG_CONTROL_PLANE_BACKEND[] =
+    "Which control plane backend to used. Options: <multicast | fs>. Defaults to <multicast>";
+
 constexpr char CAPIO_LOG_SERVER_CLI_CONT_ON_ERR_WARNING[] =
     "[ \033[1;33m SERVER \033[0m ]\033[1;31m "
     "|==================================================================|\033[0m\n"
@@ -181,5 +184,8 @@ constexpr char CAPIO_SERVER_ARG_PARSER_CONFIG_BACKEND_HELP[] =
 
 constexpr int DEFAULT_CAPIO_BACKEND_PORT       = 2222;
 constexpr int CAPIO_BACKEND_DEFAULT_SLEEP_TIME = 300;
-
-#endif // CAPIO_COMMON_CONSTANTS_HPP
+constexpr char MULTICAST_DISCOVERY_ADDR[]      = "234.234.234.1";
+constexpr int MULTICAST_DISCOVERY_PORT         = 2223;
+constexpr int MULTICAST_ALIVE_TOKEN_MESSAGE_SIZE =
+    HOST_NAME_MAX + 10; // hostname + : + sizeof(port)
+#endif                  // CAPIO_COMMON_CONSTANTS_HPP

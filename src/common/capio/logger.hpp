@@ -22,8 +22,8 @@ inline bool continue_on_error = false; // change behaviour of ERR_EXIT to contin
 #ifndef __CAPIO_POSIX
 #include <filesystem>
 thread_local std::ofstream logfile; // if building for server, self-contained logfile
-std::string log_master_dir_name = CAPIO_DEFAULT_LOG_FOLDER;
-std::string logfile_prefix      = CAPIO_SERVER_DEFAULT_LOG_FILE_PREFIX;
+inline std::string log_master_dir_name = CAPIO_DEFAULT_LOG_FOLDER;
+inline std::string logfile_prefix      = CAPIO_SERVER_DEFAULT_LOG_FILE_PREFIX;
 #else
 inline thread_local bool logfileOpen = false;
 inline thread_local int logfileFD    = -1;
@@ -45,6 +45,10 @@ inline int CAPIO_LOG_LEVEL = CAPIO_MAX_LOG_LEVEL;
 inline auto open_server_logfile() {
     auto hostname = new char[HOST_NAME_MAX];
     gethostname(hostname, HOST_NAME_MAX);
+
+    if (log_master_dir_name.empty()) {
+        log_master_dir_name = CAPIO_DEFAULT_LOG_FOLDER;
+    }
 
     const std::filesystem::path output_folder =
         std::string{log_master_dir_name + "/server/" + hostname};
