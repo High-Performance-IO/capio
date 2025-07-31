@@ -94,8 +94,9 @@ class MTCL_backend : public BackendInterface {
         delete unit->_bytes;
         LOG("Freed transfer unit _bytes buffer");
 
-        delete unit;
-        LOG("Deleted transfer unit");
+        // DO NOT DELETE unit: here just afterwards, the unit experiences a pop() which
+        // effectively calls a delete on the container. If I delete it here, a double delete is raised
+
     }
 
     /**
