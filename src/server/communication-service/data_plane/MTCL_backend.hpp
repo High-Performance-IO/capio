@@ -326,7 +326,6 @@ class MTCL_backend : public BackendInterface {
 
         std::string filename(inputUnit->_filepath);
 
-        delete inputUnit;
         return filename;
     }
 
