@@ -202,7 +202,12 @@ DIR *opendir(const char *name) {
     }
 
     LOG("Performing consent request to open directory %s", absolute_path.c_str());
-    consent_request_cache_fs->consent_request(absolute_path.c_str(), gettid(), __FUNCTION__);
+
+    char resolved_path[PATH_MAX];
+    syscall_no_intercept(SYS_readlink, absolute_path.c_str(), resolved_path, PATH_MAX);
+    LOG("Resolved symlink path: %s", resolved_path);
+
+    consent_request_cache_fs->consent_request(resolved_path, gettid(), __FUNCTION__);
 
     syscall_no_intercept_flag = true;
     auto dir                  = real_opendir(absolute_path.c_str());
@@ -211,7 +216,7 @@ DIR *opendir(const char *name) {
     if (directory_commit_token_path.find(absolute_path) == directory_commit_token_path.end()) {
         LOG("Commit token path was not found for path %s", absolute_path.c_str());
         auto token_path = new char[PATH_MAX]{0};
-        posix_directory_committed_request(capio_syscall(SYS_gettid), absolute_path, token_path);
+        posix_directory_committed_request(capio_syscall(SYS_gettid), resolved_path, token_path);
         LOG("Inserting token path %s", token_path);
         directory_commit_token_path.insert({absolute_path, token_path});
     }
@@ -222,7 +227,7 @@ DIR *opendir(const char *name) {
     directory_items->emplace(std::string(absolute_path), new std::vector<dirent64 *>());
 
     auto fd = dirfd(dir);
-    LOG("File descriptor for directory %s is %d", absolute_path.c_str(), fd);
+    LOG("File descriptor for directory %s is %d", resolved_path, fd);
 
     add_capio_fd(capio_syscall(SYS_gettid), absolute_path.c_str(), fd, 0, 0);
 

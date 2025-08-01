@@ -19,7 +19,11 @@ int access_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long a
         path = capio_posix_realpath(pathname);
     }
 
-    consent_request_cache_fs->consent_request(path, tid, __FUNCTION__);
+    char resolved_path[PATH_MAX];
+    syscall_no_intercept(SYS_readlink, path.c_str(), resolved_path, PATH_MAX);
+    LOG("Resolved symlink path: %s", resolved_path);
+
+    consent_request_cache_fs->consent_request(resolved_path, tid, __FUNCTION__);
     return CAPIO_POSIX_SYSCALL_REQUEST_SKIP;
 }
 #endif // SYS_access
@@ -58,7 +62,11 @@ int faccessat_handler(long arg0, long arg1, long arg2, long arg3, long arg4, lon
         }
     }
 
-    consent_request_cache_fs->consent_request(path, tid, __FUNCTION__);
+    char resolved_path[PATH_MAX];
+    syscall_no_intercept(SYS_readlink, path.c_str(), resolved_path, PATH_MAX);
+    LOG("Resolved symlink path: %s", resolved_path);
+
+    consent_request_cache_fs->consent_request(resolved_path, tid, __FUNCTION__);
     return CAPIO_POSIX_SYSCALL_REQUEST_SKIP;
 }
 #endif // SYS_faccessat

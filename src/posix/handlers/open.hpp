@@ -87,18 +87,30 @@ int open_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg
             create_request(-1, path.data(), tid);
         } else {
             LOG("not O_CREAT");
-            open_request(-1, path.data(), tid);
+            open_request(-1, path, tid);
         }
     } else {
         LOG("Not a CAPIO path. skipping...");
         return CAPIO_POSIX_SYSCALL_REQUEST_SKIP;
     }
 
-    int fd = static_cast<int>(syscall_no_intercept(SYS_open, arg0, arg1, arg2, arg3, arg4, arg5));
+    char resolved_path[PATH_MAX];
+    syscall_no_intercept(SYS_readlink, path.c_str(), resolved_path, PATH_MAX);
+    LOG("Resolved symlink path: %s", resolved_path);
+
+    /*
+     * Here it might happen that we try to open a symbolic link. instead of opening the link, we
+     * open the resolved link. in this way, when we get the associated path from the File
+     * descriptor, we ensure that the file descriptor is associated to the real file. This way the
+     * server always check on the real file and not on the link
+     */
+
+    int fd = static_cast<int>(syscall_no_intercept(SYS_open, reinterpret_cast<long>(resolved_path),
+                                                   arg1, arg2, arg3, arg4, arg5));
 
     if (is_capio_path(path) && fd >= 0) {
         LOG("Adding capio path");
-        add_capio_fd(tid, path, fd, 0, (flags & O_CLOEXEC) == O_CLOEXEC);
+        add_capio_fd(tid, resolved_path, fd, 0, (flags & O_CLOEXEC) == O_CLOEXEC);
     }
 
     *result = fd;
@@ -136,12 +148,20 @@ int openat_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long a
         return CAPIO_POSIX_SYSCALL_REQUEST_SKIP;
     }
 
-    int fd = static_cast<int>(syscall_no_intercept(SYS_openat, arg0, arg1, arg2, arg3, arg4, arg5));
+    char resolved_path[PATH_MAX];
+    syscall_no_intercept(SYS_readlinkat, arg0, path.c_str(), resolved_path, PATH_MAX);
+    LOG("Resolved symlink path: %s", resolved_path);
+
+    /**
+     * Using readlinkat, we have the realpath of the symbolic link, and we can perform a normal open
+     */
+    int fd = static_cast<int>(syscall_no_intercept(SYS_open, reinterpret_cast<long>(resolved_path),
+                                                   arg1, arg2, arg3, arg4, arg5));
     LOG("fd=%d", fd);
 
     if (is_capio_path(path) && fd >= 0) {
         LOG("Adding capio path");
-        add_capio_fd(tid, path, fd, 0, (flags & O_CLOEXEC) == O_CLOEXEC);
+        add_capio_fd(tid, resolved_path, fd, 0, (flags & O_CLOEXEC) == O_CLOEXEC);
     }
 
     *result = fd;

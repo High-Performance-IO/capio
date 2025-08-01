@@ -33,7 +33,11 @@ inline off64_t capio_mkdirat(int dirfd, const std::string_view &pathname, mode_t
 
     if (is_capio_path(path)) {
 
-        create_request(-1, path, tid);
+        char resolved_path[PATH_MAX];
+        syscall_no_intercept(SYS_readlink, path.c_str(), resolved_path, PATH_MAX);
+        LOG("Resolved symlink path: %s", resolved_path);
+
+        create_request(-1, resolved_path, tid);
     }
     return CAPIO_POSIX_SYSCALL_REQUEST_SKIP;
 }

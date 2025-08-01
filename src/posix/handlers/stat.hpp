@@ -28,7 +28,11 @@ inline int capio_lstat(const std::string_view &pathname, struct stat *statbuf, p
 
     const std::filesystem::path absolute_path(pathname);
     if (is_capio_path(absolute_path)) {
-        consent_request_cache_fs->consent_request(pathname, tid, __FUNCTION__);
+        char resolved_path[PATH_MAX];
+        syscall_no_intercept(SYS_readlink, absolute_path.c_str(), resolved_path, PATH_MAX);
+        LOG("Resolved symlink path: %s", resolved_path);
+
+        consent_request_cache_fs->consent_request(resolved_path, tid, __FUNCTION__);
     }
     return CAPIO_POSIX_SYSCALL_REQUEST_SKIP;
 }
