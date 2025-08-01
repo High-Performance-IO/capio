@@ -198,9 +198,7 @@ class CapioStorageService {
         if (StoreOnlyInMemory) {
             LOG("All files should be handled in memory. sending * wildcard");
             char f[PATH_MAX + 1]{0};
-            auto c_dir = get_capio_dir().string();
-            memcpy(f, c_dir.c_str(), c_dir.length());
-            memcpy(f + c_dir.size(), "/*", 2);
+            f[0] = '*';
             _server_to_client_queue->at(pid)->write(f, PATH_MAX);
             LOG("Return value=%llu", 1);
             return 1;

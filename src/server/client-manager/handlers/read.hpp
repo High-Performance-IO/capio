@@ -17,12 +17,6 @@ inline void read_handler(const char *const str) {
     START_LOG(gettid(), "call(path=%s, tid=%ld, end_of_read=%llu)", path, tid, end_of_read);
 
     const std::filesystem::path path_fs(path);
-    // Skip operations on CAPIO_DIR
-    if (!CapioCLEngine::fileToBeHandled(path_fs)) {
-        LOG("Ignore calls as file should not be treated by CAPIO");
-        client_manager->reply_to_client(tid, 1);
-        return;
-    }
 
     /**
      * If process is producer OR fire rule is no update and there is enough data, allow the process

@@ -69,6 +69,15 @@ inline std::vector<std::regex> *file_in_memory_request(const long pid) {
         auto file = new char[PATH_MAX]{};
         stc_queue->read(file, PATH_MAX);
         LOG("Obtained path %s", file);
+
+        if (file[0] == '*') {
+            LOG("Obtained all file regex. converting it to be coherent with CAPIO paths");
+            auto c_dir = get_capio_dir().string();
+            memcpy(file, c_dir.c_str(), c_dir.length());
+            memcpy(file + c_dir.size(), "/*", 2);
+            LOG("Generated path relative to CAPIO_DIR: %s", file);
+        }
+
         regex_vector->emplace_back(generateCapioRegex(file));
         delete[] file;
     }

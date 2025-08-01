@@ -155,6 +155,10 @@ constexpr char CAPIO_SERVER_ARG_PARSER_CONFIG_NCONTINUE_ON_ERROR_HELP[] =
     "specified,  and a fatal termination point is reached, the behaviour of capio is undefined and "
     "should not  be taken as valid";
 
+constexpr char CAPIO_SERVER_ARG_PARSER_CONFIG_RESOLVE_RELATIVE_TO_HELP[] =
+    "When finding relative paths in the CAPIO-CL configuration file, resolve them relative to the "
+    "provided path";
+
 constexpr char CAPIO_SERVER_ARG_PARSER_CONFIG_CONTROL_PLANE_BACKEND[] =
     "Which control plane backend to used. Options: <multicast | fs>. Defaults to <multicast>";
 

@@ -32,8 +32,8 @@ int faccessat_handler(long arg0, long arg1, long arg2, long arg3, long arg4, lon
     auto tid = static_cast<pid_t>(syscall_no_intercept(SYS_gettid));
     START_LOG(tid, "call()");
 
-    if (is_forbidden_path(pathname)) {
-        LOG("Path %s is forbidden: skip", pathname.data());
+    if (is_forbidden_path(pathname) || !is_capio_path(pathname)) {
+        LOG("Path %s is forbidden or is not a capio path: skip", pathname.data());
         return CAPIO_POSIX_SYSCALL_REQUEST_SKIP;
     }
 
