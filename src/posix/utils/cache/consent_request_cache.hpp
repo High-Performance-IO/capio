@@ -6,8 +6,8 @@ class ConsentRequestCache {
 
     // Block until server allows for proceeding to a generic request
     static capio_off64_t _consent_to_proceed_request(const std::filesystem::path &path,
-                                                            const long tid,
-                                                            const std::string &source_func) {
+                                                     const long tid,
+                                                     const std::string &source_func) {
         START_LOG(capio_syscall(SYS_gettid), "call(path=%s, tid=%ld, source_func=%s)", path.c_str(),
                   tid, source_func.c_str());
         char req[CAPIO_REQ_MAX_SIZE];

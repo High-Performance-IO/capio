@@ -49,16 +49,20 @@ class JsonParser {
      * @return CapioCLEngine instance with the information provided by the config file
      */
     static CapioCLEngine *parse(const std::filesystem::path &source) {
-        auto locations        = new CapioCLEngine();
-        const auto &capio_dir = get_capio_dir();
+        auto locations = new CapioCLEngine();
 
-        START_LOG(gettid(), "call(config_file='%s', capio_dir='%s')", source.c_str(),
-                  capio_dir.c_str());
+        START_LOG(gettid(), "call(config_file='%s')", source.c_str());
 
-        locations->newFile(get_capio_dir());
-        locations->setDirectory(get_capio_dir());
+        /*
+         * Before here a call to get_capio_dir() was issued. However, to support multiple CAPIO_DIRs
+         * there is no difference to use the wildcard * instead of CAPIO_DIR. This is true as only
+         * paths relative to the capio_dir directory are forwarded to the server, and as such, there
+         * is no difference that to create a ROOT dir equal to CAPIO_DIR compared to the wildcard *.
+         */
+        locations->newFile("*");
+        locations->setDirectory("*");
         if (StoreOnlyInMemory) {
-            locations->setStoreFileInMemory(get_capio_dir());
+            locations->setStoreFileInMemory("*");
         }
 
         if (source.empty()) {
@@ -117,22 +121,20 @@ class JsonParser {
                     std::filesystem::path file(itm.get_string().take_value());
                     std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_JSON << " [ " << node_name << " ] "
                               << "Found file : " << file << std::endl;
-                    if (file.is_relative() || first_is_subpath_of_second(file, get_capio_dir())) {
-                        std::string appname(app_name);
-                        std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_JSON << " [ " << node_name << " ] "
-                                  << "File : " << file << " added to app: " << app_name
-                                  << std::endl;
-                        if (file.is_relative()) {
-                            file = capio_dir / file;
-                        }
-                        locations->newFile(file.c_str());
-                        locations->addConsumer(file, appname);
-                    } else {
+                    if (file.is_relative()) {
                         std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_WARNING << " [ " << node_name
                                   << " ] "
                                   << "File : " << file
-                                  << " is not relative to CAPIO_DIR. Ignoring..." << std::endl;
+                                  << " IS RELATIVE! using cwd() of server to compute abs path."
+                                  << std::endl;
+                        file = std::filesystem::current_path() / file;
                     }
+                    std::string appname(app_name);
+                    std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_JSON << " [ " << node_name << " ] "
+                              << "File : " << file << " added to app: " << app_name << std::endl;
+
+                    locations->newFile(file.c_str());
+                    locations->addConsumer(file, appname);
                 }
 
                 std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_JSON << " [ " << node_name << " ] "
@@ -148,17 +150,22 @@ class JsonParser {
             } else {
                 for (auto itm : output_stream) {
                     std::filesystem::path file(itm.get_string().take_value());
-                    if (file.is_relative() || first_is_subpath_of_second(file, get_capio_dir())) {
-                        std::string appname(app_name);
-                        std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_JSON << " [ " << node_name << " ] "
-                                  << "Adding file: " << file << " to app: " << app_name
-                                  << std::endl;
+                    if (file.is_relative()) {
                         if (file.is_relative()) {
-                            file = capio_dir / file;
+                            std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_WARNING << " [ " << node_name
+                                      << " ] "
+                                      << "File : " << file
+                                      << " IS RELATIVE! using cwd() of server to compute abs path."
+                                      << std::endl;
+                            file = std::filesystem::current_path() / file;
                         }
-                        locations->newFile(file);
-                        locations->addProducer(file, appname);
                     }
+                    std::string appname(app_name);
+                    std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_JSON << " [ " << node_name << " ] "
+                              << "Adding file: " << file << " to app: " << app_name << std::endl;
+
+                    locations->newFile(file);
+                    locations->addProducer(file, appname);
                 }
                 std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_JSON << " [ " << node_name << " ] "
                           << "Completed output_stream parsing for app: " << app_name << std::endl;
@@ -199,11 +206,16 @@ class JsonParser {
                         std::string_view elem = item.get_string().value();
                         LOG("Found name: %s", std::string(elem).c_str());
                         std::filesystem::path file_fs(elem);
-                        if (file_fs.is_relative() ||
-                            first_is_subpath_of_second(file_fs, get_capio_dir())) {
-                            LOG("Saving file %s to locations", std::string(elem).c_str());
-                            streaming_names.emplace_back(elem);
+                        if (file_fs.is_relative()) {
+                            std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_WARNING << " [ " << node_name
+                                      << " ] "
+                                      << "File : " << file_fs
+                                      << " IS RELATIVE! using cwd() of server to compute abs path."
+                                      << std::endl;
+                            file_fs = std::filesystem::current_path() / file_fs;
                         }
+                        LOG("Saving file %s to locations", std::string(elem).c_str());
+                        streaming_names.emplace_back(elem);
                     }
 
                     // PARSING COMMITTED
@@ -254,9 +266,15 @@ class JsonParser {
                         for (auto itm : file_deps_tmp) {
                             name_tmp = itm.get_string().value();
                             std::filesystem::path computed_path(name_tmp);
-                            computed_path = computed_path.is_relative()
-                                                ? (get_capio_dir() / computed_path)
-                                                : computed_path;
+                            if (computed_path.is_relative()) {
+                                std::cout
+                                    << CAPIO_LOG_SERVER_CLI_LEVEL_WARNING << " [ " << node_name
+                                    << " ] "
+                                    << "File : " << computed_path
+                                    << " IS RELATIVE! using cwd() of server to compute abs path."
+                                    << std::endl;
+                                computed_path = std::filesystem::current_path() / computed_path;
+                            }
                             std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_JSON << " [ " << node_name
                                       << " ] "
                                       << "Adding file: " << computed_path
@@ -289,8 +307,14 @@ class JsonParser {
                         std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_JSON << " [ " << node_name << " ] "
                                   << " [ " << node_name << " ] "
                                   << "Updating metadata for path:  " << path << std::endl;
+
                         if (path.is_relative()) {
-                            path = (capio_dir / path).lexically_normal();
+                            std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_WARNING << " [ " << node_name
+                                      << " ] "
+                                      << "Path : " << path
+                                      << " IS RELATIVE! using cwd() of server to compute abs path."
+                                      << std::endl;
+                            path = std::filesystem::current_path() / path;
                         }
                         LOG("path: %s", path.c_str());
 
@@ -343,12 +367,16 @@ class JsonParser {
                 std::filesystem::path path(name);
 
                 if (path.is_relative()) {
-                    path = (capio_dir / path).lexically_normal();
+                    std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_WARNING << " [ " << node_name << " ] "
+                              << "Path : " << path
+                              << " IS RELATIVE! using cwd() of server to compute abs path."
+                              << std::endl;
+                    path = std::filesystem::current_path() / path;
                 }
+
                 // TODO: check for globs
-                if (first_is_subpath_of_second(path, get_capio_dir())) {
-                    locations->setPermanent(name.data(), true);
-                }
+                // TODO: improve this
+                locations->setPermanent(name.data(), true);
             }
             std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_JSON << " [ " << node_name << " ] "
                       << "Completed parsing of permanent files" << std::endl;
@@ -374,12 +402,14 @@ class JsonParser {
                 std::filesystem::path path(name);
 
                 if (path.is_relative()) {
-                    path = (capio_dir / path).lexically_normal();
+                    std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_WARNING << " [ " << node_name << " ] "
+                              << "Path : " << path
+                              << " IS RELATIVE! using cwd() of server to compute abs path."
+                              << std::endl;
+                    path = std::filesystem::current_path() / path;
                 }
                 // TODO: check for globs
-                if (first_is_subpath_of_second(path, get_capio_dir())) {
-                    locations->setExclude(name.data(), true);
-                }
+                locations->setExclude(name.data(), true);
             }
             std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_JSON << " [ " << node_name << " ] "
                       << "Completed parsing of exclude files" << std::endl;
