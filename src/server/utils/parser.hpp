@@ -1,7 +1,7 @@
 #ifndef PARSER_HPP
 #define PARSER_HPP
 
-std::string parseCLI(int argc, char **argv) {
+std::string parseCLI(int argc, char **argv, char *resolve_prefix) {
     Logger *log;
 
     args::ArgumentParser parser(CAPIO_SERVER_ARG_PARSER_PRE, CAPIO_SERVER_ARG_PARSER_EPILOGUE);
@@ -32,6 +32,10 @@ std::string parseCLI(int argc, char **argv) {
 
     args::Flag memStorageOnly(arguments, "mem-storage-only",
                               CAPIO_SERVER_ARG_PARSER_CONFIG_NCONTINUE_ON_ERROR_HELP, {"mem-only"});
+
+    args::ValueFlag<std::string> capio_cl_resolve_path(
+        arguments, "capio-cl-relative-to", CAPIO_SERVER_ARG_PARSER_CONFIG_RESOLVE_RELATIVE_TO_HELP,
+        {"resolve-capiocl-to"});
 
     args::ValueFlag<std::string> controlPlaneBackend(
         arguments, "backend", CAPIO_SERVER_ARG_PARSER_CONFIG_CONTROL_PLANE_BACKEND,
@@ -169,6 +173,16 @@ std::string parseCLI(int argc, char **argv) {
         std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_INFO << " [ " << node_name << " ] "
                   << "Selected backend is File System" << std::endl;
         capio_backend = new NoBackend();
+    }
+
+    if (capio_cl_resolve_path) {
+        auto path = args::get(capio_cl_resolve_path);
+        memcpy(resolve_prefix, path.c_str(), PATH_MAX);
+        std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_INFO << " [ " << node_name << " ] "
+                  << "CAPIO-CL relative file prefix: " << resolve_prefix << std::endl;
+    } else {
+        std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_WARNING << " [ " << node_name << " ] "
+                  << "No CAPIO-CL resolve file prefix provided" << std::endl;
     }
 
     if (config) {

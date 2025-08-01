@@ -48,9 +48,9 @@ class JsonParser {
      * @param source
      * @return CapioCLEngine instance with the information provided by the config file
      */
-    static CapioCLEngine *parse(const std::filesystem::path &source) {
+    static CapioCLEngine *parse(const std::filesystem::path &source,
+                                const std::filesystem::path resolve_prexix) {
         auto locations = new CapioCLEngine();
-
         START_LOG(gettid(), "call(config_file='%s')", source.c_str());
 
         /*
@@ -127,7 +127,7 @@ class JsonParser {
                                   << "File : " << file
                                   << " IS RELATIVE! using cwd() of server to compute abs path."
                                   << std::endl;
-                        file = std::filesystem::current_path() / file;
+                        file = resolve_prexix / file;
                     }
                     std::string appname(app_name);
                     std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_JSON << " [ " << node_name << " ] "
@@ -157,7 +157,7 @@ class JsonParser {
                                       << "File : " << file
                                       << " IS RELATIVE! using cwd() of server to compute abs path."
                                       << std::endl;
-                            file = std::filesystem::current_path() / file;
+                            file = resolve_prexix / file;
                         }
                     }
                     std::string appname(app_name);
@@ -212,7 +212,7 @@ class JsonParser {
                                       << "File : " << file_fs
                                       << " IS RELATIVE! using cwd() of server to compute abs path."
                                       << std::endl;
-                            file_fs = std::filesystem::current_path() / file_fs;
+                            file_fs = resolve_prexix / file_fs;
                         }
                         LOG("Saving file %s to locations", std::string(elem).c_str());
                         streaming_names.emplace_back(elem);
@@ -273,7 +273,7 @@ class JsonParser {
                                     << "File : " << computed_path
                                     << " IS RELATIVE! using cwd() of server to compute abs path."
                                     << std::endl;
-                                computed_path = std::filesystem::current_path() / computed_path;
+                                computed_path = resolve_prexix / computed_path;
                             }
                             std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_JSON << " [ " << node_name
                                       << " ] "
@@ -314,7 +314,7 @@ class JsonParser {
                                       << "Path : " << path
                                       << " IS RELATIVE! using cwd() of server to compute abs path."
                                       << std::endl;
-                            path = std::filesystem::current_path() / path;
+                            path = resolve_prexix / path;
                         }
                         LOG("path: %s", path.c_str());
 
@@ -371,7 +371,7 @@ class JsonParser {
                               << "Path : " << path
                               << " IS RELATIVE! using cwd() of server to compute abs path."
                               << std::endl;
-                    path = std::filesystem::current_path() / path;
+                    path = resolve_prexix / path;
                 }
 
                 // TODO: check for globs
@@ -406,10 +406,10 @@ class JsonParser {
                               << "Path : " << path
                               << " IS RELATIVE! using cwd() of server to compute abs path."
                               << std::endl;
-                    path = std::filesystem::current_path() / path;
+                    path = resolve_prexix / path;
                 }
                 // TODO: check for globs
-                locations->setExclude(name.data(), true);
+                locations->setExclude(path, true);
             }
             std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_JSON << " [ " << node_name << " ] "
                       << "Completed parsing of exclude files" << std::endl;
