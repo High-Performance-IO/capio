@@ -5,9 +5,9 @@ class ConsentRequestCache {
     std::unordered_map<std::string, capio_off64_t> *available_consent;
 
     // Block until server allows for proceeding to a generic request
-    static inline capio_off64_t _consent_to_proceed_request(const std::filesystem::path &path,
-                                                            const long tid,
-                                                            const std::string &source_func) {
+    static capio_off64_t _consent_to_proceed_request(const std::filesystem::path &path,
+                                                     const long tid,
+                                                     const std::string &source_func) {
         START_LOG(capio_syscall(SYS_gettid), "call(path=%s, tid=%ld, source_func=%s)", path.c_str(),
                   tid, source_func.c_str());
         char req[CAPIO_REQ_MAX_SIZE];

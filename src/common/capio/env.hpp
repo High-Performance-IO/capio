@@ -53,7 +53,7 @@ inline const std::filesystem::path &get_capio_metadata_path() {
         auto buf        = std::unique_ptr<char[]>(new char[PATH_MAX]);
 
         if (val == nullptr) {
-            metadata_path = get_capio_dir() / ".capio_metadata";
+            metadata_path = std::filesystem::current_path() / ".capio_metadata";
         } else {
             metadata_path = std::filesystem::path(val) / ".capio_metadata";
         }

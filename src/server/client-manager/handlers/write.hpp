@@ -16,11 +16,6 @@ inline void write_handler(const char *const str) {
     char path[PATH_MAX];
     sscanf(str, "%d %d %s %llu", &tid, &fd, path, &write_size);
     START_LOG(gettid(), "call(tid=%d, fd=%d, path=%s, count=%llu)", tid, fd, path, write_size);
-    std::filesystem::path filename(path);
-
-    if (!CapioCLEngine::fileToBeHandled(filename)) {
-        return;
-    }
 
     /**
      * File needs to be handled, however, to not overload the client manager thread, on which

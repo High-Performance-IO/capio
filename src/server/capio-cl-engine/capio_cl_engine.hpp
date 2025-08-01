@@ -122,21 +122,6 @@ class CapioCLEngine {
         std::cout << std::endl;
     };
 
-    // TODO: might need to be improved
-    static bool fileToBeHandled(std::filesystem::path::iterator::reference path) {
-        START_LOG(gettid(), "call(path=%s)", path.c_str());
-
-        if (path == get_capio_dir()) {
-            LOG("Path is capio_dir. Ignoring.");
-            return false;
-        }
-
-        LOG("Parent path=%s", path.parent_path().c_str());
-        LOG("Path %s be handled by CAPIO",
-            path.parent_path().string().rfind(get_capio_dir(), 0) == 0 ? "SHOULD" : "SHOULD NOT");
-        return path.parent_path().string().rfind(get_capio_dir(), 0) == 0;
-    };
-
     /**
      * Check whether the file is contained inside the location, either by direct name or by glob
      * @param file

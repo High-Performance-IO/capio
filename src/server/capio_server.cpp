@@ -53,12 +53,14 @@ int main(int argc, char **argv) {
     CAPIO_SERVER_MAIN_PID = gettid();
     std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_INFO << " [ " << node_name << " ] "
               << "Started server with PID: " << CAPIO_SERVER_MAIN_PID << std::endl;
-    const std::string config_path = parseCLI(argc, argv);
+
+    char resolve_prefix[PATH_MAX]{0};
+    const std::string config_path = parseCLI(argc, argv, resolve_prefix);
 
     START_LOG(gettid(), "call()");
     setup_signal_handlers();
 
-    capio_cl_engine         = JsonParser::parse(config_path);
+    capio_cl_engine         = JsonParser::parse(config_path, std::filesystem::path(resolve_prefix));
     shm_canary              = new CapioShmCanary(workflow_name);
     file_manager            = new CapioFileManager();
     fs_monitor              = new FileSystemMonitor();

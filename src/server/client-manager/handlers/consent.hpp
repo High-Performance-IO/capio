@@ -15,7 +15,7 @@ inline void consent_to_proceed_handler(const char *const str) {
     START_LOG(gettid(), "call(tid=%d, path=%s, source=%s)", tid, path, source_func);
 
     // Skip operations on CAPIO_DIR
-    if (!CapioCLEngine::fileToBeHandled(path) || !capio_cl_engine->contains(path)) {
+    if (!capio_cl_engine->contains(path)) {
         LOG("Ignore calls as file should not be treated by CAPIO");
         client_manager->reply_to_client(tid, 1);
         return;

@@ -7,7 +7,7 @@
 #include "utils/distributed_semaphore.hpp"
 
 inline std::string CapioFileManager::getMetadataPath(const std::string &path) {
-    return get_capio_metadata_path() / (path.substr(path.find(get_capio_dir()) + 1) + ".capio");
+    return get_capio_metadata_path() / (path + ".capio");
 }
 
 /**
