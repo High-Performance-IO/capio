@@ -125,9 +125,6 @@ std::string parseCLI(int argc, char **argv) {
         ERR_EXIT("no config file provided, and  --no-config not provided");
     }
 
-    std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_INFO << " [ " << node_name << " ] "
-              << "CAPIO_DIR=" << get_capio_dir().c_str() << std::endl;
-
 #ifdef CAPIO_LOG
     CAPIO_LOG_LEVEL = get_capio_log_level();
     std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_INFO << " [ " << node_name << " ] "

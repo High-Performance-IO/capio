@@ -287,12 +287,6 @@ static constexpr std::array<CPHandler_t, CAPIO_NR_SYSCALLS> build_syscall_table(
 #ifdef SYS_getcwd
     _syscallTable[SYS_getcwd] = getcwd_handler;
 #endif
-#ifdef SYS_getdents
-    _syscallTable[SYS_getdents] = getdents_handler;
-#endif
-#ifdef SYS_getdents64
-    _syscallTable[SYS_getdents64] = getdents64_handler;
-#endif
 #ifdef SYS_getxattr
     _syscallTable[SYS_getxattr] = not_implemented_handler;
 #endif

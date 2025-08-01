@@ -16,11 +16,6 @@ inline void close_handler(const char *const str) {
 
     const std::filesystem::path filename(path);
 
-    if (!CapioCLEngine::fileToBeHandled(filename)) {
-        LOG("File should not be handled");
-        return;
-    }
-
     LOG("File needs handling");
 
     // Call the set_committed method only if the commit rule is on_close and calling thread is a
