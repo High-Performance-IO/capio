@@ -7,7 +7,31 @@
 #include "utils/distributed_semaphore.hpp"
 
 inline std::string CapioFileManager::getMetadataPath(const std::string &path) {
-    return get_capio_metadata_path() / (path + ".capio");
+    START_LOG(gettid(), "call(path=%s)", path.c_str());
+
+    const std::filesystem::path &metadata_path = get_capio_metadata_path();
+    std::filesystem::path input_path(path);
+
+    auto metadata_it = metadata_path.begin();
+    auto input_it    = input_path.begin();
+
+    std::filesystem::path relative_path;
+    while (metadata_it != metadata_path.end() && input_it != input_path.end() &&
+           *metadata_it == *input_it) {
+        ++metadata_it;
+        ++input_it;
+    }
+
+    for (; input_it != input_path.end(); ++input_it) {
+        relative_path /= *input_it;
+    }
+
+    relative_path += ".capio";
+
+    std::filesystem::path token_full_path = metadata_path / relative_path;
+
+    LOG("Computed token path is: %s", token_full_path.c_str());
+    return token_full_path;
 }
 
 /**
@@ -31,6 +55,7 @@ inline std::string CapioFileManager::getAndCreateMetadataPath(const std::string 
         LOG("Created capio metadata parent path (if no file existed). returning metadata token "
             "file");
     }
+    LOG("token_path=%s", metadata_paths[path].c_str());
     return metadata_paths[path];
 }
 
