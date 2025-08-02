@@ -8,13 +8,16 @@
 
 inline std::string CapioFileManager::getMetadataPath(const std::string &path) {
     START_LOG(gettid(), "call(path=%s)", path.c_str());
-    const std::filesystem::path &metadata_path = get_capio_metadata_path();
-    LOG("Obtained metadata token path: %s", metadata_path.c_str());
-    const std::filesystem::path token_pathname = path + ".capio";
-    LOG("Token name relative to metadata path is %s", token_pathname.c_str());
-    const std::filesystem::path token_full_path = metadata_path / token_pathname;
-    LOG("Computed token path is: %s", token_full_path.c_str());
-    return token_full_path;
+    std::filesystem::path metadata_path  = get_capio_metadata_path();
+    std::filesystem::path token_pathname = path + ".capio";
+
+    char token_full_path[2 * PATH_MAX]{0};
+    sprintf(token_full_path, "%s%s", metadata_path.c_str(), token_pathname.c_str());
+
+    std::filesystem::path return_value(token_full_path);
+
+    LOG("Computed token path is: %s", return_value.c_str());
+    return return_value;
 }
 
 /**
