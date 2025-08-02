@@ -9,7 +9,7 @@
 inline std::string CapioFileManager::getMetadataPath(const std::string &path) {
     START_LOG(gettid(), "call(path=%s)", path.c_str());
 
-    const std::filesystem::path& metadata_path = get_capio_metadata_path();
+    const std::filesystem::path &metadata_path = get_capio_metadata_path();
     std::filesystem::path input_path(path);
 
     auto metadata_it = metadata_path.begin();
