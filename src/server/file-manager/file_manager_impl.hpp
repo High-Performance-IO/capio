@@ -14,7 +14,7 @@ inline std::string CapioFileManager::getMetadataPath(const std::string &path) {
     LOG("Token name relative to metadata path is %s", token_pathname.c_str());
     const std::filesystem::path token_full_path = metadata_path / token_pathname;
     LOG("Computed token path is: %s", token_full_path.c_str());
-    return token_pathname;
+    return token_full_path;
 }
 
 /**
