@@ -8,7 +8,9 @@
 
 inline std::string CapioFileManager::getMetadataPath(const std::string &path) {
     START_LOG(gettid(), "call(path=%s)", path.c_str());
-    return get_capio_metadata_path() / (path + ".capio");
+    auto result = get_capio_metadata_path() / path / ".capio";
+    LOG("Computed token path is: %s", result.c_str());
+    return result;
 }
 
 /**
