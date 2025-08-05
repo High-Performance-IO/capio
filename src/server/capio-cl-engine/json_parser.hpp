@@ -1,5 +1,7 @@
 #ifndef JSON_PARSER_HPP
 #define JSON_PARSER_HPP
+#include "capio/constants.hpp"
+
 #include <singleheader/simdjson.h>
 
 /**
@@ -216,22 +218,28 @@ class JsonParser {
                         auto pos = committed.find(':');
                         if (pos != std::string::npos) {
                             commit_rule = committed.substr(0, pos);
-                            if (commit_rule != CAPIO_FILE_COMMITTED_ON_CLOSE) {
+                            std::string count_str(committed.substr(pos + 1, committed.length()));
+                            if (!is_int(count_str)) {
+                                std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_ERROR << " [ " << node_name
+                                          << " ] "
+                                          << "commit rule on_close/n_files invalid number"
+                                          << std::endl;
+                                ERR_EXIT("error commit rule on_close invalid number: !is_int()");
+                            }
+
+                            if (commit_rule == CAPIO_FILE_COMMITTED_ON_CLOSE) {
+                                n_close = std::stol(count_str);
+                            } else if (commit_rule == CAPIO_FILE_COMMITTED_N_FILES) {
+                                n_files     = std::stol(count_str);
+                                // TODO: use internally n_files. for now, we use on_close as default
+                                commit_rule = CAPIO_FILE_COMMITTED_ON_CLOSE;
+                            } else {
                                 std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_ERROR << " [ " << node_name
                                           << " ] "
                                           << "commit rule " << commit_rule << std::endl;
                                 ERR_EXIT("error commit rule: %s", std::string(commit_rule).c_str());
                             }
 
-                            std::string n_close_str(committed.substr(pos + 1, committed.length()));
-
-                            if (!is_int(n_close_str)) {
-                                std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_ERROR << " [ " << node_name
-                                          << " ] "
-                                          << "commit rule on_close invalid number" << std::endl;
-                                ERR_EXIT("error commit rule on_close invalid number: !is_int()");
-                            }
-                            n_close = std::stol(n_close_str);
                         } else {
                             commit_rule = committed;
                         }
