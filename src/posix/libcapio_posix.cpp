@@ -188,6 +188,9 @@ static constexpr long CAPIO_NR_SYSCALLS = 1 + std::max({
 #ifdef SYS_writev
                                                   SYS_writev,
 #endif
+#ifdef SYS_copy_file_range
+                                                  SYS_copy_file_range,
+#endif
                                               });
 
 static constexpr std::array<CPHandler_t, CAPIO_NR_SYSCALLS> build_syscall_table() {
@@ -355,6 +358,9 @@ static constexpr std::array<CPHandler_t, CAPIO_NR_SYSCALLS> build_syscall_table(
 #endif
 #ifdef SYS_writev
     _syscallTable[SYS_writev] = writev_handler;
+#endif
+#ifdef SYS_copy_file_range
+    _syscallTable[SYS_copy_file_range] = copy_file_range_handler;
 #endif
 
     return _syscallTable;
