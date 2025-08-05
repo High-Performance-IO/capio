@@ -38,29 +38,30 @@ class CapioCLEngine {
                   << "Composition of expected CAPIO FS: " << std::endl
                   << std::endl
                   << "|============================================================================"
-                     "===============================================|"
+                     "==========================================================|"
                   << std::endl
-                  << "|" << std::setw(124) << "|" << std::endl
+                  << "|" << std::setw(135) << "|" << std::endl
                   << "|     Parsed configuration file for workflow: \e[1;36m" << workflow_name
-                  << std::setw(83 - workflow_name.length()) << "\e[0m |" << std::endl
-                  << "|" << std::setw(124) << "|" << std::endl
+                  << std::setw(94 - workflow_name.length()) << "\e[0m |" << std::endl
+                  << "|" << std::setw(135) << "|" << std::endl
                   << "|     File color legend:     \e[48;5;034m  \e[0m File stored in memory"
-                  << std::setw(72) << "|" << std::endl
+                  << std::setw(83) << "|" << std::endl
                   << "|                            "
-                  << "\e[48;5;172m  \e[0m File stored on file system" << std::setw(67) << "|"
+                  << "\e[48;5;172m  \e[0m File stored on file system" << std::setw(78) << "|"
                   << std::endl
                   << "|============================================================================"
-                     "===============================================|"
+                     "==========================================================|"
                   << std::endl
                   << "|======|===================|===================|====================|========"
-                     "============|============|===========|=========|"
+                     "============|============|===========|=========|==========|"
                   << std::endl
                   << "| Kind | Filename          | Producer step     | Consumer step      |  "
-                     "Commit Rule       |  Fire Rule | Permanent | Exclude |"
+                     "Commit Rule       |  Fire Rule | Permanent | Exclude | n_files  |"
                   << std::endl
                   << "|======|===================|===================|====================|========"
-                     "============|============|===========|=========|"
+                     "============|============|===========|=========|==========|"
                   << std::endl;
+
         for (auto itm : _locations) {
             std::string color_preamble = std::get<11>(itm.second) ? "\e[38;5;034m" : "\e[38;5;172m";
             std::string color_post     = "\e[0m";
@@ -75,6 +76,12 @@ class CapioCLEngine {
             auto consumers = std::get<1>(itm.second);
             auto rowCount =
                 producers.size() > consumers.size() ? producers.size() : consumers.size();
+
+            // Add logic to handle the n_files column
+            std::string n_files = std::to_string(std::get<8>(itm.second));
+            if (std::get<8>(itm.second) < 1) {
+                n_files = "N.A.";
+            }
 
             for (int i = 0; i <= rowCount; i++) {
                 std::string prod, cons;
@@ -107,15 +114,17 @@ class CapioCLEngine {
                               << std::setw(20 - commit_rule.length()) << " | " << fire_rule
                               << std::setfill(' ') << std::setw(13 - fire_rule.length()) << " | "
                               << "    " << (permanent ? "YES" : "NO ") << "   |   "
-                              << (exclude ? "YES" : "NO ") << "   |" << std::endl;
+                              << (exclude ? "YES" : "NO ") << "   | " << n_files
+                              << std::setw(11 - n_files.length()) << " | " << std::endl;
                 } else {
                     std::cout << std::setfill(' ') << std::setw(20) << "|" << std::setfill(' ')
                               << std::setw(13) << "|" << std::setfill(' ') << std::setw(12) << "|"
-                              << std::setfill(' ') << std::setw(10) << "|" << std::endl;
+                              << std::setfill(' ') << std::setw(10) << "|" << std::setw(11) << "|"
+                              << std::endl;
                 }
             }
             std::cout << "*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~"
-                         "~~~~~~~"
+                         "~~~~~~~~~~~~~~~~~~"
                          "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*"
                       << std::endl;
         }
