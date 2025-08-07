@@ -144,7 +144,7 @@ int openat_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long a
     LOG("fd=%d", fd);
 
     if (is_capio_path(path) && fd >= 0) {
-        LOG("Adding capio path");
+        LOG("Adding resolved capio path (%s)", resolved_path.c_str());
         add_capio_fd(tid, resolved_path, fd, 0, (flags & O_CLOEXEC) == O_CLOEXEC);
     }
 
