@@ -1,7 +1,6 @@
 #include <capio/constants.hpp>
 #include <gtest/gtest.h>
 
-bool syscall_no_intercept_flag;
 #define syscall_no_intercept syscall
 
 std::string workflow_name = CAPIO_DEFAULT_WORKFLOW_NAME;
