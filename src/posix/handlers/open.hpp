@@ -80,7 +80,7 @@ int open_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg
     }
 
     std::string path = compute_abs_path(pathname.data(), -1);
-    std::string resolved_path;
+    std::string resolved_path = resolve_possible_symlink(path);
 
     if (is_capio_path(path)) {
         if ((flags & O_CREAT) == O_CREAT) {
@@ -88,7 +88,6 @@ int open_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg
             create_request(-1, path.data(), tid);
         } else {
             LOG("not O_CREAT");
-            resolved_path = resolve_possible_symlink(path);
             open_request(-1, resolved_path.data(), tid);
         }
     } else {
@@ -124,7 +123,7 @@ int openat_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long a
     }
 
     std::string path = compute_abs_path(pathname.data(), dirfd);
-    std::string resolved_path;
+    std::string resolved_path = resolve_possible_symlink(path);
 
     if (is_capio_path(path)) {
         if ((flags & O_CREAT) == O_CREAT) {
@@ -132,7 +131,6 @@ int openat_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long a
             create_request(-1, path.data(), tid);
         } else {
             LOG("not O_CREAT");
-            resolved_path = resolve_possible_symlink(path);
             open_request(-1, resolved_path.data(), tid);
         }
     } else {
