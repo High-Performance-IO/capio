@@ -305,15 +305,44 @@ inline void set_current_dir(const std::filesystem::path &cwd) {
  * @param path
  * @return
  */
-[[nodiscard]] static std::string resolve_possible_symlink(const std::filesystem::path &path) {
-    START_LOG(capio_syscall(SYS_gettid), "call(path=%s)", path.c_str());
+#include <set>
+[[nodiscard]] static std::string resolve_possible_symlink(const std::filesystem::path &input_path) {
+    START_LOG(capio_syscall(SYS_gettid), "call(path=%s)", input_path.c_str());
 
-    std::string resolved_path(PATH_MAX, 0);
-    syscall_no_intercept(SYS_readlink, path.c_str(), resolved_path.data(), PATH_MAX);
-    resolved_path = capio_absolute(resolved_path);
-    LOG("Resolved path from %s to %s. Using resolved path for query", path.c_str(),
-        resolved_path.c_str());
-    return resolved_path;
+    std::filesystem::path resolved;
+
+    for (const auto &part : input_path) {
+        if (part == "." || part.empty()) {
+            continue;
+        }
+        if (part == "..") {
+            resolved = resolved.parent_path();
+            continue;
+        }
+
+        resolved /= part;
+
+        if (std::filesystem::is_symlink(resolved)) {
+            char buf[PATH_MAX]{0};
+            if (syscall_no_intercept(SYS_readlink, resolved.c_str(), buf, sizeof(buf) - 1) == -1) {
+                LOG("File might not exist. path was %s and  Error is %s", resolved.c_str(),
+                    strerror(errno));
+                continue;
+            }
+
+            if (std::filesystem::path target(buf); target.is_relative()) {
+                resolved = resolved.parent_path() / target;
+            } else {
+                resolved = target;
+            }
+
+            resolved = std::filesystem::absolute(resolved);
+        }
+    }
+
+    std::string final_path = resolved.string();
+    LOG("Resolved path from %s to %s. Using resolved path for query", input_path.c_str(),
+        final_path.c_str());
+    return final_path;
 }
-
 #endif // CAPIO_POSIX_UTILS_FILESYSTEM_HPP
