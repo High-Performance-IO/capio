@@ -124,6 +124,7 @@ int openat_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long a
     }
 
     std::string path = compute_abs_path(pathname.data(), dirfd);
+    std::string resolved_path;
 
     if (is_capio_path(path)) {
         if ((flags & O_CREAT) == O_CREAT) {
@@ -131,7 +132,8 @@ int openat_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long a
             create_request(-1, path.data(), tid);
         } else {
             LOG("not O_CREAT");
-            open_request(-1, path.data(), tid);
+            resolved_path = resolve_possible_symlink(path);
+            open_request(-1, resolved_path.data(), tid);
         }
     } else {
         LOG("Not a CAPIO path. skipping...");
@@ -143,7 +145,7 @@ int openat_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long a
 
     if (is_capio_path(path) && fd >= 0) {
         LOG("Adding capio path");
-        add_capio_fd(tid, path, fd, 0, (flags & O_CLOEXEC) == O_CLOEXEC);
+        add_capio_fd(tid, resolved_path, fd, 0, (flags & O_CLOEXEC) == O_CLOEXEC);
     }
 
     *result = fd;
