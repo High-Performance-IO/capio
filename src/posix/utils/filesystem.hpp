@@ -314,6 +314,8 @@ inline void set_current_dir(const std::filesystem::path &cwd) {
     std::filesystem::path resolved;
 
     for (const auto &part : input_path) {
+        resolved /= part;
+
         if (part == "." || part.empty()) {
             continue;
         }
@@ -321,9 +323,6 @@ inline void set_current_dir(const std::filesystem::path &cwd) {
             resolved = resolved.parent_path();
             continue;
         }
-
-        resolved /= part;
-
         if (std::filesystem::is_symlink(resolved)) {
             char buf[PATH_MAX]{0};
             if (syscall_no_intercept(SYS_readlink, resolved.c_str(), buf, sizeof(buf) - 1) == -1) {
@@ -342,10 +341,8 @@ inline void set_current_dir(const std::filesystem::path &cwd) {
         }
     }
 
-    std::string final_path = resolved.string();
-    LOG("Resolved path from %s to %s. Using resolved path for query", input_path.c_str(),
-        final_path.c_str());
     syscall_no_intercept_flag = false;
-    return final_path;
+
+    return capio_absolute(resolved);
 }
 #endif // CAPIO_POSIX_UTILS_FILESYSTEM_HPP
