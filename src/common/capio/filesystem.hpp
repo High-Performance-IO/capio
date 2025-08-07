@@ -146,7 +146,7 @@ inline bool is_capio_path(const std::filesystem::path &path_to_check) {
         }
         if (std::filesystem::is_symlink(resolved)) {
             char buf[PATH_MAX]{0};
-            if (syscall_no_intercept(SYS_readlink, resolved.c_str(), buf, sizeof(buf) - 1) == -1) {
+            if (capio_syscall(SYS_readlink, resolved.c_str(), buf, sizeof(buf) - 1) == -1) {
                 LOG("File might not exist. path was %s and  Error is %s", resolved.c_str(),
                     strerror(errno));
                 continue;
