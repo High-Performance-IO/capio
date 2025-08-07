@@ -309,6 +309,8 @@ inline void set_current_dir(const std::filesystem::path &cwd) {
 [[nodiscard]] static std::string resolve_possible_symlink(const std::filesystem::path &input_path) {
     START_LOG(capio_syscall(SYS_gettid), "call(path=%s)", input_path.c_str());
 
+    syscall_no_intercept_flag = true;
+
     std::filesystem::path resolved;
 
     for (const auto &part : input_path) {
@@ -343,6 +345,7 @@ inline void set_current_dir(const std::filesystem::path &cwd) {
     std::string final_path = resolved.string();
     LOG("Resolved path from %s to %s. Using resolved path for query", input_path.c_str(),
         final_path.c_str());
+    syscall_no_intercept_flag = false;
     return final_path;
 }
 #endif // CAPIO_POSIX_UTILS_FILESYSTEM_HPP
