@@ -38,11 +38,12 @@ class ConsentRequestCache {
          * If entry is not present in cache, then proceed to perform request. othrewise if present,
          * there is no need to perform request to server and can proceed
          */
-        if (available_consent->find(path) == available_consent->end()) {
+        if (const auto resolved_path = resolve_possible_symlink(path);
+            available_consent->find(resolved_path) == available_consent->end()) {
             LOG("File not present in cache. performing request");
-            auto res = ConsentRequestCache::_consent_to_proceed_request(path, tid, source_func);
+            auto res = _consent_to_proceed_request(resolved_path, tid, source_func);
             LOG("Registering new file for consent to proceed");
-            available_consent->emplace(path, res);
+            available_consent->emplace(resolved_path, res);
         }
         LOG("Unlocking thread");
     }
