@@ -309,11 +309,14 @@ inline void set_current_dir(const std::filesystem::path &cwd) {
 [[nodiscard]] static std::string resolve_possible_symlink(const std::filesystem::path &input_path) {
     START_LOG(capio_syscall(SYS_gettid), "call(path=%s)", input_path.c_str());
 
+    auto input_abs_path = capio_absolute(input_path);
+    LOG("Absolute path = %s", input_abs_path.c_str());
+
     syscall_no_intercept_flag = true;
 
     std::filesystem::path resolved;
 
-    for (const auto &part : input_path) {
+    for (const auto &part : input_abs_path) {
         resolved /= part;
 
         if (part == "." || part.empty()) {
