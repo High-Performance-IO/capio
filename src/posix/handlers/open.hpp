@@ -79,7 +79,7 @@ int open_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg
         return CAPIO_POSIX_SYSCALL_REQUEST_SKIP;
     }
 
-    std::string path = compute_abs_path(pathname.data(), -1);
+    std::string path          = compute_abs_path(pathname.data(), -1);
     std::string resolved_path = resolve_possible_symlink(path);
 
     if (is_capio_path(path)) {
@@ -122,7 +122,7 @@ int openat_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long a
         return CAPIO_POSIX_SYSCALL_REQUEST_SKIP;
     }
 
-    std::string path = compute_abs_path(pathname.data(), dirfd);
+    std::string path          = compute_abs_path(pathname.data(), dirfd);
     std::string resolved_path = resolve_possible_symlink(path);
 
     if (is_capio_path(path)) {
