@@ -300,4 +300,20 @@ inline void set_current_dir(const std::filesystem::path &cwd) {
     current_dir = std::make_unique<std::filesystem::path>(cwd);
 }
 
+/**
+ * Resolve a possible symbolic link to the absolute path that it points to
+ * @param path
+ * @return
+ */
+[[nodiscard]] static std::string resolve_possible_symlink(const std::filesystem::path &path) {
+    START_LOG(capio_syscall(SYS_gettid), "call(path=%s)", path.c_str());
+
+    std::string resolved_path(PATH_MAX, 0);
+    syscall_no_intercept(SYS_readlink, path.c_str(), resolved_path.data(), PATH_MAX);
+    resolved_path = capio_absolute(resolved_path);
+    LOG("Resolved path from %s to %s. Using resolved path for query", path.c_str(),
+        resolved_path.c_str());
+    return resolved_path;
+}
+
 #endif // CAPIO_POSIX_UTILS_FILESYSTEM_HPP

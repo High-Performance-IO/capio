@@ -34,18 +34,12 @@ class ConsentRequestCache {
         START_LOG(capio_syscall(SYS_gettid), "call(path=%s, tid=%ld, source=%s)", path.c_str(), tid,
                   source_func.c_str());
 
-        std::string resolved_path;
-        resolved_path.reserve(PATH_MAX);
-        syscall_no_intercept(SYS_readlink, path.c_str(), resolved_path.data(), PATH_MAX);
-        resolved_path = capio_absolute(resolved_path);
-        LOG("Resolved path from %s to %s. Using resolved path for query", path.c_str(),
-            resolved_path.c_str());
-
         /**
          * If entry is not present in cache, then proceed to perform request. othrewise if present,
          * there is no need to perform request to server and can proceed
          */
-        if (available_consent->find(resolved_path) == available_consent->end()) {
+        if (const auto resolved_path = resolve_possible_symlink(path);
+            available_consent->find(resolved_path) == available_consent->end()) {
             LOG("File not present in cache. performing request");
             auto res = _consent_to_proceed_request(resolved_path, tid, source_func);
             LOG("Registering new file for consent to proceed");
