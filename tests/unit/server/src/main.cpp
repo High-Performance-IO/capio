@@ -1,6 +1,7 @@
 #include <capio/constants.hpp>
 #include <gtest/gtest.h>
 
+bool syscall_no_intercept_flag;
 #define syscall_no_intercept syscall
 
 std::string workflow_name = CAPIO_DEFAULT_WORKFLOW_NAME;
@@ -9,6 +10,7 @@ std::string node_name;
 
 #include "CapioCacheSPSCQueueTests.hpp"
 #include "CapioFileTests.hpp"
+
 
 int main(int argc, char **argv) {
     testing::InitGoogleTest(&argc, argv);
