@@ -117,10 +117,9 @@ inline bool is_capio_path(const std::filesystem::path &path_to_check) {
 
 /**
  * Resolve a possible symbolic link to the absolute path that it points to
- * @param path
+ * @param input_path
  * @return
  */
-#include <set>
 [[nodiscard]] static std::string resolve_possible_symlink(const std::filesystem::path &input_path) {
     START_LOG(capio_syscall(SYS_gettid), "call(path=%s)", input_path.c_str());
 

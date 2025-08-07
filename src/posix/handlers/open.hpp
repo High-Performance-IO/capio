@@ -74,33 +74,27 @@ int open_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg
     auto tid    = static_cast<pid_t>(syscall_no_intercept(SYS_gettid));
     START_LOG(tid, "call(path=%s, flags=%d, mode=%d)", pathname.data(), flags, mode);
 
-    if (is_forbidden_path(pathname)) {
-        LOG("Path %s is forbidden: skip", pathname.data());
+    std::string path = compute_abs_path(pathname.data(), -1);
+
+    if (is_forbidden_path(pathname) || !is_capio_path(path)) {
+        LOG("Path %s is not a capio path: skip", pathname.data());
         return CAPIO_POSIX_SYSCALL_REQUEST_SKIP;
     }
 
-    std::string path          = compute_abs_path(pathname.data(), -1);
     std::string resolved_path = resolve_possible_symlink(path);
-
-    if (is_capio_path(path)) {
-        if ((flags & O_CREAT) == O_CREAT) {
-            LOG("O_CREAT");
-            create_request(-1, path.data(), tid);
-        } else {
-            LOG("not O_CREAT");
-            open_request(-1, resolved_path.data(), tid);
-        }
+    if ((flags & O_CREAT) == O_CREAT) {
+        LOG("O_CREAT");
+        create_request(-1, path.data(), tid);
     } else {
-        LOG("Not a CAPIO path. skipping...");
-        return CAPIO_POSIX_SYSCALL_REQUEST_SKIP;
+        LOG("not O_CREAT");
+        open_request(-1, resolved_path.data(), tid);
     }
 
     int fd = static_cast<int>(syscall_no_intercept(SYS_open, arg0, arg1, arg2, arg3, arg4, arg5));
 
-    if (is_capio_path(path) && fd >= 0) {
-        LOG("Adding capio path");
-        add_capio_fd(tid, resolved_path, fd, 0, (flags & O_CLOEXEC) == O_CLOEXEC);
-    }
+    LOG("Adding capio path");
+    add_capio_fd(tid, resolved_path, fd, 0, (flags & O_CLOEXEC) == O_CLOEXEC);
+    LOG("fd=%d", fd);
 
     *result = fd;
     return CAPIO_POSIX_SYSCALL_SUCCESS;
@@ -117,34 +111,27 @@ int openat_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long a
     START_LOG(tid, "call(dirfd=%ld, path=%s, flags=%d, mode=%d)", dirfd, pathname.data(), flags,
               mode);
 
-    if (is_forbidden_path(pathname)) {
-        LOG("Path %s is forbidden: skip", pathname.data());
+    std::string path = compute_abs_path(pathname.data(), dirfd);
+    if (is_forbidden_path(pathname) || !is_capio_path(path)) {
+        LOG("Path %s is not a capio path: skip", pathname.data());
         return CAPIO_POSIX_SYSCALL_REQUEST_SKIP;
     }
 
-    std::string path          = compute_abs_path(pathname.data(), dirfd);
     std::string resolved_path = resolve_possible_symlink(path);
 
-    if (is_capio_path(path)) {
-        if ((flags & O_CREAT) == O_CREAT) {
-            LOG("O_CREAT");
-            create_request(-1, path.data(), tid);
-        } else {
-            LOG("not O_CREAT");
-            open_request(-1, resolved_path.data(), tid);
-        }
+    if ((flags & O_CREAT) == O_CREAT) {
+        LOG("O_CREAT");
+        create_request(-1, path.data(), tid);
     } else {
-        LOG("Not a CAPIO path. skipping...");
-        return CAPIO_POSIX_SYSCALL_REQUEST_SKIP;
+        LOG("not O_CREAT");
+        open_request(-1, resolved_path.data(), tid);
     }
 
     int fd = static_cast<int>(syscall_no_intercept(SYS_openat, arg0, arg1, arg2, arg3, arg4, arg5));
     LOG("fd=%d", fd);
 
-    if (is_capio_path(path) && fd >= 0) {
-        LOG("Adding resolved capio path (%s)", resolved_path.c_str());
-        add_capio_fd(tid, resolved_path, fd, 0, (flags & O_CLOEXEC) == O_CLOEXEC);
-    }
+    LOG("Adding resolved capio path (%s)", resolved_path.c_str());
+    add_capio_fd(tid, resolved_path, fd, 0, (flags & O_CLOEXEC) == O_CLOEXEC);
 
     *result = fd;
     return CAPIO_POSIX_SYSCALL_SUCCESS;
