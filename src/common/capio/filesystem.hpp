@@ -129,9 +129,7 @@ inline bool is_capio_path(const std::filesystem::path &path_to_check) {
     syscall_no_intercept_flag = true;
 #endif
 
-    auto input_abs_path = std::filesystem::absolute(input_path);
-
-    std::filesystem::path resolved;
+    std::filesystem::path resolved, input_abs_path = std::filesystem::absolute(input_path);
 
     for (const auto &part : input_abs_path) {
         resolved /= part;
@@ -156,16 +154,13 @@ inline bool is_capio_path(const std::filesystem::path &path_to_check) {
             } else {
                 resolved = target;
             }
-
-            resolved = std::filesystem::absolute(resolved);
         }
     }
-    auto return_value = std::filesystem::absolute(resolved);
 #ifdef __CAPIO_POSIX
     syscall_no_intercept_flag = false;
 #endif
 
-    return return_value;
+    return resolved;
 }
 
 #endif // CAPIO_COMMON_FILESYSTEM_HPP
