@@ -160,7 +160,7 @@ inline bool is_capio_path(const std::filesystem::path &path_to_check) {
             resolved = std::filesystem::absolute(resolved);
         }
     }
-    auto return_value = std::filesystem::absolute(input_path);
+    auto return_value = std::filesystem::absolute(resolved);
 #ifdef __CAPIO_POSIX
     syscall_no_intercept_flag = false;
 #endif

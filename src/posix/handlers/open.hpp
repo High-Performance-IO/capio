@@ -84,7 +84,7 @@ int open_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg
     std::string resolved_path = resolve_possible_symlink(path);
     if ((flags & O_CREAT) == O_CREAT) {
         LOG("O_CREAT");
-        create_request(-1, path.data(), tid);
+        create_request(-1, resolved_path.data(), tid);
     } else {
         LOG("not O_CREAT");
         open_request(-1, resolved_path.data(), tid);
@@ -121,7 +121,7 @@ int openat_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long a
 
     if ((flags & O_CREAT) == O_CREAT) {
         LOG("O_CREAT");
-        create_request(-1, path.data(), tid);
+        create_request(-1, resolved_path.data(), tid);
     } else {
         LOG("not O_CREAT");
         open_request(-1, resolved_path.data(), tid);
