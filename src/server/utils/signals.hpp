@@ -87,7 +87,10 @@ inline void setup_signal_handlers() {
 inline void RequestHandlerEngine::handle_termination_phase() const {
     START_LOG(capio_syscall(SYS_gettid), "call()");
 
+    auto str = std::unique_ptr<char[]>(new char[CAPIO_REQ_MAX_SIZE]);
     while (client_manager->get_connected_posix_client() > 0) {
+        int code = read_next_request(str.get());
+        request_handlers[code](str.get());
     }
 
     LOG("All client steps have terminated. stopping execution of server");
