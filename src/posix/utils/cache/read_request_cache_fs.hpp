@@ -59,7 +59,7 @@ class ReadRequestCacheFS {
             return;
         }
 
-        if (end_of_read > max_read) {
+        if (static_cast<capio_off64_t>(end_of_read) > max_read) {
             LOG("[cache] end_of_read > max_read. Performing server request");
             max_read = _read_request(current_path, end_of_read, tid, fd);
             LOG("[cache] Obtained value from server is %llu", max_read);
