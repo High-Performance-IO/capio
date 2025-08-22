@@ -107,7 +107,7 @@ class CapioStorageService {
 
         auto file_size = sizeOf(path);
 
-        for (const auto [offset, size, thread_id] : threads) {
+        for (auto &[offset, size, thread_id] : threads) {
             if (file_size >= offset + size) {
                 reply_to_client(thread_id, path, offset, size);
             }

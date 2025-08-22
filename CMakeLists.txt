@@ -23,12 +23,12 @@ set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -O3")
 
 # Silence warning from G++
 if (CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
-    set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -Wno-terminate -Wno-unknown-escape-sequence")
+    set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -Wno-terminate")
 endif ()
 
 # Silence warning from clang
 if (CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
-    set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -Wall -pedantic -O0 -Wno-gnu-zero-variadic-macro-arguments -Wno-exceptions -Wno-unknown-escape-sequence")
+    set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -Wall -pedantic -O0 -Wno-gnu-zero-variadic-macro-arguments -Wno-exceptions")
 endif (CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
 
 #####################################
