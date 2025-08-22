@@ -49,7 +49,7 @@ inline void read_handler(const char *const str) {
 }
 
 inline void read_mem_handler(const char *const str) {
-    pid_t tid;
+    long int tid;
     capio_off64_t read_size, client_cache_line_size, read_begin_offset;
     int use_cache;
     char path[PATH_MAX];

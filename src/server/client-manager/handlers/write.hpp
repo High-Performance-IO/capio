@@ -29,7 +29,7 @@ inline void write_handler(const char *const str) {
 }
 
 inline void write_mem_handler(const char *const str) {
-    pid_t tid;
+    long int tid;
     char path[PATH_MAX];
     off64_t write_size;
     capio_off64_t offset;
