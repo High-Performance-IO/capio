@@ -134,8 +134,7 @@ class RequestHandlerEngine {
                 if (termination_phase) {
                     std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_WARNING << " [ " << node_name << " ] "
                               << "Termination phase is in progress... Ignoring Exception likely "
-                                 "thrown while "
-                                 "reciving SIGUSR1"
+                                 "thrown while receiving SIGUSR1"
                               << std::endl;
                     continue;
                 }
@@ -143,7 +142,7 @@ class RequestHandlerEngine {
             }
 
             if (code < 0 && errno == EINTR) {
-                LOG("Signal recived while waiting on data. skipping iteration");
+                LOG("Signal received while waiting on data. skipping iteration");
                 continue;
             }
 

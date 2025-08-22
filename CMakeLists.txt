@@ -21,6 +21,14 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS TRUE)
 set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -Wall -pedantic -O0")
 set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -O3")
 
+# We use exception to terminate execution when critical errors arise.
+# Disable warning of non caught exception.
+if (CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
+    add_compile_options(-Wno-terminate)
+elseif (CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
+    add_compile_options(-Wno-exceptions)
+endif()
+
 # Silence warning from clang
 if (CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
     set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -Wall -pedantic -O0 -Wno-gnu-zero-variadic-macro-arguments")
@@ -48,6 +56,14 @@ find_package(Threads REQUIRED)
 # Definitions
 #####################################
 add_compile_definitions(CAPIO_VERSION="${CMAKE_PROJECT_VERSION}")
+
+# We check here and define only here the CAPIO_BUILD_TESTS macro
+# as it is required by both src/posix and src/server targets
+# Later on we check again to add the tests subproject, which cannot
+# be added here for issues with include directories
+IF (CAPIO_BUILD_TESTS)
+    add_compile_definitions(CAPIO_BUILD_TESTS)
+ENDIF (CAPIO_BUILD_TESTS)
 
 IF (CAPIO_LOG)
     IF (CMAKE_BUILD_TYPE STREQUAL "Debug")
@@ -97,5 +113,6 @@ install(
 
 IF (CAPIO_BUILD_TESTS)
     message(STATUS "Building CAPIO test suite")
+    add_compile_definitions(CAPIO_BUILD_TESTS)
     add_subdirectory(tests)
 ENDIF (CAPIO_BUILD_TESTS)
