@@ -32,8 +32,7 @@ inline void init_client() {
 }
 
 /**
- * Perform handshake. server returns the amount of paths that needs to be obtained from the server
- * to know which files are going to be treated during write and read operations inside memory
+ * Perform handshake.
  * @param tid
  * @param pid
  * @param app_name
@@ -51,9 +50,16 @@ inline void handshake_request(const long tid, const long pid, const std::string 
     char req[CAPIO_REQ_MAX_SIZE];
     sprintf(req, "%04d %ld %ld %s", CAPIO_REQUEST_HANDSHAKE, tid, pid, app_name.c_str());
     buf_requests->write(req, CAPIO_REQ_MAX_SIZE);
+    bufs_response->at(pid)->read();
     LOG("Sent handshake request");
 }
 
+/**
+ * File in memory requests: server returns the amount of paths that needs to be obtained from the
+ * server to know which files are going to be treated during write and read operations inside memory
+ * @param pid
+ * @return
+ */
 inline std::vector<std::regex> *file_in_memory_request(const long pid) {
     START_LOG(capio_syscall(SYS_gettid), "call(pid=%ld)", pid);
     char req[CAPIO_REQ_MAX_SIZE];

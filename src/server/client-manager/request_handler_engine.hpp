@@ -56,14 +56,24 @@ class RequestHandlerEngine {
     }
 
     /**
+     * Note: this function needs to be defined within the server/utils/signals.hpp header
+     *       file to avoid recursive include
+     *
+     * This function, empties all requests while clients are connected. as soon as queues are empty
+     * and the server ha removed all requests, it calls the termination handler to stop the server
+     * execution
+     */
+    inline void handle_termination_phase() const;
+    /**
      * Read next incoming request into @param str and returns the request code
      * @param str
      * @return request code
      */
     inline auto read_next_request(char *str) const {
         char req[CAPIO_REQ_MAX_SIZE];
+        START_LOG(gettid(), "call()");
         buf_requests->read(req);
-        START_LOG(gettid(), "call(req=%s)", req);
+        LOG("req=%s", req);
         int code       = -1;
         auto [ptr, ec] = std::from_chars(req, req + 4, code);
         if (ec == std::errc()) {
@@ -112,7 +122,31 @@ class RequestHandlerEngine {
         auto str = std::unique_ptr<char[]>(new char[CAPIO_REQ_MAX_SIZE]);
         while (true) {
             LOG(CAPIO_LOG_SERVER_REQUEST_START);
-            int code = read_next_request(str.get());
+
+            if (termination_phase) {
+                handle_termination_phase();
+            }
+
+            int code;
+            try {
+                code = read_next_request(str.get());
+            } catch (const std::exception &e) {
+                if (termination_phase) {
+                    std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_WARNING << " [ " << node_name << " ] "
+                              << "Termination phase is in progress... Ignoring Exception likely "
+                                 "thrown while "
+                                 "reciving SIGUSR1"
+                              << std::endl;
+                    continue;
+                }
+                throw e;
+            }
+
+            if (code < 0 && errno == EINTR) {
+                LOG("Signal recived while waiting on data. skipping iteration");
+                continue;
+            }
+
             try {
                 request_handlers[code](str.get());
             } catch (const std::exception &exception) {
