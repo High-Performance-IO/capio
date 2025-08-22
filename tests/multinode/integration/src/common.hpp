@@ -5,6 +5,7 @@
 #include <assert.h>
 #include <errno.h>
 #include <future>
+#include <linux/limits.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -49,11 +50,12 @@ static const char *phrases[] = {
 static const int maxphraselen  = 1024;
 static const int maxfilename   = 32;
 static const int maxnumfiles   = 10000;
-static char fmtin[]            = "%s/infile_%05d.dat"; // 5 is the number of digits of maxnumfiles
-static char fmtout[]           = "%s/outfile_%05d.dat";
 static const int REALLOC_BATCH = 10485760; // 10MB
 static const int REDUCE_CHUNK  = 10240;    // 10K
 static const int IO_BUFFER     = 1048576;  // 1MB
+static char fmtout[]           = "%s/outfile_%05d.dat";
+[[maybe_unused]] static char fmtin[] =
+    "%s/infile_%05d.dat"; // 5 is the number of digits of maxnumfiles
 
 // reading file data into memory
 static inline char *readdata(FILE *fp, char *dataptr, size_t *datalen, size_t *datacapacity) {
@@ -107,15 +109,15 @@ static inline double diffmsec(const struct timeval a, const struct timeval b) {
     return ((double) (sec * 1000) + ((double) usec) / 1000.0);
 }
 
-static int writedata(char *dataptr, size_t datalen, float percent, char *destdir, ssize_t dstart,
-                     ssize_t dfiles) {
+[[maybe_unused]] static int writedata(char *dataptr, size_t datalen, float percent, char *destdir,
+                                      ssize_t dstart, ssize_t dfiles) {
     int error = 0;
     FILE **fp = (FILE **) calloc(sizeof(FILE *), dfiles);
     if (!fp) {
         perror("malloc");
         return -1;
     }
-    char filepath[strlen(destdir) + maxfilename];
+    char filepath[2 * PATH_MAX]{0};
 
     // opening (truncating) all files
     for (int j = 0, i = 0 + dstart; i < (dfiles + dstart); ++i, ++j) {
@@ -152,7 +154,7 @@ static int writedata(char *dataptr, size_t datalen, float percent, char *destdir
     return error;
 }
 
-static char *getrandomphrase(char *buffer, size_t len) {
+[[maybe_unused]] static char *getrandomphrase(char *buffer, size_t len) {
     static int phrases_entry = sizeof(phrases) / sizeof(phrases[0]);
 
     bzero(buffer, len);
@@ -219,7 +221,7 @@ char **build_env(char **envp) {
     }
 
     char **cleaned_env = (char **) malloc((vars.size() + 2) * sizeof(uintptr_t));
-    for (int i = 0; i < vars.size(); i++) {
+    for (long unsigned int i = 0; i < vars.size(); i++) {
         cleaned_env[i] = strdup(envp[i]);
     }
     cleaned_env[vars.size()]     = strdup("LD_PRELOAD=");

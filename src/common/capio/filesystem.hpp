@@ -105,7 +105,7 @@ inline bool is_capio_path(const std::filesystem::path &path_to_check) {
  * @param capio_path String to convert
  * @return std::regex compiled with the corresponding c++ regex
  */
-[[nodiscard]] static std::regex generateCapioRegex(const std::string &capio_path) {
+[[maybe_unused]] [[nodiscard]] static std::regex generateCapioRegex(const std::string &capio_path) {
     START_LOG(gettid(), "call(capio_path=%s)", capio_path.c_str());
     auto computed = replaceSymbol(capio_path, '.', "\\.");
     computed      = replaceSymbol(computed, '/', "\\/");

@@ -71,7 +71,7 @@ TEST(SystemCallTest, TestDirentsOnCapioDir) {
             break;
         }
 
-        for (size_t bpos = 0, i = 0; bpos < nread && i < 10; i++) {
+        for (long int bpos = 0, i = 0; bpos < nread && i < 10; i++) {
             auto d = (struct linux_dirent64 *) (buf + bpos);
 
             EXPECT_NE(std::find(expectedNames.begin(), expectedNames.end(), d->d_name),

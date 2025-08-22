@@ -36,7 +36,7 @@ char **build_env(char **envp) {
     }
 
     char **cleaned_env = (char **) malloc((vars.size() + 2) * sizeof(uintptr_t));
-    for (int i = 0; i < vars.size(); i++) {
+    for (size_t i = 0; i < vars.size(); i++) {
         cleaned_env[i] = strdup(envp[i]);
     }
 

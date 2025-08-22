@@ -15,6 +15,9 @@ FetchContent_Declare(
         GIT_REPOSITORY https://github.com/Taywee/args.git
         GIT_TAG 6.4.7
 )
+set(ARGS_BUILD_EXAMPLE OFF CACHE INTERNAL "")
+set(ARGS_BUILD_UNITTESTS OFF CACHE INTERNAL "")
+
 FetchContent_Declare(
         simdjson
         GIT_REPOSITORY https://github.com/simdjson/simdjson.git
