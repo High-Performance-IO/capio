@@ -83,7 +83,7 @@ class CapioCLEngine {
                 n_files = "N.A.";
             }
 
-            for (int i = 0; i <= rowCount; i++) {
+            for (std::size_t i = 0; i <= rowCount; i++) {
                 std::string prod, cons;
                 if (i > 0) {
                     std::cout << "|      |                   | ";

@@ -80,20 +80,4 @@ inline void setup_signal_handlers() {
     }
 }
 
-/*
- * Defining here the RequestHandlerEngine::handle_termination_phase()
- * to avoid recursive include within the header files
- */
-void RequestHandlerEngine::handle_termination_phase() const {
-    START_LOG(capio_syscall(SYS_gettid), "call()");
-
-    const auto str = std::unique_ptr<char[]>(new char[CAPIO_REQ_MAX_SIZE]);
-    while (client_manager->get_connected_posix_client() > 0) {
-        RequestHandlerEngine::fetch_and_handle_request(str.get());
-    }
-
-    LOG("All client steps have terminated. stopping execution of server");
-    sig_term_handler(SIGTERM, nullptr, nullptr);
-}
-
 #endif // CAPIO_SERVER_HANDLERS_SIGNALS_HPP

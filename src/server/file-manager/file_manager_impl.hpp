@@ -446,7 +446,7 @@ inline void CapioFileManager::checkDirectoriesNFiles() const {
             long count = 0;
             if (std::filesystem::exists(path_config)) {
                 auto iterator = std::filesystem::directory_iterator(path_config);
-                for (const auto &entry : iterator) {
+                for ([[maybe_unused]] const auto &entry : iterator) {
                     ++count;
                 }
             }

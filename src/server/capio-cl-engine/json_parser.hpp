@@ -449,7 +449,7 @@ class JsonParser {
             } else {
                 for (auto file : storage_memory) {
                     std::string_view file_str;
-                    file.get_string().get(file_str);
+                    [[maybe_unused]] const auto error = file.get_string().get(file_str);
                     std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_JSON << " [ " << node_name << " ] "
                               << "Setting file " << file_str << " to be stored in memory"
                               << std::endl;
@@ -466,7 +466,7 @@ class JsonParser {
             } else {
                 for (auto file : storage_fs) {
                     std::string_view file_str;
-                    file.get_string().get(file_str);
+                    [[maybe_unused]] const auto error = file.get_string().get(file_str);
                     std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_JSON << " [ " << node_name << " ] "
                               << "Setting file " << file_str << " to be stored on file system"
                               << std::endl;

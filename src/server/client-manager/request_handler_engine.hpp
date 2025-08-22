@@ -79,56 +79,6 @@ class RequestHandlerEngine {
         return code;
     }
 
-    void fetch_and_handle_request(char *str) const {
-        START_LOG(capio_syscall(SYS_gettid), "call()");
-        int code;
-        try {
-            code = read_next_request(str);
-        } catch (const std::exception &e) {
-            if (termination_phase) {
-                std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_WARNING << " [ " << node_name << " ] "
-                          << "Termination phase is in progress... Ignoring Exception likely "
-                             "thrown while receiving SIGUSR1"
-                          << std::endl;
-                return;
-            }
-            throw;
-        }
-
-        try {
-            request_handlers[code](str);
-        } catch (const std::exception &exception) {
-            std::cout << std::endl
-                      << "~~~~~~~~~~~~~~[\033[31mRequestHandlerEngine::start(): FATAL "
-                         "EXCEPTION\033[0m]~~~~~~~~~~~~~~"
-                      << std::endl
-                      << "|  Exception thrown while handling request number: " << code << " : "
-                      << str << std::endl
-                      << "|  TID of offending thread: " << gettid() << std::endl
-                      << "|  PID of offending thread: " << getpid() << std::endl
-                      << "|  PPID of offending thread: " << getppid() << std::endl
-                      << "|  " << std::endl
-                      << "|  `" << typeid(exception).name() << ": " << exception.what() << std::endl
-                      << "|" << std::endl
-                      << "~~~~~~~~~~~~~~[\033[31mRequestHandlerEngine::start(): FATAL "
-                         "EXCEPTION\033[0m]~~~~~~~~~~~~~~"
-                      << std::endl
-                      << std::endl;
-
-            ERR_EXIT("%s", exception.what());
-        }
-    }
-
-    /**
-     * Note: this function needs to be defined within the server/utils/signals.hpp header
-     *       file to avoid recursive include
-     *
-     * This function, empties all requests while clients are connected. as soon as queues are empty
-     * and the server ha removed all requests, it calls the termination handler to stop the server
-     * execution
-     */
-    void handle_termination_phase() const;
-
   public:
     explicit RequestHandlerEngine() {
         START_LOG(gettid(), "call()");
@@ -157,18 +107,54 @@ class RequestHandlerEngine {
      * the posix clients (aggregated) and handle the response
      *
      */
-    [[noreturn]] void start() const {
+    void start() const {
         START_LOG(gettid(), "call()\n\n");
 
         const auto str = std::unique_ptr<char[]>(new char[CAPIO_REQ_MAX_SIZE]);
-        while (true) {
-            LOG(CAPIO_LOG_SERVER_REQUEST_START);
+        int code;
 
-            if (termination_phase) {
-                handle_termination_phase();
+        /* When in termination_phase, we empty all requests while clients are connected. as soon
+         * as queues are empty and the server ha removed all requests, it calls the termination
+         * handler to stop the server execution
+         */
+        while (!termination_phase || client_manager->get_connected_posix_client() > 0) {
+            LOG(CAPIO_LOG_SERVER_REQUEST_START);
+            try {
+                code = read_next_request(str.get());
+            } catch (const std::exception &e) {
+                if (termination_phase) {
+                    std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_WARNING << " [ " << node_name << " ] "
+                              << "Termination phase is in progress... Ignoring Exception likely "
+                                 "thrown while receiving SIGUSR1"
+                              << std::endl;
+                    continue;
+                }
+                throw;
             }
 
-            fetch_and_handle_request(str.get());
+            try {
+                request_handlers[code](str.get());
+            } catch (const std::exception &exception) {
+                std::cout << std::endl
+                          << "~~~~~~~~~~~~~~[\033[31mRequestHandlerEngine::start(): FATAL "
+                             "EXCEPTION\033[0m]~~~~~~~~~~~~~~"
+                          << std::endl
+                          << "|  Exception thrown while handling request number: " << code << " : "
+                          << str.get() << std::endl
+                          << "|  TID of offending thread: " << gettid() << std::endl
+                          << "|  PID of offending thread: " << getpid() << std::endl
+                          << "|  PPID of offending thread: " << getppid() << std::endl
+                          << "|  " << std::endl
+                          << "|  `" << typeid(exception).name() << ": " << exception.what()
+                          << std::endl
+                          << "|" << std::endl
+                          << "~~~~~~~~~~~~~~[\033[31mRequestHandlerEngine::start(): FATAL "
+                             "EXCEPTION\033[0m]~~~~~~~~~~~~~~"
+                          << std::endl
+                          << std::endl;
+
+                exit(EXIT_FAILURE);
+            }
 
             LOG(CAPIO_LOG_SERVER_REQUEST_END);
         }
