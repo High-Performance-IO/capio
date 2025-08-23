@@ -20,15 +20,7 @@
 #include <unordered_set>
 #include <vector>
 
-/*
- * Variables required to be globally available
- * to all classes and subclasses.
- */
-bool termination_phase = false;
-std::string workflow_name;
-pid_t CAPIO_SERVER_MAIN_PID;
-inline bool StoreOnlyInMemory = false;
-char node_name[HOST_NAME_MAX];
+#include "utils/configuration.hpp"
 
 #include "utils/types.hpp"
 
@@ -50,10 +42,10 @@ char node_name[HOST_NAME_MAX];
 int main(int argc, char **argv) {
 
     std::cout << CAPIO_LOG_SERVER_BANNER;
-    gethostname(node_name, HOST_NAME_MAX);
-    CAPIO_SERVER_MAIN_PID = gettid();
-    std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_INFO << " [ " << node_name << " ] "
-              << "Started server with PID: " << CAPIO_SERVER_MAIN_PID << std::endl;
+    std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_INFO << " [ " << capio_global_configuration->node_name
+              << " ] "
+              << "Started server with PID: " << capio_global_configuration->CAPIO_SERVER_MAIN_PID
+              << std::endl;
 
     char resolve_prefix[PATH_MAX]{0};
     const std::string config_path = parseCLI(argc, argv, resolve_prefix);
@@ -62,7 +54,7 @@ int main(int argc, char **argv) {
     setup_signal_handlers();
 
     capio_cl_engine         = JsonParser::parse(config_path, std::filesystem::path(resolve_prefix));
-    shm_canary              = new CapioShmCanary(workflow_name);
+    shm_canary              = new CapioShmCanary(capio_global_configuration->workflow_name);
     file_manager            = new CapioFileManager();
     fs_monitor              = new FileSystemMonitor();
     request_handlers_engine = new RequestHandlerEngine();
@@ -70,8 +62,8 @@ int main(int argc, char **argv) {
 
     capio_cl_engine->print();
 
-    std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_INFO << " [ " << node_name << " ] "
-              << "server initialization completed!" << std::endl
+    std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_INFO << " [ " << capio_global_configuration->node_name
+              << " ] server initialization completed!" << std::endl
               << std::flush;
 
     request_handlers_engine->start();

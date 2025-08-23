@@ -34,15 +34,18 @@ class CapioCLEngine {
 
   public:
     void print() const {
-        std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_JSON << " [ " << node_name << " ] "
+        std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_JSON << " [ "
+                  << capio_global_configuration->node_name << " ] "
                   << "Composition of expected CAPIO FS: " << std::endl
                   << std::endl
                   << "|============================================================================"
                      "==========================================================|"
                   << std::endl
                   << "|" << std::setw(135) << "|" << std::endl
-                  << "|     Parsed configuration file for workflow: \033[1;36m" << workflow_name
-                  << std::setw(94 - workflow_name.length()) << "\033[0m |" << std::endl
+                  << "|     Parsed configuration file for workflow: \033[1;36m"
+                  << capio_global_configuration->workflow_name
+                  << std::setw(94 - capio_global_configuration->workflow_name.length())
+                  << "\033[0m |" << std::endl
                   << "|" << std::setw(135) << "|" << std::endl
                   << "|     File color legend:     \033[48;5;034m  \033[0m File stored in memory"
                   << std::setw(83) << "|" << std::endl
@@ -440,11 +443,11 @@ class CapioCLEngine {
         START_LOG(gettid(), "call(path=%s)", path.c_str());
         if (const auto location = _locations.find(path); location == _locations.end()) {
             LOG("No rule for home node. Returning create home node");
-            return node_name;
+            return capio_global_configuration->node_name;
         } else {
             LOG("Found location entry");
         }
-        return node_name;
+        return capio_global_configuration->node_name;
     }
 
   protected:

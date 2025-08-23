@@ -18,18 +18,20 @@ extern "C" void __gcov_dump(void);
  * @param ptr
  */
 inline void sig_term_handler(int signum, siginfo_t *info, void *ptr) {
-    if (gettid() != CAPIO_SERVER_MAIN_PID) {
+    if (gettid() != capio_global_configuration->CAPIO_SERVER_MAIN_PID) {
         return;
     }
     START_LOG(gettid(), "call(signal=[%d] (%s) from process with pid=%ld)", signum,
               strsignal(signum), info != nullptr ? info->si_pid : -1);
 
     std::cout << std::endl
-              << CAPIO_LOG_SERVER_CLI_LEVEL_WARNING << " [ " << node_name << " ] "
+              << CAPIO_LOG_SERVER_CLI_LEVEL_WARNING << " [ "
+              << capio_global_configuration->node_name << " ] "
               << "shutting down server" << std::endl;
 
     if (signum == SIGSEGV) {
-        std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_ERROR << " [ " << node_name << " ] "
+        std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_ERROR << " [ "
+                  << capio_global_configuration->node_name << " ] "
                   << "Segfault detected!" << std::endl;
     }
 
@@ -41,20 +43,22 @@ inline void sig_term_handler(int signum, siginfo_t *info, void *ptr) {
     delete fs_monitor;
     delete capio_communication_service;
     delete shm_canary;
-    std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_INFO << " [ " << node_name << " ] "
+    std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_INFO << " [ " << capio_global_configuration->node_name
+              << " ] "
               << "Bye!" << std::endl;
     exit(EXIT_SUCCESS);
 }
 
 inline void sig_usr1_handler(int signum, siginfo_t *info, void *ptr) {
-    if (gettid() != CAPIO_SERVER_MAIN_PID) {
+    if (gettid() != capio_global_configuration->CAPIO_SERVER_MAIN_PID) {
         return;
     }
     START_LOG(gettid(), "call(signal=[%d] (%s) from process with pid=%ld)", signum,
               strsignal(signum), info != nullptr ? info->si_pid : -1);
-    std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_WARNING << " [ " << node_name << " ] "
+    std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_WARNING << " [ "
+              << capio_global_configuration->node_name << " ] "
               << "Received request for graceful shutdown!" << std::endl;
-    termination_phase = true;
+    capio_global_configuration->termination_phase = true;
 }
 
 /**

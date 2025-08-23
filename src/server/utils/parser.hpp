@@ -71,8 +71,9 @@ std::string parseCLI(int argc, char **argv, char *resolve_prefix) {
     }
 
     if (memStorageOnly) {
-        StoreOnlyInMemory = true;
-        std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_INFO << " [ " << node_name << " ] "
+        capio_global_configuration->StoreOnlyInMemory = true;
+        std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_INFO << " [ "
+                  << capio_global_configuration->node_name << " ] "
                   << "All files will be stored in memory whenever possible." << std::endl;
     }
 
@@ -104,26 +105,31 @@ std::string parseCLI(int argc, char **argv, char *resolve_prefix) {
 #ifdef CAPIO_LOG
     auto logname = open_server_logfile();
     log          = new Logger(__func__, __FILE__, __LINE__, gettid(), "Created new log file");
-    std::cout << CAPIO_SERVER_CLI_LOG_SERVER << " [ " << node_name << " ] "
+    std::cout << CAPIO_SERVER_CLI_LOG_SERVER << " [ " << capio_global_configuration->node_name
+              << " ] "
               << "started logging to logfile " << logname << std::endl;
 #endif
 
     if (config) {
         std::string token = args::get(config);
-        std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_INFO << " [ " << node_name << " ] "
+        std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_INFO << " [ "
+                  << capio_global_configuration->node_name << " ] "
                   << "parsing config file: " << token << std::endl;
         // TODO: pass config file path
     } else if (noConfigFile) {
-        workflow_name = std::string_view(get_capio_workflow_name());
-        std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_WARNING << " [ " << node_name << " ] "
+        capio_global_configuration->workflow_name = std::string_view(get_capio_workflow_name());
+        std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_WARNING << " [ "
+                  << capio_global_configuration->node_name << " ] "
                   << "skipping config file parsing." << std::endl
-                  << CAPIO_LOG_SERVER_CLI_LEVEL_WARNING << " [ " << node_name << " ] "
+                  << CAPIO_LOG_SERVER_CLI_LEVEL_WARNING << " [ "
+                  << capio_global_configuration->node_name << " ] "
                   << "Obtained from environment variable current workflow name: "
-                  << workflow_name.data() << std::endl;
+                  << capio_global_configuration->workflow_name.data() << std::endl;
 
     } else {
         START_LOG(gettid(), "call()");
-        std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_ERROR << " [ " << node_name << " ] "
+        std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_ERROR << " [ "
+                  << capio_global_configuration->node_name << " ] "
                   << "Error: no config file provided. To skip config file use --no-config option!"
                   << std::endl;
         ERR_EXIT("no config file provided, and  --no-config not provided");
@@ -131,14 +137,16 @@ std::string parseCLI(int argc, char **argv, char *resolve_prefix) {
 
 #ifdef CAPIO_LOG
     CAPIO_LOG_LEVEL = get_capio_log_level();
-    std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_INFO << " [ " << node_name << " ] "
+    std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_INFO << " [ " << capio_global_configuration->node_name
+              << " ] "
               << "LOG_LEVEL set to: " << CAPIO_LOG_LEVEL << std::endl;
     std::cout << CAPIO_LOG_SERVER_CLI_LOGGING_ENABLED_WARNING;
     log->log("LOG_LEVEL set to: %d", CAPIO_LOG_LEVEL);
     delete log;
 #else
     if (std::getenv("CAPIO_LOG_LEVEL") != nullptr) {
-        std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_WARNING << " [ " << node_name << " ] "
+        std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_WARNING << " [ "
+                  << capio_global_configuration->node_name << " ] "
                   << CAPIO_LOG_SERVER_CLI_LOGGING_NOT_AVAILABLE << std::endl;
     }
 #endif
@@ -156,21 +164,24 @@ std::string parseCLI(int argc, char **argv, char *resolve_prefix) {
         if (controlPlaneBackend) {
             auto tmp = args::get(controlPlaneBackend);
             if (tmp != "multicast" && tmp != "fs") {
-                std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_WARNING << " [ " << node_name << " ] "
+                std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_WARNING << " [ "
+                          << capio_global_configuration->node_name << " ] "
                           << "Unknown control plane backend " << tmp << std::endl;
             } else {
                 constrol_backend_name = tmp;
             }
         }
 
-        std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_INFO << " [ " << node_name << " ] "
+        std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_INFO << " [ "
+                  << capio_global_configuration->node_name << " ] "
                   << "Using control plane backend: " << constrol_backend_name << std::endl;
 
         capio_communication_service =
             new CapioCommunicationService(backend_name, port, constrol_backend_name);
 
     } else {
-        std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_INFO << " [ " << node_name << " ] "
+        std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_INFO << " [ "
+                  << capio_global_configuration->node_name << " ] "
                   << "Selected backend is File System" << std::endl;
         capio_backend = new NoBackend();
     }
@@ -178,10 +189,12 @@ std::string parseCLI(int argc, char **argv, char *resolve_prefix) {
     if (capio_cl_resolve_path) {
         auto path = args::get(capio_cl_resolve_path);
         memcpy(resolve_prefix, path.c_str(), PATH_MAX);
-        std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_INFO << " [ " << node_name << " ] "
+        std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_INFO << " [ "
+                  << capio_global_configuration->node_name << " ] "
                   << "CAPIO-CL relative file prefix: " << resolve_prefix << std::endl;
     } else {
-        std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_WARNING << " [ " << node_name << " ] "
+        std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_WARNING << " [ "
+                  << capio_global_configuration->node_name << " ] "
                   << "No CAPIO-CL resolve file prefix provided" << std::endl;
     }
 

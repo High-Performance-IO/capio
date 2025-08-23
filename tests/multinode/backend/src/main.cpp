@@ -2,7 +2,8 @@
 #include <gtest/gtest.h>
 #include <thread>
 
-std::string node_name;
+#include "../server/utils/configuration.hpp"
+
 #include "MTCL.hpp"
 #include <capio/logger.hpp>
 

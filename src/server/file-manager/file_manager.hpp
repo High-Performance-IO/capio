@@ -25,7 +25,7 @@ class CapioFileManager {
   public:
     CapioFileManager() {
         START_LOG(gettid(), "call()");
-        std::cout << CAPIO_SERVER_CLI_LOG_SERVER << " [ " << node_name << " ] "
+        std::cout << CAPIO_SERVER_CLI_LOG_SERVER << " [ " << capio_global_configuration->node_name << " ] "
                   << "CapioFileManager initialization completed." << std::endl;
     }
     ~CapioFileManager() { START_LOG(gettid(), "call()"); }
