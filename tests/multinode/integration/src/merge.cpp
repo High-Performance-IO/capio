@@ -1,5 +1,7 @@
 #include "common.hpp"
 
+#include <linux/limits.h>
+
 int mergeFunction(ssize_t nfiles, char *sourcedir, char *destdir) {
 
     struct timeval before, after;
@@ -16,11 +18,11 @@ int mergeFunction(ssize_t nfiles, char *sourcedir, char *destdir) {
     EXPECT_NE(stat(destdir, &statbuf), -1);
     EXPECT_TRUE(S_ISDIR(statbuf.st_mode));
 
-    char filepath[strlen(sourcedir) + maxfilename];
+    char filepath[2 * PATH_MAX]{0};
     for (int i = 0; i < nfiles; ++i) {
         sprintf(filepath, fmtout, sourcedir, i);
         FILE *fp = fopen(filepath, "r");
-        EXPECT_TRUE(fp);
+        EXPECT_NE(fileno(fp), -1);
 
         char *ptr = readdata(fp, dataptr, &datalen, &datacapacity);
         EXPECT_NE(ptr, nullptr);
@@ -29,7 +31,7 @@ int mergeFunction(ssize_t nfiles, char *sourcedir, char *destdir) {
         fclose(fp);
     }
 
-    char resultpath[strlen(destdir) + strlen("/result.dat")];
+    char resultpath[2 * PATH_MAX]{0};
     sprintf(resultpath, "%s/result.dat", destdir);
     FILE *fp = fopen(resultpath, "w");
     EXPECT_TRUE(fp);

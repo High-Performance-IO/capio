@@ -124,7 +124,7 @@ TEST(CapioCacheSPSCQueue, TestWriteCacheSPSCQueueAndCapioFile) {
         CapioMemoryFile *testFile = new CapioMemoryFile(test_file_name);
         testFile->readFromQueue(*cts_queue, 0, long_test_length);
         char *readBuf = new char[readBufSize]{};
-        for (auto offset = 0; offset < long_test_length; offset += readBufSize) {
+        for (unsigned long offset = 0; offset < long_test_length; offset += readBufSize) {
             testFile->readData(readBuf, offset, readBufSize);
             EXPECT_EQ(strncmp(readBuf, SOURCE_TEST_TEXT + offset, readBufSize), 0);
         }
@@ -149,8 +149,8 @@ TEST(CapioCacheSPSCQueue, TestWriteCacheSPSCQueueAndCapioFileWithRequest) {
 
     std::thread server_thread([readBufSize] {
         char *req = new char[CAPIO_REQ_MAX_SIZE];
-        int code, fd;
-        pid_t tid;
+        int code;
+        long int tid;
         char path[PATH_MAX];
         off64_t write_size;
         capio_off64_t offset;
@@ -202,7 +202,7 @@ TEST(CapioCacheSPSCQueue, TestWriteCacheSPSCQueueAndCapioFileWithRequestAndSeek)
     std::thread t3([readBufSize, long_test_length] {
         char *req = new char[CAPIO_REQ_MAX_SIZE];
         int code;
-        pid_t tid;
+        long int tid;
         char path[PATH_MAX];
         off64_t write_size;
         capio_off64_t offset, total_read_size = 0;
@@ -274,9 +274,8 @@ TEST(CapioCacheSPSCQueue, TestReadCacheWithSpscQueueRead) {
         while (total_data_sent < long_test_length) {
 
             char req[CAPIO_REQ_MAX_SIZE];
-            char file[1024];
             int code;
-            pid_t tid;
+            long int tid;
             capio_off64_t read_size, client_cache_line_size, read_begin_offset;
             buf_requests->read(req, CAPIO_REQ_MAX_SIZE);
 
@@ -285,7 +284,7 @@ TEST(CapioCacheSPSCQueue, TestReadCacheWithSpscQueueRead) {
             strcpy(req, ptr + 1);
             EXPECT_EQ(code, CAPIO_REQUEST_READ_MEM);
             sscanf(req, "%ld %llu %llu %llu", &tid, &read_begin_offset, &read_size,
-                   &client_cache_line_size, file);
+                   &client_cache_line_size);
 
             auto size_to_send =
                 read_size < client_cache_line_size ? read_size : client_cache_line_size;
@@ -325,9 +324,8 @@ TEST(CapioCacheSPSCQueue, TestReadCacheWithSpscQueueReadWithCapioFile) {
         while (total_data_sent < long_test_length) {
 
             char req[CAPIO_REQ_MAX_SIZE];
-            char file[1024];
             int code;
-            pid_t tid;
+            long int tid;
             capio_off64_t read_size, client_cache_line_size, read_begin_offset;
             buf_requests->read(req, CAPIO_REQ_MAX_SIZE);
 
@@ -336,7 +334,7 @@ TEST(CapioCacheSPSCQueue, TestReadCacheWithSpscQueueReadWithCapioFile) {
             strcpy(req, ptr + 1);
             EXPECT_EQ(code, CAPIO_REQUEST_READ_MEM);
             sscanf(req, "%ld %llu %llu %llu", &tid, &read_begin_offset, &read_size,
-                   &client_cache_line_size, file);
+                   &client_cache_line_size);
 
             auto size_to_send =
                 read_size < client_cache_line_size ? read_size : client_cache_line_size;
@@ -380,7 +378,7 @@ TEST(CapioCacheSPSCQueue, TestReadCacheWithSpscQueueReadWithCapioFileAndSeek) {
             char req[CAPIO_REQ_MAX_SIZE]{0};
             char file[1024];
             int code, use_cache;
-            pid_t tid;
+            long int tid;
             capio_off64_t read_size, client_cache_line_size, read_begin_offset;
 
             buf_requests->read(req, CAPIO_REQ_MAX_SIZE);

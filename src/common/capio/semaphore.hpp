@@ -94,7 +94,7 @@ class NamedSemaphore {
         START_LOG(capio_syscall(SYS_gettid), "call(name=%s)", _name.c_str());
 
         if (sem_wait(_sem) == -1) {
-            ERR_EXIT(" unable to acquire %s", _name.c_str());
+            ERR_EXIT("Unable to acquire %s", _name.c_str());
         }
     }
 

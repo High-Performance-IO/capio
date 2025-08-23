@@ -32,8 +32,7 @@ inline void init_client() {
 }
 
 /**
- * Perform handshake. server returns the amount of paths that needs to be obtained from the server
- * to know which files are going to be treated during write and read operations inside memory
+ * Perform handshake.
  * @param tid
  * @param pid
  * @param app_name
@@ -51,9 +50,29 @@ inline void handshake_request(const long tid, const long pid, const std::string 
     char req[CAPIO_REQ_MAX_SIZE];
     sprintf(req, "%04d %ld %ld %s", CAPIO_REQUEST_HANDSHAKE, tid, pid, app_name.c_str());
     buf_requests->write(req, CAPIO_REQ_MAX_SIZE);
+
+#ifndef CAPIO_BUILD_TESTS
+    LOG("Waiting for response from capio_server");
+    /*
+     * The handshake request must be blocking ONLY when not building tests. This is because when
+     * starting unit tests, the binary is loaded with libcapio_posix.so underneath thus performing
+     * a handshake request. If the handshake is blocking, then the capio_server binary cannot be
+     * started as the whole process is waiting for a handshake.
+     */
+    if (bufs_response->at(pid)->read() == 0) {
+        ERR_EXIT("Error: handshake request sent while capio_server is shutting down!");
+    }
+#endif
+
     LOG("Sent handshake request");
 }
 
+/**
+ * File in memory requests: server returns the amount of paths that needs to be obtained from the
+ * server to know which files are going to be treated during write and read operations inside memory
+ * @param pid
+ * @return
+ */
 inline std::vector<std::regex> *file_in_memory_request(const long pid) {
     START_LOG(capio_syscall(SYS_gettid), "call(pid=%ld)", pid);
     char req[CAPIO_REQ_MAX_SIZE];
@@ -64,7 +83,7 @@ inline std::vector<std::regex> *file_in_memory_request(const long pid) {
     capio_off64_t files_to_read_from_queue = bufs_response->at(pid)->read();
     LOG("Need to read %llu files from data queues", files_to_read_from_queue);
     const auto regex_vector = new std::vector<std::regex>;
-    for (int i = 0; i < files_to_read_from_queue; i++) {
+    for (capio_off64_t i = 0; i < files_to_read_from_queue; i++) {
         LOG("Reading file number %d", i);
         auto file = new char[PATH_MAX]{};
         stc_queue->read(file, PATH_MAX);

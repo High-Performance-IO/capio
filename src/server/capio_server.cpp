@@ -24,6 +24,7 @@
  * Variables required to be globally available
  * to all classes and subclasses.
  */
+bool termination_phase = false;
 std::string workflow_name;
 pid_t CAPIO_SERVER_MAIN_PID;
 inline bool StoreOnlyInMemory = false;
@@ -74,6 +75,8 @@ int main(int argc, char **argv) {
               << std::flush;
 
     request_handlers_engine->start();
+
+    sig_term_handler(SIGTERM, nullptr, nullptr);
 
     return 0;
 }

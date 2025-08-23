@@ -22,13 +22,13 @@ int mapReduceFunction(char *sourcedirname, ssize_t sstart, ssize_t sfiles, char 
     EXPECT_GT(percent, 0);
     EXPECT_LE(percent, 1);
 
-    char filepath[strlen(sourcedirname) + maxfilename];
+    char filepath[2 * PATH_MAX]{0};
     // concatenating all files in memory (dataptr)
     for (int i = 0 + sstart; i < (sfiles + sstart); ++i) {
         sprintf(filepath, fmtin, sourcedirname, i);
 
         FILE *fp = fopen(filepath, "r");
-        EXPECT_TRUE(fp);
+        EXPECT_NE(fileno(fp), -1);
 
         char *ptr = readdata(fp, dataptr, &datalen, &datacapacity);
         EXPECT_NE(ptr, nullptr);

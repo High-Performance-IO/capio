@@ -10,8 +10,8 @@
 #include <utils/requests.hpp>
 
 // Map &DIR -> <dir_path, files already served>
-inline std::unordered_map<unsigned long int, std::pair<std::string, int>> *opened_directory =
-    nullptr;
+inline std::unordered_map<unsigned long int, std::pair<std::string, long unsigned int>>
+    *opened_directory = nullptr;
 
 inline std::unordered_map<std::string, std::vector<dirent64 *> *> *directory_items;
 
@@ -50,8 +50,9 @@ inline void init_posix_dirent() {
         real_readdir = (dirent * (*) (DIR *) ) dlsym(RTLD_NEXT, "readdir");
     }
 
-    directory_items  = new std::unordered_map<std::string, std::vector<dirent64 *> *>();
-    opened_directory = new std::unordered_map<unsigned long, std::pair<std::string, int>>();
+    directory_items = new std::unordered_map<std::string, std::vector<dirent64 *> *>();
+    opened_directory =
+        new std::unordered_map<unsigned long, std::pair<std::string, unsigned long int>>();
 
     dirent_curr_dir   = new dirent64();
     dirent_parent_dir = new dirent64();
@@ -65,14 +66,14 @@ inline void init_posix_dirent() {
     syscall_no_intercept_flag = false;
 }
 
-inline int load_files_from_directory(const char *path) {
+inline unsigned long int load_files_from_directory(const char *path) {
 
     START_LOG(capio_syscall(SYS_gettid), "call(path=%s)", path);
 
     syscall_no_intercept_flag = true;
     dirent64 *entry;
-    DIR *dir  = real_opendir(path);
-    int count = 0;
+    DIR *dir                = real_opendir(path);
+    unsigned long int count = 0;
 
     if (directory_items->find(path) == directory_items->end()) {
         LOG("Directory vector not present. Adding it at path %s", path);

@@ -2,11 +2,13 @@
 #define CAPIO_COPY_FILE_RANGE_HPP
 int copy_file_range_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg5,
                             long *result) {
-    auto tid     = static_cast<pid_t>(syscall_no_intercept(SYS_gettid));
-    auto fd_in   = static_cast<int>(arg0);
-    auto fd_out  = static_cast<int>(arg2);
-    auto off_in  = static_cast<capio_off64_t>(arg1);
-    auto off_out = static_cast<capio_off64_t>(arg3);
+    auto tid    = static_cast<pid_t>(syscall_no_intercept(SYS_gettid));
+    auto fd_in  = static_cast<int>(arg0);
+    auto off_in = static_cast<capio_off64_t>(arg1);
+
+    // auto fd_out  = static_cast<int>(arg2);
+    // auto off_out = static_cast<capio_off64_t>(arg3);
+
     START_LOG(tid, "call()");
 
     // TODO: support in memory read  / write

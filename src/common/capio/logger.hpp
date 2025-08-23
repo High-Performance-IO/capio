@@ -329,7 +329,7 @@ class Logger {
         gethostname(node_name, HOST_NAME_MAX);                                                     \
         printf("%s [ %s ] %s\n", CAPIO_LOG_SERVER_CLI_LEVEL_ERROR, node_name, tmp_buf);            \
         fflush(stdout);                                                                            \
-        exit(EXIT_FAILURE);                                                                        \
+        throw std::runtime_error(std::string(tmp_buf));                                            \
     }
 #define LOG(message, ...) log.log(message, ##__VA_ARGS__)
 #define START_LOG(tid, message, ...)                                                               \

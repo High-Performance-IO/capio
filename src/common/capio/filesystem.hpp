@@ -105,7 +105,7 @@ inline bool is_capio_path(const std::filesystem::path &path_to_check) {
  * @param capio_path String to convert
  * @return std::regex compiled with the corresponding c++ regex
  */
-[[nodiscard]] static std::regex generateCapioRegex(const std::string &capio_path) {
+[[maybe_unused]] [[nodiscard]] static std::regex generateCapioRegex(const std::string &capio_path) {
     START_LOG(gettid(), "call(capio_path=%s)", capio_path.c_str());
     auto computed = replaceSymbol(capio_path, '.', "\\.");
     computed      = replaceSymbol(computed, '/', "\\/");
@@ -113,54 +113,6 @@ inline bool is_capio_path(const std::filesystem::path &path_to_check) {
     computed      = replaceSymbol(computed, '+', ".");
     LOG("Computed regex: %s", computed.c_str());
     return std::regex(computed);
-}
-
-/**
- * Resolve a possible symbolic link to the absolute path that it points to
- * @param input_path
- * @return
- */
-[[nodiscard]] static std::string resolve_possible_symlink(const std::filesystem::path &input_path) {
-    START_LOG(capio_syscall(SYS_gettid), "call(path=%s)", input_path.c_str());
-
-    LOG("Absolute path = %s", input_path.c_str());
-
-#ifdef __CAPIO_POSIX
-    syscall_no_intercept_flag = true;
-#endif
-
-    std::filesystem::path resolved, input_abs_path = std::filesystem::absolute(input_path);
-
-    for (const auto &part : input_abs_path) {
-        resolved /= part;
-
-        if (part == "." || part.empty()) {
-            continue;
-        }
-        if (part == "..") {
-            resolved = resolved.parent_path();
-            continue;
-        }
-        if (std::filesystem::is_symlink(resolved)) {
-            char buf[PATH_MAX]{0};
-            if (capio_syscall(SYS_readlink, resolved.c_str(), buf, sizeof(buf) - 1) == -1) {
-                LOG("File might not exist. path was %s and  Error is %s", resolved.c_str(),
-                    strerror(errno));
-                continue;
-            }
-
-            if (std::filesystem::path target(buf); target.is_relative()) {
-                resolved = resolved.parent_path() / target;
-            } else {
-                resolved = target;
-            }
-        }
-    }
-#ifdef __CAPIO_POSIX
-    syscall_no_intercept_flag = false;
-#endif
-
-    return resolved;
 }
 
 #endif // CAPIO_COMMON_FILESYSTEM_HPP

@@ -28,7 +28,7 @@ class CapioCLEngine {
                                   bool>>                    // Store File on FS. true = memory [11]
         _locations;
 
-    static std::string truncateLastN(const std::string &str, const int n) {
+    static std::string truncateLastN(const std::string &str, const std::size_t n) {
         return str.length() > n ? "[..] " + str.substr(str.length() - n) : str;
     }
 
@@ -41,13 +41,13 @@ class CapioCLEngine {
                      "==========================================================|"
                   << std::endl
                   << "|" << std::setw(135) << "|" << std::endl
-                  << "|     Parsed configuration file for workflow: \e[1;36m" << workflow_name
-                  << std::setw(94 - workflow_name.length()) << "\e[0m |" << std::endl
+                  << "|     Parsed configuration file for workflow: \033[1;36m" << workflow_name
+                  << std::setw(94 - workflow_name.length()) << "\033[0m |" << std::endl
                   << "|" << std::setw(135) << "|" << std::endl
-                  << "|     File color legend:     \e[48;5;034m  \e[0m File stored in memory"
+                  << "|     File color legend:     \033[48;5;034m  \033[0m File stored in memory"
                   << std::setw(83) << "|" << std::endl
                   << "|                            "
-                  << "\e[48;5;172m  \e[0m File stored on file system" << std::setw(78) << "|"
+                  << "\033[48;5;172m  \033[0m File stored on file system" << std::setw(78) << "|"
                   << std::endl
                   << "|============================================================================"
                      "==========================================================|"
@@ -63,8 +63,9 @@ class CapioCLEngine {
                   << std::endl;
 
         for (auto itm : _locations) {
-            std::string color_preamble = std::get<11>(itm.second) ? "\e[38;5;034m" : "\e[38;5;172m";
-            std::string color_post     = "\e[0m";
+            std::string color_preamble =
+                std::get<11>(itm.second) ? "\033[38;5;034m" : "\033[38;5;172m";
+            std::string color_post = "\033[0m";
 
             std::string name_trunc = truncateLastN(itm.first, 12);
             auto kind              = std::get<6>(itm.second) ? "F" : "D";
@@ -83,7 +84,7 @@ class CapioCLEngine {
                 n_files = "N.A.";
             }
 
-            for (int i = 0; i <= rowCount; i++) {
+            for (std::size_t i = 0; i <= rowCount; i++) {
                 std::string prod, cons;
                 if (i > 0) {
                     std::cout << "|      |                   | ";

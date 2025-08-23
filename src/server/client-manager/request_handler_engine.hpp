@@ -62,8 +62,9 @@ class RequestHandlerEngine {
      */
     inline auto read_next_request(char *str) const {
         char req[CAPIO_REQ_MAX_SIZE];
+        START_LOG(gettid(), "call()");
         buf_requests->read(req);
-        START_LOG(gettid(), "call(req=%s)", req);
+        LOG("req=%s", req);
         int code       = -1;
         auto [ptr, ec] = std::from_chars(req, req + 4, code);
         if (ec == std::errc()) {
@@ -106,13 +107,31 @@ class RequestHandlerEngine {
      * the posix clients (aggregated) and handle the response
      *
      */
-    [[noreturn]] void start() const {
+    void start() const {
         START_LOG(gettid(), "call()\n\n");
 
-        auto str = std::unique_ptr<char[]>(new char[CAPIO_REQ_MAX_SIZE]);
-        while (true) {
+        const auto str = std::unique_ptr<char[]>(new char[CAPIO_REQ_MAX_SIZE]);
+        int code;
+
+        /* When in termination_phase, we empty all requests while clients are connected. as soon
+         * as queues are empty and the server ha removed all requests, it calls the termination
+         * handler to stop the server execution
+         */
+        while (!termination_phase || client_manager->get_connected_posix_client() > 0) {
             LOG(CAPIO_LOG_SERVER_REQUEST_START);
-            int code = read_next_request(str.get());
+            try {
+                code = read_next_request(str.get());
+            } catch (const std::exception &e) {
+                if (termination_phase) {
+                    std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_WARNING << " [ " << node_name << " ] "
+                              << "Termination phase is in progress... Ignoring Exception likely "
+                                 "thrown while receiving SIGUSR1"
+                              << std::endl;
+                    continue;
+                }
+                throw;
+            }
+
             try {
                 request_handlers[code](str.get());
             } catch (const std::exception &exception) {
@@ -134,11 +153,13 @@ class RequestHandlerEngine {
                           << std::endl
                           << std::endl;
 
-                ERR_EXIT("%s", exception.what());
+                exit(EXIT_FAILURE);
             }
 
             LOG(CAPIO_LOG_SERVER_REQUEST_END);
         }
+
+        LOG("Terminated handling of posix clients");
     }
 };
 

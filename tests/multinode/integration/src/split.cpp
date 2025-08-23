@@ -20,7 +20,7 @@ int splitFunction(ssize_t nlines, ssize_t nfiles, char *dirname) {
     EXPECT_TRUE(buffer);
 
     int error = 0;
-    char filepath[strlen(dirname) + maxfilename];
+    char filepath[2 * PATH_MAX]{0};
     // opening (truncating) all files
     for (int i = 0; i < nfiles; ++i) {
         sprintf(filepath, fmtin, dirname, i);

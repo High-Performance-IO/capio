@@ -173,7 +173,7 @@ inline void CapioFileManager::_unlockThreadAwaitingData(
             client_manager->reply_to_client(item->first, filesize);
             // remove thread from map
             LOG("Removing thread %ld from threads awaiting on data", item->first);
-            item = item = pids_awaiting.erase(item);
+            item = pids_awaiting.erase(item);
 
         } else if (isCommitted(path)) {
 
@@ -181,7 +181,7 @@ inline void CapioFileManager::_unlockThreadAwaitingData(
             client_manager->reply_to_client(item->first, ULLONG_MAX);
             // remove thread from map
             LOG("Removing thread %ld from threads awaiting on data", item->first);
-            item = item = pids_awaiting.erase(item);
+            item = pids_awaiting.erase(item);
         } else {
 
             // DEFAULT: no condition to unlock has occurred, hence wait...
@@ -446,7 +446,7 @@ inline void CapioFileManager::checkDirectoriesNFiles() const {
             long count = 0;
             if (std::filesystem::exists(path_config)) {
                 auto iterator = std::filesystem::directory_iterator(path_config);
-                for (const auto &entry : iterator) {
+                for ([[maybe_unused]] const auto &entry : iterator) {
                     ++count;
                 }
             }

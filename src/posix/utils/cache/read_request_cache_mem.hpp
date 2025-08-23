@@ -85,7 +85,7 @@ class ReadRequestCacheMEM {
         _real_file_size_commmitted = -1;
     }
 
-    long read(const int fd, void *buffer, off64_t count) {
+    long read(const int fd, void *buffer, capio_off64_t count) {
         START_LOG(capio_syscall(SYS_gettid), "call(fd=%d, count=%ld)", fd, count);
 
         long actual_read_size = 0;

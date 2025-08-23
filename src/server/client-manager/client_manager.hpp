@@ -122,6 +122,8 @@ class ClientManager {
         }
         return CAPIO_DEFAULT_APP_NAME;
     }
+
+    inline auto get_connected_posix_client() { return bufs_response->size(); }
 };
 
 inline ClientManager *client_manager;

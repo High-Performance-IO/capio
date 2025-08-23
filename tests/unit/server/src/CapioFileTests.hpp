@@ -59,7 +59,7 @@ TEST(CapioMemoryFileTest, TestWriteAndRead) {
     // 8 MB buffer
     const auto buffer = new std::vector<char>();
     buffer->reserve(FILE_SIZE);
-    for (ssize_t i = 0; i < buffer->size(); i++) {
+    for (size_t i = 0; i < buffer->size(); i++) {
         buffer->push_back(static_cast<char>('a' + i % 26));
     }
 
@@ -87,7 +87,7 @@ TEST(CapioMemoryFileTest, TestWriteAndReadDifferentPageStartOffset) {
     // 8 MB buffer
     const auto buffer = new std::vector<char>();
     buffer->reserve(FILE_SIZE);
-    for (ssize_t i = 0; i < buffer->size(); i++) {
+    for (size_t i = 0; i < buffer->size(); i++) {
         buffer->push_back(static_cast<char>('a' + i % 26));
     }
 
@@ -117,7 +117,7 @@ TEST(CapioMemoryFileTest, TestThreadsSpscqueueAndCapioMemFile) {
 
     // 8 MB buffer
     auto buffer = new char[10 * FILE_SIZE];
-    for (ssize_t i = 0; i < 10 * FILE_SIZE; i++) {
+    for (size_t i = 0; i < 10 * FILE_SIZE; i++) {
         buffer[i] = 'a' + i % 26;
     }
 

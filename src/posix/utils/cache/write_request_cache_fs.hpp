@@ -2,8 +2,8 @@
 #define WRITE_REQUEST_CACHE_FS_HPP
 class WriteRequestCacheFS {
 
-    int current_fd         = -1;
-    long long current_size = 0;
+    int current_fd             = -1;
+    capio_off64_t current_size = 0;
 
     const capio_off64_t _max_size;
 

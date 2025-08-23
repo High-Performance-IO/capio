@@ -11,9 +11,9 @@
 typedef unsigned long long int capio_off64_t;
 
 // CAPIO files constants
-constexpr size_t CAPIO_DEFAULT_DIR_INITIAL_SIZE   = 1024L * 1024 * 1024;
-constexpr off64_t CAPIO_DEFAULT_FILE_INITIAL_SIZE = 1024L * 1024 * 1024 * 4;
-constexpr std::array CAPIO_DIR_FORBIDDEN_PATHS    = {
+constexpr size_t CAPIO_DEFAULT_DIR_INITIAL_SIZE                 = 1024L * 1024 * 1024;
+constexpr off64_t CAPIO_DEFAULT_FILE_INITIAL_SIZE               = 1024L * 1024 * 1024 * 4;
+[[maybe_unused]] constexpr std::array CAPIO_DIR_FORBIDDEN_PATHS = {
     std::string_view{"/proc/"}, std::string_view{"/sys/"}, std::string_view{"/boot/"},
     std::string_view{"/dev/"},  std::string_view{"/var/"}, std::string_view{"/run/"},
     std::string_view("/spack/")};
