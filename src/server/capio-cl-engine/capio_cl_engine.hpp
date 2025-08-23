@@ -12,7 +12,6 @@
 class CapioCLEngine {
     friend class CapioFileManager;
 
-  private:
     std::unordered_map<std::string,                         // path name
                        std::tuple<std::vector<std::string>, // Vector for producers            [0]
                                   std::vector<std::string>, // Vector for consumers            [1]
@@ -34,76 +33,103 @@ class CapioCLEngine {
 
   public:
     void print() const {
-        std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_JSON << " [ " << node_name << " ] "
-                  << "Composition of expected CAPIO FS: " << std::endl
-                  << std::endl
-                  << "|============================================================================"
-                     "==========================================================|"
-                  << std::endl
-                  << "|" << std::setw(135) << "|" << std::endl
-                  << "|     Parsed configuration file for workflow: \033[1;36m" << workflow_name
-                  << std::setw(94 - workflow_name.length()) << "\033[0m |" << std::endl
-                  << "|" << std::setw(135) << "|" << std::endl
-                  << "|     File color legend:     \033[48;5;034m  \033[0m File stored in memory"
-                  << std::setw(83) << "|" << std::endl
-                  << "|                            "
-                  << "\033[48;5;172m  \033[0m File stored on file system" << std::setw(78) << "|"
-                  << std::endl
-                  << "|============================================================================"
-                     "==========================================================|"
-                  << std::endl
-                  << "|======|===================|===================|====================|========"
-                     "============|============|===========|=========|==========|"
-                  << std::endl
-                  << "| Kind | Filename          | Producer step     | Consumer step      |  "
-                     "Commit Rule       |  Fire Rule | Permanent | Exclude | n_files  |"
-                  << std::endl
-                  << "|======|===================|===================|====================|========"
-                     "============|============|===========|=========|==========|"
-                  << std::endl;
+        // First message
+        server_println(CAPIO_LOG_SERVER_CLI_LEVEL_JSON, "");
+        server_println(CAPIO_LOG_SERVER_CLI_LEVEL_JSON, "Composition of expected CAPIO FS: ");
 
-        for (auto itm : _locations) {
+        // Table header lines
+        server_println(
+            CAPIO_LOG_SERVER_CLI_LEVEL_JSON,
+            "|============================================================================"
+            "==========================================================|");
+
+        server_println(CAPIO_LOG_SERVER_CLI_LEVEL_JSON, "|" + std::string(134, ' ') + "|");
+
+        {
+            std::ostringstream oss;
+            oss << "|     Parsed configuration file for workflow: \033[1;36m"
+                << capio_global_configuration->workflow_name
+                << std::setw(94 - capio_global_configuration->workflow_name.length())
+                << "\033[0m |";
+            server_println(CAPIO_LOG_SERVER_CLI_LEVEL_JSON, oss.str());
+        }
+
+        server_println(CAPIO_LOG_SERVER_CLI_LEVEL_JSON, "|" + std::string(134, ' ') + "|");
+
+        server_println(
+            CAPIO_LOG_SERVER_CLI_LEVEL_JSON,
+            "|     File color legend:     \033[48;5;034m  \033[0m File stored in memory" +
+                std::string(82, ' ') + "|");
+
+        server_println(
+            CAPIO_LOG_SERVER_CLI_LEVEL_JSON,
+            "|                            \033[48;5;172m  \033[0m File stored on file system" +
+                std::string(77, ' ') + "|");
+
+        server_println(
+            CAPIO_LOG_SERVER_CLI_LEVEL_JSON,
+            "|============================================================================"
+            "==========================================================|");
+
+        server_println(
+            CAPIO_LOG_SERVER_CLI_LEVEL_JSON,
+            "|======|===================|===================|====================|========"
+            "============|============|===========|=========|==========|");
+
+        server_println(CAPIO_LOG_SERVER_CLI_LEVEL_JSON,
+                       "| Kind | Filename          | Producer step     | Consumer step      |  "
+                       "Commit Rule       |  Fire Rule | Permanent | Exclude | n_files  |");
+
+        server_println(
+            CAPIO_LOG_SERVER_CLI_LEVEL_JSON,
+            "|======|===================|===================|====================|========"
+            "============|============|===========|=========|==========|");
+
+        // Iterate over _locations
+        for (auto &itm : _locations) {
             std::string color_preamble =
                 std::get<11>(itm.second) ? "\033[38;5;034m" : "\033[38;5;172m";
             std::string color_post = "\033[0m";
 
             std::string name_trunc = truncateLastN(itm.first, 12);
             auto kind              = std::get<6>(itm.second) ? "F" : "D";
-            std::cout << "|   " << color_preamble << kind << color_post << "  | " << color_preamble
+
+            std::ostringstream base_line;
+            base_line << "|   " << color_preamble << kind << color_post << "  | " << color_preamble
                       << name_trunc << color_post << std::setfill(' ')
                       << std::setw(20 - name_trunc.length()) << "| ";
 
             auto producers = std::get<0>(itm.second);
             auto consumers = std::get<1>(itm.second);
-            auto rowCount =
-                producers.size() > consumers.size() ? producers.size() : consumers.size();
+            auto rowCount  = std::max(producers.size(), consumers.size());
 
-            // Add logic to handle the n_files column
             std::string n_files = std::to_string(std::get<8>(itm.second));
             if (std::get<8>(itm.second) < 1) {
                 n_files = "N.A.";
             }
 
             for (std::size_t i = 0; i <= rowCount; i++) {
-                std::string prod, cons;
-                if (i > 0) {
-                    std::cout << "|      |                   | ";
+                std::ostringstream line;
+
+                if (i == 0) {
+                    line << base_line.str();
+                } else {
+                    line << "|      |                   | ";
                 }
 
                 if (i < producers.size()) {
                     auto prod1 = truncateLastN(producers.at(i), 12);
-                    std::cout << prod1 << std::setfill(' ') << std::setw(20 - prod1.length())
-                              << " | ";
+                    line << prod1 << std::setfill(' ') << std::setw(20 - prod1.length()) << " | ";
                 } else {
-                    std::cout << std::setfill(' ') << std::setw(20) << " | ";
+                    line << std::setfill(' ') << std::setw(20) << " | ";
                 }
 
                 if (i < consumers.size()) {
                     auto cons1 = truncateLastN(consumers.at(i), 12);
-                    std::cout << " " << cons1 << std::setfill(' ') << std::setw(20 - cons1.length())
-                              << " | ";
+                    line << " " << cons1 << std::setfill(' ') << std::setw(20 - cons1.length())
+                         << " | ";
                 } else {
-                    std::cout << std::setfill(' ') << std::setw(21) << " | ";
+                    line << std::setfill(' ') << std::setw(21) << " | ";
                 }
 
                 if (i == 0) {
@@ -111,26 +137,30 @@ class CapioCLEngine {
                                 fire_rule   = std::get<3>(itm.second);
                     bool exclude = std::get<4>(itm.second), permanent = std::get<5>(itm.second);
 
-                    std::cout << " " << commit_rule << std::setfill(' ')
-                              << std::setw(20 - commit_rule.length()) << " | " << fire_rule
-                              << std::setfill(' ') << std::setw(13 - fire_rule.length()) << " | "
-                              << "    " << (permanent ? "YES" : "NO ") << "   |   "
-                              << (exclude ? "YES" : "NO ") << "   | " << n_files
-                              << std::setw(11 - n_files.length()) << " | " << std::endl;
+                    line << " " << commit_rule << std::setfill(' ')
+                         << std::setw(20 - commit_rule.length()) << " | " << fire_rule
+                         << std::setfill(' ') << std::setw(13 - fire_rule.length()) << " | "
+                         << "    " << (permanent ? "YES" : "NO ") << "   |   "
+                         << (exclude ? "YES" : "NO ") << "   | " << n_files
+                         << std::setw(10 - n_files.length()) << " |";
                 } else {
-                    std::cout << std::setfill(' ') << std::setw(20) << "|" << std::setfill(' ')
-                              << std::setw(13) << "|" << std::setfill(' ') << std::setw(12) << "|"
-                              << std::setfill(' ') << std::setw(10) << "|" << std::setw(11) << "|"
-                              << std::endl;
+                    line << std::setfill(' ') << std::setw(20) << "|" << std::setfill(' ')
+                         << std::setw(13) << "|" << std::setfill(' ') << std::setw(12) << "|"
+                         << std::setfill(' ') << std::setw(10) << "|" << std::setw(10) << "|";
                 }
+
+                server_println(CAPIO_LOG_SERVER_CLI_LEVEL_JSON, line.str());
             }
-            std::cout << "*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~"
-                         "~~~~~~~~~~~~~~~~~~"
-                         "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*"
-                      << std::endl;
+
+            server_println(
+                CAPIO_LOG_SERVER_CLI_LEVEL_JSON,
+                "*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~"
+                "~~~~~~~~~~~~~~~~~~"
+                "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*");
         }
-        std::cout << std::endl;
-    };
+
+        server_println(CAPIO_LOG_SERVER_CLI_LEVEL_JSON, "");
+    }
 
     /**
      * Check whether the file is contained inside the location, either by direct name or by glob
@@ -440,11 +470,11 @@ class CapioCLEngine {
         START_LOG(gettid(), "call(path=%s)", path.c_str());
         if (const auto location = _locations.find(path); location == _locations.end()) {
             LOG("No rule for home node. Returning create home node");
-            return node_name;
+            return capio_global_configuration->node_name;
         } else {
             LOG("Found location entry");
         }
-        return node_name;
+        return capio_global_configuration->node_name;
     }
 
   protected:

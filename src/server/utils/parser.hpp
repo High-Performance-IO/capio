@@ -63,26 +63,25 @@ std::string parseCLI(int argc, char **argv, char *resolve_prefix) {
         continue_on_error = true;
         std::cout << CAPIO_LOG_SERVER_CLI_CONT_ON_ERR_WARNING << std::endl;
 #else
-        std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_WARNING
-                  << "--continue-on-error flag given, but logger is not compiled into CAPIO. Flag "
-                     "is ignored."
-                  << std::endl;
+
+        server_println(CAPIO_LOG_SERVER_CLI_LEVEL_WARNING,
+                       "--continue-on-error flag given, but logger is not compiled into CAPIO. "
+                       "Flag is ignored.");
 #endif
     }
 
     if (memStorageOnly) {
-        StoreOnlyInMemory = true;
-        std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_INFO << " [ " << node_name << " ] "
-                  << "All files will be stored in memory whenever possible." << std::endl;
+        capio_global_configuration->StoreOnlyInMemory = true;
+        server_println(CAPIO_LOG_SERVER_CLI_LEVEL_INFO,
+                       "All files will be stored in memory whenever possible.");
     }
 
     if (logfile_folder) {
 #ifdef CAPIO_LOG
         log_master_dir_name = args::get(logfile_folder);
 #else
-        std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_WARNING
-                  << "Capio logfile folder, but logging capabilities not compiled into capio!"
-                  << std::endl;
+        server_println(CAPIO_LOG_SERVER_CLI_LEVEL_WARNING,
+                       "Capio logfile folder, but logging capabilities not compiled into capio!");
 #endif
     }
 
@@ -96,50 +95,46 @@ std::string parseCLI(int argc, char **argv, char *resolve_prefix) {
         }
         logfile_prefix = token;
 #else
-        std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_WARNING
-                  << "Capio logfile provided, but logging capabilities not compiled into capio!"
-                  << std::endl;
+        server_println(CAPIO_LOG_SERVER_CLI_LEVEL_WARNING,
+                       "Capio logfile provided, but logging capabilities not compiled into capio!");
 #endif
     }
 #ifdef CAPIO_LOG
     auto logname = open_server_logfile();
     log          = new Logger(__func__, __FILE__, __LINE__, gettid(), "Created new log file");
-    std::cout << CAPIO_SERVER_CLI_LOG_SERVER << " [ " << node_name << " ] "
-              << "started logging to logfile " << logname << std::endl;
+    server_println(CAPIO_SERVER_CLI_LOG_SERVER, "started logging to logfile " + logname.string());
 #endif
 
     if (config) {
         std::string token = args::get(config);
-        std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_INFO << " [ " << node_name << " ] "
-                  << "parsing config file: " << token << std::endl;
+        server_println(CAPIO_LOG_SERVER_CLI_LEVEL_INFO, "parsing config file: " + token);
         // TODO: pass config file path
     } else if (noConfigFile) {
-        workflow_name = std::string_view(get_capio_workflow_name());
-        std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_WARNING << " [ " << node_name << " ] "
-                  << "skipping config file parsing." << std::endl
-                  << CAPIO_LOG_SERVER_CLI_LEVEL_WARNING << " [ " << node_name << " ] "
-                  << "Obtained from environment variable current workflow name: "
-                  << workflow_name.data() << std::endl;
+        capio_global_configuration->workflow_name = std::string_view(get_capio_workflow_name());
+        server_println(CAPIO_LOG_SERVER_CLI_LEVEL_WARNING, "skipping config file parsing.");
+        server_println(CAPIO_LOG_SERVER_CLI_LEVEL_WARNING,
+                       "Obtained from environment variable current workflow name: " +
+                           capio_global_configuration->workflow_name);
 
     } else {
         START_LOG(gettid(), "call()");
-        std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_ERROR << " [ " << node_name << " ] "
-                  << "Error: no config file provided. To skip config file use --no-config option!"
-                  << std::endl;
+        server_println(
+            CAPIO_LOG_SERVER_CLI_LEVEL_ERROR,
+            "Error: no config file provided. To skip config file use --no-config option!");
         ERR_EXIT("no config file provided, and  --no-config not provided");
     }
 
 #ifdef CAPIO_LOG
     CAPIO_LOG_LEVEL = get_capio_log_level();
-    std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_INFO << " [ " << node_name << " ] "
-              << "LOG_LEVEL set to: " << CAPIO_LOG_LEVEL << std::endl;
+    server_println(CAPIO_LOG_SERVER_CLI_LEVEL_INFO,
+                   "LOG_LEVEL set to: " + std::to_string(CAPIO_LOG_LEVEL));
     std::cout << CAPIO_LOG_SERVER_CLI_LOGGING_ENABLED_WARNING;
     log->log("LOG_LEVEL set to: %d", CAPIO_LOG_LEVEL);
     delete log;
 #else
     if (std::getenv("CAPIO_LOG_LEVEL") != nullptr) {
-        std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_WARNING << " [ " << node_name << " ] "
-                  << CAPIO_LOG_SERVER_CLI_LOGGING_NOT_AVAILABLE << std::endl;
+        server_println(CAPIO_LOG_SERVER_CLI_LEVEL_WARNING,
+                       CAPIO_LOG_SERVER_CLI_LOGGING_NOT_AVAILABLE);
     }
 #endif
 
@@ -152,37 +147,35 @@ std::string parseCLI(int argc, char **argv, char *resolve_prefix) {
             port = args::get(backend_port);
         }
 
-        std::string constrol_backend_name = "multicast";
+        std::string control_backend_name = "multicast";
         if (controlPlaneBackend) {
             auto tmp = args::get(controlPlaneBackend);
             if (tmp != "multicast" && tmp != "fs") {
-                std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_WARNING << " [ " << node_name << " ] "
-                          << "Unknown control plane backend " << tmp << std::endl;
+                server_println(CAPIO_LOG_SERVER_CLI_LEVEL_WARNING,
+                               "Unknown control plane backend " + tmp);
             } else {
-                constrol_backend_name = tmp;
+                control_backend_name = tmp;
             }
         }
 
-        std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_INFO << " [ " << node_name << " ] "
-                  << "Using control plane backend: " << constrol_backend_name << std::endl;
+        server_println(CAPIO_LOG_SERVER_CLI_LEVEL_INFO,
+                       "Using control plane backend: " + control_backend_name);
 
         capio_communication_service =
-            new CapioCommunicationService(backend_name, port, constrol_backend_name);
+            new CapioCommunicationService(backend_name, port, control_backend_name);
 
     } else {
-        std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_INFO << " [ " << node_name << " ] "
-                  << "Selected backend is File System" << std::endl;
+        server_println(CAPIO_LOG_SERVER_CLI_LEVEL_INFO, "Selected backend is File System");
         capio_backend = new NoBackend();
     }
 
     if (capio_cl_resolve_path) {
         auto path = args::get(capio_cl_resolve_path);
         memcpy(resolve_prefix, path.c_str(), PATH_MAX);
-        std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_INFO << " [ " << node_name << " ] "
-                  << "CAPIO-CL relative file prefix: " << resolve_prefix << std::endl;
+        server_println(CAPIO_LOG_SERVER_CLI_LEVEL_INFO, "CAPIO-CL relative file prefix: " + path);
     } else {
-        std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_WARNING << " [ " << node_name << " ] "
-                  << "No CAPIO-CL resolve file prefix provided" << std::endl;
+        server_println(CAPIO_LOG_SERVER_CLI_LEVEL_WARNING,
+                       "No CAPIO-CL resolve file prefix provided");
     }
 
     if (config) {

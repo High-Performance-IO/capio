@@ -101,7 +101,7 @@ killall -USR1 capio_server
 > CAPIO-CL configuration file), CAPIO will not be able to operate correctly!
 
 > [!tip]  
-> To gracefully shhut down the capio server instance, just send the SIGUSR1 signal.
+> To gracefully shut down the capio server instance, just send the SIGUSR1 signal.
 > the capio_server process will then automatically clean up and terminate itself!
 
 ---

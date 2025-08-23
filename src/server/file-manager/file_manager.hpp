@@ -25,10 +25,12 @@ class CapioFileManager {
   public:
     CapioFileManager() {
         START_LOG(gettid(), "call()");
-        std::cout << CAPIO_SERVER_CLI_LOG_SERVER << " [ " << node_name << " ] "
-                  << "CapioFileManager initialization completed." << std::endl;
+        server_println(CAPIO_SERVER_CLI_LOG_SERVER, "CapioFileManager initialization completed.");
     }
-    ~CapioFileManager() { START_LOG(gettid(), "call()"); }
+    ~CapioFileManager() {
+        START_LOG(gettid(), "call()");
+        server_println(CAPIO_SERVER_CLI_LOG_SERVER, "CapioFileManager cleanup completed.");
+    }
 
     static uintmax_t get_file_size_if_exists(const std::filesystem::path &path);
     static std::string getMetadataPath(const std::string &path);

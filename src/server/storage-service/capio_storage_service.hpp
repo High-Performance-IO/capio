@@ -38,8 +38,8 @@ class CapioStorageService {
         _threads_waiting_for_memory_data =
             new std::unordered_map<std::string,
                                    std::vector<std::tuple<capio_off64_t, capio_off64_t, pid_t>>>;
-        std::cout << CAPIO_SERVER_CLI_LOG_SERVER << " [ " << node_name << " ] "
-                  << "CapioStorageService initialization completed." << std::endl;
+        server_println(CAPIO_SERVER_CLI_LOG_SERVER,
+                       "CapioStorageService initialization completed.");
     }
 
     ~CapioStorageService() {
@@ -48,6 +48,7 @@ class CapioStorageService {
         delete _client_to_server_queue;
         delete _server_to_client_queue;
         delete _threads_waiting_for_memory_data;
+        server_println(CAPIO_SERVER_CLI_LOG_SERVER, "CapioStorageService cleanup completed.");
     }
 
     void createMemoryFile(const std::string &file_name) const {
@@ -132,11 +133,13 @@ class CapioStorageService {
     void register_client(const std::string &app_name, const pid_t pid) const {
         START_LOG(gettid(), "call(app_name=%s)", app_name.c_str());
         _client_to_server_queue->emplace(
-            pid, new SPSCQueue("queue-" + std::to_string(pid) + +".cts", get_cache_lines(),
-                               get_cache_line_size(), workflow_name, false));
+            pid,
+            new SPSCQueue("queue-" + std::to_string(pid) + +".cts", get_cache_lines(),
+                          get_cache_line_size(), capio_global_configuration->workflow_name, false));
         _server_to_client_queue->emplace(
-            pid, new SPSCQueue("queue-" + std::to_string(pid) + +".stc", get_cache_lines(),
-                               get_cache_line_size(), workflow_name, false));
+            pid,
+            new SPSCQueue("queue-" + std::to_string(pid) + +".stc", get_cache_lines(),
+                          get_cache_line_size(), capio_global_configuration->workflow_name, false));
         LOG("Created communication queues");
     }
 
@@ -195,7 +198,7 @@ class CapioStorageService {
     [[nodiscard]] size_t sendFilesToStoreInMemory(const long pid) const {
         START_LOG(gettid(), "call(pid=%d)", pid);
 
-        if (StoreOnlyInMemory) {
+        if (capio_global_configuration->StoreOnlyInMemory) {
             LOG("All files should be handled in memory. sending * wildcard");
             char f[PATH_MAX + 1]{0};
             f[0] = '*';

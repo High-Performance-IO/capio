@@ -10,8 +10,6 @@
 
 class CapioCommunicationService {
 
-    char ownHostname[HOST_NAME_MAX] = {0};
-
   public:
     ~CapioCommunicationService() {
         delete capio_control_plane;
@@ -21,48 +19,44 @@ class CapioCommunicationService {
     CapioCommunicationService(std::string &backend_name, const int port,
                               const std::string &control_plane_backend = "multicast") {
         START_LOG(gettid(), "call(backend_name=%s)", backend_name.c_str());
-        gethostname(ownHostname, HOST_NAME_MAX);
-        LOG("My hostname is %s. Starting to listen on connection", ownHostname);
+
+        LOG("My hostname is %s. Starting to listen on connection",
+            capio_global_configuration->node_name);
 
         if (backend_name == "MQTT" || backend_name == "MPI") {
-            std::cout
-                << CAPIO_LOG_SERVER_CLI_LEVEL_WARNING << " [ " << ownHostname << " ] "
-                << "Warn: selected backend is not yet officially supported. Setting backend to TCP"
-                << std::endl;
+            server_println(
+                CAPIO_LOG_SERVER_CLI_LEVEL_WARNING,
+                "Warn: selected backend is not yet officially supported. Setting backend to TCP");
             backend_name = "TCP";
         }
 
         if (backend_name == "TCP" || backend_name == "UCX") {
-            std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_INFO << " [ " << ownHostname << " ] "
-                      << "Selected backend is: " << backend_name << std::endl;
-            std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_INFO << " [ " << ownHostname << " ] "
-                      << "Selected backend port is: " << port << std::endl;
+
+            server_println(CAPIO_LOG_SERVER_CLI_LEVEL_INFO, "Selected backend is " + backend_name);
+            server_println(CAPIO_LOG_SERVER_CLI_LEVEL_INFO,
+                           "Selected backend port is " + std::to_string(port));
             capio_backend = new MTCL_backend(backend_name, std::to_string(port),
                                              CAPIO_BACKEND_DEFAULT_SLEEP_TIME);
         } else if (backend_name == "FS") {
-            std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_INFO << " [ " << ownHostname << " ] "
-                      << "Selected backend is File System" << std::endl;
+            server_println(CAPIO_LOG_SERVER_CLI_LEVEL_INFO, "Selected backend is File System");
             capio_backend = new NoBackend();
         } else {
             START_LOG(gettid(), "call()");
-            std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_ERROR << " [ " << ownHostname << " ] "
-                      << "Provided communication backend " << backend_name << " is invalid"
-                      << std::endl;
+            server_println(CAPIO_LOG_SERVER_CLI_LEVEL_ERROR,
+                           "Provided communication backend " + backend_name + " is invalid");
             ERR_EXIT("No valid backend was provided");
         }
 
         if (control_plane_backend == "multicast") {
-            std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_INFO << " [ " << ownHostname << " ] "
-                      << "Starting multicast control plane" << std::endl;
+            server_println(CAPIO_LOG_SERVER_CLI_LEVEL_INFO, "Starting multicast control plane");
             capio_control_plane = new MulticastControlPlane(port);
         } else {
-            std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_INFO << " [ " << ownHostname << " ] "
-                      << "Starting file system control plane" << std::endl;
+            server_println(CAPIO_LOG_SERVER_CLI_LEVEL_INFO, "Starting file system control plane");
             capio_control_plane = new FSControlPlane(port);
         }
 
-        std::cout << CAPIO_SERVER_CLI_LOG_SERVER << " [ " << ownHostname << " ] "
-                  << "CapioCommunicationService initialization completed." << std::endl;
+        server_println(CAPIO_SERVER_CLI_LOG_SERVER,
+                       "CapioCommunicationService initialization completed.");
     }
 };
 

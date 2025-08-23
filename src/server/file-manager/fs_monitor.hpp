@@ -75,8 +75,8 @@ class FileSystemMonitor {
         START_LOG(gettid(), "call()");
         *continue_execution = true;
         th                  = new std::thread(_main, std::ref(continue_execution));
-        std::cout << CAPIO_SERVER_CLI_LOG_SERVER << " [ " << node_name << " ] "
-                  << "CapioFileSystemMonitor initialization completed." << std::endl;
+        server_println(CAPIO_SERVER_CLI_LOG_SERVER,
+                       "CapioFileSystemMonitor initialization completed.");
     }
 
     ~FileSystemMonitor() {
@@ -90,8 +90,7 @@ class FileSystemMonitor {
 
         delete th;
         delete continue_execution;
-        std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_WARNING << " [ " << node_name << " ] "
-                  << "fs_monitor cleanup completed" << std::endl;
+        server_println(CAPIO_SERVER_CLI_LOG_SERVER, "CapioFileSystemMonitor cleanup completed.");
     }
 };
 

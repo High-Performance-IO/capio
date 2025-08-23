@@ -11,7 +11,6 @@ constexpr capio_off64_t BUFFER_SIZES = 1024;
 
 TEST(CapioCommServiceTest, TestPingPong) {
     START_LOG(gettid(), "INFO: TestPingPong");
-    gethostname(node_name.data(), HOST_NAME_MAX);
     const int port             = 1234;
     std::string proto          = "TCP";
     auto communication_service = new CapioCommunicationService(proto, port, "multicast");

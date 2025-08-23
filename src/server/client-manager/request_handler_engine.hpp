@@ -70,10 +70,10 @@ class RequestHandlerEngine {
         if (ec == std::errc()) {
             strcpy(str, ptr + 1);
         } else {
-            std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_ERROR << " [ " << node_name << " ] "
-                      << "Received invalid code: " << code << std::endl;
-            std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_ERROR << " [ " << node_name << " ] "
-                      << "Offending request: " << ptr << " / " << req << std::endl;
+            server_println(CAPIO_LOG_SERVER_CLI_LEVEL_ERROR,
+                           "Received invalid code: " + std::to_string(code));
+            server_println(CAPIO_LOG_SERVER_CLI_LEVEL_ERROR,
+                           "Offending request: " + std::string(ptr) + " / " + req);
             ERR_EXIT("Invalid request %d:%s", code, ptr);
         }
         return code;
@@ -85,21 +85,19 @@ class RequestHandlerEngine {
 
         client_manager   = new ClientManager();
         request_handlers = build_request_handlers_table();
-        buf_requests     = new CSBufRequest_t(SHM_COMM_CHAN_NAME, CAPIO_REQ_BUFF_CNT,
-                                              CAPIO_REQ_MAX_SIZE, workflow_name);
+        buf_requests =
+            new CSBufRequest_t(SHM_COMM_CHAN_NAME, CAPIO_REQ_BUFF_CNT, CAPIO_REQ_MAX_SIZE,
+                               capio_global_configuration->workflow_name);
 
-        std::cout << CAPIO_SERVER_CLI_LOG_SERVER << " [ " << node_name << " ] "
-                  << "RequestHandlerEngine initialization completed." << std::endl;
+        server_println(CAPIO_SERVER_CLI_LOG_SERVER,
+                       "RequestHandlerEngine initialization completed.");
     }
 
     ~RequestHandlerEngine() {
         START_LOG(gettid(), "call()");
         delete buf_requests;
 
-        std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_WARNING << " [ " << node_name << " ] "
-                  << "buf_requests cleanup completed" << std::endl;
-        std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_WARNING << " [ " << node_name << " ] "
-                  << "request_handlers_engine cleanup completed" << std::endl;
+        server_println(CAPIO_LOG_SERVER_CLI_LEVEL_INFO, "RequestHandlerEngine cleanup completed.");
     }
 
     /**
@@ -117,16 +115,16 @@ class RequestHandlerEngine {
          * as queues are empty and the server ha removed all requests, it calls the termination
          * handler to stop the server execution
          */
-        while (!termination_phase || client_manager->get_connected_posix_client() > 0) {
+        while (!capio_global_configuration->termination_phase ||
+               client_manager->get_connected_posix_client() > 0) {
             LOG(CAPIO_LOG_SERVER_REQUEST_START);
             try {
                 code = read_next_request(str.get());
             } catch (const std::exception &e) {
-                if (termination_phase) {
-                    std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_WARNING << " [ " << node_name << " ] "
-                              << "Termination phase is in progress... Ignoring Exception likely "
-                                 "thrown while receiving SIGUSR1"
-                              << std::endl;
+                if (capio_global_configuration->termination_phase) {
+                    server_println(CAPIO_LOG_SERVER_CLI_LEVEL_WARNING,
+                                   "Termination phase is in progress... "
+                                   "Ignoring Exception likely  thrown while receiving SIGUSR1");
                     continue;
                 }
                 throw;

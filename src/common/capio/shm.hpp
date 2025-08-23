@@ -32,16 +32,16 @@
 
 #define SHM_DESTROY_CHECK(source_name)                                                             \
     if (shm_unlink(source_name) == -1) {                                                           \
-        std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_WARNING << " [ " << node_name << " ] "             \
-                  << "Unable to destroy shared mem: '" << source_name << "' (" << strerror(errno)  \
-                  << ")" << std::endl;                                                             \
+        server_println(CAPIO_LOG_SERVER_CLI_LEVEL_ERROR, "Unable to destroy shared mem: '" +       \
+                                                             std::string(source_name) + "' (" +    \
+                                                             strerror(errno) + ")");               \
     };
 
 #define SHM_CREATE_CHECK(condition, source)                                                        \
     if (condition) {                                                                               \
-        LOG("error while creating %s", source);                                                    \
-        std::cout << CAPIO_SERVER_CLI_LOG_SERVER_ERROR << " [ " << node_name << " ] "              \
-                  << "Unable to create shm: " << source << std::endl;                              \
+        server_println(CAPIO_LOG_SERVER_CLI_LEVEL_ERROR, "Unable to create shared mem: '" +        \
+                                                             std::string(source) + "' (" +         \
+                                                             strerror(errno) + ")");               \
         ERR_EXIT("Unable to open shm %s: %s", source, strerror(errno));                            \
     };
 
@@ -75,8 +75,7 @@ class CapioShmCanary {
     ~CapioShmCanary() {
         START_LOG(capio_syscall(SYS_gettid), "call()");
 #ifndef __CAPIO_POSIX
-        std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_WARNING << " [ " << node_name << " ] "
-                  << "Removing shared memory canary flag" << std::endl;
+        server_println(CAPIO_LOG_SERVER_CLI_LEVEL_INFO, "Removing shared memory canary flag");
 #endif
 
 #ifdef __CAPIO_POSIX
@@ -89,8 +88,7 @@ class CapioShmCanary {
 #endif
 
 #ifndef __CAPIO_POSIX
-        std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_INFO << " [ " << node_name << " ] "
-                  << "shutdown completed" << std::endl;
+        server_println(CAPIO_LOG_SERVER_CLI_LEVEL_INFO, "Shutdown completed");
 #endif
     }
 };

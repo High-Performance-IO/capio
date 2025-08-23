@@ -19,9 +19,10 @@ class DistributedSemaphore {
                 fp = open(name.c_str(), O_EXCL | O_CREAT | O_WRONLY, 0777);
             }
             LOG("Locked %s", name.c_str());
-            if (write(fp, node_name, strlen(node_name)) == -1) {
-                ERR_EXIT("Unable to insert lock holder %s on lock file %s", node_name,
-                         name.c_str());
+            if (write(fp, capio_global_configuration->node_name,
+                      strlen(capio_global_configuration->node_name)) == -1) {
+                ERR_EXIT("Unable to insert lock holder %s on lock file %s",
+                         capio_global_configuration->node_name, name.c_str());
             }
         }
         LOG("Completed spinlock on lock file %s", name.c_str());

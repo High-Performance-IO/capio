@@ -100,7 +100,7 @@ inline std::string get_capio_workflow_name() {
         }
 #else
         LOG("fetching name from workflow_name");
-        name = workflow_name;
+        name = capio_global_configuration->workflow_name;
         if (name.size() == 0) {
             LOG("Falling back to default workflow name");
             name = CAPIO_DEFAULT_WORKFLOW_NAME;

@@ -186,8 +186,8 @@ class MTCL_backend : public BackendInterface {
             char connected_hostname[HOST_NAME_MAX] = {0};
             UserManager.receive(connected_hostname, HOST_NAME_MAX);
 
-            std::cout << CAPIO_SERVER_CLI_LOG_SERVER << " [ " << ownHostname << " ] "
-                      << "Connected from " << connected_hostname << std::endl;
+            server_println(CAPIO_SERVER_CLI_LOG_SERVER,
+                           std::string("Connected from ") + connected_hostname);
 
             LOG("Received connection hostname: %s", connected_hostname);
 
@@ -224,8 +224,7 @@ class MTCL_backend : public BackendInterface {
 
         LOG("Trying to connect on remote: %s", remoteToken.c_str());
         if (auto UserManager = MTCL::Manager::connect(remoteToken); UserManager.isValid()) {
-            std::cout << CAPIO_SERVER_CLI_LOG_SERVER << " [ " << ownHostname << " ] "
-                      << "Connected to " << remoteToken << std::endl;
+            server_println(CAPIO_SERVER_CLI_LOG_SERVER, std::string("Connected to ") + remoteToken);
             LOG("Connected to: %s", remoteToken.c_str());
             UserManager.send(ownHostname, HOST_NAME_MAX);
             const std::lock_guard lg(*_guard);
@@ -239,9 +238,10 @@ class MTCL_backend : public BackendInterface {
                 server_connection_handler, std::move(UserManager), remoteHost.c_str(),
                 thread_sleep_times, connection_tuple, terminate, TO_REMOTE));
         } else {
-            std::cout << CAPIO_SERVER_CLI_LOG_SERVER_WARNING << " [ " << ownHostname << " ] "
-                      << "Warning: found token " << remoteHost << ".alive_token"
-                      << ", but connection is not valid" << std::endl;
+
+            server_println(CAPIO_SERVER_CLI_LOG_SERVER_WARNING,
+                           "Warning: found token " + std::string(remoteHost) +
+                               ".alive_token, but connection is not valid");
         }
     }
 
@@ -269,8 +269,7 @@ class MTCL_backend : public BackendInterface {
 
         th = new std::thread(incoming_connection_listener, std::ref(continue_execution), sleep_time,
                              &connected_hostnames_map, _guard, &connection_threads, terminate);
-        std::cout << CAPIO_SERVER_CLI_LOG_SERVER << " [ " << ownHostname << " ] "
-                  << "MTCL data plane initialization completed." << std::endl;
+        server_println(CAPIO_LOG_SERVER_CLI_LEVEL_INFO, "MTCL_backend initialization completed.");
     }
 
     ~MTCL_backend() override {
@@ -293,8 +292,7 @@ class MTCL_backend : public BackendInterface {
 
         MTCL::Manager::finalize();
         LOG("Finalizing MTCL backend");
-        std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_WARNING << " [ " << ownHostname << " ] "
-                  << "MTCL backend correctly terminated" << std::endl;
+        server_println(CAPIO_LOG_SERVER_CLI_LEVEL_INFO, "MTCL_backend cleanup completed.");
     }
 
     std::string receive(char *buf, capio_off64_t *buf_size, capio_off64_t *start_offset) override {
@@ -353,7 +351,7 @@ class MTCL_backend : public BackendInterface {
             LOG("Pushing Transport unit to out queue");
             out->push(outputUnit);
         } else {
-            std::cout << "can't find target" << std::endl;
+            server_println(CAPIO_LOG_SERVER_CLI_LEVEL_ERROR, "can't find target");
         }
     }
 
