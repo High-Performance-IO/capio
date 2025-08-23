@@ -28,7 +28,7 @@ int mapReduceFunction(char *sourcedirname, ssize_t sstart, ssize_t sfiles, char 
         sprintf(filepath, fmtin, sourcedirname, i);
 
         FILE *fp = fopen(filepath, "r");
-        EXPECT_TRUE(fp);
+        EXPECT_NE(fileno(fp), -1);
 
         char *ptr = readdata(fp, dataptr, &datalen, &datacapacity);
         EXPECT_NE(ptr, nullptr);

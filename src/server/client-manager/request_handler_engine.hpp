@@ -158,6 +158,8 @@ class RequestHandlerEngine {
 
             LOG(CAPIO_LOG_SERVER_REQUEST_END);
         }
+
+        LOG("Terminated handling of posix clients");
     }
 };
 

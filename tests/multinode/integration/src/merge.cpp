@@ -22,7 +22,7 @@ int mergeFunction(ssize_t nfiles, char *sourcedir, char *destdir) {
     for (int i = 0; i < nfiles; ++i) {
         sprintf(filepath, fmtout, sourcedir, i);
         FILE *fp = fopen(filepath, "r");
-        EXPECT_TRUE(fp);
+        EXPECT_NE(fileno(fp), -1);
 
         char *ptr = readdata(fp, dataptr, &datalen, &datacapacity);
         EXPECT_NE(ptr, nullptr);

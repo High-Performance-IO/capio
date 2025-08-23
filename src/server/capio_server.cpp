@@ -76,5 +76,7 @@ int main(int argc, char **argv) {
 
     request_handlers_engine->start();
 
+    sig_term_handler(SIGTERM, nullptr, nullptr);
+
     return 0;
 }
