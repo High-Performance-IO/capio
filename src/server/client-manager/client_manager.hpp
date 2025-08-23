@@ -20,9 +20,7 @@ class ClientManager {
         bufs_response             = new std::unordered_map<long, ResponseQueue *>();
         app_names                 = new std::unordered_map<int, const std::string>;
         files_created_by_producer = new std::unordered_map<pid_t, std::vector<std::string> *>;
-        std::cout << CAPIO_SERVER_CLI_LOG_SERVER << " [ " << capio_global_configuration->node_name
-                  << " ] "
-                  << "ClientManager initialization completed." << std::endl;
+        server_println(CAPIO_SERVER_CLI_LOG_SERVER, "ClientManager initialization completed.");
     }
 
     ~ClientManager() {
@@ -30,9 +28,7 @@ class ClientManager {
         delete bufs_response;
         delete app_names;
         delete files_created_by_producer;
-        std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_WARNING << " [ "
-                  << capio_global_configuration->node_name << " ] "
-                  << "buf_response cleanup completed" << std::endl;
+        server_println(CAPIO_LOG_SERVER_CLI_LEVEL_WARNING, "ClientManager cleanup completed.");
     }
 
     /**

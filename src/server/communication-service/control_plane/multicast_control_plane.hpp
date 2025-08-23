@@ -20,13 +20,12 @@ class MulticastControlPlane : public CapioControlPlane {
 
         int transmission_socket = socket(AF_INET, SOCK_DGRAM, 0);
         if (transmission_socket < 0) {
-            std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_ERROR << " [ "
-                      << capio_global_configuration->node_name << " ] "
-                      << "WARNING: unable to bind multicast socket: " << strerror(errno)
-                      << std::endl;
-            std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_WARNING << " [ "
-                      << capio_global_configuration->node_name << " ] "
-                      << "Execution will continue only with FS discovery support" << std::endl;
+            server_println(CAPIO_LOG_SERVER_CLI_LEVEL_ERROR,
+                           std::string("WARNING: unable to bind multicast socket: ") +
+                               strerror(errno));
+            server_println(CAPIO_LOG_SERVER_CLI_LEVEL_WARNING,
+                           "Execution will continue only with FS discovery support");
+
             return;
         }
 
@@ -40,10 +39,9 @@ class MulticastControlPlane : public CapioControlPlane {
 
         if (sendto(transmission_socket, message, strlen(message), 0,
                    reinterpret_cast<sockaddr *>(&addr), sizeof(addr)) < 0) {
-            std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_ERROR << " [ "
-                      << capio_global_configuration->node_name << " ] "
-                      << "WARNING: unable to send alive token(" << message
-                      << ") to multicast address!: " << strerror(errno) << std::endl;
+            server_println(CAPIO_LOG_SERVER_CLI_LEVEL_ERROR,
+                           "WARNING: unable to send alive token(" + std::string(message) +
+                               ") to multicast address!: " + strerror(errno));
         }
         LOG("Sent multicast token");
         close(transmission_socket);
@@ -66,13 +64,11 @@ class MulticastControlPlane : public CapioControlPlane {
 
         int discovery_socket = socket(AF_INET, SOCK_DGRAM, 0);
         if (discovery_socket < 0) {
-            std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_ERROR << " [ "
-                      << capio_global_configuration->node_name << " ] "
-                      << "WARNING: unable to open multicast socket: " << strerror(errno)
-                      << std::endl;
-            std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_WARNING << " [ "
-                      << capio_global_configuration->node_name << " ] "
-                      << "Execution will continue only with FS discovery support" << std::endl;
+            server_println(CAPIO_LOG_SERVER_CLI_LEVEL_ERROR,
+                           std::string("WARNING: unable to open multicast socket: ") +
+                               strerror(errno));
+            server_println(CAPIO_LOG_SERVER_CLI_LEVEL_WARNING,
+                           "Execution will continue only with FS discovery support");
             return;
         }
         LOG("Created socket");
@@ -80,26 +76,23 @@ class MulticastControlPlane : public CapioControlPlane {
         if (setsockopt(discovery_socket, SOL_SOCKET, SO_REUSEADDR,
                        (char *) &multiple_socket_on_same_address,
                        sizeof(multiple_socket_on_same_address)) < 0) {
-            std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_ERROR << " [ "
-                      << capio_global_configuration->node_name << " ] "
-                      << "WARNING: unable to assign multiple sockets to same address: "
-                      << strerror(errno) << std::endl;
-            std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_WARNING << " [ "
-                      << capio_global_configuration->node_name << " ] "
-                      << "Execution will continue only with FS discovery support" << std::endl;
+            server_println(CAPIO_LOG_SERVER_CLI_LEVEL_ERROR,
+                           std::string("WARNING: unable to multiple sockets to same address: ") +
+                               strerror(errno));
+            server_println(CAPIO_LOG_SERVER_CLI_LEVEL_WARNING,
+                           "Execution will continue only with FS discovery support");
             return;
         }
         LOG("Set IP address to accept multiple sockets on same address");
 
         if (setsockopt(discovery_socket, IPPROTO_IP, IP_MULTICAST_LOOP, &loopback,
                        sizeof(loopback)) < 0) {
-            std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_ERROR << " [ "
-                      << capio_global_configuration->node_name << " ] "
-                      << "WARNING: unable to filter out loopback incoming messages: "
-                      << strerror(errno) << std::endl;
-            std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_WARNING << " [ "
-                      << capio_global_configuration->node_name << " ] "
-                      << "Execution will continue only with FS discovery support" << std::endl;
+            server_println(
+                CAPIO_LOG_SERVER_CLI_LEVEL_ERROR,
+                std::string("WARNING: unable to filter out loopback incoming messages: ") +
+                    strerror(errno));
+            server_println(CAPIO_LOG_SERVER_CLI_LEVEL_WARNING,
+                           "Execution will continue only with FS discovery support");
             return;
         }
         LOG("Disabled reception of loopback messages from socket");
@@ -114,13 +107,11 @@ class MulticastControlPlane : public CapioControlPlane {
         // bind to receive address
         if (bind(discovery_socket, reinterpret_cast<struct sockaddr *>(&addr), sizeof(addr)) < 0) {
 
-            std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_ERROR << " [ "
-                      << capio_global_configuration->node_name << " ] "
-                      << "WARNING: unable to bind multicast socket: " << strerror(errno)
-                      << std::endl;
-            std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_WARNING << " [ "
-                      << capio_global_configuration->node_name << " ] "
-                      << "Execution will continue only with FS discovery support" << std::endl;
+            server_println(CAPIO_LOG_SERVER_CLI_LEVEL_ERROR,
+                           std::string("WARNING: unable to bind multicast socket: ") +
+                               strerror(errno));
+            server_println(CAPIO_LOG_SERVER_CLI_LEVEL_WARNING,
+                           "Execution will continue only with FS discovery support");
             return;
         }
         LOG("Binded socket");
@@ -129,13 +120,11 @@ class MulticastControlPlane : public CapioControlPlane {
         mreq.imr_multiaddr.s_addr = inet_addr(MULTICAST_DISCOVERY_ADDR);
         mreq.imr_interface.s_addr = htonl(INADDR_ANY);
         if (setsockopt(discovery_socket, IPPROTO_IP, IP_ADD_MEMBERSHIP, &mreq, sizeof(mreq)) < 0) {
-            std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_ERROR << " [ "
-                      << capio_global_configuration->node_name << " ] "
-                      << "WARNING: unable to join multicast group: " << strerror(errno)
-                      << std::endl;
-            std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_WARNING << " [ "
-                      << capio_global_configuration->node_name << " ] "
-                      << "Execution will continue only with FS discovery support" << std::endl;
+            server_println(CAPIO_LOG_SERVER_CLI_LEVEL_ERROR,
+                           std::string("WARNING: unable to join multicast group: ") +
+                               strerror(errno));
+            server_println(CAPIO_LOG_SERVER_CLI_LEVEL_WARNING,
+                           "Execution will continue only with FS discovery support");
             return;
         }
         LOG("Successfully joined multicast group");
@@ -152,14 +141,11 @@ class MulticastControlPlane : public CapioControlPlane {
                 LOG("Received multicast data of size %ld and content %s", recv_sice,
                     incomingMessage);
                 if (recv_sice < 0) {
-                    std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_ERROR << " [ "
-                              << capio_global_configuration->node_name << " ] "
-                              << "WARNING: received < 0 bytes from multicast: " << strerror(errno)
-                              << std::endl;
-                    std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_WARNING << " [ "
-                              << capio_global_configuration->node_name << " ] "
-                              << "Execution will continue only with FS discovery support"
-                              << std::endl;
+                    server_println(
+                        CAPIO_LOG_SERVER_CLI_LEVEL_ERROR,
+                        std::string("WARNING: received 0 bytes from multicast socket: "));
+                    server_println(CAPIO_LOG_SERVER_CLI_LEVEL_WARNING,
+                                   "Execution will continue only with FS discovery support");
                     return;
                 }
             } while (std::string(incomingMessage) == SELF_TOKEN);
@@ -167,9 +153,8 @@ class MulticastControlPlane : public CapioControlPlane {
             std::lock_guard lg(*token_used_to_connect_mutex);
             if (std::find(token_used_to_connect->begin(), token_used_to_connect->end(),
                           incomingMessage) == token_used_to_connect->end()) {
-                std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_INFO << " [ "
-                          << capio_global_configuration->node_name << " ] "
-                          << "Multicast adv: " << incomingMessage << std::endl;
+                server_println(CAPIO_LOG_SERVER_CLI_LEVEL_INFO,
+                               "Multicast adv: " + std::string(incomingMessage));
                 LOG("Received message: %s", incomingMessage);
                 token_used_to_connect->push_back(incomingMessage);
                 capio_backend->connect_to(incomingMessage);
@@ -187,9 +172,10 @@ class MulticastControlPlane : public CapioControlPlane {
 
         thread = new std::thread(multicast_server_aliveness_thread, std::ref(continue_execution),
                                  &token_used_to_connect, token_used_to_connect_mutex, backend_port);
-        std::cout << CAPIO_SERVER_CLI_LOG_SERVER << " [ " << ownHostname << " ] "
-                  << "Multicast discovery service @ " << MULTICAST_DISCOVERY_ADDR << ":"
-                  << MULTICAST_DISCOVERY_PORT << std::endl;
+
+        server_println(CAPIO_SERVER_CLI_LOG_SERVER, std::string("Multicast discovery service @ ") +
+                                                        MULTICAST_DISCOVERY_ADDR + ":" +
+                                                        std::to_string(MULTICAST_DISCOVERY_PORT));
     }
 
     ~MulticastControlPlane() override {
@@ -199,8 +185,7 @@ class MulticastControlPlane : public CapioControlPlane {
         delete token_used_to_connect_mutex;
         delete thread;
         delete continue_execution;
-        std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_WARNING << " [ " << ownHostname << " ] "
-                  << "MulticastControlPlane correctly terminated" << std::endl;
+        server_println(CAPIO_SERVER_CLI_LOG_SERVER, "MulticastControlPlane correctly terminated");
     }
 };
 

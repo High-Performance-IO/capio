@@ -26,8 +26,7 @@ class FSControlPlane : public CapioControlPlane {
         FilePort.close();
 
         LOG("Saved self token info to FS");
-        std::cout << CAPIO_SERVER_CLI_LOG_SERVER << " [ " << ownHostname << " ] "
-                  << "Generated token at " << token_filename << std::endl;
+        server_println(CAPIO_SERVER_CLI_LOG_SERVER, "Generated token at " + token_filename);
     }
 
     void delete_aliveness_token() const {
@@ -102,6 +101,8 @@ class FSControlPlane : public CapioControlPlane {
         token_used_to_connect_mutex = new std::mutex();
         thread = new std::thread(fs_server_aliveness_detector_thread, std::ref(continue_execution),
                                  &token_used_to_connect, token_used_to_connect_mutex);
+        server_println(CAPIO_LOG_SERVER_CLI_LEVEL_WARNING,
+                       "FSControlPlane initialization completed.");
     };
 
     ~FSControlPlane() override {
@@ -112,8 +113,7 @@ class FSControlPlane : public CapioControlPlane {
         delete continue_execution;
         delete token_used_to_connect_mutex;
 
-        std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_WARNING << " [ " << ownHostname << " ] "
-                  << "FSControlPlane correctly terminated" << std::endl;
+        server_println(CAPIO_LOG_SERVER_CLI_LEVEL_WARNING, "FSControlPlane cleanup completed.");
     }
 };
 

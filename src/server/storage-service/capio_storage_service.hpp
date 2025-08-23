@@ -38,9 +38,8 @@ class CapioStorageService {
         _threads_waiting_for_memory_data =
             new std::unordered_map<std::string,
                                    std::vector<std::tuple<capio_off64_t, capio_off64_t, pid_t>>>;
-        std::cout << CAPIO_SERVER_CLI_LOG_SERVER << " [ " << capio_global_configuration->node_name
-                  << " ] "
-                  << "CapioStorageService initialization completed." << std::endl;
+        server_println(CAPIO_SERVER_CLI_LOG_SERVER,
+                       "CapioStorageService initialization completed.");
     }
 
     ~CapioStorageService() {
@@ -49,6 +48,7 @@ class CapioStorageService {
         delete _client_to_server_queue;
         delete _server_to_client_queue;
         delete _threads_waiting_for_memory_data;
+        server_println(CAPIO_SERVER_CLI_LOG_SERVER, "CapioStorageService cleanup completed.");
     }
 
     void createMemoryFile(const std::string &file_name) const {

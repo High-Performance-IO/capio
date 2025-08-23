@@ -42,10 +42,10 @@
 int main(int argc, char **argv) {
 
     std::cout << CAPIO_LOG_SERVER_BANNER;
-    std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_INFO << " [ " << capio_global_configuration->node_name
-              << " ] "
-              << "Started server with PID: " << capio_global_configuration->CAPIO_SERVER_MAIN_PID
-              << std::endl;
+
+    server_println(CAPIO_LOG_SERVER_CLI_LEVEL_INFO,
+                   "Started server with PID: " +
+                       std::to_string(capio_global_configuration->CAPIO_SERVER_MAIN_PID));
 
     char resolve_prefix[PATH_MAX]{0};
     const std::string config_path = parseCLI(argc, argv, resolve_prefix);
@@ -62,9 +62,7 @@ int main(int argc, char **argv) {
 
     capio_cl_engine->print();
 
-    std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_INFO << " [ " << capio_global_configuration->node_name
-              << " ] server initialization completed!" << std::endl
-              << std::flush;
+    server_println(CAPIO_LOG_SERVER_CLI_LEVEL_INFO, "server initialization completed!");
 
     request_handlers_engine->start();
 

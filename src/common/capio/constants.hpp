@@ -35,9 +35,9 @@ constexpr int CAPIO_CACHE_LINE_SIZE_DEFAULT          = 32768; // 32K of default 
 // TODO: use that in communication only uses the file descriptor instead of the path to save on the
 // PATH_MAX
 constexpr size_t CAPIO_REQ_MAX_SIZE                  = (PATH_MAX + 256) * sizeof(char);
-constexpr char CAPIO_SERVER_CLI_LOG_SERVER[]         = "[ \033[1;32m SERVER \033[0m ] ";
-constexpr char CAPIO_SERVER_CLI_LOG_SERVER_WARNING[] = "[ \033[1;33m SERVER \033[0m ] ";
-constexpr char CAPIO_SERVER_CLI_LOG_SERVER_ERROR[]   = "[ \033[1;31m SERVER \033[0m ] ";
+constexpr char CAPIO_SERVER_CLI_LOG_SERVER[]         = "[\033[1;32mSERVER\033[0m";
+constexpr char CAPIO_SERVER_CLI_LOG_SERVER_WARNING[] = "[\033[1;33mSERVER\033[0m";
+constexpr char CAPIO_SERVER_CLI_LOG_SERVER_ERROR[]   = "[\033[1;31mSERVER\033[0m";
 constexpr char LOG_CAPIO_START_REQUEST[]             = "\n+++++++++++ SYSCALL %s (%d) +++++++++++";
 constexpr char LOG_CAPIO_END_REQUEST[]               = "----------- END SYSCALL ----------\n";
 constexpr char CAPIO_SERVER_LOG_START_REQUEST_MSG[] = "\n+++++++++++++++++REQUEST+++++++++++++++++";
@@ -103,22 +103,20 @@ constexpr char CAPIO_LOG_SERVER_BANNER[] =
     "\\______/\n\n"
     "\033[0m   CAPIO - Cross Application Programmable IO         \n"
     "                    V. " CAPIO_VERSION "\n\n";
-constexpr char CAPIO_LOG_SERVER_CLI_LEVEL_INFO[]    = "[ \033[1;32m SERVER \033[0m ] ";
-constexpr char CAPIO_LOG_SERVER_CLI_LEVEL_WARNING[] = "[ \033[1;33m SERVER \033[0m ] ";
-constexpr char CAPIO_LOG_SERVER_CLI_LEVEL_ERROR[]   = "[ \033[1;31m SERVER \033[0m ] ";
-constexpr char CAPIO_LOG_SERVER_CLI_LEVEL_JSON[]    = "[ \033[1;34m SERVER \033[0m ] ";
+constexpr char CAPIO_LOG_SERVER_CLI_LEVEL_INFO[]    = "[\033[1;32mSERVER\033[0m";
+constexpr char CAPIO_LOG_SERVER_CLI_LEVEL_WARNING[] = "[\033[1;33mSERVER\033[0m";
+constexpr char CAPIO_LOG_SERVER_CLI_LEVEL_ERROR[]   = "[\033[1;31mSERVER\033[0m";
+constexpr char CAPIO_LOG_SERVER_CLI_LEVEL_JSON[]    = "[\033[1;34mSERVER\033[0m";
 constexpr char CAPIO_LOG_SERVER_CLI_LOGGING_ENABLED_WARNING[] =
-    "[ \033[1;33m SERVER \033[0m ] "
+    "[\033[1;33mSERVER\033[0m] "
     "|==================================================================|\n"
-    "[ \033[1;33m SERVER \033[0m ] | you are running a build of CAPIO with "
+    "[\033[1;33mSERVER\033[0m] | you are running a build of CAPIO with "
     "logging enabled.           |\n"
-    "[ \033[1;33m SERVER \033[0m ] | this will have impact on performance. "
-    "you "
-    "should recompile CAPIO |\n"
-    "[ \033[1;33m SERVER \033[0m ] | with -DCAPIO_LOG=FALSE                 "
-    "   "
-    "                       |\n"
-    "[ \033[1;33m SERVER \033[0m ] "
+    "[\033[1;33mSERVER\033[0m] | this will have impact on performance. "
+    "you should recompile CAPIO |\n"
+    "[\033[1;33mSERVER\033[0m] | with -DCAPIO_LOG=FALSE                 "
+    "                          |\n"
+    "[\033[1;33mSERVER\033[0m] "
     "|==================================================================|\n";
 constexpr char CAPIO_LOG_SERVER_CLI_LOGGING_NOT_AVAILABLE[] =
     "CAPIO_LOG set but log support was not compiled into CAPIO!";
