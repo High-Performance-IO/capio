@@ -13,15 +13,23 @@ Bash.
 
 
 ---
+## Automatic install with SPACK
 
-## 🔧 Build and Run Tests
+CAPIO is on SPACK! to install it automatically, just add the High Performance IO 
+repo to spack and then install CAPIO:
+```bash
+spack repo add https://github.com/High-Performance-IO/hpio-spack.git
+spack install capio
+```
+
+## 🔧 Manual Build and Install
 
 ### Dependencies
 
 **Required manually:**
 
 - `cmake >= 3.15`
-- `C++17`
+- `C++20`
 - `pthreads`
 
 **Fetched/compiled during configuration:**
@@ -84,11 +92,17 @@ CAPIO_WORKFLOW_NAME=wfname
 CAPIO_APP_NAME=appname
 LD_PRELOAD=libcapio_posix.so
 ./your_app <args>
+
+killall -USR1 capio_server
 ```
 
 > [!CAUTION]  
 > if `CAPIO_APP_NAME` and `CAPIO_WORKFLOW_NAME` are not set (or are set but do not match the values present in the
 > CAPIO-CL configuration file), CAPIO will not be able to operate correctly!
+
+> [!tip]  
+> To gracefully shhut down the capio server instance, just send the SIGUSR1 signal.
+> the capio_server process will then automatically clean up and terminate itself!
 
 ---
 
