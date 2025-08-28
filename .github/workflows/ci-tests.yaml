@@ -156,29 +156,34 @@ jobs:
         run: |
           export LD_LIBRARY_PATH="/usr/local/lib:${LD_LIBRARY_PATH}"
           
-          echo "Run CAPIO syscall Unit tests"
-          #LD_PRELOAD=libcapio_posix.so \
-          #capio_syscall_unit_tests \
-          #  --gtest_break_on_failure \
-          #  --gtest_print_time=1
+          echo "Run CAPIO syscall Unit tests"         
+          capio_server --no-config &
+          CAPIO_SERVER_PID=$!
+          LD_PRELOAD=libcapio_posix.so  capio_syscall_unit_tests          \
+                  --gtest_break_on_failure --gtest_print_time=1
+          kill $CAPIO_SERVER_PID
           
-          capiorun -d $CAPIO_DIR -n default_app -L -1  capio_syscall_unit_tests  --gtest_break_on_failure  --gtest_print_time=1
           
-          echo "Run CAPIO SERVER unit tests"
-          capio_server_unit_tests \
-            --gtest_break_on_failure \
-            --gtest_print_time=1
+          echo "Run CAPIO memory file integration tests"
+          capio_server --no-config &
+          CAPIO_SERVER_PID=$!
+          LD_PRELOAD=libcapio_posix.so  capio_memory_file_unit_tests      \
+                  --gtest_break_on_failure  --gtest_print_time=1
+          kill $CAPIO_SERVER_PID
+          
+          
           
           echo "Run CAPIO POSIX Unit tests"
           capio_posix_unit_tests \
             --gtest_break_on_failure \
             --gtest_print_time=1 
           
-          echo "Run CAPIO memory file integration tests"
-          LD_PRELOAD=libcapio_posix.so \
-          capio_memory_file_unit_tests \
+          
+          echo "Run CAPIO SERVER unit tests"
+          capio_server_unit_tests \
             --gtest_break_on_failure \
             --gtest_print_time=1
+
 
       - name: "Show client logs on failure"
         if: ${{ always() && steps.run-tests.outcome == 'failure' && matrix.build_type == 'Debug' }}
