@@ -329,7 +329,9 @@ resolve_possible_symlink(const std::filesystem::path &input_path) {
         }
         if (std::filesystem::is_symlink(resolved)) {
             char buf[PATH_MAX]{0};
-            if (capio_syscall(SYS_readlink, resolved.c_str(), buf, sizeof(buf) - 1) == -1) {
+            auto result =
+                capio_syscall(SYS_readlinkat, AT_FDCWD, resolved.c_str(), buf, sizeof(buf) - 1);
+            if (result == -1) {
                 LOG("File might not exist. path was %s and  Error is %s", resolved.c_str(),
                     strerror(errno));
                 continue;
