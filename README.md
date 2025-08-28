@@ -11,6 +11,10 @@ Bash.
 > Just use a MTCL provided backend, if you want the in-memory IO, or fall back to the file system backend (default) if
 > oy just want to coordinate IO operations between workflow steps!
 
+Compatible on:
+- ![Architecture](https://img.shields.io/badge/Architecture-x86_64-blue.svg) 
+- ![Architecture](https://img.shields.io/badge/Architecture-risc--v-green.svg)
+- ![Architecture](https://img.shields.io/badge/Architecture-arm64-red.svg) coming soon!
 
 ---
 ## Automatic install with SPACK
@@ -21,6 +25,9 @@ repo to spack and then install CAPIO:
 spack repo add https://github.com/High-Performance-IO/hpio-spack.git
 spack install capio
 ```
+
+> [!WARNING]  
+> To use this method, you need spack >= v1.0.0
 
 ## 🔧 Manual Build and Install
 

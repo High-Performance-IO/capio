@@ -51,20 +51,10 @@ inline void handshake_request(const long tid, const long pid, const std::string 
     sprintf(req, "%04d %ld %ld %s", CAPIO_REQUEST_HANDSHAKE, tid, pid, app_name.c_str());
     buf_requests->write(req, CAPIO_REQ_MAX_SIZE);
 
-#ifndef CAPIO_BUILD_TESTS
     LOG("Waiting for response from capio_server");
-    /*
-     * The handshake request must be blocking ONLY when not building tests. This is because when
-     * starting unit tests, the binary is loaded with libcapio_posix.so underneath thus performing
-     * a handshake request. If the handshake is blocking, then the capio_server binary cannot be
-     * started as the whole process is waiting for a handshake.
-     */
     if (bufs_response->at(pid)->read() == 0) {
         ERR_EXIT("Error: handshake request sent while capio_server is shutting down!");
     }
-#endif
-
-    LOG("Sent handshake request");
 }
 
 /**
