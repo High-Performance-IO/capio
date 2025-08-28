@@ -3,7 +3,6 @@
 
 std::string workflow_name = CAPIO_DEFAULT_WORKFLOW_NAME;
 
-
 int main(int argc, char **argv, char **envp) {
     testing::InitGoogleTest(&argc, argv);
 

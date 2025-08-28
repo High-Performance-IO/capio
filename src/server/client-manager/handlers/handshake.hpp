@@ -22,24 +22,17 @@ inline void handshake_handler(const char *const str) {
         storage_service->register_client(app_name, tid);
         server_println(CAPIO_LOG_SERVER_CLI_LEVEL_INFO,
                        "Registered new app: " + std::string(app_name));
-        /*
-         * The handshake request must be blocking ONLY when not building tests. This is because when
-         * starting unit tests, the binary is loaded with libcapio_posix.so underneath thus
-         * performing a handshake request. If the handshake is blocking, then the capio_server
-         * binary cannot be started as the whole process is waiting for a handshake.
-         */
-#ifndef CAPIO_BUILD_TESTS
+
         // Unlock client waiting to start
         LOG("Allowing handshake to continue");
         client_manager->reply_to_client(tid, 1);
-#endif
+
     } else {
-#ifndef CAPIO_BUILD_TESTS
         LOG("Termination phase is in progress. ignoring further handshakes.");
         client_manager->reply_to_client(tid, 0);
         server_println(CAPIO_LOG_SERVER_CLI_LEVEL_ERROR,
                        "Termination phase is in progress. ignoring further handshakes.");
-#endif
+
     }
 }
 
