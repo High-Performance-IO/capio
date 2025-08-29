@@ -19,7 +19,7 @@ class CapioControlPlane {
                 const std::string &hostname_target) {}
 
     /**
-     * Notify all nodes of the occurence of an event
+     * Notify all nodes of the occurrence of an event
      * @param event
      * @param path
      */

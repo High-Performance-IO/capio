@@ -111,7 +111,7 @@ class MulticastControlPlane : public CapioControlPlane {
             }
 
             server_println(CAPIO_LOG_SERVER_CLI_LEVEL_INFO,
-                           "Recived control message: " + std::string(incoming_msg));
+                           "Received control message: " + std::string(incoming_msg));
         }
 
         close(discovery_socket);

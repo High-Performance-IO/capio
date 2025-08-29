@@ -16,7 +16,8 @@ class CapioCommunicationService {
         delete capio_backend;
     };
 
-    CapioCommunicationService(std::string &backend_name, const int port) {
+    CapioCommunicationService(std::string &backend_name, const int port,
+                              const std::string &control_backend_name) {
         START_LOG(gettid(), "call(backend_name=%s)", backend_name.c_str());
 
         LOG("My hostname is %s. Starting to listen on connection",
@@ -48,6 +49,16 @@ class CapioCommunicationService {
 
         server_println(CAPIO_SERVER_CLI_LOG_SERVER,
                        "CapioCommunicationService initialization completed.");
+
+        if (control_backend_name == "fs") {
+            server_println(CAPIO_LOG_SERVER_CLI_LEVEL_INFO, "Starting FS control plane");
+            capio_control_plane = new FSControlPlane(port);
+        } else if (control_backend_name == "multicast") {
+            server_println(CAPIO_LOG_SERVER_CLI_LEVEL_INFO, "Starting multicast control plane");
+            capio_control_plane = new MulticastControlPlane(port);
+        }else {
+            server_println(CAPIO_LOG_SERVER_CLI_LEVEL_INFO, "Error: unknown control plane backend: " + control_backend_name);
+        }
     }
 };
 

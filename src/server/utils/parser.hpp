@@ -139,37 +139,26 @@ std::string parseCLI(int argc, char **argv, char *resolve_prefix) {
 #endif
 
     // Port used for communication backend
-    int port = DEFAULT_CAPIO_BACKEND_PORT;
+    int port                         = DEFAULT_CAPIO_BACKEND_PORT;
+    std::string control_backend_name = "multicast";
     if (backend_port) {
         port = args::get(backend_port);
     }
 
-    if (backend) {
-        std::string backend_name = args::get(backend);
-        std::transform(backend_name.begin(), backend_name.end(), backend_name.begin(), ::toupper);
-
-        capio_communication_service = new CapioCommunicationService(backend_name, port);
-
-    } else {
-        server_println(CAPIO_LOG_SERVER_CLI_LEVEL_INFO, "Selected backend is File System");
-        capio_backend = new NoBackend();
-    }
-
-    std::string control_backend_name = "multicast";
-
     if (controlPlaneBackend) {
-        auto tmp = args::get(controlPlaneBackend);
-        if (tmp == "fs") {
-            server_println(CAPIO_LOG_SERVER_CLI_LEVEL_INFO, "Starting FS control plane");
-            capio_control_plane = new FSControlPlane(port);
-        } else {
-            server_println(CAPIO_LOG_SERVER_CLI_LEVEL_INFO, "Starting multicast control plane");
-            capio_control_plane = new MulticastControlPlane(port);
-        }
-    } else {
-        server_println(CAPIO_LOG_SERVER_CLI_LEVEL_INFO, "Starting multicast control plane");
-        capio_control_plane = new MulticastControlPlane(port);
+        control_backend_name = std::string(args::get(controlPlaneBackend));
     }
+
+    std::string backend_name = "none";
+    if (backend) {
+        std::string tmp = args::get(backend);
+        std::ranges::transform(tmp, tmp.begin(), ::toupper);
+        backend_name = tmp;
+    }
+
+    server_println(CAPIO_LOG_SERVER_CLI_LEVEL_INFO, "Selected backend is: " + backend_name);
+    capio_communication_service =
+        new CapioCommunicationService(backend_name, port, control_backend_name);
 
     if (capio_cl_resolve_path) {
         auto path = args::get(capio_cl_resolve_path);
