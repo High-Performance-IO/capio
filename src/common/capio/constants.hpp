@@ -11,16 +11,16 @@
 typedef unsigned long long int capio_off64_t;
 
 // CAPIO files constants
-constexpr size_t CAPIO_DEFAULT_DIR_INITIAL_SIZE                 = 1024L * 1024 * 1024;
-constexpr off64_t CAPIO_DEFAULT_FILE_INITIAL_SIZE               = 1024L * 1024 * 1024 * 4;
+constexpr size_t CAPIO_DEFAULT_DIR_INITIAL_SIZE = 1024L * 1024 * 1024;
+constexpr off64_t CAPIO_DEFAULT_FILE_INITIAL_SIZE = 1024L * 1024 * 1024 * 4;
 [[maybe_unused]] constexpr std::array CAPIO_DIR_FORBIDDEN_PATHS = {
     std::string_view{"/proc/"}, std::string_view{"/sys/"}, std::string_view{"/boot/"},
-    std::string_view{"/dev/"},  std::string_view{"/var/"}, std::string_view{"/run/"},
+    std::string_view{"/dev/"}, std::string_view{"/var/"}, std::string_view{"/run/"},
     std::string_view("/spack/")};
 
 // CAPIO default values for shared memory
 constexpr char CAPIO_DEFAULT_WORKFLOW_NAME[] = "CAPIO";
-constexpr char CAPIO_DEFAULT_APP_NAME[]      = "default_app";
+constexpr char CAPIO_DEFAULT_APP_NAME[] = "default_app";
 constexpr char CAPIO_SHM_CANARY_ERROR[] =
     "FATAL ERROR:  Shared memories for workflow %s already "
     "exists. One of two (or both) reasons are to blame: \n             "
@@ -29,52 +29,52 @@ constexpr char CAPIO_SHM_CANARY_ERROR[] =
     "is already running. Clean shared memory and then retry";
 
 // CAPIO communication constants
-constexpr int CAPIO_REQ_BUFF_CNT                     = 512; // Max number of elements inside buffers
-constexpr int CAPIO_CACHE_LINES_DEFAULT              = 10;
-constexpr int CAPIO_CACHE_LINE_SIZE_DEFAULT          = 32768; // 32K of default size for cache lines
+constexpr int CAPIO_REQ_BUFF_CNT = 512; // Max number of elements inside buffers
+constexpr int CAPIO_CACHE_LINES_DEFAULT = 10;
+constexpr int CAPIO_CACHE_LINE_SIZE_DEFAULT = 32768; // 32K of default size for cache lines
 // TODO: use that in communication only uses the file descriptor instead of the path to save on the
 // PATH_MAX
-constexpr size_t CAPIO_REQ_MAX_SIZE                  = (PATH_MAX + 256) * sizeof(char);
-constexpr char CAPIO_SERVER_CLI_LOG_SERVER[]         = "[\033[1;32mSERVER\033[0m";
+constexpr size_t CAPIO_REQ_MAX_SIZE = (PATH_MAX + 256) * sizeof(char);
+constexpr char CAPIO_SERVER_CLI_LOG_SERVER[] = "[\033[1;32mSERVER\033[0m";
 constexpr char CAPIO_SERVER_CLI_LOG_SERVER_WARNING[] = "[\033[1;33mSERVER\033[0m";
-constexpr char CAPIO_SERVER_CLI_LOG_SERVER_ERROR[]   = "[\033[1;31mSERVER\033[0m";
-constexpr char LOG_CAPIO_START_REQUEST[]             = "\n+++++++++++ SYSCALL %s (%d) +++++++++++";
-constexpr char LOG_CAPIO_END_REQUEST[]               = "----------- END SYSCALL ----------\n";
+constexpr char CAPIO_SERVER_CLI_LOG_SERVER_ERROR[] = "[\033[1;31mSERVER\033[0m";
+constexpr char LOG_CAPIO_START_REQUEST[] = "\n+++++++++++ SYSCALL %s (%d) +++++++++++";
+constexpr char LOG_CAPIO_END_REQUEST[] = "----------- END SYSCALL ----------\n";
 constexpr char CAPIO_SERVER_LOG_START_REQUEST_MSG[] = "\n+++++++++++++++++REQUEST+++++++++++++++++";
-constexpr char CAPIO_SERVER_LOG_END_REQUEST_MSG[]   = "~~~~~~~~~~~~~~~END REQUEST~~~~~~~~~~~~~~~";
-constexpr int CAPIO_LOG_MAX_MSG_LEN                 = 4096;
-constexpr int CAPIO_MAX_SPSQUEUE_ELEMS              = 10;
-constexpr int CAPIO_MAX_SPSCQUEUE_ELEM_SIZE         = 1024 * 256;
+constexpr char CAPIO_SERVER_LOG_END_REQUEST_MSG[] = "~~~~~~~~~~~~~~~END REQUEST~~~~~~~~~~~~~~~";
+constexpr int CAPIO_LOG_MAX_MSG_LEN = 4096;
+constexpr int CAPIO_MAX_SPSQUEUE_ELEMS = 10;
+constexpr int CAPIO_MAX_SPSCQUEUE_ELEM_SIZE = 1024 * 256;
 
 // CAPIO streaming semantics
-constexpr char CAPIO_FILE_MODE_NO_UPDATE[]           = "no_update";
-constexpr char CAPIO_FILE_MODE_UPDATE[]              = "update";
-constexpr char CAPIO_FILE_COMMITTED_ON_CLOSE[]       = "on_close";
-constexpr char CAPIO_FILE_COMMITTED_ON_FILE[]        = "on_file";
-constexpr char CAPIO_FILE_COMMITTED_N_FILES[]        = "n_files";
+constexpr char CAPIO_FILE_MODE_NO_UPDATE[] = "no_update";
+constexpr char CAPIO_FILE_MODE_UPDATE[] = "update";
+constexpr char CAPIO_FILE_COMMITTED_ON_CLOSE[] = "on_close";
+constexpr char CAPIO_FILE_COMMITTED_ON_FILE[] = "on_file";
+constexpr char CAPIO_FILE_COMMITTED_N_FILES[] = "n_files";
 constexpr char CAPIO_FILE_COMMITTED_ON_TERMINATION[] = "on_termination";
 
 // CAPIO POSIX return codes
-constexpr int CAPIO_POSIX_SYSCALL_ERRNO        = -1;
+constexpr int CAPIO_POSIX_SYSCALL_ERRNO = -1;
 constexpr int CAPIO_POSIX_SYSCALL_REQUEST_SKIP = -2;
-constexpr int CAPIO_POSIX_SYSCALL_SKIP         = 1;
-constexpr int CAPIO_POSIX_SYSCALL_SUCCESS      = 0;
+constexpr int CAPIO_POSIX_SYSCALL_SKIP = 1;
+constexpr int CAPIO_POSIX_SYSCALL_SUCCESS = 0;
 
 // CAPIO logger - common
-constexpr char CAPIO_LOG_PRE_MSG[]        = "at[%.15llu][%.40s]: ";
+constexpr char CAPIO_LOG_PRE_MSG[] = "at[%.15llu][%.40s]: ";
 constexpr char CAPIO_DEFAULT_LOG_FOLDER[] = "capio_logs\0";
 
 // CAPIO common - shared memory constant names
-constexpr char SHM_FIRST_ELEM[]        = "_first_elem_";
-constexpr char SHM_LAST_ELEM[]         = "_last_elem_";
-constexpr char SHM_MUTEX_PREFIX[]      = "_mutex_";
-constexpr char SHM_SEM_ELEMS[]         = "_sem_num_elems_";
-constexpr char SHM_SEM_EMPTY[]         = "_sem_num_empty_";
+constexpr char SHM_FIRST_ELEM[] = "_first_elem_";
+constexpr char SHM_LAST_ELEM[] = "_last_elem_";
+constexpr char SHM_MUTEX_PREFIX[] = "_mutex_";
+constexpr char SHM_SEM_ELEMS[] = "_sem_num_elems_";
+constexpr char SHM_SEM_EMPTY[] = "_sem_num_empty_";
 constexpr char SHM_SPSC_PREFIX_WRITE[] = "capio_write_tid_";
-constexpr char SHM_SPSC_PREFIX_READ[]  = "capio_read_tid_";
+constexpr char SHM_SPSC_PREFIX_READ[] = "capio_read_tid_";
 
 // CAPIO common - shared channel by client and server
-constexpr char SHM_COMM_CHAN_NAME[]      = "request_buffer";
+constexpr char SHM_COMM_CHAN_NAME[] = "request_buffer";
 constexpr char SHM_COMM_CHAN_NAME_RESP[] = "response_buffer_";
 
 // CAPIO logger - shm errors
@@ -84,8 +84,8 @@ constexpr char CAPIO_SHM_OPEN_ERROR[] =
 
 // CAPIO logger - POSIX
 constexpr char CAPIO_LOG_POSIX_DEFAULT_LOG_FILE_PREFIX[] = "posix_thread_\0";
-constexpr char CAPIO_LOG_POSIX_SYSCALL_START[]           = "\n+++++++++ SYSCALL %s (%d) +++++++++";
-constexpr char CAPIO_LOG_POSIX_SYSCALL_END[]             = "~~~~~~~~~  END SYSCALL ~~~~~~~~~\n";
+constexpr char CAPIO_LOG_POSIX_SYSCALL_START[] = "\n+++++++++ SYSCALL %s (%d) +++++++++";
+constexpr char CAPIO_LOG_POSIX_SYSCALL_END[] = "~~~~~~~~~  END SYSCALL ~~~~~~~~~\n";
 
 // CAPIO logger - server
 constexpr char CAPIO_SERVER_DEFAULT_LOG_FILE_PREFIX[] = "server_thread_\0";
@@ -103,10 +103,10 @@ constexpr char CAPIO_LOG_SERVER_BANNER[] =
     "\\______/\n\n"
     "\033[0m   CAPIO - Cross Application Programmable IO         \n"
     "                    V. " CAPIO_VERSION "\n\n";
-constexpr char CAPIO_LOG_SERVER_CLI_LEVEL_INFO[]    = "[\033[1;32mSERVER\033[0m";
+constexpr char CAPIO_LOG_SERVER_CLI_LEVEL_INFO[] = "[\033[1;32mSERVER\033[0m";
 constexpr char CAPIO_LOG_SERVER_CLI_LEVEL_WARNING[] = "[\033[1;33mSERVER\033[0m";
-constexpr char CAPIO_LOG_SERVER_CLI_LEVEL_ERROR[]   = "[\033[1;31mSERVER\033[0m";
-constexpr char CAPIO_LOG_SERVER_CLI_LEVEL_JSON[]    = "[\033[1;34mSERVER\033[0m";
+constexpr char CAPIO_LOG_SERVER_CLI_LEVEL_ERROR[] = "[\033[1;31mSERVER\033[0m";
+constexpr char CAPIO_LOG_SERVER_CLI_LEVEL_JSON[] = "[\033[1;34mSERVER\033[0m";
 constexpr char CAPIO_LOG_SERVER_CLI_LOGGING_ENABLED_WARNING[] =
     "[\033[1;33mSERVER\033[0m] "
     "|==================================================================|\n"
@@ -121,7 +121,7 @@ constexpr char CAPIO_LOG_SERVER_CLI_LOGGING_ENABLED_WARNING[] =
 constexpr char CAPIO_LOG_SERVER_CLI_LOGGING_NOT_AVAILABLE[] =
     "CAPIO_LOG set but log support was not compiled into CAPIO!";
 constexpr char CAPIO_LOG_SERVER_REQUEST_START[] = "+++++++++++ REQUEST +++++++++++";
-constexpr char CAPIO_LOG_SERVER_REQUEST_END[]   = "~~~~~~~~~ END REQUEST ~~~~~~~~~\n";
+constexpr char CAPIO_LOG_SERVER_REQUEST_END[] = "~~~~~~~~~ END REQUEST ~~~~~~~~~\n";
 
 // CAPIO server argument parser
 constexpr char CAPIO_SERVER_ARG_PARSER_PRE[] =
@@ -185,10 +185,17 @@ constexpr char CAPIO_SERVER_ARG_PARSER_CONFIG_BACKEND_HELP[] =
 
 // CAPIO backend constant values
 
-constexpr int DEFAULT_CAPIO_BACKEND_PORT       = 2222;
+constexpr int DEFAULT_CAPIO_BACKEND_PORT = 2222;
 constexpr int CAPIO_BACKEND_DEFAULT_SLEEP_TIME = 300;
-constexpr char MULTICAST_DISCOVERY_ADDR[]      = "234.234.234.1";
-constexpr int MULTICAST_DISCOVERY_PORT         = 2223;
-constexpr int MULTICAST_ALIVE_TOKEN_MESSAGE_SIZE =
-    HOST_NAME_MAX + 10; // hostname + : + sizeof(port)
+constexpr char MULTICAST_DISCOVERY_ADDR[] = "234.234.234.1";
+constexpr char MULTICAST_CONTROLPL_ADDR[] = "234.234.234.2";
+constexpr int MULTICAST_DISCOVERY_PORT = 2223;
+constexpr int MULTICAST_CONTROLPL_PORT = 2224;
+
+
+// hostname + : + sizeof(port)
+constexpr int MULTICAST_ALIVE_TOKEN_MESSAGE_SIZE = HOST_NAME_MAX + 10;
+constexpr int MULTICAST_CONTROLPL_MESSAGE_SIZE = HOST_NAME_MAX + PATH_MAX + 10;
+
+
 #endif                  // CAPIO_COMMON_CONSTANTS_HPP

@@ -13,7 +13,7 @@ TEST(CapioCommServiceTest, TestPingPong) {
     START_LOG(gettid(), "INFO: TestPingPong");
     const int port             = 1234;
     std::string proto          = "TCP";
-    auto communication_service = new CapioCommunicationService(proto, port, "multicast");
+    auto communication_service = new CapioCommunicationService(proto, port);
     capio_off64_t size_revc, offset;
 
     std::vector<std::string> connections;

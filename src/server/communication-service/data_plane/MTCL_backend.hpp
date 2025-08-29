@@ -238,10 +238,9 @@ class MTCL_backend : public BackendInterface {
                 server_connection_handler, std::move(UserManager), remoteHost.c_str(),
                 thread_sleep_times, connection_tuple, terminate, TO_REMOTE));
         } else {
-
             server_println(CAPIO_SERVER_CLI_LOG_SERVER_WARNING,
-                           "Warning: found token " + std::string(remoteHost) +
-                               ".alive_token, but connection is not valid");
+                           "Warning: tried to connect to " + std::string(remoteHost) +
+                               " but connection is not valid");
         }
     }
 

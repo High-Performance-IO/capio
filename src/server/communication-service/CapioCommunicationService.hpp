@@ -16,8 +16,7 @@ class CapioCommunicationService {
         delete capio_backend;
     };
 
-    CapioCommunicationService(std::string &backend_name, const int port,
-                              const std::string &control_plane_backend = "multicast") {
+    CapioCommunicationService(std::string &backend_name, const int port) {
         START_LOG(gettid(), "call(backend_name=%s)", backend_name.c_str());
 
         LOG("My hostname is %s. Starting to listen on connection",
@@ -45,14 +44,6 @@ class CapioCommunicationService {
             server_println(CAPIO_LOG_SERVER_CLI_LEVEL_ERROR,
                            "Provided communication backend " + backend_name + " is invalid");
             ERR_EXIT("No valid backend was provided");
-        }
-
-        if (control_plane_backend == "multicast") {
-            server_println(CAPIO_LOG_SERVER_CLI_LEVEL_INFO, "Starting multicast control plane");
-            capio_control_plane = new MulticastControlPlane(port);
-        } else {
-            server_println(CAPIO_LOG_SERVER_CLI_LEVEL_INFO, "Starting file system control plane");
-            capio_control_plane = new FSControlPlane(port);
         }
 
         server_println(CAPIO_SERVER_CLI_LOG_SERVER,

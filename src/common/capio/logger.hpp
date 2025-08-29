@@ -372,7 +372,7 @@ inline bool syscall_no_intercept_flag = false;
 #define ERR_EXIT(fmt, ...)                                                                         \
     if (!continue_on_error) {                                                                      \
         syscall_no_intercept_flag = true;                                                          \
-        char tmp_buf[1024];                                                                        \
+        char tmp_buf[5120];                                                                        \
         sprintf(tmp_buf, fmt, ##__VA_ARGS__);                                                      \
         char node_name[HOST_NAME_MAX]{0};                                                          \
         gethostname(node_name, HOST_NAME_MAX);                                                     \
