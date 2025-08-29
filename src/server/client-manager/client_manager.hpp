@@ -1,6 +1,9 @@
 #ifndef CLIENT_MANAGER_HPP
 #define CLIENT_MANAGER_HPP
 #include <capio/response_queue.hpp>
+#include <utils/configuration.hpp>
+#include <unordered_map>
+#include <vector>
 
 /**
  * @brief Class to handle libcapio_posix clients applications

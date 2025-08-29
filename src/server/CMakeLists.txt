@@ -5,6 +5,8 @@ set(TARGET_NAME capio_server)
 set(TARGET_INCLUDE_FOLDER ${CMAKE_CURRENT_SOURCE_DIR})
 set(TARGET_SOURCES
         ${CMAKE_CURRENT_SOURCE_DIR}/capio_server.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/src/capio_cl_engine.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/src/json_parser.cpp
 )
 
 #####################################

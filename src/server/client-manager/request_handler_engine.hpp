@@ -1,8 +1,8 @@
 #ifndef CAPIO_CL_ENGINE_MAIN_HPP
 #define CAPIO_CL_ENGINE_MAIN_HPP
 
-#include "capio-cl-engine/capio_cl_engine.hpp"
-#include "capio-cl-engine/json_parser.hpp"
+#include "include/capio-cl-engine/capio_cl_engine.hpp"
+#include "include/capio-cl-engine/json_parser.hpp"
 #include "capio/requests.hpp"
 #include "client_manager.hpp"
 #include "file-manager/file_manager.hpp"

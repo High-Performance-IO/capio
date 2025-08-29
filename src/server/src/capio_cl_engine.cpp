@@ -1,0 +1,434 @@
+
+#include <include/capio-cl-engine/capio_cl_engine.hpp>
+#include "utils/configuration.hpp"
+
+void CapioCLEngine::print() const {
+    // First message
+    server_println(CAPIO_LOG_SERVER_CLI_LEVEL_JSON, "");
+    server_println(CAPIO_LOG_SERVER_CLI_LEVEL_JSON, "Composition of expected CAPIO FS: ");
+
+    // Table header lines
+    server_println(CAPIO_LOG_SERVER_CLI_LEVEL_JSON,
+                   "|============================================================================"
+                   "==========================================================|");
+
+    server_println(CAPIO_LOG_SERVER_CLI_LEVEL_JSON, "|" + std::string(134, ' ') + "|");
+
+    {
+        std::ostringstream oss;
+        oss << "|     Parsed configuration file for workflow: \033[1;36m"
+            << capio_global_configuration->workflow_name
+            << std::setw(94 - capio_global_configuration->workflow_name.length()) << "\033[0m |";
+        server_println(CAPIO_LOG_SERVER_CLI_LEVEL_JSON, oss.str());
+    }
+
+    server_println(CAPIO_LOG_SERVER_CLI_LEVEL_JSON, "|" + std::string(134, ' ') + "|");
+
+    server_println(CAPIO_LOG_SERVER_CLI_LEVEL_JSON,
+                   "|     File color legend:     \033[48;5;034m  \033[0m File stored in memory" +
+                       std::string(82, ' ') + "|");
+
+    server_println(
+        CAPIO_LOG_SERVER_CLI_LEVEL_JSON,
+        "|                            \033[48;5;172m  \033[0m File stored on file system" +
+            std::string(77, ' ') + "|");
+
+    server_println(CAPIO_LOG_SERVER_CLI_LEVEL_JSON,
+                   "|============================================================================"
+                   "==========================================================|");
+
+    server_println(CAPIO_LOG_SERVER_CLI_LEVEL_JSON,
+                   "|======|===================|===================|====================|========"
+                   "============|============|===========|=========|==========|");
+
+    server_println(CAPIO_LOG_SERVER_CLI_LEVEL_JSON,
+                   "| Kind | Filename          | Producer step     | Consumer step      |  "
+                   "Commit Rule       |  Fire Rule | Permanent | Exclude | n_files  |");
+
+    server_println(CAPIO_LOG_SERVER_CLI_LEVEL_JSON,
+                   "|======|===================|===================|====================|========"
+                   "============|============|===========|=========|==========|");
+
+    // Iterate over _locations
+    for (auto &itm : _locations) {
+        std::string color_preamble = std::get<11>(itm.second) ? "\033[38;5;034m" : "\033[38;5;172m";
+        std::string color_post     = "\033[0m";
+
+        std::string name_trunc = truncateLastN(itm.first, 12);
+        auto kind              = std::get<6>(itm.second) ? "F" : "D";
+
+        std::ostringstream base_line;
+        base_line << "|   " << color_preamble << kind << color_post << "  | " << color_preamble
+                  << name_trunc << color_post << std::setfill(' ')
+                  << std::setw(20 - name_trunc.length()) << "| ";
+
+        auto producers = std::get<0>(itm.second);
+        auto consumers = std::get<1>(itm.second);
+        auto rowCount  = std::max(producers.size(), consumers.size());
+
+        std::string n_files = std::to_string(std::get<8>(itm.second));
+        if (std::get<8>(itm.second) < 1) {
+            n_files = "N.A.";
+        }
+
+        for (std::size_t i = 0; i <= rowCount; i++) {
+            std::ostringstream line;
+
+            if (i == 0) {
+                line << base_line.str();
+            } else {
+                line << "|      |                   | ";
+            }
+
+            if (i < producers.size()) {
+                auto prod1 = truncateLastN(producers.at(i), 12);
+                line << prod1 << std::setfill(' ') << std::setw(20 - prod1.length()) << " | ";
+            } else {
+                line << std::setfill(' ') << std::setw(20) << " | ";
+            }
+
+            if (i < consumers.size()) {
+                auto cons1 = truncateLastN(consumers.at(i), 12);
+                line << " " << cons1 << std::setfill(' ') << std::setw(20 - cons1.length())
+                     << " | ";
+            } else {
+                line << std::setfill(' ') << std::setw(21) << " | ";
+            }
+
+            if (i == 0) {
+                std::string commit_rule = std::get<2>(itm.second),
+                            fire_rule   = std::get<3>(itm.second);
+                bool exclude = std::get<4>(itm.second), permanent = std::get<5>(itm.second);
+
+                line << " " << commit_rule << std::setfill(' ')
+                     << std::setw(20 - commit_rule.length()) << " | " << fire_rule
+                     << std::setfill(' ') << std::setw(13 - fire_rule.length()) << " | "
+                     << "    " << (permanent ? "YES" : "NO ") << "   |   "
+                     << (exclude ? "YES" : "NO ") << "   | " << n_files
+                     << std::setw(10 - n_files.length()) << " |";
+            } else {
+                line << std::setfill(' ') << std::setw(20) << "|" << std::setfill(' ')
+                     << std::setw(13) << "|" << std::setfill(' ') << std::setw(12) << "|"
+                     << std::setfill(' ') << std::setw(10) << "|" << std::setw(10) << "|";
+            }
+
+            server_println(CAPIO_LOG_SERVER_CLI_LEVEL_JSON, line.str());
+        }
+
+        server_println(CAPIO_LOG_SERVER_CLI_LEVEL_JSON,
+                       "*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~"
+                       "~~~~~~~~~~~~~~~~~~"
+                       "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*");
+    }
+
+    server_println(CAPIO_LOG_SERVER_CLI_LEVEL_JSON, "");
+}
+
+bool CapioCLEngine::contains(const std::filesystem::path &file) {
+    START_LOG(gettid(), "call(file=%s)", file.c_str());
+    return std::any_of(_locations.begin(), _locations.end(), [&](auto &itm) {
+        return std::regex_match(file.c_str(), std::get<10>(itm.second));
+    });
+}
+
+void CapioCLEngine::add(std::string &path, std::vector<std::string> &producers,
+                        std::vector<std::string> &consumers, const std::string &commit_rule,
+                        const std::string &fire_rule, bool permanent, bool exclude,
+                        const std::vector<std::string> &dependencies) {
+    START_LOG(gettid(), "call(path=%s, commit=%s, fire=%s, permanent=%s, exclude=%s)", path.c_str(),
+              commit_rule.c_str(), fire_rule.c_str(), permanent ? "YES" : "NO",
+              exclude ? "YES" : "NO");
+
+    _locations.emplace(path, std::make_tuple(producers, consumers, commit_rule, fire_rule,
+                                             permanent, exclude, true, -1, -1, dependencies,
+                                             generateCapioRegex(path), false));
+}
+
+void CapioCLEngine::newFile(const std::string &path) {
+    START_LOG(gettid(), "call(path=%s)", path.c_str());
+    if (_locations.find(path) == _locations.end()) {
+        std::string commit = CAPIO_FILE_COMMITTED_ON_TERMINATION;
+        std::string fire   = CAPIO_FILE_MODE_UPDATE;
+
+        /*
+         * Inherit commit and fire rules from LPM directory
+         * matchSize is used to compute LPM
+         */
+        size_t matchSize = 0;
+        for (const auto &[filename, data] : _locations) {
+            if (std::regex_match(path, std::get<10>(data)) && filename.length() > matchSize) {
+                LOG("Found match with %s", filename.c_str());
+                matchSize = filename.length();
+                commit    = std::get<2>(data);
+                fire      = std::get<3>(data);
+            }
+        }
+        LOG("Adding file %s to _locations with commit=%s, and fire=%s", path.c_str(),
+            commit.c_str(), fire.c_str());
+        _locations.emplace(path, std::make_tuple(std::vector<std::string>(),
+                                                 std::vector<std::string>(), commit, fire, false,
+                                                 false, true, -1, -1, std::vector<std::string>(),
+                                                 generateCapioRegex(path), false));
+    }
+}
+
+long CapioCLEngine::getDirectoryFileCount(const std::string &path) {
+    if (const auto itm = _locations.find(path); itm != _locations.end()) {
+        return std::get<8>(itm->second);
+    }
+    return 0;
+}
+
+void CapioCLEngine::addProducer(const std::string &path, std::string &producer) {
+    START_LOG(gettid(), "call(path=%s, producer=%s)", path.c_str(), producer.c_str());
+    producer.erase(remove_if(producer.begin(), producer.end(), isspace), producer.end());
+    newFile(path);
+    if (const auto itm = _locations.find(path); itm != _locations.end()) {
+        std::get<0>(itm->second).emplace_back(producer);
+    }
+}
+
+void CapioCLEngine::addConsumer(const std::string &path, std::string &consumer) {
+    START_LOG(gettid(), "call(path=%s, consumer=%s)", path.c_str(), consumer.c_str());
+    consumer.erase(remove_if(consumer.begin(), consumer.end(), isspace), consumer.end());
+    if (const auto itm = _locations.find(path); itm != _locations.end()) {
+        std::get<1>(itm->second).emplace_back(consumer);
+    }
+}
+
+void CapioCLEngine::setCommitRule(const std::string &path, const std::string &commit_rule) {
+    START_LOG(gettid(), "call(path=%s, commit_rule=%s)", path.c_str(), commit_rule.c_str());
+    if (const auto itm = _locations.find(path); itm != _locations.end()) {
+        std::get<2>(itm->second) = commit_rule;
+    }
+}
+
+std::string CapioCLEngine::getCommitRule(const std::string &path) {
+    START_LOG(gettid(), "call(path=%s)", path.c_str());
+    if (const auto itm = _locations.find(path); itm != _locations.end()) {
+        LOG("Commit rule: %s", std::get<2>(_locations.at(path)).c_str());
+        return std::get<2>(itm->second);
+    }
+
+    /*
+     * For caching purpose, each new file is then added to the map if not found,
+     * with its data being instantiated from the metadata of the most likely matched glob
+     * TODO: check overhead of this
+     */
+    LOG("No entry found on map. checking globs. Creating new file from globs");
+    this->newFile((path));
+    LOG("Returning DEFAULT Fire rule for file %s (update)", path.c_str());
+    return std::get<2>(_locations.at((path)));
+}
+
+void CapioCLEngine::setFireRule(const std::string &path, const std::string &fire_rule) {
+    START_LOG(gettid(), "call(path=%s, fire_rule=%s)", path.c_str(), fire_rule.c_str());
+    if (const auto itm = _locations.find(path); itm != _locations.end()) {
+        std::get<3>(itm->second) = fire_rule;
+    }
+}
+
+bool CapioCLEngine::isFirable(const std::string &path) {
+    START_LOG(gettid(), "call(path=%s)", path.c_str());
+    if (const auto itm = _locations.find(path); itm != _locations.end()) {
+        LOG("Fire rule for file %s is %s", path.c_str(), std::get<3>(itm->second).c_str());
+        return std::get<3>(itm->second) == CAPIO_FILE_MODE_NO_UPDATE;
+    }
+    /*
+     * For caching purpose, each new file is then added to the map if not found,
+     * with its data being instantiated from the metadata of the most likely matched glob
+     * TODO: check overhead of this
+     */
+    LOG("No entry found on map. checking globs. Creating new file from globs");
+    this->newFile((path));
+    LOG("Fire rule for file %s is  %s", path.c_str(), std::get<3>(_locations.at((path))).c_str());
+    return std::get<3>(_locations.at((path))) == CAPIO_FILE_MODE_NO_UPDATE;
+}
+
+void CapioCLEngine::setPermanent(const std::string &path, bool value) {
+    START_LOG(gettid(), "call(path=%s, value=%s)", path.c_str(), value ? "true" : "false");
+    if (const auto itm = _locations.find(path); itm != _locations.end()) {
+        std::get<4>(itm->second) = value;
+    }
+}
+
+void CapioCLEngine::setExclude(const std::string &path, const bool value) {
+    START_LOG(gettid(), "call(path=%s, value=%s)", path.c_str(), value ? "true" : "false");
+    if (const auto itm = _locations.find(path); itm != _locations.end()) {
+        std::get<5>(itm->second) = value;
+    }
+}
+
+void CapioCLEngine::setDirectory(const std::string &path) {
+    START_LOG(gettid(), "call(path=%s)", path.c_str());
+    if (const auto itm = _locations.find(path); itm != _locations.end()) {
+        std::get<6>(itm->second) = false;
+    }
+}
+
+void CapioCLEngine::setFile(const std::string &path) {
+    START_LOG(gettid(), "call(path=%s)", path.c_str());
+    if (const auto itm = _locations.find(path); itm != _locations.end()) {
+        std::get<6>(itm->second) = true;
+    }
+}
+
+bool CapioCLEngine::isFile(const std::string &path) const {
+    if (const auto itm = _locations.find(path); itm != _locations.end()) {
+        return std::get<6>(itm->second);
+    }
+    return false;
+}
+
+bool CapioCLEngine::isDirectory(const std::string &path) const {
+    START_LOG(gettid(), "call(path=%s)", path.c_str());
+    return !isFile(path);
+}
+
+void CapioCLEngine::setCommitedNumber(const std::string &path, const int num) {
+    START_LOG(gettid(), "call(path=%s, num=%ld)", path.c_str(), num);
+    if (const auto itm = _locations.find(path); itm != _locations.end()) {
+        std::get<7>(itm->second) = num;
+    }
+}
+
+void CapioCLEngine::setDirectoryFileCount(const std::string &path, long num) {
+    START_LOG(gettid(), "call(path=%s, num=%ld)", path.c_str(), num);
+    if (const auto itm = _locations.find(path); itm != _locations.end()) {
+        std::get<8>(itm->second) = num;
+    }
+}
+
+void CapioCLEngine::remove(const std::string &path) {
+    START_LOG(gettid(), "call(path=%s)", path.c_str());
+    _locations.erase(path);
+}
+
+// TODO: return vector
+std::vector<std::string> CapioCLEngine::producers(const std::string &path) {
+    START_LOG(gettid(), "call(path=%s)", path.c_str());
+    if (const auto itm = _locations.find(path); itm != _locations.end()) {
+        return std::get<0>(itm->second);
+    }
+    return {};
+}
+
+// TODO: return vector
+std::vector<std::string> CapioCLEngine::consumers(const std::string &path) {
+    START_LOG(gettid(), "call(path=%s)", path.c_str());
+    if (const auto itm = _locations.find(path); itm != _locations.end()) {
+        return std::get<1>(itm->second);
+    }
+    return {};
+}
+
+bool CapioCLEngine::isProducer(const std::string &path, const pid_t pid) {
+    START_LOG(gettid(), "call(path=%s, pid=%ld", path.c_str(), pid);
+
+    const auto app_name = client_manager->get_app_name(pid);
+    LOG("App name for tid %d is %s", pid, app_name.c_str());
+
+    // check for exact entry
+    if (const auto itm = _locations.find(path); itm != _locations.end()) {
+        LOG("Found exact match for path");
+        std::vector<std::string> producers = std::get<0>(itm->second);
+        DBG(gettid(), [&](const std::vector<std::string> &arr) {
+            for (auto elem : arr) {
+                LOG("producer: %s", elem.c_str());
+            }
+        }(producers));
+        return std::find(producers.begin(), producers.end(), app_name) != producers.end();
+    }
+    LOG("No exact match found in locations. checking for globs");
+    // check for glob
+    for (const auto &[k, entry] : _locations) {
+        if (std::regex_match(path, std::get<10>(entry))) {
+            LOG("Found possible glob match");
+            std::vector<std::string> producers = std::get<0>(entry);
+            DBG(gettid(), [&](const std::vector<std::string> &arr) {
+                for (auto itm : arr) {
+                    LOG("producer: %s", itm.c_str());
+                }
+            }(producers));
+            return std::find(producers.begin(), producers.end(), app_name) != producers.end();
+        }
+    }
+    LOG("No match has been found");
+    return false;
+}
+
+void CapioCLEngine::setFileDeps(const std::filesystem::path &path,
+                                const std::vector<std::string> &dependencies) {
+    START_LOG(gettid(), "call()");
+    if (dependencies.empty()) {
+        return;
+    }
+    if (_locations.find(path) == _locations.end()) {
+        this->newFile(path);
+    }
+    std::get<9>(_locations.at(path)) = dependencies;
+    for (const auto &itm : dependencies) {
+        LOG("Creating new fie (if it exists) for path %s", itm.c_str());
+        newFile(itm);
+    }
+}
+
+int CapioCLEngine::getCommitCloseCount(std::filesystem::path::iterator::reference path) const {
+    START_LOG(gettid(), "call(path=%s)", path.c_str());
+    int count = 0;
+    if (const auto itm = _locations.find(path); itm != _locations.end()) {
+        count = std::get<7>(itm->second);
+    }
+    LOG("Expected number on close to commit file: %d", count);
+    return count;
+};
+
+// todo fix leak
+std::vector<std::string> CapioCLEngine::get_file_deps(const std::filesystem::path &path) {
+    if (const auto itm = _locations.find(path); itm != _locations.end()) {
+        return std::get<9>(itm->second);
+    }
+    return {};
+}
+
+void CapioCLEngine::setStoreFileInMemory(const std::filesystem::path &path) {
+    this->newFile(path);
+    std::get<11>(_locations.at(path)) = true;
+}
+
+void CapioCLEngine::setStoreFileInFileSystem(const std::filesystem::path &path) {
+    this->newFile(path);
+    std::get<11>(_locations.at(path)) = false;
+}
+
+bool CapioCLEngine::storeFileInMemory(const std::filesystem::path &path) {
+    if (const auto itm = _locations.find(path); itm != _locations.end()) {
+        return std::get<11>(itm->second);
+    }
+    return false;
+}
+
+std::vector<std::string> CapioCLEngine::getFileToStoreInMemory() {
+    START_LOG(gettid(), "call()");
+    std::vector<std::string> files;
+
+    for (const auto &[path, file] : _locations) {
+        if (std::get<11>(file)) {
+            files.push_back(path);
+        }
+    }
+
+    return files;
+}
+
+auto CapioCLEngine::get_home_node(const std::string &path) {
+    // TODO: understand here how to get the home node policy.
+    START_LOG(gettid(), "call(path=%s)", path.c_str());
+    if (const auto location = _locations.find(path); location == _locations.end()) {
+        LOG("No rule for home node. Returning create home node");
+        return capio_global_configuration->node_name;
+    } else {
+        LOG("Found location entry");
+    }
+    return capio_global_configuration->node_name;
+}

@@ -5,6 +5,7 @@
 
 #include <limits.h>
 #include <string>
+#include <unistd.h>
 
 /*
  * Variables required to be globally available

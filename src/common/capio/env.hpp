@@ -9,6 +9,8 @@
 
 #include <sys/stat.h>
 
+#include <utils/configuration.hpp>
+
 #include "logger.hpp"
 #include "syscall.hpp"
 

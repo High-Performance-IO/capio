@@ -39,6 +39,9 @@
 
 #include <utils/parser.hpp>
 
+#include "include/capio-cl-engine/json_parser.hpp"
+#include "include/capio-cl-engine/capio_cl_engine.hpp"
+
 int main(int argc, char **argv) {
     std::cout << CAPIO_LOG_SERVER_BANNER;
 

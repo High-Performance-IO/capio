@@ -21,7 +21,7 @@ inline bool continue_on_error = false; // change behaviour of ERR_EXIT to contin
 
 #ifndef __CAPIO_POSIX
 #include <filesystem>
-thread_local std::ofstream logfile; // if building for server, self-contained logfile
+inline thread_local std::ofstream logfile; // if building for server, self-contained logfile
 inline std::string log_master_dir_name = CAPIO_DEFAULT_LOG_FOLDER;
 inline std::string logfile_prefix      = CAPIO_SERVER_DEFAULT_LOG_FILE_PREFIX;
 #else
@@ -323,7 +323,7 @@ class Logger {
 #define ERR_EXIT(message, ...)                                                                     \
     log.log(message, ##__VA_ARGS__);                                                               \
     if (!continue_on_error) {                                                                      \
-        char tmp_buf[1024];                                                                        \
+        char tmp_buf[5120];                                                                        \
         sprintf(tmp_buf, message, ##__VA_ARGS__);                                                  \
         char node_name[HOST_NAME_MAX]{0};                                                          \
         gethostname(node_name, HOST_NAME_MAX);                                                     \
