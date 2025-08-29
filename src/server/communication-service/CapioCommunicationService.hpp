@@ -56,8 +56,9 @@ class CapioCommunicationService {
         } else if (control_backend_name == "multicast") {
             server_println(CAPIO_LOG_SERVER_CLI_LEVEL_INFO, "Starting multicast control plane");
             capio_control_plane = new MulticastControlPlane(port);
-        }else {
-            server_println(CAPIO_LOG_SERVER_CLI_LEVEL_INFO, "Error: unknown control plane backend: " + control_backend_name);
+        } else {
+            server_println(CAPIO_LOG_SERVER_CLI_LEVEL_INFO,
+                           "Error: unknown control plane backend: " + control_backend_name);
         }
     }
 };

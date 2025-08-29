@@ -1,6 +1,8 @@
 #ifndef PARSER_HPP
 #define PARSER_HPP
 
+#include <ranges>
+
 std::string parseCLI(int argc, char **argv, char *resolve_prefix) {
     Logger *log;
 
