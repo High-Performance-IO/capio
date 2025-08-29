@@ -28,7 +28,6 @@ class CapioMemoryFile : public CapioFile {
      * @return tuple
      */
     static auto compute_offsets(const std::size_t offset, std::size_t length) {
-
         START_LOG(gettid(), "call(offset=%llu, length=%llu)", offset, length);
         // Compute the offset of the memoryBlocks component.
         const auto map_offset = offset / _pageSizeBytes;
@@ -74,7 +73,6 @@ class CapioMemoryFile : public CapioFile {
      */
     std::size_t writeData(const char *buffer, const std::size_t file_offset,
                           std::size_t buffer_length) override {
-
         const auto &[map_offset, write_offset, first_write_size] =
             compute_offsets(file_offset, buffer_length);
 
@@ -151,7 +149,6 @@ class CapioMemoryFile : public CapioFile {
      * @param length
      */
     void readFromQueue(SPSCQueue &queue, std::size_t offset, std::size_t length) override {
-
         const auto &[map_offset, write_offset, first_write_size] = compute_offsets(offset, length);
 
         auto remaining_bytes = length;

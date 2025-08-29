@@ -1,7 +1,7 @@
 #ifndef CONSENT_REQUEST_CACHE_HPP
 #define CONSENT_REQUEST_CACHE_HPP
-class ConsentRequestCache {
 
+class ConsentRequestCache {
     std::unordered_map<std::string, capio_off64_t> *available_consent;
 
     // Block until server allows for proceeding to a generic request

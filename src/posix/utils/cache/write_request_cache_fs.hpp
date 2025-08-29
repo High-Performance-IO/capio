@@ -1,7 +1,7 @@
 #ifndef WRITE_REQUEST_CACHE_FS_HPP
 #define WRITE_REQUEST_CACHE_FS_HPP
-class WriteRequestCacheFS {
 
+class WriteRequestCacheFS {
     int current_fd             = -1;
     capio_off64_t current_size = 0;
 

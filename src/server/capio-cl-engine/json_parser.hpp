@@ -9,7 +9,6 @@
  *
  */
 class JsonParser {
-
     /**
      * @brief Check if a string is a representation of a integer number
      *
@@ -131,7 +130,6 @@ class JsonParser {
                                    "Found file " + std::string(file));
 
                     if (file.is_relative()) {
-
                         server_println(
                             CAPIO_LOG_SERVER_CLI_LEVEL_WARNING,
                             "Path : " + std::string(file) +
@@ -155,7 +153,6 @@ class JsonParser {
             }
 
             if (app["output_stream"].get_array().get(output_stream)) {
-
                 server_println(CAPIO_LOG_SERVER_CLI_LEVEL_ERROR,
                                "No output_stream section found for app " + std::string(app_name));
                 ERR_EXIT("No output_stream section found for app %s",
@@ -258,7 +255,6 @@ class JsonParser {
                                                "Invalid commit rule: " + std::string(commit_rule));
                                 ERR_EXIT("error commit rule: %s", std::string(commit_rule).c_str());
                             }
-
                         } else {
                             commit_rule = committed;
                         }
@@ -332,7 +328,6 @@ class JsonParser {
                         // TODO: check for globs
                         std::string commit(commit_rule), firerule(mode);
                         if (n_files != -1) {
-
                             server_println(CAPIO_LOG_SERVER_CLI_LEVEL_JSON,
                                            "Setting path:  " + std::string(path) + " n_files to " +
                                                std::to_string(n_files));

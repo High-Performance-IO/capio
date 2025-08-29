@@ -1,4 +1,3 @@
-
 #ifndef POSIX_READDIR_HPP
 #define POSIX_READDIR_HPP
 

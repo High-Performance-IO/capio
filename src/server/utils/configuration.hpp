@@ -11,7 +11,7 @@
  * to all classes and subclasses.
  */
 class CapioGlobalConfiguration {
-public:
+  public:
     bool termination_phase, StoreOnlyInMemory;
     std::string workflow_name;
     pid_t CAPIO_SERVER_MAIN_PID = -1;
@@ -19,10 +19,10 @@ public:
 
     CapioGlobalConfiguration() {
         gethostname(node_name, HOST_NAME_MAX);
-        termination_phase = false;
-        StoreOnlyInMemory = false;
+        termination_phase     = false;
+        StoreOnlyInMemory     = false;
         CAPIO_SERVER_MAIN_PID = gettid();
-        workflow_name = CAPIO_DEFAULT_WORKFLOW_NAME;
+        workflow_name         = CAPIO_DEFAULT_WORKFLOW_NAME;
     }
 };
 
@@ -34,8 +34,8 @@ inline void server_println(const std::string &message_type = "",
         std::cout << std::endl;
     } else {
         std::cout << message_type << " " << capio_global_configuration->node_name << "] "
-            << message_line << std::endl
-            << std::flush;
+                  << message_line << std::endl
+                  << std::flush;
     }
 }
 

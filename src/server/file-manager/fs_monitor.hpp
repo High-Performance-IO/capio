@@ -44,7 +44,6 @@ class FileSystemMonitor {
      * @param continue_execution
      */
     static void _main(const bool *continue_execution) {
-
         START_LOG(gettid(), "INFO: instance of FileSystemMonitor");
 
         timespec sleep{};

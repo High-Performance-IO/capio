@@ -32,6 +32,7 @@ class TransportUnit {
 
 class MTCL_backend : public BackendInterface {
     typedef enum { FROM_REMOTE, TO_REMOTE } CONN_HANDLER_ORIGIN;
+
     typedef std::tuple<std::queue<TransportUnit *> *, std::queue<TransportUnit *> *, std::mutex *>
         TransportUnitInterface;
     std::unordered_map<std::string, TransportUnitInterface> connected_hostnames_map;
@@ -238,9 +239,9 @@ class MTCL_backend : public BackendInterface {
                 server_connection_handler, std::move(UserManager), remoteHost.c_str(),
                 thread_sleep_times, connection_tuple, terminate, TO_REMOTE));
         } else {
-            server_println(CAPIO_SERVER_CLI_LOG_SERVER_WARNING,
-                           "Warning: tried to connect to " + std::string(remoteHost) +
-                               " but connection is not valid");
+            server_println(CAPIO_SERVER_CLI_LOG_SERVER_WARNING, "Warning: tried to connect to " +
+                                                                    std::string(remoteHost) +
+                                                                    " but connection is not valid");
         }
     }
 

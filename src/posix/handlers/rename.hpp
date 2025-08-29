@@ -16,7 +16,8 @@ int rename_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long a
     auto newpath_abs = capio_absolute(newpath);
     LOG("newpath absolute: %s", newpath_abs.c_str());
 
-    if (is_prefix(oldpath_abs, newpath_abs)) { // TODO: The check is more complex
+    if (is_prefix(oldpath_abs, newpath_abs)) {
+        // TODO: The check is more complex
         errno   = EINVAL;
         *result = -errno;
         return CAPIO_POSIX_SYSCALL_SUCCESS;

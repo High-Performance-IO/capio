@@ -4,7 +4,7 @@
 #include <filesystem>
 
 class CapioControlPlane {
-public:
+  public:
     typedef enum { CREATE, DELETE, WRITE } event_type;
 
     virtual ~CapioControlPlane() = default;
@@ -16,8 +16,7 @@ public:
      * @param hostname_target
      */
     void notify(event_type event, const std::filesystem::path &path,
-                const std::string &hostname_target) {
-    }
+                const std::string &hostname_target) {}
 
     /**
      * Notify all nodes of the occurence of an event

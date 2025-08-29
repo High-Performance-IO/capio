@@ -33,7 +33,7 @@ inline thread_local char logfile_path[PATH_MAX]{'\0'};
 inline thread_local int current_log_level = 0;
 inline thread_local bool logging_syscall =
     false; // this variable tells the logger that syscall logging
-           // has started and we are not in setup phase
+// has started and we are not in setup phase
 
 #ifndef CAPIO_MAX_LOG_LEVEL // capio max log level. defaults to -1, where everything is logged
 #define CAPIO_MAX_LOG_LEVEL -1

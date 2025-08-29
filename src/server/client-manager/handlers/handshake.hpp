@@ -26,7 +26,6 @@ inline void handshake_handler(const char *const str) {
         // Unlock client waiting to start
         LOG("Allowing handshake to continue");
         client_manager->reply_to_client(tid, 1);
-
     } else {
         LOG("Termination phase is in progress. ignoring further handshakes.");
         client_manager->reply_to_client(tid, 0);

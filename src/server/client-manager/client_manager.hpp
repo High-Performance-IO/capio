@@ -92,6 +92,7 @@ class ClientManager {
         }
         LOG("Error: tis is not present in files_created_by_producers map");
     }
+
     /**
      * @brief Get the files that a given pid is waiting to be produced
      *

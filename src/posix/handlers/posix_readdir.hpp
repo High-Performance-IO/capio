@@ -67,7 +67,6 @@ inline void init_posix_dirent() {
 }
 
 inline unsigned long int load_files_from_directory(const char *path) {
-
     START_LOG(capio_syscall(SYS_gettid), "call(path=%s)", path);
 
     syscall_no_intercept_flag = true;
@@ -178,7 +177,6 @@ inline struct dirent64 *capio_internal_readdir(DIR *dirp, long pid) {
 }
 
 DIR *opendir(const char *name) {
-
     START_LOG(capio_syscall(SYS_gettid), "call(path=%s)", name);
 
     if (is_forbidden_path(name)) {
@@ -380,7 +378,6 @@ void seekdir(DIR *dirp, long int loc) {
 }
 
 int readdir_r(DIR *dirp, struct dirent *entry, struct dirent **result) {
-
     /*
      * WARN: I have not yet clear the usage of this function, as such bugs are surely presents
      * TODO: implement the correct handling logic for this method

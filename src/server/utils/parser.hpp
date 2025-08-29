@@ -101,7 +101,7 @@ std::string parseCLI(int argc, char **argv, char *resolve_prefix) {
     }
 #ifdef CAPIO_LOG
     auto logname = open_server_logfile();
-    log = new Logger(__func__, __FILE__, __LINE__, gettid(), "Created new log file");
+    log          = new Logger(__func__, __FILE__, __LINE__, gettid(), "Created new log file");
     server_println(CAPIO_SERVER_CLI_LOG_SERVER, "started logging to logfile " + logname.string());
 #endif
 
@@ -114,7 +114,7 @@ std::string parseCLI(int argc, char **argv, char *resolve_prefix) {
         server_println(CAPIO_LOG_SERVER_CLI_LEVEL_WARNING, "skipping config file parsing.");
         server_println(CAPIO_LOG_SERVER_CLI_LEVEL_WARNING,
                        "Obtained from environment variable current workflow name: " +
-                       capio_global_configuration->workflow_name);
+                           capio_global_configuration->workflow_name);
 
     } else {
         START_LOG(gettid(), "call()");
@@ -144,13 +144,11 @@ std::string parseCLI(int argc, char **argv, char *resolve_prefix) {
         port = args::get(backend_port);
     }
 
-
     if (backend) {
         std::string backend_name = args::get(backend);
         std::transform(backend_name.begin(), backend_name.end(), backend_name.begin(), ::toupper);
 
-        capio_communication_service =
-            new CapioCommunicationService(backend_name, port);
+        capio_communication_service = new CapioCommunicationService(backend_name, port);
 
     } else {
         server_println(CAPIO_LOG_SERVER_CLI_LEVEL_INFO, "Selected backend is File System");

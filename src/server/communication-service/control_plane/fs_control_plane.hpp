@@ -93,11 +93,11 @@ class FSControlPlane : public CapioControlPlane {
         sleep(1);
     }
 
-public:
+  public:
     explicit FSControlPlane(int backend_port) : _backend_port(backend_port) {
         gethostname(ownHostname, HOST_NAME_MAX);
         generate_aliveness_token(backend_port);
-        continue_execution = new bool(true);
+        continue_execution          = new bool(true);
         token_used_to_connect_mutex = new std::mutex();
         thread = new std::thread(fs_server_aliveness_detector_thread, std::ref(continue_execution),
                                  &token_used_to_connect, token_used_to_connect_mutex);
@@ -116,8 +116,7 @@ public:
         server_println(CAPIO_LOG_SERVER_CLI_LEVEL_WARNING, "FSControlPlane cleanup completed.");
     }
 
-    void notify_all(event_type event, const std::filesystem::path &path) override {
-    }
+    void notify_all(event_type event, const std::filesystem::path &path) override {}
 };
 
 #endif // FS_CONTROL_PLANE_HPP

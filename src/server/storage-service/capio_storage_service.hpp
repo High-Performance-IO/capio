@@ -7,7 +7,6 @@
 #include "CapioFile/CapioRemoteFile.hpp"
 
 class CapioStorageService {
-
     // TODO: put all of this conde on a different thread
 
     std::unordered_map<pid_t, SPSCQueue *> *_client_to_server_queue;
