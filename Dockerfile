@@ -18,7 +18,9 @@ RUN apt update                              \
 
 COPY CMakeLists.txt /opt/capio/
 COPY scripts /opt/capio/scripts
-COPY src /opt/capio/src
+COPY capio-common /opt/capio/capio-common
+COPY capio-posix /opt/capio/capio-posix
+COPY capio-server /opt/capio/capio-server
 COPY tests /opt/capio/tests
 COPY capiorun /opt/capio/capiorun
 

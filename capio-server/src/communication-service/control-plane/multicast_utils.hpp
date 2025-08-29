@@ -1,6 +1,12 @@
 #ifndef CAPIO_MULTICAST_UTILS_HPP
 #define CAPIO_MULTICAST_UTILS_HPP
 
+#include <arpa/inet.h>
+#include <capio/logger.hpp>
+#include <cerrno>
+#include <cstring>
+#include <netinet/in.h>
+#include <sys/socket.h>
 #include <utils/configuration.hpp>
 
 static int open_outgoing_multicast_socket(const char *address, const int port, sockaddr_in *addr) {

@@ -8,7 +8,7 @@
 #include "../capio-posix/utils/env.hpp"
 #include "../capio-posix/utils/filesystem.hpp"
 #include "../capio-posix/utils/types.hpp"
-#include "../common-headers/capio/response_queue.hpp"
+#include "capio/response_queue.hpp"
 
 #include "storage-service/CapioFile/CapioMemoryFile.hpp"
 
