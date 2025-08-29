@@ -3,12 +3,12 @@
 
 #include <thread>
 
-#include "../server/utils/configuration.hpp"
+#include "../capio-server/utils/configuration.hpp"
 
-#include "../common/capio/response_queue.hpp"
-#include "../posix/utils/env.hpp"
-#include "../posix/utils/filesystem.hpp"
-#include "../posix/utils/types.hpp"
+#include "../capio-posix/utils/env.hpp"
+#include "../capio-posix/utils/filesystem.hpp"
+#include "../capio-posix/utils/types.hpp"
+#include "../common-headers/capio/response_queue.hpp"
 
 #include "storage-service/CapioFile/CapioMemoryFile.hpp"
 
@@ -16,7 +16,7 @@ inline SPSCQueue *cts_queue, *stc_queue;
 inline std::unordered_map<long, ResponseQueue *> *bufs_response;
 inline CircularBuffer<char> *buf_requests;
 
-#include "../posix/utils/cache.hpp"
+#include "../capio-posix/utils/cache.hpp"
 #include "SourceText.hpp"
 
 auto checkStringEquality = [](const std::string &a, const std::string &b) {

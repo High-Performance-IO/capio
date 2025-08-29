@@ -78,8 +78,8 @@ ENDIF (CAPIO_LOG)
 #####################################
 # Include files and directories
 #####################################
-file(GLOB_RECURSE CAPIO_COMMON_HEADERS "src/common/capio/*.hpp")
-include_directories(src/common)
+file(GLOB_RECURSE CAPIO_COMMON_HEADERS "capio-common/capio/*.hpp")
+include_directories(${PROJECT_SOURCE_DIR}/capio-common)
 
 IF (CAPIO_LOG AND CMAKE_BUILD_TYPE STREQUAL "Debug")
     include_directories("${PROJECT_BINARY_DIR}/include/syscall")
@@ -88,8 +88,8 @@ ENDIF (CAPIO_LOG AND CMAKE_BUILD_TYPE STREQUAL "Debug")
 #####################################
 # Targets
 #####################################
-add_subdirectory(src/posix)
-add_subdirectory(src/server)
+add_subdirectory(capio-posix)
+add_subdirectory(capio-server)
 
 #####################################
 # Install capiorun

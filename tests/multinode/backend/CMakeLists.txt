@@ -3,7 +3,7 @@
 #####################################
 set(TARGET_NAME capio_backend_unit_tests)
 
-set(TARGET_INCLUDE_FOLDER "../../../src/server")
+set(TARGET_INCLUDE_FOLDER "../../../capio-server")
 set(TARGET_SOURCES
         src/main.cpp
 )

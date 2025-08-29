@@ -2,7 +2,7 @@
 #include <gtest/gtest.h>
 #include <thread>
 
-#include "../server/utils/configuration.hpp"
+#include "../capio-server/utils/configuration.hpp"
 
 #include "MTCL.hpp"
 #include <capio/logger.hpp>

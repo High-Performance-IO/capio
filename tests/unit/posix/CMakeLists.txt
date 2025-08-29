@@ -2,7 +2,7 @@
 # Target information
 #####################################
 set(TARGET_NAME capio_posix_unit_tests)
-set(TARGET_INCLUDE_FOLDER "${PROJECT_SOURCE_DIR}/src/posix")
+set(TARGET_INCLUDE_FOLDER "../../../capio-posix")
 set(TARGET_SOURCES
         ${CMAKE_CURRENT_SOURCE_DIR}/src/realpath.cpp
 )
