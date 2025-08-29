@@ -1,8 +1,6 @@
 #ifndef PARSER_HPP
 #define PARSER_HPP
 
-#include <ranges>
-
 std::string parseCLI(int argc, char **argv, char *resolve_prefix) {
     Logger *log;
 
@@ -154,7 +152,7 @@ std::string parseCLI(int argc, char **argv, char *resolve_prefix) {
     std::string backend_name = "none";
     if (backend) {
         std::string tmp = args::get(backend);
-        std::ranges::transform(tmp, tmp.begin(), ::toupper);
+        std::transform(tmp.begin(), tmp.end(), tmp.begin(), ::toupper);
         backend_name = tmp;
     }
 

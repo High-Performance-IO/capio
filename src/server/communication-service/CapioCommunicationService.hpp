@@ -40,6 +40,9 @@ class CapioCommunicationService {
         } else if (backend_name == "FS") {
             server_println(CAPIO_LOG_SERVER_CLI_LEVEL_INFO, "Selected backend is File System");
             capio_backend = new NoBackend();
+        } else if (backend_name == "none") {
+            server_println(CAPIO_LOG_SERVER_CLI_LEVEL_INFO,
+                           "Skipping communication backend startup");
         } else {
             START_LOG(gettid(), "call()");
             server_println(CAPIO_LOG_SERVER_CLI_LEVEL_ERROR,
