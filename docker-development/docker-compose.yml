@@ -1,0 +1,34 @@
+services:
+  node1:
+    image: alphaunito/capio:latest
+    tty: true
+    working_dir: /shared
+    volumes:
+      - shared_data:/shared
+    networks:
+      capio_net:
+        aliases:
+          - node1
+    environment:
+      - CAPIO_LOG_LEVEL=-1
+
+  node2:
+    image: alphaunito/capio:latest
+    tty: true
+    working_dir: /shared
+    volumes:
+      - shared_data:/shared
+    networks:
+      capio_net:
+        aliases:
+          - node2
+    environment:
+      - CAPIO_LOG_LEVEL=-1
+
+
+volumes:
+  shared_data:
+
+networks:
+  capio_net:
+    driver: bridge

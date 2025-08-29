@@ -33,7 +33,7 @@ inline thread_local char logfile_path[PATH_MAX]{'\0'};
 inline thread_local int current_log_level = 0;
 inline thread_local bool logging_syscall =
     false; // this variable tells the logger that syscall logging
-           // has started and we are not in setup phase
+// has started and we are not in setup phase
 
 #ifndef CAPIO_MAX_LOG_LEVEL // capio max log level. defaults to -1, where everything is logged
 #define CAPIO_MAX_LOG_LEVEL -1
@@ -372,7 +372,7 @@ inline bool syscall_no_intercept_flag = false;
 #define ERR_EXIT(fmt, ...)                                                                         \
     if (!continue_on_error) {                                                                      \
         syscall_no_intercept_flag = true;                                                          \
-        char tmp_buf[1024];                                                                        \
+        char tmp_buf[5120];                                                                        \
         sprintf(tmp_buf, fmt, ##__VA_ARGS__);                                                      \
         char node_name[HOST_NAME_MAX]{0};                                                          \
         gethostname(node_name, HOST_NAME_MAX);                                                     \

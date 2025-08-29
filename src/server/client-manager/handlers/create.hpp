@@ -1,5 +1,6 @@
 #ifndef CAPIO_CREATE_HPP
 #define CAPIO_CREATE_HPP
+#include "communication-service/control_plane/capio_control_plane.hpp"
 #include "storage-service/capio_storage_service.hpp"
 
 /**
@@ -24,6 +25,7 @@ inline void create_handler(const char *const str) {
     capio_cl_engine->addProducer(path, name);
     client_manager->register_produced_file(tid, path_str);
     storage_service->createMemoryFile(path);
+    capio_control_plane->notify_all(CapioControlPlane::CREATE, path_str);
 }
 
 #endif // CAPIO_CREATE_HPP

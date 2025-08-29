@@ -22,7 +22,6 @@ inline void close_handler(const char *const str) {
     // producer
     if (capio_cl_engine->getCommitRule(filename) == CAPIO_FILE_COMMITTED_ON_CLOSE &&
         capio_cl_engine->isProducer(filename, tid)) {
-
         CapioFileManager::setCommitted(path);
         /**
          * The increase close count is called only on explicit close() sc, as defined by the

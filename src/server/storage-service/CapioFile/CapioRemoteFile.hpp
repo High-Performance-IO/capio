@@ -6,7 +6,6 @@
 #include "CapioFile.hpp"
 
 class CapioRemoteFile : public CapioFile {
-
   public:
     explicit CapioRemoteFile(const std::string &filePath) : CapioFile(filePath) {}
 

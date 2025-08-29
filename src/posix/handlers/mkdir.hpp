@@ -32,7 +32,6 @@ inline off64_t capio_mkdirat(int dirfd, const std::string_view &pathname, mode_t
     }
 
     if (is_capio_path(path)) {
-
         create_request(-1, path, tid);
     }
     return CAPIO_POSIX_SYSCALL_REQUEST_SKIP;

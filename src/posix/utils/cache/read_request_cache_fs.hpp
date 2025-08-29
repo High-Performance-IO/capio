@@ -1,5 +1,6 @@
 #ifndef READ_REQUEST_CACHE_FS_HPP
 #define READ_REQUEST_CACHE_FS_HPP
+
 class ReadRequestCacheFS {
     int current_fd         = -1;
     capio_off64_t max_read = 0;

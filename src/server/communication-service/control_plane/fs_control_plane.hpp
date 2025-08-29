@@ -115,6 +115,8 @@ class FSControlPlane : public CapioControlPlane {
 
         server_println(CAPIO_LOG_SERVER_CLI_LEVEL_WARNING, "FSControlPlane cleanup completed.");
     }
+
+    void notify_all(event_type event, const std::filesystem::path &path) override {}
 };
 
 #endif // FS_CONTROL_PLANE_HPP

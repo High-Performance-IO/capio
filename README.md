@@ -12,9 +12,9 @@ Bash.
 > oy just want to coordinate IO operations between workflow steps!
 
 Compatible on:
-- ![Architecture](https://img.shields.io/badge/Architecture-x86_64-blue.svg) 
-- ![Architecture](https://img.shields.io/badge/Architecture-risc--v-green.svg)
-- ![Architecture](https://img.shields.io/badge/Architecture-arm64-red.svg) coming soon!
+- ![Architecture](https://img.shields.io/badge/Architecture-x86__64_/_amd64-50C878.svg) 
+- ![Architecture](https://img.shields.io/badge/Architecture-RISC--V_(riscv64)-50C878.svg)
+- ![Architecture](https://img.shields.io/badge/Architecture-ARM64_coming_soon-red.svg)
 
 ---
 ## Automatic install with SPACK

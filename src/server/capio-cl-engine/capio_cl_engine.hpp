@@ -34,7 +34,7 @@ class CapioCLEngine {
   public:
     void print() const {
         // First message
-        server_println(CAPIO_LOG_SERVER_CLI_LEVEL_JSON, "");
+        server_println(CAPIO_LOG_SERVER_CLI_LEVEL_JSON);
         server_println(CAPIO_LOG_SERVER_CLI_LEVEL_JSON, "Composition of expected CAPIO FS: ");
 
         // Table header lines

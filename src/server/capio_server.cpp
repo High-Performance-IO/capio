@@ -40,7 +40,6 @@
 #include <utils/parser.hpp>
 
 int main(int argc, char **argv) {
-
     std::cout << CAPIO_LOG_SERVER_BANNER;
 
     server_println(CAPIO_LOG_SERVER_CLI_LEVEL_INFO,

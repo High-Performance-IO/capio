@@ -188,7 +188,12 @@ constexpr char CAPIO_SERVER_ARG_PARSER_CONFIG_BACKEND_HELP[] =
 constexpr int DEFAULT_CAPIO_BACKEND_PORT       = 2222;
 constexpr int CAPIO_BACKEND_DEFAULT_SLEEP_TIME = 300;
 constexpr char MULTICAST_DISCOVERY_ADDR[]      = "234.234.234.1";
+constexpr char MULTICAST_CONTROLPL_ADDR[]      = "234.234.234.2";
 constexpr int MULTICAST_DISCOVERY_PORT         = 2223;
-constexpr int MULTICAST_ALIVE_TOKEN_MESSAGE_SIZE =
-    HOST_NAME_MAX + 10; // hostname + : + sizeof(port)
-#endif                  // CAPIO_COMMON_CONSTANTS_HPP
+constexpr int MULTICAST_CONTROLPL_PORT         = 2224;
+
+// hostname + : + sizeof(port)
+constexpr int MULTICAST_ALIVE_TOKEN_MESSAGE_SIZE = HOST_NAME_MAX + 10;
+constexpr int MULTICAST_CONTROLPL_MESSAGE_SIZE   = HOST_NAME_MAX + PATH_MAX + 10;
+
+#endif // CAPIO_COMMON_CONSTANTS_HPP

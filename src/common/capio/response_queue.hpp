@@ -43,6 +43,7 @@ class ResponseQueue {
 
     ResponseQueue(const ResponseQueue &)            = delete;
     ResponseQueue &operator=(const ResponseQueue &) = delete;
+
     ~ResponseQueue() {
         START_LOG(capio_syscall(SYS_gettid), "call(_shm_name=%s)", _shm_name.c_str());
         if (require_cleanup) {

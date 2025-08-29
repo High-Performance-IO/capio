@@ -18,7 +18,7 @@ ExternalProject_Add(syscall_intercept
         GIT_TAG b05ff8037de2eb7b44dfb7fa372cfe08d565ba84
         PREFIX ${CMAKE_CURRENT_BINARY_DIR}
         CMAKE_ARGS
-		-DSTATIC_CAPSTONE=ON
+        -DSTATIC_CAPSTONE=ON
         -DBUILD_TESTS=OFF
         -DBUILD_EXAMPLES=OFF
         -DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE}

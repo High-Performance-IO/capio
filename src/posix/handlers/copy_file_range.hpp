@@ -1,5 +1,6 @@
 #ifndef CAPIO_COPY_FILE_RANGE_HPP
 #define CAPIO_COPY_FILE_RANGE_HPP
+
 int copy_file_range_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg5,
                             long *result) {
     auto tid    = static_cast<pid_t>(syscall_no_intercept(SYS_gettid));

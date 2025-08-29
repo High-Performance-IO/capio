@@ -89,15 +89,15 @@ COPY --from=builder                                         \
 
 # Binaries
 COPY --from=builder                                         \
-    "/usr/local/bin/capio_posix_unit_test[s]"               \
+    "/usr/local/bin/capio_posix_unit_test[s]*"              \
     "/usr/local/bin/capio_server"                           \
-    "/usr/local/bin/capio_server_unit_test[s]"              \
-    "/usr/local/bin/capio_syscall_unit_test[s]"             \
-    "/usr/local/bin/capio_integration_test[s]"              \
-    "/usr/local/bin/capio_backend_unit_tests"               \
-    "/usr/local/bin/capio_integration_test_map"             \
-    "/usr/local/bin/capio_integration_test_merge"           \
-    "/usr/local/bin/capio_integration_test_split"           \
+    "/usr/local/bin/capio_server_unit_test[s]*"             \
+    "/usr/local/bin/capio_syscall_unit_test[s]*"            \
+    "/usr/local/bin/capio_integration_test[s]*"             \
+    "/usr/local/bin/capio_backend_unit_tests*"              \
+    "/usr/local/bin/capio_integration_test_map*"            \
+    "/usr/local/bin/capio_integration_test_merge*"          \
+    "/usr/local/bin/capio_integration_test_split*"          \
     "/opt/capio/capiorun/capiorun"                          \
     /usr/local/bin/
 

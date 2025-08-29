@@ -141,7 +141,6 @@ class ReadRequestCacheMEM {
             actual_read_size = count;
             _last_read_end   = get_capio_fd_offset(_fd) + count;
             set_capio_fd_offset(fd, _last_read_end);
-
         } else {
             // There could be some data available already on the cache. Copy that first and then
             // proceed to request the other missing data

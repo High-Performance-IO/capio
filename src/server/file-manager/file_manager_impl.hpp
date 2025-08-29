@@ -162,7 +162,6 @@ inline void CapioFileManager::_unlockThreadAwaitingData(
             // remove thread from map
             LOG("Removing thread %ld from threads awaiting on data", item->first);
             item = pids_awaiting.erase(item);
-
         } else if (capio_cl_engine->isFirable(path) && filesize >= item->second) {
             /**
              * if is Fire No Update and there is enough data
@@ -174,16 +173,13 @@ inline void CapioFileManager::_unlockThreadAwaitingData(
             // remove thread from map
             LOG("Removing thread %ld from threads awaiting on data", item->first);
             item = pids_awaiting.erase(item);
-
         } else if (isCommitted(path)) {
-
             LOG("Thread %ld can be unlocked as file is committed", item->first);
             client_manager->reply_to_client(item->first, ULLONG_MAX);
             // remove thread from map
             LOG("Removing thread %ld from threads awaiting on data", item->first);
             item = pids_awaiting.erase(item);
         } else {
-
             // DEFAULT: no condition to unlock has occurred, hence wait...
             LOG("Waiting threads cannot yet be unlocked");
             ++item;
@@ -429,7 +425,6 @@ inline void CapioFileManager::checkDirectoriesNFiles() const {
     static const auto loc = capio_cl_engine->getLocations();
 
     for (const auto &[path_config, config] : *loc) {
-
         if (std::get<6>(config)) {
             /*
              * In this case we are trying to check for a file.

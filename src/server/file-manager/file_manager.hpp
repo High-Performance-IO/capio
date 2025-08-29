@@ -27,6 +27,7 @@ class CapioFileManager {
         START_LOG(gettid(), "call()");
         server_println(CAPIO_SERVER_CLI_LOG_SERVER, "CapioFileManager initialization completed.");
     }
+
     ~CapioFileManager() {
         START_LOG(gettid(), "call()");
         server_println(CAPIO_SERVER_CLI_LOG_SERVER, "CapioFileManager cleanup completed.");

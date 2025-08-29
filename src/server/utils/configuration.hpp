@@ -28,10 +28,15 @@ class CapioGlobalConfiguration {
 
 inline auto capio_global_configuration = new CapioGlobalConfiguration();
 
-inline void server_println(const std::string &message_type, const std::string &message_line) {
-    std::cout << message_type << " " << capio_global_configuration->node_name << "] "
-              << message_line << std::endl
-              << std::flush;
+inline void server_println(const std::string &message_type = "",
+                           const std::string &message_line = "") {
+    if (message_type.empty()) {
+        std::cout << std::endl;
+    } else {
+        std::cout << message_type << " " << capio_global_configuration->node_name << "] "
+                  << message_line << std::endl
+                  << std::flush;
+    }
 }
 
 #endif // CAPIO_CONFIGURATION_HPP

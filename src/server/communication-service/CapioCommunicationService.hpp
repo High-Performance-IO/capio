@@ -17,7 +17,7 @@ class CapioCommunicationService {
     };
 
     CapioCommunicationService(std::string &backend_name, const int port,
-                              const std::string &control_plane_backend = "multicast") {
+                              const std::string &control_backend_name) {
         START_LOG(gettid(), "call(backend_name=%s)", backend_name.c_str());
 
         LOG("My hostname is %s. Starting to listen on connection",
@@ -40,6 +40,9 @@ class CapioCommunicationService {
         } else if (backend_name == "FS") {
             server_println(CAPIO_LOG_SERVER_CLI_LEVEL_INFO, "Selected backend is File System");
             capio_backend = new NoBackend();
+        } else if (backend_name == "none") {
+            server_println(CAPIO_LOG_SERVER_CLI_LEVEL_INFO,
+                           "Skipping communication backend startup");
         } else {
             START_LOG(gettid(), "call()");
             server_println(CAPIO_LOG_SERVER_CLI_LEVEL_ERROR,
@@ -47,16 +50,19 @@ class CapioCommunicationService {
             ERR_EXIT("No valid backend was provided");
         }
 
-        if (control_plane_backend == "multicast") {
+        server_println(CAPIO_SERVER_CLI_LOG_SERVER,
+                       "CapioCommunicationService initialization completed.");
+
+        if (control_backend_name == "fs") {
+            server_println(CAPIO_LOG_SERVER_CLI_LEVEL_INFO, "Starting FS control plane");
+            capio_control_plane = new FSControlPlane(port);
+        } else if (control_backend_name == "multicast") {
             server_println(CAPIO_LOG_SERVER_CLI_LEVEL_INFO, "Starting multicast control plane");
             capio_control_plane = new MulticastControlPlane(port);
         } else {
-            server_println(CAPIO_LOG_SERVER_CLI_LEVEL_INFO, "Starting file system control plane");
-            capio_control_plane = new FSControlPlane(port);
+            server_println(CAPIO_LOG_SERVER_CLI_LEVEL_INFO,
+                           "Error: unknown control plane backend: " + control_backend_name);
         }
-
-        server_println(CAPIO_SERVER_CLI_LOG_SERVER,
-                       "CapioCommunicationService initialization completed.");
     }
 };
 

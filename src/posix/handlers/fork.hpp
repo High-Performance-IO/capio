@@ -12,7 +12,8 @@ int fork_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg
 
     START_LOG(parent_tid, "call(pid=%ld)", pid);
 
-    if (pid == 0) { // child
+    if (pid == 0) {
+        // child
         auto child_tid = static_cast<pid_t>(syscall_no_intercept(SYS_gettid));
         init_process(child_tid);
         *result = 0;

@@ -61,7 +61,8 @@ inline int capio_fstatat(int dirfd, const std::string_view &pathname, struct sta
 
     std::filesystem::path path(pathname);
     if (path.empty() && (flags & AT_EMPTY_PATH) == AT_EMPTY_PATH) {
-        if (dirfd == AT_FDCWD) { // operate on currdir
+        if (dirfd == AT_FDCWD) {
+            // operate on currdir
             return capio_lstat(get_current_dir().native(), statbuf, tid);
         }
         // operate on dirfd. in this case dirfd can refer to any type of file

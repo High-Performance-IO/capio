@@ -23,9 +23,7 @@ inline const std::filesystem::path &get_capio_dir() {
 
         if (val == nullptr) {
             ERR_EXIT("Fatal:  CAPIO_DIR not provided!");
-
         } else {
-
             const char *realpath_res = capio_realpath(val, buf.get());
             if (realpath_res == nullptr) {
                 ERR_EXIT("error CAPIO_DIR: directory %s does not "
