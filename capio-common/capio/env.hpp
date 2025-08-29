@@ -113,8 +113,6 @@ inline std::string get_capio_workflow_name() {
     return name;
 }
 
-
-
 inline long get_cache_lines() {
     START_LOG(capio_syscall(SYS_gettid), "call()");
     static long data_bufs_size = -1;

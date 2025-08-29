@@ -1,10 +1,10 @@
 #ifndef MULTICAST_CONTROL_PLANE_HPP
 #define MULTICAST_CONTROL_PLANE_HPP
-#include <thread>
 #include <capio/logger.hpp>
-#include <vector>
-#include <utils/configuration.hpp>
 #include <include/communication-service/control-plane/capio_control_plane.hpp>
+#include <thread>
+#include <utils/configuration.hpp>
+#include <vector>
 
 class MulticastControlPlane : public CapioControlPlane {
     bool *continue_execution;
@@ -18,15 +18,14 @@ class MulticastControlPlane : public CapioControlPlane {
                                                   std::mutex *token_used_to_connect_mutex,
                                                   int dataplane_backend_port);
 
-
-    static void multicast_control_plane_incoming_thread(const bool *continue_execution) ;
+    static void multicast_control_plane_incoming_thread(const bool *continue_execution);
 
   public:
-    explicit MulticastControlPlane(int dataplane_backend_port) ;
+    explicit MulticastControlPlane(int dataplane_backend_port);
 
-    ~MulticastControlPlane() override ;
+    ~MulticastControlPlane() override;
 
     void notify_all(const event_type event, const std::filesystem::path &path) override;
 };
 
-#endif //MULTICAST_CONTROL_PLANE_HPP
+#endif // MULTICAST_CONTROL_PLANE_HPP
