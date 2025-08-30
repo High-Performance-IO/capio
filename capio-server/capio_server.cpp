@@ -12,13 +12,8 @@
 #include <singleheader/simdjson.h>
 #include <sstream>
 #include <string>
-#include <tuple>
 #include <unistd.h>
 #include <unordered_set>
-
-#include "utils/configuration.hpp"
-
-#include "utils/types.hpp"
 
 #include "capio/env.hpp"
 #include "capio/logger.hpp"
@@ -31,7 +26,7 @@
 #include <include/file-manager/file_manager.hpp>
 #include <include/file-manager/fs_monitor.hpp>
 #include <include/storage-service/capio_storage_service.hpp>
-
+#include <utils/configuration.hpp>
 #include <utils/parser.hpp>
 #include <utils/signals.hpp>
 

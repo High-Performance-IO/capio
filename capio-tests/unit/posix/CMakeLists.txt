@@ -2,7 +2,8 @@
 # Target information
 #####################################
 set(TARGET_NAME capio_posix_unit_tests)
-set(TARGET_INCLUDE_FOLDER "../../../capio-posix")
+set(TARGET_INCLUDE_FOLDER "${CMAKE_SOURCE_DIR}/capio-posix")
+list(FILTER TARGET_INCLUDE_FOLDER EXCLUDE REGEX ".*/libcapio_posix\\.cpp$")
 set(TARGET_SOURCES
         ${CMAKE_CURRENT_SOURCE_DIR}/src/realpath.cpp
 )
@@ -15,7 +16,7 @@ add_executable(${TARGET_NAME} ${TARGET_SOURCES})
 #####################################
 # External projects
 #####################################
-set(SYSCALL_INTERCEPT_BINARY_DIR "${PROJECT_BINARY_DIR}/src/posix/syscall_intercept")
+set(SYSCALL_INTERCEPT_BINARY_DIR "${PROJECT_BINARY_DIR}/capio-posix/syscall_intercept")
 set(SYSCALL_INTERCEPT_INCLUDE_FOLDER
         "${SYSCALL_INTERCEPT_BINARY_DIR}/${CMAKE_INSTALL_INCLUDEDIR}")
 set(SYSCALL_INTERCEPT_LIB_FOLDER
