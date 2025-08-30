@@ -2,7 +2,6 @@
 #define CLIENT_MANAGER_HPP
 #include <capio/response_queue.hpp>
 #include <unordered_map>
-#include <utils/configuration.hpp>
 #include <vector>
 
 /**

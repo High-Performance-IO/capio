@@ -3,8 +3,8 @@
 #include <filesystem>
 #include <include/communication-service/control-plane/fs_control_plane.hpp>
 #include <include/communication-service/data-plane/backend_interface.hpp>
+#include <include/utils/configuration.hpp>
 #include <thread>
-#include <utils/configuration.hpp>
 
 void FSControlPlane::generate_aliveness_token(const int port) const {
     START_LOG(gettid(), "call(port=d)", port);

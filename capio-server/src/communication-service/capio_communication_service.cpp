@@ -5,7 +5,7 @@
 #include <include/communication-service/control-plane/multicast_control_plane.hpp>
 #include <include/communication-service/data-plane/backend_interface.hpp>
 #include <include/communication-service/data-plane/mtcl_backend.hpp>
-#include <utils/configuration.hpp>
+#include <include/utils/configuration.hpp>
 
 CapioCommunicationService::~CapioCommunicationService() {
     delete capio_control_plane;

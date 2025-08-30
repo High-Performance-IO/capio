@@ -3,8 +3,7 @@
 
 #include "capio/requests.hpp"
 
-#include <iostream>
-#include <utils/types.hpp>
+#include <include/utils/types.hpp>
 
 /**
  * @brief Class that handles the system calls received from the posix client application

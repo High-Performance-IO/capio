@@ -1,7 +1,11 @@
-#ifndef PARSER_HPP
-#define PARSER_HPP
-
+#include <args.hxx>
+#include <capio/constants.hpp>
+#include <capio/env.hpp>
+#include <capio/logger.hpp>
 #include <include/communication-service/capio_communication_service.hpp>
+#include <include/utils/command_line_parser.hpp>
+#include <include/utils/configuration.hpp>
+#include <sstream>
 
 std::string parseCLI(int argc, char **argv, char *resolve_prefix) {
     Logger *log;
@@ -176,5 +180,3 @@ std::string parseCLI(int argc, char **argv, char *resolve_prefix) {
     }
     return "";
 }
-
-#endif // PARSER_HPP

@@ -2,7 +2,7 @@
 #define CAPIO_FS_FILE_SYSTEM_MONITOR_HPP
 #include <capio/logger.hpp>
 #include <thread>
-#include <utils/configuration.hpp>
+
 /**
  * @brief Class that monitors the composition of the CAPIO_DIR directory.
  *

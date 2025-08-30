@@ -3,7 +3,7 @@
 
 #include <thread>
 
-#include "../capio-server/utils/configuration.hpp"
+#include "../capio-server/include/utils/configuration.hpp"
 
 #include "../capio-posix/utils/env.hpp"
 #include "../capio-posix/utils/filesystem.hpp"

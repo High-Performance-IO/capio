@@ -1,7 +1,7 @@
 #include <capio/logger.hpp>
 #include <include/file-manager/file_manager.hpp>
 #include <include/file-manager/fs_monitor.hpp>
-#include <utils/configuration.hpp>
+#include <include/utils/configuration.hpp>
 
 FileSystemMonitor::FileSystemMonitor() {
     START_LOG(gettid(), "call()");

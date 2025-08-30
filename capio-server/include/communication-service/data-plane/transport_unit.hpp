@@ -1,8 +1,8 @@
 #ifndef TRANSPORT_UNIT_HPP
 #define TRANSPORT_UNIT_HPP
 
+#include <include/utils/types.hpp>
 #include <string>
-#include <utils/types.hpp>
 
 class TransportUnit {
   protected:

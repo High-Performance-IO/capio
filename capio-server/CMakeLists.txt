@@ -2,6 +2,7 @@
 # Target information
 #####################################
 set(TARGET_NAME capio_server)
+
 set(TARGET_INCLUDE_FOLDER .)
 file(GLOB_RECURSE TARGET_SOURCES
         "${CMAKE_CURRENT_SOURCE_DIR}/*.cpp"

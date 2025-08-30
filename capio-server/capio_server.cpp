@@ -1,5 +1,4 @@
 #include <algorithm>
-#include <args.hxx>
 #include <cstdio>
 #include <cstring>
 #include <dirent.h>
@@ -10,7 +9,6 @@
 #include <list>
 #include <semaphore.h>
 #include <singleheader/simdjson.h>
-#include <sstream>
 #include <string>
 #include <unistd.h>
 #include <unordered_set>
@@ -26,9 +24,9 @@
 #include <include/file-manager/file_manager.hpp>
 #include <include/file-manager/fs_monitor.hpp>
 #include <include/storage-service/capio_storage_service.hpp>
-#include <utils/configuration.hpp>
-#include <utils/parser.hpp>
-#include <utils/signals.hpp>
+#include <include/utils/command_line_parser.hpp>
+#include <include/utils/configuration.hpp>
+#include <include/utils/signals.hpp>
 
 int main(int argc, char **argv) {
     std::cout << CAPIO_LOG_SERVER_BANNER;

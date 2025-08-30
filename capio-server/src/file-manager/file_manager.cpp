@@ -2,12 +2,10 @@
 #define FILE_MANAGER_HPP
 #include "include/file-manager/file_manager.hpp"
 #include "capio/env.hpp"
-
-#include "utils/distributed_semaphore.hpp"
-
 #include <include/capio-cl-engine/capio_cl_engine.hpp>
 #include <include/client-manager/client_manager.hpp>
 #include <include/storage-service/capio_storage_service.hpp>
+#include <include/utils/distributed_semaphore.hpp>
 
 std::string CapioFileManager::getMetadataPath(const std::string &path) {
     START_LOG(gettid(), "call(path=%s)", path.c_str());

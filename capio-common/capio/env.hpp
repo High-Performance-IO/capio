@@ -10,7 +10,7 @@
 #include <sys/stat.h>
 
 #ifndef __CAPIO_POSIX
-#include <utils/configuration.hpp>
+#include <include/utils/configuration.hpp>
 #endif
 
 #include "logger.hpp"

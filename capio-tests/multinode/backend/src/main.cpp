@@ -1,11 +1,6 @@
 
-#include <gtest/gtest.h>
-#include <thread>
-
-#include "../capio-server/utils/configuration.hpp"
-
 #include "MTCL.hpp"
-#include <capio/logger.hpp>
+#include <gtest/gtest.h>
 
 int main(int argc, char **argv) {
     testing::InitGoogleTest(&argc, argv);

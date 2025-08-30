@@ -1,10 +1,10 @@
 #ifndef FILE_MANAGER_HEADER_HPP
 #define FILE_MANAGER_HEADER_HPP
 
+#include <include/utils/types.hpp>
 #include <mutex>
 #include <string>
 #include <unordered_map>
-#include <utils/types.hpp>
 
 inline std::mutex creation_mutex;
 inline std::mutex data_mutex;

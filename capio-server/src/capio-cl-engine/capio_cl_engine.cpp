@@ -1,5 +1,4 @@
 
-#include "utils/configuration.hpp"
 #include <include/capio-cl-engine/capio_cl_engine.hpp>
 
 void CapioCLEngine::print() const {
