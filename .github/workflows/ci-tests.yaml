@@ -70,8 +70,10 @@ jobs:
     strategy:
       matrix:
         path:
-          - "src"
-          - "tests"
+          - "capio-posix"
+          - "capio-server"
+          - "capio-common"
+          - "capio-tests"
     steps:
       - uses: actions/checkout@v4
       - name: "Run clang-format style check"
