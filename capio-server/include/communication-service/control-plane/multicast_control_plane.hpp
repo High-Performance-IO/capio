@@ -2,8 +2,8 @@
 #define MULTICAST_CONTROL_PLANE_HPP
 #include <capio/logger.hpp>
 #include <include/communication-service/control-plane/capio_control_plane.hpp>
+#include <mutex>
 #include <thread>
-#include <utils/configuration.hpp>
 #include <vector>
 
 class MulticastControlPlane : public CapioControlPlane {
@@ -25,7 +25,7 @@ class MulticastControlPlane : public CapioControlPlane {
 
     ~MulticastControlPlane() override;
 
-    void notify_all(const event_type event, const std::filesystem::path &path) override;
+    void notify_all(event_type event, const std::filesystem::path &path) override;
 };
 
 #endif // MULTICAST_CONTROL_PLANE_HPP

@@ -1,7 +1,6 @@
 #ifndef FS_CONTROL_PLANE_HPP
 #define FS_CONTROL_PLANE_HPP
 
-#include <climits>
 #include <include/communication-service/control-plane/capio_control_plane.hpp>
 #include <mutex>
 #include <thread>
@@ -15,7 +14,7 @@ class FSControlPlane : public CapioControlPlane {
     std::vector<std::string> token_used_to_connect;
     std::mutex *token_used_to_connect_mutex;
 
-    void generate_aliveness_token(const int port) const;
+    void generate_aliveness_token(int port) const;
 
     void delete_aliveness_token();
 

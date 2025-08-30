@@ -76,7 +76,7 @@ To launch your workflow with capio you can follow two routes:
 #### A) Use `capiorun` for simplified operations
 
 You can simplify the execution of workflow steps with CAPIO using the `capiorun` utility. See the
-[`capiorun` documentation](capiorun/readme.md) for usage and examples. `capiorun` provides an easier way to manage
+[`capiorun` documentation](capio-run/readme.md) for usage and examples. `capiorun` provides an easier way to manage
 daemon startup and environment preparation, so that the user do not need to manually prepare the environment.
 
 #### B) Manually launch CAPIO

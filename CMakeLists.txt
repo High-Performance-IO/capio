@@ -92,10 +92,10 @@ add_subdirectory(capio-posix)
 add_subdirectory(capio-server)
 
 #####################################
-# Install capiorun
+# Install capio-run
 #####################################
 install(
-        FILES ${PROJECT_SOURCE_DIR}/capiorun/capiorun
+        FILES ${PROJECT_SOURCE_DIR}/capio-run/capiorun
         DESTINATION ${CMAKE_INSTALL_BINDIR}
         PERMISSIONS
         OWNER_READ
