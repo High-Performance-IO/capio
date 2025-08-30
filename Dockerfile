@@ -18,9 +18,11 @@ RUN apt update                              \
 
 COPY CMakeLists.txt /opt/capio/
 COPY scripts /opt/capio/scripts
-COPY src /opt/capio/src
-COPY tests /opt/capio/tests
-COPY capiorun /opt/capio/capiorun
+COPY capio-common /opt/capio/capio-common
+COPY capio-posix /opt/capio/capio-posix
+COPY capio-server /opt/capio/capio-server
+COPY capio-tests /opt/capio/capio-tests
+COPY capio-run /opt/capio/capio-run
 
 RUN mkdir -p /opt/capio/build                     \
  && cmake                                         \
@@ -98,7 +100,7 @@ COPY --from=builder                                         \
     "/usr/local/bin/capio_integration_test_map*"            \
     "/usr/local/bin/capio_integration_test_merge*"          \
     "/usr/local/bin/capio_integration_test_split*"          \
-    "/opt/capio/capiorun/capiorun"                          \
+    "/opt/capio/capio-run/capiorun"                         \
     /usr/local/bin/
 
 # Pkgconfig

@@ -19,7 +19,7 @@ jobs:
       - name: "Run codespell"
         uses: codespell-project/actions-codespell@v2
         with:
-          exclude_file: tests/unit/server/src/SourceText.hpp
+          exclude_file: capio-tests/unit/server/src/SourceText.hpp
   docker-check:
     name: "Check Docker image"
     runs-on: ubuntu-22.04
@@ -57,11 +57,11 @@ jobs:
 
       - name: "Run backend communication tests"
         working-directory: ${{ github.workspace }}
-        run: docker compose -f tests/multinode/backend/docker-compose.yml up --abort-on-container-exit
+        run: docker compose -f capio-tests/multinode/backend/docker-compose.yml up --abort-on-container-exit
 
       - name: "Run integration tests"
         working-directory: ${{ github.workspace }}
-        run: docker compose -f tests/multinode/integration/docker-compose.yml up --abort-on-container-exit
+        run: docker compose -f capio-tests/multinode/integration/docker-compose.yml up --abort-on-container-exit
 
 
   format-check:
@@ -70,8 +70,10 @@ jobs:
     strategy:
       matrix:
         path:
-          - "src"
-          - "tests"
+          - "capio-posix"
+          - "capio-server"
+          - "capio-common"
+          - "capio-tests"
     steps:
       - uses: actions/checkout@v4
       - name: "Run clang-format style check"
@@ -89,7 +91,6 @@ jobs:
           - Debug
           - Release
         cxx:
-          - g++-9
           - g++-10
           - g++-11
           - g++-12
@@ -155,7 +156,7 @@ jobs:
           CAPIO_LOG_LEVEL: -1
         run: |
           export LD_LIBRARY_PATH="/usr/local/lib:${LD_LIBRARY_PATH}"
-          
+
           echo "Run CAPIO syscall Unit tests"         
           capio_server --no-config &
           CAPIO_SERVER_PID=$!
@@ -163,8 +164,8 @@ jobs:
                   --gtest_break_on_failure --gtest_print_time=1
           kill $CAPIO_SERVER_PID
           sleep 2
-          
-          
+
+
           echo "Run CAPIO memory file integration tests"
           capio_server --no-config &
           CAPIO_SERVER_PID=$!
@@ -172,16 +173,16 @@ jobs:
                   --gtest_break_on_failure  --gtest_print_time=1
           kill $CAPIO_SERVER_PID
           sleep 2
-          
-          
-          
+
+
+
           echo "Run CAPIO POSIX Unit tests"
           capio_posix_unit_tests \
             --gtest_break_on_failure \
             --gtest_print_time=1 
           sleep 2
-          
-          
+
+
           echo "Run CAPIO SERVER unit tests"
           capio_server_unit_tests \
             --gtest_break_on_failure \

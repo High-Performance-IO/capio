@@ -78,8 +78,8 @@ ENDIF (CAPIO_LOG)
 #####################################
 # Include files and directories
 #####################################
-file(GLOB_RECURSE CAPIO_COMMON_HEADERS "src/common/capio/*.hpp")
-include_directories(src/common)
+file(GLOB_RECURSE CAPIO_COMMON_HEADERS "capio-common/capio/*.hpp")
+include_directories(${PROJECT_SOURCE_DIR}/capio-common)
 
 IF (CAPIO_LOG AND CMAKE_BUILD_TYPE STREQUAL "Debug")
     include_directories("${PROJECT_BINARY_DIR}/include/syscall")
@@ -88,14 +88,14 @@ ENDIF (CAPIO_LOG AND CMAKE_BUILD_TYPE STREQUAL "Debug")
 #####################################
 # Targets
 #####################################
-add_subdirectory(src/posix)
-add_subdirectory(src/server)
+add_subdirectory(capio-posix)
+add_subdirectory(capio-server)
 
 #####################################
-# Install capiorun
+# Install capio-run
 #####################################
 install(
-        FILES ${PROJECT_SOURCE_DIR}/capiorun/capiorun
+        FILES ${PROJECT_SOURCE_DIR}/capio-run/capiorun
         DESTINATION ${CMAKE_INSTALL_BINDIR}
         PERMISSIONS
         OWNER_READ
@@ -111,5 +111,5 @@ install(
 IF (CAPIO_BUILD_TESTS)
     message(STATUS "Building CAPIO test suite")
     add_compile_definitions(CAPIO_BUILD_TESTS)
-    add_subdirectory(tests)
+    add_subdirectory(capio-tests)
 ENDIF (CAPIO_BUILD_TESTS)
