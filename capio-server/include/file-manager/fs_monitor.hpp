@@ -1,8 +1,8 @@
 #ifndef CAPIO_FS_FILE_SYSTEM_MONITOR_HPP
 #define CAPIO_FS_FILE_SYSTEM_MONITOR_HPP
+#include <capio/logger.hpp>
 #include <thread>
 #include <utils/configuration.hpp>
-#include <capio/logger.hpp>
 /**
  * @brief Class that monitors the composition of the CAPIO_DIR directory.
  *
@@ -27,7 +27,7 @@ class FileSystemMonitor {
      */
     static void _main(const bool *continue_execution);
 
-    explicit FileSystemMonitor() ;
+    explicit FileSystemMonitor();
 
     ~FileSystemMonitor();
 };

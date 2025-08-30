@@ -1,18 +1,17 @@
-#include <include/file-manager/fs_monitor.hpp>
 #include <capio/logger.hpp>
-#include <utils/configuration.hpp>
 #include <include/file-manager/file_manager.hpp>
-
+#include <include/file-manager/fs_monitor.hpp>
+#include <utils/configuration.hpp>
 
 FileSystemMonitor::FileSystemMonitor() {
     START_LOG(gettid(), "call()");
     *continue_execution = true;
     th                  = new std::thread(_main, std::ref(continue_execution));
-    server_println(CAPIO_SERVER_CLI_LOG_SERVER,
-                   "CapioFileSystemMonitor initialization completed.");
+    server_println(CAPIO_SERVER_CLI_LOG_SERVER, "CapioFileSystemMonitor initialization completed.");
 }
 
-void FileSystemMonitor::print_message_error(const std::string &func, const std::exception &exception) {
+void FileSystemMonitor::print_message_error(const std::string &func,
+                                            const std::exception &exception) {
     START_LOG(gettid(), "call()");
     std::cout << std::endl
               << "~~~~~~~~~~~~~~[\033[31mFileSystemMonitor: FATAL "
@@ -73,4 +72,3 @@ FileSystemMonitor::~FileSystemMonitor() {
     delete continue_execution;
     server_println(CAPIO_SERVER_CLI_LOG_SERVER, "CapioFileSystemMonitor cleanup completed.");
 }
-

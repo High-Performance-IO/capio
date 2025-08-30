@@ -38,7 +38,7 @@ class JsonParser {
      * @return CapioCLEngine instance with the information provided by the config file
      */
     static CapioCLEngine *parse(const std::filesystem::path &source,
-                         const std::filesystem::path resolve_prexix);
+                                const std::filesystem::path resolve_prexix);
 };
 
 #endif // JSON_PARSER_HPP

@@ -5,13 +5,13 @@
 #include <utils/types.hpp>
 
 class TransportUnit {
-protected:
+  protected:
     std::string _filepath;
     char *_bytes{};
     capio_off64_t _buffer_size{};
     capio_off64_t _start_write_offset{};
 
-public:
+  public:
     TransportUnit() = default;
 
     ~TransportUnit() { delete[] _bytes; }
@@ -19,5 +19,4 @@ public:
     friend class MTCLBackend;
 };
 
-
-#endif //TRANSPORT_UNIT_HPP
+#endif // TRANSPORT_UNIT_HPP

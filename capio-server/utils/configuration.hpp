@@ -3,10 +3,10 @@
 
 #include "capio/constants.hpp"
 
+#include <iostream>
 #include <limits.h>
 #include <string>
 #include <unistd.h>
-#include <iostream>
 
 /*
  * Variables required to be globally available

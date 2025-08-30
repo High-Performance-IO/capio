@@ -59,8 +59,8 @@ void handshake_handler(const char *const str);
 void open_handler(const char *const str);
 
 /**
-*
-*/
+ *
+ */
 void posix_readdir_handler(const char *const str);
 
 /**
@@ -72,7 +72,6 @@ void posix_readdir_handler(const char *const str);
 void read_handler(const char *const str);
 
 void read_mem_handler(const char *const str);
-
 
 /**
  * @brief Handle the rename systemcall
@@ -92,6 +91,4 @@ void write_handler(const char *const str);
 
 void write_mem_handler(const char *const str);
 
-
-
-#endif //HANDLERS_HPP
+#endif // HANDLERS_HPP

@@ -2,9 +2,9 @@
 #define BACKEND_INTERFACE_HPP
 
 #include "capio/constants.hpp"
-#include <unistd.h>
 #include <cstdint>
 #include <string>
+#include <unistd.h>
 #include <vector>
 
 class NotImplementedBackendMethod : public std::exception {
@@ -79,4 +79,4 @@ class NoBackend final : public BackendInterface {
 };
 
 inline BackendInterface *capio_backend;
-#endif //BACKEND_INTERFACE_HPP
+#endif // BACKEND_INTERFACE_HPP

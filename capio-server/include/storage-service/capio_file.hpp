@@ -1,20 +1,19 @@
 #ifndef CAPIO_FILE_HPP
 #define CAPIO_FILE_HPP
 
-#include <iostream>
-#include <unistd.h>
 #include <capio/logger.hpp>
 #include <capio/queue.hpp>
+#include <iostream>
 #include <map>
+#include <unistd.h>
 #include <vector>
 
-
 class CapioFile {
-protected:
+  protected:
     const std::string fileName;
     std::size_t totalSize;
 
-public:
+  public:
     explicit CapioFile(const std::string &filePath) : fileName(filePath), totalSize(0) {};
     virtual ~CapioFile() = default;
 
@@ -63,8 +62,6 @@ public:
                                      std::size_t length) const = 0;
 };
 
-
-
 class CapioMemoryFile : public CapioFile {
     std::map<std::size_t, std::vector<char>> memoryBlocks;
 
@@ -87,12 +84,12 @@ class CapioMemoryFile : public CapioFile {
      * @param id
      * @return
      */
-    std::vector<char> &get_block(u_int64_t id) ;
+    std::vector<char> &get_block(u_int64_t id);
 
   public:
     explicit CapioMemoryFile(const std::string &filePath);
 
-    ~CapioMemoryFile() ;
+    ~CapioMemoryFile();
 
     /**
      * Write data to a file stored inside the memory
@@ -101,7 +98,7 @@ class CapioMemoryFile : public CapioFile {
      * @param buffer_length Size of the buffer.
      */
     std::size_t writeData(const char *buffer, const std::size_t file_offset,
-                          std::size_t buffer_length) override ;
+                          std::size_t buffer_length) override;
 
     /**
      * Read from Capio File
@@ -110,7 +107,7 @@ class CapioMemoryFile : public CapioFile {
      * @param buffer_size Length of buffer
      * @return number of bytes read from CapioMemoryFile
      */
-    std::size_t readData(char *buffer, std::size_t file_offset, std::size_t buffer_size) ;
+    std::size_t readData(char *buffer, std::size_t file_offset, std::size_t buffer_size);
 
     /**
      * Store data inside the CapioMemoryFile by reading it from a SPSCQueue object. Behaves just
@@ -119,7 +116,7 @@ class CapioMemoryFile : public CapioFile {
      * @param offset
      * @param length
      */
-    void readFromQueue(SPSCQueue &queue, std::size_t offset, std::size_t length) override ;
+    void readFromQueue(SPSCQueue &queue, std::size_t offset, std::size_t length) override;
 
     /**
      * Write the content of the capioFile to a SPSCQueue object
@@ -129,15 +126,14 @@ class CapioMemoryFile : public CapioFile {
      * @return
      */
     std::size_t writeToQueue(SPSCQueue &queue, std::size_t offset,
-                             std::size_t length) const override ;
+                             std::size_t length) const override;
 };
-
 
 class CapioRemoteFile : public CapioFile {
-public:
+  public:
     explicit CapioRemoteFile(const std::string &filePath);
 
-    ~CapioRemoteFile() override ;
+    ~CapioRemoteFile() override;
 
     /**
      * Write data to a file stored inside the memory
@@ -146,7 +142,7 @@ public:
      * @param buffer_length Size of the buffer.
      */
     std::size_t writeData(const char *buffer, const std::size_t file_offset,
-                          std::size_t buffer_length) override ;
+                          std::size_t buffer_length) override;
 
     /**
      * Read from Capio File
@@ -155,7 +151,7 @@ public:
      * @param buffer_size Length of buffer
      * @return number of bytes read from CapioMemoryFile
      */
-    std::size_t readData(char *buffer, std::size_t file_offset, std::size_t buffer_size) ;
+    std::size_t readData(char *buffer, std::size_t file_offset, std::size_t buffer_size);
 
     /**
      * Store data inside the CapioMemoryFile by reading it from a SPSCQueue object. Behaves just
@@ -164,7 +160,7 @@ public:
      * @param offset
      * @param length
      */
-    void readFromQueue(SPSCQueue &queue, std::size_t offset, std::size_t length) override ;
+    void readFromQueue(SPSCQueue &queue, std::size_t offset, std::size_t length) override;
 
     /**
      * Write the content of the capioFile to a SPSCQueue object
@@ -174,7 +170,7 @@ public:
      * @return
      */
     std::size_t writeToQueue(SPSCQueue &queue, std::size_t offset,
-                             std::size_t length) const override ;
+                             std::size_t length) const override;
 };
 
-#endif //CAPIO_FILE_HPP
+#endif // CAPIO_FILE_HPP

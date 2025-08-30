@@ -3,14 +3,13 @@
 #include "include/file-manager/file_manager.hpp"
 #include "capio/env.hpp"
 
-
 #include "utils/distributed_semaphore.hpp"
 
 #include <include/capio-cl-engine/capio_cl_engine.hpp>
-#include <include/storage-service/capio_storage_service.hpp>
 #include <include/client-manager/client_manager.hpp>
+#include <include/storage-service/capio_storage_service.hpp>
 
- std::string CapioFileManager::getMetadataPath(const std::string &path) {
+std::string CapioFileManager::getMetadataPath(const std::string &path) {
     START_LOG(gettid(), "call(path=%s)", path.c_str());
 
     const std::filesystem::path &metadata_path = get_capio_metadata_path();
@@ -38,7 +37,7 @@
     return token_full_path;
 }
 
- std::string CapioFileManager::getAndCreateMetadataPath(const std::string &path) {
+std::string CapioFileManager::getAndCreateMetadataPath(const std::string &path) {
     START_LOG(gettid(), "call(path=%s)", path.c_str());
     static std::unordered_map<std::string, std::string> metadata_paths;
     if (metadata_paths.find(path) == metadata_paths.end()) {
@@ -54,18 +53,18 @@
     return metadata_paths[path];
 }
 
- uintmax_t CapioFileManager::get_file_size_if_exists(const std::filesystem::path &path) {
+uintmax_t CapioFileManager::get_file_size_if_exists(const std::filesystem::path &path) {
     return std::filesystem::exists(path) ? std::filesystem::file_size(path) : 0;
 }
 
- void CapioFileManager::addThreadAwaitingCreation(const std::string &path, pid_t tid) {
+void CapioFileManager::addThreadAwaitingCreation(const std::string &path, pid_t tid) {
     START_LOG(gettid(), "call(path=%s, tid=%ld)", path.c_str(), tid);
     const std::lock_guard lg(creation_mutex);
     thread_awaiting_file_creation[path].push_back(tid);
 }
 
- void CapioFileManager::_unlockThreadAwaitingCreation(const std::string &path,
-                                                            const std::vector<pid_t> &pids) {
+void CapioFileManager::_unlockThreadAwaitingCreation(const std::string &path,
+                                                     const std::vector<pid_t> &pids) {
     START_LOG(gettid(), "call(path=%s)", path.c_str());
     for (const auto tid : pids) {
         client_manager->reply_to_client(tid, 1);
@@ -77,8 +76,8 @@
     }
 }
 
- void CapioFileManager::addThreadAwaitingData(const std::string &path, int tid,
-                                                    size_t expected_size) {
+void CapioFileManager::addThreadAwaitingData(const std::string &path, int tid,
+                                             size_t expected_size) {
     START_LOG(gettid(), "call(path=%s, tid=%ld, expected_size=%ld)", path.c_str(), tid,
               expected_size);
 
@@ -93,7 +92,7 @@
     thread_awaiting_data[path].emplace(tid, expected_size);
 }
 
- void CapioFileManager::_unlockThreadAwaitingData(
+void CapioFileManager::_unlockThreadAwaitingData(
     const std::string &path, std::unordered_map<pid_t, capio_off64_t> &pids_awaiting) {
     START_LOG(gettid(), "call(path=%s)", path.c_str());
 
@@ -150,7 +149,7 @@
     LOG("Completed loops over threads vector for file!");
 }
 
- void CapioFileManager::increaseCloseCount(const std::filesystem::path &path) {
+void CapioFileManager::increaseCloseCount(const std::filesystem::path &path) {
     START_LOG(gettid(), "call(path=%s)", path.c_str());
     auto metadata_path    = getAndCreateMetadataPath(path);
     auto lock             = new DistributedSemaphore(metadata_path + ".lock", 300);
@@ -173,7 +172,7 @@
     delete lock;
 }
 
- void CapioFileManager::setCommitted(const std::filesystem::path &path) {
+void CapioFileManager::setCommitted(const std::filesystem::path &path) {
     START_LOG(gettid(), "call(path=%s)", path.c_str());
     auto metadata_path = getAndCreateMetadataPath(path);
     LOG("Creating token %s", metadata_path.c_str());
@@ -182,7 +181,7 @@
     close(fd);
 }
 
- void CapioFileManager::setCommitted(const pid_t tid) {
+void CapioFileManager::setCommitted(const pid_t tid) {
     START_LOG(gettid(), "call(tid=%d)", tid);
     auto files = client_manager->get_produced_files(tid);
     for (const auto &file : *files) {
@@ -191,7 +190,7 @@
     }
 }
 
- bool CapioFileManager::isCommitted(const std::filesystem::path &path) {
+bool CapioFileManager::isCommitted(const std::filesystem::path &path) {
     START_LOG(gettid(), "call(path=%s)", path.c_str());
     /**
      * Hash map to store committed files to avoid recomputing the commit state of a given file
@@ -299,7 +298,7 @@
     return false;
 }
 
- void CapioFileManager::checkFilesAwaitingCreation() {
+void CapioFileManager::checkFilesAwaitingCreation() {
     // NOTE: do not put inside here log code as it will generate a lot of useless log
     const std::lock_guard lg(creation_mutex);
     std::vector<std::string> path_to_delete;
@@ -319,7 +318,7 @@
     }
 }
 
- void CapioFileManager::checkFileAwaitingData() {
+void CapioFileManager::checkFileAwaitingData() {
     // NOTE: do not put inside here log code as it will generate a lot of useless log
     const std::lock_guard lg(data_mutex);
     for (auto iter = thread_awaiting_data.begin(); iter != thread_awaiting_data.end();) {
@@ -342,7 +341,7 @@
     }
 }
 
- void CapioFileManager::checkDirectoriesNFiles() const {
+void CapioFileManager::checkDirectoriesNFiles() const {
     /*
      * WARN: this function directly access the _location internal structure in read only mode to
      * avoid race conditions. Since we do not update locations, get the pointer only at the

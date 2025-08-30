@@ -2,8 +2,8 @@
 #define CAPIO_STORAGE_SERVICE_H
 
 #include <capio/env.hpp>
-#include <include/storage-service/capio_file.hpp>
 #include <include/capio-cl-engine/capio_cl_engine.hpp>
+#include <include/storage-service/capio_file.hpp>
 
 class CapioStorageService {
     // TODO: put all of this conde on a different thread
@@ -20,30 +20,30 @@ class CapioStorageService {
      * @param file_name
      * @return
      */
-    [[nodiscard]] auto getFile(const std::string &file_name) const ;
+    [[nodiscard]] auto getFile(const std::string &file_name) const;
 
   public:
-    CapioStorageService() ;
+    CapioStorageService();
 
-    ~CapioStorageService() ;
+    ~CapioStorageService();
 
-    void createMemoryFile(const std::string &file_name) const ;
+    void createMemoryFile(const std::string &file_name) const;
 
     /**
      * Create a CapioRemoteFile, after checking that an instance of CapioMemoryFile (meaning a local
      * file) is not present
      * @param file_name file path
      */
-    void createRemoteFile(const std::string &file_name) const ;
+    void createRemoteFile(const std::string &file_name) const;
 
-    void deleteFile(const std::string &file_name) const ;
+    void deleteFile(const std::string &file_name) const;
 
     /**
      * Notify the occurrence of an operation on a given file, for which other servers running at a
      * certain point might be required to know. This function is used to allow CAPIO to function in
      * the event that a distributed file system (or at least a shared directory) is not available
      */
-    void notifyEvent(const std::string &event_name, const std::filesystem::path &filename) const ;
+    void notifyEvent(const std::string &event_name, const std::filesystem::path &filename) const;
 
     /**
      * Add a new thread in the list of thhreads awaiting for expected_size to be available
@@ -53,23 +53,23 @@ class CapioStorageService {
      * @param  size
      */
     void addThreadWaitingForData(pid_t tid, const std::string &path, capio_off64_t offset,
-                                 capio_off64_t size) const ;
+                                 capio_off64_t size) const;
 
-    void check_and_unlock_thread_awaiting_data(const std::string &path) ;
+    void check_and_unlock_thread_awaiting_data(const std::string &path);
 
     /**
      * Return size of given path as contained inside memory
      * @param path
      * @return
      */
-    size_t sizeOf(const std::string &path) const ;
+    size_t sizeOf(const std::string &path) const;
 
     /**
      * Initialize a new client data structure
      * @param app_name
      * @param pid
      */
-    void register_client(const std::string &app_name, const pid_t pid) const ;
+    void register_client(const std::string &app_name, const pid_t pid) const;
 
     /**
      * Send the file content to a client application
@@ -79,7 +79,7 @@ class CapioStorageService {
      * @param size
      */
     void reply_to_client(pid_t pid, const std::string &file, capio_off64_t offset,
-                         capio_off64_t size) const ;
+                         capio_off64_t size) const;
 
     /**
      * Send raw data to client without fetching from the storage manager itself

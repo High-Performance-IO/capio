@@ -3,7 +3,7 @@
 #include <filesystem>
 
 class CapioControlPlane {
-public:
+  public:
     typedef enum { CREATE, DELETE, WRITE } event_type;
 
     virtual ~CapioControlPlane() = default;
@@ -27,4 +27,4 @@ public:
 
 inline CapioControlPlane *capio_control_plane;
 
-#endif //CAPIO_CONTROL_PLANE_HPP
+#endif // CAPIO_CONTROL_PLANE_HPP

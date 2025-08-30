@@ -24,7 +24,6 @@ inline capio_off64_t get_capio_write_cache_size() {
     return cache_size;
 }
 
-
 inline long get_posix_read_cache_line_size() {
     START_LOG(capio_syscall(SYS_gettid), "call()");
     static long data_bufs_count = -1;

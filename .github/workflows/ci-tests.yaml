@@ -19,7 +19,7 @@ jobs:
       - name: "Run codespell"
         uses: codespell-project/actions-codespell@v2
         with:
-          exclude_file: tests/unit/server/src/SourceText.hpp
+          exclude_file: capio-tests/unit/server/src/SourceText.hpp
   docker-check:
     name: "Check Docker image"
     runs-on: ubuntu-22.04
