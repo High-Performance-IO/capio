@@ -1,6 +1,6 @@
 #ifndef CAPIOFILETESTS_HPP
 #define CAPIOFILETESTS_HPP
-#include "../capio-server/storage-service/CapioFile/CapioMemoryFile.hpp"
+#include <include/storage-service/capio_file.hpp>
 
 constexpr size_t FILE_SIZE = 8 * 1024 * 1024;
 

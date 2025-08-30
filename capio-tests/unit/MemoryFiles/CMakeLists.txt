@@ -2,9 +2,16 @@
 # Target information
 #####################################
 set(TARGET_NAME capio_memory_file_unit_tests)
-set(TARGET_INCLUDE_FOLDER "../../../capio-posix")
+
+file(GLOB_RECURSE CAPIO_SERVER_SOURCES ${CMAKE_SOURCE_DIR}/capio-server/ "*.cpp")
+
+set(TARGET_INCLUDE_FOLDER
+        "${CMAKE_SOURCE_DIR}/capio-server/"
+        "${CMAKE_SOURCE_DIR}../../../capio-posix")
+
 set(TARGET_SOURCES
         ${CMAKE_CURRENT_SOURCE_DIR}/src/main.cpp
+        ${CAPIO_SERVER_SOURCES}
 )
 
 #####################################

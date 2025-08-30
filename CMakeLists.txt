@@ -111,5 +111,5 @@ install(
 IF (CAPIO_BUILD_TESTS)
     message(STATUS "Building CAPIO test suite")
     add_compile_definitions(CAPIO_BUILD_TESTS)
-    add_subdirectory(tests)
+    add_subdirectory(capio-tests)
 ENDIF (CAPIO_BUILD_TESTS)

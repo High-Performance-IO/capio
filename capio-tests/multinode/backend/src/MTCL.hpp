@@ -2,8 +2,10 @@
 #define TEST_CAPIOCOMMUNICATIONSERVICE_HPP
 
 #include <capio/constants.hpp>
-#include <communication-service/CapioCommunicationService.hpp>
+#include <capio/logger.hpp>
 #include <gtest/gtest.h>
+#include <include/communication-service/capio_communication_service.hpp>
+#include <include/communication-service/data-plane/backend_interface.hpp>
 #include <thread>
 
 constexpr char TEST_MESSAGE[]        = "hello world how is it going?";

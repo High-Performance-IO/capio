@@ -10,7 +10,7 @@
 #include "../capio-posix/utils/types.hpp"
 #include "capio/response_queue.hpp"
 
-#include "storage-service/CapioFile/CapioMemoryFile.hpp"
+#include <include/storage-service/capio_file.hpp>
 
 inline SPSCQueue *cts_queue, *stc_queue;
 inline std::unordered_map<long, ResponseQueue *> *bufs_response;
