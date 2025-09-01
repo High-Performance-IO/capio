@@ -33,8 +33,9 @@ class CapioStorageService {
      * Create a CapioRemoteFile, after checking that an instance of CapioMemoryFile (meaning a local
      * file) is not present
      * @param file_name file path
+     * @param home_node
      */
-    void createRemoteFile(const std::string &file_name) const;
+    void createRemoteFile(const std::string &file_name, const std::string &home_node) const;
 
     void deleteFile(const std::string &file_name) const;
 
@@ -69,7 +70,7 @@ class CapioStorageService {
      * @param app_name
      * @param pid
      */
-    void register_client(const std::string &app_name, const pid_t pid) const;
+    void register_client(const std::string &app_name, pid_t pid) const;
 
     /**
      * Send the file content to a client application
@@ -87,7 +88,7 @@ class CapioStorageService {
      * @param data
      * @param len
      */
-    void reply_to_client_raw(pid_t pid, const char *data, const capio_off64_t len) const;
+    void reply_to_client_raw(pid_t pid, const char *data, capio_off64_t len) const;
 
     /**
      * Receive the file content from the client application
@@ -105,9 +106,9 @@ class CapioStorageService {
      * @param pid
      * @return
      */
-    [[nodiscard]] size_t sendFilesToStoreInMemory(const long pid) const;
+    [[nodiscard]] size_t sendFilesToStoreInMemory(long pid) const;
 
-    void remove_client(const pid_t pid) const;
+    void remove_client(pid_t pid) const;
 };
 
 inline CapioStorageService *storage_service;

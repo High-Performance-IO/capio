@@ -70,7 +70,7 @@ void CapioFileManager::_unlockThreadAwaitingCreation(const std::string &path,
          * Here we need to create a new remote file, as it might be that the file is not
          * produced by this node but by another remote one
          */
-        storage_service->createRemoteFile(path);
+        storage_service->createRemoteFile(path, {});
     }
 }
 

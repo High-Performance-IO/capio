@@ -27,7 +27,7 @@ void open_handler(const char *const str) {
          * At this point, the file that needs to be created more likely than not is not local to the
          * machine. As such, we call the creation of a new CapioRemoteFile
          */
-        storage_service->createRemoteFile(path);
+        storage_service->createRemoteFile(path, {});
         return;
     }
 

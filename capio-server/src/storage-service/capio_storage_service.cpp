@@ -37,7 +37,8 @@ void CapioStorageService::createMemoryFile(const std::string &file_name) const {
     _stored_files->emplace(file_name, new CapioMemoryFile(file_name));
 }
 
-void CapioStorageService::createRemoteFile(const std::string &file_name) const {
+void CapioStorageService::createRemoteFile(const std::string &file_name,
+                                           const std::string &home_node) const {
     /*
      * First we check that the file associate does not yet exists, as it might be produced
      * by another app running under the same server instance. if it is not found, we create
@@ -46,7 +47,7 @@ void CapioStorageService::createRemoteFile(const std::string &file_name) const {
     START_LOG(gettid(), "call(file_name=%s)", file_name.c_str());
     if (_stored_files->find(file_name) == _stored_files->end()) {
         LOG("File not found. Creating a new remote file");
-        _stored_files->emplace(file_name, new CapioRemoteFile(file_name));
+        _stored_files->emplace(file_name, new CapioRemoteFile(file_name, home_node));
     }
 }
 

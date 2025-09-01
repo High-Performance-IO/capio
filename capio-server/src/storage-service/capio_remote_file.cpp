@@ -1,7 +1,7 @@
 
 #include <include/storage-service/capio_file.hpp>
 
-CapioRemoteFile::CapioRemoteFile(const std::string &filePath) : CapioFile(filePath) {}
+CapioRemoteFile::CapioRemoteFile(const std::string &filePath, const std::string& home_node) : CapioFile(filePath) {}
 
 CapioRemoteFile::~CapioRemoteFile() {}
 

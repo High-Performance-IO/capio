@@ -10,11 +10,13 @@
 
 class CapioFile {
   protected:
-    const std::string fileName;
+    const std::string fileName, homeNode;
     std::size_t totalSize;
 
   public:
-    explicit CapioFile(const std::string &filePath) : fileName(filePath), totalSize(0) {};
+    explicit CapioFile(const std::string &filePath,
+                       const std::string &home_node = capio_global_configuration->node_name)
+        : fileName(filePath), homeNode(home_node), totalSize(0) {};
     virtual ~CapioFile() = default;
 
     [[nodiscard]] std::size_t getSize() const {
@@ -131,7 +133,7 @@ class CapioMemoryFile : public CapioFile {
 
 class CapioRemoteFile : public CapioFile {
   public:
-    explicit CapioRemoteFile(const std::string &filePath);
+    explicit CapioRemoteFile(const std::string &filePath, const std::string &home_node);
 
     ~CapioRemoteFile() override;
 
