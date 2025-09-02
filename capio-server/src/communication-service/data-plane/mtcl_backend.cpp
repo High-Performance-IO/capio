@@ -1,118 +1,42 @@
+#include <algorithm>
+#include <capio/logger.hpp>
 #include <include/communication-service/data-plane/mtcl_backend.hpp>
+#include <include/utils/configuration.hpp>
 #include <mtcl.hpp>
-
-TransportUnit *MTCLBackend::receive_unit(MTCL::HandleUser *HandlerPointer) {
-    START_LOG(gettid(), "call()");
-    size_t filepath_len;
-    const auto unit = new TransportUnit();
-    HandlerPointer->receive(&filepath_len, sizeof(size_t));
-    LOG("Incoming path of length %ld", filepath_len);
-    unit->_filepath.reserve(filepath_len + 1);
-    HandlerPointer->receive(unit->_filepath.data(), filepath_len);
-    LOG("Received message! Path : %s", unit->_filepath.c_str());
-    HandlerPointer->receive(&unit->_buffer_size, sizeof(capio_off64_t));
-    LOG("Buffer size for incoming data is %ld", unit->_buffer_size);
-    unit->_bytes = new char[unit->_buffer_size];
-    LOG("Allocated space for incoming data");
-    HandlerPointer->receive(unit->_bytes, unit->_buffer_size);
-    LOG("Received file buffer data");
-    HandlerPointer->receive(&unit->_start_write_offset, sizeof(capio_off64_t));
-    LOG("Received chunk of data should be stored on offset %ld of file %s",
-        unit->_start_write_offset, unit->_filepath.c_str());
-    return unit;
-}
-
-void MTCLBackend::send_unit(MTCL::HandleUser *HandlerPointer, const TransportUnit *unit) {
-    START_LOG(gettid(), "call()");
-    LOG("[send] buffer=%s", unit->_bytes);
-    /**
-     * step0: send file path
-     * step1: send receive buffer size
-     * step1: send offset of write
-     * step2: send data
-     */
-    const size_t file_path_length = unit->_filepath.length();
-
-    HandlerPointer->send(&file_path_length, sizeof(size_t));
-    LOG("Size of path that is being sent: %ld", file_path_length);
-
-    HandlerPointer->send(unit->_filepath.c_str(), file_path_length);
-    LOG("Sent file path: %s", unit->_filepath.c_str());
-
-    HandlerPointer->send(&unit->_buffer_size, sizeof(capio_off64_t));
-    LOG("Size of file buffer to be sent: %ld", unit->_buffer_size);
-
-    HandlerPointer->send(unit->_bytes, unit->_buffer_size);
-    LOG("Sent %ld bytes of data chunk", unit->_buffer_size);
-
-    HandlerPointer->send(&unit->_start_write_offset, sizeof(capio_off64_t));
-    LOG("Sent start write offset : %ld", unit->_start_write_offset);
-
-    // DO NOT DELETE unit: here just afterward, the unit experiences a pop() which
-    // effectively calls delete on the container. If I delete it here, a double delete is
-    // raised
-}
 
 /**
  * This thread will handle connections towards a single target.
  */
-void MTCLBackend::server_connection_handler(MTCL::HandleUser HandlerPointer,
-                                            const std::string remote_hostname, const int sleep_time,
-                                            TransportUnitInterface interface, const bool *terminate,
-                                            CONN_HANDLER_ORIGIN source) {
+void MTCLBackend::serverConnectionHandler(MTCL::HandleUser HandlerPointer,
+                                          const std::string &remote_hostname,
+                                          std::queue<std::string> *outbound_messages,
+                                          const int sleep_time, const bool *terminate,
+                                          const CONN_HANDLER_ORIGIN source) {
     START_LOG(gettid(), "call(remote_hostname=%s, kind=%s)", remote_hostname.c_str(),
               source == FROM_REMOTE ? "from remote server" : "to remote server");
-    // out = data to sent to others
-    // in = data from others
-    auto [in, out, mutex] = interface;
-
     while (HandlerPointer.isValid()) {
         // execute up to N operation of send &/or receive, to avoid starvation due to
         // semaphores.
         constexpr int max_net_op = 10;
 
         // Send phase
-        for (int completed_io_operations = 0; completed_io_operations < max_net_op && !out->empty();
+        for (int completed_io_operations = 0; completed_io_operations < max_net_op;
              ++completed_io_operations) {
-            LOG("[send] Starting send section");
-            const auto unit = out->front();
-
-            LOG("[send] Sending %ld bytes of file %s to %s", unit->_buffer_size,
-                unit->_filepath.c_str(), remote_hostname.c_str());
-            send_unit(&HandlerPointer, unit);
-            LOG("[send] Message sent");
-
-            const std::lock_guard lg(*mutex);
-            LOG("[send] Locked guard");
-            out->pop();
+            // TODO: send incoming request and then retrive result...
         }
 
         // Receive phase
         size_t receive_size = 0, completed_io_operations = 0;
         HandlerPointer.probe(receive_size, false);
         while (completed_io_operations < max_net_op && receive_size > 0) {
-            LOG("[recv] Receiving data");
-            auto unit = receive_unit(&HandlerPointer);
-            LOG("[recv] Lock guard");
-            const std::lock_guard lg(*mutex);
-            in->push(unit);
-            LOG("[recv] Pushed %ld bytes to be stored on file %s", unit->_buffer_size,
-                unit->_filepath.c_str());
-
-            ++completed_io_operations;
-            receive_size = 0;
-            HandlerPointer.probe(receive_size, false);
+            completed_io_operations++;
         }
 
         // terminate phase
         if (*terminate) {
-            const std::lock_guard lg(*mutex);
+
             LOG("[TERM PHASE] Locked access send and receive queues");
-            while (!out->empty()) {
-                const auto unit = out->front();
-                send_unit(&HandlerPointer, unit);
-                out->pop();
-            }
+
             LOG("[TERM PHASE] Emptied queues. Closing connection");
             HandlerPointer.close();
             LOG("[TERM PHASE] Terminating thread server_connection_handler");
@@ -123,9 +47,9 @@ void MTCLBackend::server_connection_handler(MTCL::HandleUser HandlerPointer,
     }
 }
 
-void MTCLBackend::incoming_connection_listener(
+void MTCLBackend::incomingConnectionListener(
     const bool *continue_execution, int sleep_time,
-    std::unordered_map<std::string, TransportUnitInterface> *open_connections, std::mutex *guard,
+    std::unordered_map<std::string, std::queue<std::string>> *open_connections, std::mutex *guard,
     std::vector<std::thread *> *_connection_threads, bool *terminate) {
 
     char ownHostname[HOST_NAME_MAX] = {0};
@@ -150,14 +74,11 @@ void MTCLBackend::incoming_connection_listener(
 
         const std::lock_guard lock(*guard);
 
-        open_connections->insert(
-            {connected_hostname,
-             std::make_tuple(new std::queue<TransportUnit *>(), new std::queue<TransportUnit *>(),
-                             new std::mutex())});
+        open_connections->insert({connected_hostname, {}});
 
         _connection_threads->push_back(new std::thread(
-            server_connection_handler, std::move(UserManager), connected_hostname, sleep_time,
-            open_connections->at(connected_hostname), terminate, FROM_REMOTE));
+            serverConnectionHandler, std::move(UserManager), connected_hostname,
+            &open_connections->at(connected_hostname), sleep_time, terminate, FROM_REMOTE));
     }
 }
 
@@ -173,7 +94,7 @@ void MTCLBackend::connect_to(std::string hostname_port) {
         return;
     }
 
-    if (connected_hostnames_map.find(remoteToken) != connected_hostnames_map.end()) {
+    if (open_connections.contains(remoteHost)) {
         LOG("Remote host %s is already connected", remoteHost.c_str());
         return;
     }
@@ -185,13 +106,11 @@ void MTCLBackend::connect_to(std::string hostname_port) {
         UserManager.send(ownHostname, HOST_NAME_MAX);
         const std::lock_guard lg(*_guard);
 
-        auto connection_tuple = std::make_tuple(
-            new std::queue<TransportUnit *>(), new std::queue<TransportUnit *>(), new std::mutex());
-        connected_hostnames_map.insert({remoteHost, connection_tuple});
+        open_connections.insert({remoteHost, {}});
 
-        connection_threads.push_back(
-            new std::thread(server_connection_handler, std::move(UserManager), remoteHost.c_str(),
-                            thread_sleep_times, connection_tuple, terminate, TO_REMOTE));
+        connection_threads.push_back(new std::thread(
+            serverConnectionHandler, std::move(UserManager), remoteHost.c_str(),
+            &open_connections.at(remoteHost), thread_sleep_times, terminate, TO_REMOTE));
     } else {
         server_println(CAPIO_SERVER_CLI_LOG_SERVER_WARNING, "Warning: tried to connect to " +
                                                                 std::string(remoteHost) +
@@ -220,8 +139,8 @@ MTCLBackend::MTCLBackend(const std::string &proto, const std::string &port, int 
 
     MTCL::Manager::listen(selfToken);
 
-    th = new std::thread(incoming_connection_listener, std::ref(continue_execution), sleep_time,
-                         &connected_hostnames_map, _guard, &connection_threads, terminate);
+    th = new std::thread(incomingConnectionListener, std::ref(continue_execution), sleep_time,
+                         &open_connections, _guard, &connection_threads, terminate);
     server_println(CAPIO_LOG_SERVER_CLI_LEVEL_INFO, "MTCL_backend initialization completed.");
 }
 
@@ -248,71 +167,30 @@ MTCLBackend::~MTCLBackend() {
     server_println(CAPIO_LOG_SERVER_CLI_LEVEL_INFO, "MTCL_backend cleanup completed.");
 }
 
-std::string MTCLBackend::receive(char *buf, capio_off64_t *buf_size, capio_off64_t *start_offset) {
-    START_LOG(gettid(), "call()");
-
-    std::queue<TransportUnit *> *inQueue = nullptr;
-    TransportUnitInterface interface;
-    bool found = false;
-    while (!found) {
-        for (auto [hostname, data] : connected_hostnames_map) {
-            inQueue   = std::get<0>(data);
-            interface = data;
-            found     = !inQueue->empty();
-            LOG("Hostname %s, %s incoming data", hostname.c_str(), found ? "has" : "has not");
-        }
-        if (!found) {
-            LOG("No incoming messages. Putting thread to sleep");
-            std::this_thread::sleep_for(std::chrono::milliseconds(thread_sleep_times));
-        }
-    }
-    LOG("Found incoming message");
-    const std::lock_guard lg(*std::get<2>(interface));
-    auto inputUnit = inQueue->front();
-    *buf_size      = inputUnit->_buffer_size;
-    *start_offset  = inputUnit->_start_write_offset;
-    memcpy(buf, inputUnit->_bytes, *buf_size);
-    LOG("Received buffer: %s", inputUnit->_bytes);
-    inQueue->pop();
-
-    std::string filename(inputUnit->_filepath);
-
-    return filename;
-}
-
-void MTCLBackend::send(const std::string &target, char *buf, uint64_t buf_size,
-                       const std::string &filepath, const capio_off64_t start_offset) {
-    START_LOG(gettid(), "call(target=%s, buf_size=%ld, file_path=%s, start_offset=%ld, buf=%s)",
-              target.c_str(), buf_size, filepath.c_str(), start_offset, buf);
-
-    if (const auto element = connected_hostnames_map.find(target);
-        element != connected_hostnames_map.end()) {
-        LOG("Found alive connection for given target");
-
-        const auto interface = element->second;
-        auto *out            = std::get<1>(interface);
-
-        const auto outputUnit           = new TransportUnit();
-        outputUnit->_buffer_size        = buf_size;
-        outputUnit->_filepath           = filepath;
-        outputUnit->_start_write_offset = start_offset;
-        outputUnit->_bytes              = new char[buf_size];
-        memcpy(outputUnit->_bytes, buf, buf_size);
-        LOG("Copied buffer: %s", outputUnit->_bytes);
-
-        const std::lock_guard lg(*std::get<2>(interface));
-        LOG("Pushing Transport unit to out queue");
-        out->push(outputUnit);
-    } else {
-        server_println(CAPIO_LOG_SERVER_CLI_LEVEL_ERROR, "can't find target");
-    }
-}
-
 std::vector<std::string> MTCLBackend::get_open_connections() {
-    std::vector<std::string> connections;
+    std::vector<std::string> keys;
+    keys.reserve(open_connections.size()); // avoid reallocations
 
-    for (const auto &[hostname, _] : connected_hostnames_map) {
-        connections.push_back(hostname);
+    for (const auto &pair : open_connections) {
+        keys.push_back(pair.first);
     }
-    return connections;
+
+    return keys;
+}
+
+size_t MTCLBackend::fetchFromRemoteHost(const std::string &hostname,
+                                        const std::filesystem::path &filepath, char *buffer,
+                                        capio_off64_t offset, capio_off64_t count) {
+    START_LOG(gettid(), "call(hostname=%s, path=%s, offset=%ld, count=%ld)", hostname.c_str(),
+              filepath.c_str(), offset, count);
+
+    char REQUEST[CAPIO_REQ_MAX_SIZE];
+
+    sprintf(REQUEST, "%d %s %llu %llu", FETCH_FROM_REMOTE, filepath.c_str(), offset, count);
+    open_connections.at(hostname).emplace(REQUEST);
+
+
+
+
+    return 0;
 }

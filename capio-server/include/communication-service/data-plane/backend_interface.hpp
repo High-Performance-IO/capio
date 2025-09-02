@@ -3,6 +3,7 @@
 
 #include "capio/constants.hpp"
 #include <cstdint>
+#include <filesystem>
 #include <string>
 #include <unistd.h>
 #include <vector>
@@ -17,6 +18,9 @@ class NotImplementedBackendMethod : public std::exception {
 };
 
 class BackendInterface {
+  protected:
+    typedef enum { FETCH_FROM_REMOTE } BackendRequest_t;
+
   public:
     virtual ~BackendInterface() = default;
 
@@ -25,29 +29,18 @@ class BackendInterface {
      */
     virtual void connect_to(std::string hostname_port) { throw NotImplementedBackendMethod(); };
 
-    /**
-     * @brief Send data to target
+    /** Fetch a chunk of CapioFile internal data from remote host
      *
-     * @param target Hostname of remote target
-     * @param buf pointer to data to sent
-     * @param buf_size length of@param filepath
-     * @param start_offset
-     * @param buf
+     * @param hostname Hostname to request data from
+     * @param filepath Path of the file targeted by the request
+     * @param buffer Buffer in which data will be available
+     * @param offset Offset relative to the beginning of the file from which to read from
+     * @param count Size of @param buffer and hence size of the fetch operation
+     * @return Amount of data returned from the remote host
      */
-    virtual void send(const std::string &target, char *buf, uint64_t buf_size,
-                      const std::string &filepath, capio_off64_t start_offset) {
-        throw NotImplementedBackendMethod();
-    };
-
-    /**
-     * @brief receive data
-     *
-     * @param buf allocated data buffer
-     * @param buf_size size of @param buf
-     * @param start_offset
-     * @return std::string hostname of sender
-     */
-    virtual std::string receive(char *buf, capio_off64_t *buf_size, capio_off64_t *start_offset) {
+    virtual size_t fetchFromRemoteHost(const std::string &hostname,
+                                       const std::filesystem::path &filepath, char *buffer,
+                                       capio_off64_t offset, capio_off64_t count) {
         throw NotImplementedBackendMethod();
     };
 
@@ -65,15 +58,10 @@ class BackendInterface {
 class NoBackend final : public BackendInterface {
   public:
     void connect_to(std::string hostname_port) override { return; };
-
-    void send(const std::string &target, char *buf, uint64_t buf_size, const std::string &filepath,
-              capio_off64_t start_offset) override {
-        return;
+    size_t fetchFromRemoteHost(const std::string &hostname, const std::filesystem::path &filepath,
+                               char *buffer, capio_off64_t offset, capio_off64_t count) override {
+        return -1;
     };
-
-    std::string receive(char *buf, capio_off64_t *buf_size, capio_off64_t *start_offset) override {
-        return {"no-backend"};
-    }
 
     std::vector<std::string> get_open_connections() override { return {}; }
 };
