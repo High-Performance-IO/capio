@@ -101,12 +101,12 @@ void CapioStorageService::register_client(const std::string &app_name, const pid
     LOG("Created communication queues");
 }
 
-void CapioStorageService::reply_to_client(pid_t pid, const std::string &file, capio_off64_t offset,
+size_t CapioStorageService::reply_to_client(pid_t pid, const std::string &file, capio_off64_t offset,
                                           capio_off64_t size) const {
     START_LOG(gettid(), "call(pid=%llu, file=%s, offset=%llu, size=%llu)", pid, file.c_str(),
               offset, size);
 
-    getFile(file)->writeToQueue(*_server_to_client_queue->at(pid), offset, size);
+    return getFile(file)->writeToQueue(*_server_to_client_queue->at(pid), offset, size);
 }
 
 void CapioStorageService::reply_to_client_raw(pid_t pid, const char *data,

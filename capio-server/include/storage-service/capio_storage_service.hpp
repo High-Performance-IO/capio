@@ -78,9 +78,10 @@ class CapioStorageService {
      * @param file
      * @param offset
      * @param size
+     * @return size sent to client
      */
-    void reply_to_client(pid_t pid, const std::string &file, capio_off64_t offset,
-                         capio_off64_t size) const;
+    size_t reply_to_client(pid_t pid, const std::string &file, capio_off64_t offset,
+                           capio_off64_t size) const;
 
     /**
      * Send raw data to client without fetching from the storage manager itself
