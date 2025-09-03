@@ -1,4 +1,6 @@
+#include "../../../../cmake-build-release/_deps/mtcl-src/include/protocols/shm.hpp"
 #include "include/storage-service/capio_storage_service.hpp"
+#include "protocols/mpip2p.hpp"
 
 #include <algorithm>
 #include <capio/logger.hpp>
@@ -20,24 +22,42 @@ void MTCLBackend::serverConnectionHandler(MTCL::HandleUser HandlerPointer,
         // semaphores.
         constexpr int max_net_op = 10;
 
-        // TODO: implement send and recive!
+        /*
+         * TODO: this code works for this reason: most of the time, it happens that data flows in
+         *       one way. as such it is very unlikely that request between two nodes handled by this
+         *       function to arrive at the same time. when this happens, we would need to reorder
+         *       messages, but as data flows in one direction we probably could avoid to fix this
+         *       issue as of right now.
+         */
 
         // Send phase
-        for (int completed_io_operations = 0; completed_io_operations < max_net_op;
-             ++completed_io_operations) {
-            // TODO: send incoming request and then retrive result...
+        if (queue->has_requests()) {
+            // Send of request
+            auto request = queue->get_request();
+            HandlerPointer.send(request.c_str(), request.length());
+
+            // Retrive size of response
+            capio_off64_t response_size;
+            HandlerPointer.receive(&response_size, sizeof(response_size));
+            char *response_buffer = new char[response_size];
+            HandlerPointer.receive(response_buffer, response_size);
+
+            // push response back to the source
+            queue->push_response(response_buffer, response_size, request);
         }
 
         // Receive phase
         size_t receive_size = 0, completed_io_operations = 0;
         HandlerPointer.probe(receive_size, false);
-        while (completed_io_operations < max_net_op && receive_size > 0) {
-            completed_io_operations++;
+        while (receive_size > 0) {
+            char incoming_request[CAPIO_REQ_MAX_SIZE];
+            HandlerPointer.receive(incoming_request, receive_size);
+
+            //TODO: handle request
         }
 
         // terminate phase
         if (*terminate) {
-
             LOG("[TERM PHASE] Locked access send and receive queues");
 
             LOG("[TERM PHASE] Emptied queues. Closing connection");
