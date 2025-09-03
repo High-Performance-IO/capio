@@ -4,9 +4,69 @@
 #include "capio/constants.hpp"
 #include <cstdint>
 #include <filesystem>
+#include <mutex>
+#include <queue>
 #include <string>
 #include <unistd.h>
+#include <utility>
 #include <vector>
+
+class MessageQueue {
+
+    class ResponseToRequest {
+      public:
+        std::string original_request;
+        char *response;
+        capio_off64_t response_size;
+
+        ResponseToRequest(std::string request, char *buf, capio_off64_t buff_size)
+            : original_request(std::move(request)), response(buf), response_size(buff_size) {}
+    };
+
+    std::queue<std::string> request_queue;
+    std::queue<ResponseToRequest> response_queue;
+    std::mutex request_queue_mutex, response_queue_mutex;
+
+  public:
+    void push_request(const std::string &request) {
+        std::lock_guard lg(request_queue_mutex);
+        request_queue.emplace(request);
+    }
+
+    void push_response(char *buffer, capio_off64_t buff_size, std::string origin) {
+        std::lock_guard lg(response_queue_mutex);
+        response_queue.emplace(std::move(origin), buffer, buff_size);
+    }
+
+    std::string get_request() {
+        std::lock_guard lg(request_queue_mutex);
+        std::string req = std::move(request_queue.front());
+        request_queue.pop();
+        return req;
+    }
+
+    std::tuple<capio_off64_t, char *> get_response() {
+        timespec sleep{.tv_sec = 0, .tv_nsec = 300};
+        while (!this->has_response()) {
+            nanosleep(&sleep, nullptr);
+        }
+
+        std::lock_guard lg(response_queue_mutex);
+        auto response = std::move(response_queue.front());
+        response_queue.pop();
+        return std::make_tuple(response.response_size, response.response);
+    }
+
+    bool has_requests() {
+        std::lock_guard lg(request_queue_mutex);
+        return !request_queue.empty();
+    }
+
+    bool has_response() {
+        std::lock_guard lg(response_queue_mutex);
+        return !response_queue.empty();
+    }
+};
 
 class NotImplementedBackendMethod : public std::exception {
   public:

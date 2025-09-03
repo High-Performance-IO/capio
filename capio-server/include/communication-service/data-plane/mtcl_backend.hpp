@@ -18,7 +18,7 @@ class MTCLBackend : public BackendInterface {
     typedef enum { FROM_REMOTE, TO_REMOTE } CONN_HANDLER_ORIGIN;
 
     std::string selfToken, connectedHostname, ownPort, usedProtocol;
-    std::unordered_map<std::string, std::queue<std::string>> open_connections;
+    std::unordered_map<std::string, MessageQueue *> open_connections;
     char ownHostname[HOST_NAME_MAX] = {0};
     int thread_sleep_times          = 0;
     bool *continue_execution        = new bool;
@@ -32,14 +32,16 @@ class MTCLBackend : public BackendInterface {
      * @param HandlerPointer
      * @param remote_hostname
      * @param outbound_messages
+     * @param inbound_messages queue of inbound results for outbound message, with pair of buffer
+     * ond buffer size
      * @param sleep_time
      * @param terminate
      * @param source
      */
     void static serverConnectionHandler(MTCL::HandleUser HandlerPointer,
-                                        const std::string &remote_hostname,
-                                        std::queue<std::string> *outbound_messages, int sleep_time,
-                                        const bool *terminate, CONN_HANDLER_ORIGIN source);
+                                        const std::string &remote_hostname, MessageQueue *queue,
+                                        int sleep_time, const bool *terminate,
+                                        CONN_HANDLER_ORIGIN source);
 
     /**
      * Waits for incoming new requests to connect to new server instances. When a new request
@@ -55,9 +57,8 @@ class MTCLBackend : public BackendInterface {
      */
     void static incomingConnectionListener(
         const bool *continue_execution, int sleep_time,
-
-        std::unordered_map<std::string, std::queue<std::string>> *open_connections,
-        std::mutex *guard, std::vector<std::thread *> *_connection_threads, bool *terminate);
+        std::unordered_map<std::string, MessageQueue *> *open_connections, std::mutex *guard,
+        std::vector<std::thread *> *_connection_threads, bool *terminate);
 
   public:
     explicit MTCLBackend(const std::string &proto, const std::string &port, int sleep_time);

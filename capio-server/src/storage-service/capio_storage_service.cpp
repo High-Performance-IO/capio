@@ -101,8 +101,8 @@ void CapioStorageService::register_client(const std::string &app_name, const pid
     LOG("Created communication queues");
 }
 
-size_t CapioStorageService::reply_to_client(pid_t pid, const std::string &file, capio_off64_t offset,
-                                          capio_off64_t size) const {
+size_t CapioStorageService::reply_to_client(pid_t pid, const std::string &file,
+                                            capio_off64_t offset, capio_off64_t size) const {
     START_LOG(gettid(), "call(pid=%llu, file=%s, offset=%llu, size=%llu)", pid, file.c_str(),
               offset, size);
 
@@ -150,4 +150,11 @@ size_t CapioStorageService::sendFilesToStoreInMemory(const long pid) const {
 
     LOG("Return value=%llu", files_to_store_in_mem.size());
     return files_to_store_in_mem.size();
+}
+
+void CapioStorageService::storeData(const std::filesystem::path &path, const capio_off64_t offset,
+                                    const capio_off64_t buff_size, const char *buffer) const {
+    const auto file = getFile(path);
+
+    file->writeData(buffer, offset, buff_size);
 }

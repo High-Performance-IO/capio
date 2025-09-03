@@ -1,3 +1,5 @@
+#include "include/storage-service/capio_storage_service.hpp"
+
 #include <algorithm>
 #include <capio/logger.hpp>
 #include <include/communication-service/data-plane/mtcl_backend.hpp>
@@ -8,8 +10,7 @@
  * This thread will handle connections towards a single target.
  */
 void MTCLBackend::serverConnectionHandler(MTCL::HandleUser HandlerPointer,
-                                          const std::string &remote_hostname,
-                                          std::queue<std::string> *outbound_messages,
+                                          const std::string &remote_hostname, MessageQueue *queue,
                                           const int sleep_time, const bool *terminate,
                                           const CONN_HANDLER_ORIGIN source) {
     START_LOG(gettid(), "call(remote_hostname=%s, kind=%s)", remote_hostname.c_str(),
@@ -18,6 +19,8 @@ void MTCLBackend::serverConnectionHandler(MTCL::HandleUser HandlerPointer,
         // execute up to N operation of send &/or receive, to avoid starvation due to
         // semaphores.
         constexpr int max_net_op = 10;
+
+        // TODO: implement send and recive!
 
         // Send phase
         for (int completed_io_operations = 0; completed_io_operations < max_net_op;
@@ -49,7 +52,7 @@ void MTCLBackend::serverConnectionHandler(MTCL::HandleUser HandlerPointer,
 
 void MTCLBackend::incomingConnectionListener(
     const bool *continue_execution, int sleep_time,
-    std::unordered_map<std::string, std::queue<std::string>> *open_connections, std::mutex *guard,
+    std::unordered_map<std::string, MessageQueue *> *open_connections, std::mutex *guard,
     std::vector<std::thread *> *_connection_threads, bool *terminate) {
 
     char ownHostname[HOST_NAME_MAX] = {0};
@@ -78,7 +81,7 @@ void MTCLBackend::incomingConnectionListener(
 
         _connection_threads->push_back(new std::thread(
             serverConnectionHandler, std::move(UserManager), connected_hostname,
-            &open_connections->at(connected_hostname), sleep_time, terminate, FROM_REMOTE));
+            open_connections->at(connected_hostname), sleep_time, terminate, FROM_REMOTE));
     }
 }
 
@@ -108,9 +111,11 @@ void MTCLBackend::connect_to(std::string hostname_port) {
 
         open_connections.insert({remoteHost, {}});
 
-        connection_threads.push_back(new std::thread(
-            serverConnectionHandler, std::move(UserManager), remoteHost.c_str(),
-            &open_connections.at(remoteHost), thread_sleep_times, terminate, TO_REMOTE));
+        auto queue_elem = open_connections.at(remoteHost);
+
+        connection_threads.push_back(new std::thread(serverConnectionHandler,
+                                                     std::move(UserManager), remoteHost, queue_elem,
+                                                     thread_sleep_times, terminate, TO_REMOTE));
     } else {
         server_println(CAPIO_SERVER_CLI_LOG_SERVER_WARNING, "Warning: tried to connect to " +
                                                                 std::string(remoteHost) +
@@ -181,16 +186,20 @@ std::vector<std::string> MTCLBackend::get_open_connections() {
 size_t MTCLBackend::fetchFromRemoteHost(const std::string &hostname,
                                         const std::filesystem::path &filepath, char *buffer,
                                         capio_off64_t offset, capio_off64_t count) {
+
     START_LOG(gettid(), "call(hostname=%s, path=%s, offset=%ld, count=%ld)", hostname.c_str(),
               filepath.c_str(), offset, count);
 
     char REQUEST[CAPIO_REQ_MAX_SIZE];
 
     sprintf(REQUEST, "%d %s %llu %llu", FETCH_FROM_REMOTE, filepath.c_str(), offset, count);
-    open_connections.at(hostname).emplace(REQUEST);
+    auto queues = open_connections.at(hostname);
 
+    queues->push_request(REQUEST);
 
+    auto [buff_size, response_buffer] = queues->get_response();
 
+    storage_service->storeData(filepath, offset, buff_size, response_buffer);
 
     return 0;
 }
