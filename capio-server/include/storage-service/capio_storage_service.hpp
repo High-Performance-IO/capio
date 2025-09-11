@@ -111,9 +111,19 @@ class CapioStorageService {
 
     void remove_client(pid_t pid) const;
 
-
     void storeData(const std::filesystem::path &path, capio_off64_t offset, capio_off64_t buff_size,
                    const char *buffer) const;
+
+    /**
+     * Read data from file and store it inside buffer
+     * @param filepath filepath
+     * @param offset  starting read offset
+     * @param buffer targeted read buffer
+     * @param count Requested read size
+     * @return Actual size of read
+     */
+    size_t readFromFileToBuffer(const std::filesystem::path &filepath, capio_off64_t offset,
+                                char *buffer, capio_off64_t count) const;
 };
 
 inline CapioStorageService *storage_service;

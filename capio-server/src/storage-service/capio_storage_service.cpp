@@ -158,3 +158,11 @@ void CapioStorageService::storeData(const std::filesystem::path &path, const cap
 
     file->writeData(buffer, offset, buff_size);
 }
+
+size_t CapioStorageService::readFromFileToBuffer(const std::filesystem::path &filepath,
+                                                 capio_off64_t offset, char *buffer,
+                                                 capio_off64_t count) const {
+    const auto file = this->getFile(filepath);
+
+    return file->readData(buffer, offset, count);
+}

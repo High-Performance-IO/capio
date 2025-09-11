@@ -1,3 +1,4 @@
+#include "include/file-manager/file_manager.hpp"
 #include "include/storage-service/capio_storage_service.hpp"
 
 #include <algorithm>
@@ -65,7 +66,7 @@ void MTCLBackend::serverConnectionHandler(MTCL::HandleUser HandlerPointer,
                 size_t receive_size = 0;
                 HandlerPointer.probe(receive_size, false);
                 while (receive_size > 0) {
-                    BackendRequest_t requestCode;
+                    int requestCode;
                     char incoming_request[CAPIO_REQ_MAX_SIZE];
                     HandlerPointer.receive(incoming_request, receive_size);
                     sscanf(incoming_request, "%d", &requestCode);
@@ -80,7 +81,17 @@ void MTCLBackend::serverConnectionHandler(MTCL::HandleUser HandlerPointer,
 
                     case FETCH_FROM_REMOTE: {
                         // Scan request fetch from remote
+                        char filepath[PATH_MAX];
+                        capio_off64_t offset, count;
 
+                        sscanf(incoming_request, "%s %llu %llu", filepath, &offset, &count);
+
+                        auto buffer = new char[count];
+                        auto read_size =
+                            storage_service->readFromFileToBuffer(filepath, offset, buffer, count);
+                        HandlerPointer.send(&read_size, sizeof(read_size));
+                        HandlerPointer.send(buffer, read_size);
+                        delete[] buffer;
                         break;
                     }
 
