@@ -7,6 +7,8 @@ set(TARGET_SOURCES
         src/main.cpp
 )
 
+set(TARGET_INCLUDE_FOLDER "${CMAKE_SOURCE_DIR}/capio-server/")
+
 #####################################
 # Target definition
 #####################################
@@ -24,9 +26,8 @@ target_include_directories(${TARGET_NAME} PRIVATE
 file(GLOB_RECURSE CAPIO_SERVER_SOURCES
         "${CMAKE_SOURCE_DIR}/capio-server/src/communication-service/*.cpp"
 )
-file(GLOB_RECURSE CAPIO_SERVER_HEADERS
-        "${TARGET_INCLUDE_FOLDER}/*.hpp"
-)
+
+file(GLOB_RECURSE CAPIO_SERVER_HEADERS "${TARGET_INCLUDE_FOLDER}/*.hpp")
 
 target_sources(${TARGET_NAME} PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}/src/main.cpp
