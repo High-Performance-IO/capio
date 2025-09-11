@@ -327,7 +327,7 @@ class Logger {
         sprintf(tmp_buf, message, ##__VA_ARGS__);                                                  \
         char node_name[HOST_NAME_MAX]{0};                                                          \
         gethostname(node_name, HOST_NAME_MAX);                                                     \
-        printf("%s [ %s ] %s\n", CAPIO_LOG_SERVER_CLI_LEVEL_ERROR, node_name, tmp_buf);            \
+        printf("%s %s] %s\n", CAPIO_LOG_SERVER_CLI_LEVEL_ERROR, node_name, tmp_buf);              \
         fflush(stdout);                                                                            \
         throw std::runtime_error(std::string(tmp_buf));                                            \
     }

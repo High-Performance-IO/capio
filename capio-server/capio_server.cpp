@@ -16,6 +16,7 @@
 #include "capio/env.hpp"
 #include "capio/logger.hpp"
 #include "capio/semaphore.hpp"
+#include "include/api-server/api-server.hpp"
 
 #include <include/capio-cl-engine/capio_cl_engine.hpp>
 #include <include/capio-cl-engine/json_parser.hpp>
@@ -43,6 +44,7 @@ int main(int argc, char **argv) {
 
     capio_cl_engine         = JsonParser::parse(config_path, std::filesystem::path(resolve_prefix));
     shm_canary              = new CapioShmCanary(capio_global_configuration->workflow_name);
+    api_server              = new CapioAPIServer(6666);
     file_manager            = new CapioFileManager();
     fs_monitor              = new FileSystemMonitor();
     client_manager          = new ClientManager();

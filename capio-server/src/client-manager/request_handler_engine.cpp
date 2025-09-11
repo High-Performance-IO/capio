@@ -79,7 +79,7 @@ void RequestHandlerEngine::start() const {
             if (capio_global_configuration->termination_phase) {
                 server_println(CAPIO_LOG_SERVER_CLI_LEVEL_WARNING,
                                "Termination phase is in progress... "
-                               "Ignoring Exception likely  thrown while receiving SIGUSR1");
+                               "Ignoring Exception likely thrown while waking up threads");
                 continue;
             }
             throw;
