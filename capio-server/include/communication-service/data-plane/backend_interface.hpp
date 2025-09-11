@@ -79,7 +79,7 @@ class NotImplementedBackendMethod : public std::exception {
 
 class BackendInterface {
   protected:
-    typedef enum { FETCH_FROM_REMOTE } BackendRequest_t;
+    typedef enum { HAVE_FINISH_SEND_REQUEST, FETCH_FROM_REMOTE } BackendRequest_t;
 
   public:
     virtual ~BackendInterface() = default;

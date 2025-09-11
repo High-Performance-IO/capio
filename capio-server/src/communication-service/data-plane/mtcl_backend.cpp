@@ -1,6 +1,4 @@
-#include "../../../../cmake-build-release/_deps/mtcl-src/include/protocols/shm.hpp"
 #include "include/storage-service/capio_storage_service.hpp"
-#include "protocols/mpip2p.hpp"
 
 #include <algorithm>
 #include <capio/logger.hpp>
@@ -15,57 +13,93 @@ void MTCLBackend::serverConnectionHandler(MTCL::HandleUser HandlerPointer,
                                           const std::string &remote_hostname, MessageQueue *queue,
                                           const int sleep_time, const bool *terminate,
                                           const CONN_HANDLER_ORIGIN source) {
+    constexpr int max_net_op = 10;
+    /*
+     * Algorithm works in this way. At the beginning, the role of the node that starts to send is
+     * chosen as the smaller lexicographically between the two hostnames involved in the
+     * communication. Then two phases of sending and receiving up to max_net_op are performed.
+     * The two nodes switches phases after a final synchronization with the special request
+     * HAVE_FINISH_SEND_REQUEST.
+     * When the sender sends this request, either because it has reached the max_net_op or because
+     * there are no more messages to be sent, the two nodes switches roles. This continues until the
+     * remote handle pointer is valid
+     */
+
+    char ownHostname[HOST_NAME_MAX];
+    gethostname(ownHostname, HOST_NAME_MAX);
+    bool my_turn_to_send = ownHostname > remote_hostname;
+
+    char request_has_finished_to_send[CAPIO_REQ_MAX_SIZE]{0};
+    sprintf(request_has_finished_to_send, "%03d", HAVE_FINISH_SEND_REQUEST);
+
     START_LOG(gettid(), "call(remote_hostname=%s, kind=%s)", remote_hostname.c_str(),
               source == FROM_REMOTE ? "from remote server" : "to remote server");
+
+    LOG("Will begin execution with %s phase", my_turn_to_send ? "sending" : "receiving");
+
     while (HandlerPointer.isValid()) {
-        // execute up to N operation of send &/or receive, to avoid starvation due to
-        // semaphores.
-        constexpr int max_net_op = 10;
+        // execute up to N operation of send &/or receive, to avoid starvation
 
-        /*
-         * TODO: this code works for this reason: most of the time, it happens that data flows in
-         *       one way. as such it is very unlikely that request between two nodes handled by this
-         *       function to arrive at the same time. when this happens, we would need to reorder
-         *       messages, but as data flows in one direction we probably could avoid to fix this
-         *       issue as of right now.
-         */
+        if (my_turn_to_send) {
+            for (int i = 0; i < max_net_op && queue->has_requests(); i++) {
+                // Send of request
+                auto request = queue->get_request();
+                HandlerPointer.send(request.c_str(), request.length());
 
-        // Send phase
-        if (queue->has_requests()) {
-            // Send of request
-            auto request = queue->get_request();
-            HandlerPointer.send(request.c_str(), request.length());
+                // Retrive size of response
+                capio_off64_t response_size;
+                HandlerPointer.receive(&response_size, sizeof(response_size));
+                char *response_buffer = new char[response_size];
+                HandlerPointer.receive(response_buffer, response_size);
 
-            // Retrive size of response
-            capio_off64_t response_size;
-            HandlerPointer.receive(&response_size, sizeof(response_size));
-            char *response_buffer = new char[response_size];
-            HandlerPointer.receive(response_buffer, response_size);
+                // push response back to the source
+                queue->push_response(response_buffer, response_size, request);
+            }
 
-            // push response back to the source
-            queue->push_response(response_buffer, response_size, request);
-        }
+            // Send message I have finished
+            HandlerPointer.send(request_has_finished_to_send, sizeof(request_has_finished_to_send));
 
-        // Receive phase
-        size_t receive_size = 0, completed_io_operations = 0;
-        HandlerPointer.probe(receive_size, false);
-        while (receive_size > 0) {
-            char incoming_request[CAPIO_REQ_MAX_SIZE];
-            HandlerPointer.receive(incoming_request, receive_size);
+        } else {
+            for (int i = 0; i < max_net_op; i++) {
+                // Receive phase
+                size_t receive_size = 0;
+                HandlerPointer.probe(receive_size, false);
+                while (receive_size > 0) {
+                    BackendRequest_t requestCode;
+                    char incoming_request[CAPIO_REQ_MAX_SIZE];
+                    HandlerPointer.receive(incoming_request, receive_size);
+                    sscanf(incoming_request, "%d", &requestCode);
 
-            //TODO: handle request
+                    switch (requestCode) {
+                    case HAVE_FINISH_SEND_REQUEST: {
+                        // Finished sending data. Set i to be greater than max_net_op to go to next
+                        // phase
+                        i = max_net_op;
+                        break;
+                    }
+
+                    case FETCH_FROM_REMOTE: {
+                        // Scan request fetch from remote
+
+                        break;
+                    }
+
+                    default:
+                        break;
+                    }
+                }
+            }
         }
 
         // terminate phase
         if (*terminate) {
-            LOG("[TERM PHASE] Locked access send and receive queues");
-
-            LOG("[TERM PHASE] Emptied queues. Closing connection");
+            LOG("[TERM PHASE] Closing connection");
             HandlerPointer.close();
             LOG("[TERM PHASE] Terminating thread server_connection_handler");
             return;
         }
 
+        my_turn_to_send = !my_turn_to_send;
         std::this_thread::sleep_for(std::chrono::milliseconds(sleep_time));
     }
 }
@@ -212,7 +246,7 @@ size_t MTCLBackend::fetchFromRemoteHost(const std::string &hostname,
 
     char REQUEST[CAPIO_REQ_MAX_SIZE];
 
-    sprintf(REQUEST, "%d %s %llu %llu", FETCH_FROM_REMOTE, filepath.c_str(), offset, count);
+    sprintf(REQUEST, "%03d %s %llu %llu", FETCH_FROM_REMOTE, filepath.c_str(), offset, count);
     auto queues = open_connections.at(hostname);
 
     queues->push_request(REQUEST);
