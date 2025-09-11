@@ -17,8 +17,11 @@ file(GLOB_RECURSE CAPIO_SERVER_SOURCES
         "${CMAKE_SOURCE_DIR}/capio-server/src/capio-cl-engine/capio_cl_engine.cpp"
         "${CMAKE_SOURCE_DIR}/capio-server/src/client-manager/client_manager.cpp"
 )
-file(GLOB_RECURSE CAPIO_SERVER_HEADERS "${TARGET_INCLUDE_FOLDER}/*.hpp")
+
 set(TARGET_INCLUDE_FOLDER "${CMAKE_SOURCE_DIR}/capio-server/")
+file(GLOB_RECURSE CAPIO_SERVER_HEADERS "${TARGET_INCLUDE_FOLDER}/*.hpp")
+
+
 target_sources(${TARGET_NAME} PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}/src/main.cpp
         ${CAPIO_SERVER_SOURCES}
