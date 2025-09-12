@@ -69,6 +69,7 @@ class CapioCLEngine {
     void setDirectory(const std::string &path);
     void setFile(const std::string &path);
     bool isFile(const std::string &path) const;
+    bool isExcluded(const std::string &path) const;
     bool isDirectory(const std::string &path) const;
     void setCommitedNumber(const std::string &path, int num);
     void setDirectoryFileCount(const std::string &path, long num);
