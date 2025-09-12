@@ -13,6 +13,12 @@ void posix_readdir_handler(const char *const str) {
     auto metadata_token = file_manager->getMetadataPath(path);
     LOG("sending to pid %ld token path of %s", pid, metadata_token.c_str());
 
+    if (capio_cl_engine->isExcluded(path)) {
+        LOG("Path is excluded. Not sending token");
+        client_manager->reply_to_client(pid, 0);
+        return;
+    }
+
     client_manager->reply_to_client(pid, metadata_token.length());
     storage_service->reply_to_client_raw(pid, metadata_token.c_str(), metadata_token.length());
 }
