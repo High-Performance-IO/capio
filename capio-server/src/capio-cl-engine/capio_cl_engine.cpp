@@ -432,11 +432,16 @@ auto CapioCLEngine::get_home_node(const std::string &path) {
     return capio_global_configuration->node_name;
 }
 
-
 bool CapioCLEngine::isExcluded(const std::string &path) const {
     START_LOG(gettid(), "call(path=%s)", path.c_str());
     if (const auto itm = _locations.find(path); itm != _locations.end()) {
         return std::get<5>(itm->second);
     }
-    return false;
+
+    return std::any_of(_locations.begin(), _locations.end(), [&](auto &itm) {
+        if (std::regex_match(path.c_str(), std::get<10>(itm.second))) {
+            return std::get<5>(itm.second);
+        }
+        return false;
+    });
 }
