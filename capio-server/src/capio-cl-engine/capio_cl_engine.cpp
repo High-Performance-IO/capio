@@ -97,7 +97,7 @@ void CapioCLEngine::print() const {
             if (i == 0) {
                 std::string commit_rule = std::get<2>(itm.second),
                             fire_rule   = std::get<3>(itm.second);
-                bool exclude = std::get<4>(itm.second), permanent = std::get<5>(itm.second);
+                bool exclude = std::get<5>(itm.second), permanent = std::get<4>(itm.second);
 
                 line << " " << commit_rule << std::setfill(' ')
                      << std::setw(20 - commit_rule.length()) << " | " << fire_rule
@@ -430,4 +430,20 @@ auto CapioCLEngine::get_home_node(const std::string &path) {
         LOG("Found location entry");
     }
     return capio_global_configuration->node_name;
+}
+
+bool CapioCLEngine::isExcluded(const std::string &path) const {
+    START_LOG(gettid(), "call(path=%s)", path.c_str());
+    if (const auto itm = _locations.find(path); itm != _locations.end()) {
+        return std::get<5>(itm->second);
+    }
+    LOG("Checking against REGEX");
+    return std::any_of(_locations.begin(), _locations.end(), [&](auto &itm) {
+        LOG("Checking against %s", itm.first.c_str());
+        if (std::regex_match(path.c_str(), std::get<10>(itm.second))) {
+            LOG("Found match. Is excluded: %s", std::get<5>(itm.second) ? "YES" : "NO");
+            return std::get<5>(itm.second);
+        }
+        return false;
+    });
 }

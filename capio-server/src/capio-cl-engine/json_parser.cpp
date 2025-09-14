@@ -385,7 +385,7 @@ CapioCLEngine *JsonParser::parse(const std::filesystem::path &source,
                                    " IS RELATIVE! using cwd() of server to compute abs path.");
                 path = resolve_prexix / path;
             }
-            // TODO: check for globs
+            locations->newFile(path);
             locations->setExclude(path, true);
         }
 

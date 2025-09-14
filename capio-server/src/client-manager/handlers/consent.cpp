@@ -17,6 +17,12 @@ void consent_to_proceed_handler(const char *const str) {
         return;
     }
 
+    if (capio_cl_engine->isExcluded(path)) {
+        LOG("File should NOT be handled by CAPIO as it is marked as EXCLUDED");
+        client_manager->reply_to_client(tid, 1);
+        return;
+    }
+
     if (capio_cl_engine->isProducer(path, tid)) {
         LOG("Application is producer. continuing");
         client_manager->reply_to_client(tid, 1);
