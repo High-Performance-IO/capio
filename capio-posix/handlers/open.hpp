@@ -87,10 +87,14 @@ int open_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg
         create_request(-1, resolved_path.data(), tid);
     } else {
         LOG("not O_CREAT");
-        open_request(-1, resolved_path.data(), tid);
+        if (open_request(-1, resolved_path.data(), tid) == 0) {
+            LOG("File is excluded! Skipping open of file!");
+            return CAPIO_POSIX_SYSCALL_REQUEST_SKIP;
+        }
     }
 
-    int fd = static_cast<int>(syscall_no_intercept(SYS_open, arg0, arg1, arg2, arg3, arg4, arg5));
+    const int fd =
+        static_cast<int>(syscall_no_intercept(SYS_open, arg0, arg1, arg2, arg3, arg4, arg5));
 
     LOG("Adding capio path");
     add_capio_fd(tid, resolved_path, fd, 0, (flags & O_CLOEXEC) == O_CLOEXEC);
@@ -124,10 +128,14 @@ int openat_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long a
         create_request(-1, resolved_path.data(), tid);
     } else {
         LOG("not O_CREAT");
-        open_request(-1, resolved_path.data(), tid);
+        if (open_request(-1, resolved_path.data(), tid) == 0) {
+            LOG("File is excluded! Skipping open of file!");
+            return CAPIO_POSIX_SYSCALL_REQUEST_SKIP;
+        }
     }
 
-    int fd = static_cast<int>(syscall_no_intercept(SYS_openat, arg0, arg1, arg2, arg3, arg4, arg5));
+    const int fd =
+        static_cast<int>(syscall_no_intercept(SYS_openat, arg0, arg1, arg2, arg3, arg4, arg5));
     LOG("fd=%d", fd);
 
     LOG("Adding resolved capio path (%s)", resolved_path.c_str());

@@ -15,13 +15,6 @@ void read_handler(const char *const str) {
 
     const std::filesystem::path path_fs(path);
 
-
-    if (capio_cl_engine->isExcluded(path)) {
-        LOG("PATH IS MARKED AS EXCLUDE");
-        client_manager->reply_to_client(tid, ULLONG_MAX);
-        return;
-    }
-
     /**
      * If process is producer OR fire rule is no update and there is enough data, allow the process
      * to continue in its execution

@@ -97,7 +97,7 @@ void CapioCLEngine::print() const {
             if (i == 0) {
                 std::string commit_rule = std::get<2>(itm.second),
                             fire_rule   = std::get<3>(itm.second);
-                bool exclude = std::get<4>(itm.second), permanent = std::get<5>(itm.second);
+                bool exclude = std::get<5>(itm.second), permanent = std::get<4>(itm.second);
 
                 line << " " << commit_rule << std::setfill(' ')
                      << std::setw(20 - commit_rule.length()) << " | " << fire_rule

@@ -12,6 +12,12 @@ void open_handler(const char *const str) {
     sscanf(str, "%d %d %s", &tid, &fd, path);
     START_LOG(gettid(), "call(tid=%d, fd=%d, path=%s", tid, fd, path);
 
+    if (capio_cl_engine->isExcluded(path)) {
+        LOG("File should not be handled as it is excluded!");
+        client_manager->reply_to_client(tid, 0);
+        return;
+    }
+
     if (capio_cl_engine->isProducer(path, tid)) {
         LOG("Thread is producer. allowing to continue with open");
         client_manager->reply_to_client(tid, 1);

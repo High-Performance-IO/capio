@@ -137,15 +137,17 @@ inline void exit_group_request(const long tid) {
 }
 
 // block until open is possible
-inline void open_request(const int fd, const std::filesystem::path &path, const long tid) {
+[[nodiscard]] inline capio_off64_t open_request(const int fd, const std::filesystem::path &path,
+                                                const long tid) {
     START_LOG(capio_syscall(SYS_gettid), "call(fd=%ld, path=%s, tid=%ld)", fd, path.c_str(), tid);
     write_request_cache_fs->flush(tid);
 
     char req[CAPIO_REQ_MAX_SIZE];
     sprintf(req, "%04d %ld %d %s", CAPIO_REQUEST_OPEN, tid, fd, path.c_str());
     buf_requests->write(req, CAPIO_REQ_MAX_SIZE);
-    capio_off64_t res = bufs_response->at(tid)->read();
-    LOG("Obtained from server %llu", res);
+    const capio_off64_t res = bufs_response->at(tid)->read();
+    LOG("Obtained from server %llu. File is %s exclude", res, res == 0 ? "" : "NOT");
+    return res;
 }
 
 // non blocking
