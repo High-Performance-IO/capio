@@ -52,7 +52,12 @@ int creat_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long ar
         LOG("Create request sent");
     }
 
-    int fd = static_cast<int>(syscall_no_intercept(SYS_creat, arg0, arg1, arg2, arg3, arg4, arg5));
+    const int fd =
+        static_cast<int>(syscall_no_intercept(SYS_creat, arg0, arg1, arg2, arg3, arg4, arg5));
+
+    if (fd < 0) {
+        return CAPIO_POSIX_SYSCALL_ERRNO;
+    }
 
     LOG("fd=%d", fd);
 
@@ -94,6 +99,9 @@ int open_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg
 
     const int fd =
         static_cast<int>(syscall_no_intercept(SYS_open, arg0, arg1, arg2, arg3, arg4, arg5));
+    if (fd < 0) {
+        return CAPIO_POSIX_SYSCALL_ERRNO;
+    }
 
     LOG("Adding capio path");
     add_capio_fd(tid, resolved_path, fd, 0, (flags & O_CLOEXEC) == O_CLOEXEC);
@@ -135,6 +143,10 @@ int openat_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long a
     const int fd =
         static_cast<int>(syscall_no_intercept(SYS_openat, arg0, arg1, arg2, arg3, arg4, arg5));
     LOG("fd=%d", fd);
+
+    if (fd < 0) {
+        return CAPIO_POSIX_SYSCALL_ERRNO;
+    }
 
     LOG("Adding resolved capio path (%s)", resolved_path.c_str());
     add_capio_fd(tid, resolved_path, fd, 0, (flags & O_CLOEXEC) == O_CLOEXEC);
