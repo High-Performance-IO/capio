@@ -99,7 +99,8 @@ int open_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg
     add_capio_fd(tid, resolved_path, fd, 0, (flags & O_CLOEXEC) == O_CLOEXEC);
     LOG("fd=%d", fd);
 
-    return CAPIO_POSIX_SYSCALL_SUCCESS;
+
+    return posix_return_value(fd, result);
 }
 #endif // SYS_open
 
@@ -139,7 +140,7 @@ int openat_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long a
     LOG("Adding resolved capio path (%s)", resolved_path.c_str());
     add_capio_fd(tid, resolved_path, fd, 0, (flags & O_CLOEXEC) == O_CLOEXEC);
 
-    return posix_return_value(CAPIO_POSIX_SYSCALL_SUCCESS, result);
+    return posix_return_value(fd, result);
 }
 #endif // SYS_openat
 
