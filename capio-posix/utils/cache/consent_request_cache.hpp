@@ -36,7 +36,7 @@ class ConsentRequestCache {
 
         const auto resolved_path = resolve_possible_symlink(path);
 
-        if (is_forbidden_path(resolved_path)) {
+        if (!is_capio_path(resolved_path)) {
             LOG("PATH is forbidden. Skipping request!");
             return;
         }

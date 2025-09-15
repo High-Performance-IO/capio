@@ -40,7 +40,7 @@ int creat_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long ar
     mode_t mode = static_cast<int>(arg2);
     START_LOG(tid, "call(path=%s, flags=%d, mode=%d)", pathname.data(), flags, mode);
 
-    if (is_forbidden_path(pathname)) {
+    if (!is_capio_path(pathname)) {
         LOG("Path %s is forbidden: skip", pathname.data());
         return CAPIO_POSIX_SYSCALL_REQUEST_SKIP;
     }
@@ -80,7 +80,7 @@ int open_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg
 
     std::string path = compute_abs_path(pathname.data(), -1);
 
-    if (is_forbidden_path(pathname) || !is_capio_path(path)) {
+    if (!is_capio_path(pathname)) {
         LOG("Path %s is not a capio path: skip", pathname.data());
         return CAPIO_POSIX_SYSCALL_REQUEST_SKIP;
     }
@@ -122,7 +122,7 @@ int openat_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long a
               mode);
 
     std::string path = compute_abs_path(pathname.data(), dirfd);
-    if (is_forbidden_path(pathname) || !is_capio_path(path)) {
+    if (!is_capio_path(pathname)) {
         LOG("Path %s is not a capio path: skip", pathname.data());
         return CAPIO_POSIX_SYSCALL_REQUEST_SKIP;
     }
