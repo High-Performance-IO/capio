@@ -19,14 +19,14 @@ inline off64_t capio_read_fs(int fd, size_t count, pid_t tid) {
 inline off64_t capio_read_mem(int fd, size_t count, void *buffer, long *result) {
     START_LOG(capio_syscall(SYS_gettid), "call(fd=%d, count=%ld)", fd, count);
     if (exists_capio_fd(fd)) {
-        auto computed_offset = get_capio_fd_offset(fd) + count;
+        const auto computed_offset = get_capio_fd_offset(fd) + count;
 
         LOG("Handling read on file %s up to byte %ld", get_capio_fd_path(fd).c_str(),
             computed_offset);
 
-        *result = read_request_cache_mem->read(fd, buffer, count);
-        LOG("Result of read is %lu", *result);
-        return CAPIO_POSIX_SYSCALL_SUCCESS;
+        const auto res = read_request_cache_mem->read(fd, buffer, count);
+        LOG("Result of read is %lu", res);
+        return posix_return_value(res, result);
     }
     return CAPIO_POSIX_SYSCALL_REQUEST_SKIP;
 }

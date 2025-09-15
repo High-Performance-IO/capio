@@ -42,7 +42,7 @@ int creat_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long ar
 
     if (is_forbidden_path(pathname)) {
         LOG("Path %s is forbidden: skip", pathname.data());
-        return posix_return_value(CAPIO_POSIX_SYSCALL_REQUEST_SKIP, result);
+        return CAPIO_POSIX_SYSCALL_REQUEST_SKIP;
     }
 
     std::string path = compute_abs_path(pathname.data(), -1);
@@ -61,7 +61,6 @@ int creat_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long ar
         add_capio_fd(tid, path, fd, 0, (flags & O_CLOEXEC) == O_CLOEXEC);
     }
 
-    *result = fd;
     return posix_return_value(fd, result);
 }
 #endif // SYS_creat
@@ -78,7 +77,7 @@ int open_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg
 
     if (is_forbidden_path(pathname) || !is_capio_path(path)) {
         LOG("Path %s is not a capio path: skip", pathname.data());
-        return posix_return_value(CAPIO_POSIX_SYSCALL_REQUEST_SKIP, result);
+        return CAPIO_POSIX_SYSCALL_REQUEST_SKIP;
     }
 
     std::string resolved_path = resolve_possible_symlink(path);
@@ -89,7 +88,7 @@ int open_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg
         LOG("not O_CREAT");
         if (open_request(-1, resolved_path.data(), tid) == 0) {
             LOG("File is excluded! Skipping open of file!");
-            return posix_return_value(CAPIO_POSIX_SYSCALL_REQUEST_SKIP, result);
+            return CAPIO_POSIX_SYSCALL_REQUEST_SKIP;
         }
     }
 
@@ -117,7 +116,7 @@ int openat_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long a
     std::string path = compute_abs_path(pathname.data(), dirfd);
     if (is_forbidden_path(pathname) || !is_capio_path(path)) {
         LOG("Path %s is not a capio path: skip", pathname.data());
-        return posix_return_value(CAPIO_POSIX_SYSCALL_REQUEST_SKIP, result);
+        return CAPIO_POSIX_SYSCALL_REQUEST_SKIP;
     }
 
     std::string resolved_path = resolve_possible_symlink(path);
@@ -129,7 +128,7 @@ int openat_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long a
         LOG("not O_CREAT");
         if (open_request(-1, resolved_path.data(), tid) == 0) {
             LOG("File is excluded! Skipping open of file!");
-            return posix_return_value(CAPIO_POSIX_SYSCALL_REQUEST_SKIP, result);
+            return CAPIO_POSIX_SYSCALL_REQUEST_SKIP;
         }
     }
 

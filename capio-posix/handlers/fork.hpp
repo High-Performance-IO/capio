@@ -14,14 +14,13 @@ int fork_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg
 
     if (pid == 0) {
         // child
-        auto child_tid = static_cast<pid_t>(syscall_no_intercept(SYS_gettid));
+        const auto child_tid = static_cast<pid_t>(syscall_no_intercept(SYS_gettid));
         init_process(child_tid);
         *result = 0;
-    } else {
-        *result = pid;
+        return posix_return_value(0, result);
     }
 
-    return CAPIO_POSIX_SYSCALL_SUCCESS;
+    return posix_return_value(pid, result);
 }
 
 #endif // SYS_fork
