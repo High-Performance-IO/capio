@@ -40,7 +40,7 @@ int creat_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long ar
     mode_t mode = static_cast<int>(arg2);
     START_LOG(tid, "call(path=%s, flags=%d, mode=%d)", pathname.data(), flags, mode);
 
-    if (is_forbidden_path(pathname)) {
+    if (!is_capio_path(pathname)) {
         LOG("Path %s is forbidden: skip", pathname.data());
         return CAPIO_POSIX_SYSCALL_REQUEST_SKIP;
     }
@@ -52,7 +52,12 @@ int creat_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long ar
         LOG("Create request sent");
     }
 
-    int fd = static_cast<int>(syscall_no_intercept(SYS_creat, arg0, arg1, arg2, arg3, arg4, arg5));
+    const int fd =
+        static_cast<int>(syscall_no_intercept(SYS_creat, arg0, arg1, arg2, arg3, arg4, arg5));
+
+    if (fd < 0) {
+        return CAPIO_POSIX_SYSCALL_ERRNO;
+    }
 
     LOG("fd=%d", fd);
 
@@ -61,8 +66,7 @@ int creat_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long ar
         add_capio_fd(tid, path, fd, 0, (flags & O_CLOEXEC) == O_CLOEXEC);
     }
 
-    *result = fd;
-    return CAPIO_POSIX_SYSCALL_SUCCESS;
+    return posix_return_value(fd, result);
 }
 #endif // SYS_creat
 
@@ -76,7 +80,7 @@ int open_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg
 
     std::string path = compute_abs_path(pathname.data(), -1);
 
-    if (is_forbidden_path(pathname) || !is_capio_path(path)) {
+    if (!is_capio_path(pathname)) {
         LOG("Path %s is not a capio path: skip", pathname.data());
         return CAPIO_POSIX_SYSCALL_REQUEST_SKIP;
     }
@@ -95,13 +99,15 @@ int open_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg
 
     const int fd =
         static_cast<int>(syscall_no_intercept(SYS_open, arg0, arg1, arg2, arg3, arg4, arg5));
+    if (fd < 0) {
+        return CAPIO_POSIX_SYSCALL_ERRNO;
+    }
 
     LOG("Adding capio path");
     add_capio_fd(tid, resolved_path, fd, 0, (flags & O_CLOEXEC) == O_CLOEXEC);
     LOG("fd=%d", fd);
 
-    *result = fd;
-    return CAPIO_POSIX_SYSCALL_SUCCESS;
+    return posix_return_value(fd, result);
 }
 #endif // SYS_open
 
@@ -116,7 +122,7 @@ int openat_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long a
               mode);
 
     std::string path = compute_abs_path(pathname.data(), dirfd);
-    if (is_forbidden_path(pathname) || !is_capio_path(path)) {
+    if (!is_capio_path(pathname)) {
         LOG("Path %s is not a capio path: skip", pathname.data());
         return CAPIO_POSIX_SYSCALL_REQUEST_SKIP;
     }
@@ -138,11 +144,14 @@ int openat_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long a
         static_cast<int>(syscall_no_intercept(SYS_openat, arg0, arg1, arg2, arg3, arg4, arg5));
     LOG("fd=%d", fd);
 
+    if (fd < 0) {
+        return CAPIO_POSIX_SYSCALL_ERRNO;
+    }
+
     LOG("Adding resolved capio path (%s)", resolved_path.c_str());
     add_capio_fd(tid, resolved_path, fd, 0, (flags & O_CLOEXEC) == O_CLOEXEC);
 
-    *result = fd;
-    return CAPIO_POSIX_SYSCALL_SUCCESS;
+    return posix_return_value(fd, result);
 }
 #endif // SYS_openat
 

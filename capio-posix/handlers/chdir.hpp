@@ -13,7 +13,7 @@ int chdir_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long ar
     START_LOG(tid, "call(path=%s)", pathname.data());
 
     syscall_no_intercept_flag = true;
-    if (is_forbidden_path(pathname) || !is_capio_path(pathname)) {
+    if (!is_capio_path(pathname)) {
         LOG("Path %s is forbidden: skip", pathname.data());
         syscall_no_intercept_flag = false;
         return CAPIO_POSIX_SYSCALL_SKIP;

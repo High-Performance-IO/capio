@@ -179,14 +179,6 @@ inline struct dirent64 *capio_internal_readdir(DIR *dirp, long pid) {
 DIR *opendir(const char *name) {
     START_LOG(capio_syscall(SYS_gettid), "call(path=%s)", name);
 
-    if (is_forbidden_path(name)) {
-        LOG("Path %s is forbidden: skip", name);
-        syscall_no_intercept_flag = true;
-        auto res                  = real_opendir(name);
-        syscall_no_intercept_flag = false;
-        return res;
-    }
-
     auto absolute_path = capio_absolute(name);
 
     LOG("Resolved absolute path = %s", absolute_path.c_str());

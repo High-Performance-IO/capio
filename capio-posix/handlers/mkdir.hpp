@@ -7,7 +7,7 @@
 inline off64_t capio_mkdirat(int dirfd, const std::string_view &pathname, mode_t mode, pid_t tid) {
     START_LOG(tid, "call(dirfd=%d, pathname=%s, mode=%o)", dirfd, pathname.data(), mode);
 
-    if (is_forbidden_path(pathname)) {
+    if (!is_capio_path(pathname)) {
         LOG("Path %s is forbidden: skip", pathname.data());
         return CAPIO_POSIX_SYSCALL_REQUEST_SKIP;
     }

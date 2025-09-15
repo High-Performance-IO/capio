@@ -21,7 +21,7 @@ inline int capio_fstat(int fd, struct stat *statbuf, pid_t tid) {
 inline int capio_lstat(const std::string_view &pathname, struct stat *statbuf, pid_t tid) {
     START_LOG(tid, "call(absolute_path=%s, statbuf=0x%08x)", pathname.data(), statbuf);
 
-    if (is_forbidden_path(pathname)) {
+    if (!is_capio_path(pathname)) {
         LOG("Path %s is forbidden: skip", pathname.data());
         return CAPIO_POSIX_SYSCALL_REQUEST_SKIP;
     }
@@ -36,7 +36,7 @@ inline int capio_lstat(const std::string_view &pathname, struct stat *statbuf, p
 inline int capio_lstat_wrapper(const std::string_view &pathname, struct stat *statbuf, pid_t tid) {
     START_LOG(tid, "call(path=%s, buf=0x%08x)", pathname.data(), statbuf);
 
-    if (is_forbidden_path(pathname)) {
+    if (!is_capio_path(pathname)) {
         LOG("Path %s is forbidden: skip", pathname.data());
         return CAPIO_POSIX_SYSCALL_REQUEST_SKIP;
     }
@@ -54,7 +54,7 @@ inline int capio_fstatat(int dirfd, const std::string_view &pathname, struct sta
     START_LOG(tid, "call(dirfd=%ld, pathname=%s, statbuf=0x%08x, flags=%X)", dirfd, pathname.data(),
               statbuf, flags);
 
-    if (is_forbidden_path(pathname)) {
+    if (!is_capio_path(pathname)) {
         LOG("Path %s is forbidden: skip", pathname.data());
         return CAPIO_POSIX_SYSCALL_REQUEST_SKIP;
     }

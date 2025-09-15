@@ -10,16 +10,13 @@ inline int capio_statx(int dirfd, const std::string_view &pathname, int flags, i
     START_LOG(tid, "call(dirfd=%d, pathname=%s, flags=%d, mask=%d, statxbuf=0x%08x)", dirfd,
               pathname.data(), flags, mask, statxbuf);
 
-    if (is_forbidden_path(pathname)) {
+    if (!is_capio_path(pathname)) {
         LOG("Path %s is forbidden: skip", pathname.data());
         return CAPIO_POSIX_SYSCALL_REQUEST_SKIP;
     }
 
-    std::filesystem::path path(pathname);
+    consent_request_cache_fs->consent_request(pathname, tid, __FUNCTION__);
 
-    if (is_capio_path(path)) {
-        consent_request_cache_fs->consent_request(path, tid, __FUNCTION__);
-    }
     return CAPIO_POSIX_SYSCALL_REQUEST_SKIP;
 }
 

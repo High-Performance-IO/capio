@@ -19,8 +19,7 @@ int dup_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg5
         }
         dup_capio_fd(tid, fd, res, false);
 
-        *result = res;
-        return CAPIO_POSIX_SYSCALL_SUCCESS;
+        return posix_return_value(res, result);
     }
     return CAPIO_POSIX_SYSCALL_SKIP;
 }
@@ -43,8 +42,8 @@ int dup2_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg
         if (fd != res) {
             dup_capio_fd(tid, fd, res, false);
         }
-        *result = res;
-        return CAPIO_POSIX_SYSCALL_SUCCESS;
+
+        return posix_return_value(res, result);
     }
     return CAPIO_POSIX_SYSCALL_SKIP;
 }
@@ -75,8 +74,7 @@ int dup3_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg
         bool is_cloexec = (flags & O_CLOEXEC) == O_CLOEXEC;
         dup_capio_fd(tid, fd, res, is_cloexec);
 
-        *result = res;
-        return CAPIO_POSIX_SYSCALL_SUCCESS;
+        return posix_return_value(res, result);
     }
     return CAPIO_POSIX_SYSCALL_SKIP;
 }
