@@ -34,12 +34,18 @@ class ConsentRequestCache {
         START_LOG(capio_syscall(SYS_gettid), "call(path=%s, tid=%ld, source=%s)", path.c_str(), tid,
                   source_func.c_str());
 
+        const auto resolved_path = resolve_possible_symlink(path);
+
+        if (is_forbidden_path(resolved_path)) {
+            LOG("PATH is forbidden. Skipping request!");
+            return;
+        }
+
         /**
          * If entry is not present in cache, then proceed to perform request. othrewise if present,
          * there is no need to perform request to server and can proceed
          */
-        if (const auto resolved_path = resolve_possible_symlink(path);
-            available_consent->find(resolved_path) == available_consent->end()) {
+        if (!available_consent->contains(resolved_path)) {
             LOG("File not present in cache. performing request");
             auto res = _consent_to_proceed_request(resolved_path, tid, source_func);
             LOG("Registering new file for consent to proceed");
