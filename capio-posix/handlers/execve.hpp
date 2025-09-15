@@ -11,7 +11,7 @@ int execve_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long a
 
     create_snapshot(tid);
 
-    return CAPIO_POSIX_SYSCALL_SKIP;
+    return posix_return_value(CAPIO_POSIX_SYSCALL_REQUEST_SKIP, result);
 }
 
 #endif // SYS_execve

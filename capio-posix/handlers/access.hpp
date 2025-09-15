@@ -11,7 +11,7 @@ int access_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long a
     START_LOG(tid, "call()");
     if (is_forbidden_path(pathname) || !is_capio_path(pathname)) {
         LOG("Path %s is forbidden: skip", pathname.data());
-        return CAPIO_POSIX_SYSCALL_REQUEST_SKIP;
+        return posix_return_value(CAPIO_POSIX_SYSCALL_REQUEST_SKIP, result);
     }
 
     std::filesystem::path path(pathname);
@@ -20,7 +20,7 @@ int access_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long a
     }
 
     consent_request_cache_fs->consent_request(path, tid, __FUNCTION__);
-    return CAPIO_POSIX_SYSCALL_REQUEST_SKIP;
+    return posix_return_value(CAPIO_POSIX_SYSCALL_REQUEST_SKIP, result);
 }
 #endif // SYS_access
 
@@ -34,7 +34,7 @@ int faccessat_handler(long arg0, long arg1, long arg2, long arg3, long arg4, lon
 
     if (is_forbidden_path(pathname) || !is_capio_path(pathname)) {
         LOG("Path %s is forbidden or is not a capio path: skip", pathname.data());
-        return CAPIO_POSIX_SYSCALL_REQUEST_SKIP;
+        return posix_return_value(CAPIO_POSIX_SYSCALL_REQUEST_SKIP, result);
     }
 
     std::filesystem::path path(pathname);
@@ -43,23 +43,23 @@ int faccessat_handler(long arg0, long arg1, long arg2, long arg3, long arg4, lon
             path = capio_posix_realpath(pathname);
             if (path.empty()) {
                 errno = ENONET;
-                return CAPIO_POSIX_SYSCALL_ERRNO;
+                return posix_return_value(CAPIO_POSIX_SYSCALL_ERRNO, result);
             }
         } else {
             if (!is_directory(dirfd)) {
                 LOG("dirfd does not point to a directory");
-                return CAPIO_POSIX_SYSCALL_REQUEST_SKIP;
+                return posix_return_value(CAPIO_POSIX_SYSCALL_REQUEST_SKIP, result);
             }
             const std::filesystem::path dir_path = get_dir_path(dirfd);
             if (dir_path.empty()) {
-                return CAPIO_POSIX_SYSCALL_REQUEST_SKIP;
+                return posix_return_value(CAPIO_POSIX_SYSCALL_REQUEST_SKIP, result);
             }
             path = (dir_path / path).lexically_normal();
         }
     }
 
     consent_request_cache_fs->consent_request(path, tid, __FUNCTION__);
-    return CAPIO_POSIX_SYSCALL_REQUEST_SKIP;
+    return posix_return_value(CAPIO_POSIX_SYSCALL_REQUEST_SKIP, result);
 }
 #endif // SYS_faccessat
 

@@ -15,7 +15,7 @@ int unlink_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long a
         delete_capio_path(pathname.data());
     }
 
-    return CAPIO_POSIX_SYSCALL_SKIP;
+    return posix_return_value(CAPIO_POSIX_SYSCALL_REQUEST_SKIP, result);
 }
 #endif // SYS_unlink
 
@@ -32,7 +32,7 @@ int unlinkat_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long
         delete_capio_path(path);
     }
 
-    return CAPIO_POSIX_SYSCALL_SKIP;
+    return posix_return_value(CAPIO_POSIX_SYSCALL_REQUEST_SKIP, result);
 }
 #endif // SYS_unlinkat
 

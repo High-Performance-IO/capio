@@ -16,7 +16,7 @@ int chdir_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long ar
     if (is_forbidden_path(pathname) || !is_capio_path(pathname)) {
         LOG("Path %s is forbidden: skip", pathname.data());
         syscall_no_intercept_flag = false;
-        return CAPIO_POSIX_SYSCALL_SKIP;
+        return posix_return_value(CAPIO_POSIX_SYSCALL_REQUEST_SKIP, result);
     }
 
     std::filesystem::path path(pathname);
@@ -28,7 +28,7 @@ int chdir_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long ar
 
     syscall_no_intercept_flag = false;
     // if not a capio path, then control is given to kernel
-    return CAPIO_POSIX_SYSCALL_SKIP;
+    return posix_return_value(CAPIO_POSIX_SYSCALL_REQUEST_SKIP, result);
 }
 
 #endif // SYS_chdir

@@ -58,7 +58,7 @@ int writev_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long a
               io_vec->iov_len, tid);
     if (!exists_capio_fd(fd)) {
         LOG("FD %d is not handled by CAPIO... skipping syscall", fd);
-        return CAPIO_POSIX_SYSCALL_REQUEST_SKIP;
+        return posix_return_value(CAPIO_POSIX_SYSCALL_REQUEST_SKIP, result);
     }
 
     LOG("Need to handle %ld IOVEC objects", iovcnt);

@@ -16,7 +16,7 @@ int close_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long ar
         delete_capio_fd(fd);
     }
 
-    return CAPIO_POSIX_SYSCALL_SKIP;
+    return posix_return_value(CAPIO_POSIX_SYSCALL_REQUEST_SKIP, result);
 }
 
 #endif // SYS_close

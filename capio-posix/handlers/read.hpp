@@ -45,10 +45,11 @@ int read_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg
                                : capio_read_fs(fd, count, tid);
 
         LOG("read result: %ld", read_result);
-        return read_result;
+        *result = read_result;
+        posix_return_value(CAPIO_POSIX_SYSCALL_SUCCESS, result);
     }
     LOG("Not a CAPIO fd... skipping...");
-    return CAPIO_POSIX_SYSCALL_REQUEST_SKIP;
+    return posix_return_value(CAPIO_POSIX_SYSCALL_REQUEST_SKIP, result);
 }
 #endif // SYS_read
 
@@ -65,7 +66,7 @@ int readv_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long ar
 
         set_capio_fd_offset(fd, computed_offset);
     }
-    return CAPIO_POSIX_SYSCALL_REQUEST_SKIP;
+    return posix_return_value(CAPIO_POSIX_SYSCALL_REQUEST_SKIP, result);
 }
 #endif // SYS_readv
 

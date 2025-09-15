@@ -38,7 +38,7 @@ int exit_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg
     syscall_no_intercept_flag = false;
     LOG("syscall_no_intercept_flag = false");
 
-    return CAPIO_POSIX_SYSCALL_SKIP;
+    return posix_return_value(CAPIO_POSIX_SYSCALL_REQUEST_SKIP, result);
 }
 
 #endif // SYS_exit || SYS_exit_group

@@ -20,7 +20,7 @@ int rename_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long a
         // TODO: The check is more complex
         errno   = EINVAL;
         *result = -errno;
-        return CAPIO_POSIX_SYSCALL_SUCCESS;
+        return posix_return_value(CAPIO_POSIX_SYSCALL_SUCCESS, result);
     }
     LOG("newpath is not prefix of old");
 
@@ -34,7 +34,7 @@ int rename_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long a
         rename_request(oldpath_abs, newpath_abs, tid);
     }
 
-    return CAPIO_POSIX_SYSCALL_SKIP;
+    return posix_return_value(CAPIO_POSIX_SYSCALL_REQUEST_SKIP, result);
 }
 
 #endif // SYS_rename

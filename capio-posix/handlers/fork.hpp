@@ -21,7 +21,7 @@ int fork_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg
         *result = pid;
     }
 
-    return CAPIO_POSIX_SYSCALL_SUCCESS;
+    return posix_return_value(CAPIO_POSIX_SYSCALL_SUCCESS, result);
 }
 
 #endif // SYS_fork

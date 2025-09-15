@@ -19,10 +19,9 @@ int dup_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg5
         }
         dup_capio_fd(tid, fd, res, false);
 
-        *result = res;
-        return CAPIO_POSIX_SYSCALL_SUCCESS;
+        return posix_return_value(CAPIO_POSIX_SYSCALL_SUCCESS, result);
     }
-    return CAPIO_POSIX_SYSCALL_SKIP;
+    return posix_return_value(CAPIO_POSIX_SYSCALL_REQUEST_SKIP, result);
 }
 #endif // SYS_dup
 

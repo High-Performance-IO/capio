@@ -19,6 +19,6 @@ int copy_file_range_handler(long arg0, long arg1, long arg2, long arg3, long arg
         read_request_cache_fs->read_request(path, off_in, tid, fd_in);
     }
 
-    return CAPIO_POSIX_SYSCALL_SKIP;
+    return posix_return_value(CAPIO_POSIX_SYSCALL_REQUEST_SKIP, result);
 }
 #endif // CAPIO_COPY_FILE_RANGE_HPP

@@ -26,7 +26,7 @@ int lseek_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long ar
         set_capio_fd_offset(fd, computed_offset);
     }
 
-    return CAPIO_POSIX_SYSCALL_REQUEST_SKIP;
+    return posix_return_value(CAPIO_POSIX_SYSCALL_REQUEST_SKIP, result);
 }
 
 #endif // SYS_lseek || SYS_llseek

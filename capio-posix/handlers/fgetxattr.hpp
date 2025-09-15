@@ -15,7 +15,7 @@ int fgetxattr_handler(long arg0, long arg1, long arg2, long arg3, long arg4, lon
     if (exists_capio_fd(fd)) {
         consent_request_cache_fs->consent_request(get_capio_fd_path(fd), tid, __FUNCTION__);
     }
-    return CAPIO_POSIX_SYSCALL_SKIP;
+    return posix_return_value(CAPIO_POSIX_SYSCALL_REQUEST_SKIP, result);
 }
 
 #endif // SYS_fgetxattr
