@@ -55,11 +55,14 @@ void CapioStorageService::createRemoteFile(const std::string &file_name,
      * by another app running under the same server instance. if it is not found, we create
      * the file
      */
-    START_LOG(gettid(), "call(file_name=%s)", file_name.c_str());
-    if (_stored_files->find(file_name) == _stored_files->end()) {
+    START_LOG(gettid(), "call(file_name=%s, home_node=%s)", file_name.c_str(), home_node.c_str());
+    if (!_stored_files->contains(file_name)) {
         LOG("File not found. Creating a new remote file");
         _stored_files->emplace(file_name, new CapioRemoteFile(file_name, home_node));
     }
+    LOG("Created remote file at path %s with home_node %s",
+        _stored_files->at(file_name)->getFileName().c_str(),
+        _stored_files->at(file_name)->getHomeNode().c_str());
 }
 
 void CapioStorageService::deleteFile(const std::string &file_name) const {

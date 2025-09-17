@@ -5,7 +5,7 @@
 #include <include/storage-service/capio_file.hpp>
 
 CapioRemoteFile::CapioRemoteFile(const std::string &filePath, const std::string &home_node)
-    : CapioFile(filePath) {}
+    : CapioFile(filePath, home_node) {}
 
 CapioRemoteFile::~CapioRemoteFile() {}
 
@@ -30,7 +30,7 @@ std::size_t CapioRemoteFile::writeToQueue(SPSCQueue &queue, std::size_t offset,
     auto buffer = new char[length];
 
     auto buffer_size =
-        capio_backend->fetchFromRemoteHost(this->fileName, this->homeNode, buffer, offset, length);
+        capio_backend->fetchFromRemoteHost(this->homeNode, this->fileName, buffer, offset, length);
 
     queue.write(buffer, buffer_size);
 

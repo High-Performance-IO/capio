@@ -64,6 +64,12 @@ class CapioFile {
      */
     virtual std::size_t writeToQueue(SPSCQueue &queue, std::size_t offset,
                                      std::size_t length) const = 0;
+
+    /**
+     *
+     * @return HomeNode of file
+     */
+    virtual std::string getHomeNode() { return homeNode; };
 };
 
 class CapioMemoryFile : public CapioFile {

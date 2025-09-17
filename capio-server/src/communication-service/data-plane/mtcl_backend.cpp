@@ -42,19 +42,23 @@ void MTCLBackend::serverConnectionHandler(MTCL::HandleUser HandlerPointer,
         // execute up to N operation of send &/or receive, to avoid starvation
 
         if (my_turn_to_send) {
+            LOG("Send PHASE");
             for (int i = 0; i < max_net_op && queue->has_requests(); i++) {
                 // Send of request
                 auto request = queue->get_request();
+                LOG("Request to be sent = %s", request.c_str());
                 HandlerPointer.send(request.c_str(), request.length());
 
                 // Retrive size of response
                 capio_off64_t response_size;
                 HandlerPointer.receive(&response_size, sizeof(response_size));
+                LOG("Response will have size %ld", response_size);
                 char *response_buffer = new char[response_size];
                 HandlerPointer.receive(response_buffer, response_size);
-
+                LOG("Received response");
                 // push response back to the source
                 queue->push_response(response_buffer, response_size, request);
+                LOG("Pushed response back!");
             }
 
             // Send message I have finished
@@ -63,29 +67,34 @@ void MTCLBackend::serverConnectionHandler(MTCL::HandleUser HandlerPointer,
         } else {
             for (int i = 0; i < max_net_op; i++) {
                 // Receive phase
+                LOG("Receive PHASE");
                 size_t receive_size = 0;
                 HandlerPointer.probe(receive_size, false);
                 while (receive_size > 0) {
+                    LOG("A request is incoming");
                     int requestCode;
                     char incoming_request[CAPIO_REQ_MAX_SIZE];
                     HandlerPointer.receive(incoming_request, receive_size);
+                    LOG("Received request = %s", incoming_request);
                     sscanf(incoming_request, "%d", &requestCode);
-
+                    LOG("Request code is %d", requestCode);
                     switch (requestCode) {
                     case HAVE_FINISH_SEND_REQUEST: {
                         // Finished sending data. Set i to be greater than max_net_op to go to next
                         // phase
+                        LOG("Other has finished sending phase. swithing me from receive to send");
                         i = max_net_op;
                         break;
                     }
 
                     case FETCH_FROM_REMOTE: {
+                        LOG("Received request for data from remote server");
                         // Scan request fetch from remote
                         char filepath[PATH_MAX];
                         capio_off64_t offset, count;
 
                         sscanf(incoming_request, "%s %llu %llu", filepath, &offset, &count);
-
+                        LOG("filepath=%s, offset=%ld, count=%ld", filepath, offset, count);
                         auto buffer = new char[count];
                         auto read_size =
                             storage_service->readFromFileToBuffer(filepath, offset, buffer, count);
@@ -258,7 +267,7 @@ size_t MTCLBackend::fetchFromRemoteHost(const std::string &hostname,
     char REQUEST[CAPIO_REQ_MAX_SIZE];
 
     sprintf(REQUEST, "%03d %s %llu %llu", FETCH_FROM_REMOTE, filepath.c_str(), offset, count);
-    LOG("Sending request %s", REQUEST);
+    LOG("Sending request %s. Fetching queue to hostname %s", REQUEST, hostname.c_str());
     auto queues = open_connections.at(hostname);
     LOG("obtained access to queue");
 

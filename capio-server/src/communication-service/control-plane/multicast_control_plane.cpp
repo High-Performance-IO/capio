@@ -90,14 +90,13 @@ void MulticastControlPlane::multicast_control_plane_incoming_thread(
             continue;
         }
 
-        event_type event;
+        int event;
         char source_hostname[HOST_NAME_MAX];
         char source_path[PATH_MAX];
 
-        sscanf(incoming_msg, "%d %s %s", reinterpret_cast<int *>(&event), source_hostname,
-               source_path);
+        sscanf(incoming_msg, "%d %s %s", &event, source_hostname, source_path);
 
-        LOG("event=%d, source:%s, path=%s", event, source_path, incoming_msg);
+        LOG("event=%d, source=%s, path=%s", event, source_hostname, source_path);
 
         if (strcmp(capio_global_configuration->node_name, source_hostname) == 0) {
             continue;
