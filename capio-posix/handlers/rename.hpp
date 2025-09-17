@@ -5,10 +5,11 @@
 
 #include "utils/filesystem.hpp"
 
-int rename_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg5, long *result) {
+int rename_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg5, long *result,
+                   const pid_t tid) {
     std::filesystem::path oldpath(reinterpret_cast<const char *>(arg0));
     std::filesystem::path newpath(reinterpret_cast<const char *>(arg1));
-    auto tid = static_cast<pid_t>(syscall_no_intercept(SYS_gettid));
+
     START_LOG(tid, "call(oldpath=%s, newpath=%s)", oldpath.c_str(), newpath.c_str());
     LOG("Compute paths");
     auto oldpath_abs = capio_absolute(oldpath);

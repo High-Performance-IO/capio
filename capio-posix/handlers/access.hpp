@@ -5,9 +5,9 @@
 #include "utils/filesystem.hpp"
 
 #if defined(SYS_access)
-int access_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg5, long *result) {
+inline int access_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg5, long *result,
+                   const pid_t tid) {
     const std::string_view pathname(reinterpret_cast<const char *>(arg0));
-    auto tid = static_cast<pid_t>(syscall_no_intercept(SYS_gettid));
     START_LOG(tid, "call()");
     if (!is_capio_path(pathname)) {
         LOG("Path %s is forbidden: skip", pathname.data());
@@ -25,11 +25,10 @@ int access_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long a
 #endif // SYS_access
 
 #if defined(SYS_faccessat) || defined(SYS_faccessat2)
-int faccessat_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg5,
-                      long *result) {
+inline int faccessat_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg5,
+                      long *result, const pid_t tid) {
     auto dirfd = static_cast<int>(arg0);
     const std::string_view pathname(reinterpret_cast<const char *>(arg1));
-    auto tid = static_cast<pid_t>(syscall_no_intercept(SYS_gettid));
     START_LOG(tid, "call()");
 
     if (!is_capio_path(pathname)) {

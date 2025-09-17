@@ -4,7 +4,7 @@
 #include "utils/common.hpp"
 #include "utils/filesystem.hpp"
 
-std::string compute_abs_path(char *pathname, int dirfd) {
+inline std::string compute_abs_path(char *pathname, int dirfd) {
     START_LOG(syscall_no_intercept(SYS_gettid), "call(pathname=%s, dirfd=%d)", pathname, dirfd);
     std::filesystem::path path(pathname);
     if (path.is_relative()) {
@@ -33,9 +33,9 @@ std::string compute_abs_path(char *pathname, int dirfd) {
 }
 
 #if defined(SYS_creat)
-int creat_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg5, long *result) {
+inline int creat_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg5,
+                         long *result, const pid_t tid) {
     std::string pathname(reinterpret_cast<const char *>(arg0));
-    auto tid    = static_cast<pid_t>(syscall_no_intercept(SYS_gettid));
     int flags   = O_CREAT | O_WRONLY | O_TRUNC;
     mode_t mode = static_cast<int>(arg2);
     START_LOG(tid, "call(path=%s, flags=%d, mode=%d)", pathname.data(), flags, mode);
@@ -71,11 +71,11 @@ int creat_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long ar
 #endif // SYS_creat
 
 #if defined(SYS_open)
-int open_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg5, long *result) {
+inline int open_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg5,
+                        long *result, const pid_t tid) {
     std::string pathname(reinterpret_cast<const char *>(arg0));
     int flags   = static_cast<int>(arg1);
     mode_t mode = static_cast<int>(arg2);
-    auto tid    = static_cast<pid_t>(syscall_no_intercept(SYS_gettid));
     START_LOG(tid, "call(path=%s, flags=%d, mode=%d)", pathname.data(), flags, mode);
 
     std::string path = compute_abs_path(pathname.data(), -1);
@@ -112,12 +112,13 @@ int open_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg
 #endif // SYS_open
 
 #if defined(SYS_openat)
-int openat_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg5, long *result) {
+inline int openat_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg5,
+                          long *result, const pid_t tid) {
     int dirfd = static_cast<int>(arg0);
     std::string pathname(reinterpret_cast<const char *>(arg1));
     int flags   = static_cast<int>(arg2);
     mode_t mode = static_cast<int>(arg3);
-    auto tid    = static_cast<pid_t>(syscall_no_intercept(SYS_gettid));
+
     START_LOG(tid, "call(dirfd=%ld, path=%s, flags=%d, mode=%d)", dirfd, pathname.data(), flags,
               mode);
 

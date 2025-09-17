@@ -5,11 +5,11 @@
 
 #include "utils/common.hpp"
 
-int lseek_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg5, long *result) {
+inline int lseek_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg5,
+                         long *result, const pid_t tid) {
     int fd      = static_cast<int>(arg0);
     auto offset = static_cast<capio_off64_t>(arg1);
     int whence  = static_cast<int>(arg2);
-    auto tid    = static_cast<pid_t>(syscall_no_intercept(SYS_gettid));
 
     START_LOG(tid, "call(fd=%d, offset=%ld, whence=%d)", fd, offset, whence);
     if (exists_capio_fd(fd)) {

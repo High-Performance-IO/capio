@@ -15,13 +15,13 @@ inline thread_local WriteRequestCacheFS *write_request_cache_fs;
 inline thread_local WriteRequestCacheMEM *write_request_cache_mem;
 inline thread_local ReadRequestCacheMEM *read_request_cache_mem;
 
-inline void init_caches() {
+inline void init_caches(pid_t tid) {
     START_LOG(capio_syscall(SYS_gettid), "call()");
     write_request_cache_fs   = new WriteRequestCacheFS();
     read_request_cache_fs    = new ReadRequestCacheFS();
     consent_request_cache_fs = new ConsentRequestCache();
     write_request_cache_mem  = new WriteRequestCacheMEM();
-    read_request_cache_mem   = new ReadRequestCacheMEM();
+    read_request_cache_mem   = new ReadRequestCacheMEM(tid);
 }
 
 inline void delete_caches() {

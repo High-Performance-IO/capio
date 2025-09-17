@@ -14,8 +14,8 @@ class ReadRequestCacheMEM {
      * @param buffer
      * @param count
      */
-    void _read(void *buffer, capio_off64_t count) {
-        START_LOG(capio_syscall(SYS_gettid), "call(count=%ld)", count);
+    void _read(void *buffer, capio_off64_t count, pid_t tid) {
+        START_LOG(tid, "call(count=%ld)", count);
 
         if (count > 0) {
             memcpy(buffer, _cache + _cache_offset, count);
@@ -27,8 +27,8 @@ class ReadRequestCacheMEM {
   protected:
     [[nodiscard]] capio_off64_t read_request(const int fd, const capio_off64_t count,
                                              const long tid, bool use_cache = true) {
-        START_LOG(capio_syscall(SYS_gettid), "call(fd=%ld, count=%llu, tid=%ld, load_data=%s)", fd,
-                  count, tid, use_cache ? "true" : "false");
+        START_LOG(tid, "call(fd=%ld, count=%llu, tid=%ld, load_data=%s)", fd, count, tid,
+                  use_cache ? "true" : "false");
         char req[CAPIO_REQ_MAX_SIZE];
 
         // send as the last parameter to the server the maximum amount of data that can be read into
@@ -65,19 +65,19 @@ class ReadRequestCacheMEM {
     }
 
   public:
-    explicit ReadRequestCacheMEM(const long line_size = get_posix_read_cache_line_size())
-        : _cache(nullptr), _tid(capio_syscall(SYS_gettid)), _fd(-1), _max_line_size(line_size),
-          _actual_size(0), _cache_offset(0), _last_read_end(-1) {
+    explicit ReadRequestCacheMEM(pid_t tid, const long line_size = get_posix_read_cache_line_size())
+        : _cache(nullptr), _tid(tid), _fd(-1), _max_line_size(line_size), _actual_size(0),
+          _cache_offset(0), _last_read_end(-1) {
         _cache = new char[_max_line_size];
     }
 
     ~ReadRequestCacheMEM() {
-        START_LOG(capio_syscall(SYS_gettid), "call()");
+        START_LOG(capio_current_thread_id, "call()");
         delete[] _cache;
     }
 
     void flush() {
-        START_LOG(capio_syscall(SYS_gettid), "call()");
+        START_LOG(capio_current_thread_id, "call()");
         if (_cache_offset != _actual_size) {
             _actual_size = _cache_offset = 0;
         }
@@ -85,8 +85,8 @@ class ReadRequestCacheMEM {
         _real_file_size_commmitted = -1;
     }
 
-    long read(const int fd, void *buffer, capio_off64_t count) {
-        START_LOG(capio_syscall(SYS_gettid), "call(fd=%d, count=%ld)", fd, count);
+    long read(const int fd, void *buffer, capio_off64_t count, pid_t tid) {
+        START_LOG(tid, "call(fd=%d, count=%ld)", fd, count);
 
         long actual_read_size = 0;
 
@@ -137,7 +137,7 @@ class ReadRequestCacheMEM {
         if (count <= _max_line_size - _cache_offset) {
             // There is enough data to perform a read
             LOG("The requested amount of data can be served without performing a request");
-            _read(buffer, count);
+            _read(buffer, count, tid);
             actual_read_size = count;
             _last_read_end   = get_capio_fd_offset(_fd) + count;
             set_capio_fd_offset(fd, _last_read_end);
@@ -152,7 +152,7 @@ class ReadRequestCacheMEM {
                 " std::min(_actual_size(%llu) - _cache_offset(%llu), count(%llu) = %ld",
                 _actual_size, _cache_offset, count, first_copy_size);
 
-            _read(buffer, first_copy_size);
+            _read(buffer, first_copy_size, tid);
             _last_read_end = get_capio_fd_offset(_fd) + first_copy_size;
             set_capio_fd_offset(fd, get_capio_fd_offset(fd) + first_copy_size);
             actual_read_size = first_copy_size;
@@ -178,7 +178,7 @@ class ReadRequestCacheMEM {
                     remaining_size < _actual_size ? remaining_size : _actual_size;
 
                 LOG("Sending %ld of data to posix application", size_to_send_to_client);
-                _read(static_cast<char *>(buffer) + copy_offset, size_to_send_to_client);
+                _read(static_cast<char *>(buffer) + copy_offset, size_to_send_to_client, tid);
                 actual_read_size += size_to_send_to_client;
                 LOG("actual_read_size incremented to: %ld", actual_read_size);
 

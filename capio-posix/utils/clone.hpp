@@ -31,6 +31,56 @@ inline void remove_capio_tid(const pid_t tid) {
     }
 }
 
+#define APPEND_CLONE_FLAGS(str, val)                                                               \
+    do {                                                                                           \
+        if ((val) & CLONE_VM)                                                                      \
+            (str) += "CLONE_VM ";                                                                  \
+        if ((val) & CLONE_FS)                                                                      \
+            (str) += "CLONE_FS ";                                                                  \
+        if ((val) & CLONE_FILES)                                                                   \
+            (str) += "CLONE_FILES ";                                                               \
+        if ((val) & CLONE_SIGHAND)                                                                 \
+            (str) += "CLONE_SIGHAND ";                                                             \
+        if ((val) & CLONE_PTRACE)                                                                  \
+            (str) += "CLONE_PTRACE ";                                                              \
+        if ((val) & CLONE_VFORK)                                                                   \
+            (str) += "CLONE_VFORK ";                                                               \
+        if ((val) & CLONE_PARENT)                                                                  \
+            (str) += "CLONE_PARENT ";                                                              \
+        if ((val) & CLONE_THREAD)                                                                  \
+            (str) += "CLONE_THREAD ";                                                              \
+        if ((val) & CLONE_NEWNS)                                                                   \
+            (str) += "CLONE_NEWNS ";                                                               \
+        if ((val) & CLONE_SYSVSEM)                                                                 \
+            (str) += "CLONE_SYSVSEM ";                                                             \
+        if ((val) & CLONE_SETTLS)                                                                  \
+            (str) += "CLONE_SETTLS ";                                                              \
+        if ((val) & CLONE_PARENT_SETTID)                                                           \
+            (str) += "CLONE_PARENT_SETTID ";                                                       \
+        if ((val) & CLONE_CHILD_CLEARTID)                                                          \
+            (str) += "CLONE_CHILD_CLEARTID ";                                                      \
+        if ((val) & CLONE_DETACHED)                                                                \
+            (str) += "CLONE_DETACHED ";                                                            \
+        if ((val) & CLONE_UNTRACED)                                                                \
+            (str) += "CLONE_UNTRACED ";                                                            \
+        if ((val) & CLONE_CHILD_SETTID)                                                            \
+            (str) += "CLONE_CHILD_SETTID ";                                                        \
+        if ((val) & CLONE_NEWCGROUP)                                                               \
+            (str) += "CLONE_NEWCGROUP ";                                                           \
+        if ((val) & CLONE_NEWUTS)                                                                  \
+            (str) += "CLONE_NEWUTS ";                                                              \
+        if ((val) & CLONE_NEWIPC)                                                                  \
+            (str) += "CLONE_NEWIPC ";                                                              \
+        if ((val) & CLONE_NEWUSER)                                                                 \
+            (str) += "CLONE_NEWUSER ";                                                             \
+        if ((val) & CLONE_NEWPID)                                                                  \
+            (str) += "CLONE_NEWPID ";                                                              \
+        if ((val) & CLONE_NEWNET)                                                                  \
+            (str) += "CLONE_NEWNET ";                                                              \
+        if ((val) & CLONE_IO)                                                                      \
+            (str) += "CLONE_IO ";                                                                  \
+    } while (0)
+
 inline void init_threading_support() { tids = new std::unordered_set<pid_t>{}; }
 
 inline void init_process(pid_t tid) {
@@ -94,7 +144,7 @@ inline void hook_clone_child() {
     init_process(tid);
     LOG("Child thread %d initialized", tid);
     LOG("Starting child thread %d", tid);
-    init_caches();
+    init_caches(tid);
 #ifdef __CAPIO_POSIX
     syscall_no_intercept_flag = false;
 #endif

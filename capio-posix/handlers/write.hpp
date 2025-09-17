@@ -27,11 +27,12 @@ inline off64_t capio_write_mem(int fd, char *buffer, capio_off64_t count, pid_t 
 }
 
 #if defined(SYS_write)
-int write_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg5, long *result) {
+inline int write_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg5,
+                         long *result, const pid_t tid) {
     auto fd     = static_cast<int>(arg0);
     auto buffer = reinterpret_cast<char *>(arg1);
     auto count  = static_cast<capio_off64_t>(arg2);
-    auto tid    = static_cast<pid_t>(syscall_no_intercept(SYS_gettid));
+
     START_LOG(tid, "call(fd=%d, buffer=%p, count=%ld, id=%ld)", fd, buffer, count, tid);
     if (!exists_capio_fd(fd)) {
         LOG("FD %d is not handled by capio... skipping syscall", fd);
@@ -49,11 +50,12 @@ int write_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long ar
 #endif // SYS_write
 
 #if defined(SYS_writev)
-int writev_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg5, long *result) {
+inline int writev_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg5,
+                          long *result, const pid_t tid) {
     auto fd     = static_cast<int>(arg0);
     auto io_vec = reinterpret_cast<const struct iovec *>(arg1);
     auto iovcnt = static_cast<int>(arg2);
-    long tid    = syscall_no_intercept(SYS_gettid);
+
     START_LOG(tid, "call(fd=%d, buffer=%p, count=%ld, pid=%ld)", fd, io_vec->iov_base,
               io_vec->iov_len, tid);
     if (!exists_capio_fd(fd)) {

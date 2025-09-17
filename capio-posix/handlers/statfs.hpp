@@ -3,10 +3,9 @@
 
 #if defined(SYS_fstatfs) || defined(SYS_fstatfs64)
 
-int fstatfs_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg5,
-                    long *result) {
-    auto fd  = static_cast<int>(arg0);
-    auto tid = static_cast<pid_t>(syscall_no_intercept(SYS_gettid));
+inline int fstatfs_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg5,
+                           long *result, const pid_t tid) {
+    auto fd = static_cast<int>(arg0);
 
     START_LOG(tid, "call(fd=%d)", fd);
 

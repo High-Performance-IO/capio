@@ -5,8 +5,8 @@
 
 #include "utils/snapshot.hpp"
 
-int execve_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg5, long *result) {
-    auto tid = static_cast<pid_t>(syscall_no_intercept(SYS_gettid));
+inline int execve_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg5,
+                          long *result, const pid_t tid) {
     START_LOG(tid, "call()");
 
     create_snapshot(tid);

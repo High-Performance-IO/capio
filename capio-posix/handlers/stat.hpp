@@ -88,43 +88,42 @@ inline int capio_fstatat(int dirfd, const std::string_view &pathname, struct sta
 }
 
 #if defined(SYS_fstat) || defined(SYS_fstat64)
-int fstat_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg5, long *result) {
+inline int fstat_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg5,
+                         long *result, const pid_t tid) {
     auto fd   = static_cast<int>(arg0);
     auto *buf = reinterpret_cast<struct stat *>(arg1);
-    auto tid  = static_cast<pid_t>(syscall_no_intercept(SYS_gettid));
 
     return posix_return_value(capio_fstat(fd, buf, tid), result);
 }
 #endif // SYS_fstat || SYS_fstat64
 
 #if defined(SYS_fstatat) || defined(SYS_newfstatat) || defined(SYS_fstatat64)
-int fstatat_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg5,
-                    long *result) {
+inline int fstatat_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg5,
+                           long *result, const pid_t tid) {
     auto dirfd = static_cast<int>(arg0);
     const std::string_view pathname(reinterpret_cast<const char *>(arg1));
     auto *statbuf = reinterpret_cast<struct stat *>(arg2);
     auto flags    = static_cast<int>(arg3);
-    auto tid      = static_cast<pid_t>(syscall_no_intercept(SYS_gettid));
 
     return posix_return_value(capio_fstatat(dirfd, pathname, statbuf, flags, tid), result);
 }
 #endif // SYS_fstatat || SYS_newfstatat || SYS_fstatat64
 
 #if defined(SYS_lstat) || defined(SYS_lstat64)
-int lstat_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg5, long *result) {
+inline int lstat_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg5,
+                         long *result, const pid_t tid) {
     const std::string_view pathname(reinterpret_cast<const char *>(arg0));
     auto *buf = reinterpret_cast<struct stat *>(arg1);
-    auto tid  = static_cast<pid_t>(syscall_no_intercept(SYS_gettid));
 
     return posix_return_value(capio_lstat_wrapper(pathname, buf, tid), result);
 }
 #endif // SYS_lstat || SYS_lstat64
 
 #if defined(SYS_stat) || defined(SYS_stat64)
-int stat_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg5, long *result) {
+inline int stat_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg5,
+                        long *result, const pid_t tid) {
     const std::string_view pathname(reinterpret_cast<const char *>(arg0));
     auto *buf = reinterpret_cast<struct stat *>(arg1);
-    long tid  = syscall_no_intercept(SYS_gettid);
 
     return posix_return_value(capio_lstat_wrapper(pathname, buf, tid), result);
 }

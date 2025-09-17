@@ -1,9 +1,9 @@
 #ifndef CAPIO_COPY_FILE_RANGE_HPP
 #define CAPIO_COPY_FILE_RANGE_HPP
 
-int copy_file_range_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg5,
-                            long *result) {
-    auto tid    = static_cast<pid_t>(syscall_no_intercept(SYS_gettid));
+inline int copy_file_range_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg5,
+                                   long *result, const pid_t tid) {
+
     auto fd_in  = static_cast<int>(arg0);
     auto off_in = static_cast<capio_off64_t>(arg1);
 

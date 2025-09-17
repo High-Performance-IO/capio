@@ -2,6 +2,7 @@
 #include <gtest/gtest.h>
 
 #define syscall_no_intercept syscall
+pid_t capio_current_thread_id = gettid();
 
 std::string workflow_name = CAPIO_DEFAULT_WORKFLOW_NAME;
 

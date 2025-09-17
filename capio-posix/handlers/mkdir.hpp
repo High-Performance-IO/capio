@@ -44,31 +44,30 @@ inline off64_t capio_rmdir(const std::string_view &pathname, pid_t tid) {
 }
 
 #if defined(SYS_mkdir)
-int mkdir_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg5, long *result) {
+inline int mkdir_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg5,
+                         long *result, const pid_t tid) {
     const std::string_view pathname(reinterpret_cast<const char *>(arg0));
     auto mode = static_cast<mode_t>(arg1);
-    auto tid  = static_cast<pid_t>(syscall_no_intercept(SYS_gettid));
 
     return posix_return_value(capio_mkdirat(AT_FDCWD, pathname, mode, tid), result);
 }
 #endif // SYS_mkdir
 
 #if defined(SYS_mkdirat)
-int mkdirat_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg5,
-                    long *result) {
+inline int mkdirat_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg5,
+                           long *result, const pid_t tid) {
     int dirfd = static_cast<int>(arg0);
     const std::string_view pathname(reinterpret_cast<const char *>(arg1));
     auto mode = static_cast<mode_t>(arg2);
-    auto tid  = static_cast<pid_t>(syscall_no_intercept(SYS_gettid));
 
     return posix_return_value(capio_mkdirat(dirfd, pathname, mode, tid), result);
 }
 #endif // SYS_mkdirat
 
 #if defined(SYS_rmdir)
-int rmdir_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg5, long *result) {
+inline int rmdir_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg5,
+                         long *result, const pid_t tid) {
     const std::string_view pathname(reinterpret_cast<const char *>(arg0));
-    auto tid = static_cast<pid_t>(syscall_no_intercept(SYS_gettid));
 
     return posix_return_value(capio_rmdir(pathname, tid), result);
 }

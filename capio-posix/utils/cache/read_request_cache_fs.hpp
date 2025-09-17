@@ -11,8 +11,8 @@ class ReadRequestCacheFS {
     // return amount of readable bytes
     static capio_off64_t _read_request(const std::filesystem::path &path, const off64_t end_of_Read,
                                        const long tid, const long fd) {
-        START_LOG(capio_syscall(SYS_gettid), "call(path=%s, end_of_Read=%ld, tid=%ld, fd=%ld)",
-                  path.c_str(), end_of_Read, tid, fd);
+        START_LOG(tid, "call(path=%s, end_of_Read=%ld, tid=%ld, fd=%ld)", path.c_str(), end_of_Read,
+                  tid, fd);
         char req[CAPIO_REQ_MAX_SIZE];
         sprintf(req, "%04d %ld %ld %s %ld", CAPIO_REQUEST_READ, tid, fd, path.c_str(), end_of_Read);
         LOG("Sending read request %s", req);
@@ -28,13 +28,13 @@ class ReadRequestCacheFS {
     };
 
     ~ReadRequestCacheFS() {
-        START_LOG(capio_syscall(SYS_gettid), "call()");
+        START_LOG(capio_current_thread_id, "call()");
         delete available_read_cache;
     };
 
     void read_request(std::filesystem::path path, const long end_of_read, int tid, const int fd) {
-        START_LOG(capio_syscall(SYS_gettid), "[cache] call(path=%s, end_of_read=%ld, tid=%ld)",
-                  path.c_str(), end_of_read, tid);
+        START_LOG(tid, "[cache] call(path=%s, end_of_read=%ld, tid=%ld)", path.c_str(), end_of_read,
+                  tid);
         if (fd != current_fd || path.compare(current_path) != 0) {
             LOG("[cache] %s changed from previous state. updating",
                 fd != current_fd ? "File descriptor" : "File path");

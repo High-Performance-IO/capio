@@ -3,9 +3,10 @@
  * if -1, and capio logging is enable everything is logged, otherwise, only
  * logs up to CAPIO_MAX_LOG_LEVEL function calls
  */
-
 #include <array>
 #include <string>
+
+thread_local pid_t capio_current_thread_id = -1;
 
 #include "capio/syscall.hpp"
 
@@ -19,7 +20,7 @@
  * Handler for syscall not handled and interrupt syscall_intercept
  */
 static int not_handled_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg5,
-                               long *result) {
+                               long *result, pid_t pid) {
     return 1;
 }
 
@@ -28,7 +29,7 @@ static int not_handled_handler(long arg0, long arg1, long arg2, long arg3, long 
  * syscall_intercept
  */
 static int not_implemented_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg5,
-                                   long *result) {
+                                   long *result, pid_t pid) {
     errno   = ENOTSUP;
     *result = -errno;
     return 0;
@@ -383,6 +384,10 @@ static int hook(long syscall_number, long arg0, long arg1, long arg2, long arg3,
     }
 #endif
 
+    if (syscall_number == SYS_vfork) {
+        return 0;
+    }
+
     // If the flag is set to true, CAPIO will not
     // intercept the system calls
     if (syscall_no_intercept_flag) {
@@ -394,6 +399,17 @@ static int hook(long syscall_number, long arg0, long arg1, long arg2, long arg3,
 #endif
 
     START_LOG(syscall_no_intercept(SYS_gettid), "call(syscall_number=%ld)", syscall_number);
+
+    if (syscall_number == SYS_clone) {
+        std::string flags;
+        APPEND_CLONE_FLAGS(flags, arg0);
+        APPEND_CLONE_FLAGS(flags, arg1);
+        APPEND_CLONE_FLAGS(flags, arg2);
+        APPEND_CLONE_FLAGS(flags, arg3);
+        APPEND_CLONE_FLAGS(flags, arg4);
+        APPEND_CLONE_FLAGS(flags, arg5);
+        LOG("clone flags = %s", flags.c_str());
+    }
 
     // If the syscall_number is higher than the maximum
     // syscall captured by CAPIO, simply return
@@ -410,7 +426,8 @@ static int hook(long syscall_number, long arg0, long arg1, long arg2, long arg3,
 
     LOG("Handling syscall NO %ld (max num is %ld)", syscall_number, CAPIO_NR_SYSCALLS);
     try {
-        return syscallTable[syscall_number](arg0, arg1, arg2, arg3, arg4, arg5, result);
+        return syscallTable[syscall_number](arg0, arg1, arg2, arg3, arg4, arg5, result,
+                                            capio_current_thread_id);
     } catch (const std::exception &exception) {
         syscall_no_intercept_flag = true;
 
@@ -455,7 +472,7 @@ static
     register_capio_tid(tid);
 
     // TODO: use var to set cache size
-    init_caches();
+    init_caches(tid);
 
     intercept_hook_point_clone_child  = hook_clone_child;
     intercept_hook_point_clone_parent = hook_clone_parent;

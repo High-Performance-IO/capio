@@ -38,7 +38,7 @@ inline void init_client() {
  * @param app_name
  */
 inline void handshake_request(const long tid, const long pid, const std::string &app_name) {
-    START_LOG(capio_syscall(SYS_gettid), "call(tid=%ld, pid=%ld, app_name=%s)", tid, pid,
+    START_LOG(tid, "call(tid=%ld, pid=%ld, app_name=%s)", tid, pid,
               app_name.c_str());
 
     cts_queue = new SPSCQueue("queue-" + std::to_string(tid) + ".cts", get_cache_lines(),
@@ -64,7 +64,7 @@ inline void handshake_request(const long tid, const long pid, const std::string 
  * @return
  */
 inline std::vector<std::regex> *file_in_memory_request(const long pid) {
-    START_LOG(capio_syscall(SYS_gettid), "call(pid=%ld)", pid);
+    START_LOG(pid, "call(pid=%ld)", pid);
     char req[CAPIO_REQ_MAX_SIZE];
 
     sprintf(req, "%04d %ld ", CAPIO_REQUEST_QUERY_MEM_FILE, pid);
@@ -96,7 +96,7 @@ inline std::vector<std::regex> *file_in_memory_request(const long pid) {
 inline capio_off64_t posix_directory_committed_request(const long pid,
                                                        const std::filesystem::path &path,
                                                        char *token_path) {
-    START_LOG(capio_syscall(SYS_gettid), "call(path=%s)", path.c_str());
+    START_LOG(pid, "call(path=%s)", path.c_str());
     char req[CAPIO_REQ_MAX_SIZE];
 
     sprintf(req, "%04d %ld %s ", CAPIO_REQUEST_POSIX_DIR_COMMITTED, pid, path.c_str());
@@ -111,17 +111,17 @@ inline capio_off64_t posix_directory_committed_request(const long pid,
 }
 
 // non blocking
-inline void close_request(const std::filesystem::path &path, const long tid) {
-    START_LOG(capio_syscall(SYS_gettid), "call(path=%s, tid=%ld)", path.c_str(), tid);
+inline void close_request(const std::filesystem::path &path, pid_t tid) {
+    START_LOG(tid, "call(path=%s, tid=%ld)", path.c_str(), tid);
     write_request_cache_fs->flush(tid);
     char req[CAPIO_REQ_MAX_SIZE];
-    sprintf(req, "%04d %ld %s", CAPIO_REQUEST_CLOSE, tid, path.c_str());
+    sprintf(req, "%04d %d %s", CAPIO_REQUEST_CLOSE, tid, path.c_str());
     buf_requests->write(req, CAPIO_REQ_MAX_SIZE);
 }
 
 // non blocking
 inline void create_request(const int fd, const std::filesystem::path &path, const long tid) {
-    START_LOG(capio_syscall(SYS_gettid), "call(fd=%ld, path=%s, tid=%ld)", fd, path.c_str(), tid);
+    START_LOG(tid, "call(fd=%ld, path=%s, tid=%ld)", fd, path.c_str(), tid);
     char req[CAPIO_REQ_MAX_SIZE];
     sprintf(req, "%04d %ld %d %s", CAPIO_REQUEST_CREATE, tid, fd, path.c_str());
     buf_requests->write(req, CAPIO_REQ_MAX_SIZE);
@@ -129,7 +129,7 @@ inline void create_request(const int fd, const std::filesystem::path &path, cons
 
 // non blocking
 inline void exit_group_request(const long tid) {
-    START_LOG(capio_syscall(SYS_gettid), "call(tid=%ld)", tid);
+    START_LOG(tid, "call(tid=%ld)", tid);
     write_request_cache_fs->flush(tid);
     char req[CAPIO_REQ_MAX_SIZE];
     sprintf(req, "%04d %ld", CAPIO_REQUEST_EXIT_GROUP, tid);
@@ -139,7 +139,7 @@ inline void exit_group_request(const long tid) {
 // block until open is possible
 [[nodiscard]] inline capio_off64_t open_request(const int fd, const std::filesystem::path &path,
                                                 const long tid) {
-    START_LOG(capio_syscall(SYS_gettid), "call(fd=%ld, path=%s, tid=%ld)", fd, path.c_str(), tid);
+    START_LOG(tid, "call(fd=%ld, path=%s, tid=%ld)", fd, path.c_str(), tid);
     write_request_cache_fs->flush(tid);
 
     char req[CAPIO_REQ_MAX_SIZE];
@@ -153,7 +153,7 @@ inline void exit_group_request(const long tid) {
 // non blocking
 inline void rename_request(const std::filesystem::path &old_path,
                            const std::filesystem::path &new_path, const long tid) {
-    START_LOG(capio_syscall(SYS_gettid), "call(old=%s, new=%s, tid=%ld)", old_path.c_str(),
+    START_LOG(tid, "call(old=%s, new=%s, tid=%ld)", old_path.c_str(),
               new_path.c_str(), tid);
     char req[CAPIO_REQ_MAX_SIZE];
     sprintf(req, "%04d %ld %s %s", CAPIO_REQUEST_RENAME, tid, old_path.c_str(), new_path.c_str());

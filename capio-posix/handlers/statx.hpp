@@ -20,13 +20,13 @@ inline int capio_statx(int dirfd, const std::string_view &pathname, int flags, i
     return CAPIO_POSIX_SYSCALL_REQUEST_SKIP;
 }
 
-int statx_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg5, long *result) {
+int statx_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg5, long *result,
+                  const pid_t tid) {
     auto dirfd = static_cast<int>(arg0);
     const std::string_view pathname(reinterpret_cast<const char *>(arg1));
     auto flags = static_cast<int>(arg2);
     auto mask  = static_cast<int>(arg3);
     auto *buf  = reinterpret_cast<struct statx *>(arg4);
-    auto tid   = static_cast<pid_t>(syscall_no_intercept(SYS_gettid));
 
     return posix_return_value(capio_statx(dirfd, pathname, flags, mask, buf, tid), result);
 }

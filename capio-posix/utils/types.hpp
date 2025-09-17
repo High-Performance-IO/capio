@@ -13,6 +13,6 @@ typedef std::unordered_map<long, CircularBuffer<capio_off64_t> *> CPBufResponse_
 typedef std::unordered_map<int, std::string> CPFileDescriptors_t;
 typedef std::unordered_map<std::string, std::unordered_set<int>> CPFilesPaths_t;
 
-typedef int (*CPHandler_t)(long, long, long, long, long, long, long *);
+typedef int (*CPHandler_t)(long, long, long, long, long, long, long *, pid_t);
 
 #endif // CAPIO_POSIX_UTILS_TYPES_HPP

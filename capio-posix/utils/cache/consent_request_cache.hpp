@@ -8,8 +8,8 @@ class ConsentRequestCache {
     static capio_off64_t _consent_to_proceed_request(const std::filesystem::path &path,
                                                      const long tid,
                                                      const std::string &source_func) {
-        START_LOG(capio_syscall(SYS_gettid), "call(path=%s, tid=%ld, source_func=%s)", path.c_str(),
-                  tid, source_func.c_str());
+        START_LOG(tid, "call(path=%s, tid=%ld, source_func=%s)", path.c_str(), tid,
+                  source_func.c_str());
         char req[CAPIO_REQ_MAX_SIZE];
         sprintf(req, "%04d %ld %s %s", CAPIO_REQUEST_CONSENT, tid, path.c_str(),
                 source_func.c_str());
@@ -25,14 +25,13 @@ class ConsentRequestCache {
     };
 
     ~ConsentRequestCache() {
-        START_LOG(capio_syscall(SYS_gettid), "call()");
+        START_LOG(capio_current_thread_id, "call()");
         delete available_consent;
     };
 
     void consent_request(const std::filesystem::path &path, long tid,
                          const std::string &source_func) const {
-        START_LOG(capio_syscall(SYS_gettid), "call(path=%s, tid=%ld, source=%s)", path.c_str(), tid,
-                  source_func.c_str());
+        START_LOG(tid, "call(path=%s, tid=%ld, source=%s)", path.c_str(), tid, source_func.c_str());
 
         const auto resolved_path = resolve_possible_symlink(path);
 

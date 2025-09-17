@@ -5,10 +5,10 @@
 #include "utils/requests.hpp"
 
 #if defined(SYS_dup)
-int dup_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg5, long *result) {
-    auto tid = static_cast<pid_t>(syscall_no_intercept(SYS_gettid));
-    int fd   = static_cast<int>(arg0);
+inline int dup_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg5,
+                       long *result, const pid_t tid) {
 
+    const int fd = static_cast<int>(arg0);
     START_LOG(tid, "call(fd=%d)", fd);
 
     if (exists_capio_fd(fd)) {
@@ -26,8 +26,8 @@ int dup_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg5
 #endif // SYS_dup
 
 #if defined(SYS_dup2)
-int dup2_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg5, long *result) {
-    auto tid = static_cast<pid_t>(syscall_no_intercept(SYS_gettid));
+inline int dup2_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg5,
+                        long *result, const pid_t tid) {
     auto fd  = static_cast<int>(arg0);
     auto fd2 = static_cast<int>(arg1);
 
@@ -50,8 +50,8 @@ int dup2_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg
 #endif // SYS_dup2
 
 #if defined(SYS_dup3)
-int dup3_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg5, long *result) {
-    auto tid  = static_cast<pid_t>(syscall_no_intercept(SYS_gettid));
+inline int dup3_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg5,
+                        long *result, const pid_t tid) {
     int fd    = static_cast<int>(arg0);
     int fd2   = static_cast<int>(arg1);
     int flags = static_cast<int>(arg2);

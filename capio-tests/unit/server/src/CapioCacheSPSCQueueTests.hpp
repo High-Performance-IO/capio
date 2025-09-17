@@ -40,7 +40,7 @@ std::string test_file_name = "test.dat";
 
 void init_server_data_structures() {
     writeCache              = new WriteRequestCacheMEM();
-    readCache               = new ReadRequestCacheMEM();
+    readCache               = new ReadRequestCacheMEM(gettid());
     bufs_response           = new std::unordered_map<long, ResponseQueue *>();
     files                   = new CPFiles_t();
     capio_files_descriptors = new CPFileDescriptors_t();
@@ -298,7 +298,7 @@ TEST(CapioCacheSPSCQueue, TestReadCacheWithSpscQueueRead) {
         }
     });
 
-    readCache->read(test_fd, tmp_buf->get(), long_test_length);
+    readCache->read(test_fd, tmp_buf->get(), long_test_length, gettid());
     auto result = strncmp(SOURCE_TEST_TEXT, tmp_buf->get(), long_test_length);
     EXPECT_EQ(result, 0);
     server_thread.join();
@@ -348,7 +348,7 @@ TEST(CapioCacheSPSCQueue, TestReadCacheWithSpscQueueReadWithCapioFile) {
         }
     });
 
-    readCache->read(test_fd, tmp_buf->get(), long_test_length);
+    readCache->read(test_fd, tmp_buf->get(), long_test_length, gettid());
     auto result = strncmp(SOURCE_TEST_TEXT, tmp_buf->get(), long_test_length);
     EXPECT_EQ(result, 0);
     server_thread.join();
@@ -407,7 +407,7 @@ TEST(CapioCacheSPSCQueue, TestReadCacheWithSpscQueueReadWithCapioFileAndSeek) {
 
     auto tmp_buf_ptr = tmp_buf->get();
 
-    readCache->read(test_fd, tmp_buf_ptr, 1000);
+    readCache->read(test_fd, tmp_buf_ptr, 1000, gettid());
     EXPECT_EQ(strncmp(SOURCE_TEST_TEXT, tmp_buf->get(), 1000), 0);
 
     // emulate seek
@@ -415,7 +415,7 @@ TEST(CapioCacheSPSCQueue, TestReadCacheWithSpscQueueReadWithCapioFileAndSeek) {
     set_capio_fd_offset(test_fd, new_offset);
 
     tmp_buf_ptr += new_offset;
-    readCache->read(test_fd, tmp_buf_ptr, 1000);
+    readCache->read(test_fd, tmp_buf_ptr, 1000, gettid());
     // checkStringEquality(SOURCE_TEST_TEXT + new_offset, tmp_buf->get() + new_offset);
     EXPECT_EQ(strncmp(SOURCE_TEST_TEXT + new_offset, tmp_buf->get() + new_offset, 1000), 0);
 
