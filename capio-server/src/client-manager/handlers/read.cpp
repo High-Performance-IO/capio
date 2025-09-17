@@ -59,7 +59,7 @@ void read_mem_handler(const char *const str) {
               use_cache ? "true" : "false", path);
 
     capio_off64_t size_to_send = std::min({client_cache_line_size, read_size});
-    LOG("Will try to send up to %ld bytes", size_to_send);
+    LOG("Will try to send to client up to %ld bytes", size_to_send);
     auto size_sent = storage_service->reply_to_client(tid, path, read_begin_offset, size_to_send);
 
     LOG("Sending to posix app the offset up to which read.");

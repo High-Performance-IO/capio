@@ -7,9 +7,20 @@
 #include <include/storage-service/capio_storage_service.hpp>
 
 auto CapioStorageService::getFile(const std::string &file_name) const {
+    START_LOG(gettid(), "getFile(file_name=%s)", file_name.c_str());
     if (_stored_files->find(file_name) == _stored_files->end()) {
+        LOG("File not found. Creating file!");
+        DBG(gettid(), [&]() {
+            for (auto f : *_stored_files) {
+                LOG("Found path in storage service %s", f.first.c_str());
+            }
+        });
+
         createMemoryFile(file_name);
     }
+    auto file = _stored_files->at(file_name);
+    LOG("Returning %s instance with path %s",
+        file->is_remote() ? "CapioRemotFile" : "CapioMemoryFile", file->getFileName().c_str());
     return _stored_files->at(file_name);
 }
 

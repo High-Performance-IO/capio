@@ -46,13 +46,17 @@ class MessageQueue {
     }
 
     std::tuple<capio_off64_t, char *> get_response() {
+        START_LOG(gettid(), "call()");
         timespec sleep{.tv_sec = 0, .tv_nsec = 300};
         while (!this->has_response()) {
             nanosleep(&sleep, nullptr);
         }
 
+        LOG("Got a response!");
         std::lock_guard lg(response_queue_mutex);
         auto response = std::move(response_queue.front());
+        LOG("Response to query %s has size %ld", response.original_request.c_str(),
+            response.response_size);
         response_queue.pop();
         return std::make_tuple(response.response_size, response.response);
     }

@@ -19,6 +19,8 @@ class CapioFile {
         : fileName(filePath), homeNode(home_node), totalSize(0) {};
     virtual ~CapioFile() = default;
 
+    virtual bool is_remote() { return false; }
+
     [[nodiscard]] std::size_t getSize() const {
         START_LOG(gettid(), "call()");
         return totalSize;
@@ -136,6 +138,8 @@ class CapioRemoteFile : public CapioFile {
     explicit CapioRemoteFile(const std::string &filePath, const std::string &home_node);
 
     ~CapioRemoteFile() override;
+
+    bool is_remote() override { return true; };
 
     /**
      * Write data to a file stored inside the memory
