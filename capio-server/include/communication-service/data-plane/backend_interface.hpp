@@ -1,7 +1,8 @@
 #ifndef BACKEND_INTERFACE_HPP
 #define BACKEND_INTERFACE_HPP
 
-#include "capio/constants.hpp"
+#include <capio/constants.hpp>
+#include <capio/logger.hpp>
 #include <cstdint>
 #include <filesystem>
 #include <mutex>

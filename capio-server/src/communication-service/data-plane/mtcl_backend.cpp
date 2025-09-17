@@ -258,12 +258,14 @@ size_t MTCLBackend::fetchFromRemoteHost(const std::string &hostname,
     char REQUEST[CAPIO_REQ_MAX_SIZE];
 
     sprintf(REQUEST, "%03d %s %llu %llu", FETCH_FROM_REMOTE, filepath.c_str(), offset, count);
+    LOG("Sending request %s", REQUEST);
     auto queues = open_connections.at(hostname);
+    LOG("obtained access to queue");
 
     queues->push_request(REQUEST);
-
+    LOG("Request pushed to output queue");
     auto [buff_size, response_buffer] = queues->get_response();
-
+    LOG("Obtained response. Buffer size of response is $ld", buff_size);
     storage_service->storeData(filepath, offset, buff_size, response_buffer);
 
     return 0;
