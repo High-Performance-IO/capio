@@ -3,9 +3,11 @@
 
 #include <capio/constants.hpp>
 #include <capio/logger.hpp>
+#include <condition_variable>
 #include <cstdint>
 #include <filesystem>
 #include <mutex>
+#include <optional>
 #include <queue>
 #include <string>
 #include <unistd.h>
@@ -13,7 +15,6 @@
 #include <vector>
 
 class MessageQueue {
-
     class ResponseToRequest {
       public:
         std::string original_request;
@@ -26,50 +27,55 @@ class MessageQueue {
 
     std::queue<std::string> request_queue;
     std::queue<ResponseToRequest> response_queue;
-    std::mutex request_queue_mutex, response_queue_mutex;
+
+    std::mutex request_mutex;
+    std::mutex response_mutex;
+
+    std::condition_variable request_cv;
+    std::condition_variable response_cv;
 
   public:
+
     void push_request(const std::string &request) {
-        std::lock_guard lg(request_queue_mutex);
-        request_queue.emplace(request);
+        START_LOG(gettid(), "call(req=%s)", request.c_str());
+        {
+            std::lock_guard lg(request_mutex);
+            LOG("Obtained lock");
+            request_queue.emplace(request);
+        }
+        request_cv.notify_one();
     }
 
-    void push_response(char *buffer, capio_off64_t buff_size, std::string origin) {
-        std::lock_guard lg(response_queue_mutex);
-        response_queue.emplace(std::move(origin), buffer, buff_size);
-    }
-
-    std::string get_request() {
-        std::lock_guard lg(request_queue_mutex);
+    std::optional<std::string> try_get_request() {
+        START_LOG(gettid(), "call()");
+        std::lock_guard lg(request_mutex);
+        LOG("Obtained lock");
+        if (request_queue.empty()) {
+            return std::nullopt;
+        }
         std::string req = std::move(request_queue.front());
         request_queue.pop();
         return req;
     }
 
+    void push_response(char *buffer, capio_off64_t buff_size, std::string origin) {
+        START_LOG(gettid(), "call(origin=%s, buff_size=%ld)", origin.c_str(), buff_size);
+        {
+            std::lock_guard lg(response_mutex);
+            LOG("Obtained lock");
+            response_queue.emplace(std::move(origin), buffer, buff_size);
+        }
+        response_cv.notify_one();
+    }
+
     std::tuple<capio_off64_t, char *> get_response() {
         START_LOG(gettid(), "call()");
-        timespec sleep{.tv_sec = 0, .tv_nsec = 300};
-        while (!this->has_response()) {
-            nanosleep(&sleep, nullptr);
-        }
-
-        LOG("Got a response!");
-        std::lock_guard lg(response_queue_mutex);
+        std::unique_lock lk(response_mutex);
+        response_cv.wait(lk, [this] { return !response_queue.empty(); });
+        LOG("Obtained lock");
         auto response = std::move(response_queue.front());
-        LOG("Response to query %s has size %ld", response.original_request.c_str(),
-            response.response_size);
         response_queue.pop();
-        return std::make_tuple(response.response_size, response.response);
-    }
-
-    bool has_requests() {
-        std::lock_guard lg(request_queue_mutex);
-        return !request_queue.empty();
-    }
-
-    bool has_response() {
-        std::lock_guard lg(response_queue_mutex);
-        return !response_queue.empty();
+        return {response.response_size, response.response};
     }
 };
 

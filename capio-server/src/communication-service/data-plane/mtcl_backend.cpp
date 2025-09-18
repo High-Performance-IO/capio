@@ -43,34 +43,40 @@ void MTCLBackend::serverConnectionHandler(MTCL::HandleUser HandlerPointer,
 
         if (my_turn_to_send) {
             LOG("Send PHASE");
-            for (int i = 0; i < max_net_op && queue->has_requests(); i++) {
+            for (int i = 0; i < max_net_op; i++) {
                 // Send of request
-                auto request = queue->get_request();
-                LOG("Request to be sent = %s", request.c_str());
-                HandlerPointer.send(request.c_str(), request.length());
+                LOG("PIPPO");
+                const auto request_opt = queue->try_get_request();
+                if (request_opt.has_value()) {
+                    const auto &request = request_opt.value();
+                    LOG("Request to be sent = %s", request.c_str());
+                    HandlerPointer.send(request.c_str(), request.length());
 
-                // Retrive size of response
-                capio_off64_t response_size;
-                HandlerPointer.receive(&response_size, sizeof(response_size));
-                LOG("Response will have size %ld", response_size);
-                char *response_buffer = new char[response_size];
-                HandlerPointer.receive(response_buffer, response_size);
-                LOG("Received response");
-                // push response back to the source
-                queue->push_response(response_buffer, response_size, request);
-                LOG("Pushed response back!");
+                    // Retrieve size of response
+                    capio_off64_t response_size;
+                    HandlerPointer.receive(&response_size, sizeof(response_size));
+                    LOG("Response will have size %ld", response_size);
+                    char *response_buffer = new char[response_size];
+                    HandlerPointer.receive(response_buffer, response_size);
+                    LOG("Received response");
+                    // push response back to the source
+                    queue->push_response(response_buffer, response_size, request);
+                    LOG("Pushed response back!");
+                }
             }
-
+            LOG("Completed SEND PHASE");
             // Send message I have finished
             HandlerPointer.send(request_has_finished_to_send, sizeof(request_has_finished_to_send));
 
         } else {
-            for (int i = 0; i < max_net_op; i++) {
+
+            bool continue_receive_phase = true;
+            size_t receive_size         = 0;
+            LOG("Receive PHASE");
+            while (continue_receive_phase) {
                 // Receive phase
-                LOG("Receive PHASE");
-                size_t receive_size = 0;
                 HandlerPointer.probe(receive_size, false);
-                while (receive_size > 0) {
+                if (receive_size > 0) {
                     LOG("A request is incoming");
                     int requestCode;
                     char incoming_request[CAPIO_REQ_MAX_SIZE];
@@ -80,10 +86,10 @@ void MTCLBackend::serverConnectionHandler(MTCL::HandleUser HandlerPointer,
                     LOG("Request code is %d", requestCode);
                     switch (requestCode) {
                     case HAVE_FINISH_SEND_REQUEST: {
-                        // Finished sending data. Set i to be greater than max_net_op to go to next
-                        // phase
-                        LOG("Other has finished sending phase. swithing me from receive to send");
-                        i = max_net_op;
+                        // Finished sending data. Set continue_receive_phase to
+                        // false to go to next phase
+                        LOG("Other has finished sending phase. Switching me from receive to send");
+                        continue_receive_phase = false;
                         break;
                     }
 
@@ -95,7 +101,7 @@ void MTCLBackend::serverConnectionHandler(MTCL::HandleUser HandlerPointer,
 
                         sscanf(incoming_request, "%s %llu %llu", filepath, &offset, &count);
                         LOG("filepath=%s, offset=%ld, count=%ld", filepath, offset, count);
-                        auto buffer = new char[count];
+                        const auto buffer = new char[count];
                         auto read_size =
                             storage_service->readFromFileToBuffer(filepath, offset, buffer, count);
                         HandlerPointer.send(&read_size, sizeof(read_size));
@@ -145,7 +151,7 @@ void MTCLBackend::incomingConnectionListener(
         UserManager.receive(connected_hostname, HOST_NAME_MAX);
 
         server_println(CAPIO_SERVER_CLI_LOG_SERVER,
-                       std::string("Connected from ") + connected_hostname);
+                       std::string("Accepted connection with ") + connected_hostname);
 
         LOG("Received connection hostname: %s", connected_hostname);
 
@@ -178,8 +184,9 @@ void MTCLBackend::connect_to(std::string hostname_port) {
 
     LOG("Trying to connect on remote: %s", remoteToken.c_str());
     if (auto UserManager = MTCL::Manager::connect(remoteToken); UserManager.isValid()) {
-        server_println(CAPIO_SERVER_CLI_LOG_SERVER, std::string("Connected to ") + remoteToken);
-        LOG("Connected to: %s", remoteToken.c_str());
+        server_println(CAPIO_SERVER_CLI_LOG_SERVER,
+                       std::string("Opened connection with ") + remoteToken);
+        LOG("Opened connection with: %s", remoteToken.c_str());
         UserManager.send(ownHostname, HOST_NAME_MAX);
         const std::lock_guard lg(*_guard);
 
