@@ -27,10 +27,9 @@ std::size_t CapioRemoteFile::writeToQueue(SPSCQueue &queue, std::size_t offset,
                                           std::size_t length) const {
 
     START_LOG(gettid(), "call(offset=%ld,count=%ld,path=%s)", offset, length, fileName.c_str());
-    auto buffer = new char[length];
 
-    auto buffer_size =
-        capio_backend->fetchFromRemoteHost(this->homeNode, this->fileName, buffer, offset, length);
+    auto [buffer_size, buffer] =
+        capio_backend->fetchFromRemoteHost(this->homeNode, this->fileName, offset, length);
 
     queue.write(buffer, buffer_size);
 

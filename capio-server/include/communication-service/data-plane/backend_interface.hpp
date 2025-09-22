@@ -35,10 +35,10 @@ class MessageQueue {
     std::condition_variable response_cv;
 
   public:
-
     void push_request(const std::string &request) {
         START_LOG(gettid(), "call(req=%s)", request.c_str());
         {
+            LOG("Locking request_mutex");
             std::lock_guard lg(request_mutex);
             LOG("Obtained lock");
             request_queue.emplace(request);
@@ -48,6 +48,7 @@ class MessageQueue {
 
     std::optional<std::string> try_get_request() {
         START_LOG(gettid(), "call()");
+        LOG("Locking request_mutex");
         std::lock_guard lg(request_mutex);
         LOG("Obtained lock");
         if (request_queue.empty()) {
@@ -104,14 +105,14 @@ class BackendInterface {
      *
      * @param hostname Hostname to request data from
      * @param filepath Path of the file targeted by the request
-     * @param buffer Buffer in which data will be available
      * @param offset Offset relative to the beginning of the file from which to read from
      * @param count Size of @param buffer and hence size of the fetch operation
-     * @return Amount of data returned from the remote host
+     * @return Tuple of size of buffer and pointer to char* with the actual buffer
      */
-    virtual size_t fetchFromRemoteHost(const std::string &hostname,
-                                       const std::filesystem::path &filepath, char *buffer,
-                                       capio_off64_t offset, capio_off64_t count) {
+    virtual std::tuple<size_t, char *> fetchFromRemoteHost(const std::string &hostname,
+                                                           const std::filesystem::path &filepath,
+                                                           capio_off64_t offset,
+                                                           capio_off64_t count) {
         throw NotImplementedBackendMethod();
     };
 
@@ -129,9 +130,11 @@ class BackendInterface {
 class NoBackend final : public BackendInterface {
   public:
     void connect_to(std::string hostname_port) override { return; };
-    size_t fetchFromRemoteHost(const std::string &hostname, const std::filesystem::path &filepath,
-                               char *buffer, capio_off64_t offset, capio_off64_t count) override {
-        return -1;
+    std::tuple<size_t, char *> fetchFromRemoteHost(const std::string &hostname,
+                                                   const std::filesystem::path &filepath,
+                                                   capio_off64_t offset,
+                                                   capio_off64_t count) override {
+        return {-1, nullptr};
     };
 
     std::vector<std::string> get_open_connections() override { return {}; }

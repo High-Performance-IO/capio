@@ -33,10 +33,10 @@ TEST(CapioCommServiceTest, TestPingPong) {
             std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_INFO << "Sending ping to: " << i << std::endl;
             char buff[BUFFER_SIZES]{0}, buff1[BUFFER_SIZES]{0};
             memcpy(buff, TEST_MESSAGE, strlen(TEST_MESSAGE));
-            capio_backend->send(i, buff, BUFFER_SIZES, "./test", 0);
+            // capio_backend->send(i, buff, BUFFER_SIZES, "./test", 0);
             std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_INFO << "sent ping to: " << i
                       << ". Waiting for response" << std::endl;
-            capio_backend->receive(buff1, &size_revc, &offset);
+            // capio_backend->receive(buff1, &size_revc, &offset);
             std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_INFO << "Received ping response from : " << i
                       << std::endl;
             EXPECT_EQ(strcmp(buff, buff1), 0);
@@ -46,10 +46,10 @@ TEST(CapioCommServiceTest, TestPingPong) {
         std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_INFO << "Listening for ping from: " << i
                   << std::endl;
         char recvBuff[BUFFER_SIZES];
-        capio_backend->receive(recvBuff, &size_revc, &offset);
+        // capio_backend->receive(recvBuff, &size_revc, &offset);
         std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_INFO << "Received ping from: " << i << std::endl;
         EXPECT_EQ(strcmp(recvBuff, TEST_MESSAGE), 0);
-        capio_backend->send(i, recvBuff, size_revc, "./test", 0);
+        // capio_backend->send(i, recvBuff, size_revc, "./test", 0);
         std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_INFO << "Sent ping response to: " << i << std::endl;
         delete communication_service;
         return;

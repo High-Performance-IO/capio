@@ -60,6 +60,14 @@ class MTCLBackend : public BackendInterface {
         std::unordered_map<std::string, MessageQueue *> *open_connections, std::mutex *guard,
         std::vector<std::thread *> *_connection_threads, bool *terminate);
 
+    /**
+     * Explode request into request code and request arguments
+     * @param req Original request string as received from remote node
+     * @param args output string with parameters of the request
+     * @return  request code
+     */
+    static int read_next_request(char *req, char *args);
+
   public:
     explicit MTCLBackend(const std::string &proto, const std::string &port, int sleep_time);
 
@@ -68,8 +76,10 @@ class MTCLBackend : public BackendInterface {
     void connect_to(std::string hostname_port) override;
 
     std::vector<std::string> get_open_connections() override;
-    size_t fetchFromRemoteHost(const std::string &hostname, const std::filesystem::path &filepath,
-                               char *buffer, capio_off64_t offset, capio_off64_t count) override;
+    std::tuple<size_t, char *> fetchFromRemoteHost(const std::string &hostname,
+                                                   const std::filesystem::path &filepath,
+                                                   capio_off64_t offset,
+                                                   capio_off64_t count) override;
 };
 
 #endif // MTCL_BACKEND_HPP
