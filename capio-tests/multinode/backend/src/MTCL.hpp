@@ -9,8 +9,8 @@
 #include <thread>
 
 const char *filename   = "data.bin";
-const size_t chunkSize = 1024;
-const size_t totalSize = 2048;
+const int chunkSize = 1024;
+const int totalSize = 2048;
 
 inline int writer() {
 
@@ -27,7 +27,7 @@ inline int writer() {
     }
 
     fclose(fp);
-    printf("Wrote %zu bytes to %s\n", totalSize, filename);
+    printf("Wrote %d bytes to %s\n", totalSize, filename);
     return 0;
 }
 

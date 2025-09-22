@@ -20,6 +20,7 @@ add_executable(${TARGET_NAME} ${TARGET_SOURCES})
 target_include_directories(${TARGET_NAME} PRIVATE
         ${TARGET_INCLUDE_FOLDER}
         ${mtcl_SOURCE_DIR}/include
+        ${httplib_SOURCE_DIR}
         "${CMAKE_SOURCE_DIR}/capio-server/"
 )
 
