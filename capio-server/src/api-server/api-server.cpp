@@ -6,12 +6,13 @@ CapioAPIServer::CapioAPIServer(int server_port) {
     th = new std::thread(api_server_main_func, server_port, &httplib_server_instance);
 
     // Register callback for unknown routes
-    httplib_server_instance.set_error_handler([](const httplib::Request &req, httplib::Response &res) {
-        ResponseMap map;
-        map["status"]  = std::to_string(res.status);
-        map["message"] = "Error: Unknown request: " + req.path;
-        res.set_content(build_json_response(map).c_str(), "application/json");
-    });
+    httplib_server_instance.set_error_handler(
+        [](const httplib::Request &req, httplib::Response &res) {
+            ResponseMap map;
+            map["status"]  = std::to_string(res.status);
+            map["message"] = "Error: Unknown request: " + req.path;
+            res.set_content(build_json_response(map).c_str(), "application/json");
+        });
 }
 
 CapioAPIServer::~CapioAPIServer() {
