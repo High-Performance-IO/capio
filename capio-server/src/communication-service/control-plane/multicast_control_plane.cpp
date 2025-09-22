@@ -1,4 +1,6 @@
+#include "include/storage-service/capio_storage_service.hpp"
 #include "multicast_utils.hpp"
+
 #include <algorithm>
 #include <arpa/inet.h>
 #include <capio/logger.hpp>
@@ -29,12 +31,11 @@ void MulticastControlPlane::multicast_server_aliveness_thread(
                                                     std::to_string(MULTICAST_DISCOVERY_PORT));
 
     while (*continue_execution) {
-        bzero(incomingMessage, sizeof(incomingMessage));
-        // Send port of local data plane backend
         send_multicast_alive_token(dataplane_backend_port);
         LOG("Waiting for incoming token...");
 
         do {
+            bzero(incomingMessage, sizeof(incomingMessage));
             const auto recv_sice =
                 recvfrom(discovery_socket, incomingMessage, MULTICAST_ALIVE_TOKEN_MESSAGE_SIZE, 0,
                          reinterpret_cast<sockaddr *>(&addr), &addrlen);
@@ -82,26 +83,36 @@ void MulticastControlPlane::multicast_control_plane_incoming_thread(
                      reinterpret_cast<sockaddr *>(&addr), &addrlen);
         LOG("Received multicast data of size %ld and content %s", recv_sice, incoming_msg);
         if (recv_sice < 0) {
-            server_println(CAPIO_LOG_SERVER_CLI_LEVEL_ERROR,
-                           std::string("WARNING: received 0 bytes from multicast socket: "));
-            server_println(CAPIO_LOG_SERVER_CLI_LEVEL_WARNING,
-                           "Execution will continue only with FS discovery support");
+            LOG("WARNING: received size less than zero. An error might have occurred: %s",
+                strerror(errno));
+            LOG("Skipping iteration and returning to listening for incoming paxkets");
             continue;
         }
 
-        event_type event;
+        int event;
         char source_hostname[HOST_NAME_MAX];
         char source_path[PATH_MAX];
 
-        sscanf(incoming_msg, "%d %s %s", reinterpret_cast<int *>(&event), source_hostname,
-               source_path);
+        sscanf(incoming_msg, "%d %s %s", &event, source_hostname, source_path);
+
+        LOG("event=%d, source=%s, path=%s", event, source_hostname, source_path);
 
         if (strcmp(capio_global_configuration->node_name, source_hostname) == 0) {
             continue;
         }
 
-        server_println(CAPIO_LOG_SERVER_CLI_LEVEL_INFO,
-                       "Received control message: " + std::string(incoming_msg));
+        switch (event) {
+        case CREATE:
+            LOG("Handling remote CREATE event");
+            storage_service->createRemoteFile(source_path, source_hostname);
+            break;
+
+        default:
+            LOG("WARNING: unknown / unhandled event: %s", incoming_msg);
+            server_println(CAPIO_LOG_SERVER_CLI_LEVEL_WARNING,
+                           "Unknown/Unhandled message received: " + std::string(incoming_msg));
+        }
+        LOG("Completed handling of event");
     }
 
     close(discovery_socket);

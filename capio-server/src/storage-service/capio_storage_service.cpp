@@ -7,9 +7,20 @@
 #include <include/storage-service/capio_storage_service.hpp>
 
 auto CapioStorageService::getFile(const std::string &file_name) const {
+    START_LOG(gettid(), "getFile(file_name=%s)", file_name.c_str());
     if (_stored_files->find(file_name) == _stored_files->end()) {
+        LOG("File not found. Creating file!");
+        DBG(gettid(), [&]() {
+            for (auto f : *_stored_files) {
+                LOG("Found path in storage service %s", f.first.c_str());
+            }
+        });
+
         createMemoryFile(file_name);
     }
+    auto file = _stored_files->at(file_name);
+    LOG("Returning %s instance with path %s",
+        file->is_remote() ? "CapioRemotFile" : "CapioMemoryFile", file->getFileName().c_str());
     return _stored_files->at(file_name);
 }
 
@@ -37,17 +48,21 @@ void CapioStorageService::createMemoryFile(const std::string &file_name) const {
     _stored_files->emplace(file_name, new CapioMemoryFile(file_name));
 }
 
-void CapioStorageService::createRemoteFile(const std::string &file_name) const {
+void CapioStorageService::createRemoteFile(const std::string &file_name,
+                                           const std::string &home_node) const {
     /*
      * First we check that the file associate does not yet exists, as it might be produced
      * by another app running under the same server instance. if it is not found, we create
      * the file
      */
-    START_LOG(gettid(), "call(file_name=%s)", file_name.c_str());
-    if (_stored_files->find(file_name) == _stored_files->end()) {
+    START_LOG(gettid(), "call(file_name=%s, home_node=%s)", file_name.c_str(), home_node.c_str());
+    if (!_stored_files->contains(file_name)) {
         LOG("File not found. Creating a new remote file");
-        _stored_files->emplace(file_name, new CapioRemoteFile(file_name));
+        _stored_files->emplace(file_name, new CapioRemoteFile(file_name, home_node));
     }
+    LOG("Created remote file at path %s with home_node %s",
+        _stored_files->at(file_name)->getFileName().c_str(),
+        _stored_files->at(file_name)->getHomeNode().c_str());
 }
 
 void CapioStorageService::deleteFile(const std::string &file_name) const {
@@ -100,12 +115,12 @@ void CapioStorageService::register_client(const std::string &app_name, const pid
     LOG("Created communication queues");
 }
 
-void CapioStorageService::reply_to_client(pid_t pid, const std::string &file, capio_off64_t offset,
-                                          capio_off64_t size) const {
+size_t CapioStorageService::reply_to_client(pid_t pid, const std::string &file,
+                                            capio_off64_t offset, capio_off64_t size) const {
     START_LOG(gettid(), "call(pid=%llu, file=%s, offset=%llu, size=%llu)", pid, file.c_str(),
               offset, size);
 
-    getFile(file)->writeToQueue(*_server_to_client_queue->at(pid), offset, size);
+    return getFile(file)->writeToQueue(*_server_to_client_queue->at(pid), offset, size);
 }
 
 void CapioStorageService::reply_to_client_raw(pid_t pid, const char *data,
@@ -149,4 +164,19 @@ size_t CapioStorageService::sendFilesToStoreInMemory(const long pid) const {
 
     LOG("Return value=%llu", files_to_store_in_mem.size());
     return files_to_store_in_mem.size();
+}
+
+void CapioStorageService::storeData(const std::filesystem::path &path, const capio_off64_t offset,
+                                    const capio_off64_t buff_size, const char *buffer) const {
+    const auto file = getFile(path);
+
+    file->writeData(buffer, offset, buff_size);
+}
+
+size_t CapioStorageService::readFromFileToBuffer(const std::filesystem::path &filepath,
+                                                 capio_off64_t offset, char *buffer,
+                                                 capio_off64_t count) const {
+    const auto file = this->getFile(filepath);
+
+    return file->readData(buffer, offset, count);
 }

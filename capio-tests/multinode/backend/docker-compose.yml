@@ -11,7 +11,11 @@ services:
           - node1
     environment:
       - CAPIO_LOG_LEVEL=-1
-    command: capio_backend_unit_tests  --gtest_break_on_failure --gtest_print_time=1
+      - APP_TYPE=writer
+      - CAPIO_DIR=.
+    command: |
+      bash -c " capio_server -b tcp --mem-only --no-config & \
+      LD_PRELOAD=libcapio_posix.so capio_backend_unit_tests --gtest_break_on_failure --gtest_print_time=1"
 
   node2:
     image: alphaunito/capio:latest
@@ -25,7 +29,11 @@ services:
           - node2
     environment:
       - CAPIO_LOG_LEVEL=-1
-    command: bash -c "sleep 5 && capio_backend_unit_tests --gtest_break_on_failure --gtest_print_time=1"
+      - APP_TYPE=reader
+      - CAPIO_DIR=.
+    command: |
+      sleep 5 && bash -c " capio_server -b tcp --mem-only --no-config & \
+      LD_PRELOAD=libcapio_posix.so capio_backend_unit_tests --gtest_break_on_failure --gtest_print_time=1"
 
 volumes:
   shared_data:

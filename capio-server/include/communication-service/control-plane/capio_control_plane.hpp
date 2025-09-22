@@ -4,7 +4,7 @@
 
 class CapioControlPlane {
   public:
-    typedef enum { CREATE, DELETE, WRITE } event_type;
+    typedef enum { CREATE, WRITE, CLOSE, COMMIT } event_type;
 
     virtual ~CapioControlPlane() = default;
 

@@ -420,7 +420,7 @@ std::vector<std::string> CapioCLEngine::getFileToStoreInMemory() {
     return files;
 }
 
-auto CapioCLEngine::get_home_node(const std::string &path) {
+std::string CapioCLEngine::get_home_node(const std::string &path) {
     // TODO: understand here how to get the home node policy.
     START_LOG(gettid(), "call(path=%s)", path.c_str());
     if (const auto location = _locations.find(path); location == _locations.end()) {

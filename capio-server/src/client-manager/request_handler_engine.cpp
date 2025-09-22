@@ -1,3 +1,4 @@
+#include <csignal>
 #include <include/client-manager/client_manager.hpp>
 #include <include/client-manager/handlers.hpp>
 #include <include/client-manager/request_handler_engine.hpp>
@@ -104,7 +105,8 @@ void RequestHandlerEngine::start() const {
                       << std::endl
                       << std::endl;
 
-            exit(EXIT_FAILURE);
+            capio_global_configuration->termination_phase = true;
+            kill(getpid(), SIGUSR1);
         }
 
         LOG(CAPIO_LOG_SERVER_REQUEST_END);

@@ -10,12 +10,16 @@
 
 class CapioFile {
   protected:
-    const std::string fileName;
+    const std::string fileName, homeNode;
     std::size_t totalSize;
 
   public:
-    explicit CapioFile(const std::string &filePath) : fileName(filePath), totalSize(0) {};
+    explicit CapioFile(const std::string &filePath,
+                       const std::string &home_node = capio_global_configuration->node_name)
+        : fileName(filePath), homeNode(home_node), totalSize(0) {};
     virtual ~CapioFile() = default;
+
+    virtual bool is_remote() { return false; }
 
     [[nodiscard]] std::size_t getSize() const {
         START_LOG(gettid(), "call()");
@@ -60,6 +64,12 @@ class CapioFile {
      */
     virtual std::size_t writeToQueue(SPSCQueue &queue, std::size_t offset,
                                      std::size_t length) const = 0;
+
+    /**
+     *
+     * @return HomeNode of file
+     */
+    virtual std::string getHomeNode() { return homeNode; };
 };
 
 class CapioMemoryFile : public CapioFile {
@@ -131,9 +141,11 @@ class CapioMemoryFile : public CapioFile {
 
 class CapioRemoteFile : public CapioFile {
   public:
-    explicit CapioRemoteFile(const std::string &filePath);
+    explicit CapioRemoteFile(const std::string &filePath, const std::string &home_node);
 
     ~CapioRemoteFile() override;
+
+    bool is_remote() override { return true; };
 
     /**
      * Write data to a file stored inside the memory

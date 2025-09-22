@@ -85,7 +85,7 @@ class CapioCLEngine {
     void setStoreFileInFileSystem(const std::filesystem::path &path);
     bool storeFileInMemory(const std::filesystem::path &path);
     std::vector<std::string> getFileToStoreInMemory();
-    auto get_home_node(const std::string &path);
+    std::string get_home_node(const std::string &path);
 };
 
 inline CapioCLEngine *capio_cl_engine;

@@ -8,51 +8,56 @@
 #include <include/communication-service/data-plane/backend_interface.hpp>
 #include <thread>
 
-constexpr char TEST_MESSAGE[]        = "hello world how is it going?";
-constexpr capio_off64_t BUFFER_SIZES = 1024;
+const char *filename   = "data.bin";
+const size_t chunkSize = 1024;
+const size_t totalSize = 2048;
 
-TEST(CapioCommServiceTest, TestPingPong) {
-    START_LOG(gettid(), "INFO: TestPingPong");
-    const int port             = 1234;
-    std::string proto          = "TCP";
-    auto communication_service = new CapioCommunicationService(proto, port, "multicast");
-    capio_off64_t size_revc, offset;
+inline int writer() {
 
-    std::vector<std::string> connections;
+    char buffer[chunkSize];
+    for (int i = 0; i < chunkSize; i++) {
+        buffer[i] = i % 26 + 'A';
+    }
 
-    do {
-        connections = capio_backend->get_open_connections();
-        std::this_thread::sleep_for(std::chrono::milliseconds(300));
-    } while (connections.empty());
+    FILE *fp = fopen(filename, "wb");
+    EXPECT_NE(fp, nullptr);
 
-    char ownHostname[HOST_NAME_MAX] = {0};
-    gethostname(ownHostname, HOST_NAME_MAX);
+    for (int i = 0; i < totalSize / chunkSize; i++) {
+        EXPECT_EQ(fwrite(buffer, 1, chunkSize, fp), chunkSize);
+    }
 
-    for (const auto &i : connections) {
-        if (i.compare(ownHostname) < 0) {
-            std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_INFO << "Sending ping to: " << i << std::endl;
-            char buff[BUFFER_SIZES]{0}, buff1[BUFFER_SIZES]{0};
-            memcpy(buff, TEST_MESSAGE, strlen(TEST_MESSAGE));
-            capio_backend->send(i, buff, BUFFER_SIZES, "./test", 0);
-            std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_INFO << "sent ping to: " << i
-                      << ". Waiting for response" << std::endl;
-            capio_backend->receive(buff1, &size_revc, &offset);
-            std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_INFO << "Received ping response from : " << i
-                      << std::endl;
-            EXPECT_EQ(strcmp(buff, buff1), 0);
-            delete communication_service;
-            return;
-        }
-        std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_INFO << "Listening for ping from: " << i
-                  << std::endl;
-        char recvBuff[BUFFER_SIZES];
-        capio_backend->receive(recvBuff, &size_revc, &offset);
-        std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_INFO << "Received ping from: " << i << std::endl;
-        EXPECT_EQ(strcmp(recvBuff, TEST_MESSAGE), 0);
-        capio_backend->send(i, recvBuff, size_revc, "./test", 0);
-        std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_INFO << "Sent ping response to: " << i << std::endl;
-        delete communication_service;
-        return;
+    fclose(fp);
+    printf("Wrote %zu bytes to %s\n", totalSize, filename);
+    return 0;
+}
+
+inline int reader() {
+
+    char buffer[chunkSize];
+    size_t totalRead = 0;
+
+    FILE *fp = fopen(filename, "rb");
+    EXPECT_NE(fp, nullptr);
+
+    // Read in 1024-byte chunks until EOF
+    size_t bytesRead;
+    while ((bytesRead = fread(buffer, 1, chunkSize, fp)) > 0) {
+        totalRead += bytesRead;
+    }
+
+    EXPECT_EQ(totalRead, totalSize);
+
+    fclose(fp);
+    printf("Total read: %zu bytes\n", totalRead);
+    return 0;
+}
+
+TEST(CapioCommServiceTest, TestCapioMemoryNetworkBackend) {
+
+    if (const auto program = std::getenv("APP_TYPE"); std::string(program) == "writer") {
+        EXPECT_EQ(writer(), 0);
+    } else {
+        EXPECT_EQ(reader(), 0);
     }
 }
 

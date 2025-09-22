@@ -24,10 +24,24 @@ target_include_directories(${TARGET_NAME} PRIVATE
 )
 
 file(GLOB_RECURSE CAPIO_SERVER_SOURCES
-        "${CMAKE_SOURCE_DIR}/capio-server/src/communication-service/*.cpp"
+        "${CMAKE_SOURCE_DIR}/capio-server/*.cpp"
 )
 
+
 file(GLOB_RECURSE CAPIO_SERVER_HEADERS "${TARGET_INCLUDE_FOLDER}/*.hpp")
+
+list(FILTER CAPIO_SERVER_SOURCES EXCLUDE REGEX
+        ".*/json_parser\\.cpp$"
+)
+
+list(FILTER CAPIO_SERVER_SOURCES EXCLUDE REGEX
+        ".*/capio_server\\.cpp$"
+)
+
+list(FILTER CAPIO_SERVER_SOURCES EXCLUDE REGEX
+        ".*/command_line_parser\\.cpp$"
+)
+
 
 target_sources(${TARGET_NAME} PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}/src/main.cpp

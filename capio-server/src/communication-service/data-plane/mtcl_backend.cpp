@@ -1,131 +1,147 @@
+#include <algorithm>
+#include <capio/logger.hpp>
 #include <include/communication-service/data-plane/mtcl_backend.hpp>
+#include <include/file-manager/file_manager.hpp>
+#include <include/storage-service/capio_storage_service.hpp>
+#include <include/utils/configuration.hpp>
 #include <mtcl.hpp>
 
-TransportUnit *MTCLBackend::receive_unit(MTCL::HandleUser *HandlerPointer) {
-    START_LOG(gettid(), "call()");
-    size_t filepath_len;
-    const auto unit = new TransportUnit();
-    HandlerPointer->receive(&filepath_len, sizeof(size_t));
-    LOG("Incoming path of length %ld", filepath_len);
-    unit->_filepath.reserve(filepath_len + 1);
-    HandlerPointer->receive(unit->_filepath.data(), filepath_len);
-    LOG("Received message! Path : %s", unit->_filepath.c_str());
-    HandlerPointer->receive(&unit->_buffer_size, sizeof(capio_off64_t));
-    LOG("Buffer size for incoming data is %ld", unit->_buffer_size);
-    unit->_bytes = new char[unit->_buffer_size];
-    LOG("Allocated space for incoming data");
-    HandlerPointer->receive(unit->_bytes, unit->_buffer_size);
-    LOG("Received file buffer data");
-    HandlerPointer->receive(&unit->_start_write_offset, sizeof(capio_off64_t));
-    LOG("Received chunk of data should be stored on offset %ld of file %s",
-        unit->_start_write_offset, unit->_filepath.c_str());
-    return unit;
-}
+int MTCLBackend::read_next_request(char *req, char *args) {
 
-void MTCLBackend::send_unit(MTCL::HandleUser *HandlerPointer, const TransportUnit *unit) {
-    START_LOG(gettid(), "call()");
-    LOG("[send] buffer=%s", unit->_bytes);
-    /**
-     * step0: send file path
-     * step1: send receive buffer size
-     * step1: send offset of write
-     * step2: send data
-     */
-    const size_t file_path_length = unit->_filepath.length();
-
-    HandlerPointer->send(&file_path_length, sizeof(size_t));
-    LOG("Size of path that is being sent: %ld", file_path_length);
-
-    HandlerPointer->send(unit->_filepath.c_str(), file_path_length);
-    LOG("Sent file path: %s", unit->_filepath.c_str());
-
-    HandlerPointer->send(&unit->_buffer_size, sizeof(capio_off64_t));
-    LOG("Size of file buffer to be sent: %ld", unit->_buffer_size);
-
-    HandlerPointer->send(unit->_bytes, unit->_buffer_size);
-    LOG("Sent %ld bytes of data chunk", unit->_buffer_size);
-
-    HandlerPointer->send(&unit->_start_write_offset, sizeof(capio_off64_t));
-    LOG("Sent start write offset : %ld", unit->_start_write_offset);
-
-    // DO NOT DELETE unit: here just afterward, the unit experiences a pop() which
-    // effectively calls delete on the container. If I delete it here, a double delete is
-    // raised
+    START_LOG(gettid(), "call(req=%s)", req);
+    int code       = -1;
+    auto [ptr, ec] = std::from_chars(req, req + 4, code);
+    if (ec == std::errc()) {
+        strcpy(args, ptr + 1);
+    } else {
+        server_println(CAPIO_LOG_SERVER_CLI_LEVEL_ERROR,
+                       "Received invalid code: " + std::to_string(code));
+        server_println(CAPIO_LOG_SERVER_CLI_LEVEL_ERROR,
+                       "Offending request: " + std::string(ptr) + " / " + req);
+        ERR_EXIT("Invalid request %d:%s", code, ptr);
+    }
+    return code;
 }
 
 /**
  * This thread will handle connections towards a single target.
+ * Algorithm works in this way. In the beginning, the role of the node that starts to send is
+ * chosen as the smaller lexicographically between the two hostnames involved in the
+ * communication. Then two phases of sending and receiving up to max_net_op are performed.
+ * The two nodes switch phases after a final synchronization with the special request
+ * HAVE_FINISH_SEND_REQUEST.
+ * When the sender sends this request, either because it has reached the max_net_op or because
+ * there are no more messages to be sent, the two nodes switch roles. This continues until the
+ * remote handle pointer is valid
  */
-void MTCLBackend::server_connection_handler(MTCL::HandleUser HandlerPointer,
-                                            const std::string remote_hostname, const int sleep_time,
-                                            TransportUnitInterface interface, const bool *terminate,
-                                            CONN_HANDLER_ORIGIN source) {
-    START_LOG(gettid(), "call(remote_hostname=%s, kind=%s)", remote_hostname.c_str(),
-              source == FROM_REMOTE ? "from remote server" : "to remote server");
-    // out = data to sent to others
-    // in = data from others
-    auto [in, out, mutex] = interface;
+void MTCLBackend::serverConnectionHandler(MTCL::HandleUser HandlerPointer,
+                                          const std::string &remote_hostname, MessageQueue *queue,
+                                          const int sleep_time, const bool *terminate) {
+
+    char ownHostname[HOST_NAME_MAX];
+    gethostname(ownHostname, HOST_NAME_MAX);
+    bool my_turn_to_send = ownHostname > remote_hostname;
+
+    char request_has_finished_to_send[CAPIO_REQ_MAX_SIZE]{0};
+    sprintf(request_has_finished_to_send, "%03d", HAVE_FINISH_SEND_REQUEST);
+
+    START_LOG(gettid(), "call(remote_hostname=%s)", remote_hostname.c_str());
+
+    LOG("Will begin execution with %s phase", my_turn_to_send ? "sending" : "receiving");
 
     while (HandlerPointer.isValid()) {
-        // execute up to N operation of send &/or receive, to avoid starvation due to
-        // semaphores.
-        constexpr int max_net_op = 10;
+        // execute up to N operation of send &/or receive, to avoid starvation
 
-        // Send phase
-        for (int completed_io_operations = 0; completed_io_operations < max_net_op && !out->empty();
-             ++completed_io_operations) {
-            LOG("[send] Starting send section");
-            const auto unit = out->front();
+        if (my_turn_to_send) {
+            constexpr int max_net_op = 10;
+            LOG("Send PHASE");
+            for (int i = 0; i < max_net_op; i++) {
+                // Send of request
+                if (const auto request_opt = queue->try_get_request(); request_opt.has_value()) {
+                    const auto &request = request_opt.value();
+                    LOG("Request to be sent = %s", request.c_str());
+                    HandlerPointer.send(request.c_str(), request.length());
 
-            LOG("[send] Sending %ld bytes of file %s to %s", unit->_buffer_size,
-                unit->_filepath.c_str(), remote_hostname.c_str());
-            send_unit(&HandlerPointer, unit);
-            LOG("[send] Message sent");
+                    // Retrieve size of response
+                    capio_off64_t response_size;
+                    HandlerPointer.receive(&response_size, sizeof(response_size));
+                    LOG("Response will have size %ld", response_size);
+                    char *response_buffer = new char[response_size];
+                    HandlerPointer.receive(response_buffer, response_size);
+                    LOG("Received response");
+                    // push response back to the source
+                    queue->push_response(response_buffer, response_size, request);
+                    LOG("Pushed response back!");
+                }
+            }
+            LOG("Completed SEND PHASE");
+            // Send message I have finished
+            HandlerPointer.send(request_has_finished_to_send, sizeof(request_has_finished_to_send));
 
-            const std::lock_guard lg(*mutex);
-            LOG("[send] Locked guard");
-            out->pop();
-        }
+        } else {
 
-        // Receive phase
-        size_t receive_size = 0, completed_io_operations = 0;
-        HandlerPointer.probe(receive_size, false);
-        while (completed_io_operations < max_net_op && receive_size > 0) {
-            LOG("[recv] Receiving data");
-            auto unit = receive_unit(&HandlerPointer);
-            LOG("[recv] Lock guard");
-            const std::lock_guard lg(*mutex);
-            in->push(unit);
-            LOG("[recv] Pushed %ld bytes to be stored on file %s", unit->_buffer_size,
-                unit->_filepath.c_str());
+            bool continue_receive_phase = true;
+            size_t receive_size         = 0;
+            LOG("Receive PHASE");
+            while (continue_receive_phase) {
+                // Receive phase
+                HandlerPointer.probe(receive_size, false);
+                if (receive_size > 0) {
+                    LOG("A request is incoming");
 
-            ++completed_io_operations;
-            receive_size = 0;
-            HandlerPointer.probe(receive_size, false);
+                    char incoming_request[CAPIO_REQ_MAX_SIZE], request_args[CAPIO_REQ_MAX_SIZE];
+                    HandlerPointer.receive(incoming_request, CAPIO_REQ_MAX_SIZE);
+                    LOG("Received request = %s", incoming_request);
+                    int requestCode = read_next_request(incoming_request, request_args);
+                    LOG("Request code is %d", requestCode);
+                    switch (requestCode) {
+                    case HAVE_FINISH_SEND_REQUEST: {
+                        // Finished sending data. Set continue_receive_phase to
+                        // false to go to next phase
+                        LOG("Other has finished sending phase. Switching me from receive to send");
+                        continue_receive_phase = false;
+                        break;
+                    }
+
+                    case FETCH_FROM_REMOTE: {
+                        LOG("Received request for data from remote server");
+                        // Scan request fetch from remote
+                        char filepath[PATH_MAX];
+                        capio_off64_t offset, count;
+                        sscanf(request_args, "%s %llu %llu", filepath, &offset, &count);
+                        LOG("filepath=%s, offset=%ld, count=%ld", filepath, offset, count);
+                        const auto buffer = new char[count];
+                        auto read_size =
+                            storage_service->readFromFileToBuffer(filepath, offset, buffer, count);
+                        HandlerPointer.send(&read_size, sizeof(read_size));
+                        HandlerPointer.send(buffer, read_size);
+                        delete[] buffer;
+                        break;
+                    }
+
+                    default:
+                        break;
+                    }
+                }
+            }
         }
 
         // terminate phase
         if (*terminate) {
-            const std::lock_guard lg(*mutex);
-            LOG("[TERM PHASE] Locked access send and receive queues");
-            while (!out->empty()) {
-                const auto unit = out->front();
-                send_unit(&HandlerPointer, unit);
-                out->pop();
-            }
-            LOG("[TERM PHASE] Emptied queues. Closing connection");
+            LOG("[TERM PHASE] Closing connection");
             HandlerPointer.close();
             LOG("[TERM PHASE] Terminating thread server_connection_handler");
             return;
         }
 
+        my_turn_to_send = !my_turn_to_send;
         std::this_thread::sleep_for(std::chrono::milliseconds(sleep_time));
     }
 }
 
-void MTCLBackend::incoming_connection_listener(
+void MTCLBackend::incomingConnectionListener(
     const bool *continue_execution, int sleep_time,
-    std::unordered_map<std::string, TransportUnitInterface> *open_connections, std::mutex *guard,
+    std::unordered_map<std::string, MessageQueue *> *open_connections, std::mutex *guard,
     std::vector<std::thread *> *_connection_threads, bool *terminate) {
 
     char ownHostname[HOST_NAME_MAX] = {0};
@@ -144,20 +160,18 @@ void MTCLBackend::incoming_connection_listener(
         UserManager.receive(connected_hostname, HOST_NAME_MAX);
 
         server_println(CAPIO_SERVER_CLI_LOG_SERVER,
-                       std::string("Connected from ") + connected_hostname);
+                       std::string("Accepted connection with ") + connected_hostname);
 
         LOG("Received connection hostname: %s", connected_hostname);
 
-        const std::lock_guard lock(*guard);
-
-        open_connections->insert(
-            {connected_hostname,
-             std::make_tuple(new std::queue<TransportUnit *>(), new std::queue<TransportUnit *>(),
-                             new std::mutex())});
-
-        _connection_threads->push_back(new std::thread(
-            server_connection_handler, std::move(UserManager), connected_hostname, sleep_time,
-            open_connections->at(connected_hostname), terminate, FROM_REMOTE));
+        auto *queue = new MessageQueue();
+        {
+            const std::lock_guard lock(*guard);
+            open_connections->insert({connected_hostname, queue});
+        }
+        _connection_threads->push_back(new std::thread(serverConnectionHandler,
+                                                       std::move(UserManager), connected_hostname,
+                                                       queue, sleep_time, terminate));
     }
 }
 
@@ -173,25 +187,26 @@ void MTCLBackend::connect_to(std::string hostname_port) {
         return;
     }
 
-    if (connected_hostnames_map.find(remoteToken) != connected_hostnames_map.end()) {
+    if (open_connections.contains(remoteHost)) {
         LOG("Remote host %s is already connected", remoteHost.c_str());
         return;
     }
 
     LOG("Trying to connect on remote: %s", remoteToken.c_str());
     if (auto UserManager = MTCL::Manager::connect(remoteToken); UserManager.isValid()) {
-        server_println(CAPIO_SERVER_CLI_LOG_SERVER, std::string("Connected to ") + remoteToken);
-        LOG("Connected to: %s", remoteToken.c_str());
+        server_println(CAPIO_SERVER_CLI_LOG_SERVER,
+                       std::string("Opened connection with ") + remoteToken);
+        LOG("Opened connection with: %s", remoteToken.c_str());
         UserManager.send(ownHostname, HOST_NAME_MAX);
-        const std::lock_guard lg(*_guard);
 
-        auto connection_tuple = std::make_tuple(
-            new std::queue<TransportUnit *>(), new std::queue<TransportUnit *>(), new std::mutex());
-        connected_hostnames_map.insert({remoteHost, connection_tuple});
-
-        connection_threads.push_back(
-            new std::thread(server_connection_handler, std::move(UserManager), remoteHost.c_str(),
-                            thread_sleep_times, connection_tuple, terminate, TO_REMOTE));
+        auto *queue = new MessageQueue();
+        {
+            const std::lock_guard lg(*_guard);
+            open_connections.insert({remoteHost, queue});
+        }
+        connection_threads.push_back(new std::thread(serverConnectionHandler,
+                                                     std::move(UserManager), remoteHost, queue,
+                                                     thread_sleep_times, terminate));
     } else {
         server_println(CAPIO_SERVER_CLI_LOG_SERVER_WARNING, "Warning: tried to connect to " +
                                                                 std::string(remoteHost) +
@@ -220,8 +235,8 @@ MTCLBackend::MTCLBackend(const std::string &proto, const std::string &port, int 
 
     MTCL::Manager::listen(selfToken);
 
-    th = new std::thread(incoming_connection_listener, std::ref(continue_execution), sleep_time,
-                         &connected_hostnames_map, _guard, &connection_threads, terminate);
+    th = new std::thread(incomingConnectionListener, std::ref(continue_execution), sleep_time,
+                         &open_connections, _guard, &connection_threads, terminate);
     server_println(CAPIO_LOG_SERVER_CLI_LEVEL_INFO, "MTCL_backend initialization completed.");
 }
 
@@ -248,71 +263,35 @@ MTCLBackend::~MTCLBackend() {
     server_println(CAPIO_LOG_SERVER_CLI_LEVEL_INFO, "MTCL_backend cleanup completed.");
 }
 
-std::string MTCLBackend::receive(char *buf, capio_off64_t *buf_size, capio_off64_t *start_offset) {
-    START_LOG(gettid(), "call()");
-
-    std::queue<TransportUnit *> *inQueue = nullptr;
-    TransportUnitInterface interface;
-    bool found = false;
-    while (!found) {
-        for (auto [hostname, data] : connected_hostnames_map) {
-            inQueue   = std::get<0>(data);
-            interface = data;
-            found     = !inQueue->empty();
-            LOG("Hostname %s, %s incoming data", hostname.c_str(), found ? "has" : "has not");
-        }
-        if (!found) {
-            LOG("No incoming messages. Putting thread to sleep");
-            std::this_thread::sleep_for(std::chrono::milliseconds(thread_sleep_times));
-        }
-    }
-    LOG("Found incoming message");
-    const std::lock_guard lg(*std::get<2>(interface));
-    auto inputUnit = inQueue->front();
-    *buf_size      = inputUnit->_buffer_size;
-    *start_offset  = inputUnit->_start_write_offset;
-    memcpy(buf, inputUnit->_bytes, *buf_size);
-    LOG("Received buffer: %s", inputUnit->_bytes);
-    inQueue->pop();
-
-    std::string filename(inputUnit->_filepath);
-
-    return filename;
-}
-
-void MTCLBackend::send(const std::string &target, char *buf, uint64_t buf_size,
-                       const std::string &filepath, const capio_off64_t start_offset) {
-    START_LOG(gettid(), "call(target=%s, buf_size=%ld, file_path=%s, start_offset=%ld, buf=%s)",
-              target.c_str(), buf_size, filepath.c_str(), start_offset, buf);
-
-    if (const auto element = connected_hostnames_map.find(target);
-        element != connected_hostnames_map.end()) {
-        LOG("Found alive connection for given target");
-
-        const auto interface = element->second;
-        auto *out            = std::get<1>(interface);
-
-        const auto outputUnit           = new TransportUnit();
-        outputUnit->_buffer_size        = buf_size;
-        outputUnit->_filepath           = filepath;
-        outputUnit->_start_write_offset = start_offset;
-        outputUnit->_bytes              = new char[buf_size];
-        memcpy(outputUnit->_bytes, buf, buf_size);
-        LOG("Copied buffer: %s", outputUnit->_bytes);
-
-        const std::lock_guard lg(*std::get<2>(interface));
-        LOG("Pushing Transport unit to out queue");
-        out->push(outputUnit);
-    } else {
-        server_println(CAPIO_LOG_SERVER_CLI_LEVEL_ERROR, "can't find target");
-    }
-}
-
 std::vector<std::string> MTCLBackend::get_open_connections() {
-    std::vector<std::string> connections;
+    std::vector<std::string> keys;
+    keys.reserve(open_connections.size()); // avoid reallocations
 
-    for (const auto &[hostname, _] : connected_hostnames_map) {
-        connections.push_back(hostname);
+    for (const auto &pair : open_connections) {
+        keys.push_back(pair.first);
     }
-    return connections;
+
+    return keys;
+}
+
+std::tuple<size_t, char *> MTCLBackend::fetchFromRemoteHost(const std::string &hostname,
+                                                            const std::filesystem::path &filepath,
+                                                            capio_off64_t offset,
+                                                            capio_off64_t count) {
+
+    START_LOG(gettid(), "call(hostname=%s, path=%s, offset=%ld, count=%ld)", hostname.c_str(),
+              filepath.c_str(), offset, count);
+
+    char REQUEST[CAPIO_REQ_MAX_SIZE];
+
+    sprintf(REQUEST, "%04d %s %llu %llu", FETCH_FROM_REMOTE, filepath.c_str(), offset, count);
+    LOG("Sending request %s. Fetching queue to hostname %s", REQUEST, hostname.c_str());
+    auto queues = open_connections.at(hostname);
+    LOG("obtained access to queue");
+
+    queues->push_request(REQUEST);
+    LOG("Request pushed to output queue");
+    auto [buff_size, response_buffer] = queues->get_response();
+    LOG("Obtained response. Buffer size of response is %ld", buff_size);
+    return std::make_tuple(buff_size, response_buffer);
 }
