@@ -16,7 +16,7 @@ class CapioAPIServer {
     typedef std::unordered_map<std::string, std::string> ResponseMap;
 
     std::thread *th;
-    httplib::Server svr;
+    httplib::Server httplib_server_instance;
     static void api_server_main_func(int server_port, httplib::Server *svr);
 
     static std::string

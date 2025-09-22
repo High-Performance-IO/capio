@@ -3,10 +3,10 @@
 #include <include/client-manager/client_manager.hpp>
 
 CapioAPIServer::CapioAPIServer(int server_port) {
-    th = new std::thread(api_server_main_func, server_port, &svr);
+    th = new std::thread(api_server_main_func, server_port, &httplib_server_instance);
 
     // Register callback for unknown routes
-    svr.set_error_handler([](const httplib::Request &req, httplib::Response &res) {
+    httplib_server_instance.set_error_handler([](const httplib::Request &req, httplib::Response &res) {
         ResponseMap map;
         map["status"]  = std::to_string(res.status);
         map["message"] = "Error: Unknown request: " + req.path;
@@ -15,7 +15,7 @@ CapioAPIServer::CapioAPIServer(int server_port) {
 }
 
 CapioAPIServer::~CapioAPIServer() {
-    svr.stop();
+    httplib_server_instance.stop();
     th->join();
     delete th;
     server_println(CAPIO_SERVER_CLI_LOG_SERVER, "API server correctly terminated");
@@ -70,5 +70,6 @@ void CapioAPIServer::api_server_main_func(const int server_port, httplib::Server
                            res.set_content(build_json_response(map).c_str(), "application/json");
                        });
 
-    svr->listen("*", server_port);
+    svr->listen("127.0.0.1", server_port);
+    server_println(CAPIO_SERVER_CLI_LOG_SERVER_ERROR, "API server terminated unexpectedly");
 }
