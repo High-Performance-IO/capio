@@ -110,7 +110,7 @@ void MulticastControlPlane::multicast_control_plane_incoming_thread(
         default:
             LOG("WARNING: unknown / unhandled event: %s", incoming_msg);
             server_println(CAPIO_LOG_SERVER_CLI_LEVEL_WARNING,
-                           "Unknown/Unhandled message recived: " + std::string(incoming_msg));
+                           "Unknown/Unhandled message received: " + std::string(incoming_msg));
         }
         LOG("Completed handling of event");
     }

@@ -7,7 +7,7 @@
 #include <unordered_map>
 
 /**
- * This avoids to include the MTCL library here as it is a header only library.
+ * This avoids it to include the MTCL library here as it is a header-only library.
  * this is equivalent to use extern in C but for class
  */
 namespace MTCL {
@@ -15,7 +15,6 @@ class HandleUser;
 }
 
 class MTCLBackend : public BackendInterface {
-    typedef enum { FROM_REMOTE, TO_REMOTE } CONN_HANDLER_ORIGIN;
 
     std::string selfToken, connectedHostname, ownPort, usedProtocol;
     std::unordered_map<std::string, MessageQueue *> open_connections;
@@ -29,23 +28,21 @@ class MTCLBackend : public BackendInterface {
 
     /**
      * This thread handles a single p2p connection with another capio_server instance
-     * @param HandlerPointer
-     * @param remote_hostname
-     * @param outbound_messages
-     * @param inbound_messages queue of inbound results for outbound message, with pair of buffer
-     * ond buffer size
-     * @param sleep_time
-     * @param terminate
-     * @param source
+     * @param HandlerPointer A MTCL valid HandlePointer
+     * @param remote_hostname The remote endpoint of the connection handled by this thread
+     * @param queue A pointer to a queue to communicate with other components. Queue has pointers to
+     * inbound and outbound sub-queues for inbound and outbound messages
+     * @param sleep_time How long to sleep between thread cycle
+     * @param terminate A reference to a boolean heap allocated variable that is controlled by the
+     * main thread that tells when to terminate the execution
      */
     void static serverConnectionHandler(MTCL::HandleUser HandlerPointer,
                                         const std::string &remote_hostname, MessageQueue *queue,
-                                        int sleep_time, const bool *terminate,
-                                        CONN_HANDLER_ORIGIN source);
+                                        int sleep_time, const bool *terminate);
 
     /**
      * Waits for incoming new requests to connect to new server instances. When a new request
-     * arrives it then handshakes with the remote servers, opening a new connection, and starting a
+     * arrives, it then handshakes with the remote servers, opening a new connection, and starting a
      * new thread that will handle remote requests
      *
      * @param continue_execution
@@ -62,7 +59,7 @@ class MTCLBackend : public BackendInterface {
 
     /**
      * Explode request into request code and request arguments
-     * @param req Original request string as received from remote node
+     * @param req Original request string as received from the remote node
      * @param args output string with parameters of the request
      * @return  request code
      */

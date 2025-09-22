@@ -1,9 +1,8 @@
-#include "include/file-manager/file_manager.hpp"
-#include "include/storage-service/capio_storage_service.hpp"
-
 #include <algorithm>
 #include <capio/logger.hpp>
 #include <include/communication-service/data-plane/mtcl_backend.hpp>
+#include <include/file-manager/file_manager.hpp>
+#include <include/storage-service/capio_storage_service.hpp>
 #include <include/utils/configuration.hpp>
 #include <mtcl.hpp>
 
@@ -26,22 +25,18 @@ int MTCLBackend::read_next_request(char *req, char *args) {
 
 /**
  * This thread will handle connections towards a single target.
+ * Algorithm works in this way. In the beginning, the role of the node that starts to send is
+ * chosen as the smaller lexicographically between the two hostnames involved in the
+ * communication. Then two phases of sending and receiving up to max_net_op are performed.
+ * The two nodes switch phases after a final synchronization with the special request
+ * HAVE_FINISH_SEND_REQUEST.
+ * When the sender sends this request, either because it has reached the max_net_op or because
+ * there are no more messages to be sent, the two nodes switch roles. This continues until the
+ * remote handle pointer is valid
  */
 void MTCLBackend::serverConnectionHandler(MTCL::HandleUser HandlerPointer,
                                           const std::string &remote_hostname, MessageQueue *queue,
-                                          const int sleep_time, const bool *terminate,
-                                          const CONN_HANDLER_ORIGIN source) {
-    constexpr int max_net_op = 10;
-    /*
-     * Algorithm works in this way. At the beginning, the role of the node that starts to send is
-     * chosen as the smaller lexicographically between the two hostnames involved in the
-     * communication. Then two phases of sending and receiving up to max_net_op are performed.
-     * The two nodes switches phases after a final synchronization with the special request
-     * HAVE_FINISH_SEND_REQUEST.
-     * When the sender sends this request, either because it has reached the max_net_op or because
-     * there are no more messages to be sent, the two nodes switches roles. This continues until the
-     * remote handle pointer is valid
-     */
+                                          const int sleep_time, const bool *terminate) {
 
     char ownHostname[HOST_NAME_MAX];
     gethostname(ownHostname, HOST_NAME_MAX);
@@ -50,8 +45,7 @@ void MTCLBackend::serverConnectionHandler(MTCL::HandleUser HandlerPointer,
     char request_has_finished_to_send[CAPIO_REQ_MAX_SIZE]{0};
     sprintf(request_has_finished_to_send, "%03d", HAVE_FINISH_SEND_REQUEST);
 
-    START_LOG(gettid(), "call(remote_hostname=%s, kind=%s)", remote_hostname.c_str(),
-              source == FROM_REMOTE ? "from remote server" : "to remote server");
+    START_LOG(gettid(), "call(remote_hostname=%s)", remote_hostname.c_str());
 
     LOG("Will begin execution with %s phase", my_turn_to_send ? "sending" : "receiving");
 
@@ -59,6 +53,7 @@ void MTCLBackend::serverConnectionHandler(MTCL::HandleUser HandlerPointer,
         // execute up to N operation of send &/or receive, to avoid starvation
 
         if (my_turn_to_send) {
+            constexpr int max_net_op = 10;
             LOG("Send PHASE");
             for (int i = 0; i < max_net_op; i++) {
                 // Send of request
@@ -176,7 +171,7 @@ void MTCLBackend::incomingConnectionListener(
         }
         _connection_threads->push_back(new std::thread(serverConnectionHandler,
                                                        std::move(UserManager), connected_hostname,
-                                                       queue, sleep_time, terminate, FROM_REMOTE));
+                                                       queue, sleep_time, terminate));
     }
 }
 
@@ -211,7 +206,7 @@ void MTCLBackend::connect_to(std::string hostname_port) {
         }
         connection_threads.push_back(new std::thread(serverConnectionHandler,
                                                      std::move(UserManager), remoteHost, queue,
-                                                     thread_sleep_times, terminate, TO_REMOTE));
+                                                     thread_sleep_times, terminate));
     } else {
         server_println(CAPIO_SERVER_CLI_LOG_SERVER_WARNING, "Warning: tried to connect to " +
                                                                 std::string(remoteHost) +
