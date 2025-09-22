@@ -8,9 +8,9 @@
 #include <include/communication-service/data-plane/backend_interface.hpp>
 #include <thread>
 
-const char *filename   = "data.bin";
-const int chunkSize = 1024;
-const int totalSize = 2048;
+const char *filename = "data.bin";
+const int chunkSize  = 1024;
+const int totalSize  = 2048;
 
 inline int writer() {
 
