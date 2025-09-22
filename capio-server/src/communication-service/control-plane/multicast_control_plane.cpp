@@ -31,12 +31,11 @@ void MulticastControlPlane::multicast_server_aliveness_thread(
                                                     std::to_string(MULTICAST_DISCOVERY_PORT));
 
     while (*continue_execution) {
-        bzero(incomingMessage, sizeof(incomingMessage));
-        // Send port of local data plane backend
         send_multicast_alive_token(dataplane_backend_port);
         LOG("Waiting for incoming token...");
 
         do {
+            bzero(incomingMessage, sizeof(incomingMessage));
             const auto recv_sice =
                 recvfrom(discovery_socket, incomingMessage, MULTICAST_ALIVE_TOKEN_MESSAGE_SIZE, 0,
                          reinterpret_cast<sockaddr *>(&addr), &addrlen);
