@@ -73,10 +73,16 @@ inline bool is_capio_path(const std::filesystem::path &path_to_check) {
     START_LOG(capio_syscall(SYS_gettid), "call(path_to_check=%s)", path_to_check.c_str());
 
     // check if path_to_check begins with CAPIO_DIR
-    const auto res =
-        is_prefix(get_capio_dir(), path_to_check) && !is_forbidden_path(path_to_check.string());
-    LOG("is_capio_path:%s", res ? "yes" : "no");
-    return res;
+    const auto is_prefix_res    = is_prefix(get_capio_dir(), path_to_check);
+
+    LOG("IS PREFIX=%s", is_prefix_res ? "TRUE" : "FALSE");
+
+    const auto is_forbidden_res = is_forbidden_path(path_to_check.string());
+
+    LOG("IS FORBIDDEN=%s", is_forbidden_res ? "TRUE" : "FALSE");
+
+    LOG("is_capio_path:%s", is_prefix_res && !is_forbidden_res ? "yes" : "no");
+    return is_prefix_res && !is_forbidden_res;
 }
 
 /**
