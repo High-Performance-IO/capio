@@ -1,46 +1,50 @@
 #include "common.hpp"
 
-int mapReduceFunction(char *sourcedirname, ssize_t sstart, ssize_t sfiles, char *destdirname,
-                      ssize_t dstart, ssize_t dfiles, float percent, int *return_value) {
-    struct timeval before, after;
-    struct stat statbuf;
-    char *dataptr       = NULL;
-    size_t datalen      = 0;
-    size_t datacapacity = 0;
-    gettimeofday(&before, NULL);
+int mapReduceFunction(const char *sourcedirname, ssize_t sstart, ssize_t sfiles,
+                      const char *destdirname, ssize_t dstart, ssize_t dfiles, float percent,
+                      int *return_value) {
+    struct timeval before{}, after{};
+    struct stat statbuf{};
+
+    gettimeofday(&before, nullptr);
 
     EXPECT_NE(stat(sourcedirname, &statbuf), -1);
     EXPECT_TRUE(S_ISDIR(statbuf.st_mode));
     EXPECT_GE(sstart, 0);
     EXPECT_GT(sfiles, 0);
+
     EXPECT_NE(stat(destdirname, &statbuf), -1);
     EXPECT_TRUE(S_ISDIR(statbuf.st_mode));
     EXPECT_GE(dstart, 0);
     EXPECT_GT(dfiles, 0);
+
     EXPECT_GT(percent, 0);
     EXPECT_LE(percent, 1);
 
+    std::vector<char> merged;
+
     char filepath[2 * PATH_MAX]{0};
-    // concatenating all files in memory (dataptr)
-    for (int i = 0 + sstart; i < (sfiles + sstart); ++i) {
+    // Concatenate all files into `merged`
+    for (int i = sstart; i < (sstart + sfiles); ++i) {
         sprintf(filepath, fmtin, sourcedirname, i);
 
         FILE *fp = fopen(filepath, "r");
-        EXPECT_NE(fileno(fp), -1);
+        EXPECT_TRUE(fp != nullptr);
 
-        char *ptr = readdata(fp, dataptr, &datalen, &datacapacity);
-        EXPECT_NE(ptr, nullptr);
+        auto chunk = readdata_new(fp);
+        EXPECT_FALSE(chunk.empty());
 
-        dataptr = ptr;
+        merged.insert(merged.end(), chunk.begin(), chunk.end());
+
         fclose(fp);
     }
 
-    int r = writedata(dataptr, datalen, percent, destdirname, dstart, dfiles);
-    free(dataptr);
+    // Call writedata with the concatenated buffer
+    int r = writedata(merged, percent, destdirname, dstart, dfiles);
 
     *return_value = r;
 
-    gettimeofday(&after, NULL);
+    gettimeofday(&after, nullptr);
     double elapsed_time = diffmsec(after, before);
     fprintf(stdout, "MAPREDUCE: elapsed time (ms) : %g\n", elapsed_time);
 
