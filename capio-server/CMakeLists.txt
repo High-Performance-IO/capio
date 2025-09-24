@@ -30,8 +30,14 @@ FetchContent_Declare(
         GIT_TAG fbd8aa924b916c6578963af315fdb5f10c3969ad
 )
 
+FetchContent_Declare(
+        httplib
+        GIT_REPOSITORY https://github.com/yhirose/cpp-httplib.git
+        GIT_TAG v0.26.0
+)
 
-FetchContent_MakeAvailable(args simdjson mtcl)
+
+FetchContent_MakeAvailable(args simdjson mtcl httplib)
 
 #####################################
 # Target definition
@@ -52,6 +58,7 @@ target_include_directories(${TARGET_NAME} PRIVATE
         ${args_SOURCE_DIR}
         ${simdjson_SOURCE_DIR}
         ${mtcl_SOURCE_DIR}/include
+        ${httplib_SOURCE_DIR}
 )
 
 #####################################
