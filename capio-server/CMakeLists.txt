@@ -79,7 +79,7 @@ install(TARGETS ${TARGET_NAME}
 IF (ENABLE_COVERAGE)
     IF (CMAKE_BUILD_TYPE STREQUAL "Debug")
         target_compile_definitions(${TARGET_NAME} PRIVATE CAPIO_COVERAGE)
-        target_compile_options(${TARGET_NAME} PRIVATE --coverage -fprofile-arcs -ftest-coverage)
+        target_compile_options(${TARGET_NAME} PRIVATE --coverage -fprofile-arcs -ftest-coverage -fprofile-update=atomic)
         target_link_options(${TARGET_NAME} PRIVATE --coverage -fprofile-arcs -ftest-coverage)
         IF (CMAKE_C_COMPILER_ID MATCHES "GNU" OR CMAKE_CXX_COMPILER_ID MATCHES "GNU")
             target_link_libraries(${TARGET_NAME} PRIVATE gcov)
