@@ -24,7 +24,7 @@ int mergeFunction(ssize_t nfiles, const char *sourcedir, const char *destdir) {
         FILE *fp = fopen(filepath, "r");
         EXPECT_TRUE(fp != nullptr);
 
-        auto chunk = readdata_new(fp);
+        auto chunk = readdata(fp);
         EXPECT_FALSE(chunk.empty());
 
         // append this file's data to merged

@@ -58,47 +58,7 @@ static char fmtout[]           = "%s/outfile_%05d.dat";
     "%s/infile_%05d.dat"; // 5 is the number of digits of maxnumfiles
 
 // reading file data into memory
-static inline char *readdata(FILE *fp, char *dataptr, size_t *datalen, size_t *datacapacity) {
-    auto buffer = static_cast<char *>(malloc(maxphraselen));
-    if (!buffer) {
-        perror("malloc");
-        return nullptr;
-    }
-    size_t len = maxphraselen - 1;
-
-    if (dataptr == 0) {
-        dataptr = (char *) realloc(dataptr, REALLOC_BATCH);
-        if (dataptr == nullptr) {
-            perror("realloc");
-            return nullptr;
-        }
-        *datacapacity = REALLOC_BATCH;
-        *datalen      = 0;
-    }
-    ssize_t r;
-    while (errno = 0, (r = getline(&buffer, &len, fp)) > 0) {
-        if ((*datalen + r) > *datacapacity) {
-            *datacapacity += REALLOC_BATCH;
-            const auto tmp = static_cast<char *>(realloc(dataptr, *datacapacity));
-            if (tmp == nullptr) {
-                perror("realloc");
-                free(dataptr);
-                return nullptr;
-            }
-            dataptr = tmp;
-        }
-        strncpy(&dataptr[*datalen], buffer, maxphraselen);
-        *datalen += r;
-    }
-    if (errno != 0) {
-        perror("getline");
-        free(dataptr);
-        return nullptr;
-    }
-    return dataptr;
-}
-
-static inline std::vector<char> readdata_new(FILE *fp) {
+static inline std::vector<char> readdata(FILE *fp) {
     std::vector<char> data;
     data.reserve(REALLOC_BATCH);
 

@@ -31,7 +31,7 @@ int mapReduceFunction(const char *sourcedirname, ssize_t sstart, ssize_t sfiles,
         FILE *fp = fopen(filepath, "r");
         EXPECT_TRUE(fp != nullptr);
 
-        auto chunk = readdata_new(fp);
+        auto chunk = readdata(fp);
         EXPECT_FALSE(chunk.empty());
 
         merged.insert(merged.end(), chunk.begin(), chunk.end());
