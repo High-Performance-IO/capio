@@ -122,8 +122,8 @@ int openat_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long a
               mode);
 
     std::string path = compute_abs_path(pathname.data(), dirfd);
-    if (!is_capio_path(pathname)) {
-        LOG("Path %s is not a capio path: skip", pathname.data());
+    if (!is_capio_path(path)) {
+        LOG("Path %s is not a capio path: skip", path.data());
         return CAPIO_POSIX_SYSCALL_REQUEST_SKIP;
     }
 
