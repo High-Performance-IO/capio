@@ -1,0 +1,46 @@
+services:
+  node1:
+    image: alphaunito/capio:latest
+    tty: true
+    working_dir: /shared
+    volumes:
+      - shared_data:/shared
+    networks:
+      capio_net:
+        aliases:
+          - node1
+    environment:
+      - CAPIO_LOG_LEVEL=-1
+    cap_add:
+      - SYS_PTRACE
+    security_opt:
+        - seccomp=unconfined
+    ports:
+      - "1111:1111"   # Use 1111 for gdbserver
+
+  node2:
+    image: alphaunito/capio:latest
+    tty: true
+    working_dir: /shared
+    volumes:
+      - shared_data:/shared
+    networks:
+      capio_net:
+        aliases:
+          - node2
+    environment:
+      - CAPIO_LOG_LEVEL=-1
+    cap_add:
+      - SYS_PTRACE
+    security_opt:
+      - seccomp=unconfined
+    ports:
+      - "1112:1112"   # Use 1111 for gdbserver
+
+
+volumes:
+  shared_data:
+
+networks:
+  capio_net:
+    driver: bridge

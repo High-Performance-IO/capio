@@ -18,8 +18,11 @@ RUN apt update                              \
 
 COPY CMakeLists.txt /opt/capio/
 COPY scripts /opt/capio/scripts
-COPY src /opt/capio/src
-COPY tests /opt/capio/tests
+COPY capio-common /opt/capio/capio-common
+COPY capio-posix /opt/capio/capio-posix
+COPY capio-server /opt/capio/capio-server
+COPY capio-tests /opt/capio/capio-tests
+COPY capio-run /opt/capio/capio-run
 
 RUN mkdir -p /opt/capio/build                     \
  && cmake                                         \
@@ -68,7 +71,6 @@ COPY --from=builder                                         \
     "/usr/local/include/gmoc[k]"                            \
     "/usr/local/include/gtes[t]"                            \
     "/usr/local/include/libsyscall_intercept_hook_point.h"  \
-    "/usr/local/include/simdjson.h"                         \
     /usr/local/include/
 
 # Libraries
@@ -89,11 +91,16 @@ COPY --from=builder                                         \
 
 # Binaries
 COPY --from=builder                                         \
-    "/usr/local/bin/capio_posix_unit_test[s]"               \
+    "/usr/local/bin/capio_posix_unit_test[s]*"              \
     "/usr/local/bin/capio_server"                           \
-    "/usr/local/bin/capio_server_unit_test[s]"              \
-    "/usr/local/bin/capio_syscall_unit_test[s]"             \
-    "/usr/local/bin/capio_integration_test[s]"              \
+    "/usr/local/bin/capio_server_unit_test[s]*"             \
+    "/usr/local/bin/capio_syscall_unit_test[s]*"            \
+    "/usr/local/bin/capio_integration_test[s]*"             \
+    "/usr/local/bin/capio_backend_unit_tests*"              \
+    "/usr/local/bin/capio_integration_test_map*"            \
+    "/usr/local/bin/capio_integration_test_merge*"          \
+    "/usr/local/bin/capio_integration_test_split*"          \
+    "/opt/capio/capio-run/capiorun"                         \
     /usr/local/bin/
 
 # Pkgconfig

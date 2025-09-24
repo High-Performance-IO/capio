@@ -1,0 +1,52 @@
+services:
+  split:
+    image: alphaunito/capio:latest
+    tty: true
+    working_dir: /shared
+    environment:
+      - CAPIO_DIR=/shared
+      - CAPIO_LOG_LEVEL=-1
+    volumes:
+      - shared_data:/shared
+    networks:
+      capio_net:
+        aliases:
+          - split
+    command: capio_integration_test_split --gtest_break_on_failure  --gtest_print_time=1
+
+  map:
+    image: alphaunito/capio:latest
+    tty: true
+    working_dir: /shared
+    environment:
+      - CAPIO_DIR=/shared
+      - CAPIO_LOG_LEVEL=-1
+    volumes:
+      - shared_data:/shared
+    networks:
+      capio_net:
+        aliases:
+          - map
+    command: capio_integration_test_map --gtest_break_on_failure --gtest_print_time=1
+
+  merge:
+    image: alphaunito/capio:latest
+    tty: true
+    working_dir: /shared
+    environment:
+      - CAPIO_DIR=/shared
+      - CAPIO_LOG_LEVEL=-1
+    volumes:
+      - shared_data:/shared
+    networks:
+      capio_net:
+        aliases:
+          - merge
+    command: capio_integration_test_merge --gtest_break_on_failure  --gtest_print_time=1
+
+volumes:
+  shared_data:
+
+networks:
+  capio_net:
+    driver: bridge

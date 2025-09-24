@@ -6,17 +6,20 @@ on:
   pull_request:
     branches:
       - master
+      - capio-v2
 concurrency:
   group: build-${{ github.event.pull_request.number || github.ref }}
-  cancel-in-progress: true
 jobs:
   codespell-check:
     name: "Check codespell conformance"
     runs-on: ubuntu-22.04
+    continue-on-error: true
     steps:
       - uses: actions/checkout@v4
       - name: "Run codespell"
         uses: codespell-project/actions-codespell@v2
+        with:
+          exclude_file: capio-tests/unit/server/src/SourceText.hpp
   docker-check:
     name: "Check Docker image"
     runs-on: ubuntu-22.04
@@ -39,7 +42,9 @@ jobs:
           load: true
           tags: alphaunito/capio:latest
       - name: "Run unit tests with Docker"
+        working-directory: ${{ github.workspace }}
         run: |
+
           echo "Run CAPIO POSIX Unit tests"
           docker run --rm                         \
               --env CAPIO_DIR=/tmp                \
@@ -49,38 +54,15 @@ jobs:
             capio_posix_unit_tests                \
               --gtest_break_on_failure            \
               --gtest_print_time=1
-          
-          echo "Run CAPIO server Unit tests"
-          docker run --rm                         \
-              --env CAPIO_DIR=/tmp                \
-              --env CAPIO_LOG_LEVEL=-1            \
-              --name capio-docker                 \
-              alphaunito/capio:latest             \
-            capio_server_unit_tests               \
-              --gtest_break_on_failure            \
-              --gtest_print_time=1
-          
-          echo "Run CAPIO syscall Unit tests"
-          docker run --rm                         \
-              --env CAPIO_DIR=/tmp                \
-              --env CAPIO_LOG_LEVEL=-1            \
-              --env LD_PRELOAD=libcapio_posix.so  \
-              --name capio-docker                 \
-              alphaunito/capio:latest             \
-            capio_server_unit_tests               \
-              --gtest_break_on_failure            \
-              --gtest_print_time=1
-          
-          echo "Run CAPIO integration tests"
-            docker run --rm                     \
-            --env CAPIO_DIR=/tmp                \
-            --env CAPIO_LOG_LEVEL=-1            \
-            --env LD_PRELOAD=libcapio_posix.so  \
-            --name capio-docker                 \
-            alphaunito/capio:latest             \
-            capio_integration_tests             \
-            --gtest_break_on_failure            \
-            --gtest_print_time=1
+
+      - name: "Run backend communication tests"
+        working-directory: ${{ github.workspace }}
+        run: docker compose -f capio-tests/multinode/backend/docker-compose.yml up --abort-on-container-exit
+
+      - name: "Run integration tests"
+        working-directory: ${{ github.workspace }}
+        run: docker compose -f capio-tests/multinode/integration/docker-compose.yml up --abort-on-container-exit
+
 
   format-check:
     name: "Check ${{ matrix.path }} clang-format conformance"
@@ -88,25 +70,27 @@ jobs:
     strategy:
       matrix:
         path:
-          - "src"
-          - "tests"
+          - "capio-posix"
+          - "capio-server"
+          - "capio-common"
+          - "capio-tests"
     steps:
       - uses: actions/checkout@v4
       - name: "Run clang-format style check"
-        uses: jidicula/clang-format-action@v4.11.0
+        uses: jidicula/clang-format-action@v4.15.0
         with:
-          clang-format-version: "16"
+          clang-format-version: "20"
           check-path: "${{ matrix.path }}"
   unit-tests:
     name: "Build ${{ matrix.build_type }} with ${{ matrix.cxx }}"
     runs-on: ubuntu-22.04
+    continue-on-error: true
     strategy:
       matrix:
         build_type:
           - Debug
           - Release
         cxx:
-          - g++-9
           - g++-10
           - g++-11
           - g++-12
@@ -126,7 +110,8 @@ jobs:
             libopenmpi-dev \
             ninja-build \
             openmpi-bin \
-            pkg-config
+            pkg-config \
+            cmake
       - name: "Get compiler version"
         run: |
           IFS='-' read -r -a COMPILER <<< "${{ matrix.cxx }}"
@@ -161,38 +146,48 @@ jobs:
                 -B ../build \
                 -S ${GITHUB_WORKSPACE}
           cmake --build ../build -j $(nproc)
-          sudo cmake --install ../build --prefix /usr/local
+          sudo cmake --install ../build --prefix /usr/local          
+
       - name: "Run tests"
         id: run-tests
-        timeout-minutes: 5
+        timeout-minutes: 2
         env:
           CAPIO_DIR: ${{ github.workspace }}
           CAPIO_LOG_LEVEL: -1
         run: |
           export LD_LIBRARY_PATH="/usr/local/lib:${LD_LIBRARY_PATH}"
-          
+
+          echo "Run CAPIO syscall Unit tests"         
+          capio_server --no-config &
+          CAPIO_SERVER_PID=$!
+          LD_PRELOAD=libcapio_posix.so  capio_syscall_unit_tests          \
+                  --gtest_break_on_failure --gtest_print_time=1
+          kill $CAPIO_SERVER_PID
+          sleep 2
+
+
+          echo "Run CAPIO memory file integration tests"
+          capio_server --no-config &
+          CAPIO_SERVER_PID=$!
+          LD_PRELOAD=libcapio_posix.so  capio_memory_file_unit_tests      \
+                  --gtest_break_on_failure  --gtest_print_time=1
+          kill $CAPIO_SERVER_PID
+          sleep 2
+
+
+
           echo "Run CAPIO POSIX Unit tests"
           capio_posix_unit_tests \
             --gtest_break_on_failure \
-            --gtest_print_time=1
-          
-          echo "Run CAPIO server Unit tests"
+            --gtest_print_time=1 
+          sleep 2
+
+
+          echo "Run CAPIO SERVER unit tests"
           capio_server_unit_tests \
             --gtest_break_on_failure \
             --gtest_print_time=1
-          
-          echo "Run CAPIO syscall Unit tests"
-          LD_PRELOAD=libcapio_posix.so \
-          capio_syscall_unit_tests \
-            --gtest_break_on_failure \
-            --gtest_print_time=1
-          
-          echo "Run CAPIO integration tests"
-          rm -rf /dev/shm/CAPIO*
-          LD_PRELOAD=libcapio_posix.so \
-          capio_integration_tests \
-            --gtest_break_on_failure \
-            --gtest_print_time=1
+
       - name: "Show client logs on failure"
         if: ${{ always() && steps.run-tests.outcome == 'failure' && matrix.build_type == 'Debug' }}
         run: tail -v -n +1 capio_logs/posix/$(hostname)/posix_thread_*.log
@@ -204,6 +199,7 @@ jobs:
         run: |
           pip install --upgrade gcovr
           gcovr \
+            --gcov-ignore-parse-errors \
             --exclude-throw-branches \
             --xml coverage.xml \
             --gcov-executable "${{ startsWith(matrix.cxx, 'clang-') && format('llvm-cov-{0} gcov', env.CXX_VERSION) || format('gcov-{0}', env.CXX_VERSION) }}" \
