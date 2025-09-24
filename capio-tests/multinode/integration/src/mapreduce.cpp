@@ -1,9 +1,7 @@
 #include "common.hpp"
-#include <future>
 
 int mapReduceFunction(char *sourcedirname, ssize_t sstart, ssize_t sfiles, char *destdirname,
-                      ssize_t dstart, ssize_t dfiles, float percent,
-                      std::promise<int> &&return_value) {
+                      ssize_t dstart, ssize_t dfiles, float percent, int *return_value) {
     struct timeval before, after;
     struct stat statbuf;
     char *dataptr       = NULL;
@@ -40,7 +38,7 @@ int mapReduceFunction(char *sourcedirname, ssize_t sstart, ssize_t sfiles, char 
     int r = writedata(dataptr, datalen, percent, destdirname, dstart, dfiles);
     free(dataptr);
 
-    return_value.set_value(r);
+    *return_value = r;
 
     gettimeofday(&after, NULL);
     double elapsed_time = diffmsec(after, before);
@@ -50,17 +48,17 @@ int mapReduceFunction(char *sourcedirname, ssize_t sstart, ssize_t sfiles, char 
 }
 
 TEST(integrationTests, RunMapReducerTest) {
-    std::promise<int> ret1, ret2;
+    int ret1 = -1, ret2 = -1;
     std::thread mapReducer1(mapReduceFunction, std::getenv("CAPIO_DIR"), 0, 5,
-                            std::getenv("CAPIO_DIR"), 0, 5, 0.3, std::move(ret1));
+                            std::getenv("CAPIO_DIR"), 0, 5, 0.3, &ret1);
     std::thread mapReducer2(mapReduceFunction, std::getenv("CAPIO_DIR"), 1, 5,
-                            std::getenv("CAPIO_DIR"), 1, 5, 0.3, std::move(ret2));
+                            std::getenv("CAPIO_DIR"), 1, 5, 0.3, &ret2);
 
     mapReducer1.join();
     mapReducer2.join();
 
-    EXPECT_EQ(ret1.get_future().get(), 0);
-    EXPECT_EQ(ret2.get_future().get(), 0);
+    EXPECT_EQ(ret1, 0);
+    EXPECT_EQ(ret2, 0);
 }
 
 int main(int argc, char **argv, char **envp) {
