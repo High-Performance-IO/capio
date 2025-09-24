@@ -2,13 +2,11 @@
 
 #include <linux/limits.h>
 
-int mergeFunction(ssize_t nfiles, char *sourcedir, char *destdir) {
+int mergeFunction(ssize_t nfiles, const char *sourcedir, const char *destdir) {
+    timeval before{}, after{};
+    struct stat statbuf{};
 
-    struct timeval before, after;
-    struct stat statbuf;
-    char *dataptr  = NULL;
-    size_t datalen = 0, datacapacity = 0;
-    gettimeofday(&before, NULL);
+    gettimeofday(&before, nullptr);
 
     EXPECT_GT(nfiles, 0);
 
@@ -18,16 +16,20 @@ int mergeFunction(ssize_t nfiles, char *sourcedir, char *destdir) {
     EXPECT_NE(stat(destdir, &statbuf), -1);
     EXPECT_TRUE(S_ISDIR(statbuf.st_mode));
 
+    std::vector<char> merged; // final result buffer
+
     char filepath[2 * PATH_MAX]{0};
     for (int i = 0; i < nfiles; ++i) {
         sprintf(filepath, fmtout, sourcedir, i);
         FILE *fp = fopen(filepath, "r");
-        EXPECT_NE(fileno(fp), -1);
+        EXPECT_TRUE(fp != nullptr);
 
-        char *ptr = readdata(fp, dataptr, &datalen, &datacapacity);
-        EXPECT_NE(ptr, nullptr);
+        auto chunk = readdata(fp);
+        EXPECT_FALSE(chunk.empty());
 
-        dataptr = ptr;
+        // append this file's data to merged
+        merged.insert(merged.end(), chunk.begin(), chunk.end());
+
         fclose(fp);
     }
 
@@ -36,11 +38,11 @@ int mergeFunction(ssize_t nfiles, char *sourcedir, char *destdir) {
     FILE *fp = fopen(resultpath, "w");
     EXPECT_TRUE(fp);
 
-    EXPECT_EQ(fwrite(dataptr, 1, datalen, fp), datalen);
+    EXPECT_EQ(fwrite(merged.data(), 1, merged.size(), fp), merged.size());
 
-    free(dataptr);
+    fclose(fp);
 
-    gettimeofday(&after, NULL);
+    gettimeofday(&after, nullptr);
     double elapsed_time = diffmsec(after, before);
     fprintf(stdout, "MERGE: elapsed time (ms) : %g\n", elapsed_time);
 

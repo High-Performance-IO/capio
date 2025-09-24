@@ -58,44 +58,35 @@ static char fmtout[]           = "%s/outfile_%05d.dat";
     "%s/infile_%05d.dat"; // 5 is the number of digits of maxnumfiles
 
 // reading file data into memory
-static inline char *readdata(FILE *fp, char *dataptr, size_t *datalen, size_t *datacapacity) {
-    char *buffer = (char *) malloc(maxphraselen);
-    if (!buffer) {
-        perror("malloc");
-        return NULL;
-    }
-    size_t len = maxphraselen - 1;
+static inline std::vector<char> readdata(FILE *fp) {
+    std::vector<char> data;
+    data.reserve(REALLOC_BATCH);
 
-    if (dataptr == 0) {
-        dataptr = (char *) realloc(dataptr, REALLOC_BATCH);
-        if (dataptr == NULL) {
-            perror("realloc");
-            return NULL;
-        }
-        *datacapacity = REALLOC_BATCH;
-        *datalen      = 0;
-    }
+    char *line = nullptr;
+    size_t len = 0;
     ssize_t r;
-    while (errno = 0, (r = getline(&buffer, &len, fp)) > 0) {
-        if ((*datalen + r) > *datacapacity) {
-            *datacapacity += REALLOC_BATCH;
-            char *tmp = (char *) realloc(dataptr, *datacapacity);
-            if (tmp == NULL) {
-                perror("realloc");
-                free(dataptr);
-                return NULL;
+
+    while (errno = 0, (r = getline(&line, &len, fp)) > 0) {
+        if (data.capacity() < data.size() + static_cast<size_t>(r)) {
+            // grow in batches
+            size_t newCap = data.capacity();
+            while (newCap < data.size() + static_cast<size_t>(r)) {
+                newCap += REALLOC_BATCH;
             }
-            dataptr = tmp;
+            data.reserve(newCap);
         }
-        strncpy(&dataptr[*datalen], buffer, maxphraselen);
-        *datalen += r;
+
+        // append raw bytes
+        data.insert(data.end(), line, line + r);
     }
+
     if (errno != 0) {
         perror("getline");
-        free(dataptr);
-        return NULL;
+        data.clear();
     }
-    return dataptr;
+
+    free(line); // getline() allocates, must free
+    return data;
 }
 
 static inline double diffmsec(const struct timeval a, const struct timeval b) {
@@ -109,33 +100,32 @@ static inline double diffmsec(const struct timeval a, const struct timeval b) {
     return ((double) (sec * 1000) + ((double) usec) / 1000.0);
 }
 
-[[maybe_unused]] static int writedata(char *dataptr, size_t datalen, float percent, char *destdir,
-                                      ssize_t dstart, ssize_t dfiles) {
+[[maybe_unused]] static int writedata(const std::vector<char> &data, float percent,
+                                      const char *destdir, ssize_t dstart, ssize_t dfiles) {
     int error = 0;
-    FILE **fp = (FILE **) calloc(sizeof(FILE *), dfiles);
-    if (!fp) {
-        perror("malloc");
-        return -1;
-    }
+    std::vector<FILE *> fps(dfiles, nullptr);
+
     char filepath[2 * PATH_MAX]{0};
 
-    // opening (truncating) all files
-    for (int j = 0, i = 0 + dstart; i < (dfiles + dstart); ++i, ++j) {
+    // Open (truncate) all files
+    for (int j = 0, i = dstart; i < (dstart + dfiles); ++i, ++j) {
         sprintf(filepath, fmtout, destdir, i);
-        fp[j] = fopen(filepath, "w");
-        if (!fp[j]) {
+        fps[j] = fopen(filepath, "w");
+        if (!fps[j]) {
             perror("fopen");
-            fprintf(stderr, "cannot create (open) the file %s\n", filepath);
+            std::cerr << "cannot create (open) the file " << filepath << "\n";
             error = -1;
         }
     }
 
     if (!error) {
-        size_t nbytes = datalen * percent;
-        size_t cnt    = 0;
+        size_t nbytes       = static_cast<size_t>(data.size() * percent);
+        size_t cnt          = 0;
+        const char *dataptr = data.data();
+
         while (nbytes > 0) {
             size_t chunk = (nbytes > REDUCE_CHUNK) ? REDUCE_CHUNK : nbytes;
-            if (fwrite(dataptr, 1, chunk, fp[cnt]) != chunk) {
+            if (fwrite(dataptr, 1, chunk, fps[cnt]) != chunk) {
                 perror("fwrite");
                 error = -1;
                 break;
@@ -144,13 +134,14 @@ static inline double diffmsec(const struct timeval a, const struct timeval b) {
             nbytes -= chunk;
         }
     }
-    // closing all files
-    for (int i = 0; i < dfiles; ++i) {
-        if (fp[i]) {
-            fclose(fp[i]);
+
+    // Close all files
+    for (auto f : fps) {
+        if (f) {
+            fclose(f);
         }
     }
-    free(fp);
+
     return error;
 }
 
