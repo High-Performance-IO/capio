@@ -233,15 +233,27 @@ bool CapioCLEngine::isFirable(const std::string &path) {
         LOG("Fire rule for file %s is %s", path.c_str(), std::get<3>(itm->second).c_str());
         return std::get<3>(itm->second) == CAPIO_FILE_MODE_NO_UPDATE;
     }
+
+    LOG("No entry found on map. checking globs...");
+    const auto is_firable = std::any_of(_locations.begin(), _locations.end(), [&](auto &itm) {
+        LOG("Checking against %s", itm.first.c_str());
+        if (std::regex_match(path.c_str(), std::get<10>(itm.second))) {
+            LOG("Found match. Is Firable: %s",
+                std::get<3>(itm.second) == CAPIO_FILE_MODE_NO_UPDATE ? "YES" : "NO");
+            return std::get<3>(itm.second) == CAPIO_FILE_MODE_NO_UPDATE;
+        }
+        return false;
+    });
+
     /*
      * For caching purpose, each new file is then added to the map if not found,
      * with its data being instantiated from the metadata of the most likely matched glob
-     * TODO: check overhead of this
      */
-    LOG("No entry found on map. checking globs. Creating new file from globs");
-    this->newFile((path));
+    LOG("Creating new file for caching purpose...");
+    this->newFile(path);
+    this->setFireRule(path, is_firable ? CAPIO_FILE_MODE_NO_UPDATE : CAPIO_FILE_MODE_UPDATE);
     LOG("Fire rule for file %s is  %s", path.c_str(), std::get<3>(_locations.at((path))).c_str());
-    return std::get<3>(_locations.at((path))) == CAPIO_FILE_MODE_NO_UPDATE;
+    return is_firable;
 }
 
 void CapioCLEngine::setPermanent(const std::string &path, bool value) {
