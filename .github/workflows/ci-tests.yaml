@@ -190,7 +190,7 @@ jobs:
           
           
           echo "Run CAPIO integration tests"
-          rm -rf /dev/shm/CAPIO*
+          rm -rf /dev/shm/*CAPIO*
           LD_PRELOAD=libcapio_posix.so \
           capio_integration_tests \
             --gtest_break_on_failure \
