@@ -4,6 +4,7 @@
 
 #include <fcntl.h>
 #include <semaphore.h>
+#include <syscall.h>
 #include <unistd.h>
 
 constexpr int ARRAY_SIZE = 100;
@@ -60,7 +61,7 @@ TEST(SystemCallTest, TestThreadCloneProducerConsumer) {
 }
 
 TEST(SystemCallTest, TestForkParentChild) {
-    auto pid = fork();
+    auto pid = syscall(SYS_fork);
     EXPECT_GE(pid, 0);
     if (pid == 0) {
         exit(EXIT_SUCCESS);
@@ -68,7 +69,7 @@ TEST(SystemCallTest, TestForkParentChild) {
 }
 
 TEST(SystemCallTest, TestThreadCloneProducerConsumerWithStat) {
-    constexpr const char *PATHNAME = "test_file.txt";
+    constexpr const char *PATHNAME = "test_clone.txt";
     sem                            = static_cast<sem_t *>(malloc(sizeof(sem_t)));
     EXPECT_EQ(sem_init(sem, 0, 0), 0);
     FILE *fp = fopen(PATHNAME, "w+");
