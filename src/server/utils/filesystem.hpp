@@ -25,7 +25,7 @@ void write_entry_dir(int tid, const std::filesystem::path &file_path,
     START_LOG(gettid(), "call(file_path=%s, dir=%s, type=%d)", file_path.c_str(), dir.c_str(),
               type);
 
-    struct linux_dirent64 ld {};
+    struct linux_dirent64 ld{};
     ld.d_ino = std::hash<std::string>{}(file_path);
     std::filesystem::path file_name;
     if (type == 0) {

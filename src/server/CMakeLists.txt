@@ -13,12 +13,15 @@ set(TARGET_SOURCES
 FetchContent_Declare(
         args
         GIT_REPOSITORY https://github.com/Taywee/args.git
-        GIT_TAG 6.4.6
+        GIT_TAG 6.4.7
 )
+set(ARGS_BUILD_EXAMPLE OFF CACHE INTERNAL "")
+set(ARGS_BUILD_UNITTESTS OFF CACHE INTERNAL "")
+
 FetchContent_Declare(
         simdjson
         GIT_REPOSITORY https://github.com/simdjson/simdjson.git
-        GIT_TAG v3.3.0
+        GIT_TAG v4.0.6
 )
 FetchContent_MakeAvailable(args simdjson)
 
