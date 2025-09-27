@@ -175,16 +175,19 @@ jobs:
             --gtest_break_on_failure \
             --gtest_print_time=1
           
+          
           echo "Run CAPIO server Unit tests"
           capio_server_unit_tests \
             --gtest_break_on_failure \
             --gtest_print_time=1
+          
           
           echo "Run CAPIO syscall Unit tests"
           LD_PRELOAD=libcapio_posix.so \
           capio_syscall_unit_tests \
             --gtest_break_on_failure \
             --gtest_print_time=1
+          
           
           echo "Run CAPIO integration tests"
           rm -rf /dev/shm/CAPIO*
