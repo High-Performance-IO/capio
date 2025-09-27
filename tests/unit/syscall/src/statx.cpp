@@ -22,7 +22,7 @@ TEST(SystemCallTest, TestStatxOnFileWithAtFdcwd) {
     EXPECT_EQ(faccessat(AT_FDCWD, PATHNAME, F_OK, 0), 0);
     EXPECT_EQ(write(fd, BUFFER, strlen(BUFFER)), strlen(BUFFER));
     EXPECT_NE(close(fd), -1);
-    struct statx statxbuf {};
+    struct statx statxbuf{};
     EXPECT_EQ(statx(AT_FDCWD, PATHNAME, 0, STATX_BASIC_STATS | STATX_BTIME, &statxbuf), 0);
     check_statxbuf(statxbuf, strlen(BUFFER) * sizeof(char));
     EXPECT_NE(unlinkat(AT_FDCWD, PATHNAME, 0), -1);
@@ -33,7 +33,7 @@ TEST(SystemCallTest, TestStatxOnDirectoryWithAtFdcwd) {
     constexpr const char *PATHNAME = "test";
     EXPECT_NE(mkdirat(AT_FDCWD, PATHNAME, S_IRWXU), -1);
     EXPECT_EQ(faccessat(AT_FDCWD, PATHNAME, F_OK, 0), 0);
-    struct statx statxbuf {};
+    struct statx statxbuf{};
     EXPECT_EQ(statx(AT_FDCWD, PATHNAME, 0, STATX_BASIC_STATS | STATX_BTIME, &statxbuf), 0);
     check_statxbuf(statxbuf, 4096);
     EXPECT_NE(unlinkat(AT_FDCWD, PATHNAME, AT_REMOVEDIR), -1);
@@ -51,7 +51,7 @@ TEST(SystemCallTest, TestStatxOnFileInDifferentDirectoryWithAbsolutePath) {
     EXPECT_EQ(faccessat(0, PATHNAME, F_OK, 0), 0);
     EXPECT_EQ(write(fd, BUFFER, strlen(BUFFER)), strlen(BUFFER));
     EXPECT_NE(close(fd), -1);
-    struct statx statxbuf {};
+    struct statx statxbuf{};
     EXPECT_EQ(statx(AT_FDCWD, PATHNAME, 0, STATX_BASIC_STATS | STATX_BTIME, &statxbuf), 0);
     check_statxbuf(statxbuf, strlen(BUFFER) * sizeof(char));
     EXPECT_NE(unlinkat(0, PATHNAME, 0), -1);
@@ -63,7 +63,7 @@ TEST(SystemCallTest, TestStatxOnDirectoryInDifferentDirectoryWithAbsoluePath) {
     const char *PATHNAME = path_fs.c_str();
     EXPECT_NE(mkdirat(0, PATHNAME, S_IRWXU), -1);
     EXPECT_EQ(faccessat(0, PATHNAME, F_OK, 0), 0);
-    struct statx statxbuf {};
+    struct statx statxbuf{};
     EXPECT_EQ(statx(AT_FDCWD, PATHNAME, 0, STATX_BASIC_STATS | STATX_BTIME, &statxbuf), 0);
     check_statxbuf(statxbuf, 4096);
     EXPECT_NE(unlinkat(0, PATHNAME, AT_REMOVEDIR), -1);
@@ -81,7 +81,7 @@ TEST(SystemCallTest, TestStatxOnFileInDifferentDirectoryWithDirfd) {
     EXPECT_EQ(faccessat(dirfd, PATHNAME, F_OK, 0), 0);
     EXPECT_EQ(write(fd, BUFFER, strlen(BUFFER)), strlen(BUFFER));
     EXPECT_NE(close(fd), -1);
-    struct statx statxbuf {};
+    struct statx statxbuf{};
     EXPECT_EQ(statx(dirfd, PATHNAME, 0, STATX_BASIC_STATS | STATX_BTIME, &statxbuf), 0);
     check_statxbuf(statxbuf, strlen(BUFFER) * sizeof(char));
     EXPECT_NE(unlinkat(dirfd, PATHNAME, 0), -1);
@@ -96,7 +96,7 @@ TEST(SystemCallTest, TestStatxOnDirectoryInDifferentDirectoryWithDirfd) {
     EXPECT_NE(dirfd, -1);
     EXPECT_NE(mkdirat(dirfd, PATHNAME, S_IRWXU), -1);
     EXPECT_EQ(faccessat(dirfd, PATHNAME, F_OK, 0), 0);
-    struct statx statxbuf {};
+    struct statx statxbuf{};
     EXPECT_EQ(statx(dirfd, PATHNAME, 0, STATX_BASIC_STATS | STATX_BTIME, &statxbuf), 0);
     check_statxbuf(statxbuf, 4096);
     EXPECT_NE(unlinkat(dirfd, PATHNAME, AT_REMOVEDIR), -1);
@@ -105,7 +105,7 @@ TEST(SystemCallTest, TestStatxOnDirectoryInDifferentDirectoryWithDirfd) {
 }
 
 TEST(SystemCallTest, TestStatxWithAtEmptyPathAndAtFdcwd) {
-    struct statx statxbuf {};
+    struct statx statxbuf{};
     EXPECT_EQ(statx(AT_FDCWD, "", AT_EMPTY_PATH, STATX_BASIC_STATS | STATX_BTIME, &statxbuf), 0);
     check_statxbuf(statxbuf, 4096);
 }
@@ -117,7 +117,7 @@ TEST(SystemCallTest, TestStatxOnFileWithAtEmptyPathAndDirfd) {
     int dirfd = openat(AT_FDCWD, PATHNAME, O_CREAT | O_WRONLY | O_TRUNC, S_IRUSR | S_IWUSR);
     EXPECT_EQ(faccessat(AT_FDCWD, PATHNAME, F_OK, 0), 0);
     EXPECT_EQ(write(dirfd, BUFFER, strlen(BUFFER)), strlen(BUFFER));
-    struct statx statxbuf {};
+    struct statx statxbuf{};
     EXPECT_EQ(statx(dirfd, "", AT_EMPTY_PATH, STATX_BASIC_STATS | STATX_BTIME, &statxbuf), 0);
     check_statxbuf(statxbuf, strlen(BUFFER) * sizeof(char));
     EXPECT_NE(close(dirfd), -1);
@@ -131,7 +131,7 @@ TEST(SystemCallTest, TestStatxOnDirectoryWithAtEmptyPathAndDirfd) {
     EXPECT_EQ(faccessat(AT_FDCWD, PATHNAME, F_OK, 0), 0);
     int dirfd = openat(AT_FDCWD, PATHNAME, O_RDONLY | O_DIRECTORY);
     EXPECT_NE(dirfd, -1);
-    struct statx statxbuf {};
+    struct statx statxbuf{};
     EXPECT_EQ(statx(dirfd, "", AT_EMPTY_PATH, STATX_BASIC_STATS | STATX_BTIME, &statxbuf), 0);
     check_statxbuf(statxbuf, 4096);
     EXPECT_NE(close(dirfd), -1);
@@ -140,27 +140,27 @@ TEST(SystemCallTest, TestStatxOnDirectoryWithAtEmptyPathAndDirfd) {
 }
 
 TEST(SystemCallTest, TestStatxOnNonexistentFile) {
-    struct statx statxbuf {};
+    struct statx statxbuf{};
     EXPECT_EQ(statx(AT_FDCWD, "test", 0, STATX_BASIC_STATS | STATX_BTIME, &statxbuf), -1);
     EXPECT_EQ(errno, ENOENT);
 }
 
 TEST(SystemCallTest, TestStatxOnRelativePathWithInvalidDirfd) {
     constexpr const char *PATHNAME = "test";
-    struct statx statxbuf {};
+    struct statx statxbuf{};
     EXPECT_EQ(statx(-1, PATHNAME, 0, STATX_BASIC_STATS | STATX_BTIME, &statxbuf), -1);
     EXPECT_EQ(errno, EBADF);
 }
 
 TEST(SystemCallTest, TestStatxWithStatxReservedSet) {
     constexpr const char *PATHNAME = "test";
-    struct statx statxbuf {};
+    struct statx statxbuf{};
     EXPECT_EQ(statx(-1, PATHNAME, 0, STATX__RESERVED, &statxbuf), -1);
     EXPECT_EQ(errno, EINVAL);
 }
 
 TEST(SystemCallTest, TestStatxWithEmptyPathAndNoEmptyPath) {
-    struct statx statxbuf {};
+    struct statx statxbuf{};
     EXPECT_EQ(statx(AT_FDCWD, "", 0, STATX_BASIC_STATS | STATX_BTIME, &statxbuf), -1);
     EXPECT_EQ(errno, ENOENT);
 }
