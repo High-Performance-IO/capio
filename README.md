@@ -15,7 +15,7 @@ python and bash.
 CAPIO depends on the following software that needs to be manually installed:
 
 - `cmake >=3.15`
-- `c++17` or newer
+- `c++20` or newer
 - `openmpi`
 - `pthreads`
 

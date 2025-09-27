@@ -12,14 +12,14 @@ concurrency:
 jobs:
   codespell-check:
     name: "Check codespell conformance"
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
       - name: "Run codespell"
         uses: codespell-project/actions-codespell@v2
   docker-check:
     name: "Check Docker image"
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     strategy:
       matrix:
         cmake-build-type:
@@ -84,7 +84,7 @@ jobs:
 
   format-check:
     name: "Check ${{ matrix.path }} clang-format conformance"
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     strategy:
       matrix:
         path:
@@ -93,20 +93,19 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: "Run clang-format style check"
-        uses: jidicula/clang-format-action@v4.11.0
+        uses: jidicula/clang-format-action@v4.15.0
         with:
-          clang-format-version: "16"
+          clang-format-version: "20"
           check-path: "${{ matrix.path }}"
   unit-tests:
     name: "Build ${{ matrix.build_type }} with ${{ matrix.cxx }}"
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     strategy:
       matrix:
         build_type:
           - Debug
           - Release
         cxx:
-          - g++-9
           - g++-10
           - g++-11
           - g++-12
@@ -219,7 +218,7 @@ jobs:
   upload-to-codecov:
     name: "Codecov report upload"
     needs: [ "unit-tests" , "codespell-check" , "format-check" ]
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
       - name: "Download artifacts"
