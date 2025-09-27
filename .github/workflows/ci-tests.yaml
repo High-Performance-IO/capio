@@ -146,7 +146,6 @@ jobs:
         run: |
           apt update
           apt install -y      \
-            libcapstone-dev   \
             openmpi-bin       \
             libopenmpi-dev    \
             ninja-build       \
@@ -164,6 +163,28 @@ jobs:
             python3-pip       \
             python3-venv
 
+      - name: "Get compiler version"
+        run: |
+          IFS='-' read -r -a COMPILER <<< "${{ matrix.cxx }}"
+          echo "CXX_VERSION=${COMPILER[1]}" >> $GITHUB_ENV
+      - name: "Install Clang"
+        if: ${{ startsWith(matrix.cxx, 'clang-') }}
+        run: |
+          wget -O /tmp/llvm.sh https://apt.llvm.org/llvm.sh
+          chmod u+x /tmp/llvm.sh
+          sudo /tmp/llvm.sh ${{ env.CXX_VERSION }}
+          rm -f /tmp/llvm.sh
+      - name: "Fix missing libclang_rt.profile for Clang 14"
+        if: ${{ matrix.cxx == 'clang-14' }}
+        run: |
+          sudo apt download libclang-rt-14-dev
+          sudo dpkg --force-all -i libclang-rt-14-dev*
+      - name: "Install GCC"
+        if: ${{ startsWith(matrix.cxx, 'g++-') }}
+        run: |
+          sudo add-apt-repository ppa:ubuntu-toolchain-r/test
+          sudo apt update
+          sudo apt install -y ${{ matrix.cxx }}
       - name: "Run CMake"
         shell: bash
         run: |
