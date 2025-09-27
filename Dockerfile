@@ -10,7 +10,6 @@ RUN apt update                              \
         ca-certificates                     \
         cmake                               \
         git                                 \
-        libcapstone-dev                     \
         libopenmpi-dev                      \
         ninja-build                         \
         openmpi-bin                         \
@@ -39,7 +38,6 @@ ENV LD_LIBRARY_PATH="/usr/local/lib"
 
 RUN apt update                                                \
  && apt install -y --no-install-recommends                    \
-        libcapstone4                                          \
         openmpi-bin                                           \
         openssh-server                                        \
  && rm -rf /var/lib/apt/lists/*                               \
