@@ -2,7 +2,7 @@
 # Target information
 #####################################
 set(TARGET_NAME capio_server_unit_tests)
-set(TARGET_INCLUDE_FOLDER "${PROJECT_SOURCE_DIR}/src/server")
+set(TARGET_INCLUDE_FOLDER "${PROJECT_SOURCE_DIR}/capio/server")
 set(TARGET_SOURCES
         ${CMAKE_CURRENT_SOURCE_DIR}/src/capio_file.cpp
 )

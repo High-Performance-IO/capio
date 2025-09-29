@@ -2,7 +2,7 @@
 
 #include <iostream>
 
-#include "capio/env.hpp"
+#include "common/env.hpp"
 #include "utils/capio_file.hpp"
 
 TEST(ServerTest, TestInsertSingleSector) {

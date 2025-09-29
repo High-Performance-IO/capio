@@ -18,7 +18,7 @@ RUN apt update                              \
 
 COPY CMakeLists.txt /opt/capio/
 COPY scripts /opt/capio/scripts
-COPY src /opt/capio/src
+COPY capio /opt/capio/src
 COPY tests /opt/capio/tests
 
 RUN mkdir -p /opt/capio/build                     \
