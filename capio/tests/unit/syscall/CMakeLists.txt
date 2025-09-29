@@ -3,18 +3,18 @@
 #####################################
 set(TARGET_NAME capio_syscall_unit_tests)
 set(TARGET_SOURCES
-        src/clone.cpp
-        src/chdir.cpp
-        src/directory.cpp
-        src/dirent.cpp
-        src/dup.cpp
-        src/file.cpp
-        src/fcntl.cpp
-        src/main.cpp
-        src/rename.cpp
-        src/stat.cpp
-        src/statx.cpp
-        src/write.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/src/clone.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/src/chdir.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/src/directory.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/src/dirent.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/src/dup.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/src/file.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/src/fcntl.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/src/main.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/src/rename.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/src/stat.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/src/statx.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/src/write.cpp
 )
 
 #####################################
@@ -31,7 +31,7 @@ target_link_libraries(${TARGET_NAME} PRIVATE GTest::gtest)
 # Configure tests
 #####################################
 gtest_discover_tests(${TARGET_NAME}
-        WORKING_DIRECTORY ../../../..
+        WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}
         PROPERTIES ENVIRONMENT LD_PRELOAD=${PROJECT_BINARY_DIR}/src/posix/libcapio_posix.so
 )
 

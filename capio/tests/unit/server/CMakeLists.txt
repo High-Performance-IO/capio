@@ -2,7 +2,7 @@
 # Target information
 #####################################
 set(TARGET_NAME capio_server_unit_tests)
-set(TARGET_INCLUDE_FOLDER "../../../server")
+set(TARGET_INCLUDE_FOLDER "${PROJECT_SOURCE_DIR}/capio/server")
 set(TARGET_SOURCES
         src/capio_file.cpp
 )
@@ -31,7 +31,7 @@ target_link_libraries(${TARGET_NAME} PRIVATE GTest::gtest_main rt)
 # Configure tests
 #####################################
 gtest_discover_tests(${TARGET_NAME}
-        WORKING_DIRECTORY ../../../..
+        WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}
 )
 
 #####################################

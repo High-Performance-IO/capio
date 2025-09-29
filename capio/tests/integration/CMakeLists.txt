@@ -21,7 +21,7 @@ target_link_libraries(${TARGET_NAME} PRIVATE GTest::gtest)
 # Configure tests
 #####################################
 gtest_discover_tests(${TARGET_NAME}
-        WORKING_DIRECTORY ../../..
+        WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}
         PROPERTIES ENVIRONMENT LD_PRELOAD=${PROJECT_BINARY_DIR}/src/posix/libcapio_posix.so
 )
 
