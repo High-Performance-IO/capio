@@ -1,10 +1,20 @@
 #####################################
 # Target information
 #####################################
-set(TARGET_NAME capio_server_unit_tests)
-set(TARGET_INCLUDE_FOLDER "${PROJECT_SOURCE_DIR}/capio/server")
+set(TARGET_NAME capio_syscall_unit_tests)
 set(TARGET_SOURCES
-        ${CMAKE_CURRENT_SOURCE_DIR}/src/capio_file.cpp
+        src/clone.cpp
+        src/chdir.cpp
+        src/directory.cpp
+        src/dirent.cpp
+        src/dup.cpp
+        src/file.cpp
+        src/fcntl.cpp
+        src/main.cpp
+        src/rename.cpp
+        src/stat.cpp
+        src/statx.cpp
+        src/write.cpp
 )
 
 #####################################
@@ -13,25 +23,16 @@ set(TARGET_SOURCES
 add_executable(${TARGET_NAME} ${TARGET_SOURCES})
 
 #####################################
-# Include files and directories
-#####################################
-file(GLOB_RECURSE CAPIO_SERVER_HEADERS "${TARGET_INCLUDE_FOLDER}/*.hpp")
-target_sources(${TARGET_NAME} PRIVATE
-        "${CAPIO_COMMON_HEADERS}"
-        "${CAPIO_SERVER_HEADERS}"
-)
-target_include_directories(${TARGET_NAME} PRIVATE ${TARGET_INCLUDE_FOLDER})
-
-#####################################
 # Link libraries
 #####################################
-target_link_libraries(${TARGET_NAME} PRIVATE GTest::gtest_main rt)
+target_link_libraries(${TARGET_NAME} PRIVATE GTest::gtest)
 
 #####################################
 # Configure tests
 #####################################
 gtest_discover_tests(${TARGET_NAME}
-        WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}
+        WORKING_DIRECTORY ../../../..
+        PROPERTIES ENVIRONMENT LD_PRELOAD=${PROJECT_BINARY_DIR}/src/posix/libcapio_posix.so
 )
 
 #####################################
