@@ -24,7 +24,7 @@ FetchContent_Declare(
 
 set(ARGS_BUILD_EXAMPLE OFF CACHE INTERNAL "")
 set(ARGS_BUILD_UNITTESTS OFF CACHE INTERNAL "")
-
+set(SIMDJSON_IMPLEMENTATION fallback CACHE STRING "" FORCE)
 
 FetchContent_MakeAvailable(args simdjson)
 

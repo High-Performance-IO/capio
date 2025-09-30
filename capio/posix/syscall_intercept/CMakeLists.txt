@@ -22,4 +22,5 @@ ExternalProject_Add(syscall_intercept
         -DBUILD_EXAMPLES=OFF
         -DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE}
         -DCMAKE_INSTALL_PREFIX:PATH=<INSTALL_DIR>
+        -DCMAKE_POLICY_VERSION_MINIMUM=3.5
 )
