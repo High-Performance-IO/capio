@@ -2,9 +2,9 @@
 # Target information
 #####################################
 set(TARGET_NAME capio_server)
-set(TARGET_INCLUDE_FOLDER ${CMAKE_CURRENT_SOURCE_DIR})
 file(GLOB_RECURSE TARGET_SOURCES
         "${CMAKE_CURRENT_SOURCE_DIR}/**/*.cpp"
+        "capio_server.cpp"
 )
 
 #####################################
@@ -21,7 +21,7 @@ FetchContent_Declare(
         GIT_TAG v3.3.0
 )
 
-set(SIMDJSON_IMPLEMENTATION fallback CACHE STRING "" FORCE)
+
 set(ARGS_BUILD_EXAMPLE OFF CACHE INTERNAL "")
 set(ARGS_BUILD_UNITTESTS OFF CACHE INTERNAL "")
 
@@ -42,7 +42,7 @@ target_sources(${TARGET_NAME} PRIVATE
         "${CAPIO_SERVER_HEADERS}"
 )
 target_include_directories(${TARGET_NAME} PRIVATE
-        ${TARGET_INCLUDE_FOLDER}/include
+        ${${CMAKE_CURRENT_SOURCE_DIR}}/include
         ${MPI_INCLUDE_PATH}
         ${args_SOURCE_DIR}
         ${simdjson_SOURCE_DIR}
