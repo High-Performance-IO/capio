@@ -3,7 +3,7 @@
 
 #include "read.hpp"
 
-#include "utils/filesystem.hpp"
+#include "server/include/utils/filesystem.hpp"
 
 inline void handle_pending_remote_nfiles(const std::filesystem::path &path) {
     START_LOG(gettid(), "call(%s)", path.c_str());

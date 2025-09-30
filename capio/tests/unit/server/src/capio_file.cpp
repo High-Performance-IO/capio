@@ -3,7 +3,7 @@
 #include <iostream>
 
 #include "common/env.hpp"
-#include "utils/capio_file.hpp"
+#include "server/include/utils/capio_file.hpp"
 
 TEST(ServerTest, TestInsertSingleSector) {
     CapioFile c_file;

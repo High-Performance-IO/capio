@@ -22,7 +22,7 @@
 
 std::string workflow_name;
 
-#include "utils/types.hpp"
+#include "include/utils/types.hpp"
 
 // tid -> (client_to_server_data_buf, server_to_client_data_buf)
 CSDataBufferMap_t data_buffers;
@@ -30,12 +30,12 @@ CSDataBufferMap_t data_buffers;
 #include "common/env.hpp"
 #include "common/logger.hpp"
 #include "common/semaphore.hpp"
-#include "utils/capio_file.hpp"
-#include "utils/common.hpp"
-#include "utils/env.hpp"
-#include "utils/json.hpp"
-#include "utils/metadata.hpp"
-#include "utils/requests.hpp"
+#include "include/utils/capio_file.hpp"
+#include "include/utils/common.hpp"
+#include "include/utils/env.hpp"
+#include "include/utils/json.hpp"
+#include "include/utils/metadata.hpp"
+#include "include/utils/requests.hpp"
 
 using namespace simdjson;
 
@@ -64,11 +64,11 @@ CSClientsRemotePendingNFilesMap_t clients_remote_pending_nfiles;
 
 std::mutex nfiles_mutex;
 
-#include "handlers.hpp"
-#include "utils/location.hpp"
-#include "utils/signals.hpp"
+#include "include/handlers.hpp"
+#include "include/utils/location.hpp"
+#include "include/utils/signals.hpp"
 
-#include "remote/listener.hpp"
+#include "include/remote/listener.hpp"
 
 static constexpr std::array<CSHandler_t, CAPIO_NR_REQUESTS> build_request_handlers_table() {
     std::array<CSHandler_t, CAPIO_NR_REQUESTS> _request_handlers{0};
