@@ -6,10 +6,10 @@
 #include "common/constants.hpp"
 #include "common/dirent.hpp"
 
-#include "capio_file.hpp"
-#include "metadata.hpp"
-#include "requests.hpp"
-#include "types.hpp"
+#include "utils/capio_file.hpp"
+#include "utils/metadata.hpp"
+#include "utils/requests.hpp"
+#include "utils/types.hpp"
 
 void send_data_to_client(int tid, int fd, char *buf, off64_t offset, off64_t count) {
     START_LOG(gettid(), "call(tid=%d, fd=%d, buf=0x%08x, offset=%ld, count=%ld)", tid, fd, buf,

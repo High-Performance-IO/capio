@@ -3,10 +3,10 @@
 
 #include "common/logger.hpp"
 
-#include "backend.hpp"
-#include "backend/include.hpp"
-
-#include "handlers.hpp"
+#include "remote/backend.hpp"
+#include "remote/backend/include.hpp"
+#include "remote/handlers/read.hpp"
+#include "remote/handlers/stat.hpp"
 
 typedef void (*CComsHandler_t)(const RemoteRequest &);
 

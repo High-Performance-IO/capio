@@ -2,9 +2,9 @@
 # Target information
 #####################################
 set(TARGET_NAME capio_server)
-set(TARGET_INCLUDE_FOLDER ${CMAKE_CURRENT_SOURCE_DIR})
-set(TARGET_SOURCES
-        ${CMAKE_CURRENT_SOURCE_DIR}/capio_server.cpp
+file(GLOB_RECURSE TARGET_SOURCES
+        "${CMAKE_CURRENT_SOURCE_DIR}/**/*.cpp"
+        "capio_server.cpp"
 )
 
 #####################################
@@ -20,6 +20,12 @@ FetchContent_Declare(
         GIT_REPOSITORY https://github.com/simdjson/simdjson.git
         GIT_TAG v3.3.0
 )
+
+
+set(ARGS_BUILD_EXAMPLE OFF CACHE INTERNAL "")
+set(ARGS_BUILD_UNITTESTS OFF CACHE INTERNAL "")
+
+
 FetchContent_MakeAvailable(args simdjson)
 
 #####################################
@@ -30,13 +36,13 @@ add_executable(${TARGET_NAME} ${TARGET_SOURCES} ${simdjson_SOURCE_DIR}/singlehea
 #####################################
 # Include files and directories
 #####################################
-file(GLOB_RECURSE CAPIO_SERVER_HEADERS "*.hpp")
+file(GLOB_RECURSE CAPIO_SERVER_HEADERS "${CMAKE_CURRENT_SOURCE_DIR}/include/**/*.hpp")
 target_sources(${TARGET_NAME} PRIVATE
         "${CAPIO_COMMON_HEADERS}"
         "${CAPIO_SERVER_HEADERS}"
 )
 target_include_directories(${TARGET_NAME} PRIVATE
-        ${TARGET_INCLUDE_FOLDER}
+        ${CMAKE_CURRENT_SOURCE_DIR}/include
         ${MPI_INCLUDE_PATH}
         ${args_SOURCE_DIR}
         ${simdjson_SOURCE_DIR}
