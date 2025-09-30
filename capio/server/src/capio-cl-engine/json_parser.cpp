@@ -309,7 +309,7 @@ CapioCLEngine *JsonParser::parse(const std::filesystem::path &source,
                     is_file ? locations->setFile(path) : locations->setDirectory(path);
                     locations->setCommitRule(path, commit);
                     locations->setFireRule(path, firerule);
-                    locations->setCommitedNumber(path, n_close);
+                    locations->setCommitedCloseNumber(path, n_close);
                     locations->setFileDeps(path, file_deps);
                 }
             }

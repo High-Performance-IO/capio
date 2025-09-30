@@ -1,5 +1,4 @@
 #include "posix/utils/env.hpp"
-
 #include <common/constants.hpp>
 #include <common/filesystem.hpp>
 #include <common/logger.hpp>
@@ -156,7 +155,7 @@ void CapioCLEngine::newFile(const std::string &path) {
         std::string fire   = CAPIO_FILE_MODE_UPDATE;
 
         /*
-         * Inherit commit and fire rules from LPM directory
+         * Inherit commit and fire rules from LPM (Longest Prefix Match) directory
          * matchSize is used to compute LPM
          */
         size_t matchSize = 0;
@@ -215,15 +214,23 @@ std::string CapioCLEngine::getCommitRule(const std::string &path) {
         return std::get<2>(itm->second);
     }
 
-    /*
-     * For caching purpose, each new file is then added to the map if not found,
-     * with its data being instantiated from the metadata of the most likely matched glob
-     * TODO: check overhead of this
-     */
-    LOG("No entry found on map. checking globs. Creating new file from globs");
+    LOG("No entry found on map. checking globs. Creating new file from globs for cache purpose");
     this->newFile((path));
-    LOG("Returning DEFAULT Fire rule for file %s (update)", path.c_str());
+    LOG("Returning commit rule for file %s (update)", path.c_str());
     return std::get<2>(_locations.at((path)));
+}
+
+std::string CapioCLEngine::getFireRule(const std::string &path) {
+    START_LOG(gettid(), "call(path=%s)", path.c_str());
+    if (const auto itm = _locations.find(path); itm != _locations.end()) {
+        LOG("Fire rule: %s", std::get<3>(_locations.at(path)).c_str());
+        return std::get<3>(itm->second);
+    }
+
+    LOG("No entry found on map. checking globs. Creating new file from globs for cache purpose");
+    this->newFile(path);
+    LOG("Returning Fire rule for file %s (update)", path.c_str());
+    return std::get<3>(_locations.at((path)));
 }
 
 void CapioCLEngine::setFireRule(const std::string &path, const std::string &fire_rule) {
@@ -239,12 +246,8 @@ bool CapioCLEngine::isFirable(const std::string &path) {
         LOG("Fire rule for file %s is %s", path.c_str(), std::get<3>(itm->second).c_str());
         return std::get<3>(itm->second) == CAPIO_FILE_MODE_NO_UPDATE;
     }
-    /*
-     * For caching purpose, each new file is then added to the map if not found,
-     * with its data being instantiated from the metadata of the most likely matched glob
-     * TODO: check overhead of this
-     */
-    LOG("No entry found on map. checking globs. Creating new file from globs");
+
+    LOG("No entry found on map. checking globs. Creating new file from globs for cache purpose");
     this->newFile((path));
     LOG("Fire rule for file %s is  %s", path.c_str(), std::get<3>(_locations.at((path))).c_str());
     return std::get<3>(_locations.at((path))) == CAPIO_FILE_MODE_NO_UPDATE;
@@ -290,7 +293,7 @@ bool CapioCLEngine::isDirectory(const std::string &path) const {
     return !isFile(path);
 }
 
-void CapioCLEngine::setCommitedNumber(const std::string &path, const int num) {
+void CapioCLEngine::setCommitedCloseNumber(const std::string &path, const int num) {
     START_LOG(gettid(), "call(path=%s, num=%ld)", path.c_str(), num);
     if (const auto itm = _locations.find(path); itm != _locations.end()) {
         std::get<7>(itm->second) = num;
@@ -309,8 +312,7 @@ void CapioCLEngine::remove(const std::string &path) {
     _locations.erase(path);
 }
 
-// TODO: return vector
-std::vector<std::string> CapioCLEngine::producers(const std::string &path) {
+std::vector<std::string> CapioCLEngine::getProducers(const std::string &path) {
     START_LOG(gettid(), "call(path=%s)", path.c_str());
     if (const auto itm = _locations.find(path); itm != _locations.end()) {
         return std::get<0>(itm->second);
@@ -318,8 +320,7 @@ std::vector<std::string> CapioCLEngine::producers(const std::string &path) {
     return {};
 }
 
-// TODO: return vector
-std::vector<std::string> CapioCLEngine::consumers(const std::string &path) {
+std::vector<std::string> CapioCLEngine::getConsumers(const std::string &path) {
     START_LOG(gettid(), "call(path=%s)", path.c_str());
     if (const auto itm = _locations.find(path); itm != _locations.end()) {
         return std::get<1>(itm->second);
@@ -390,7 +391,6 @@ int CapioCLEngine::getCommitCloseCount(std::filesystem::path::iterator::referenc
     return count;
 };
 
-// todo fix leak
 std::vector<std::string> CapioCLEngine::get_file_deps(const std::filesystem::path &path) {
     if (const auto itm = _locations.find(path); itm != _locations.end()) {
         return std::get<9>(itm->second);
@@ -408,7 +408,7 @@ void CapioCLEngine::setStoreFileInFileSystem(const std::filesystem::path &path) 
     std::get<11>(_locations.at(path)) = false;
 }
 
-bool CapioCLEngine::storeFileInMemory(const std::filesystem::path &path) {
+bool CapioCLEngine::isStoredInMemory(const std::filesystem::path &path) {
     if (const auto itm = _locations.find(path); itm != _locations.end()) {
         return std::get<11>(itm->second);
     }
@@ -429,14 +429,15 @@ std::vector<std::string> CapioCLEngine::getFileToStoreInMemory() {
 }
 
 std::string CapioCLEngine::get_home_node(const std::string &path) {
-    // TODO: understand here how to get the home node policy.
+    // TODO: understand here how to get the home node policy when home_node_policies are
+    //       being implemented.
     START_LOG(gettid(), "call(path=%s)", path.c_str());
     if (const auto location = _locations.find(path); location == _locations.end()) {
         LOG("No rule for home node. Returning create home node");
         return capio_global_configuration->node_name;
-    } else {
-        LOG("Found location entry");
     }
+
+    LOG("Found location entry");
     return capio_global_configuration->node_name;
 }
 

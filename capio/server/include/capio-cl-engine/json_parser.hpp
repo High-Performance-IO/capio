@@ -22,7 +22,7 @@ class JsonParser {
      *
      * @param path
      * @param base
-     * @return true if path is a subdirectory of base
+     * @return true if @p path is a subdirectory of base
      * @return false otherwise
      */
     static inline bool first_is_subpath_of_second(const std::filesystem::path &path,
