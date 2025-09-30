@@ -15,7 +15,7 @@ add_executable(${TARGET_NAME} ${TARGET_SOURCES})
 #####################################
 # Include files and directories
 #####################################
-file(GLOB_RECURSE CAPIO_SERVER_HEADERS "${TARGET_INCLUDE_FOLDER}/include/**.hpp**")
+file(GLOB_RECURSE CAPIO_SERVER_HEADERS "${TARGET_INCLUDE_FOLDER}/include/**/*.hpp")
 target_sources(${TARGET_NAME} PRIVATE
         "${CAPIO_COMMON_HEADERS}"
         "${CAPIO_SERVER_HEADERS}"
