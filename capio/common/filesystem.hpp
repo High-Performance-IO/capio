@@ -7,14 +7,14 @@
 #include <filesystem>
 #include <fstream>
 #include <iostream>
-
+#include <regex>
 #include <sys/stat.h>
 
 #include "common/logger.hpp"
 #include "common/syscall.hpp"
 #include "env.hpp"
 
-std::filesystem::path get_parent_dir_path(const std::filesystem::path &file_path) {
+inline std::filesystem::path get_parent_dir_path(const std::filesystem::path &file_path) {
     START_LOG(capio_syscall(SYS_gettid), "call(file_path=%s)", file_path.c_str());
     if (file_path == file_path.root_path()) {
         return file_path;
@@ -34,7 +34,7 @@ inline bool in_dir(const std::string &path, const std::string &glob) {
 inline bool is_directory(int dirfd) {
     START_LOG(capio_syscall(SYS_gettid), "call(dirfd=%d)", dirfd);
 
-    struct stat path_stat {};
+    struct stat path_stat{};
     int tmp = fstat(dirfd, &path_stat);
     if (tmp != 0) {
         LOG("Error at is_directory(dirfd=%d) -> %d: %d (%s)", dirfd, tmp, errno,
@@ -71,6 +71,43 @@ inline bool is_capio_path(const std::filesystem::path &path_to_check) {
     const auto res = is_prefix(get_capio_dir(), path_to_check);
     LOG("is_capio_path:%s", res ? "yes" : "no");
     return res;
+}
+
+/**
+ * Given a string, replace a single character with a string. This function is used
+ * when converting a CAPIO-CL wildcard into a C++ valid regular expression
+ * @param str
+ * @param symbol
+ * @param replacement
+ * @return
+ */
+[[nodiscard]] static std::string replaceSymbol(const std::string &str, char symbol,
+                                               const std::string &replacement) {
+    std::string result = str;
+    size_t pos         = 0;
+
+    // Find the symbol and replace it
+    while ((pos = result.find(symbol, pos)) != std::string::npos) {
+        result.replace(pos, 1, replacement);
+        pos += replacement.length(); // Move past the replacement
+    }
+
+    return result;
+}
+
+/**
+ * Convert a CAPIO-CL regular expression into a c++ valid regular expression
+ * @param capio_path String to convert
+ * @return std::regex compiled with the corresponding c++ regex
+ */
+[[maybe_unused]] [[nodiscard]] static std::regex generateCapioRegex(const std::string &capio_path) {
+    START_LOG(gettid(), "call(capio_path=%s)", capio_path.c_str());
+    auto computed = replaceSymbol(capio_path, '.', "\\.");
+    computed      = replaceSymbol(computed, '/', "\\/");
+    computed      = replaceSymbol(computed, '*', R"([a-zA-Z0-9\/\.\-_:]*)");
+    computed      = replaceSymbol(computed, '+', ".");
+    LOG("Computed regex: %s", computed.c_str());
+    return std::regex(computed);
 }
 
 #endif // CAPIO_COMMON_FILESYSTEM_HPP

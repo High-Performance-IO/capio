@@ -45,6 +45,8 @@ constexpr int THEORETICAL_SIZE_DIRENT64              = sizeof(ino64_t) + sizeof(
 constexpr char CAPIO_FILE_MODE_NO_UPDATE[]           = "no_update";
 constexpr char CAPIO_FILE_MODE_UPDATE[]              = "update";
 constexpr char CAPIO_FILE_COMMITTED_ON_CLOSE[]       = "on_close";
+constexpr char CAPIO_FILE_COMMITTED_ON_FILE[]        = "on_file";
+constexpr char CAPIO_FILE_COMMITTED_N_FILES[]        = "n_files";
 constexpr char CAPIO_FILE_COMMITTED_ON_TERMINATION[] = "on_termination";
 
 // CAPIO POSIX return codes
@@ -96,9 +98,10 @@ constexpr char CAPIO_LOG_SERVER_BANNER[] =
     "\\______/\n\n"
     "\033[0m   CAPIO - Cross Application Programmable IO         \n"
     "                    V. " CAPIO_VERSION "\n\n";
-constexpr char CAPIO_LOG_SERVER_CLI_LEVEL_INFO[]    = "[ \033[1;32m SERVER \033[0m ] ";
-constexpr char CAPIO_LOG_SERVER_CLI_LEVEL_WARNING[] = "[ \033[1;33m SERVER \033[0m ] ";
-constexpr char CAPIO_LOG_SERVER_CLI_LEVEL_ERROR[]   = "[ \033[1;31m SERVER \033[0m ] ";
+constexpr char CAPIO_LOG_SERVER_CLI_LEVEL_INFO[]    = "[\033[1;32mSERVER\033[0m";
+constexpr char CAPIO_LOG_SERVER_CLI_LEVEL_WARNING[] = "[\033[1;33mSERVER\033[0m";
+constexpr char CAPIO_LOG_SERVER_CLI_LEVEL_ERROR[]   = "[\033[1;31mSERVER\033[0m";
+constexpr char CAPIO_LOG_SERVER_CLI_LEVEL_JSON[]    = "[\033[1;34mSERVER\033[0m";
 constexpr char CAPIO_LOG_SERVER_CLI_LOGGING_ENABLED_WARNING[] =
     "[ \033[1;33m SERVER \033[0m ] "
     "|==================================================================|\n"
