@@ -15,7 +15,7 @@ class JsonParser {
      * @return true
      * @return false
      */
-    static bool is_int(const std::string &s);
+    static bool isInteger(const std::string &s);
 
     /**
      * @brief compare two paths
@@ -25,8 +25,8 @@ class JsonParser {
      * @return true if @p path is a subdirectory of base
      * @return false otherwise
      */
-    static inline bool first_is_subpath_of_second(const std::filesystem::path &path,
-                                                  const std::filesystem::path &base);
+    static inline bool firstIsSubpathOfSecond(const std::filesystem::path &path,
+                                              const std::filesystem::path &base);
 
   public:
     /**

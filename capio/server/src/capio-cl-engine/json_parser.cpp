@@ -1,11 +1,11 @@
-#include <common/logger.hpp>
+#include "capio-cl-engine/json_parser.hpp"
+#include "capio-cl-engine/capio_cl_engine.hpp"
+#include "common/logger.hpp"
+#include "singleheader/simdjson.h"
+#include "utils/configuration.hpp"
 #include <filesystem>
-#include <capio-cl-engine/capio_cl_engine.hpp>
-#include <capio-cl-engine/json_parser.hpp>
-#include <utils/configuration.hpp>
-#include <singleheader/simdjson.h>
 
-bool JsonParser::is_int(const std::string &s) {
+bool JsonParser::isInteger(const std::string &s) {
     START_LOG(gettid(), "call(%s)", s.c_str());
     bool res = false;
     if (!s.empty()) {
@@ -16,8 +16,8 @@ bool JsonParser::is_int(const std::string &s) {
     return res;
 }
 
-bool JsonParser::first_is_subpath_of_second(const std::filesystem::path &path,
-                                            const std::filesystem::path &base) {
+bool JsonParser::firstIsSubpathOfSecond(const std::filesystem::path &path,
+                                        const std::filesystem::path &base) {
     const auto mismatch_pair = std::mismatch(path.begin(), path.end(), base.begin(), base.end());
     return mismatch_pair.second == base.end();
 }
@@ -208,7 +208,7 @@ CapioCLEngine *JsonParser::parse(const std::filesystem::path &source,
                     if (pos != std::string::npos) {
                         commit_rule = committed.substr(0, pos);
                         std::string count_str(committed.substr(pos + 1, committed.length()));
-                        if (!JsonParser::is_int(count_str)) {
+                        if (!JsonParser::isInteger(count_str)) {
                             server_println(CAPIO_LOG_SERVER_CLI_LEVEL_ERROR,
                                            "commit rule on_close/n_files invalid number");
                             ERR_EXIT("error commit rule on_close invalid number: !is_int()");

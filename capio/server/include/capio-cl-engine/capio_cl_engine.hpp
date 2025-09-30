@@ -270,13 +270,13 @@ class CapioCLEngine {
     int getCommitCloseCount(std::filesystem::path::iterator::reference path) const;
 
     /// @brief Get file dependencies.
-    std::vector<std::string> get_file_deps(const std::filesystem::path &path);
+    std::vector<std::string> getCommitOnFileDependencies(const std::filesystem::path &path);
 
     /// @brief Get the list of files stored in memory.
     std::vector<std::string> getFileToStoreInMemory();
 
     /// @brief Get the home node of a file.
-    std::string get_home_node(const std::string &path);
+    std::string getHomeNode(const std::string &path);
 
     /**
      * @brief Check if a process is a producer for a file.
