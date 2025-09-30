@@ -5,7 +5,7 @@
 
 #include "common/constants.hpp"
 
-off64_t get_file_initial_size() {
+inline off64_t get_file_initial_size() {
     START_LOG(gettid(), "call()");
     static off64_t file_initial_size = 0;
     if (file_initial_size == 0) {
@@ -21,7 +21,7 @@ off64_t get_file_initial_size() {
     return file_initial_size;
 }
 
-off64_t get_prefetch_data_size() {
+inline off64_t get_prefetch_data_size() {
     START_LOG(gettid(), "call()");
     static off64_t prefetch_data_size = -1;
     if (prefetch_data_size == -1) {

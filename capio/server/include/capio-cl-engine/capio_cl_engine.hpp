@@ -1,5 +1,6 @@
 #ifndef CAPIO_ENGINE_HPP
 #define CAPIO_ENGINE_HPP
+#include <filesystem>
 #include <regex>
 #include <unordered_map>
 
@@ -51,6 +52,36 @@ class CapioCLEngine {
     static std::string truncateLastN(const std::string &str, const std::size_t n) {
         return str.length() > n ? "[..] " + str.substr(str.length() - n) : str;
     }
+
+    /**
+     * Given a string, replace a single character with a string. This function is used
+     * when converting a CAPIO-CL wildcard into a C++ valid regular expression
+     * @param str
+     * @param symbol
+     * @param replacement
+     * @return
+     */
+    [[nodiscard]] static std::string replaceSymbol(const std::string &str, char symbol,
+                                                   const std::string &replacement) {
+        std::string result = str;
+        size_t pos         = 0;
+
+        // Find the symbol and replace it
+        while ((pos = result.find(symbol, pos)) != std::string::npos) {
+            result.replace(pos, 1, replacement);
+            pos += replacement.length(); // Move past the replacement
+        }
+
+        return result;
+    }
+
+    /**
+     * Convert a CAPIO-CL regular expression into a c++ valid regular expression
+     * @param capio_path String to convert
+     * @return std::regex compiled with the corresponding c++ regex
+     */
+    [[maybe_unused]] [[nodiscard]] static std::regex
+    generateCapioRegex(const std::string &capio_path);
 
   protected:
     /**

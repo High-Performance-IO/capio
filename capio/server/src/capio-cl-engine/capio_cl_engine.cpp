@@ -6,6 +6,15 @@
 #include "utils/env.hpp"
 #include <iostream>
 
+std::regex CapioCLEngine::generateCapioRegex(const std::string &capio_path) {
+    START_LOG(gettid(), "call(capio_path=%s)", capio_path.c_str());
+    auto computed = replaceSymbol(capio_path, '.', "\\.");
+    computed      = replaceSymbol(computed, '/', "\\/");
+    computed      = replaceSymbol(computed, '*', R"([a-zA-Z0-9\/\.\-_:]*)");
+    computed      = replaceSymbol(computed, '+', ".");
+    LOG("Computed regex: %s", computed.c_str());
+    return std::regex(computed);
+}
 void CapioCLEngine::print() const {
     // First message
     server_println(CAPIO_LOG_SERVER_CLI_LEVEL_JSON, "");
