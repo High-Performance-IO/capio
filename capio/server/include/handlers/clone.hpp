@@ -1,7 +1,7 @@
 #ifndef CAPIO_SERVER_HANDLERS_CLONE_HPP
 #define CAPIO_SERVER_HANDLERS_CLONE_HPP
 
-#include "common.hpp"
+#include "handlers/common.hpp"
 
 // TODO: caching info
 inline void handle_clone(pid_t parent_tid, pid_t child_tid) {

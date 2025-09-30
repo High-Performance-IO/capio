@@ -1,8 +1,8 @@
 #ifndef CAPIO_SERVER_REMOTE_HANDLERS_READ_HPP
 #define CAPIO_SERVER_REMOTE_HANDLERS_READ_HPP
 
-#include "server/include/remote/backend.hpp"
-#include "server/include/remote/requests.hpp"
+#include "remote/backend.hpp"
+#include "remote/requests.hpp"
 
 inline void serve_remote_read(const std::filesystem::path &path, const std::string &dest, int tid,
                               int fd, off64_t count, off64_t offset, bool complete,

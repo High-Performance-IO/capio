@@ -4,7 +4,7 @@
 #include <charconv>
 
 #include "common/requests.hpp"
-#include "types.hpp"
+#include "utils/types.hpp"
 
 CSBufRequest_t *buf_requests;
 CSBufResponse_t *bufs_response;

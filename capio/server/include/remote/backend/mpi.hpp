@@ -3,7 +3,7 @@
 
 #include <mpi.h>
 
-#include "server/include/remote/backend.hpp"
+#include "remote/backend.hpp"
 
 class MPIBackend : public Backend {
 
@@ -76,8 +76,7 @@ class MPIBackend : public Backend {
         // receive from server
         MPI_Irecv(buff, CAPIO_SERVER_REQUEST_MAX_SIZE, MPI_CHAR, MPI_ANY_SOURCE, 0, MPI_COMM_WORLD,
                   &request);
-        struct timespec sleepTime {};
-        struct timespec returnTime {};
+        struct timespec sleepTime, returnTime;
         sleepTime.tv_sec  = 0;
         sleepTime.tv_nsec = 200000;
 

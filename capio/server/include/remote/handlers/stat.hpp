@@ -1,8 +1,8 @@
 #ifndef CAPIO_SERVER_REMOTE_HANDLERS_STAT_HPP
 #define CAPIO_SERVER_REMOTE_HANDLERS_STAT_HPP
 
-#include "server/include/remote/backend.hpp"
-#include "server/include/remote/requests.hpp"
+#include "remote/backend.hpp"
+#include "remote/requests.hpp"
 
 inline void serve_remote_stat(const std::filesystem::path &path, const std::string &dest,
                               int source_tid) {

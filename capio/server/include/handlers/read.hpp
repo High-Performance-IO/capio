@@ -4,12 +4,12 @@
 #include <mutex>
 #include <thread>
 
-#include "server/include/remote/backend.hpp"
-#include "server/include/remote/requests.hpp"
+#include "remote/backend.hpp"
+#include "remote/requests.hpp"
 
-#include "server/include/utils/location.hpp"
-#include "server/include/utils/metadata.hpp"
-#include "server/include/utils/producer.hpp"
+#include "utils/location.hpp"
+#include "utils/metadata.hpp"
+#include "utils/producer.hpp"
 
 std::mutex local_read_mutex;
 
