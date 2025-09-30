@@ -20,6 +20,9 @@ FetchContent_Declare(
         GIT_REPOSITORY https://github.com/simdjson/simdjson.git
         GIT_TAG v3.3.0
 )
+
+set(SIMDJSON_IMPLEMENTATION fallback CACHE STRING "" FORCE)
+
 FetchContent_MakeAvailable(args simdjson)
 
 #####################################

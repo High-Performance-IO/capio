@@ -3,7 +3,7 @@
 
 #include <csignal>
 
-#include "remote/backend.hpp"
+#include "server/include/remote/backend.hpp"
 
 #ifdef CAPIO_COVERAGE
 extern "C" void __gcov_dump(void);

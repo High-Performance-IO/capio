@@ -3,7 +3,7 @@
 
 #include <mpi.h>
 
-#include "remote/backend.hpp"
+#include "server/include/remote/backend.hpp"
 
 class MPIBackend : public Backend {
 

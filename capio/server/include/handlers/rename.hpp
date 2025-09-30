@@ -1,7 +1,7 @@
 #ifndef CAPIO_SERVER_HANDLERS_RENAME_HPP
 #define CAPIO_SERVER_HANDLERS_RENAME_HPP
 
-#include "utils/location.hpp"
+#include "server/include/utils/location.hpp"
 
 void handle_rename(int tid, const std::filesystem::path &oldpath,
                    const std::filesystem::path &newpath) {
