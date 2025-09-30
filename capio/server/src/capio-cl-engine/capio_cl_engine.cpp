@@ -1,10 +1,10 @@
-#include "posix/utils/env.hpp"
-#include <common/constants.hpp>
-#include <common/filesystem.hpp>
-#include <common/logger.hpp>
-#include <include/capio-cl-engine/capio_cl_engine.hpp>
+#include "capio-cl-engine/capio_cl_engine.hpp"
+#include "common/constants.hpp"
+#include "common/filesystem.hpp"
+#include "common/logger.hpp"
+#include "utils/configuration.hpp"
+#include "utils/env.hpp"
 #include <iostream>
-#include <server/include/utils/configuration.hpp>
 
 void CapioCLEngine::print() const {
     // First message

@@ -1,6 +1,6 @@
 #ifndef JSON_PARSER_HPP
 #define JSON_PARSER_HPP
-#include <include/capio-cl-engine/capio_cl_engine.hpp>
+#include <capio-cl-engine/capio_cl_engine.hpp>
 
 /**
  * @brief Contains the code to parse a JSON based CAPIO-CL configuration file

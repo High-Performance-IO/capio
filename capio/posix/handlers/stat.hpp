@@ -20,7 +20,9 @@ inline void fill_statbuf(struct stat *statbuf, off_t file_size, bool is_dir, ino
               "call(statbuf=0x%08x, file_size=%ld, is_dir=%s, inode=%ul)", statbuf, file_size,
               is_dir ? "true" : "false", inode);
 
-    struct timespec time{1, 1};
+    struct timespec time {
+        1, 1
+    };
     if (is_dir == 1) {
         statbuf->st_mode = S_IFDIR | S_IRWXU | S_IRGRP | S_IXGRP | S_IROTH | S_IXOTH;
         file_size        = 4096;

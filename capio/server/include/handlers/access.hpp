@@ -1,7 +1,7 @@
 #ifndef CAPIO_SERVER_HANDLERS_ACCESS_HPP
 #define CAPIO_SERVER_HANDLERS_ACCESS_HPP
 
-#include "server/include/utils/location.hpp"
+#include "utils/location.hpp"
 
 void access_handler(const char *const str) {
     START_LOG(gettid(), "call(str=%s)", str);

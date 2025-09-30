@@ -1,8 +1,8 @@
 #include <common/logger.hpp>
 #include <filesystem>
-#include <include/capio-cl-engine/capio_cl_engine.hpp>
-#include <include/capio-cl-engine/json_parser.hpp>
-#include <server/include/utils/configuration.hpp>
+#include <capio-cl-engine/capio_cl_engine.hpp>
+#include <capio-cl-engine/json_parser.hpp>
+#include <utils/configuration.hpp>
 #include <singleheader/simdjson.h>
 
 bool JsonParser::is_int(const std::string &s) {

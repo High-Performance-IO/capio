@@ -14,7 +14,7 @@
 #include "common/logger.hpp"
 #include "common/queue.hpp"
 
-#include "server/include/remote/backend.hpp"
+#include "remote/backend.hpp"
 
 /*
  * Only the server have all the information

@@ -1,7 +1,7 @@
 #ifndef CAPIO_CONFIGURATION_HPP
 #define CAPIO_CONFIGURATION_HPP
 
-#include <common/constants.hpp>
+#include "common/constants.hpp"
 #include <iostream>
 #include <string>
 #include <unistd.h>

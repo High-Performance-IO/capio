@@ -3,12 +3,12 @@
 
 #include <thread>
 
-#include "server/include/remote/backend.hpp"
-#include "server/include/remote/requests.hpp"
+#include "remote/backend.hpp"
+#include "remote/requests.hpp"
 
-#include "server/include/utils/location.hpp"
-#include "server/include/utils/metadata.hpp"
-#include "server/include/utils/producer.hpp"
+#include "utils/location.hpp"
+#include "utils/metadata.hpp"
+#include "utils/producer.hpp"
 
 inline void request_remote_getdents(int tid, int fd, off64_t count) {
     START_LOG(gettid(), "call(tid=%d, fd=%d, count=%ld)", tid, fd, count);

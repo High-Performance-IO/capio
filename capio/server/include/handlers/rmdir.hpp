@@ -1,7 +1,7 @@
 #ifndef CAPIO_SERVER_HANDLERS_RMDIR_HPP
 #define CAPIO_SERVER_HANDLERS_RMDIR_HPP
 
-#include "server/include/utils/location.hpp"
+#include "utils/location.hpp"
 
 inline void handle_rmdir(int tid, const std::filesystem::path &dir_to_remove) {
     START_LOG(gettid(), "call(tid=%d, dir_to_remove=%s)", tid, dir_to_remove.c_str());
