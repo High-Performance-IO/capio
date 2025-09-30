@@ -307,48 +307,56 @@ inline void set_current_dir(const std::filesystem::path &cwd) {
  */
 [[maybe_unused]] [[nodiscard]] static std::string
 resolve_possible_symlink(const std::filesystem::path &input_path) {
-    START_LOG(capio_syscall(SYS_gettid), "call(path=%s)", input_path.c_str());
 
-    LOG("Absolute path = %s", input_path.c_str());
+    // Cache for resolved symbolic links: link -> realpath
+    static std::unordered_map<std::string, std::string> resolved_symlinks_cache;
+
+    if (!resolved_symlinks_cache.contains(input_path)) {
+        START_LOG(capio_syscall(SYS_gettid), "call(path=%s)", input_path.c_str());
+
+        LOG("Absolute path = %s", input_path.c_str());
 
 #ifdef __CAPIO_POSIX
-    syscall_no_intercept_flag = true;
+        syscall_no_intercept_flag = true;
 #endif
 
-    std::filesystem::path resolved, input_abs_path = std::filesystem::absolute(input_path);
+        std::filesystem::path resolved;
 
-    for (const auto &part : input_abs_path) {
-        resolved /= part;
+        for (std::filesystem::path input_abs_path = std::filesystem::absolute(input_path);
+             const auto &part : input_abs_path) {
+            resolved /= part;
 
-        if (part == "." || part.empty()) {
-            continue;
-        }
-        if (part == "..") {
-            resolved = resolved.parent_path();
-            continue;
-        }
-        if (std::filesystem::is_symlink(resolved)) {
-            char buf[PATH_MAX]{0};
-            auto result =
-                capio_syscall(SYS_readlinkat, AT_FDCWD, resolved.c_str(), buf, sizeof(buf) - 1);
-            if (result == -1) {
-                LOG("File might not exist. path was %s and  Error is %s", resolved.c_str(),
-                    strerror(errno));
+            if (part == "." || part.empty()) {
                 continue;
             }
+            if (part == "..") {
+                resolved = resolved.parent_path();
+                continue;
+            }
+            if (std::filesystem::is_symlink(resolved)) {
+                char buf[PATH_MAX]{0};
+                auto result =
+                    capio_syscall(SYS_readlinkat, AT_FDCWD, resolved.c_str(), buf, sizeof(buf) - 1);
+                if (result == -1) {
+                    LOG("File might not exist. path was %s and  Error is %s", resolved.c_str(),
+                        strerror(errno));
+                    continue;
+                }
 
-            if (std::filesystem::path target(buf); target.is_relative()) {
-                resolved = resolved.parent_path() / target;
-            } else {
-                resolved = target;
+                if (std::filesystem::path target(buf); target.is_relative()) {
+                    resolved = resolved.parent_path() / target;
+                } else {
+                    resolved = target;
+                }
             }
         }
-    }
 #ifdef __CAPIO_POSIX
-    syscall_no_intercept_flag = false;
+        syscall_no_intercept_flag = false;
 #endif
 
-    return resolved;
+        resolved_symlinks_cache[input_path] = resolved;
+    }
+    return resolved_symlinks_cache[input_path];
 }
 
 #endif // CAPIO_POSIX_UTILS_FILESYSTEM_HPP

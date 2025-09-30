@@ -48,7 +48,7 @@ class ReadRequestCacheFS {
             } else {
                 LOG("[cache] Entry not found, initializing new entry to offset 0");
                 max_read = 0;
-                available_read_cache->emplace(current_path, max_read);
+                available_read_cache->emplace(current_path, 0);
             }
             LOG("[cache] Max read value is %llu %s", max_read,
                 max_read == ULLONG_MAX ? "(ULLONG_MAX)" : "");
@@ -65,9 +65,12 @@ class ReadRequestCacheFS {
             max_read = _read_request(current_path, end_of_read, tid, fd);
             LOG("[cache] Obtained value from server is %llu", max_read);
             if (available_read_cache->find(path) == available_read_cache->end()) {
+                LOG("[cache] Cound not find entry in cache. Adding new entry to cache");
                 available_read_cache->emplace(path, max_read);
             } else {
                 available_read_cache->at(path) = max_read;
+                LOG("[cache] Updating max read value in cache. new value: %llu",
+                    available_read_cache->at(path));
             }
             LOG("[cache] completed update from server of max read for file. returning control to "
                 "application");

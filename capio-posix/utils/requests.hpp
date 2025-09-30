@@ -113,7 +113,7 @@ inline capio_off64_t posix_directory_committed_request(const long pid,
 // non blocking
 inline void close_request(const std::filesystem::path &path, const long tid) {
     START_LOG(capio_syscall(SYS_gettid), "call(path=%s, tid=%ld)", path.c_str(), tid);
-    write_request_cache_fs->flush(tid);
+    write_request_cache_fs->flush(path, tid, -1);
     char req[CAPIO_REQ_MAX_SIZE];
     sprintf(req, "%04d %ld %s", CAPIO_REQUEST_CLOSE, tid, path.c_str());
     buf_requests->write(req, CAPIO_REQ_MAX_SIZE);
@@ -130,7 +130,6 @@ inline void create_request(const int fd, const std::filesystem::path &path, cons
 // non blocking
 inline void exit_group_request(const long tid) {
     START_LOG(capio_syscall(SYS_gettid), "call(tid=%ld)", tid);
-    write_request_cache_fs->flush(tid);
     char req[CAPIO_REQ_MAX_SIZE];
     sprintf(req, "%04d %ld", CAPIO_REQUEST_EXIT_GROUP, tid);
     buf_requests->write(req, CAPIO_REQ_MAX_SIZE);
@@ -140,8 +139,6 @@ inline void exit_group_request(const long tid) {
 [[nodiscard]] inline capio_off64_t open_request(const int fd, const std::filesystem::path &path,
                                                 const long tid) {
     START_LOG(capio_syscall(SYS_gettid), "call(fd=%ld, path=%s, tid=%ld)", fd, path.c_str(), tid);
-    write_request_cache_fs->flush(tid);
-
     char req[CAPIO_REQ_MAX_SIZE];
     sprintf(req, "%04d %ld %d %s", CAPIO_REQUEST_OPEN, tid, fd, path.c_str());
     buf_requests->write(req, CAPIO_REQ_MAX_SIZE);
