@@ -36,7 +36,7 @@ add_executable(${TARGET_NAME} ${TARGET_SOURCES} ${simdjson_SOURCE_DIR}/singlehea
 #####################################
 # Include files and directories
 #####################################
-file(GLOB_RECURSE CAPIO_SERVER_HEADERS "${CMAKE_CURRENT_SOURCE_DIR}/include/**.hpp**")
+file(GLOB_RECURSE CAPIO_SERVER_HEADERS "${CMAKE_CURRENT_SOURCE_DIR}/include/**/*.hpp")
 target_sources(${TARGET_NAME} PRIVATE
         "${CAPIO_COMMON_HEADERS}"
         "${CAPIO_SERVER_HEADERS}"
