@@ -400,7 +400,8 @@ int CapioCLEngine::getCommitCloseCount(std::filesystem::path::iterator::referenc
     return count;
 };
 
-std::vector<std::string> CapioCLEngine::get_file_deps(const std::filesystem::path &path) {
+std::vector<std::string>
+CapioCLEngine::getCommitOnFileDependencies(const std::filesystem::path &path) {
     if (const auto itm = _locations.find(path); itm != _locations.end()) {
         return std::get<9>(itm->second);
     }
@@ -437,7 +438,7 @@ std::vector<std::string> CapioCLEngine::getFileToStoreInMemory() {
     return files;
 }
 
-std::string CapioCLEngine::get_home_node(const std::string &path) {
+std::string CapioCLEngine::getHomeNode(const std::string &path) {
     // TODO: understand here how to get the home node policy when home_node_policies are
     //       being implemented.
     START_LOG(gettid(), "call(path=%s)", path.c_str());
