@@ -425,6 +425,14 @@ bool CapioCLEngine::isStoredInMemory(const std::filesystem::path &path) {
     return false;
 }
 
+bool CapioCLEngine::isPermanent(const std::string &path) {
+    START_LOG(gettid(), "call(path=%s)", path.c_str());
+    if (const auto itm = _locations.find(path); itm != _locations.end()) {
+        return std::get<4>(itm->second);
+    }
+    return false;
+}
+
 std::vector<std::string> CapioCLEngine::getFileToStoreInMemory() {
     START_LOG(gettid(), "call()");
     std::vector<std::string> files;

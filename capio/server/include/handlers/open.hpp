@@ -58,8 +58,7 @@ inline void handle_open(int tid, int fd, const std::filesystem::path &path) {
 
     // it is important that check_files_location is the last because is the
     // slowest (short circuit evaluation)
-    if (get_file_location_opt(path) || metadata_conf.find(path) != metadata_conf.end() ||
-        match_globs(path) != -1 || load_file_location(path)) {
+    if (get_file_location_opt(path) || load_file_location(path)) {
         update_file_metadata(path, tid, fd, false, 0);
     } else {
         write_response(tid, 1);

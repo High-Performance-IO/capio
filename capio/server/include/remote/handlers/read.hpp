@@ -151,7 +151,7 @@ inline void handle_remote_read_batch(const std::filesystem::path &path, const st
         is_getdents ? "true" : "false");
 
     // FIXME: this assignment always overrides the request parameter, which is never used
-    batch_size  = find_batch_size(prefix, metadata_conf_globs);
+    batch_size  = capio_cl_engine->getDirectoryFileCount(path);
     auto *files = files_available(prefix, app_name, path);
     LOG("files==nullptr? %s", files == nullptr ? "true" : "false");
     if (files->size() == batch_size) {

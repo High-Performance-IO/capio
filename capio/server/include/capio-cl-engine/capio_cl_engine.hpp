@@ -329,6 +329,15 @@ class CapioCLEngine {
      * @return true if stored in memory, false otherwise.
      */
     bool isStoredInMemory(const std::filesystem::path &path);
+
+    /**
+     * @brief Check if a file should exist after the workflow termination.
+     * Defaults to False
+     *
+     * @param path File path.
+     * @return true if stored in memory, false otherwise.
+     */
+    bool isPermanent(const std::string &path);
 };
 
 /// @brief Global pointer to the CAPIO-CL engine instance.

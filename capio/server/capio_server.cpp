@@ -1,3 +1,6 @@
+#include "capio-cl-engine/capio_cl_engine.hpp"
+#include "capio-cl-engine/json_parser.hpp"
+
 #include <dirent.h>
 #include <fcntl.h>
 #include <semaphore.h>
@@ -33,7 +36,6 @@ CSDataBufferMap_t data_buffers;
 #include "utils/capio_file.hpp"
 #include "utils/common.hpp"
 #include "utils/env.hpp"
-#include "utils/json.hpp"
 #include "utils/metadata.hpp"
 #include "utils/requests.hpp"
 
@@ -216,12 +218,12 @@ int parseCLI(int argc, char **argv) {
               << std::endl;
 #endif
 
+    std::string config_path;
     if (config) {
-        std::string token                      = args::get(config);
-        const std::filesystem::path &capio_dir = get_capio_dir();
-        std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_INFO << "parsing config file: " << token
+        config_path = args::get(config);
+        std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_INFO << "parsing config file: " << config_path
                   << std::endl;
-        parse_conf_file(token, capio_dir);
+
     } else if (noConfigFile) {
         workflow_name = std::string_view(get_capio_workflow_name());
         std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_WARNING << "skipping config file parsing."
@@ -229,7 +231,6 @@ int parseCLI(int argc, char **argv) {
                   << CAPIO_LOG_SERVER_CLI_LEVEL_WARNING
                   << "Obtained from environment variable current workflow name: "
                   << workflow_name.data() << std::endl;
-
     } else {
         std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_ERROR
                   << "Error: no config file provided. To skip config file use --no-config option!"
@@ -239,7 +240,8 @@ int parseCLI(int argc, char **argv) {
 #endif
         exit(EXIT_FAILURE);
     }
-
+    capio_cl_engine = JsonParser::parse(config_path, get_capio_dir());
+    capio_cl_engine->print();
     std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_INFO << "CAPIO_DIR=" << get_capio_dir().c_str()
               << std::endl;
 

@@ -7,19 +7,10 @@
 
 std::string get_producer_name(const std::filesystem::path &path) {
     START_LOG(gettid(), "call( %s)", path.c_str());
-    std::string producer_name;
-    // we handle also prefixes
-    auto it_metadata = metadata_conf.find(path);
-    if (it_metadata == metadata_conf.end()) {
-        long int pos = match_globs(path);
-        if (pos != -1) {
-            producer_name = std::get<3>(metadata_conf_globs[pos]);
-        }
-    } else {
-        producer_name = std::get<2>(it_metadata->second);
-    }
 
-    return producer_name;
+    // This version of CAPIO supports a single producer, however, the CAPIO-CL engine supports
+    // multiple producers per each file. For now, we hence return the first entry of the producers.
+    return capio_cl_engine->getProducers(path).at(0);
 }
 
 bool is_producer(int tid, const std::filesystem::path &path) {

@@ -26,7 +26,7 @@ class JsonParser {
      * @return false otherwise
      */
     static inline bool firstIsSubpathOfSecond(const std::filesystem::path &path,
-                                                  const std::filesystem::path &base);
+                                              const std::filesystem::path &base);
 
   public:
     /**

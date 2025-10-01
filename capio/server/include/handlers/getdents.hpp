@@ -55,16 +55,14 @@ inline void handle_getdents(int tid, int fd, long int count) {
                 const CapioFile &c_file = get_capio_file(path_to_check);
                 auto remote_app         = apps.find(tid);
                 if (!c_file.is_complete() && remote_app != apps.end()) {
-                    long int pos = match_globs(path_to_check);
-                    if (pos != -1) {
-                        const std::string &remote_app_name = remote_app->second;
-                        std::string prefix                 = std::get<0>(metadata_conf_globs[pos]);
-                        off64_t batch_size                 = std::get<5>(metadata_conf_globs[pos]);
-                        if (batch_size > 0) {
-                            handle_remote_read_batch_request(tid, fd, count, remote_app_name,
-                                                             prefix, batch_size, true);
-                            return;
-                        }
+
+                    const std::string &remote_app_name = remote_app->second;
+                    std::string prefix                 = path_to_check.parent_path();
+                    off64_t batch_size = capio_cl_engine->getDirectoryFileCount(path_to_check);
+                    if (batch_size > 0) {
+                        handle_remote_read_batch_request(tid, fd, count, remote_app_name, prefix,
+                                                         batch_size, true);
+                        return;
                     }
                 }
                 request_remote_getdents(tid, fd, count);
@@ -83,17 +81,15 @@ inline void handle_getdents(int tid, int fd, long int count) {
         if (!c_file.is_complete() && it != apps.end()) {
             LOG("File not complete");
             const std::string &app_name = it->second;
-            long int pos                = match_globs(path);
-            if (pos != -1) {
-                LOG("Glob matched");
-                std::string prefix = std::get<0>(metadata_conf_globs[pos]);
-                off64_t batch_size = std::get<5>(metadata_conf_globs[pos]);
-                if (batch_size > 0) {
-                    LOG("Handling batch file");
-                    handle_remote_read_batch_request(tid, fd, count, app_name, prefix, batch_size,
-                                                     true);
-                    return;
-                }
+
+            LOG("Glob matched");
+            std::string prefix = path.parent_path();
+            off64_t batch_size = capio_cl_engine->getDirectoryFileCount(path);
+            if (batch_size > 0) {
+                LOG("Handling batch file");
+                handle_remote_read_batch_request(tid, fd, count, app_name, prefix, batch_size,
+                                                 true);
+                return;
             }
         }
         LOG("Delegating to backend remote read");
