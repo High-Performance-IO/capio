@@ -9,7 +9,6 @@
 #include "remote/requests.hpp"
 
 #include "utils/location.hpp"
-#include "utils/producer.hpp"
 #include "utils/types.hpp"
 
 void wait_for_file_completion(int tid, const std::filesystem::path &path) {
@@ -41,7 +40,7 @@ inline void reply_stat(int tid, const std::filesystem::path &path) {
         if (!load_file_location(path)) {
             LOG("path %s is not present in any node", path.c_str());
 
-            if (is_producer(tid, path)) {
+            if (capio_cl_engine->isProducer(path, tid)) {
                 LOG("Metadata do not contains file or globs did not contain file or app is "
                     "producer.");
                 write_response(tid, -1); // return size

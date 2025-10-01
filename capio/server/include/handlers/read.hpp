@@ -9,7 +9,6 @@
 
 #include "utils/location.hpp"
 #include "utils/metadata.hpp"
-#include "utils/producer.hpp"
 
 std::mutex local_read_mutex;
 
@@ -139,7 +138,7 @@ inline void handle_read(int tid, int fd, off64_t count) {
 
     const std::filesystem::path &path      = get_capio_file_path(tid, fd);
     const std::filesystem::path &capio_dir = get_capio_dir();
-    bool is_prod                           = is_producer(tid, path);
+    bool is_prod                           = capio_cl_engine->isProducer(path, tid);
     auto file_location_opt                 = get_file_location_opt(path);
     if (!file_location_opt && !is_prod) {
         LOG("Starting thread to wait for file creation");
