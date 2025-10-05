@@ -4,17 +4,9 @@
 #include "common/logger.hpp"
 #include "utils/configuration.hpp"
 #include "utils/env.hpp"
+#include <fnmatch.h>
 #include <iostream>
 
-std::regex CapioCLEngine::generateCapioRegex(const std::string &capio_path) {
-    START_LOG(gettid(), "call(capio_path=%s)", capio_path.c_str());
-    auto computed = replaceSymbol(capio_path, '.', "\\.");
-    computed      = replaceSymbol(computed, '/', "\\/");
-    computed      = replaceSymbol(computed, '*', R"([a-zA-Z0-9\/\.\-_:]*)");
-    computed      = replaceSymbol(computed, '+', ".");
-    LOG("Computed regex: %s", computed.c_str());
-    return std::regex(computed);
-}
 void CapioCLEngine::print() const {
     // First message
     server_println(CAPIO_LOG_SERVER_CLI_LEVEL_JSON, "");
@@ -64,7 +56,7 @@ void CapioCLEngine::print() const {
 
     // Iterate over _locations
     for (auto &itm : _locations) {
-        std::string color_preamble = std::get<11>(itm.second) ? "\033[38;5;034m" : "\033[38;5;172m";
+        std::string color_preamble = std::get<10>(itm.second) ? "\033[38;5;034m" : "\033[38;5;172m";
         std::string color_post     = "\033[0m";
 
         std::string name_trunc = truncateLastN(itm.first, 12);
@@ -139,9 +131,12 @@ void CapioCLEngine::print() const {
 
 bool CapioCLEngine::contains(const std::filesystem::path &file) {
     START_LOG(gettid(), "call(file=%s)", file.c_str());
-    return std::any_of(_locations.begin(), _locations.end(), [&](auto &itm) {
-        return std::regex_match(file.c_str(), std::get<10>(itm.second));
-    });
+    for (auto &[fst, snd] : _locations) {
+        if (fnmatch(file.c_str(), fst.c_str(), FNM_PATHNAME) == 0) {
+            return true;
+        }
+    }
+    return false;
 }
 
 void CapioCLEngine::add(std::string &path, std::vector<std::string> &producers,
@@ -152,9 +147,9 @@ void CapioCLEngine::add(std::string &path, std::vector<std::string> &producers,
               commit_rule.c_str(), fire_rule.c_str(), permanent ? "YES" : "NO",
               exclude ? "YES" : "NO");
 
-    _locations.emplace(path, std::make_tuple(producers, consumers, commit_rule, fire_rule,
-                                             permanent, exclude, true, -1, -1, dependencies,
-                                             generateCapioRegex(path), false));
+    _locations.emplace(path,
+                       std::make_tuple(producers, consumers, commit_rule, fire_rule, permanent,
+                                       exclude, true, -1, -1, dependencies, false));
 }
 
 void CapioCLEngine::newFile(const std::string &path) {
@@ -169,7 +164,8 @@ void CapioCLEngine::newFile(const std::string &path) {
          */
         size_t matchSize = 0;
         for (const auto &[filename, data] : _locations) {
-            if (std::regex_match(path, std::get<10>(data)) && filename.length() > matchSize) {
+            if (fnmatch(filename.c_str(), path.c_str(), FNM_PATHNAME) == 0 &&
+                filename.length() > matchSize) {
                 LOG("Found match with %s", filename.c_str());
                 matchSize = filename.length();
                 commit    = std::get<2>(data);
@@ -178,10 +174,10 @@ void CapioCLEngine::newFile(const std::string &path) {
         }
         LOG("Adding file %s to _locations with commit=%s, and fire=%s", path.c_str(),
             commit.c_str(), fire.c_str());
-        _locations.emplace(path, std::make_tuple(std::vector<std::string>(),
-                                                 std::vector<std::string>(), commit, fire, false,
-                                                 false, true, -1, -1, std::vector<std::string>(),
-                                                 generateCapioRegex(path), false));
+        _locations.emplace(path,
+                           std::make_tuple(std::vector<std::string>(), std::vector<std::string>(),
+                                           commit, fire, false, false, true, -1, -1,
+                                           std::vector<std::string>(), false));
     }
 }
 
@@ -357,9 +353,10 @@ bool CapioCLEngine::isProducer(const std::string &path, const pid_t pid,
         return std::find(producers.begin(), producers.end(), app_name) != producers.end();
     }
     LOG("No exact match found in locations. checking for globs");
-    // check for glob
+
+    // check for glob. Here we do not use the LMP check
     for (const auto &[k, entry] : _locations) {
-        if (std::regex_match(path, std::get<10>(entry))) {
+        if (fnmatch(k.c_str(), path.c_str(), FNM_PATHNAME) == 0) {
             LOG("Found possible glob match");
             std::vector<std::string> producers = std::get<0>(entry);
             DBG(gettid(), [&](const std::vector<std::string> &arr) {
@@ -410,17 +407,17 @@ CapioCLEngine::getCommitOnFileDependencies(const std::filesystem::path &path) {
 
 void CapioCLEngine::setStoreFileInMemory(const std::filesystem::path &path) {
     this->newFile(path);
-    std::get<11>(_locations.at(path)) = true;
+    std::get<10>(_locations.at(path)) = true;
 }
 
 void CapioCLEngine::setStoreFileInFileSystem(const std::filesystem::path &path) {
     this->newFile(path);
-    std::get<11>(_locations.at(path)) = false;
+    std::get<10>(_locations.at(path)) = false;
 }
 
 bool CapioCLEngine::isStoredInMemory(const std::filesystem::path &path) {
     if (const auto itm = _locations.find(path); itm != _locations.end()) {
-        return std::get<11>(itm->second);
+        return std::get<10>(itm->second);
     }
     return false;
 }
@@ -430,7 +427,7 @@ std::vector<std::string> CapioCLEngine::getFileToStoreInMemory() {
     std::vector<std::string> files;
 
     for (const auto &[path, file] : _locations) {
-        if (std::get<11>(file)) {
+        if (std::get<10>(file)) {
             files.push_back(path);
         }
     }
@@ -456,13 +453,20 @@ bool CapioCLEngine::isExcluded(const std::string &path) const {
     if (const auto itm = _locations.find(path); itm != _locations.end()) {
         return std::get<5>(itm->second);
     }
-    LOG("Checking against REGEX");
-    return std::any_of(_locations.begin(), _locations.end(), [&](auto &itm) {
-        LOG("Checking against %s", itm.first.c_str());
-        if (std::regex_match(path.c_str(), std::get<10>(itm.second))) {
-            LOG("Found match. Is excluded: %s", std::get<5>(itm.second) ? "YES" : "NO");
-            return std::get<5>(itm.second);
+    LOG("Checking against GLOB");
+
+    size_t lpm_match_size = -1;
+    bool lpm_match        = false;
+    for (const auto &[glob_path, entry] : _locations) {
+        if (fnmatch(glob_path.c_str(), path.c_str(), FNM_PATHNAME) == 0) {
+            LOG("Found match with %s", glob_path.c_str());
+            if (glob_path.length() > lpm_match_size) {
+                lpm_match_size = glob_path.length();
+                lpm_match      = std::get<5>(entry);
+                LOG("Match is longer than previous match. storing value = %s",
+                    lpm_match ? "true" : "false");
+            }
         }
-        return false;
-    });
+    }
+    return lpm_match;
 }
