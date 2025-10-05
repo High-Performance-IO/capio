@@ -12,16 +12,17 @@
  */
 class CapioGlobalConfiguration {
   public:
-    bool termination_phase, StoreOnlyInMemory;
+    bool termination_phase;
+    bool store_only_in_memory;
     std::string workflow_name;
-    pid_t CAPIO_SERVER_MAIN_PID = -1;
+    pid_t capio_server_main_pid = -1;
     char node_name[HOST_NAME_MAX]{0};
 
     CapioGlobalConfiguration() {
         gethostname(node_name, HOST_NAME_MAX);
         termination_phase     = false;
-        StoreOnlyInMemory     = false;
-        CAPIO_SERVER_MAIN_PID = gettid();
+        store_only_in_memory  = false;
+        capio_server_main_pid = gettid();
         workflow_name         = CAPIO_DEFAULT_WORKFLOW_NAME;
     }
 };

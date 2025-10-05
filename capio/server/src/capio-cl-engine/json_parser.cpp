@@ -35,7 +35,7 @@ CapioCLEngine *JsonParser::parse(const std::filesystem::path &source,
      */
     locations->newFile("*");
     locations->setDirectory("*");
-    if (capio_global_configuration->StoreOnlyInMemory) {
+    if (capio_global_configuration->store_only_in_memory) {
         locations->setStoreFileInMemory("*");
     }
 
