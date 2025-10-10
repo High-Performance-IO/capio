@@ -21,9 +21,9 @@ CAPIO depends on the following software that needs to be manually installed:
 
 The following dependencies are automatically fetched during cmake configuration phase, and compiled when required.
 
+- [CAPIO-CL](https://github.com/High-Performance-IO/CAPIO-CL) To handle the CAPIO-CL configuration and enforce streaming directives
 - [syscall_intercept](https://github.com/pmem/syscall_intercept) to intercept syscalls
 - [Taywee/args](https://github.com/Taywee/args) to parse server command line inputs
-- [simdjson/simdjson](https://github.com/simdjson/simdjson) to parse json configuration files
 
 ### Compile capio
 

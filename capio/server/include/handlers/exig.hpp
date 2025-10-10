@@ -13,10 +13,7 @@ inline void handle_exit_group(int tid) {
         LOG("Path %s found. handling? %s", path.c_str(), pair.second ? "yes" : "no");
         if (pair.second) {
             LOG("Handling file %s", path.c_str());
-            auto it_conf = metadata_conf.find(path);
-            if (it_conf == metadata_conf.end() ||
-                std::get<0>(it_conf->second) == CAPIO_FILE_COMMITTED_ON_TERMINATION ||
-                std::get<0>(it_conf->second).empty()) {
+            if (capio_cl_engine->getCommitRule(path) == capiocl::commit_rules::ON_TERMINATION) {
                 CapioFile &c_file = get_capio_file(path.c_str());
                 if (c_file.is_dir()) {
                     LOG("file %s is dir", path.c_str());

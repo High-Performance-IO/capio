@@ -46,15 +46,11 @@ inline void handle_remote_stat(int source_tid, const std::filesystem::path &path
         }
     } else {
         LOG("CAPIO file is not in metadata. checking in globs for files to be created");
-        if (match_globs(path) != -1) {
-            LOG("File is in globs. creating capio_file and starting thread awaiting for future "
-                "creation of file");
-            create_capio_file(path, false, CAPIO_DEFAULT_FILE_INITIAL_SIZE);
-            std::thread t(wait_for_completion, path, source_tid, dest);
-            t.detach();
-        } else {
-            ERR_EXIT("Error capio file is not present, nor is going to be created in the future.");
-        }
+        LOG("File is in globs. creating capio_file and starting thread awaiting for future "
+            "creation of file");
+        create_capio_file(path, false, CAPIO_DEFAULT_FILE_INITIAL_SIZE);
+        std::thread t(wait_for_completion, path, source_tid, dest);
+        t.detach();
     }
 }
 

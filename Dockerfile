@@ -67,7 +67,6 @@ COPY --from=builder                                         \
     "/usr/local/include/gmoc[k]"                            \
     "/usr/local/include/gtes[t]"                            \
     "/usr/local/include/libsyscall_intercept_hook_point.h"  \
-    "/usr/local/include/simdjson.h"                         \
     /usr/local/include/
 
 # Libraries
@@ -79,7 +78,6 @@ COPY --from=builder                                         \
     "/usr/local/lib/libgmock_main.[a]"                      \
     "/usr/local/lib/libgtest.[a]"                           \
     "/usr/local/lib/libgtest_main.[a]"                      \
-    "/usr/local/lib/libsimdjson.a"                          \
     "/usr/local/lib/libsyscall_intercept.a"                 \
     "/usr/local/lib/libsyscall_intercept.so"                \
     "/usr/local/lib/libsyscall_intercept.so.0"              \
@@ -103,14 +101,7 @@ COPY --from=builder                                         \
     "/usr/local/lib/pkgconfig/gtest.p[c]"                   \
     "/usr/local/lib/pkgconfig/gtest_main.p[c]"              \
     "/usr/local/lib/pkgconfig/libsyscall_intercept.pc"      \
-    "/usr/local/lib/pkgconfig/simdjson.pc"                  \
     /usr/local/lib/pkgconfig/
-
-# CMake files
-COPY --from=builder                                         \
-    "/usr/local/lib/cmake/GTes[t]"                          \
-    "/usr/local/lib/cmake/simdjson"                         \
-    /usr/local/lib/cmake/
 
 # Start SSH server
 EXPOSE 22

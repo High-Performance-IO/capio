@@ -9,7 +9,6 @@
 
 #include "utils/location.hpp"
 #include "utils/metadata.hpp"
-#include "utils/producer.hpp"
 
 std::mutex local_read_mutex;
 
@@ -120,16 +119,13 @@ void wait_for_file(const std::filesystem::path &path, int tid, int fd, off64_t c
         const CapioFile &c_file = get_capio_file(path);
         auto remote_app         = apps.find(tid);
         if (!c_file.is_complete() && remote_app != apps.end()) {
-            long int pos = match_globs(path);
-            if (pos != -1) {
-                const std::string &remote_app_name = remote_app->second;
-                std::string prefix                 = std::get<0>(metadata_conf_globs[pos]);
-                off64_t batch_size                 = std::get<5>(metadata_conf_globs[pos]);
-                if (batch_size > 0) {
-                    handle_remote_read_batch_request(tid, fd, count, remote_app_name, prefix,
-                                                     batch_size, false);
-                    return;
-                }
+            const std::string &remote_app_name = remote_app->second;
+            std::string prefix                 = path.parent_path();
+            off64_t batch_size                 = capio_cl_engine->getDirectoryFileCount(path);
+            if (batch_size > 0) {
+                handle_remote_read_batch_request(tid, fd, count, remote_app_name, prefix,
+                                                 batch_size, false);
+                return;
             }
         }
         request_remote_read(tid, fd, count);
@@ -141,8 +137,12 @@ inline void handle_read(int tid, int fd, off64_t count) {
 
     const std::filesystem::path &path      = get_capio_file_path(tid, fd);
     const std::filesystem::path &capio_dir = get_capio_dir();
-    bool is_prod                           = is_producer(tid, path);
-    auto file_location_opt                 = get_file_location_opt(path);
+    std::string app_name;
+    if (apps.find(tid) != apps.end()) {
+        app_name = apps.at(tid);
+    }
+    bool is_prod           = capio_cl_engine->isProducer(path, app_name);
+    auto file_location_opt = get_file_location_opt(path);
     if (!file_location_opt && !is_prod) {
         LOG("Starting thread to wait for file creation");
         // launch a thread that checks when the file is created
@@ -159,17 +159,14 @@ inline void handle_read(int tid, int fd, off64_t count) {
         if (!c_file.is_complete() && it != apps.end()) {
             LOG("File not complete");
             const std::string &app_name = it->second;
-            long int pos                = match_globs(path);
-            if (pos != -1) {
-                LOG("Glob matched");
-                std::string prefix = std::get<0>(metadata_conf_globs[pos]);
-                off64_t batch_size = std::get<5>(metadata_conf_globs[pos]);
-                if (batch_size > 0) {
-                    LOG("Handling batch file");
-                    handle_remote_read_batch_request(tid, fd, count, app_name, prefix, batch_size,
-                                                     false);
-                    return;
-                }
+
+            std::string prefix = path.parent_path();
+            off64_t batch_size = capio_cl_engine->getDirectoryFileCount(path);
+            if (batch_size > 0) {
+                LOG("Handling batch file");
+                handle_remote_read_batch_request(tid, fd, count, app_name, prefix, batch_size,
+                                                 false);
+                return;
             }
         }
         LOG("Delegating to backend remote read");

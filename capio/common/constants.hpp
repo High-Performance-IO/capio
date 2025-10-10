@@ -23,21 +23,19 @@ constexpr char CAPIO_SHM_CANARY_ERROR[] =
     "is already running. Clean shared memory and then retry";
 
 // CAPIO communication constants
-constexpr int CAPIO_REQ_BUFF_CNT                     = 512; // Max number of elements inside buffers
-constexpr int CAPIO_CACHE_LINES_DEFAULT              = 10;
-constexpr int CAPIO_CACHE_LINE_SIZE_DEFAULT          = 256 * 1024;
-constexpr size_t CAPIO_SERVER_REQUEST_MAX_SIZE       = sizeof(char) * (PATH_MAX + 81920);
-constexpr size_t CAPIO_REQ_MAX_SIZE                  = 256 * sizeof(char);
-constexpr char CAPIO_SERVER_CLI_LOG_SERVER[]         = "[ \033[1;32m SERVER \033[0m ] ";
-constexpr char CAPIO_SERVER_CLI_LOG_SERVER_WARNING[] = "[ \033[1;33m SERVER \033[0m ] ";
-constexpr char CAPIO_SERVER_CLI_LOG_SERVER_ERROR[]   = "[ \033[1;31m SERVER \033[0m ] ";
-constexpr char LOG_CAPIO_START_REQUEST[]             = "\n+++++++++++ SYSCALL %s (%d) +++++++++++";
-constexpr char LOG_CAPIO_END_REQUEST[]               = "----------- END SYSCALL ----------\n";
-constexpr char CAPIO_SERVER_LOG_START_REQUEST_MSG[]  = "+++++++++++++++++REQUEST+++++++++++++++++";
-constexpr char CAPIO_SERVER_LOG_END_REQUEST_MSG[]    = "~~~~~~~~~~~~~~~END REQUEST~~~~~~~~~~~~~~~";
-constexpr int CAPIO_LOG_MAX_MSG_LEN                  = 2048;
-constexpr int CAPIO_SEM_RETRIES                      = 100;
-constexpr int THEORETICAL_SIZE_DIRENT64              = sizeof(ino64_t) + sizeof(off64_t) +
+constexpr int CAPIO_REQ_BUFF_CNT               = 512; // Max number of elements inside buffers
+constexpr int CAPIO_CACHE_LINES_DEFAULT        = 10;
+constexpr int CAPIO_CACHE_LINE_SIZE_DEFAULT    = 256 * 1024;
+constexpr size_t CAPIO_SERVER_REQUEST_MAX_SIZE = sizeof(char) * (PATH_MAX + 81920);
+constexpr size_t CAPIO_REQ_MAX_SIZE            = 256 * sizeof(char);
+
+constexpr char LOG_CAPIO_START_REQUEST[]            = "\n+++++++++++ SYSCALL %s (%d) +++++++++++";
+constexpr char LOG_CAPIO_END_REQUEST[]              = "----------- END SYSCALL ----------\n";
+constexpr char CAPIO_SERVER_LOG_START_REQUEST_MSG[] = "+++++++++++++++++REQUEST+++++++++++++++++";
+constexpr char CAPIO_SERVER_LOG_END_REQUEST_MSG[]   = "~~~~~~~~~~~~~~~END REQUEST~~~~~~~~~~~~~~~";
+constexpr int CAPIO_LOG_MAX_MSG_LEN                 = 2048;
+constexpr int CAPIO_SEM_RETRIES                     = 100;
+constexpr int THEORETICAL_SIZE_DIRENT64             = sizeof(ino64_t) + sizeof(off64_t) +
                                           sizeof(unsigned short) + sizeof(unsigned char) +
                                           sizeof(char) * NAME_MAX;
 
@@ -96,21 +94,17 @@ constexpr char CAPIO_LOG_SERVER_BANNER[] =
     "\\______/\n\n"
     "\033[0m   CAPIO - Cross Application Programmable IO         \n"
     "                    V. " CAPIO_VERSION "\n\n";
-constexpr char CAPIO_LOG_SERVER_CLI_LEVEL_INFO[]    = "[ \033[1;32m SERVER \033[0m ] ";
-constexpr char CAPIO_LOG_SERVER_CLI_LEVEL_WARNING[] = "[ \033[1;33m SERVER \033[0m ] ";
-constexpr char CAPIO_LOG_SERVER_CLI_LEVEL_ERROR[]   = "[ \033[1;31m SERVER \033[0m ] ";
+
 constexpr char CAPIO_LOG_SERVER_CLI_LOGGING_ENABLED_WARNING[] =
-    "[ \033[1;33m SERVER \033[0m ] "
+    "[\033[1;33mCAPIO-SERVER \033[0m ] "
     "|==================================================================|\n"
-    "[ \033[1;33m SERVER \033[0m ] | you are running a build of CAPIO with "
+    "[\033[1;33mCAPIO-SERVER \033[0m ] | you are running a build of CAPIO with "
     "logging enabled.           |\n"
-    "[ \033[1;33m SERVER \033[0m ] | this will have impact on performance. "
-    "you "
-    "should recompile CAPIO |\n"
-    "[ \033[1;33m SERVER \033[0m ] | with -DCAPIO_LOG=FALSE                 "
-    "   "
-    "                       |\n"
-    "[ \033[1;33m SERVER \033[0m ] "
+    "[\033[1;33mCAPIO-SERVER \033[0m ] | this will have impact on performance. "
+    "you should recompile CAPIO |\n"
+    "[\033[1;33mCAPIO-SERVER \033[0m ] | with -DCAPIO_LOG=FALSE                 "
+    "                          |\n"
+    "[\033[1;33mCAPIO-SERVER \033[0m ] "
     "|==================================================================|\n";
 constexpr char CAPIO_LOG_SERVER_CLI_LOGGING_NOT_AVAILABLE[] =
     "CAPIO_LOG set but log support was not compiled into CAPIO!";
@@ -140,27 +134,38 @@ constexpr char CAPIO_SERVER_ARG_PARSER_CONFIG_NCONTINUE_ON_ERROR_HELP[] =
     "fatal termination point. This flag should be used only to debug capio. If this flag is "
     "specified,  and a fatal termination point is reached, the behaviour of capio is undefined and "
     "should not  be taken as valid";
+constexpr char CAPIO_SERVER_ARG_PARSER_RESOLVE_PREFIX_OPT_HELP[] =
+    "Prefix to resolve CAPIO-CL configuration file paths when found to be relative";
+
+constexpr char CAPIO_SERVER_ARG_PARSER_STORE_ALL_IN_MEMORY_OPT_HELP[] =
+    "Flag to set CAPIO and CAPIO-CL to store all files in memory, independently of the "
+    "information provided by the CAPIO-CL configuration file";
 
 constexpr char CAPIO_LOG_SERVER_CLI_CONT_ON_ERR_WARNING[] =
     "[ \033[1;33m SERVER \033[0m ]\033[1;31m "
     "|==================================================================|\033[0m\n"
-    "[ \033[1;33m SERVER \033[0m ]\033[1;31m |           you are running CAPIO with "
+    "[ \033[1;33mCAPIO-SERVER \033[0m ]\033[1;31m |           you are running CAPIO with "
     "--continue-on-error         |\033[0m\n"
-    "[ \033[1;33m SERVER \033[0m ]\033[1;31m |       This is extremely dangerous as CAPIO server "
-    "will continue  |\033[0m\n"
-    "[ \033[1;33m SERVER \033[0m ]\033[1;31m |              its execution even if it should "
+    "[ \033[1;33mCAPIO-SERVER \033[0m ]\033[1;31m |       This is extremely dangerous as CAPIO "
+    "server will continue  |\033[0m\n"
+    "[ \033[1;33mCAPIO-SERVER \033[0m ]\033[1;31m |              its execution even if it should "
     "terminate.          |\033[0m\n"
-    "[ \033[1;33m SERVER \033[0m ]\033[1;31m |                                                     "
-    "             |\033[0m\n"
-    "[ \033[1;33m SERVER \033[0m ]\033[1;31m |                     USE IT AT YOUR OWN RISK         "
-    "             |\033[0m\n"
-    "[ \033[1;33m SERVER \033[0m ]\033[1;31m |                                                     "
-    "             |\033[0m\n"
-    "[ \033[1;33m SERVER \033[0m ]\033[1;31m "
+    "[ \033[1;33mCAPIO-SERVER \033[0m ]\033[1;31m |                                                "
+    "                  |\033[0m\n"
+    "[ \033[1;33mCAPIO-SERVER \033[0m ]\033[1;31m |                     USE IT AT YOUR OWN RISK    "
+    "                  |\033[0m\n"
+    "[ \033[1;33mCAPIO-SERVER \033[0m ]\033[1;31m |                                                "
+    "                  |\033[0m\n"
+    "[ \033[1;33mCAPIO-SERVER \033[0m ]\033[1;31m "
     "|==================================================================|\033[0m\n";
 
 constexpr char CAPIO_SERVER_ARG_PARSER_CONFIG_BACKEND_HELP[] =
     "Backend used in CAPIO. The value [backend] can be one of the following implemented backends: "
     "\n\t> mpi (default)\n\t> mpisync";
+
+// Cli pre messages
+constexpr char CAPIO_LOG_SERVER_CLI_LEVEL_INFO[]    = "[\033[1;32mCAPIO-SERVER\033[0m ";
+constexpr char CAPIO_LOG_SERVER_CLI_LEVEL_WARNING[] = "[\033[1;33mCAPIO-SERVER\033[0m ";
+constexpr char CAPIO_LOG_SERVER_CLI_LEVEL_ERROR[]   = "[\033[1;31mCAPIO-SERVER\033[0m ";
 
 #endif // CAPIO_COMMON_CONSTANTS_HPP

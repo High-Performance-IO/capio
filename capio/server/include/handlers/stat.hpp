@@ -9,7 +9,6 @@
 #include "remote/requests.hpp"
 
 #include "utils/location.hpp"
-#include "utils/producer.hpp"
 #include "utils/types.hpp"
 
 void wait_for_file_completion(int tid, const std::filesystem::path &path) {
@@ -41,17 +40,20 @@ inline void reply_stat(int tid, const std::filesystem::path &path) {
         if (!load_file_location(path)) {
             LOG("path %s is not present in any node", path.c_str());
             // if it is in configuration file then wait otherwise fail
-            if ((metadata_conf.find(path) != metadata_conf.end() || match_globs(path) != -1) &&
-                !is_producer(tid, path)) {
+            std::string app_name;
+            if (apps.find(tid) != apps.end()) {
+                app_name = apps.at(tid);
+            }
+            if (capio_cl_engine->isProducer(path, app_name)) {
+                LOG("Metadata do not contains file or globs did not contain file or app is "
+                    "producer.");
+                write_response(tid, -1); // return size
+                write_response(tid, -1);
+            } else {
                 LOG("File found but not ready yet. Starting a thread to wait for file %s",
                     path.c_str());
                 std::thread t(wait_for_file_completion, tid, std::filesystem::path(path));
                 t.detach();
-            } else {
-                LOG("Metadata do not contains file or globs did not contain file or app is "
-                    "producer.");
-                write_response(tid, -1); // return size
-                write_response(tid, -1); // return is_dir
             }
             return;
         }
