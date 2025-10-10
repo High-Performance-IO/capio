@@ -1,16 +1,23 @@
 #include <gtest/gtest.h>
+#include <linux/limits.h>
 
 char **build_args() {
-    char **args = (char **) malloc(3 * sizeof(uintptr_t));
+    char **args = (char **) malloc(4 * sizeof(uintptr_t));
 
     char const *command = std::getenv("CAPIO_SERVER_PATH");
     if (command == nullptr) {
         command = "capio_server";
     }
 
+    char const *path = std::getenv("CONFIG_PATH");
+    if (path == nullptr) {
+        path = "test_config.json";
+    }
+
     args[0] = strdup(command);
-    args[1] = strdup("--no-config");
-    args[2] = (char *) nullptr;
+    args[1] = strdup("-c");
+    args[2] = strdup(path);
+    args[3] = (char *) nullptr;
 
     return args;
 }
@@ -43,7 +50,7 @@ class CapioServerEnvironment : public testing::Environment {
 
   public:
     explicit CapioServerEnvironment(char **envp)
-        : args(build_args()), envp(build_env(envp)), server_pid(-1){};
+        : args(build_args()), envp(build_env(envp)), server_pid(-1) {};
 
     ~CapioServerEnvironment() override {
         for (int i = 0; args[i] != nullptr; i++) {

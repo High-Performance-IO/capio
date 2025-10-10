@@ -171,6 +171,11 @@ jobs:
           CAPIO_DIR: ${{ github.workspace }}
           CAPIO_LOG_LEVEL: -1
         run: |
+          
+          TEST_JSN="{\"name\":\"CAPIO\",\"IO_Graph\":[],\"exclude\":[\"aNonExistingFile\",\"$(pwd)\",\"$(pwd)/\"]}" 
+          echo $TEST_JSN > test_config.json
+          export CONFIG_PATH=$(realpath test_config.json)
+          
           export LD_LIBRARY_PATH="/usr/local/lib:${LD_LIBRARY_PATH}"
           
           echo "Run CAPIO POSIX Unit tests"
