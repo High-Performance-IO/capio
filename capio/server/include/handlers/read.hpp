@@ -46,8 +46,8 @@ inline void handle_local_read(int tid, int fd, off64_t count, bool is_prod) {
     bool writer                       = writers[pid][path];
     off64_t end_of_sector             = c_file.get_sector_end(process_offset);
     off64_t end_of_read               = process_offset + count;
-    std::string_view mode             = c_file.get_mode();
-    if (mode == CAPIO_FILE_MODE_UPDATE && !c_file.is_complete() && !writer && !is_prod) {
+
+    if (capio_cl_engine->isFirable(path) && !c_file.is_complete() && !writer && !is_prod) {
         // wait for file to be completed and then do what is done inside handle pending read
         LOG("Starting async thread to wait for file availability");
         std::thread t([&c_file, tid, fd, count, process_offset] {

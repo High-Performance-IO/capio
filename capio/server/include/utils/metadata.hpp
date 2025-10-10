@@ -123,7 +123,7 @@ CapioFile &create_capio_file(const std::filesystem::path &path, bool is_dir, siz
     }
 
     const auto c_file =
-        new CapioFile(commit_rule, fire_rule, is_dir, n_file, permanent, init_size, n_close_count);
+        new CapioFile(commit_rule, is_dir, n_file, permanent, init_size, n_close_count);
     add_capio_file(path, c_file);
     return *c_file;
 }

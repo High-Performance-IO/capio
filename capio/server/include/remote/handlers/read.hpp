@@ -211,8 +211,7 @@ inline void handle_remote_read(const std::filesystem::path &path, const std::str
 
     CapioFile &c_file   = get_capio_file(path);
     bool data_available = (offset + count <= c_file.get_stored_size());
-    if (c_file.is_complete() ||
-        (c_file.get_mode() == CAPIO_FILE_MODE_NO_UPDATE && data_available)) {
+    if (c_file.is_complete() || (capio_cl_engine->isFirable(path) && data_available)) {
         serve_remote_read(path, source, tid, fd, count, offset, c_file.is_complete(), is_getdents);
     } else {
         std::thread t(wait_for_data, path, source, tid, fd, count, offset, is_getdents);

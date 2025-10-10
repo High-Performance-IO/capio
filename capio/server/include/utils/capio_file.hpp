@@ -40,7 +40,6 @@ class CapioFile {
     // _fd is useful only when the file is memory-mapped
     int _fd                     = -1;
     bool _home_node             = false;
-    std::string_view _mode      = CAPIO_FILE_MODE_UPDATE;
     int _n_links                = 1;
     long int _n_close           = 0;
     long int _n_close_expected  = -1;
@@ -79,10 +78,9 @@ class CapioFile {
         : _buf_size(0), _committed(CAPIO_FILE_COMMITTED_ON_TERMINATION), _directory(false),
           _permanent(false) {}
 
-    CapioFile(const std::string_view &committed, const std::string_view &mode, bool directory,
-              long int n_files_expected, bool permanent, off64_t init_size,
-              long int n_close_expected)
-        : _buf_size(init_size), _committed(committed), _directory(directory), _mode(mode),
+    CapioFile(const std::string_view &committed, bool directory, long int n_files_expected,
+              bool permanent, off64_t init_size, long int n_close_expected)
+        : _buf_size(init_size), _committed(committed), _directory(directory),
           _n_close_expected(n_close_expected), _permanent(permanent),
           n_files_expected(n_files_expected + 2) {}
 
@@ -254,11 +252,6 @@ class CapioFile {
         } else {
             return 0;
         }
-    }
-
-    [[nodiscard]] inline const std::string_view &get_mode() const {
-        START_LOG(gettid(), "call()");
-        return _mode;
     }
 
     /*

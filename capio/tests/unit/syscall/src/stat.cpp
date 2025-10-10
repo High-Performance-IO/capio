@@ -225,13 +225,11 @@ TEST(SystemCallTest, TestFstatatOnRelativePathWithInvalidDirfd) {
     EXPECT_EQ(errno, EBADF);
 }
 
-/*
 TEST(SystemCallTest, TestFstatatWithEmptyPathAndNoAtEmptyPath) {
     struct stat statbuf {};
     EXPECT_EQ(fstatat(AT_FDCWD, "", &statbuf, 0), -1);
     EXPECT_EQ(errno, ENOENT);
 }
-*/
 
 TEST(SystemCallTest, TestFileCreateWriteCloseWithStat) {
     constexpr const char *PATHNAME = "test_file.txt";
