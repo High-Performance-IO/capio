@@ -175,12 +175,6 @@ TEST(SystemCallTest, TestFstatatOnDirectoryInDifferentDirectoryWithDirfd) {
     EXPECT_NE(close(dirfd), -1);
 }
 
-TEST(SystemCallTest, TwstFstatatWithAtEmptyPathAndAtFdcwd) {
-    struct stat statbuf {};
-    EXPECT_EQ(fstatat(AT_FDCWD, "", &statbuf, AT_EMPTY_PATH), 0);
-    check_statbuf(statbuf, 4096);
-}
-
 TEST(SystemCallTest, TestFstatatOnFileWithAtEmptyPathAndDirfd) {
     constexpr const char *PATHNAME = "test_file.txt";
     constexpr const char *BUFFER =

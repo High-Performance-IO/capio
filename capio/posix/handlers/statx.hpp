@@ -94,6 +94,9 @@ inline int capio_statx(int dirfd, const std::string_view &pathname, int flags, i
         errno = ENOENT;
         return CAPIO_POSIX_SYSCALL_ERRNO;
     }
+    if (file_size == CAPIO_POSIX_SYSCALL_REQUEST_SKIP) {
+        return CAPIO_POSIX_SYSCALL_REQUEST_SKIP;
+    }
     fill_statxbuf(statxbuf, file_size, is_dir, std::hash<std::string>{}(path), mask);
     return CAPIO_POSIX_SYSCALL_SUCCESS;
 }

@@ -50,7 +50,7 @@ class CapioServerEnvironment : public testing::Environment {
 
   public:
     explicit CapioServerEnvironment(char **envp)
-        : args(build_args()), envp(build_env(envp)), server_pid(-1) {};
+        : args(build_args()), envp(build_env(envp)), server_pid(-1) {}
 
     ~CapioServerEnvironment() override {
         for (int i = 0; args[i] != nullptr; i++) {

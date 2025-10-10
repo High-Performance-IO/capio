@@ -20,9 +20,7 @@ inline void fill_statbuf(struct stat *statbuf, off_t file_size, bool is_dir, ino
               "call(statbuf=0x%08x, file_size=%ld, is_dir=%s, inode=%ul)", statbuf, file_size,
               is_dir ? "true" : "false", inode);
 
-    struct timespec time {
-        1, 1
-    };
+    timespec time{1, 1};
     if (is_dir == 1) {
         statbuf->st_mode = S_IFDIR | S_IRWXU | S_IRGRP | S_IXGRP | S_IROTH | S_IXOTH;
         file_size        = 4096;
@@ -76,11 +74,16 @@ inline int capio_lstat(const std::string_view &pathname, struct stat *statbuf, l
             errno = ENOENT;
             return CAPIO_POSIX_SYSCALL_ERRNO;
         }
+
+        if (file_size == CAPIO_POSIX_SYSCALL_REQUEST_SKIP) {
+            // return file to not be handled as most likely is excluded
+            return file_size;
+        }
+
         fill_statbuf(statbuf, file_size, is_dir, std::hash<std::string>{}(absolute_path));
         return CAPIO_POSIX_SYSCALL_SUCCESS;
-    } else {
-        return CAPIO_POSIX_SYSCALL_REQUEST_SKIP;
     }
+    return CAPIO_POSIX_SYSCALL_REQUEST_SKIP;
 }
 
 inline int capio_lstat_wrapper(const std::string_view &pathname, struct stat *statbuf, long tid) {
