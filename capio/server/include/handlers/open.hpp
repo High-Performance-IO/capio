@@ -70,6 +70,10 @@ void create_handler(const char *const str) {
     int tid, fd;
     char path[PATH_MAX];
     sscanf(str, "%d %d %s", &tid, &fd, path);
+    if (capio_cl_engine->isExcluded(path)) {
+        write_response(tid, CAPIO_POSIX_SYSCALL_REQUEST_SKIP);
+        return;
+    }
     handle_create(tid, fd, path);
 }
 
@@ -77,6 +81,10 @@ void create_exclusive_handler(const char *const str) {
     int tid, fd;
     char path[PATH_MAX];
     sscanf(str, "%d %d %s", &tid, &fd, path);
+    if (capio_cl_engine->isExcluded(path)) {
+        write_response(tid, CAPIO_POSIX_SYSCALL_REQUEST_SKIP);
+        return;
+    }
     handle_create_exclusive(tid, fd, path);
 }
 
@@ -84,6 +92,10 @@ void open_handler(const char *const str) {
     int tid, fd;
     char path[PATH_MAX];
     sscanf(str, "%d %d %s", &tid, &fd, path);
+    if (capio_cl_engine->isExcluded(path)) {
+        write_response(tid, CAPIO_POSIX_SYSCALL_REQUEST_SKIP);
+        return;
+    }
     handle_open(tid, fd, path);
 }
 

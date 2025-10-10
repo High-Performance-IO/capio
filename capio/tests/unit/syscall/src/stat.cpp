@@ -40,13 +40,13 @@ TEST(SystemCallTest, TestStatOnDirectory) {
     EXPECT_NE(rmdir(PATHNAME), -1);
     EXPECT_NE(access(PATHNAME, F_OK), 0);
 }
-/*
+
 TEST(SystemCallTest, TestStatOnNonexistentFile) {
     struct stat statbuf {};
-    EXPECT_EQ(stat("test", &statbuf), -1);
+    EXPECT_EQ(stat("aNonExistingFile", &statbuf), -1);
     EXPECT_EQ(errno, ENOENT);
 }
-*/
+
 TEST(SystemCallTest, TestFstatOnFile) {
     constexpr const char *PATHNAME = "test_file.txt";
     constexpr const char *BUFFER =
@@ -210,13 +210,11 @@ TEST(SystemCallTest, TestFstatatOnDirectoryWIthAtEmptyPathAndDirfd) {
     EXPECT_NE(faccessat(AT_FDCWD, PATHNAME, F_OK, 0), 0);
 }
 
-/*
 TEST(SystemCallTest, TestFstatatOnNonexistentFile) {
     struct stat statbuf {};
-    EXPECT_EQ(fstatat(AT_FDCWD, "test", &statbuf, 0), -1);
+    EXPECT_EQ(fstatat(AT_FDCWD, "aNonExistingFile", &statbuf, 0), -1);
     EXPECT_EQ(errno, ENOENT);
 }
-*/
 
 TEST(SystemCallTest, TestFstatatOnRelativePathWithInvalidDirfd) {
     constexpr const char *PATHNAME = "test";

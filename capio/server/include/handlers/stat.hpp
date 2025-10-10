@@ -84,6 +84,7 @@ inline void reply_stat(int tid, const std::filesystem::path &path) {
 void fstat_handler(const char *const str) {
     int tid, fd;
     sscanf(str, "%d %d", &tid, &fd);
+
     reply_stat(tid, get_capio_file_path(tid, fd));
 }
 
@@ -91,6 +92,10 @@ void stat_handler(const char *const str) {
     char path[2048];
     int tid;
     sscanf(str, "%d %s", &tid, path);
+    if (capio_cl_engine->isExcluded(path)) {
+        write_response(tid, CAPIO_POSIX_SYSCALL_REQUEST_SKIP);
+        return;
+    }
     reply_stat(tid, path);
 }
 
