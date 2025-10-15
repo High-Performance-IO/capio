@@ -14,7 +14,8 @@ RUN apt update                              \
         libopenmpi-dev                      \
         ninja-build                         \
         openmpi-bin                         \
-        pkg-config
+        pkg-config                          \
+        xxd
 
 COPY CMakeLists.txt /opt/capio/
 COPY scripts /opt/capio/scripts
