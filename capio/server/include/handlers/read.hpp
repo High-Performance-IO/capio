@@ -140,7 +140,10 @@ inline void handle_read(int tid, int fd, off64_t count) {
     std::string app_name;
     if (apps.find(tid) != apps.end()) {
         app_name = apps.at(tid);
+    } else {
+        app_name = CAPIO_DEFAULT_APP_NAME;
     }
+
     bool is_prod           = capio_cl_engine->isProducer(path, app_name);
     auto file_location_opt = get_file_location_opt(path);
     if (!file_location_opt && !is_prod) {

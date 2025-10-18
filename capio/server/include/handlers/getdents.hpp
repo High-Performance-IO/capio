@@ -41,6 +41,8 @@ inline void handle_getdents(int tid, int fd, long int count) {
     std::string app_name;
     if (apps.find(tid) == apps.end()) {
         app_name = apps.at(tid);
+    } else {
+        app_name = CAPIO_DEFAULT_APP_NAME;
     }
     const std::filesystem::path &path      = get_capio_file_path(tid, fd);
     const std::filesystem::path &capio_dir = get_capio_dir();

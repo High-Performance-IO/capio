@@ -43,7 +43,10 @@ inline void reply_stat(int tid, const std::filesystem::path &path) {
             std::string app_name;
             if (apps.find(tid) != apps.end()) {
                 app_name = apps.at(tid);
+            } else {
+                app_name = CAPIO_DEFAULT_APP_NAME;
             }
+
             if (capio_cl_engine->isProducer(path, app_name)) {
                 LOG("Metadata do not contains file or globs did not contain file or app is "
                     "producer.");

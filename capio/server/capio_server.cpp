@@ -158,8 +158,8 @@ int parseCLI(int argc, char **argv) {
     args::Flag continueOnErrorFlag(arguments, "continue-on-error",
                                    CAPIO_SERVER_ARG_PARSER_CONFIG_NCONTINUE_ON_ERROR_HELP,
                                    {"continue-on-error"});
-    args::Flag memOnlyFlag(arguments, "mem-only",
-                           CAPIO_SERVER_ARG_PARSER_STORE_ALL_IN_MEMORY_OPT_HELP, {"mem-only"});
+    args::Flag mem_only_flag(arguments, "mem-only",
+                             CAPIO_SERVER_ARG_PARSER_STORE_ALL_IN_MEMORY_OPT_HELP, {"mem-only"});
 
     try {
         parser.ParseCLI(argc, argv);
@@ -221,8 +221,8 @@ int parseCLI(int argc, char **argv) {
 #endif
     bool store_all_in_memory = false;
 
-    if (memOnlyFlag) {
-        store_all_in_memory = args::get(memOnlyFlag);
+    if (mem_only_flag) {
+        store_all_in_memory = args::get(mem_only_flag);
     }
 
     if (config) {

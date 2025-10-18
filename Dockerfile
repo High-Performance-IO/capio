@@ -15,7 +15,7 @@ RUN apt update                              \
         ninja-build                         \
         openmpi-bin                         \
         pkg-config                          \
-        xxd
+        python3
 
 COPY CMakeLists.txt /opt/capio/
 COPY scripts /opt/capio/scripts
