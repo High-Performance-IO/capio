@@ -1,9 +1,9 @@
 #ifndef CAPIO_GETDENTS_HPP
 #define CAPIO_GETDENTS_HPP
 
-#include "posix/utils/env.hpp"
-
 #include <thread>
+
+#include "posix/utils/env.hpp"
 
 #include "remote/backend.hpp"
 #include "remote/requests.hpp"
