@@ -459,6 +459,8 @@ bool CapioCLEngine::isExcluded(const std::string &path) const {
             if (path.size() > lpm_size) {
                 lpm_size = path.size();
                 excluded = std::get<5>(file);
+
+                LOG("found match with path %s. excluded=%s", path.c_str(), excluded ? "YES" : "NO");
             }
         }
     }
