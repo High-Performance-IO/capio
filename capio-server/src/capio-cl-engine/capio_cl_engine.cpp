@@ -450,12 +450,17 @@ bool CapioCLEngine::isExcluded(const std::string &path) const {
         return std::get<5>(itm->second);
     }
     LOG("Checking against REGEX");
-    return std::any_of(_locations.begin(), _locations.end(), [&](auto &itm) {
-        LOG("Checking against %s", itm.first.c_str());
-        if (std::regex_match(path.c_str(), std::get<10>(itm.second))) {
-            LOG("Found match. Is excluded: %s", std::get<5>(itm.second) ? "YES" : "NO");
-            return std::get<5>(itm.second);
+    size_t lpm_size = 0;
+    bool excluded   = false;
+    for (const auto &[path, file] : _locations) {
+        LOG("Checking against %s", path.c_str());
+        if (std::regex_match(path.c_str(), std::get<10>(file))) {
+            LOG("Found match. Is excluded: %s", std::get<5>(file) ? "YES" : "NO");
+            if (path.size() > lpm_size) {
+                lpm_size = path.size();
+                excluded = std::get<5>(file);
+            }
         }
-        return false;
-    });
+    }
+    return excluded;
 }
