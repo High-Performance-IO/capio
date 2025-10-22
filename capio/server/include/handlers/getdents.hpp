@@ -41,7 +41,7 @@ inline void handle_getdents(int tid, int fd, long int count) {
     std::string app_name = apps.find(tid) == apps.end() ? apps.at(tid) : CAPIO_DEFAULT_APP_NAME;
     const std::filesystem::path &path      = get_capio_file_path(tid, fd);
     const std::filesystem::path &capio_dir = get_capio_dir();
-    bool is_prod                           = capio_cl_engine->isProducer(path, app_name);
+    bool is_prod                           = CapioCLEngine::get().isProducer(path, app_name);
     auto file_location_opt                 = get_file_location_opt(path);
 
     if (!file_location_opt && !is_prod) {
@@ -59,7 +59,7 @@ inline void handle_getdents(int tid, int fd, long int count) {
                 if (!c_file.is_complete() && remote_app != apps.end()) {
                     const std::string &remote_app_name = remote_app->second;
                     std::string prefix                 = path_to_check.parent_path();
-                    off64_t batch_size = capio_cl_engine->getDirectoryFileCount(path_to_check);
+                    off64_t batch_size = CapioCLEngine::get().getDirectoryFileCount(path_to_check);
                     if (batch_size > 0) {
                         handle_remote_read_batch_request(tid, fd, count, remote_app_name, prefix,
                                                          batch_size, true);
@@ -84,7 +84,7 @@ inline void handle_getdents(int tid, int fd, long int count) {
             const std::string &app_name = it->second;
             LOG("Glob matched");
             std::string prefix = path.parent_path();
-            off64_t batch_size = capio_cl_engine->getDirectoryFileCount(path);
+            off64_t batch_size = CapioCLEngine::get().getDirectoryFileCount(path);
             if (batch_size > 0) {
                 LOG("Handling batch file");
                 handle_remote_read_batch_request(tid, fd, count, app_name, prefix, batch_size,

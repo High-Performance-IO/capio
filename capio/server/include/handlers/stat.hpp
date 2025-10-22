@@ -19,7 +19,7 @@ void wait_for_file_completion(int tid, const std::filesystem::path &path) {
     CapioFile &c_file = get_capio_file(path);
 
     // if file is streamable
-    if (c_file.is_complete() || capio_cl_engine->isFirable(path) ||
+    if (c_file.is_complete() || CapioCLEngine::get().isFirable(path) ||
         strcmp(std::get<0>(get_file_location(path)), node_name) == 0) {
 
         write_response(tid, c_file.get_file_size());
@@ -40,10 +40,10 @@ inline void reply_stat(int tid, const std::filesystem::path &path) {
         if (!load_file_location(path)) {
             LOG("path %s is not present in any node", path.c_str());
             // if it is in configuration file then wait otherwise fail
-            std::string app_name;
-            std::string app_name = apps.find(tid) == apps.end() ? apps.at(tid) : CAPIO_DEFAULT_APP_NAME;
+            std::string app_name =
+                apps.find(tid) == apps.end() ? apps.at(tid) : CAPIO_DEFAULT_APP_NAME;
 
-            if (capio_cl_engine->isProducer(path, app_name)) {
+            if (CapioCLEngine::get().isProducer(path, app_name)) {
                 LOG("Metadata do not contains file or globs did not contain file or app is "
                     "producer.");
                 write_response(tid, -1); // return size
@@ -68,7 +68,7 @@ inline void reply_stat(int tid, const std::filesystem::path &path) {
         file_location_opt = get_file_location_opt(path);
     }
     if (c_file.is_complete() || strcmp(std::get<0>(file_location_opt->get()), node_name) == 0 ||
-        capio_cl_engine->isFirable(path) || capio_dir == path) {
+        CapioCLEngine::get().isFirable(path) || capio_dir == path) {
         LOG("Sending response to client");
         write_response(tid, c_file.get_file_size());
         write_response(tid, static_cast<int>(c_file.is_dir() ? 1 : 0));
@@ -91,7 +91,7 @@ void stat_handler(const char *const str) {
     char path[2048];
     int tid;
     sscanf(str, "%d %s", &tid, path);
-    if (capio_cl_engine->isExcluded(path)) {
+    if (CapioCLEngine::get().isExcluded(path)) {
         write_response(tid, CAPIO_POSIX_SYSCALL_REQUEST_SKIP);
         return;
     }

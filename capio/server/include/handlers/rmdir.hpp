@@ -14,7 +14,7 @@ void rmdir_handler(const char *const str) {
     char dir_to_remove[PATH_MAX];
     int tid;
     sscanf(str, "%s %d", dir_to_remove, &tid);
-    if (capio_cl_engine->isExcluded(dir_to_remove)) {
+    if (CapioCLEngine::get().isExcluded(dir_to_remove)) {
         write_response(tid, CAPIO_POSIX_SYSCALL_REQUEST_SKIP);
         return;
     }

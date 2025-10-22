@@ -19,8 +19,13 @@
 #include <vector>
 
 #include "capiocl.hpp"
+/// @brief const wrapper to class instance of capiocl::Engine
+class CapioCLEngine {
+  public:
+    /// @brief Get a const reference to capiocl::Engine instance
+    const static capiocl::Engine &get();
+};
 
-capiocl::Engine *capio_cl_engine;
 std::string workflow_name;
 
 #include "utils/types.hpp"
@@ -67,6 +72,14 @@ std::mutex nfiles_mutex;
 #include "utils/signals.hpp"
 
 #include "remote/listener.hpp"
+
+/**
+ * The capio_cl_engine is declared here to ensure that other components of the CAPIO server
+ * can only access it through a const reference. This prevents any modifications to the engine
+ * outside of those permitted by the capiocl::Engine class itself.
+ */
+capiocl::Engine *capio_cl_engine;
+const capiocl::Engine &CapioCLEngine::get() { return *capio_cl_engine; }
 
 static constexpr std::array<CSHandler_t, CAPIO_NR_REQUESTS> build_request_handlers_table() {
     std::array<CSHandler_t, CAPIO_NR_REQUESTS> _request_handlers{0};

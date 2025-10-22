@@ -111,11 +111,11 @@ CapioFile &create_capio_file(const std::filesystem::path &path, bool is_dir, siz
     std::string shm_name = path;
     std::replace(shm_name.begin(), shm_name.end(), '/', '_');
 
-    auto commit_rule   = capio_cl_engine->getCommitRule(path);
-    auto fire_rule     = capio_cl_engine->getFireRule(path);
-    auto n_file        = capio_cl_engine->getDirectoryFileCount(path);
-    auto permanent     = capio_cl_engine->isPermanent(path);
-    auto n_close_count = capio_cl_engine->getCommitCloseCount(path);
+    auto commit_rule   = CapioCLEngine::get().getCommitRule(path);
+    auto fire_rule     = CapioCLEngine::get().getFireRule(path);
+    auto n_file        = CapioCLEngine::get().getDirectoryFileCount(path);
+    auto permanent     = CapioCLEngine::get().isPermanent(path);
+    auto n_close_count = CapioCLEngine::get().getCommitCloseCount(path);
 
     if (n_file > 1) {
         // NODE: This is probably because it needs to be filled even when dealing with directories

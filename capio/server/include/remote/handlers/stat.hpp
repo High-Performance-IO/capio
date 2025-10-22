@@ -34,7 +34,7 @@ inline void handle_remote_stat(int source_tid, const std::filesystem::path &path
     auto c_file = get_capio_file_opt(path);
     if (c_file) {
         LOG("File %s is present on capio file system", path.c_str());
-        if (c_file->get().is_complete() || capio_cl_engine->isFirable(path)) {
+        if (c_file->get().is_complete() || CapioCLEngine::get().isFirable(path)) {
             LOG("file is complete. serving file");
             serve_remote_stat(path, dest, source_tid);
         } else { // wait for completion

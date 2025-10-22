@@ -20,7 +20,7 @@ target_sources(${TARGET_NAME} PRIVATE
         "${CAPIO_COMMON_HEADERS}"
         "${CAPIO_SERVER_HEADERS}"
 )
-target_include_directories(${TARGET_NAME} PRIVATE "${TARGET_INCLUDE_FOLDER}/include" )
+target_include_directories(${TARGET_NAME} PRIVATE "${TARGET_INCLUDE_FOLDER}/include")
 
 #####################################
 # Link libraries

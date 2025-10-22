@@ -47,7 +47,7 @@ inline void handle_local_read(int tid, int fd, off64_t count, bool is_prod) {
     off64_t end_of_sector             = c_file.get_sector_end(process_offset);
     off64_t end_of_read               = process_offset + count;
 
-    if (capio_cl_engine->isFirable(path) && !c_file.is_complete() && !writer && !is_prod) {
+    if (CapioCLEngine::get().isFirable(path) && !c_file.is_complete() && !writer && !is_prod) {
         // wait for file to be completed and then do what is done inside handle pending read
         LOG("Starting async thread to wait for file availability");
         std::thread t([&c_file, tid, fd, count, process_offset] {
@@ -121,7 +121,7 @@ void wait_for_file(const std::filesystem::path &path, int tid, int fd, off64_t c
         if (!c_file.is_complete() && remote_app != apps.end()) {
             const std::string &remote_app_name = remote_app->second;
             std::string prefix                 = path.parent_path();
-            off64_t batch_size                 = capio_cl_engine->getDirectoryFileCount(path);
+            off64_t batch_size                 = CapioCLEngine::get().getDirectoryFileCount(path);
             if (batch_size > 0) {
                 handle_remote_read_batch_request(tid, fd, count, remote_app_name, prefix,
                                                  batch_size, false);
@@ -139,7 +139,7 @@ inline void handle_read(int tid, int fd, off64_t count) {
     const std::filesystem::path &capio_dir = get_capio_dir();
     std::string app_name = apps.find(tid) == apps.end() ? apps.at(tid) : CAPIO_DEFAULT_APP_NAME;
 
-    bool is_prod           = capio_cl_engine->isProducer(path, app_name);
+    bool is_prod           = CapioCLEngine::get().isProducer(path, app_name);
     auto file_location_opt = get_file_location_opt(path);
     if (!file_location_opt && !is_prod) {
         LOG("Starting thread to wait for file creation");
@@ -159,7 +159,7 @@ inline void handle_read(int tid, int fd, off64_t count) {
             const std::string &app_name = it->second;
 
             std::string prefix = path.parent_path();
-            off64_t batch_size = capio_cl_engine->getDirectoryFileCount(path);
+            off64_t batch_size = CapioCLEngine::get().getDirectoryFileCount(path);
             if (batch_size > 0) {
                 LOG("Handling batch file");
                 handle_remote_read_batch_request(tid, fd, count, app_name, prefix, batch_size,
