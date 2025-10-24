@@ -34,7 +34,7 @@
 #define SHM_CREATE_CHECK(condition, source)                                                        \
     if (condition) {                                                                               \
         LOG("error while creating %s", source);                                                    \
-        std::cout << CAPIO_SERVER_CLI_LOG_SERVER_ERROR << "Unable to create shm: " << source       \
+        std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_ERROR << "Unable to create shm: " << source        \
                   << std::endl;                                                                    \
         ERR_EXIT("Unable to open shm: %s", source);                                                \
     };
@@ -57,7 +57,7 @@ class CapioShmCanary {
 #ifndef __CAPIO_POSIX
             auto message = new char[strlen(CAPIO_SHM_CANARY_ERROR)];
             sprintf(message, CAPIO_SHM_CANARY_ERROR, _canary_name.data());
-            std::cout << CAPIO_SERVER_CLI_LOG_SERVER_ERROR << message << std::endl;
+            std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_ERROR << message << std::endl;
             delete[] message;
 #endif
             ERR_EXIT("ERR: shm canary flag already exists");

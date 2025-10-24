@@ -225,6 +225,9 @@ inline CPStatResponse_t stat_request(const std::filesystem::path &path, const lo
     buf_requests->write(req, CAPIO_REQ_MAX_SIZE);
     off64_t file_size;
     bufs_response->at(tid)->read(&file_size);
+    if (file_size == CAPIO_POSIX_SYSCALL_REQUEST_SKIP) {
+        return {CAPIO_POSIX_SYSCALL_REQUEST_SKIP, -1};
+    }
     off64_t is_dir;
     LOG("Received file size = %d", file_size);
     bufs_response->at(tid)->read(&is_dir);

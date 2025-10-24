@@ -1,24 +1,30 @@
-#include <dirent.h>
-#include <fcntl.h>
-#include <semaphore.h>
-#include <singleheader/simdjson.h>
-#include <unistd.h>
-
 #include <algorithm>
 #include <args.hxx>
 #include <array>
 #include <cstdio>
 #include <cstring>
+#include <dirent.h>
+#include <fcntl.h>
 #include <filesystem>
 #include <fstream>
 #include <iostream>
 #include <list>
+#include <semaphore.h>
 #include <sstream>
 #include <string>
 #include <tuple>
+#include <unistd.h>
 #include <unordered_map>
 #include <unordered_set>
 #include <vector>
+
+#include "capiocl.hpp"
+/// @brief const wrapper to class instance of capiocl::Engine
+class CapioCLEngine final {
+  public:
+    /// @brief Get a const reference to capiocl::Engine instance
+    inline const static capiocl::Engine &get();
+};
 
 std::string workflow_name;
 
@@ -33,11 +39,8 @@ CSDataBufferMap_t data_buffers;
 #include "utils/capio_file.hpp"
 #include "utils/common.hpp"
 #include "utils/env.hpp"
-#include "utils/json.hpp"
 #include "utils/metadata.hpp"
 #include "utils/requests.hpp"
-
-using namespace simdjson;
 
 int n_servers;
 // name of the node
@@ -69,6 +72,14 @@ std::mutex nfiles_mutex;
 #include "utils/signals.hpp"
 
 #include "remote/listener.hpp"
+
+/**
+ * The capio_cl_engine is declared here to ensure that other components of the CAPIO server
+ * can only access it through a const reference. This prevents any modifications to the engine
+ * outside of those permitted by the capiocl::Engine class itself.
+ */
+capiocl::Engine *capio_cl_engine;
+const capiocl::Engine &CapioCLEngine::get() { return *capio_cl_engine; }
 
 static constexpr std::array<CSHandler_t, CAPIO_NR_REQUESTS> build_request_handlers_table() {
     std::array<CSHandler_t, CAPIO_NR_REQUESTS> _request_handlers{0};
@@ -146,6 +157,10 @@ int parseCLI(int argc, char **argv) {
                                              CAPIO_SERVER_ARG_PARSER_LOGILE_OPT_HELP, {'l', "log"});
     args::ValueFlag<std::string> logfile_folder(
         arguments, "filename", CAPIO_SERVER_ARG_PARSER_LOGILE_DIR_OPT_HELP, {'d', "log-dir"});
+    args::ValueFlag<std::string> resolve_prefix(arguments, "resolve-prefix",
+                                                CAPIO_SERVER_ARG_PARSER_RESOLVE_PREFIX_OPT_HELP,
+                                                {'r', "resolve-prefix"});
+
     args::ValueFlag<std::string> config(arguments, "filename",
                                         CAPIO_SERVER_ARG_PARSER_CONFIG_OPT_HELP, {'c', "config"});
     args::Flag noConfigFile(arguments, "no-config",
@@ -156,6 +171,8 @@ int parseCLI(int argc, char **argv) {
     args::Flag continueOnErrorFlag(arguments, "continue-on-error",
                                    CAPIO_SERVER_ARG_PARSER_CONFIG_NCONTINUE_ON_ERROR_HELP,
                                    {"continue-on-error"});
+    args::Flag mem_only_flag(arguments, "mem-only",
+                             CAPIO_SERVER_ARG_PARSER_STORE_ALL_IN_MEMORY_OPT_HELP, {"mem-only"});
 
     try {
         parser.ParseCLI(argc, argv);
@@ -212,24 +229,40 @@ int parseCLI(int argc, char **argv) {
 #ifdef CAPIO_LOG
     auto logname = open_server_logfile();
     log          = new Logger(__func__, __FILE__, __LINE__, gettid(), "Created new log file");
-    std::cout << CAPIO_SERVER_CLI_LOG_SERVER << "started logging to logfile " << logname
+    std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_INFO << "started logging to logfile " << logname
               << std::endl;
 #endif
+    bool store_all_in_memory = false;
+
+    if (mem_only_flag) {
+        store_all_in_memory = args::get(mem_only_flag);
+    }
 
     if (config) {
-        std::string token                      = args::get(config);
-        const std::filesystem::path &capio_dir = get_capio_dir();
+        std::string token                  = args::get(config);
+        std::filesystem::path resolve_path = "";
+
+        if (resolve_prefix) {
+            resolve_path = args::get(resolve_prefix);
+        }
+
         std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_INFO << "parsing config file: " << token
                   << std::endl;
-        parse_conf_file(token, capio_dir);
+
+        std::tie(workflow_name, capio_cl_engine) =
+            capiocl::Parser::parse(token, resolve_path, store_all_in_memory);
     } else if (noConfigFile) {
-        workflow_name = std::string_view(get_capio_workflow_name());
+        workflow_name   = std::string_view(get_capio_workflow_name());
+        capio_cl_engine = new capiocl::Engine();
+        if (store_all_in_memory) {
+            capio_cl_engine->setAllStoreInMemory();
+        }
+
         std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_WARNING << "skipping config file parsing."
                   << std::endl
                   << CAPIO_LOG_SERVER_CLI_LEVEL_WARNING
                   << "Obtained from environment variable current workflow name: "
                   << workflow_name.data() << std::endl;
-
     } else {
         std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_ERROR
                   << "Error: no config file provided. To skip config file use --no-config option!"
@@ -242,6 +275,8 @@ int parseCLI(int argc, char **argv) {
 
     std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_INFO << "CAPIO_DIR=" << get_capio_dir().c_str()
               << std::endl;
+
+    capio_cl_engine->print();
 
 #ifdef CAPIO_LOG
     CAPIO_LOG_LEVEL = get_capio_log_level();

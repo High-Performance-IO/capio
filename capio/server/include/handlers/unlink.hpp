@@ -22,6 +22,10 @@ void unlink_handler(const char *const str) {
     char path[PATH_MAX];
     int tid;
     sscanf(str, "%d %s", &tid, path);
+    if (CapioCLEngine::get().isExcluded(path)) {
+        write_response(tid, CAPIO_POSIX_SYSCALL_REQUEST_SKIP);
+        return;
+    }
     handle_unlink(tid, path);
 }
 

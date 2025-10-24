@@ -171,6 +171,13 @@ jobs:
           CAPIO_DIR: ${{ github.workspace }}
           CAPIO_LOG_LEVEL: -1
         run: |
+          jq  -n               \
+              --arg pwd $(pwd) \
+              '{name: "CAPIO", IO_Graph: [], exclude: [$pwd + "/aNonExistingFile", $pwd, $pwd + "/"]}' \
+          > test_config.json
+          
+          export CONFIG_PATH=$(realpath test_config.json)
+          
           export LD_LIBRARY_PATH="/usr/local/lib:${LD_LIBRARY_PATH}"
           
           echo "Run CAPIO POSIX Unit tests"

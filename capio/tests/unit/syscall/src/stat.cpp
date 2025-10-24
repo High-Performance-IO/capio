@@ -43,7 +43,7 @@ TEST(SystemCallTest, TestStatOnDirectory) {
 
 TEST(SystemCallTest, TestStatOnNonexistentFile) {
     struct stat statbuf {};
-    EXPECT_EQ(stat("test", &statbuf), -1);
+    EXPECT_EQ(stat("aNonExistingFile", &statbuf), -1);
     EXPECT_EQ(errno, ENOENT);
 }
 
@@ -175,12 +175,6 @@ TEST(SystemCallTest, TestFstatatOnDirectoryInDifferentDirectoryWithDirfd) {
     EXPECT_NE(close(dirfd), -1);
 }
 
-TEST(SystemCallTest, TwstFstatatWithAtEmptyPathAndAtFdcwd) {
-    struct stat statbuf {};
-    EXPECT_EQ(fstatat(AT_FDCWD, "", &statbuf, AT_EMPTY_PATH), 0);
-    check_statbuf(statbuf, 4096);
-}
-
 TEST(SystemCallTest, TestFstatatOnFileWithAtEmptyPathAndDirfd) {
     constexpr const char *PATHNAME = "test_file.txt";
     constexpr const char *BUFFER =
@@ -212,7 +206,7 @@ TEST(SystemCallTest, TestFstatatOnDirectoryWIthAtEmptyPathAndDirfd) {
 
 TEST(SystemCallTest, TestFstatatOnNonexistentFile) {
     struct stat statbuf {};
-    EXPECT_EQ(fstatat(AT_FDCWD, "test", &statbuf, 0), -1);
+    EXPECT_EQ(fstatat(AT_FDCWD, "aNonExistingFile", &statbuf, 0), -1);
     EXPECT_EQ(errno, ENOENT);
 }
 

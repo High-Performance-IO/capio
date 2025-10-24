@@ -9,7 +9,6 @@
 
 #include "utils/location.hpp"
 #include "utils/metadata.hpp"
-#include "utils/producer.hpp"
 
 std::mutex local_read_mutex;
 
@@ -47,8 +46,8 @@ inline void handle_local_read(int tid, int fd, off64_t count, bool is_prod) {
     bool writer                       = writers[pid][path];
     off64_t end_of_sector             = c_file.get_sector_end(process_offset);
     off64_t end_of_read               = process_offset + count;
-    std::string_view mode             = c_file.get_mode();
-    if (mode == CAPIO_FILE_MODE_UPDATE && !c_file.is_complete() && !writer && !is_prod) {
+
+    if (CapioCLEngine::get().isFirable(path) && !c_file.is_complete() && !writer && !is_prod) {
         // wait for file to be completed and then do what is done inside handle pending read
         LOG("Starting async thread to wait for file availability");
         std::thread t([&c_file, tid, fd, count, process_offset] {
@@ -120,16 +119,13 @@ void wait_for_file(const std::filesystem::path &path, int tid, int fd, off64_t c
         const CapioFile &c_file = get_capio_file(path);
         auto remote_app         = apps.find(tid);
         if (!c_file.is_complete() && remote_app != apps.end()) {
-            long int pos = match_globs(path);
-            if (pos != -1) {
-                const std::string &remote_app_name = remote_app->second;
-                std::string prefix                 = std::get<0>(metadata_conf_globs[pos]);
-                off64_t batch_size                 = std::get<5>(metadata_conf_globs[pos]);
-                if (batch_size > 0) {
-                    handle_remote_read_batch_request(tid, fd, count, remote_app_name, prefix,
-                                                     batch_size, false);
-                    return;
-                }
+            const std::string &remote_app_name = remote_app->second;
+            std::string prefix                 = path.parent_path();
+            off64_t batch_size                 = CapioCLEngine::get().getDirectoryFileCount(path);
+            if (batch_size > 0) {
+                handle_remote_read_batch_request(tid, fd, count, remote_app_name, prefix,
+                                                 batch_size, false);
+                return;
             }
         }
         request_remote_read(tid, fd, count);
@@ -141,8 +137,10 @@ inline void handle_read(int tid, int fd, off64_t count) {
 
     const std::filesystem::path &path      = get_capio_file_path(tid, fd);
     const std::filesystem::path &capio_dir = get_capio_dir();
-    bool is_prod                           = is_producer(tid, path);
-    auto file_location_opt                 = get_file_location_opt(path);
+    std::string app_name = apps.find(tid) == apps.end() ? apps.at(tid) : CAPIO_DEFAULT_APP_NAME;
+
+    bool is_prod           = CapioCLEngine::get().isProducer(path, app_name);
+    auto file_location_opt = get_file_location_opt(path);
     if (!file_location_opt && !is_prod) {
         LOG("Starting thread to wait for file creation");
         // launch a thread that checks when the file is created
@@ -159,17 +157,14 @@ inline void handle_read(int tid, int fd, off64_t count) {
         if (!c_file.is_complete() && it != apps.end()) {
             LOG("File not complete");
             const std::string &app_name = it->second;
-            long int pos                = match_globs(path);
-            if (pos != -1) {
-                LOG("Glob matched");
-                std::string prefix = std::get<0>(metadata_conf_globs[pos]);
-                off64_t batch_size = std::get<5>(metadata_conf_globs[pos]);
-                if (batch_size > 0) {
-                    LOG("Handling batch file");
-                    handle_remote_read_batch_request(tid, fd, count, app_name, prefix, batch_size,
-                                                     false);
-                    return;
-                }
+
+            std::string prefix = path.parent_path();
+            off64_t batch_size = CapioCLEngine::get().getDirectoryFileCount(path);
+            if (batch_size > 0) {
+                LOG("Handling batch file");
+                handle_remote_read_batch_request(tid, fd, count, app_name, prefix, batch_size,
+                                                 false);
+                return;
             }
         }
         LOG("Delegating to backend remote read");

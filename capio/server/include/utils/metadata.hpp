@@ -14,32 +14,6 @@ std::unordered_map<int, std::unordered_map<int, std::pair<CapioFile *, std::shar
 CSProcessFileMetadataMap_t processes_files_metadata;
 std::mutex processes_files_mutex;
 
-CSMetadataConfMap_t metadata_conf;
-CSMetadataConfGlobs_t metadata_conf_globs;
-
-long match_globs(const std::filesystem::path &path) {
-    START_LOG(gettid(), "call(path=%s)", path.c_str());
-
-    long int resolved_glob_offset = -1;
-    size_t max_length_prefix      = 0;
-    // compute the most accurate and precise glob for a given path
-    for (std::size_t i = 0; i < metadata_conf_globs.size(); i++) {
-        std::string prefix_str = std::get<0>(metadata_conf_globs[i]);
-        size_t prefix_length   = prefix_str.length();
-        bool path_matches =
-            static_cast<bool>(path.native().compare(0, prefix_length, prefix_str) == 0);
-        LOG("path=%s, prefix_str=%s, path_matches=%s", path.c_str(), prefix_str.c_str(),
-            path_matches ? "True" : "False");
-        if (path_matches && prefix_length > max_length_prefix) {
-            resolved_glob_offset = static_cast<long>(i);
-            max_length_prefix    = prefix_length;
-            LOG("Path matches with offset of %ld", resolved_glob_offset);
-        }
-    }
-    LOG("Result of glob %s: %d", path.c_str(), resolved_glob_offset);
-    return resolved_glob_offset;
-}
-
 inline std::unordered_map<int, std::vector<int>> get_capio_fds() {
     const std::lock_guard<std::mutex> lg(processes_files_mutex);
     std::unordered_map<int, std::vector<int>> tid_fd_pairs;
@@ -136,48 +110,21 @@ CapioFile &create_capio_file(const std::filesystem::path &path, bool is_dir, siz
 
     std::string shm_name = path;
     std::replace(shm_name.begin(), shm_name.end(), '/', '_');
-    CapioFile *c_file;
-    auto it = metadata_conf.find(path);
-    if (it == metadata_conf.end()) {
-        LOG("File was not found in metadata_conf. resolving it as glob");
-        long int pos = match_globs(path);
-        LOG("Glob %s offset is %d", path.c_str(), pos);
-        if (pos == -1) {
-            LOG("Glob %s was not found.", path.c_str());
-            if (is_dir) {
-                init_size = CAPIO_DEFAULT_DIR_INITIAL_SIZE;
-                LOG("Glob %s is a directory", path.c_str());
-            }
-            c_file = new CapioFile(is_dir, false, init_size);
-            add_capio_file(path, c_file);
-        } else {
-            LOG("Path %s is found in metadata_conf_globs", path.c_str());
-            auto &[glob, committed, mode, app_name, n_files, batch_size, permanent, n_close] =
-                metadata_conf_globs[pos];
-            if (in_dir(path, glob)) {
-                n_files = 0;
-            }
-            if (n_files > 0) {
-                init_size = CAPIO_DEFAULT_DIR_INITIAL_SIZE;
-                is_dir    = true;
-            }
-            metadata_conf[path] =
-                std::make_tuple(committed, mode, app_name, n_files, permanent, n_close);
-            LOG("Creating new capio_file. committed=%s, mode=%s", committed.c_str(), mode.c_str());
-            c_file = new CapioFile(committed, mode, is_dir, n_files, permanent, init_size, n_close);
-            add_capio_file(path, c_file);
-        }
-    } else {
-        LOG("File was found in metadata_conf. handling as normal file");
-        auto &[committed, mode, app_name, n_files, permanent, n_close] = it->second;
-        if (n_files > 0) {
-            is_dir    = true;
-            init_size = CAPIO_DEFAULT_DIR_INITIAL_SIZE;
-        }
-        LOG("Creating new capio_file. committed=%s, mode=%s", committed.c_str(), mode.c_str());
-        c_file = new CapioFile(committed, mode, is_dir, n_files, permanent, init_size, n_close);
-        add_capio_file(path, c_file);
+
+    auto commit_rule   = CapioCLEngine::get().getCommitRule(path);
+    auto fire_rule     = CapioCLEngine::get().getFireRule(path);
+    auto n_file        = CapioCLEngine::get().getDirectoryFileCount(path);
+    auto permanent     = CapioCLEngine::get().isPermanent(path);
+    auto n_close_count = CapioCLEngine::get().getCommitCloseCount(path);
+
+    if (n_file > 1) {
+        // NODE: This is probably because it needs to be filled even when dealing with directories
+        init_size = CAPIO_DEFAULT_DIR_INITIAL_SIZE;
     }
+
+    const auto c_file =
+        new CapioFile(commit_rule, is_dir, n_file, permanent, init_size, n_close_count);
+    add_capio_file(path, c_file);
     return *c_file;
 }
 
@@ -251,26 +198,4 @@ inline off64_t set_capio_file_offset(int tid, int fd, off64_t offset) {
     const std::lock_guard<std::mutex> lg(processes_files_mutex);
     return *std::get<1>(processes_files[tid][fd]) = offset;
 }
-
-void update_metadata_conf(std::filesystem::path &path, size_t pos, long int n_files,
-                          size_t batch_size, const std::string &committed, const std::string &mode,
-                          const std::string &app_name, bool permanent, long int n_close) {
-    START_LOG(gettid(),
-              "call(path=%s, pos=%ld, n_files=%ld, batch_size=%ld, committed=%s, "
-              "mode=%s, app_name=%s, permanent=%s, n_close=%ld)",
-              path.c_str(), pos, n_files, batch_size, committed.c_str(), mode.c_str(),
-              app_name.c_str(), permanent ? "true" : "false", n_close);
-
-    if (pos == std::string::npos && n_files == -1) {
-        LOG("Path is not a glob (does not end with *), and n_files is -1");
-        metadata_conf[path] =
-            std::make_tuple(committed, mode, app_name, n_files, permanent, n_close);
-    } else {
-        std::string prefix_str = path.native().substr(0, pos);
-        LOG("prefix_str=%s", prefix_str.c_str());
-        metadata_conf_globs.emplace_back(prefix_str, committed, mode, app_name, n_files, batch_size,
-                                         permanent, n_close);
-    }
-}
-
 #endif // CAPIO_SERVER_UTILS_METADATA_HPP

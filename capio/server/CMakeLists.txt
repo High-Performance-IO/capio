@@ -15,23 +15,22 @@ FetchContent_Declare(
         GIT_REPOSITORY https://github.com/Taywee/args.git
         GIT_TAG 6.4.7
 )
-FetchContent_Declare(
-        simdjson
-        GIT_REPOSITORY https://github.com/simdjson/simdjson.git
-        GIT_TAG v3.3.0
-)
-
 
 set(ARGS_BUILD_EXAMPLE OFF CACHE INTERNAL "")
 set(ARGS_BUILD_UNITTESTS OFF CACHE INTERNAL "")
-set(SIMDJSON_IMPLEMENTATION fallback CACHE STRING "" FORCE)
 
-FetchContent_MakeAvailable(args simdjson)
+FetchContent_Declare(
+        capio_cl
+        GIT_REPOSITORY https://github.com/High-Performance-IO/CAPIO-CL.git
+        GIT_TAG v1.1.1
+)
+
+FetchContent_MakeAvailable(args capio_cl)
 
 #####################################
 # Target definition
 #####################################
-add_executable(${TARGET_NAME} ${TARGET_SOURCES} ${simdjson_SOURCE_DIR}/singleheader/simdjson.cpp)
+add_executable(${TARGET_NAME} ${TARGET_SOURCES})
 
 #####################################
 # Include files and directories
@@ -45,7 +44,7 @@ target_include_directories(${TARGET_NAME} PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}/include
         ${MPI_INCLUDE_PATH}
         ${args_SOURCE_DIR}
-        ${simdjson_SOURCE_DIR}
+        ${capio_cl_SOURCE_DIR}
 )
 
 #####################################
@@ -62,7 +61,7 @@ ENDIF (MPI_LINK_FLAGS)
 #####################################
 # Link libraries
 #####################################
-target_link_libraries(${TARGET_NAME} PRIVATE ${MPI_LIBRARIES} pthread rt stdc++fs)
+target_link_libraries(${TARGET_NAME} PRIVATE ${MPI_LIBRARIES} pthread rt stdc++fs libcapio_cl)
 
 #####################################
 # Install rules

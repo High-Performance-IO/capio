@@ -151,7 +151,7 @@ inline void handle_remote_read_batch(const std::filesystem::path &path, const st
         is_getdents ? "true" : "false");
 
     // FIXME: this assignment always overrides the request parameter, which is never used
-    batch_size  = find_batch_size(prefix, metadata_conf_globs);
+    batch_size  = CapioCLEngine::get().getDirectoryFileCount(path);
     auto *files = files_available(prefix, app_name, path);
     LOG("files==nullptr? %s", files == nullptr ? "true" : "false");
     if (files->size() == batch_size) {
@@ -211,8 +211,7 @@ inline void handle_remote_read(const std::filesystem::path &path, const std::str
 
     CapioFile &c_file   = get_capio_file(path);
     bool data_available = (offset + count <= c_file.get_stored_size());
-    if (c_file.is_complete() ||
-        (c_file.get_mode() == CAPIO_FILE_MODE_NO_UPDATE && data_available)) {
+    if (c_file.is_complete() || (CapioCLEngine::get().isFirable(path) && data_available)) {
         serve_remote_read(path, source, tid, fd, count, offset, c_file.is_complete(), is_getdents);
     } else {
         std::thread t(wait_for_data, path, source, tid, fd, count, offset, is_getdents);

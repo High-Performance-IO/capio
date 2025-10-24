@@ -34,7 +34,7 @@ inline void handle_remote_stat(int source_tid, const std::filesystem::path &path
     auto c_file = get_capio_file_opt(path);
     if (c_file) {
         LOG("File %s is present on capio file system", path.c_str());
-        if (c_file->get().is_complete() || c_file->get().get_mode() == CAPIO_FILE_MODE_NO_UPDATE) {
+        if (c_file->get().is_complete() || CapioCLEngine::get().isFirable(path)) {
             LOG("file is complete. serving file");
             serve_remote_stat(path, dest, source_tid);
         } else { // wait for completion
@@ -46,15 +46,11 @@ inline void handle_remote_stat(int source_tid, const std::filesystem::path &path
         }
     } else {
         LOG("CAPIO file is not in metadata. checking in globs for files to be created");
-        if (match_globs(path) != -1) {
-            LOG("File is in globs. creating capio_file and starting thread awaiting for future "
-                "creation of file");
-            create_capio_file(path, false, CAPIO_DEFAULT_FILE_INITIAL_SIZE);
-            std::thread t(wait_for_completion, path, source_tid, dest);
-            t.detach();
-        } else {
-            ERR_EXIT("Error capio file is not present, nor is going to be created in the future.");
-        }
+        LOG("File is in globs. creating capio_file and starting thread awaiting for future "
+            "creation of file");
+        create_capio_file(path, false, CAPIO_DEFAULT_FILE_INITIAL_SIZE);
+        std::thread t(wait_for_completion, path, source_tid, dest);
+        t.detach();
     }
 }
 
