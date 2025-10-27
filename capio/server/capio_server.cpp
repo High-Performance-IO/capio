@@ -22,6 +22,7 @@
 
 std::string workflow_name;
 
+#include "client-manager/client_manager.hpp"
 #include "utils/types.hpp"
 
 // tid -> (client_to_server_data_buf, server_to_client_data_buf)
@@ -40,22 +41,8 @@ int n_servers;
 // name of the node
 char *node_name;
 
-/*
- * For multithreading:
- * tid -> pid*/
-CSPidsMap_T pids;
-
-// tid -> application name
-CSAppsMap_t apps;
-
 // application name -> set of files already sent
 CSFilesSentMap_t files_sent;
-
-/*
- * pid -> pathname -> bool
- * Different threads with the same pid are treated as a single writer
- */
-CSWritersMap_t writers;
 
 CSClientsRemotePendingNFilesMap_t clients_remote_pending_nfiles;
 
