@@ -369,7 +369,7 @@ class CapioFile {
         return _n_close_expected == -1 || _n_close == _n_close_expected;
     }
 
-    [[nodiscard]] inline bool is_deletable() const { return _n_opens == 0 && _n_links <= 0; }
+    [[nodiscard]] inline bool is_deletable() const { return _n_opens <= 0; }
 
     [[nodiscard]] inline bool is_dir() const { return _directory; }
 
@@ -475,8 +475,6 @@ class CapioFile {
         queue.read(_buf + offset, num_bytes);
         _data_avail_cv.notify_all();
     }
-
-    inline void unlink() { _n_links--; }
 };
 
 #endif // CAPIO_SERVER_UTILS_CAPIO_FILE_HPP

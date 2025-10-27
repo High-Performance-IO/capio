@@ -11,14 +11,7 @@
 #include "utils/requests.hpp"
 #include "utils/types.hpp"
 
-void send_data_to_client(int tid, int fd, char *buf, off64_t offset, off64_t count) {
-    START_LOG(gettid(), "call(tid=%d, fd=%d, buf=0x%08x, offset=%ld, count=%ld)", tid, fd, buf,
-              offset, count);
-
-    write_response(tid, offset + count);
-    data_buffers[tid].second->write(buf + offset, count);
-    set_capio_file_offset(tid, fd, offset + count);
-}
+extern ClientManager *client_manager;
 
 inline off64_t send_dirent_to_client(int tid, int fd, CapioFile &c_file, off64_t offset,
                                      off64_t count) {
@@ -48,8 +41,10 @@ inline off64_t send_dirent_to_client(int tid, int fd, CapioFile &c_file, off64_t
             LOG("DIRENT NAME: %s - TARGET NAME: %s", dir_entity->d_name, current_dirent.d_name);
         }
 
-        send_data_to_client(tid, fd, reinterpret_cast<char *>(dirents.get()) - offset, offset,
-                            actual_size);
+        client_manager->replyToClient(tid, reinterpret_cast<char *>(dirents.get()) - offset, offset,
+                                      actual_size);
+        set_capio_file_offset(tid, fd, offset + actual_size);
+
     } else {
         write_response(tid, offset);
     }
@@ -66,6 +61,17 @@ inline bool is_int(const std::string &s) {
         res = *p == 0;
     }
     return res;
+}
+
+inline void server_println(const std::string &message_type = "",
+                           const std::string &message_line = "") {
+    if (message_type.empty()) {
+        std::cout << std::endl;
+    } else {
+        std::cout << message_type << " " << get_capio_workflow_name() << "] " << message_line
+                  << std::endl
+                  << std::flush;
+    }
 }
 
 #endif // CAPIO_SERVER_UTILS_COMMON_HPP
