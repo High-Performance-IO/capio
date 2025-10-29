@@ -55,14 +55,14 @@ inline void handle_getdents(int tid, int fd, long int count) {
                 handle_getdents(tid, fd, count);
             } else {
                 const CapioFile &c_file = get_capio_file(path_to_check);
-                auto remote_app         = apps.find(tid);
-                if (!c_file.is_complete() && remote_app != apps.end()) {
-                    const std::string &remote_app_name = remote_app->second;
-                    std::string prefix                 = path_to_check.parent_path();
-                    off64_t batch_size = CapioCLEngine::get().getDirectoryFileCount(path_to_check);
-                    if (batch_size > 0) {
-                        handle_remote_read_batch_request(tid, fd, count, remote_app_name, prefix,
-                                                         batch_size, true);
+                const auto remote_app   = client_manager->get_app_name(tid);
+                if (!c_file.is_complete()) {
+                    if (const off64_t batch_size =
+                            CapioCLEngine::get().getDirectoryFileCount(path_to_check);
+                        batch_size > 0) {
+                        handle_remote_read_batch_request(tid, fd, count, remote_app,
+                                                         path_to_check.parent_path(), batch_size,
+                                                         true);
                         return;
                     }
                 }
@@ -78,16 +78,16 @@ inline void handle_getdents(int tid, int fd, long int count) {
     } else {
         LOG("File is remote");
         CapioFile &c_file = get_capio_file(path);
-        auto it           = apps.find(tid);
-        if (!c_file.is_complete() && it != apps.end()) {
+
+        if (!c_file.is_complete()) {
             LOG("File not complete");
-            const std::string &app_name = it->second;
+            const std::string &app_name_inner = client_manager->get_app_name(tid);
             LOG("Glob matched");
             std::string prefix = path.parent_path();
             off64_t batch_size = CapioCLEngine::get().getDirectoryFileCount(path);
             if (batch_size > 0) {
                 LOG("Handling batch file");
-                handle_remote_read_batch_request(tid, fd, count, app_name, prefix, batch_size,
+                handle_remote_read_batch_request(tid, fd, count, app_name_inner, prefix, batch_size,
                                                  true);
                 return;
             }

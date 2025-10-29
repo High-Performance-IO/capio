@@ -9,7 +9,7 @@
  * @brief Class to handle libcapio_posix clients applications
  */
 class ClientManager {
-    std::unordered_map<long, SPSCQueue *> *bufs_response;
+    std::unordered_map<long, std::pair<SPSCQueue *, SPSCQueue *>> *data_buffers;
     std::unordered_map<int, const std::string> *app_names;
 
     /**
@@ -39,10 +39,11 @@ class ClientManager {
     /**
      * Write offset to response buffer of process @param tid
      * @param tid
-     * @param offset
+     * @param response
+     * @param response_size
      * @return
      */
-    void reply_to_client(const pid_t tid, const unsigned long long offset) const;
+    void reply_to_client(pid_t tid,  char* response, size_t response_size) const;
 
     /**
      * @brief Add a file that is not yet ready to be consumed by a process to a list of files

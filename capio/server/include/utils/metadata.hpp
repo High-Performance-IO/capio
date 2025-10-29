@@ -3,8 +3,11 @@
 
 #include <mutex>
 #include <optional>
+#include <list>
 
 #include "common/filesystem.hpp"
+#include "utils/types.hpp"
+
 // FIXME: Remove the inline specifier by using extern
 inline CSFilesMetadata_t files_metadata;
 

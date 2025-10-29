@@ -20,7 +20,7 @@ inline CSBufResponse_t *bufs_response;
  */
 inline void init_server() {
     buf_requests  = new CSBufRequest_t(SHM_COMM_CHAN_NAME, CAPIO_REQ_BUFF_CNT, CAPIO_REQ_MAX_SIZE,
-                                       workflow_name);
+                                       get_capio_workflow_name());
     bufs_response = new CSBufResponse_t();
 }
 
@@ -47,7 +47,7 @@ inline void register_listener(long tid) {
     // TODO: replace numbers with constexpr
     auto *p_buf_response =
         new CircularBuffer<off_t>(SHM_COMM_CHAN_NAME_RESP + std::to_string(tid), CAPIO_REQ_BUFF_CNT,
-                                  sizeof(off_t), workflow_name);
+                                  sizeof(off_t), get_capio_workflow_name());
     bufs_response->insert(std::make_pair(tid, p_buf_response));
 }
 
