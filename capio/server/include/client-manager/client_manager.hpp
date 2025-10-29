@@ -39,11 +39,12 @@ class ClientManager {
     /**
      * Write offset to response buffer of process @param tid
      * @param tid
-     * @param response
-     * @param response_size
+     * @param buf
+     * @param offset
+     * @param count
      * @return
      */
-    void reply_to_client(pid_t tid,  char* response, size_t response_size) const;
+    void reply_to_client(int tid, char *buf, off64_t offset, off64_t count) const;
 
     /**
      * @brief Add a file that is not yet ready to be consumed by a process to a list of files

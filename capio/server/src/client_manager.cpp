@@ -45,10 +45,12 @@ void ClientManager::remove_client(pid_t tid) const {
     files_created_by_producer->erase(tid);
 }
 
-void ClientManager::reply_to_client(const pid_t tid, char *response, size_t response_size) const {
-    START_LOG(gettid(), "call(tid=%ld, offset=%s)", tid, response);
+void ClientManager::reply_to_client(int tid, char *buf, off64_t offset, off64_t count) const {
+    START_LOG(gettid(), "call(tid=%d, buf=0x%08x, offset=%ld, count=%ld)", tid, buf, offset, count);
+
     if (const auto out = data_buffers->find(tid); out != data_buffers->end()) {
-        out->second.second->write(response, response_size);
+        write_response(tid, offset + count);
+        out->second.second->write(buf + offset, count);
         return;
     }
     LOG("Err: no such buffer for provided tid");

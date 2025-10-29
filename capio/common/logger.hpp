@@ -23,6 +23,7 @@ inline bool continue_on_error = false; // change behaviour of ERR_EXIT to contin
 
 #ifndef __CAPIO_POSIX
 #include <filesystem>
+
 // FIXME: Remove the inline specifier by splitting into header and source code
 inline thread_local std::ofstream logfile; // if building for server, self contained logfile
 inline std::string log_master_dir_name = CAPIO_DEFAULT_LOG_FOLDER;
@@ -45,6 +46,7 @@ inline thread_local bool logging_syscall = false;
 #ifndef CAPIO_MAX_LOG_LEVEL // capio max log level. defaults to -1, where everything is logged
 #define CAPIO_MAX_LOG_LEVEL -1
 #endif
+
 // FIXME: Remove the inline specifier by splitting into header and source code
 inline int CAPIO_LOG_LEVEL = CAPIO_MAX_LOG_LEVEL;
 
