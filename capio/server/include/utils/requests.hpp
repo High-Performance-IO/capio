@@ -6,8 +6,11 @@
 #include "common/requests.hpp"
 #include "utils/types.hpp"
 
-CSBufRequest_t *buf_requests;
-CSBufResponse_t *bufs_response;
+// FIXME: Remove the inline specifier by using extern
+inline CSBufRequest_t *buf_requests;
+
+// FIXME: Remove the inline specifier by using extern
+inline CSBufResponse_t *bufs_response;
 
 /**
  * Initialize request and response buffers

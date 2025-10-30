@@ -5,14 +5,22 @@
 #include <optional>
 
 #include "common/filesystem.hpp"
+// FIXME: Remove the inline specifier by using extern
+inline CSFilesMetadata_t files_metadata;
 
-CSFilesMetadata_t files_metadata;
-std::mutex files_metadata_mutex;
+// FIXME: Remove the inline specifier by using extern
+inline std::mutex files_metadata_mutex;
 
-std::unordered_map<int, std::unordered_map<int, std::pair<CapioFile *, std::shared_ptr<off64_t>>>>
+// FIXME: Remove the inline specifier by using extern
+inline std::unordered_map<int,
+                          std::unordered_map<int, std::pair<CapioFile *, std::shared_ptr<off64_t>>>>
     processes_files;
-CSProcessFileMetadataMap_t processes_files_metadata;
-std::mutex processes_files_mutex;
+
+// FIXME: Remove the inline specifier by using extern
+inline CSProcessFileMetadataMap_t processes_files_metadata;
+
+// FIXME: Remove the inline specifier by using extern
+inline std::mutex processes_files_mutex;
 
 inline std::unordered_map<int, std::vector<int>> get_capio_fds() {
     const std::lock_guard<std::mutex> lg(processes_files_mutex);
@@ -104,7 +112,8 @@ inline void clone_capio_file(pid_t parent_tid, pid_t child_tid) {
     }
 }
 
-CapioFile &create_capio_file(const std::filesystem::path &path, bool is_dir, size_t init_size) {
+inline CapioFile &create_capio_file(const std::filesystem::path &path, bool is_dir,
+                                    size_t init_size) {
     START_LOG(gettid(), "call(path=%s, is_dir=%s, init_size=%ld)", path.c_str(),
               is_dir ? "true" : "false", init_size);
 
