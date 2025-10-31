@@ -7,7 +7,7 @@
 
 ClientManager::ClientManager() {
     START_LOG(gettid(), "call()");
-    data_buffers              = new std::unordered_map<long, std::pair<SPSCQueue *, SPSCQueue *>>();
+    data_buffers              = new std::unordered_map<long, ClientDataBuffers>();
     app_names                 = new std::unordered_map<int, const std::string>;
     files_created_by_producer = new std::unordered_map<pid_t, std::vector<std::string> *>;
     server_println(CAPIO_LOG_SERVER_CLI_LEVEL_INFO, "ClientManager initialization completed.");
@@ -15,13 +15,20 @@ ClientManager::ClientManager() {
 
 ClientManager::~ClientManager() {
     START_LOG(gettid(), "call()");
+
+    for (const auto [fst, snd] : *data_buffers) {
+        delete snd.ClientToServer;
+        delete snd.ServerToClient;
+        data_buffers->erase(fst);
+    }
+
     delete data_buffers;
     delete app_names;
     delete files_created_by_producer;
     server_println(CAPIO_LOG_SERVER_CLI_LEVEL_WARNING, "ClientManager cleanup completed.");
 }
 
-void ClientManager::register_client(const std::string &app_name, pid_t tid) const {
+void ClientManager::register_client(pid_t tid, const std::string &app_name) const {
     START_LOG(gettid(), "call(tid=%ld, app_name=%s)", tid, app_name.c_str());
     // TODO: replace numbers with constexpr
     const auto workflow_name = get_capio_workflow_name();
@@ -33,13 +40,14 @@ void ClientManager::register_client(const std::string &app_name, pid_t tid) cons
                         get_cache_line_size(), workflow_name)}});
     app_names->emplace(tid, app_name);
     files_created_by_producer->emplace(tid, new std::vector<std::string>);
+    register_listener(tid);
 }
 
 void ClientManager::remove_client(pid_t tid) const {
     START_LOG(gettid(), "call(tid=%ld)", tid);
     if (const auto it_resp = data_buffers->find(tid); it_resp != data_buffers->end()) {
-        delete it_resp->second.first;
-        delete it_resp->second.second;
+        delete it_resp->second.ClientToServer;
+        delete it_resp->second.ServerToClient;
         data_buffers->erase(it_resp);
     }
     files_created_by_producer->erase(tid);
@@ -50,7 +58,7 @@ void ClientManager::reply_to_client(int tid, char *buf, off64_t offset, off64_t 
 
     if (const auto out = data_buffers->find(tid); out != data_buffers->end()) {
         write_response(tid, offset + count);
-        out->second.second->write(buf + offset, count);
+        out->second.ServerToClient->write(buf + offset, count);
         return;
     }
     LOG("Err: no such buffer for provided tid");
@@ -81,6 +89,9 @@ std::string ClientManager::get_app_name(pid_t tid) const {
         return itm->second;
     }
     return CAPIO_DEFAULT_APP_NAME;
+}
+SPSCQueue *ClientManager::get_client_to_server_data_buffer(pid_t tid) const {
+    return data_buffers->at(tid).ClientToServer;
 }
 
 size_t ClientManager::get_connected_posix_client() { return data_buffers->size(); }

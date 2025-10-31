@@ -9,7 +9,12 @@
  * @brief Class to handle libcapio_posix clients applications
  */
 class ClientManager {
-    std::unordered_map<long, std::pair<SPSCQueue *, SPSCQueue *>> *data_buffers;
+    struct ClientDataBuffers {
+        SPSCQueue *ClientToServer;
+        SPSCQueue *ServerToClient;
+    };
+
+    std::unordered_map<long, ClientDataBuffers> *data_buffers;
     std::unordered_map<int, const std::string> *app_names;
 
     /**
@@ -25,9 +30,10 @@ class ClientManager {
     /**
      * Add a new response buffer for thread @param tid
      * @param tid
+     * @param app_name
      * @return
      */
-    void register_client(const std::string &app_name, pid_t tid) const;
+    void register_client(pid_t tid, const std::string &app_name = CAPIO_DEFAULT_APP_NAME) const;
 
     /**
      * Delete the response buffer associated with thread @param tid
@@ -70,6 +76,9 @@ class ClientManager {
      * @return std::string
      */
     [[nodiscard]] std::string get_app_name(pid_t tid) const;
+
+
+    [[nodiscard]] SPSCQueue* get_client_to_server_data_buffer(pid_t tid) const;
 
     size_t get_connected_posix_client();
 };

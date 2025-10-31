@@ -29,7 +29,7 @@ inline void handle_exit_group(int tid) {
     for (auto &fd : get_capio_fds_for_tid(tid)) {
         handle_close(tid, fd);
     }
-    free_resources(tid);
+    client_manager->remove_client(tid);
 }
 
 void exit_group_handler(const char *const str) {

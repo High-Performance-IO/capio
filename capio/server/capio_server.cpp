@@ -26,7 +26,7 @@ std::string workflow_name;
 #include "utils/types.hpp"
 
 // tid -> (client_to_server_data_buf, server_to_client_data_buf)
-CSDataBufferMap_t data_buffers;
+// CSDataBufferMap_t data_buffers;
 
 #include "common/env.hpp"
 #include "common/logger.hpp"
@@ -298,6 +298,7 @@ int main(int argc, char **argv) {
     open_files_location();
 
     shm_canary = new CapioShmCanary(workflow_name);
+    client_manager = new ClientManager();
 
     std::thread server_thread(capio_server, std::ref(internal_server_sem));
     LOG("capio_server thread started");

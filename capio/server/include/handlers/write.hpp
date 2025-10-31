@@ -17,7 +17,7 @@ void write_handler(const char *const str) {
     const std::filesystem::path &path = get_capio_file_path(tid, fd);
     CapioFile &c_file                 = get_capio_file(path);
     off64_t file_shm_size             = c_file.get_buf_size();
-    auto *data_buf                    = data_buffers[tid].first;
+    auto *data_buf                    = client_manager->get_client_to_server_data_buffer(tid);
 
     c_file.create_buffer_if_needed(path, true);
     if (end_of_write > file_shm_size) {
