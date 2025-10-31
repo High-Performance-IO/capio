@@ -1,9 +1,14 @@
 #ifndef CAPIO_SERVER_HANDLERS_UNLINK_HPP
 #define CAPIO_SERVER_HANDLERS_UNLINK_HPP
 
-inline void handle_unlink(int tid, const std::filesystem::path &path) {
-    START_LOG(gettid(), "call(tid=%d, path=%s)", tid, path.c_str());
-
+void unlink_handler(const char *const str) {
+    char path[PATH_MAX];
+    int tid;
+    sscanf(str, "%d %s", &tid, path);
+    if (CapioCLEngine::get().isExcluded(path)) {
+        write_response(tid, CAPIO_POSIX_SYSCALL_REQUEST_SKIP);
+        return;
+    }
     auto c_file_opt = get_capio_file_opt(path);
     if (c_file_opt) { // TODO: it works only in the local case
         CapioFile &c_file = c_file_opt->get();
@@ -16,17 +21,6 @@ inline void handle_unlink(int tid, const std::filesystem::path &path) {
     } else {
         write_response(tid, -1);
     }
-}
-
-void unlink_handler(const char *const str) {
-    char path[PATH_MAX];
-    int tid;
-    sscanf(str, "%d %s", &tid, path);
-    if (CapioCLEngine::get().isExcluded(path)) {
-        write_response(tid, CAPIO_POSIX_SYSCALL_REQUEST_SKIP);
-        return;
-    }
-    handle_unlink(tid, path);
 }
 
 #endif // CAPIO_SERVER_HANDLERS_UNLINK_HPP

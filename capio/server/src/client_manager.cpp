@@ -51,6 +51,7 @@ void ClientManager::remove_client(pid_t tid) const {
         data_buffers->erase(it_resp);
     }
     files_created_by_producer->erase(tid);
+    remove_listener(tid);
 }
 
 void ClientManager::reply_to_client(int tid, char *buf, off64_t offset, off64_t count) const {
