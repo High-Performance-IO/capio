@@ -29,6 +29,7 @@ int write_file_stat_clone(FILE *fp) {
         array[i] = i;
     }
     EXPECT_EQ(fwrite(array, sizeof(int), ARRAY_SIZE, fp), ARRAY_SIZE);
+    fclose(fp);
     EXPECT_EQ(sem_post(sem), 0);
     return 0;
 }
@@ -75,6 +76,7 @@ TEST(SystemCallTest, TestThreadCloneProducerConsumerWithStat) {
     EXPECT_NE(fp, nullptr);
     std::thread t1(write_file_stat_clone, fp);
     EXPECT_EQ(sem_wait(sem), 0);
+    fp = fopen(PATHNAME, "w+");
     EXPECT_NE(fseek(fp, 0, SEEK_SET), -1);
     int num;
     while (fread(&num, sizeof(int), 1, fp) != 0)
