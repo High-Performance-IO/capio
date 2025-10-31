@@ -245,6 +245,9 @@ int delete_from_files_location(const std::filesystem::path &path) {
         LOG("Path %s has been deleted from %s", path.c_str(), name.c_str());
     }
 
+    // Delete from local data structures
+    erase_from_files_location(path);
+
     return result;
 }
 
