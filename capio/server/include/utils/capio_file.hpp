@@ -1,6 +1,8 @@
 #ifndef CAPIO_SERVER_UTILS_CAPIO_FILE_HPP
 #define CAPIO_SERVER_UTILS_CAPIO_FILE_HPP
 
+#include "capiocl_adapter.hpp"
+
 #include <algorithm>
 #include <condition_variable>
 #include <set>
