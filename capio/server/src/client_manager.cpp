@@ -10,6 +10,7 @@ ClientManager::ClientManager() {
     data_buffers              = new std::unordered_map<long, ClientDataBuffers>();
     app_names                 = new std::unordered_map<int, const std::string>;
     files_created_by_producer = new std::unordered_map<pid_t, std::vector<std::string> *>;
+    files_created_by_app_name = new std::unordered_map<std::string, std::vector<std::string> *>;
     server_println(CAPIO_LOG_SERVER_CLI_LEVEL_INFO, "ClientManager initialization completed.");
 }
 
@@ -25,6 +26,7 @@ ClientManager::~ClientManager() {
     delete data_buffers;
     delete app_names;
     delete files_created_by_producer;
+    delete files_created_by_app_name;
     server_println(CAPIO_LOG_SERVER_CLI_LEVEL_WARNING, "ClientManager cleanup completed.");
 }
 
@@ -40,6 +42,7 @@ void ClientManager::register_client(pid_t tid, const std::string &app_name) cons
                         get_cache_line_size(), workflow_name)}});
     app_names->emplace(tid, app_name);
     files_created_by_producer->emplace(tid, new std::vector<std::string>);
+    files_created_by_app_name->emplace(app_name, new std::vector<std::string>);
     register_listener(tid);
 }
 
@@ -50,7 +53,9 @@ void ClientManager::remove_client(pid_t tid) const {
         delete it_resp->second.ServerToClient;
         data_buffers->erase(it_resp);
     }
+    const std::string app_name = this->get_app_name(tid);
     files_created_by_producer->erase(tid);
+    files_created_by_app_name->erase(app_name);
     remove_listener(tid);
 }
 
@@ -65,14 +70,55 @@ void ClientManager::reply_to_client(int tid, char *buf, off64_t offset, off64_t 
     LOG("Err: no such buffer for provided tid");
 }
 
-void ClientManager::register_produced_file(pid_t tid, std::string path) const {
+void ClientManager::register_produced_file(pid_t tid, const std::string path) const {
     START_LOG(gettid(), "call(tid=%ld, path=%s)", tid, path.c_str());
     if (const auto itm = files_created_by_producer->find(tid);
         itm != files_created_by_producer->end()) {
         itm->second->emplace_back(path);
+    } else {
+        LOG("Error: tid is not present in files_created_by_producers map");
         return;
     }
-    LOG("Error: tis is not present in files_created_by_producers map");
+    const std::string app_name = this->get_app_name(tid);
+    if (const auto itm = files_created_by_app_name->find(app_name);
+        itm != files_created_by_app_name->end()) {
+        itm->second->emplace_back(path);
+
+    } else {
+        LOG("Error: app_name is not present in files_created_by_app_name map");
+    }
+}
+void ClientManager::remove_produced_file(pid_t tid, const std::filesystem::path &path) const {
+    if (const auto itm = files_created_by_producer->find(tid);
+        itm != files_created_by_producer->end()) {
+        const auto &v = itm->second;
+        v->erase(std::remove(v->begin(), v->end(), path), v->end());
+    }
+
+    const std::string app_name = this->get_app_name(tid);
+    if (const auto itm = files_created_by_app_name->find(app_name);
+        itm != files_created_by_app_name->end()) {
+        const auto &v = itm->second;
+        v->erase(std::remove(v->begin(), v->end(), path), v->end());
+    }
+}
+bool ClientManager::is_producer(pid_t tid, const std::filesystem::path &path) const {
+    bool is_producer = false;
+
+    if (const auto itm = files_created_by_producer->find(tid);
+        itm != files_created_by_producer->end()) {
+        is_producer |=
+            std::find(itm->second->begin(), itm->second->end(), path) != itm->second->end();
+    }
+
+    const std::string app_name = this->get_app_name(tid);
+    if (const auto itm = files_created_by_app_name->find(app_name);
+        itm != files_created_by_app_name->end()) {
+        is_producer |=
+            std::find(itm->second->begin(), itm->second->end(), path) != itm->second->end();
+    }
+
+    return is_producer;
 }
 
 std::vector<std::string> *ClientManager::get_produced_files(pid_t tid) const {

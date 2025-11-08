@@ -143,8 +143,11 @@ inline void handle_read(int tid, int fd, off64_t count) {
     const std::filesystem::path &path      = get_capio_file_path(tid, fd);
     const std::filesystem::path &capio_dir = get_capio_dir();
     std::string app_name                   = client_manager->get_app_name(tid);
-    bool is_prod                           = CapioCLEngine::get().isProducer(path, app_name);
-    auto file_location_opt                 = get_file_location_opt(path);
+    bool is_prod =
+        CapioCLEngine::get().isProducer(path, app_name) || client_manager->is_producer(tid, path);
+    auto file_location_opt = get_file_location_opt(path);
+
+    LOG("Is producer= %s", is_prod ? "TRUE" : "FALSE");
 
     if (!file_location_opt && !is_prod) {
         LOG("Starting thread to wait for file creation");

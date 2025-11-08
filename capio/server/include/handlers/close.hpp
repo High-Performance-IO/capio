@@ -61,14 +61,8 @@ inline void handle_close(int tid, int fd) {
         c_file.commit();
     }
 
-    if (c_file.is_deletable()) {
-        LOG("file %s is deletable from CAPIO_SERVER", path.c_str());
-        delete_capio_file(path);
-        delete_from_files_location(path);
-    } else {
-        LOG("Deleting capio file %s from tid=%d", path.c_str(), tid);
-        delete_capio_file_from_tid(tid, fd);
-    }
+    LOG("Deleting capio file %s from tid=%d", path.c_str(), tid);
+    delete_capio_file_from_tid(tid, fd);
 }
 
 void close_handler(const char *str) {

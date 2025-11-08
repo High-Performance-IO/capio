@@ -22,6 +22,12 @@ class ClientManager {
      */
     std::unordered_map<pid_t, std::vector<std::string> *> *files_created_by_producer;
 
+    /**
+     * Files that are produced by a given app_name. Used to non block execution of multithreaded
+     * applications with same app name when doing IO operations on files
+     */
+    std::unordered_map<std::string, std::vector<std::string> *> *files_created_by_app_name;
+
   public:
     ClientManager();
 
@@ -62,6 +68,15 @@ class ClientManager {
     void register_produced_file(pid_t tid, std::string path) const;
 
     /**
+     * Remove a file from an app name
+     * @param tid
+     * @param path
+     */
+    void remove_produced_file(pid_t tid, const std::filesystem::path &path) const;
+
+    [[nodiscard]] bool is_producer(pid_t tid, const std::filesystem::path &path) const;
+
+    /**
      * @brief Get the files that a given pid is waiting to be produced
      *
      * @param tid
@@ -77,8 +92,7 @@ class ClientManager {
      */
     [[nodiscard]] std::string get_app_name(pid_t tid) const;
 
-
-    [[nodiscard]] SPSCQueue* get_client_to_server_data_buffer(pid_t tid) const;
+    [[nodiscard]] SPSCQueue *get_client_to_server_data_buffer(pid_t tid) const;
 
     size_t get_connected_posix_client();
 };
