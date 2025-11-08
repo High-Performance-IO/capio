@@ -297,7 +297,7 @@ int main(int argc, char **argv) {
 
     open_files_location();
 
-    shm_canary = new CapioShmCanary(workflow_name);
+    shm_canary     = new CapioShmCanary(workflow_name);
     client_manager = new ClientManager();
 
     std::thread server_thread(capio_server, std::ref(internal_server_sem));

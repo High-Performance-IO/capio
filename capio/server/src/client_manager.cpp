@@ -70,7 +70,8 @@ void ClientManager::reply_to_client(int tid, char *buf, off64_t offset, off64_t 
     LOG("Err: no such buffer for provided tid");
 }
 
-void ClientManager::register_produced_file(pid_t tid, const std::string path) const {
+// do not use const reference...
+void ClientManager::register_produced_file(pid_t tid, std::string path) const {
     START_LOG(gettid(), "call(tid=%ld, path=%s)", tid, path.c_str());
     if (const auto itm = files_created_by_producer->find(tid);
         itm != files_created_by_producer->end()) {

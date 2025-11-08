@@ -23,10 +23,12 @@ inline void handle_exit_group(int tid) {
                 c_file.set_complete();
                 c_file.commit();
             }
+            c_file.close();
         }
     }
 
     for (auto &fd : get_capio_fds_for_tid(tid)) {
+        std::string path = std::string(get_capio_file_path(tid, fd));
         handle_close(tid, fd);
     }
     client_manager->remove_client(tid);

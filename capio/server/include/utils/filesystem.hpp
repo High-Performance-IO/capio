@@ -20,7 +20,8 @@
  * type == 2 -> ".." entry
  */
 
-void write_entry_dir(int tid, const std::filesystem::path &file_path, const std::string &dir, int type) {
+void write_entry_dir(int tid, const std::filesystem::path &file_path, const std::string &dir,
+                     int type) {
     START_LOG(gettid(), "call(file_path=%s, dir=%s, type=%d)", file_path.c_str(), dir.c_str(),
               type);
 
@@ -62,7 +63,7 @@ void write_entry_dir(int tid, const std::filesystem::path &file_path, const std:
 
     c_file.insert_sector(base_offset, data_size);
     ++c_file.n_files;
-    client_manager->register_produced_file(tid , dir);
+    client_manager->register_produced_file(tid, dir);
     if (c_file.n_files == c_file.n_files_expected) {
         c_file.set_complete();
     }

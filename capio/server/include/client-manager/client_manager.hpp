@@ -24,7 +24,8 @@ class ClientManager {
 
     /**
      * Files that are produced by a given app_name. Used to non block execution of multithreaded
-     * applications with same app name when doing IO operations on files
+     * applications with same app name when doing IO operations on files, and for
+     * Commit On Termination fallback rule
      */
     std::unordered_map<std::string, std::vector<std::string> *> *files_created_by_app_name;
 

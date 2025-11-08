@@ -8,7 +8,7 @@
 #include "handlers/clone.hpp"
 #include "handlers/close.hpp"
 #include "handlers/dup.hpp"
-#include "handlers/exig.hpp"
+#include "handlers/exit.hpp"
 #include "handlers/getdents.hpp"
 #include "handlers/handshake.hpp"
 #include "handlers/mkdir.hpp"
