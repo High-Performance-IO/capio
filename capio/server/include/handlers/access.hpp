@@ -4,10 +4,11 @@
 #include "utils/location.hpp"
 
 void access_handler(const char *const str) {
+    START_LOG(gettid(), "call(str=%s)", str);
     long tid;
     char path[PATH_MAX];
     sscanf(str, "%ld %s", &tid, path);
-    START_LOG(gettid(), "call(path=%s, tid=%d)", path, tid);
+
     if (CapioCLEngine::get().isExcluded(path)) {
         write_response(tid, CAPIO_POSIX_SYSCALL_REQUEST_SKIP);
         return;

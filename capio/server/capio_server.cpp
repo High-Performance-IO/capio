@@ -37,6 +37,8 @@ std::string workflow_name;
 #include "utils/metadata.hpp"
 #include "utils/requests.hpp"
 
+ClientManager *client_manager;
+
 int n_servers;
 // name of the node
 char *node_name;

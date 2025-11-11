@@ -8,7 +8,8 @@
 #include "common/filesystem.hpp"
 #include "utils/types.hpp"
 
-// FIXME: Remove the inline specifier by using extern
+// FIXME: Remove the inline specifier for all the following
+//        global variables using extern specifier and defining then in capio_server.cpp
 inline CSFilesMetadata_t files_metadata;
 
 // FIXME: Remove the inline specifier by using extern
@@ -115,17 +116,9 @@ inline void clone_capio_file(pid_t parent_tid, pid_t child_tid) {
     }
 }
 
-<<<<<<< HEAD
-<<<<<<< HEAD
 inline CapioFile &create_capio_file(const std::filesystem::path &path, bool is_dir,
                                     size_t init_size) {
-=======
-inline CapioFile &create_capio_file(const std::filesystem::path &path, bool is_dir, size_t init_size) {
->>>>>>> 807509b (Capio server compiles)
-=======
-inline CapioFile &create_capio_file(const std::filesystem::path &path, bool is_dir,
-                                    size_t init_size) {
->>>>>>> f581728 (Bugfix)
+
     START_LOG(gettid(), "call(path=%s, is_dir=%s, init_size=%ld)", path.c_str(),
               is_dir ? "true" : "false", init_size);
 

@@ -98,6 +98,4 @@ class ClientManager {
     size_t get_connected_posix_client();
 };
 
-inline ClientManager *client_manager;
-
 #endif // CLIENT_MANAGER_HPP

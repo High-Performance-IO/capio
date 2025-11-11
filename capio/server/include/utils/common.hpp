@@ -11,6 +11,8 @@
 #include "utils/requests.hpp"
 #include "utils/types.hpp"
 
+extern ClientManager *client_manager;
+
 inline off64_t send_dirent_to_client(int tid, int fd, CapioFile &c_file, off64_t offset,
                                      off64_t count) {
     START_LOG(gettid(), "call(tid=%d, fd=%d, offset=%ld, count=%ld)", tid, fd, offset, count);
