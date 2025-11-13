@@ -6,10 +6,12 @@
 #include "common/requests.hpp"
 #include "utils/types.hpp"
 
-// FIXME: Remove the inline specifier by using extern
+// FIXME: Remove the inline specifier for all the following
+//        global variables using extern specifier and defining then in capio_server.cpp
 inline CSBufRequest_t *buf_requests;
 
-// FIXME: Remove the inline specifier by using extern
+// FIXME: Remove the inline specifier for all the following
+//        global variables using extern specifier and defining then in capio_server.cpp
 inline CSBufResponse_t *bufs_response;
 
 /**

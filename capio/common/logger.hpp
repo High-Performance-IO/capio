@@ -14,6 +14,7 @@
 #include "common/syscall.hpp"
 #include "constants.hpp"
 
+// FIXME: Remove the inline specifier
 inline bool continue_on_error = false; // change behaviour of ERR_EXIT to continue if set to true
 
 #if defined(CAPIO_LOG) && defined(__CAPIO_POSIX)

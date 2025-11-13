@@ -87,6 +87,7 @@ class Backend {
     virtual void send_request(const char *message, int message_len, const std::string &target) = 0;
 };
 
-Backend *backend;
+// FIXME: Remove the inline specifier
+inline Backend *backend;
 
 #endif // CAPIO_SERVER_REMOTE_BACKEND_HPP
