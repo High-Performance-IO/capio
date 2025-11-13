@@ -14,7 +14,7 @@
 #include "common/syscall.hpp"
 #include "env.hpp"
 
-std::filesystem::path get_parent_dir_path(const std::filesystem::path &file_path) {
+inline std::filesystem::path get_parent_dir_path(const std::filesystem::path &file_path) {
     START_LOG(capio_syscall(SYS_gettid), "call(file_path=%s)", file_path.c_str());
     if (file_path == file_path.root_path()) {
         return file_path;

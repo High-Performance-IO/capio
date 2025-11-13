@@ -12,7 +12,7 @@
 #include "common/syscall.hpp"
 #include "logger.hpp"
 
-const std::filesystem::path &get_capio_dir() {
+inline const std::filesystem::path &get_capio_dir() {
     static std::filesystem::path capio_dir{};
     START_LOG(capio_syscall(SYS_gettid), "call()");
     // TODO: if CAPIO_DIR is not set, it should be left as null

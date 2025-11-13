@@ -75,9 +75,10 @@ class CapioShmCanary {
     }
 };
 
-CapioShmCanary *shm_canary;
+// FIXME: Remove the inline specifier by using extern
+inline CapioShmCanary *shm_canary;
 
-void *create_shm(const std::string &shm_name, const long int size) {
+inline void *create_shm(const std::string &shm_name, const long int size) {
     START_LOG(capio_syscall(SYS_gettid), "call(shm_name=%s, size=%ld)", shm_name.c_str(), size);
 
     // if we are not creating a new object, mode is equals to 0
@@ -99,7 +100,7 @@ void *create_shm(const std::string &shm_name, const long int size) {
     return p;
 }
 
-void *get_shm(const std::string &shm_name) {
+inline void *get_shm(const std::string &shm_name) {
     START_LOG(capio_syscall(SYS_gettid), "call(shm_name=%s)", shm_name.c_str());
 
     // if we are not creating a new object, mode is equals to 0
@@ -124,7 +125,7 @@ void *get_shm(const std::string &shm_name) {
     return p;
 }
 
-void *get_shm_if_exist(const std::string &shm_name) {
+inline void *get_shm_if_exist(const std::string &shm_name) {
     START_LOG(capio_syscall(SYS_gettid), "call(shm_name=%s)", shm_name.c_str());
 
     // if we are not creating a new object, mode is equals to 0

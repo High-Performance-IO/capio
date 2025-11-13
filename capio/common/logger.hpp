@@ -14,7 +14,7 @@
 #include "common/syscall.hpp"
 #include "constants.hpp"
 
-bool continue_on_error = false; // change behaviour of ERR_EXIT to continue if set to true
+inline bool continue_on_error = false; // change behaviour of ERR_EXIT to continue if set to true
 
 #if defined(CAPIO_LOG) && defined(__CAPIO_POSIX)
 #include "syscallnames.h"
@@ -22,24 +22,30 @@ bool continue_on_error = false; // change behaviour of ERR_EXIT to continue if s
 
 #ifndef __CAPIO_POSIX
 #include <filesystem>
-thread_local std::ofstream logfile; // if building for server, self contained logfile
-std::string log_master_dir_name = CAPIO_DEFAULT_LOG_FOLDER;
-std::string logfile_prefix      = CAPIO_SERVER_DEFAULT_LOG_FILE_PREFIX;
+// FIXME: Remove the inline specifier by splitting into header and source code
+inline thread_local std::ofstream logfile; // if building for server, self contained logfile
+inline std::string log_master_dir_name = CAPIO_DEFAULT_LOG_FOLDER;
+inline std::string logfile_prefix      = CAPIO_SERVER_DEFAULT_LOG_FILE_PREFIX;
 #else
-thread_local bool logfileOpen = false;
-thread_local int logfileFD    = -1;
-thread_local char logfile_path[PATH_MAX]{'\0'};
+// FIXME: Remove the inline specifier by splitting into header and source code
+inline thread_local bool logfileOpen = false;
+inline thread_local int logfileFD    = -1;
+inline thread_local char logfile_path[PATH_MAX]{'\0'};
 #endif
 
-thread_local int current_log_level = 0;
-thread_local bool logging_syscall  = false; // this variable tells the logger that syscall logging
-                                            // has started and we are not in setup phase
+// FIXME: Remove the inline specifier by splitting into header and source code
+inline thread_local int current_log_level = 0;
+
+// this variable tells the logger that syscall logging
+// has started, and we are not in setup phase
+// FIXME: Remove the inline specifier by splitting into header and source code
+inline thread_local bool logging_syscall = false;
 
 #ifndef CAPIO_MAX_LOG_LEVEL // capio max log level. defaults to -1, where everything is logged
 #define CAPIO_MAX_LOG_LEVEL -1
 #endif
-
-int CAPIO_LOG_LEVEL = CAPIO_MAX_LOG_LEVEL;
+// FIXME: Remove the inline specifier by splitting into header and source code
+inline int CAPIO_LOG_LEVEL = CAPIO_MAX_LOG_LEVEL;
 
 #ifndef __CAPIO_POSIX
 inline auto open_server_logfile() {
@@ -128,7 +134,7 @@ inline void setup_posix_log_filename() {
 }
 #endif
 
-void log_write_to(char *buffer, size_t bufflen) {
+inline void log_write_to(char *buffer, size_t bufflen) {
 #ifdef __CAPIO_POSIX
     if (current_log_level < CAPIO_MAX_LOG_LEVEL || CAPIO_MAX_LOG_LEVEL < 0) {
         capio_syscall(SYS_write, logfileFD, buffer, bufflen);
