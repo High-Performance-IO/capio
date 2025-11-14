@@ -1,5 +1,7 @@
 #include "utils/capiocl_adapter.hpp"
 
+extern std::string workflow_name;
+
 #include "client-manager/client_manager.hpp"
 #include "common/constants.hpp"
 #include "common/queue.hpp"

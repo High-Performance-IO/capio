@@ -12,7 +12,6 @@ void unlink_handler(const char *const str) {
     auto c_file_opt = get_capio_file_opt(path);
     if (c_file_opt) { // TODO: it works only in the local case
         CapioFile &c_file = c_file_opt->get();
-        c_file.unlink();
         if (c_file.is_deletable()) {
             delete_capio_file(path);
             delete_from_files_location(path);

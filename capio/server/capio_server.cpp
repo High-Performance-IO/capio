@@ -23,11 +23,6 @@
 std::string workflow_name;
 
 #include "client-manager/client_manager.hpp"
-#include "utils/types.hpp"
-
-// tid -> (client_to_server_data_buf, server_to_client_data_buf)
-// CSDataBufferMap_t data_buffers;
-
 #include "common/env.hpp"
 #include "common/logger.hpp"
 #include "common/semaphore.hpp"
@@ -36,6 +31,7 @@ std::string workflow_name;
 #include "utils/env.hpp"
 #include "utils/metadata.hpp"
 #include "utils/requests.hpp"
+#include "utils/types.hpp"
 
 ClientManager *client_manager;
 

@@ -35,19 +35,11 @@ class CapioFile {
   private:
     char *_buf = nullptr; // buffer containing the data
     off64_t _buf_size;
-<<<<<<< HEAD
     bool _directory            = false;
     // _fd is useful only when the file is memory-mapped
     int _fd                    = -1;
     bool _home_node            = false;
     int _n_links               = 1;
-=======
-    bool _directory = false;
-    // _fd is useful only when the file is memory-mapped
-    int _fd         = -1;
-    bool _home_node = false;
-
->>>>>>> e2a879f (Bugfixes WIP)
     long int _n_close          = 0;
     long int _n_close_expected = -1;
     int _n_opens               = 0;
@@ -483,8 +475,6 @@ class CapioFile {
         queue.read(_buf + offset, num_bytes);
         _data_avail_cv.notify_all();
     }
-
-    inline void unlink() {}
 };
 
 #endif // CAPIO_SERVER_UTILS_CAPIO_FILE_HPP
