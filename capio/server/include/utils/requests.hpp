@@ -11,7 +11,7 @@
 inline CSBufRequest_t *buf_requests;
 
 // FIXME: Remove the inline specifier for all the following
-//        global variables using extern specifier and defining then in capio_server.cpp
+//        global variables using the extern specifier and defining them in capio_server.cpp
 inline CSBufResponse_t *bufs_response;
 
 /**
