@@ -131,8 +131,7 @@ inline CapioFile &create_capio_file(const std::filesystem::path &path, bool is_d
         init_size = CAPIO_DEFAULT_DIR_INITIAL_SIZE;
     }
 
-    const auto c_file =
-        new CapioFile(commit_rule, is_dir, n_file, permanent, init_size, n_close_count);
+    const auto c_file = new CapioFile(is_dir, n_file, permanent, init_size, n_close_count);
     add_capio_file(path, c_file);
     return *c_file;
 }

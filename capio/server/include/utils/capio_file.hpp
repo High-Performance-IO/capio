@@ -35,16 +35,15 @@ class CapioFile {
   private:
     char *_buf = nullptr; // buffer containing the data
     off64_t _buf_size;
-    std::string_view _committed = CAPIO_FILE_COMMITTED_ON_TERMINATION;
-    bool _directory             = false;
+    bool _directory            = false;
     // _fd is useful only when the file is memory-mapped
-    int _fd                     = -1;
-    bool _home_node             = false;
-    int _n_links                = 1;
-    long int _n_close           = 0;
-    long int _n_close_expected  = -1;
-    int _n_opens                = 0;
-    bool _permanent             = false;
+    int _fd                    = -1;
+    bool _home_node            = false;
+    int _n_links               = 1;
+    long int _n_close          = 0;
+    long int _n_close_expected = -1;
+    int _n_opens               = 0;
+    bool _permanent            = false;
     // _sectors stored in memory of the files (only the home node is forced to
     // be up to date)
     std::set<std::pair<off64_t, off64_t>, compare> _sectors;
@@ -74,19 +73,16 @@ class CapioFile {
 
     std::size_t real_file_size = 0;
 
-    CapioFile()
-        : _buf_size(0), _committed(CAPIO_FILE_COMMITTED_ON_TERMINATION), _directory(false),
-          _permanent(false) {}
+    CapioFile() : _buf_size(0), _directory(false), _permanent(false) {}
 
-    CapioFile(const std::string_view &committed, bool directory, long int n_files_expected,
-              bool permanent, off64_t init_size, long int n_close_expected)
-        : _buf_size(init_size), _committed(committed), _directory(directory),
-          _n_close_expected(n_close_expected), _permanent(permanent),
-          n_files_expected(n_files_expected + 2) {}
+    CapioFile(bool directory, long int n_files_expected, bool permanent, off64_t init_size,
+              long int n_close_expected)
+        : _buf_size(init_size), _directory(directory), _n_close_expected(n_close_expected),
+          _permanent(permanent), n_files_expected(n_files_expected + 2) {}
 
     CapioFile(bool directory, bool permanent, off64_t init_size, long int n_close_expected = -1)
-        : _buf_size(init_size), _committed(CAPIO_FILE_COMMITTED_ON_TERMINATION),
-          _directory(directory), _n_close_expected(n_close_expected), _permanent(permanent) {}
+        : _buf_size(init_size), _directory(directory), _n_close_expected(n_close_expected),
+          _permanent(permanent) {}
 
     CapioFile(const CapioFile &)            = delete;
     CapioFile &operator=(const CapioFile &) = delete;
@@ -238,8 +234,6 @@ class CapioFile {
     inline char *get_buffer() { return _buf; }
 
     [[nodiscard]] inline off64_t get_buf_size() const { return _buf_size; }
-
-    [[nodiscard]] inline const std::string_view &get_committed() const { return _committed; }
 
     [[nodiscard]] inline const std::vector<std::pair<int, int>> &get_fds() const {
         return _threads_fd;
