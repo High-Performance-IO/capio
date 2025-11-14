@@ -18,13 +18,7 @@
 #include <unordered_set>
 #include <vector>
 
-#include "capiocl.hpp"
-/// @brief const wrapper to class instance of capiocl::Engine
-class CapioCLEngine final {
-  public:
-    /// @brief Get a const reference to capiocl::Engine instance
-    inline const static capiocl::Engine &get();
-};
+#include "utils/capiocl_adapter.hpp"
 
 std::string workflow_name;
 
