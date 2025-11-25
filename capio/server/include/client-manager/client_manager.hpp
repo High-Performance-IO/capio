@@ -40,14 +40,14 @@ class ClientManager {
      * @param app_name
      * @return
      */
-    void register_client(pid_t tid, const std::string &app_name = CAPIO_DEFAULT_APP_NAME) const;
+    void registerClient(pid_t tid, const std::string &app_name = CAPIO_DEFAULT_APP_NAME) const;
 
     /**
      * Delete the response buffer associated with thread @param tid
      * @param tid
      * @return
      */
-    void remove_client(pid_t tid) const;
+    void removeClient(pid_t tid) const;
 
     /**
      * Write offset to response buffer of process @param tid
@@ -57,7 +57,7 @@ class ClientManager {
      * @param count
      * @return
      */
-    void reply_to_client(int tid, char *buf, off64_t offset, off64_t count) const;
+    void replyToClient(int tid, char *buf, off64_t offset, off64_t count) const;
 
     /**
      * @brief Add a file that is not yet ready to be consumed by a process to a list of files
@@ -66,16 +66,16 @@ class ClientManager {
      * @param tid
      * @param path
      */
-    void register_produced_file(pid_t tid, std::string path) const;
+    void registerProducedFile(pid_t tid, std::string path) const;
 
     /**
      * Remove a file from an app name
      * @param tid
      * @param path
      */
-    void remove_produced_file(pid_t tid, const std::filesystem::path &path) const;
+    void removeProducedFile(pid_t tid, const std::filesystem::path &path) const;
 
-    [[nodiscard]] bool is_producer(pid_t tid, const std::filesystem::path &path) const;
+    [[nodiscard]] bool isProducer(pid_t tid, const std::filesystem::path &path) const;
 
     /**
      * @brief Get the files that a given pid is waiting to be produced
@@ -83,7 +83,7 @@ class ClientManager {
      * @param tid
      * @return auto
      */
-    [[nodiscard]] std::vector<std::string> *get_produced_files(pid_t tid) const;
+    [[nodiscard]] std::vector<std::string> *getProducedFiles(pid_t tid) const;
 
     /**
      * @brief Get the app name given a process pid
@@ -91,11 +91,11 @@ class ClientManager {
      * @param tid
      * @return std::string
      */
-    [[nodiscard]] std::string get_app_name(pid_t tid) const;
+    [[nodiscard]] std::string getAppName(pid_t tid) const;
 
-    [[nodiscard]] SPSCQueue *get_client_to_server_data_buffer(pid_t tid) const;
+    [[nodiscard]] SPSCQueue *getClientToServerDataBuffers(pid_t tid) const;
 
-    size_t get_connected_posix_client();
+    size_t getConnectedPosixClients();
 };
 
 #endif // CLIENT_MANAGER_HPP

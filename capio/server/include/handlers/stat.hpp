@@ -40,7 +40,7 @@ inline void reply_stat(int tid, const std::filesystem::path &path) {
         if (!load_file_location(path)) {
             LOG("path %s is not present in any node", path.c_str());
             // if it is in configuration file then wait otherwise fail
-            std::string app_name = client_manager->get_app_name(tid);
+            std::string app_name = client_manager->getAppName(tid);
 
             if (CapioCLEngine::get().isProducer(path, app_name)) {
                 LOG("Metadata do not contains file or globs did not contain file or app is "

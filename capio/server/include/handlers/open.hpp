@@ -18,7 +18,7 @@ inline void update_file_metadata(const std::filesystem::path &path, int tid, int
     add_capio_file_to_tid(tid, fd, path, offset);
 
     if (c_file.first_write && is_creat) {
-        client_manager->register_produced_file(tid, path);
+        client_manager->registerProducedFile(tid, path);
         c_file.first_write = false;
         write_file_location(path);
         update_dir(tid, path);

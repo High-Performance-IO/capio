@@ -5,7 +5,7 @@ inline void handle_exit_group(int tid) {
     START_LOG(gettid(), "call(tid=%d)", tid);
 
     LOG("retrieving files from writers for process with pid = %d", tid);
-    auto files = client_manager->get_produced_files(tid);
+    auto files = client_manager->getProducedFiles(tid);
     for (auto &path : *files) {
 
         LOG("Handling file %s", path.c_str());
@@ -31,7 +31,7 @@ inline void handle_exit_group(int tid) {
         std::string path = std::string(get_capio_file_path(tid, fd));
         handle_close(tid, fd);
     }
-    client_manager->remove_client(tid);
+    client_manager->removeClient(tid);
 }
 
 void exit_group_handler(const char *const str) {

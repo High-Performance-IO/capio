@@ -29,7 +29,7 @@ inline void handle_pending_read(int tid, int fd, long int process_offset, long i
     }
 
     c_file.create_buffer_if_needed(path, false);
-    client_manager->reply_to_client(tid, c_file.get_buffer(), process_offset, bytes_read);
+    client_manager->replyToClient(tid, c_file.get_buffer(), process_offset, bytes_read);
     set_capio_file_offset(tid, fd, process_offset + bytes_read);
 
     // TODO: check if the file was moved to the disk
@@ -74,15 +74,15 @@ inline void handle_local_read(int tid, int fd, off64_t count, bool is_prod) {
             }
             c_file.create_buffer_if_needed(path, false);
 
-            client_manager->reply_to_client(tid, c_file.get_buffer(), process_offset,
-                                            end_of_sector - process_offset);
+            client_manager->replyToClient(tid, c_file.get_buffer(), process_offset,
+                                          end_of_sector - process_offset);
             set_capio_file_offset(tid, fd, end_of_sector);
         }
     } else {
         c_file.create_buffer_if_needed(path, false);
 
-        client_manager->reply_to_client(tid, c_file.get_buffer(), process_offset,
-                                        end_of_sector - process_offset);
+        client_manager->replyToClient(tid, c_file.get_buffer(), process_offset,
+                                      end_of_sector - process_offset);
         set_capio_file_offset(tid, fd, process_offset + count);
     }
 }
@@ -105,7 +105,7 @@ inline void request_remote_read(int tid, int fd, off64_t count) {
         LOG("Data is present locally and can be served to client");
         c_file.create_buffer_if_needed(path, false);
 
-        client_manager->reply_to_client(tid, c_file.get_buffer(), offset, count);
+        client_manager->replyToClient(tid, c_file.get_buffer(), offset, count);
         set_capio_file_offset(tid, fd, offset + count);
     } else {
         LOG("Delegating to backend remote read");
@@ -123,7 +123,7 @@ void wait_for_file(const std::filesystem::path &path, int tid, int fd, off64_t c
         handle_local_read(tid, fd, count, false);
     } else {
         const CapioFile &c_file = get_capio_file(path);
-        auto remote_app         = client_manager->get_app_name(tid);
+        auto remote_app         = client_manager->getAppName(tid);
         if (!c_file.is_complete()) {
             std::string prefix = path.parent_path();
             off64_t batch_size = CapioCLEngine::get().getDirectoryFileCount(path);
@@ -142,9 +142,9 @@ inline void handle_read(int tid, int fd, off64_t count) {
 
     const std::filesystem::path &path      = get_capio_file_path(tid, fd);
     const std::filesystem::path &capio_dir = get_capio_dir();
-    std::string app_name                   = client_manager->get_app_name(tid);
+    std::string app_name                   = client_manager->getAppName(tid);
     bool is_prod =
-        CapioCLEngine::get().isProducer(path, app_name) || client_manager->is_producer(tid, path);
+        CapioCLEngine::get().isProducer(path, app_name) || client_manager->isProducer(tid, path);
     auto file_location_opt = get_file_location_opt(path);
 
     LOG("Is producer= %s", is_prod ? "TRUE" : "FALSE");
@@ -163,7 +163,7 @@ inline void handle_read(int tid, int fd, off64_t count) {
         CapioFile &c_file = get_capio_file(path);
         if (!c_file.is_complete()) {
             LOG("File not complete");
-            const std::string &app_name = client_manager->get_app_name(tid);
+            const std::string &app_name = client_manager->getAppName(tid);
 
             std::string prefix = path.parent_path();
             off64_t batch_size = CapioCLEngine::get().getDirectoryFileCount(path);
