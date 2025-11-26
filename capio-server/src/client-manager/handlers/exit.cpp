@@ -1,5 +1,6 @@
 #include <include/file-manager/file_manager.hpp>
 #include <include/storage-service/capio_storage_service.hpp>
+#include <include/client-manager/client_manager.hpp>
 
 void exit_handler(const char *const str) {
     // TODO: register files open for each tid ti register a close

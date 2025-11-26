@@ -1,14 +1,19 @@
 #include <capio/logger.hpp>
 #include <climits>
 #include <filesystem>
-#include <include/capio-cl-engine/capio_cl_engine.hpp>
+#include <capiocl.hpp>
+#include <engine.h>
 #include <include/file-manager/file_manager.hpp>
+#include <include/client-manager/client_manager.hpp>
+extern capiocl::engine::Engine *capio_cl_engine;
 
 void consent_to_proceed_handler(const char *const str) {
     pid_t tid;
     char path[1024], source_func[1024];
     sscanf(str, "%d %s %s", &tid, path, source_func);
     START_LOG(gettid(), "call(tid=%d, path=%s, source=%s)", tid, path, source_func);
+
+    const auto app_name = client_manager->get_app_name(tid);
 
     // Skip operations on CAPIO_DIR
     if (!capio_cl_engine->contains(path)) {
@@ -23,7 +28,7 @@ void consent_to_proceed_handler(const char *const str) {
         return;
     }
 
-    if (capio_cl_engine->isProducer(path, tid)) {
+    if (capio_cl_engine->isProducer(path, app_name)) {
         LOG("Application is producer. continuing");
         client_manager->reply_to_client(tid, 1);
         return;

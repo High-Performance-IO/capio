@@ -1,9 +1,12 @@
 #include <capio/logger.hpp>
 #include <climits>
 #include <filesystem>
-#include <include/capio-cl-engine/capio_cl_engine.hpp>
+#include <capiocl.hpp>
+#include <engine.h>
 #include <include/file-manager/file_manager.hpp>
 #include <include/storage-service/capio_storage_service.hpp>
+#include <include/client-manager/client_manager.hpp>
+extern capiocl::engine::Engine *capio_cl_engine;
 
 void open_handler(const char *const str) {
     pid_t tid;
@@ -18,7 +21,9 @@ void open_handler(const char *const str) {
         return;
     }
 
-    if (capio_cl_engine->isProducer(path, tid)) {
+    const auto app_name = client_manager->get_app_name(tid);
+
+    if (capio_cl_engine->isProducer(path, app_name)) {
         LOG("Thread is producer. allowing to continue with open");
         client_manager->reply_to_client(tid, 1);
         storage_service->createMemoryFile(path);

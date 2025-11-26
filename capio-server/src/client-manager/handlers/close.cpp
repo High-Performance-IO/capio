@@ -1,8 +1,12 @@
+#include "include/client-manager/client_manager.hpp"
+
 #include <capio/logger.hpp>
+#include <capiocl.hpp>
+#include <engine.h>
 #include <climits>
 #include <filesystem>
-#include <include/capio-cl-engine/capio_cl_engine.hpp>
 #include <include/file-manager/file_manager.hpp>
+extern capiocl::engine::Engine *capio_cl_engine;
 
 void close_handler(const char *const str) {
     pid_t tid;
@@ -12,13 +16,14 @@ void close_handler(const char *const str) {
     START_LOG(gettid(), "call(tid=%d, path=%s)", tid, path);
 
     const std::filesystem::path filename(path);
+    const auto app_name = client_manager->get_app_name(tid);
 
     LOG("File needs handling");
 
     // Call the set_committed method only if the commit rule is on_close and calling thread is a
     // producer
     if (capio_cl_engine->getCommitRule(filename) == CAPIO_FILE_COMMITTED_ON_CLOSE &&
-        capio_cl_engine->isProducer(filename, tid)) {
+        capio_cl_engine->isProducer(filename, app_name)) {
         CapioFileManager::setCommitted(path);
         /**
          * The increase close count is called only on explicit close() sc, as defined by the

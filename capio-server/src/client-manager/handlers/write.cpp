@@ -1,6 +1,6 @@
 #include <capio/logger.hpp>
 #include <climits>
-#include <include/capio-cl-engine/capio_cl_engine.hpp>
+#include <capiocl.hpp>
 #include <include/storage-service/capio_storage_service.hpp>
 
 void write_handler(const char *const str) {

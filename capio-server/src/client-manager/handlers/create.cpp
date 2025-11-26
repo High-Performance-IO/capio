@@ -1,10 +1,13 @@
 #include <capio/logger.hpp>
 #include <climits>
 #include <filesystem>
-#include <include/capio-cl-engine/capio_cl_engine.hpp>
+#include <capiocl.hpp>
+#include <engine.h>
 #include <include/communication-service/control-plane/capio_control_plane.hpp>
 #include <include/file-manager/file_manager.hpp>
 #include <include/storage-service/capio_storage_service.hpp>
+#include <include/client-manager/client_manager.hpp>
+extern capiocl::engine::Engine *capio_cl_engine;
 
 void create_handler(const char *const str) {
     pid_t tid, fd;

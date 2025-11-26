@@ -203,6 +203,14 @@ DIR *opendir(const char *name) {
         LOG("Commit token path was not found for path %s", absolute_path.c_str());
         auto token_path = new char[PATH_MAX]{0};
         posix_directory_committed_request(capio_syscall(SYS_gettid), absolute_path, token_path);
+        // FIXME: This is a flying patch to implement the exclude with little to no overhead.
+        //        If the commit token is <NONE>, then the file is excluded and hence the directory
+        //        should not be handled by CAPIO...
+        // TODO: Find a better solution
+        if (strcmp(token_path, "<NONE>") == 0) {
+            LOG("File is excluded. Opening as a simple directory and not registering CAPIO fd!");
+            return dir;
+        }
         LOG("Inserting token path %s", token_path);
         directory_commit_token_path.insert({absolute_path, token_path});
     }

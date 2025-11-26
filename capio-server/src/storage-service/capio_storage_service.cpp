@@ -2,9 +2,11 @@
 
 #include <capio/env.hpp>
 #include <capio/queue.hpp>
-#include <include/capio-cl-engine/capio_cl_engine.hpp>
+#include <capiocl.hpp>
+#include <engine.h>
 #include <include/storage-service/capio_file.hpp>
 #include <include/storage-service/capio_storage_service.hpp>
+extern capiocl::engine::Engine *capio_cl_engine;
 
 auto CapioStorageService::getFile(const std::string &file_name) const {
     START_LOG(gettid(), "getFile(file_name=%s)", file_name.c_str());

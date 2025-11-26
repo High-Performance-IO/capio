@@ -22,6 +22,8 @@ target_include_directories(${TARGET_NAME} PRIVATE
         ${mtcl_SOURCE_DIR}/include
         ${httplib_SOURCE_DIR}
         "${CMAKE_SOURCE_DIR}/capio-server/"
+        ${capio_cl_SOURCE_DIR}
+        ${capio_cl_SOURCE_DIR}/include
 )
 
 file(GLOB_RECURSE CAPIO_SERVER_SOURCES
@@ -55,7 +57,7 @@ target_sources(${TARGET_NAME} PRIVATE
 #####################################
 # Link libraries
 #####################################
-target_link_libraries(${TARGET_NAME} PRIVATE GTest::gtest_main rt)
+target_link_libraries(${TARGET_NAME} PRIVATE GTest::gtest_main rt libcapio_cl)
 
 #####################################
 # Configure tests

@@ -2,7 +2,7 @@
 #define CAPIO_STORAGE_SERVICE_H
 
 #include <capio/env.hpp>
-#include <include/capio-cl-engine/capio_cl_engine.hpp>
+#include <unordered_map>
 #include <include/storage-service/capio_file.hpp>
 
 class CapioStorageService {

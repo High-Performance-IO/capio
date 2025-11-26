@@ -27,13 +27,18 @@ target_sources(${TARGET_NAME} PRIVATE
         ${CAPIO_SERVER_SOURCES}
         "${CAPIO_COMMON_HEADERS}"
         "${CAPIO_SERVER_HEADERS}"
+
 )
-target_include_directories(${TARGET_NAME} PRIVATE ${TARGET_INCLUDE_FOLDER})
+target_include_directories(${TARGET_NAME} PRIVATE
+        ${TARGET_INCLUDE_FOLDER}
+        ${capio_cl_SOURCE_DIR}
+        ${capio_cl_SOURCE_DIR}/include
+)
 
 #####################################
 # Link libraries
 #####################################
-target_link_libraries(${TARGET_NAME} PRIVATE GTest::gtest_main rt)
+target_link_libraries(${TARGET_NAME} PRIVATE GTest::gtest_main rt libcapio_cl)
 
 #####################################
 # Configure tests

@@ -36,8 +36,14 @@ FetchContent_Declare(
         GIT_TAG v0.26.0
 )
 
+FetchContent_Declare(
+        capio_cl
+        GIT_REPOSITORY https://github.com/High-Performance-IO/CAPIO-CL.git
+        GIT_TAG main
+)
 
-FetchContent_MakeAvailable(args simdjson mtcl httplib)
+
+FetchContent_MakeAvailable(args simdjson mtcl httplib capio_cl)
 
 #####################################
 # Target definition
@@ -59,12 +65,14 @@ target_include_directories(${TARGET_NAME} PRIVATE
         ${simdjson_SOURCE_DIR}
         ${mtcl_SOURCE_DIR}/include
         ${httplib_SOURCE_DIR}
+        ${capio_cl_SOURCE_DIR}
+        ${capio_cl_SOURCE_DIR}/include
 )
 
 #####################################
 # Link libraries
 #####################################
-target_link_libraries(${TARGET_NAME} PRIVATE ${MPI_LIBRARIES} pthread rt stdc++fs)
+target_link_libraries(${TARGET_NAME} PRIVATE ${MPI_LIBRARIES} pthread rt stdc++fs libcapio_cl)
 
 #####################################
 # Install rules

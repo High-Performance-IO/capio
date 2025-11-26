@@ -1,8 +1,11 @@
 #include <capio/logger.hpp>
 #include <climits>
-#include <include/capio-cl-engine/capio_cl_engine.hpp>
+#include <capiocl.hpp>
+#include <engine.h>
 #include <include/file-manager/file_manager.hpp>
 #include <include/storage-service/capio_storage_service.hpp>
+#include <include/client-manager/client_manager.hpp>
+extern capiocl::engine::Engine *capio_cl_engine;
 
 void posix_readdir_handler(const char *const str) {
     pid_t pid;
@@ -13,6 +16,8 @@ void posix_readdir_handler(const char *const str) {
     if (capio_cl_engine->isExcluded(path)) {
         LOG("Path is excluded. Creating commit token to avoid starvation");
         CapioFileManager::setCommitted(path);
+        client_manager->reply_to_client(pid, 6);
+        storage_service->reply_to_client_raw(pid, "<NONE>", 6);
     }
 
     const auto metadata_token = CapioFileManager::getMetadataPath(path);

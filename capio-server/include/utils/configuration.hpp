@@ -7,6 +7,7 @@
 #include <limits.h>
 #include <string>
 #include <unistd.h>
+#include <sys/types.h>
 
 /*
  * Variables required to be globally available
@@ -23,12 +24,12 @@ class CapioGlobalConfiguration {
         gethostname(node_name, HOST_NAME_MAX);
         termination_phase     = false;
         StoreOnlyInMemory     = false;
-        CAPIO_SERVER_MAIN_PID = gettid();
+        CAPIO_SERVER_MAIN_PID = -1;
         workflow_name         = CAPIO_DEFAULT_WORKFLOW_NAME;
     }
 };
 
-inline auto capio_global_configuration = new CapioGlobalConfiguration();
+extern CapioGlobalConfiguration* capio_global_configuration;
 
 inline void server_println(const std::string &message_type = "",
                            const std::string &message_line = "") {

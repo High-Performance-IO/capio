@@ -2,10 +2,13 @@
 #define FILE_MANAGER_HPP
 #include "include/file-manager/file_manager.hpp"
 #include "capio/env.hpp"
-#include <include/capio-cl-engine/capio_cl_engine.hpp>
+#include <capiocl.hpp>
+#include <engine.h>
 #include <include/client-manager/client_manager.hpp>
 #include <include/storage-service/capio_storage_service.hpp>
 #include <include/utils/distributed_semaphore.hpp>
+
+extern capiocl::engine::Engine *capio_cl_engine;
 
 std::string CapioFileManager::getMetadataPath(const std::string &path) {
     START_LOG(gettid(), "call(path=%s)", path.c_str());
@@ -80,7 +83,7 @@ void CapioFileManager::addThreadAwaitingData(const std::string &path, int tid,
               expected_size);
 
     // check if file needs to be handled by the storage service instead
-    if (capio_cl_engine->storeFileInMemory(path)) {
+    if (capio_cl_engine->isStoredInMemory(path)) {
         LOG("File is stored in memory. delegating storage_service to await for data");
         storage_service->addThreadWaitingForData(tid, path, 0, expected_size);
         return;
@@ -111,7 +114,7 @@ void CapioFileManager::_unlockThreadAwaitingData(
          * implementation defined when invoked on directories
          */
 
-        if (capio_cl_engine->isProducer(path, item->first)) {
+        if (capio_cl_engine->isProducer(path, client_manager->get_app_name(item->first))) {
             LOG("Thread %ld can be unlocked as thread is producer", item->first);
             // if producer, return the file as committed to allow to execute operations without
             // being interrupted
@@ -235,7 +238,7 @@ bool CapioFileManager::isCommitted(const std::filesystem::path &path) {
     if (commit_rule == CAPIO_FILE_COMMITTED_ON_FILE) {
         LOG("Commit rule is on_file. Checking for file dependencies");
         bool commit_computed = true;
-        for (const auto &file : capio_cl_engine->get_file_deps(path)) {
+        for (const auto &file : capio_cl_engine->getCommitOnFileDependencies(path)) {
             commit_computed = commit_computed && isCommitted(file);
         }
 
@@ -345,34 +348,32 @@ void CapioFileManager::checkDirectoriesNFiles() const {
      * avoid race conditions. Since we do not update locations, get the pointer only at the
      * beginning and then use it.
      */
-    static const auto loc = capio_cl_engine->getLocations();
 
-    for (const auto &[path_config, config] : *loc) {
-        if (std::get<6>(config)) {
+    for (const auto loc = capio_cl_engine->getPaths(); const std::string &path : loc) {
+        if (capio_cl_engine->isFile(path)) {
             /*
              * In this case we are trying to check for a file.
              * skip this check and go to the next path.
              */
             continue;
         }
-
-        if (auto n_files = std::get<8>(config); n_files > 0) {
+        const auto n_files = capio_cl_engine->getDirectoryFileCount(path);
+        if (n_files > 0) {
             START_LOG(gettid(), "call()");
-            LOG("Directory %s needs %ld files before being committed", path_config.c_str(),
-                n_files);
+            LOG("Directory %s needs %ld files before being committed", path.c_str(), n_files);
             // There must be n_files inside the directory to commit the file
             long count = 0;
-            if (std::filesystem::exists(path_config)) {
-                auto iterator = std::filesystem::directory_iterator(path_config);
+            if (std::filesystem::exists(path)) {
+                auto iterator = std::filesystem::directory_iterator(path);
                 for ([[maybe_unused]] const auto &entry : iterator) {
                     ++count;
                 }
             }
 
-            LOG("Directory %s has %ld files inside", path_config.c_str(), count);
+            LOG("Directory %s has %ld files inside", path.c_str(), count);
             if (count >= n_files) {
                 LOG("Committing directory");
-                this->setCommitted(path_config);
+                this->setCommitted(path);
             }
         }
     }

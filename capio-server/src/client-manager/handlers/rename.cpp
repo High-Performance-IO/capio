@@ -1,6 +1,6 @@
 #include <capio/logger.hpp>
 #include <climits>
-#include <include/capio-cl-engine/capio_cl_engine.hpp>
+#include <capiocl.hpp>
 
 void rename_handler(const char *const str) {
     pid_t tid;

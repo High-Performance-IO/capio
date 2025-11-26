@@ -1,9 +1,13 @@
 #include <capio/logger.hpp>
 #include <climits>
 #include <filesystem>
-#include <include/capio-cl-engine/capio_cl_engine.hpp>
+#include <capiocl.hpp>
+#include <engine.h>
 #include <include/file-manager/file_manager.hpp>
 #include <include/storage-service/capio_storage_service.hpp>
+#include <include/client-manager/client_manager.hpp>
+
+extern capiocl::engine::Engine *capio_cl_engine;
 
 void read_handler(const char *const str) {
     long tid;
@@ -14,13 +18,14 @@ void read_handler(const char *const str) {
     START_LOG(gettid(), "call(path=%s, tid=%ld, end_of_read=%llu)", path, tid, end_of_read);
 
     const std::filesystem::path path_fs(path);
+    const auto app_name = client_manager->get_app_name(tid);
 
     /**
      * If process is producer OR fire rule is no update and there is enough data, allow the process
      * to continue in its execution
      */
     const uintmax_t file_size = CapioFileManager::get_file_size_if_exists(path);
-    if (capio_cl_engine->isProducer(path, tid) ||
+    if (capio_cl_engine->isProducer(path, app_name) ||
         (capio_cl_engine->isFirable(path_fs) && file_size >= end_of_read)) {
         LOG("File can be consumed as it is either the producer, or the fire rule is FNU and there "
             "is enough data");
