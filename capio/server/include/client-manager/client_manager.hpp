@@ -10,24 +10,24 @@
  */
 class ClientManager {
     struct ClientDataBuffers {
-        SPSCQueue *ClientToServer;
-        SPSCQueue *ServerToClient;
+        mutable SPSCQueue *ClientToServer;
+        mutable SPSCQueue *ServerToClient;
     };
 
-    std::unordered_map<long, ClientDataBuffers> *data_buffers;
-    std::unordered_map<int, const std::string> *app_names;
+    std::unordered_map<long, ClientDataBuffers> data_buffers;
+    std::unordered_map<int, const std::string> app_names;
 
     /**
      * Files that are produced by a given pid. Used for Commit On Termination fallback rule
      */
-    std::unordered_map<pid_t, std::vector<std::string> *> *files_created_by_producer;
+    mutable std::unordered_map<pid_t, std::vector<std::string>> files_created_by_producer;
 
     /**
      * Files that are produced by a given app_name. Used to non block execution of multithreaded
      * applications with same app name when doing IO operations on files, and for
      * Commit On Termination fallback rule
      */
-    std::unordered_map<std::string, std::vector<std::string> *> *files_created_by_app_name;
+    std::unordered_map<std::string, std::vector<std::string>> files_created_by_app_name;
 
   public:
     ClientManager();
@@ -40,14 +40,14 @@ class ClientManager {
      * @param app_name
      * @return
      */
-    void registerClient(pid_t tid, const std::string &app_name = CAPIO_DEFAULT_APP_NAME) const;
+    void registerClient(pid_t tid, const std::string &app_name = CAPIO_DEFAULT_APP_NAME);
 
     /**
      * Delete the response buffer associated with thread @param tid
      * @param tid
      * @return
      */
-    void removeClient(pid_t tid) const;
+    void removeClient(pid_t tid);
 
     /**
      * Write offset to response buffer of process @param tid
@@ -66,14 +66,14 @@ class ClientManager {
      * @param tid
      * @param path
      */
-    void registerProducedFile(pid_t tid, std::string path) const;
+    void registerProducedFile(pid_t tid, std::string path);
 
     /**
      * Remove a file from an app name
      * @param tid
      * @param path
      */
-    void removeProducedFile(pid_t tid, const std::filesystem::path &path) const;
+    void removeProducedFile(pid_t tid, const std::filesystem::path &path);
 
     [[nodiscard]] bool isProducer(pid_t tid, const std::filesystem::path &path) const;
 
@@ -83,7 +83,7 @@ class ClientManager {
      * @param tid
      * @return auto
      */
-    [[nodiscard]] std::vector<std::string> *getProducedFiles(pid_t tid) const;
+    [[nodiscard]] std::vector<std::string> &getProducedFiles(pid_t tid) const;
 
     /**
      * @brief Get the app name given a process pid
@@ -93,9 +93,9 @@ class ClientManager {
      */
     [[nodiscard]] std::string getAppName(pid_t tid) const;
 
-    [[nodiscard]] SPSCQueue *getClientToServerDataBuffers(pid_t tid) const;
+    [[nodiscard]] SPSCQueue &getClientToServerDataBuffers(pid_t tid) const;
 
-    size_t getConnectedPosixClients();
+    size_t getConnectedPosixClients() const;
 };
 
 #endif // CLIENT_MANAGER_HPP

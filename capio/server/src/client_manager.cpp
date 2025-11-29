@@ -9,62 +9,47 @@ extern std::string workflow_name;
 
 ClientManager::ClientManager() {
     START_LOG(gettid(), "call()");
-    data_buffers              = new std::unordered_map<long, ClientDataBuffers>();
-    app_names                 = new std::unordered_map<int, const std::string>;
-    files_created_by_producer = new std::unordered_map<pid_t, std::vector<std::string> *>;
-    files_created_by_app_name = new std::unordered_map<std::string, std::vector<std::string> *>;
     server_println(CAPIO_LOG_SERVER_CLI_LEVEL_INFO, "ClientManager initialization completed.");
 }
 
 ClientManager::~ClientManager() {
     START_LOG(gettid(), "call()");
-
-    for (const auto [fst, snd] : *data_buffers) {
-        delete snd.ClientToServer;
-        delete snd.ServerToClient;
-        data_buffers->erase(fst);
-    }
-
-    delete data_buffers;
-    delete app_names;
-    delete files_created_by_producer;
-    delete files_created_by_app_name;
     server_println(CAPIO_LOG_SERVER_CLI_LEVEL_WARNING, "ClientManager cleanup completed.");
 }
 
-void ClientManager::registerClient(pid_t tid, const std::string &app_name) const {
+void ClientManager::registerClient(pid_t tid, const std::string &app_name) {
     START_LOG(gettid(), "call(tid=%ld, app_name=%s)", tid, app_name.c_str());
-    // TODO: replace numbers with constexpr
-    const auto workflow_name = get_capio_workflow_name();
-    data_buffers->insert(
-        {tid,
-         {new SPSCQueue(SHM_SPSC_PREFIX_WRITE + std::to_string(tid), get_cache_lines(),
-                        get_cache_line_size(), workflow_name),
-          new SPSCQueue(SHM_SPSC_PREFIX_READ + std::to_string(tid), get_cache_lines(),
-                        get_cache_line_size(), workflow_name)}});
-    app_names->emplace(tid, app_name);
-    files_created_by_producer->emplace(tid, new std::vector<std::string>);
-    files_created_by_app_name->emplace(app_name, new std::vector<std::string>);
+
+    ClientDataBuffers buffers{
+        new SPSCQueue(SHM_SPSC_PREFIX_WRITE + std::to_string(tid), get_cache_lines(),
+                      get_cache_line_size(), workflow_name),
+        new SPSCQueue(SHM_SPSC_PREFIX_READ + std::to_string(tid), get_cache_lines(),
+                      get_cache_line_size(), workflow_name)};
+
+    data_buffers.emplace(tid, std::move(buffers));
+    app_names.emplace(tid, app_name);
+    files_created_by_producer[tid];
+    files_created_by_app_name[app_name];
     register_listener(tid);
 }
 
-void ClientManager::removeClient(pid_t tid) const {
+void ClientManager::removeClient(pid_t tid) {
     START_LOG(gettid(), "call(tid=%ld)", tid);
-    if (const auto it_resp = data_buffers->find(tid); it_resp != data_buffers->end()) {
+    if (const auto it_resp = data_buffers.find(tid); it_resp != data_buffers.end()) {
         delete it_resp->second.ClientToServer;
         delete it_resp->second.ServerToClient;
-        data_buffers->erase(it_resp);
+        data_buffers.erase(it_resp);
     }
     const std::string app_name = this->getAppName(tid);
-    files_created_by_producer->erase(tid);
-    files_created_by_app_name->erase(app_name);
+    files_created_by_producer.erase(tid);
+    files_created_by_app_name.erase(app_name);
     remove_listener(tid);
 }
 
 void ClientManager::replyToClient(int tid, char *buf, off64_t offset, off64_t count) const {
     START_LOG(gettid(), "call(tid=%d, buf=0x%08x, offset=%ld, count=%ld)", tid, buf, offset, count);
 
-    if (const auto out = data_buffers->find(tid); out != data_buffers->end()) {
+    if (const auto out = data_buffers.find(tid); out != data_buffers.end()) {
         write_response(tid, offset + count);
         out->second.ServerToClient->write(buf + offset, count);
         return;
@@ -73,75 +58,74 @@ void ClientManager::replyToClient(int tid, char *buf, off64_t offset, off64_t co
 }
 
 // do not use const reference...
-void ClientManager::registerProducedFile(pid_t tid, std::string path) const {
+void ClientManager::registerProducedFile(pid_t tid, std::string path) {
     START_LOG(gettid(), "call(tid=%ld, path=%s)", tid, path.c_str());
-    if (const auto itm = files_created_by_producer->find(tid);
-        itm != files_created_by_producer->end()) {
-        itm->second->emplace_back(path);
+    if (const auto itm = files_created_by_producer.find(tid);
+        itm != files_created_by_producer.end()) {
+        itm->second.emplace_back(path);
     } else {
         LOG("Error: tid is not present in files_created_by_producers map");
         return;
     }
     const std::string app_name = this->getAppName(tid);
-    if (const auto itm = files_created_by_app_name->find(app_name);
-        itm != files_created_by_app_name->end()) {
-        itm->second->emplace_back(path);
+    if (const auto itm = files_created_by_app_name.find(app_name);
+        itm != files_created_by_app_name.end()) {
+        itm->second.emplace_back(path);
 
     } else {
         LOG("Error: app_name is not present in files_created_by_app_name map");
     }
 }
-void ClientManager::removeProducedFile(pid_t tid, const std::filesystem::path &path) const {
-    if (const auto itm = files_created_by_producer->find(tid);
-        itm != files_created_by_producer->end()) {
-        const auto &v = itm->second;
-        v->erase(std::remove(v->begin(), v->end(), path), v->end());
+void ClientManager::removeProducedFile(pid_t tid, const std::filesystem::path &path) {
+    if (const auto itm = files_created_by_producer.find(tid);
+        itm != files_created_by_producer.end()) {
+        auto &v = itm->second;
+        v.erase(std::remove(v.begin(), v.end(), path), v.end());
     }
 
     const std::string app_name = this->getAppName(tid);
-    if (const auto itm = files_created_by_app_name->find(app_name);
-        itm != files_created_by_app_name->end()) {
-        const auto &v = itm->second;
-        v->erase(std::remove(v->begin(), v->end(), path), v->end());
+    if (const auto itm = files_created_by_app_name.find(app_name);
+        itm != files_created_by_app_name.end()) {
+        auto &v = itm->second;
+        v.erase(std::remove(v.begin(), v.end(), path), v.end());
     }
 }
 bool ClientManager::isProducer(pid_t tid, const std::filesystem::path &path) const {
     bool is_producer = false;
 
-    if (const auto itm = files_created_by_producer->find(tid);
-        itm != files_created_by_producer->end()) {
-        is_producer |=
-            std::find(itm->second->begin(), itm->second->end(), path) != itm->second->end();
+    if (const auto itm = files_created_by_producer.find(tid);
+        itm != files_created_by_producer.end()) {
+        is_producer |= std::find(itm->second.begin(), itm->second.end(), path) != itm->second.end();
     }
 
     const std::string app_name = this->getAppName(tid);
-    if (const auto itm = files_created_by_app_name->find(app_name);
-        itm != files_created_by_app_name->end()) {
-        is_producer |=
-            std::find(itm->second->begin(), itm->second->end(), path) != itm->second->end();
+    if (const auto itm = files_created_by_app_name.find(app_name);
+        itm != files_created_by_app_name.end()) {
+        is_producer |= std::find(itm->second.begin(), itm->second.end(), path) != itm->second.end();
     }
 
     return is_producer;
 }
 
-std::vector<std::string> *ClientManager::getProducedFiles(pid_t tid) const {
+std::vector<std::string> &ClientManager::getProducedFiles(pid_t tid) const {
     START_LOG(gettid(), "call(tid=%ld)", tid);
-    if (const auto itm = files_created_by_producer->find(tid);
-        itm == files_created_by_producer->end()) {
-        files_created_by_producer->emplace(tid, new std::vector<std::string>());
+    if (const auto itm = files_created_by_producer.find(tid);
+        itm == files_created_by_producer.end()) {
+        files_created_by_producer[tid];
     }
-    return files_created_by_producer->at(tid);
+    return files_created_by_producer.at(tid);
 }
 
 std::string ClientManager::getAppName(pid_t tid) const {
     START_LOG(gettid(), "call(tid=%ld)", tid);
-    if (const auto itm = app_names->find(tid); itm != app_names->end()) {
+    if (const auto itm = app_names.find(tid); itm != app_names.end()) {
         return itm->second;
     }
     return CAPIO_DEFAULT_APP_NAME;
 }
-SPSCQueue *ClientManager::getClientToServerDataBuffers(pid_t tid) const {
-    return data_buffers->at(tid).ClientToServer;
+
+SPSCQueue &ClientManager::getClientToServerDataBuffers(pid_t tid) const {
+    return *data_buffers.at(tid).ClientToServer;
 }
 
-size_t ClientManager::getConnectedPosixClients() { return data_buffers->size(); }
+size_t ClientManager::getConnectedPosixClients() const { return data_buffers.size(); }

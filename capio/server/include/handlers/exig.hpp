@@ -6,7 +6,7 @@ inline void handle_exit_group(int tid) {
 
     LOG("retrieving files from writers for process with pid = %d", tid);
     auto files = client_manager->getProducedFiles(tid);
-    for (auto &path : *files) {
+    for (auto &path : files) {
 
         LOG("Handling file %s", path.c_str());
         if (CapioCLEngine::get().getCommitRule(path) == capiocl::commit_rules::ON_TERMINATION) {
