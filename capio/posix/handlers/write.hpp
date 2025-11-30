@@ -15,8 +15,8 @@ inline off64_t capio_write(int fd, const void *buffer, off64_t count, long tid) 
                      "SSIZE_MAX yet");
         }
 
-        get_read_cache(tid).flush();
-        get_write_cache(tid).write(fd, buffer, count);
+        read_cache->flush();
+        write_cache->write(fd, buffer, count);
 
         return count;
     } else {

@@ -181,6 +181,7 @@ class WriteCache {
     }
 };
 
-typedef std::unordered_map<long, std::pair<WriteCache *, ReadCache *>> CPThreadDataCache_t;
+inline thread_local WriteCache *write_cache;
+inline thread_local ReadCache *read_cache;
 
 #endif // CAPIO_SERVER_UTILS_CACHE

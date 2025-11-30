@@ -19,8 +19,8 @@ int exit_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg
     START_LOG(tid, "call()");
 
     LOG("Thread %d is a CAPIO thread: clean up", tid);
-    get_read_cache(tid).flush();
-    get_write_cache(tid).flush();
+    read_cache->flush();
+    write_cache->flush();
     exit_group_request(tid);
 
     return CAPIO_POSIX_SYSCALL_SKIP;

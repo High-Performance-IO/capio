@@ -364,11 +364,11 @@ static int hook(long syscall_number, long arg0, long arg1, long arg2, long arg3,
 }
 
 static __attribute__((constructor)) void init() {
-    init_client();
-    init_data_plane();
-    init_filesystem();
 
     const long tid = syscall_no_intercept(SYS_gettid);
+
+    init_client(tid);
+    init_filesystem();
 
     int *fd_shm = get_fd_snapshot(tid);
     if (fd_shm != nullptr) {
@@ -377,7 +377,7 @@ static __attribute__((constructor)) void init() {
 
     initialize_cloned_thread();
 
-    intercept_hook_point_clone_child  = initialize_cloned_thread;
+    intercept_hook_point_clone_child  = hook_clone_child;
     intercept_hook_point_clone_parent = hook_clone_parent;
     intercept_hook_point              = hook;
     START_SYSCALL_LOGGING();
