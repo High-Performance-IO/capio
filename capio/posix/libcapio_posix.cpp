@@ -367,6 +367,8 @@ static __attribute__((constructor)) void init() {
 
     const long tid = syscall_no_intercept(SYS_gettid);
 
+    sem_init(&semaphore_lock, 0, 0);
+
     init_client(tid);
     init_filesystem();
 

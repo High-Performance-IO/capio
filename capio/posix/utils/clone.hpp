@@ -6,8 +6,7 @@
 #include "data.hpp"
 #include "requests.hpp"
 
-inline std::mutex clone_mutex;
-inline std::condition_variable clone_cv;
+sem_t semaphore_lock;
 
 inline void initialize_cloned_thread() {
     const long tid = syscall_no_intercept(SYS_gettid);
@@ -28,8 +27,7 @@ inline void initialize_cloned_thread() {
 
 inline void hook_clone_child() {
     START_LOG(capio_syscall(SYS_gettid), "call()");
-    std::unique_lock lock(clone_mutex);
-    clone_cv.wait(lock);
+    sem_wait(&semaphore_lock);
     LOG("Parent unlocked thread");
     initialize_cloned_thread();
 }
@@ -38,7 +36,7 @@ inline void hook_clone_parent(const long child_pid) {
     const auto parent_tid = syscall_no_intercept(SYS_gettid);
     START_LOG(parent_tid, "call(parent_tid=%d, child_pid=%d)", parent_tid, child_pid);
     clone_request(parent_tid, child_pid);
-    clone_cv.notify_all();
+    sem_post(&semaphore_lock);
 }
 
 #endif // CAPIO_POSIX_UTILS_CLONE_HPP
