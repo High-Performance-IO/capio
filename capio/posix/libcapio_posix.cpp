@@ -367,19 +367,17 @@ static __attribute__((constructor)) void init() {
     init_client();
     init_data_plane();
     init_filesystem();
-    init_threading_support();
 
-    long tid = syscall_no_intercept(SYS_gettid);
+    const long tid = syscall_no_intercept(SYS_gettid);
 
     int *fd_shm = get_fd_snapshot(tid);
     if (fd_shm != nullptr) {
         initialize_from_snapshot(fd_shm, tid);
     }
 
-    init_process(tid);
-    register_capio_tid(tid);
+    initialize_cloned_thread();
 
-    intercept_hook_point_clone_child  = hook_clone_child;
+    intercept_hook_point_clone_child  = initialize_cloned_thread;
     intercept_hook_point_clone_parent = hook_clone_parent;
     intercept_hook_point              = hook;
     START_SYSCALL_LOGGING();
