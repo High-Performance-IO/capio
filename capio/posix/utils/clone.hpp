@@ -6,9 +6,18 @@
 #include "data.hpp"
 #include "requests.hpp"
 
-sem_t semaphore_lock;
+/// @brief Counting Semaphore used to allow child execution only after parent has issued a
+/// clone_request. This is required as the parent thread must first call the clone_request.
+/// This request cannot be issued from the child thread, as when issuing a syscall(SYS_getppid) from
+/// a child thread (not a child process), the returned thread might be the process that started the
+/// whole program and not the actual parent thread.
+sem_t semaphore_children_continue_after_clone;
 
-inline void initialize_cloned_thread() {
+/**
+ * Initialize the required data structures for the new child thread, and then proceed to execute a
+ * handshake request, using the DEFAULT CAPIO APP NAME is no app name is provided.
+ */
+inline void initialize_new_thread() {
     const long tid = syscall_no_intercept(SYS_gettid);
     const long pid = syscall_no_intercept(SYS_getpid);
 
@@ -16,7 +25,7 @@ inline void initialize_cloned_thread() {
     const auto capio_app_name = get_capio_app_name();
     syscall_no_intercept_flag = false;
 
-    START_LOG(tid, "call()");
+    START_LOG(tid, "call(tid=%d, pid=%d, app_name=%s)", tid, pid, capio_app_name);
 
     initialize_data_queues(tid);
     init_client(tid);
@@ -25,18 +34,29 @@ inline void initialize_cloned_thread() {
     LOG("Starting child thread %d", tid);
 }
 
+/**
+ * Entry point after a SYS_clone occurs. This function wraps around the initialize_new_thread()
+ * routine to allow the hook_clone_parent() routine to issue a clone_request before allowing the
+ * child to execute. This ensures that before processing the handshake from the child, the
+ * capio_server has cloned all the file descriptors from the parent to the children.
+ */
 inline void hook_clone_child() {
     START_LOG(capio_syscall(SYS_gettid), "call()");
-    sem_wait(&semaphore_lock);
+    sem_wait(&semaphore_children_continue_after_clone);
     LOG("Parent unlocked thread");
-    initialize_cloned_thread();
+    initialize_new_thread();
 }
 
+/**
+ * Routine given to syscall_intercept to handle the execution of a clone syscall. After issuing a
+ * clone request, it increases by one the sem_post semaphore unloking the children thread.
+ * @param child_pid
+ */
 inline void hook_clone_parent(const long child_pid) {
     const auto parent_tid = syscall_no_intercept(SYS_gettid);
     START_LOG(parent_tid, "call(parent_tid=%d, child_pid=%d)", parent_tid, child_pid);
     clone_request(parent_tid, child_pid);
-    sem_post(&semaphore_lock);
+    sem_post(&semaphore_children_continue_after_clone);
 }
 
 #endif // CAPIO_POSIX_UTILS_CLONE_HPP

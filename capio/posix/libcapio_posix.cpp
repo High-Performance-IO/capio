@@ -367,7 +367,9 @@ static __attribute__((constructor)) void init() {
 
     const long tid = syscall_no_intercept(SYS_gettid);
 
-    sem_init(&semaphore_lock, 0, 0);
+    /// Initialize at the beginning the globally available semaphore used by child threads to wait
+    /// for the issuing of clone_request by the parent thread id.
+    sem_init(&semaphore_children_continue_after_clone, 0, 0);
 
     init_client(tid);
     init_filesystem();
@@ -377,7 +379,7 @@ static __attribute__((constructor)) void init() {
         initialize_from_snapshot(fd_shm, tid);
     }
 
-    initialize_cloned_thread();
+    initialize_new_thread();
 
     intercept_hook_point_clone_child  = hook_clone_child;
     intercept_hook_point_clone_parent = hook_clone_parent;

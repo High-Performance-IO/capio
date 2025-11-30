@@ -21,12 +21,13 @@ inline void init_process(int tid) {
  * To be called only when the client thread terminates
  */
 
-inline void free_resources(const int tid) {
+void free_resources(int tid) {
     START_LOG(gettid(), "call(%d)", tid);
     std::string sem_write_shm_name;
     remove_listener(tid);
 
-    if (const auto it = data_buffers.find(tid); it != data_buffers.end()) {
+    auto it = data_buffers.find(tid);
+    if (it != data_buffers.end()) {
         delete it->second.first;
         delete it->second.second;
         data_buffers.erase(it);
