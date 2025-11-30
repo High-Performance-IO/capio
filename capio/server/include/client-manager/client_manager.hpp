@@ -83,7 +83,7 @@ class ClientManager {
      * @param tid
      * @return auto
      */
-    [[nodiscard]] std::vector<std::string> &getProducedFiles(pid_t tid) const;
+    [[nodiscard]] const std::vector<std::string> &getProducedFiles(pid_t tid) const;
 
     /**
      * @brief Get the app name given a process pid
@@ -91,11 +91,11 @@ class ClientManager {
      * @param tid
      * @return std::string
      */
-    [[nodiscard]] std::string getAppName(pid_t tid) const;
+    [[nodiscard]] const std::string &getAppName(pid_t tid) const;
 
     [[nodiscard]] SPSCQueue &getClientToServerDataBuffers(pid_t tid) const;
 
-    size_t getConnectedPosixClients() const;
+    const size_t getConnectedPosixClients() const;
 };
 
 #endif // CLIENT_MANAGER_HPP
