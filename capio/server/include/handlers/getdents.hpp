@@ -39,7 +39,7 @@ inline void request_remote_getdents(int tid, int fd, off64_t count) {
 inline void handle_getdents(int tid, int fd, long int count) {
     START_LOG(gettid(), "call(tid=%d, fd=%d, count=%ld)", tid, fd, count);
 
-    std::string app_name                   = client_manager->getAppName(tid);
+    const std::string &app_name            = client_manager->getAppName(tid);
     const std::filesystem::path &path      = get_capio_file_path(tid, fd);
     const std::filesystem::path &capio_dir = get_capio_dir();
     bool is_prod                           = CapioCLEngine::get().isProducer(path, app_name);
@@ -56,7 +56,7 @@ inline void handle_getdents(int tid, int fd, long int count) {
                 handle_getdents(tid, fd, count);
             } else {
                 const CapioFile &c_file = get_capio_file(path_to_check);
-                const auto remote_app   = client_manager->getAppName(tid);
+                const auto &remote_app  = client_manager->getAppName(tid);
                 if (!c_file.is_complete()) {
                     if (const off64_t batch_size =
                             CapioCLEngine::get().getDirectoryFileCount(path_to_check);

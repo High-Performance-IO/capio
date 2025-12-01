@@ -38,7 +38,7 @@ void ClientManager::removeClient(const pid_t tid) {
         delete it_resp->second.ServerToClient;
         data_buffers.erase(it_resp);
     }
-    const std::string app_name = this->getAppName(tid);
+    const std::string &app_name = this->getAppName(tid);
     files_created_by_producer.erase(tid);
     files_created_by_app_name.erase(app_name);
     remove_listener(tid);
@@ -67,7 +67,7 @@ void ClientManager::registerProducedFile(const pid_t tid, std::string path) {
         LOG("Error: tid is not present in files_created_by_producers map");
         return;
     }
-    const std::string app_name = this->getAppName(tid);
+    const std::string &app_name = this->getAppName(tid);
     if (const auto itm = files_created_by_app_name.find(app_name);
         itm != files_created_by_app_name.end()) {
         itm->second.emplace_back(path);
@@ -84,7 +84,7 @@ void ClientManager::removeProducedFile(const pid_t tid, const std::filesystem::p
         v.erase(std::remove(v.begin(), v.end(), path), v.end());
     }
 
-    const std::string app_name = this->getAppName(tid);
+    const std::string &app_name = this->getAppName(tid);
     if (const auto itm = files_created_by_app_name.find(app_name);
         itm != files_created_by_app_name.end()) {
         auto &v = itm->second;
@@ -100,7 +100,7 @@ bool ClientManager::isProducer(const pid_t tid, const std::filesystem::path &pat
         is_producer |= std::find(itm->second.begin(), itm->second.end(), path) != itm->second.end();
     }
 
-    const std::string app_name = this->getAppName(tid);
+    const std::string &app_name = this->getAppName(tid);
     if (const auto itm = files_created_by_app_name.find(app_name);
         itm != files_created_by_app_name.end()) {
         is_producer |= std::find(itm->second.begin(), itm->second.end(), path) != itm->second.end();

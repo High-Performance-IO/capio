@@ -123,7 +123,7 @@ void wait_for_file(const std::filesystem::path &path, int tid, int fd, off64_t c
         handle_local_read(tid, fd, count, false);
     } else {
         const CapioFile &c_file = get_capio_file(path);
-        auto remote_app         = client_manager->getAppName(tid);
+        const auto &remote_app  = client_manager->getAppName(tid);
         if (!c_file.is_complete()) {
             std::string prefix = path.parent_path();
             off64_t batch_size = CapioCLEngine::get().getDirectoryFileCount(path);
@@ -142,7 +142,7 @@ inline void handle_read(int tid, int fd, off64_t count) {
 
     const std::filesystem::path &path      = get_capio_file_path(tid, fd);
     const std::filesystem::path &capio_dir = get_capio_dir();
-    std::string app_name                   = client_manager->getAppName(tid);
+    const std::string &app_name            = client_manager->getAppName(tid);
     bool is_prod =
         CapioCLEngine::get().isProducer(path, app_name) || client_manager->isProducer(tid, path);
     auto file_location_opt = get_file_location_opt(path);
