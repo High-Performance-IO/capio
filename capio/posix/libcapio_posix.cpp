@@ -360,7 +360,28 @@ static int hook(long syscall_number, long arg0, long arg1, long arg2, long arg3,
         return 1;
     }
 
-    return syscallTable[syscall_number](arg0, arg1, arg2, arg3, arg4, arg5, result);
+    try {
+        return syscallTable[syscall_number](arg0, arg1, arg2, arg3, arg4, arg5, result);
+    } catch (const std::exception &exception) {
+        syscall_no_intercept_flag = true;
+
+        std::cout
+            << std::endl
+            << "~~~~~~~~~~~~~~[\033[31mlibcapio_posix.so: FATAL EXCEPTION\033[0m]~~~~~~~~~~~~~~"
+            << std::endl
+            << "|  Exception thrown while handling syscall " << syscall_number << std::endl
+            << "|  TID of offending thread: " << syscall_no_intercept(SYS_gettid) << std::endl
+            << "|  PID of offending thread: " << syscall_no_intercept(SYS_getpid) << std::endl
+            << "|  PPID of offending thread: " << syscall_no_intercept(SYS_getppid) << std::endl
+            << "|  " << std::endl
+            << "|  `" << demangled_name(exception) << ": " << exception.what() << std::endl
+            << "|" << std::endl
+            << "~~~~~~~~~~~~~~[\033[31mlibcapio_posix.so: FATAL EXCEPTION\033[0m]~~~~~~~~~~~~~~"
+            << std::endl
+            << std::endl;
+
+        exit(EXIT_FAILURE);
+    }
 }
 
 static __attribute__((constructor)) void init() {

@@ -4,6 +4,7 @@
 #include <cstdarg>
 #include <cstdio>
 #include <cstring>
+#include <cxxabi.h>
 #include <fcntl.h>
 #include <fstream>
 #include <string>
@@ -13,6 +14,14 @@
 
 #include "common/syscall.hpp"
 #include "constants.hpp"
+
+template <typename T> std::string demangled_name(const T &obj) {
+    int status;
+    const char *mangled = typeid(obj).name();
+    std::unique_ptr<char, void (*)(void *)> demangled(
+        abi::__cxa_demangle(mangled, nullptr, nullptr, &status), std::free);
+    return status == 0 ? demangled.get() : mangled;
+}
 
 // FIXME: Remove the inline specifier
 inline bool continue_on_error = false; // change behaviour of ERR_EXIT to continue if set to true
@@ -288,7 +297,9 @@ class Logger {
 #define ERR_EXIT(message, ...)                                                                     \
     log.log(message, ##__VA_ARGS__);                                                               \
     if (!continue_on_error) {                                                                      \
-        exit(EXIT_FAILURE);                                                                        \
+        char err_msg[CAPIO_LOG_MAX_MSG_LEN];                                                       \
+        snprintf(err_msg, CAPIO_LOG_MAX_MSG_LEN, message, ##__VA_ARGS__);                          \
+        throw std::runtime_error(err_msg);                                                         \
     }
 #define LOG(message, ...) log.log(message, ##__VA_ARGS__)
 #define START_LOG(tid, message, ...)                                                               \
@@ -325,8 +336,11 @@ class Logger {
 #else
 
 #define ERR_EXIT(message, ...)                                                                     \
-    if (!continue_on_error)                                                                        \
-    exit(EXIT_FAILURE)
+    if (!continue_on_error) {                                                                      \
+        char err_msg[CAPIO_LOG_MAX_MSG_LEN];                                                       \
+        snprintf(err_msg, sizeof(err_msg), message, ##__VA_ARGS__);                                \
+        throw std::runtime_error(err_msg);                                                         \
+    }
 #define LOG(message, ...)
 #define START_LOG(tid, message, ...)
 #define START_SYSCALL_LOGGING()
