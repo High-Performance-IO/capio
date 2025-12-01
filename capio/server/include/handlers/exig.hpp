@@ -4,37 +4,34 @@
 inline void handle_exit_group(int tid) {
     START_LOG(gettid(), "call(tid=%d)", tid);
 
-    LOG("retrieving pid for process with tid = %d", tid);
-    int pid = pids[tid];
-    LOG("retrieving files from writers for process with pid = %d", pid);
-    auto files = writers[pid];
-    for (auto &pair : files) {
-        std::string path = pair.first;
-        LOG("Path %s found. handling? %s", path.c_str(), pair.second ? "yes" : "no");
-        if (pair.second) {
-            LOG("Handling file %s", path.c_str());
-            if (CapioCLEngine::get().getCommitRule(path) == capiocl::commit_rules::ON_TERMINATION) {
-                CapioFile &c_file = get_capio_file(path.c_str());
-                if (c_file.is_dir()) {
-                    LOG("file %s is dir", path.c_str());
-                    long int n_committed = c_file.n_files_expected;
-                    if (n_committed <= c_file.n_files) {
-                        LOG("Setting file %s to complete", path.c_str());
-                        c_file.set_complete();
-                    }
-                } else {
+    LOG("retrieving files from writers for process with pid = %d", tid);
+    auto files = client_manager->getProducedFiles(tid);
+    for (auto &path : files) {
+
+        LOG("Handling file %s", path.c_str());
+        if (CapioCLEngine::get().getCommitRule(path) == capiocl::commit_rules::ON_TERMINATION) {
+            CapioFile &c_file = get_capio_file(path.c_str());
+            if (c_file.is_dir()) {
+                LOG("file %s is dir", path.c_str());
+                long int n_committed = c_file.n_files_expected;
+                if (n_committed <= c_file.n_files) {
                     LOG("Setting file %s to complete", path.c_str());
                     c_file.set_complete();
-                    c_file.commit();
                 }
+            } else {
+                LOG("Setting file %s to complete", path.c_str());
+                c_file.set_complete();
+                c_file.commit();
             }
+            c_file.close();
         }
     }
 
     for (auto &fd : get_capio_fds_for_tid(tid)) {
+        std::string path = std::string(get_capio_file_path(tid, fd));
         handle_close(tid, fd);
     }
-    free_resources(tid);
+    client_manager->removeClient(tid);
 }
 
 void exit_group_handler(const char *const str) {

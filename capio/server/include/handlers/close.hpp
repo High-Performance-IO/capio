@@ -40,7 +40,7 @@ inline void handle_pending_remote_nfiles(const std::filesystem::path &path) {
 inline void handle_close(int tid, int fd) {
     START_LOG(gettid(), "call(tid=%d, fd=%d)", tid, fd);
 
-    const std::filesystem::path &path = get_capio_file_path(tid, fd);
+    const std::filesystem::path path = get_capio_file_path(tid, fd);
     if (path.empty()) { // avoid to try to close a file that does not exists
         // (example: try to close() on a dir
         LOG("Path is empty. might be a directory. returning");
@@ -61,14 +61,8 @@ inline void handle_close(int tid, int fd) {
         c_file.commit();
     }
 
-    if (c_file.is_deletable()) {
-        LOG("file %s is deletable from CAPIO_SERVER", path.c_str());
-        delete_capio_file(path);
-        delete_from_files_location(path);
-    } else {
-        LOG("Deleting capio file %s from tid=%d", path.c_str(), tid);
-        delete_capio_file_from_tid(tid, fd);
-    }
+    LOG("Deleting capio file %s from tid=%d", path.c_str(), tid);
+    delete_capio_file_from_tid(tid, fd);
 }
 
 void close_handler(const char *str) {

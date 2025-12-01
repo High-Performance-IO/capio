@@ -16,18 +16,9 @@ inline void update_file_metadata(const std::filesystem::path &path, int tid, int
     CapioFile &c_file =
         (c_file_opt) ? c_file_opt->get() : create_capio_file(path, false, get_file_initial_size());
     add_capio_file_to_tid(tid, fd, path, offset);
-    int pid       = pids[tid];
-    auto it_files = writers.find(pid);
-    if (it_files != writers.end()) {
-        if (it_files->second.find(path) == it_files->second.end()) {
-            LOG("setting writers[%ld][%s]=false 1", pid, path.c_str());
-            writers[pid][path] = false;
-        }
-    } else {
-        LOG("setting writers[%ld][%s]=true", pid, path.c_str());
-        writers[pid][path] = true;
-    }
+
     if (c_file.first_write && is_creat) {
+        client_manager->registerProducedFile(tid, path);
         c_file.first_write = false;
         write_file_location(path);
         update_dir(tid, path);

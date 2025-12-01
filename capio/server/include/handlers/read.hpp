@@ -29,7 +29,8 @@ inline void handle_pending_read(int tid, int fd, long int process_offset, long i
     }
 
     c_file.create_buffer_if_needed(path, false);
-    send_data_to_client(tid, fd, c_file.get_buffer(), process_offset, bytes_read);
+    client_manager->replyToClient(tid, c_file.get_buffer(), process_offset, bytes_read);
+    set_capio_file_offset(tid, fd, process_offset + bytes_read);
 
     // TODO: check if the file was moved to the disk
 }
@@ -42,12 +43,10 @@ inline void handle_local_read(int tid, int fd, off64_t count, bool is_prod) {
     const std::filesystem::path &path = get_capio_file_path(tid, fd);
     CapioFile &c_file                 = get_capio_file(path);
     off64_t process_offset            = get_capio_file_offset(tid, fd);
-    int pid                           = pids[tid];
-    bool writer                       = writers[pid][path];
     off64_t end_of_sector             = c_file.get_sector_end(process_offset);
     off64_t end_of_read               = process_offset + count;
 
-    if (CapioCLEngine::get().isFirable(path) && !c_file.is_complete() && !writer && !is_prod) {
+    if (CapioCLEngine::get().isFirable(path) && !c_file.is_complete() && !is_prod) {
         // wait for file to be completed and then do what is done inside handle pending read
         LOG("Starting async thread to wait for file availability");
         std::thread t([&c_file, tid, fd, count, process_offset] {
@@ -56,7 +55,7 @@ inline void handle_local_read(int tid, int fd, off64_t count, bool is_prod) {
         });
         t.detach();
     } else if (end_of_read > end_of_sector) {
-        if (!is_prod && !writer && !c_file.is_complete()) {
+        if (!is_prod && !c_file.is_complete()) {
             LOG("Mode is NO_UPDATE. awaiting for data on separate thread before sending it to "
                 "client");
             // here if mode is NO_UPDATE, wait for data and then send it
@@ -74,12 +73,17 @@ inline void handle_local_read(int tid, int fd, off64_t count, bool is_prod) {
                 return;
             }
             c_file.create_buffer_if_needed(path, false);
-            send_data_to_client(tid, fd, c_file.get_buffer(), process_offset,
-                                end_of_sector - process_offset);
+
+            client_manager->replyToClient(tid, c_file.get_buffer(), process_offset,
+                                          end_of_sector - process_offset);
+            set_capio_file_offset(tid, fd, end_of_sector);
         }
     } else {
         c_file.create_buffer_if_needed(path, false);
-        send_data_to_client(tid, fd, c_file.get_buffer(), process_offset, count);
+
+        client_manager->replyToClient(tid, c_file.get_buffer(), process_offset,
+                                      end_of_sector - process_offset);
+        set_capio_file_offset(tid, fd, process_offset + count);
     }
 }
 
@@ -100,7 +104,9 @@ inline void request_remote_read(int tid, int fd, off64_t count) {
     } else if (end_of_read <= end_of_sector) {
         LOG("Data is present locally and can be served to client");
         c_file.create_buffer_if_needed(path, false);
-        send_data_to_client(tid, fd, c_file.get_buffer(), offset, count);
+
+        client_manager->replyToClient(tid, c_file.get_buffer(), offset, count);
+        set_capio_file_offset(tid, fd, offset + count);
     } else {
         LOG("Delegating to backend remote read");
         handle_remote_read_request(tid, fd, count, false);
@@ -117,14 +123,13 @@ void wait_for_file(const std::filesystem::path &path, int tid, int fd, off64_t c
         handle_local_read(tid, fd, count, false);
     } else {
         const CapioFile &c_file = get_capio_file(path);
-        auto remote_app         = apps.find(tid);
-        if (!c_file.is_complete() && remote_app != apps.end()) {
-            const std::string &remote_app_name = remote_app->second;
-            std::string prefix                 = path.parent_path();
-            off64_t batch_size                 = CapioCLEngine::get().getDirectoryFileCount(path);
+        const auto &remote_app  = client_manager->getAppName(tid);
+        if (!c_file.is_complete()) {
+            std::string prefix = path.parent_path();
+            off64_t batch_size = CapioCLEngine::get().getDirectoryFileCount(path);
             if (batch_size > 0) {
-                handle_remote_read_batch_request(tid, fd, count, remote_app_name, prefix,
-                                                 batch_size, false);
+                handle_remote_read_batch_request(tid, fd, count, remote_app, prefix, batch_size,
+                                                 false);
                 return;
             }
         }
@@ -137,10 +142,13 @@ inline void handle_read(int tid, int fd, off64_t count) {
 
     const std::filesystem::path &path      = get_capio_file_path(tid, fd);
     const std::filesystem::path &capio_dir = get_capio_dir();
-    std::string app_name = apps.find(tid) == apps.end() ? apps.at(tid) : CAPIO_DEFAULT_APP_NAME;
-
-    bool is_prod           = CapioCLEngine::get().isProducer(path, app_name);
+    const std::string &app_name            = client_manager->getAppName(tid);
+    bool is_prod =
+        CapioCLEngine::get().isProducer(path, app_name) || client_manager->isProducer(tid, path);
     auto file_location_opt = get_file_location_opt(path);
+
+    LOG("Is producer= %s", is_prod ? "TRUE" : "FALSE");
+
     if (!file_location_opt && !is_prod) {
         LOG("Starting thread to wait for file creation");
         // launch a thread that checks when the file is created
@@ -153,10 +161,9 @@ inline void handle_read(int tid, int fd, off64_t count) {
     } else {
         LOG("File is remote");
         CapioFile &c_file = get_capio_file(path);
-        auto it           = apps.find(tid);
-        if (!c_file.is_complete() && it != apps.end()) {
+        if (!c_file.is_complete()) {
             LOG("File not complete");
-            const std::string &app_name = it->second;
+            const std::string &app_name = client_manager->getAppName(tid);
 
             std::string prefix = path.parent_path();
             off64_t batch_size = CapioCLEngine::get().getDirectoryFileCount(path);

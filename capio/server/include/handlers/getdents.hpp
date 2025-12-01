@@ -28,7 +28,8 @@ inline void request_remote_getdents(int tid, int fd, off64_t count) {
     } else if (end_of_read <= end_of_sector) {
         LOG("?");
         c_file.create_buffer_if_needed(path, false);
-        send_data_to_client(tid, fd, c_file.get_buffer(), offset, count);
+        client_manager->replyToClient(tid, c_file.get_buffer(), offset, count);
+        set_capio_file_offset(tid, fd, offset + count);
     } else {
         LOG("Delegating to backend remote read");
         handle_remote_read_request(tid, fd, count, true);
@@ -38,7 +39,7 @@ inline void request_remote_getdents(int tid, int fd, off64_t count) {
 inline void handle_getdents(int tid, int fd, long int count) {
     START_LOG(gettid(), "call(tid=%d, fd=%d, count=%ld)", tid, fd, count);
 
-    std::string app_name = apps.find(tid) == apps.end() ? apps.at(tid) : CAPIO_DEFAULT_APP_NAME;
+    const std::string &app_name            = client_manager->getAppName(tid);
     const std::filesystem::path &path      = get_capio_file_path(tid, fd);
     const std::filesystem::path &capio_dir = get_capio_dir();
     bool is_prod                           = CapioCLEngine::get().isProducer(path, app_name);
@@ -55,14 +56,14 @@ inline void handle_getdents(int tid, int fd, long int count) {
                 handle_getdents(tid, fd, count);
             } else {
                 const CapioFile &c_file = get_capio_file(path_to_check);
-                auto remote_app         = apps.find(tid);
-                if (!c_file.is_complete() && remote_app != apps.end()) {
-                    const std::string &remote_app_name = remote_app->second;
-                    std::string prefix                 = path_to_check.parent_path();
-                    off64_t batch_size = CapioCLEngine::get().getDirectoryFileCount(path_to_check);
-                    if (batch_size > 0) {
-                        handle_remote_read_batch_request(tid, fd, count, remote_app_name, prefix,
-                                                         batch_size, true);
+                const auto &remote_app  = client_manager->getAppName(tid);
+                if (!c_file.is_complete()) {
+                    if (const off64_t batch_size =
+                            CapioCLEngine::get().getDirectoryFileCount(path_to_check);
+                        batch_size > 0) {
+                        handle_remote_read_batch_request(tid, fd, count, remote_app,
+                                                         path_to_check.parent_path(), batch_size,
+                                                         true);
                         return;
                     }
                 }
@@ -78,16 +79,16 @@ inline void handle_getdents(int tid, int fd, long int count) {
     } else {
         LOG("File is remote");
         CapioFile &c_file = get_capio_file(path);
-        auto it           = apps.find(tid);
-        if (!c_file.is_complete() && it != apps.end()) {
+
+        if (!c_file.is_complete()) {
             LOG("File not complete");
-            const std::string &app_name = it->second;
+            const std::string &app_name_inner = client_manager->getAppName(tid);
             LOG("Glob matched");
             std::string prefix = path.parent_path();
             off64_t batch_size = CapioCLEngine::get().getDirectoryFileCount(path);
             if (batch_size > 0) {
                 LOG("Handling batch file");
-                handle_remote_read_batch_request(tid, fd, count, app_name, prefix, batch_size,
+                handle_remote_read_batch_request(tid, fd, count, app_name_inner, prefix, batch_size,
                                                  true);
                 return;
             }

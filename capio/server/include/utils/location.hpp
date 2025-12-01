@@ -247,9 +247,6 @@ int delete_from_files_location(const std::filesystem::path &path) {
 
     // Delete from local data structures
     erase_from_files_location(path);
-    for (auto &pair : writers) {
-        pair.second.erase(path);
-    }
 
     return result;
 }
