@@ -30,10 +30,6 @@ inline void initialize_new_thread() {
     initialize_data_queues(tid);
     init_client(tid);
 
-    syscall_no_intercept_flag = true;
-    std::cout << "INIT queues for thread id: " << tid << std::endl;
-    syscall_no_intercept_flag = false;
-
     handshake_named_request(tid, pid, capio_app_name);
     LOG("Starting child thread %d", tid);
 }

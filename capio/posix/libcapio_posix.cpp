@@ -394,13 +394,13 @@ static __attribute__((constructor)) void init() {
 
     init_client(tid);
     init_filesystem();
+    initialize_new_thread();
 
-    int *fd_shm = get_fd_snapshot(tid);
-    if (fd_shm != nullptr) {
+    if (const int *fd_shm = get_fd_snapshot(tid); fd_shm != nullptr) {
         initialize_from_snapshot(fd_shm, tid);
     }
 
-    initialize_new_thread();
+
 
     intercept_hook_point_clone_child  = hook_clone_child;
     intercept_hook_point_clone_parent = hook_clone_parent;

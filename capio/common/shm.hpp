@@ -91,7 +91,7 @@ inline void *create_shm(const std::string &shm_name, const long int size) {
     }
     void *p = mmap(nullptr, size, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
     if (p == MAP_FAILED) {
-        ERR_EXIT("mmap create_shm %s", shm_name.c_str());
+        ERR_EXIT("mmap create_shm %s %s", shm_name.c_str(), strerror(errno));
     }
     if (close(fd) == -1) {
 
@@ -117,7 +117,7 @@ inline void *get_shm(const std::string &shm_name) {
     }
     void *p = mmap(nullptr, sb.st_size, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
     if (p == MAP_FAILED) {
-        ERR_EXIT("mmap get_shm %s", shm_name.c_str());
+        ERR_EXIT("mmap get_shm %s: %s", shm_name.c_str(), strerror(errno));
     }
     if (close(fd) == -1) {
         ERR_EXIT("close");
@@ -145,7 +145,7 @@ inline void *get_shm_if_exist(const std::string &shm_name) {
     }
     void *p = mmap(nullptr, sb.st_size, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
     if (p == MAP_FAILED) {
-        ERR_EXIT("mmap get_shm %s", shm_name.c_str());
+        ERR_EXIT("mmap get_shm %s : %s", shm_name.c_str(), strerror(errno));
     }
     if (close(fd) == -1) {
         ERR_EXIT("close");
