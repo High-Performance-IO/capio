@@ -15,10 +15,10 @@ inline thread_local CircularBuffer<off_t> *buff_response;
  * @return
  */
 inline void init_client(const long tid) {
-    buf_requests =
-        new CircularBuffer<char>(SHM_COMM_CHAN_NAME, CAPIO_REQ_BUFF_CNT, CAPIO_REQ_MAX_SIZE);
     buff_response = new CircularBuffer<off_t>(SHM_COMM_CHAN_NAME_RESP + std::to_string(tid),
                                               CAPIO_REQ_BUFF_CNT, sizeof(off_t));
+    buf_requests =
+        new CircularBuffer<char>(SHM_COMM_CHAN_NAME, CAPIO_REQ_BUFF_CNT, CAPIO_REQ_MAX_SIZE);
 }
 
 inline off64_t access_request(const std::filesystem::path &path, const long tid) {
