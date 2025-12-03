@@ -6,7 +6,6 @@
 // TODO: caching info
 inline void handle_clone(pid_t parent_tid, pid_t child_tid) {
     START_LOG(gettid(), "call(parent_tid=%d, child_tid=%d)", parent_tid, child_tid);
-    init_process(child_tid);
     clone_capio_file(parent_tid, child_tid);
     int ppid    = pids[parent_tid];
     int new_pid = pids[child_tid];

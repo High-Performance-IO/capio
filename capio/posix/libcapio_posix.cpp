@@ -369,7 +369,10 @@ static int hook(long syscall_number, long arg0, long arg1, long arg2, long arg3,
             << std::endl
             << "~~~~~~~~~~~~~~[\033[31mlibcapio_posix.so: FATAL EXCEPTION\033[0m]~~~~~~~~~~~~~~"
             << std::endl
-            << "|  Exception thrown while handling syscall " << syscall_number << std::endl
+            << "|  Exception thrown while handling:" << std::endl
+            << "|  syscall(" << syscall_number << ", arg0:" << arg0 << ", arg1:" << arg1
+            << ", arg2:" << arg2 << ", arg3:" << arg3 << ", arg4:" << arg4 << ", arg5: " << arg5
+            << ")" << std::endl
             << "|  TID of offending thread: " << syscall_no_intercept(SYS_gettid) << std::endl
             << "|  PID of offending thread: " << syscall_no_intercept(SYS_getpid) << std::endl
             << "|  PPID of offending thread: " << syscall_no_intercept(SYS_getppid) << std::endl
@@ -399,8 +402,6 @@ static __attribute__((constructor)) void init() {
     if (const int *fd_shm = get_fd_snapshot(tid); fd_shm != nullptr) {
         initialize_from_snapshot(fd_shm, tid);
     }
-
-
 
     intercept_hook_point_clone_child  = hook_clone_child;
     intercept_hook_point_clone_parent = hook_clone_parent;
