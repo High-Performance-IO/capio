@@ -367,12 +367,6 @@ static __attribute__((constructor)) void init() {
 
     const long tid = syscall_no_intercept(SYS_gettid);
 
-    /**
-     * Initialize at the beginning the globally available semaphore used by child threads to wait
-     * for the issuing of clone_request by the parent thread id.
-     */
-    sem_init(&semaphore_children_continue_after_clone, 0, 0);
-
     init_client(tid);
     init_filesystem();
     initialize_new_thread();

@@ -6,14 +6,9 @@
 #include "data.hpp"
 #include "requests.hpp"
 
-/**
- * @brief Counting Semaphore used to allow child execution only after parent has issued a
- * clone_request. This is required as the parent thread must first call the clone_request.
- * This request cannot be issued from the child thread, as when issuing a syscall(SYS_getppid) from
- * a child thread (not a child process), the returned thread might be the process that started the
- * whole program and not the actual parent thread.
- */
-sem_t semaphore_children_continue_after_clone;
+inline std::mutex mutex_child;
+inline std::condition_variable child_continue_execution;
+inline std::vector<long> initialized_children;
 
 /**
  * Initialize the required data structures for the new child thread, and then proceed to execute a
@@ -44,7 +39,12 @@ inline void initialize_new_thread() {
  */
 inline void hook_clone_child() {
     START_LOG(capio_syscall(SYS_gettid), "call()");
-    sem_wait(&semaphore_children_continue_after_clone);
+    std::unique_lock ul(mutex_child);
+    child_continue_execution.wait(ul, []() {
+        const long tid = syscall_no_intercept(SYS_gettid);
+        return std::find(initialized_children.begin(), initialized_children.end(), tid) !=
+               initialized_children.end();
+    });
     LOG("Parent unlocked thread");
     initialize_new_thread();
 }
@@ -58,7 +58,13 @@ inline void hook_clone_parent(const long child_pid) {
     const auto parent_tid = syscall_no_intercept(SYS_gettid);
     START_LOG(parent_tid, "call(parent_tid=%d, child_pid=%d)", parent_tid, child_pid);
     clone_request(parent_tid, child_pid);
-    sem_post(&semaphore_children_continue_after_clone);
+
+    {
+        std::lock_guard lg(mutex_child);
+        initialized_children.push_back(child_pid);
+    }
+
+    child_continue_execution.notify_all();
 }
 
 #endif // CAPIO_POSIX_UTILS_CLONE_HPP
