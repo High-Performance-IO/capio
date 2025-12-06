@@ -28,14 +28,7 @@ void sig_term_handler(int signum, siginfo_t *info, void *ptr) {
     }
     std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_WARNING << "shm cleanup completed" << std::endl;
 
-    for (auto &p : data_buffers) {
-        std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_WARNING << "Deleting data buffer for "
-                  << p.second.first->get_name() << std::endl;
-        delete p.second.first;
-        std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_WARNING << "Deleting data buffer for "
-                  << p.second.second->get_name() << std::endl;
-        delete p.second.second;
-    }
+    delete client_manager;
 
     std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_WARNING << "data_buffers cleanup completed"
               << std::endl;

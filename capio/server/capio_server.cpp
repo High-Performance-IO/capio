@@ -22,11 +22,7 @@
 
 std::string workflow_name;
 
-#include "utils/types.hpp"
-
-// tid -> (client_to_server_data_buf, server_to_client_data_buf)
-CSDataBufferMap_t data_buffers;
-
+#include "client-manager/client_manager.hpp"
 #include "common/env.hpp"
 #include "common/logger.hpp"
 #include "common/semaphore.hpp"
@@ -35,27 +31,16 @@ CSDataBufferMap_t data_buffers;
 #include "utils/env.hpp"
 #include "utils/metadata.hpp"
 #include "utils/requests.hpp"
+#include "utils/types.hpp"
+
+ClientManager *client_manager;
 
 int n_servers;
 // name of the node
 char *node_name;
 
-/*
- * For multithreading:
- * tid -> pid*/
-CSPidsMap_T pids;
-
-// tid -> application name
-CSAppsMap_t apps;
-
 // application name -> set of files already sent
 CSFilesSentMap_t files_sent;
-
-/*
- * pid -> pathname -> bool
- * Different threads with the same pid are treated as a single writer
- */
-CSWritersMap_t writers;
 
 CSClientsRemotePendingNFilesMap_t clients_remote_pending_nfiles;
 
@@ -310,7 +295,8 @@ int main(int argc, char **argv) {
 
     open_files_location();
 
-    shm_canary = new CapioShmCanary(workflow_name);
+    shm_canary     = new CapioShmCanary(workflow_name);
+    client_manager = new ClientManager();
 
     std::thread server_thread(capio_server, std::ref(internal_server_sem));
     LOG("capio_server thread started");

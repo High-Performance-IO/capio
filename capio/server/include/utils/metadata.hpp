@@ -1,11 +1,15 @@
 #ifndef CAPIO_SERVER_UTILS_METADATA_HPP
 #define CAPIO_SERVER_UTILS_METADATA_HPP
 
+#include <list>
 #include <mutex>
 #include <optional>
 
 #include "common/filesystem.hpp"
-// FIXME: Remove the inline specifier by using extern
+#include "utils/types.hpp"
+
+// FIXME: Remove the inline specifier for all the following
+//        global variables using extern specifier and defining then in capio_server.cpp
 inline CSFilesMetadata_t files_metadata;
 
 // FIXME: Remove the inline specifier by using extern
@@ -114,6 +118,7 @@ inline void clone_capio_file(pid_t parent_tid, pid_t child_tid) {
 
 inline CapioFile &create_capio_file(const std::filesystem::path &path, bool is_dir,
                                     size_t init_size) {
+
     START_LOG(gettid(), "call(path=%s, is_dir=%s, init_size=%ld)", path.c_str(),
               is_dir ? "true" : "false", init_size);
 
@@ -140,7 +145,12 @@ inline void delete_capio_file_from_tid(int tid, int fd) {
     START_LOG(gettid(), "call(tid=%d, fd=%d)", tid, fd);
 
     const std::lock_guard<std::mutex> lg(processes_files_mutex);
-    CapioFile &c_file = get_capio_file(processes_files_metadata[tid][fd]);
+    auto path = processes_files_metadata[tid][fd];
+    if (path.empty()) {
+        LOG("PATH is empty. returning");
+        return;
+    }
+    CapioFile &c_file = get_capio_file(path);
     c_file.remove_fd(tid, fd);
     processes_files_metadata[tid].erase(fd);
     processes_files[tid].erase(fd);
