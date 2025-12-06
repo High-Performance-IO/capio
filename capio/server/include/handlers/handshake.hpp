@@ -1,5 +1,6 @@
 #ifndef CAPIO_SERVER_HANDLERS_HANDSHAKE_HPP
 #define CAPIO_SERVER_HANDLERS_HANDSHAKE_HPP
+#include "clone.hpp"
 
 inline void handle_handshake_anonymous(int tid, int pid) {
     START_LOG(gettid(), "call(tid=%d, pid=%d)", tid, pid);
@@ -19,20 +20,16 @@ inline void handle_handshake_named(int tid, int pid, const char *app_name, const
     init_process(tid);
     if (wait) {
         std::thread t([&, target_tid = tid]() {
-            do {
-                {
-                    std::lock_guard lock(mutex_thread_allowed_to_continue);
-                    auto it = std::find(thread_allowed_to_continue.begin(),
-                                        thread_allowed_to_continue.end(), target_tid);
-                    if (it != thread_allowed_to_continue.end()) {
-                        write_response(target_tid, 1);
-                        thread_allowed_to_continue.erase(it);
-                        return;
-                    }
-                }
-                std::this_thread::sleep_for(std::chrono::milliseconds(200));
-
-            } while (true);
+            std::unique_lock<std::mutex> lock(mutex_thread_allowed_to_continue);
+            cv_thread_allowed_to_continue.wait(lock, [&, target_tid]() {
+                return std::find(thread_allowed_to_continue.begin(),
+                                 thread_allowed_to_continue.end(),
+                                 target_tid) != thread_allowed_to_continue.end();
+            });
+            write_response(target_tid, 1);
+            const auto it = std::find(thread_allowed_to_continue.begin(),
+                                      thread_allowed_to_continue.end(), target_tid);
+            thread_allowed_to_continue.erase(it);
         });
         t.detach();
     }

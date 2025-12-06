@@ -3,9 +3,10 @@
 
 #include "handlers/common.hpp"
 
-// TODO: move this variables within the client_manager class when available
+// TODO: move variables within the client_manager class when available
 inline std::mutex mutex_thread_allowed_to_continue;
 inline std::vector<int> thread_allowed_to_continue;
+inline std::condition_variable cv_thread_allowed_to_continue;
 
 // TODO: caching info
 inline void handle_clone(pid_t parent_tid, pid_t child_tid) {
@@ -28,6 +29,7 @@ void clone_handler(const char *const str) {
     {
         std::lock_guard lock(mutex_thread_allowed_to_continue);
         thread_allowed_to_continue.push_back(child_tid);
+        cv_thread_allowed_to_continue.notify_all();
     }
 }
 
