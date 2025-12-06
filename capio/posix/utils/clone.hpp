@@ -1,15 +1,14 @@
 #ifndef CAPIO_POSIX_UTILS_CLONE_HPP
 #define CAPIO_POSIX_UTILS_CLONE_HPP
-#include <chrono>
 #include <condition_variable>
-#include <thread>
 
 #include "common/syscall.hpp"
 #include "data.hpp"
 #include "requests.hpp"
 
 inline std::mutex mutex_child;
-std::vector<long> initialized_children;
+inline std::condition_variable child_continue_execution;
+inline std::vector<long> initialized_children;
 
 /**
  * Initialize the required data structures for the new child thread, and then proceed to execute a
@@ -40,17 +39,19 @@ inline void initialize_new_thread() {
  */
 inline void hook_clone_child() {
     START_LOG(capio_syscall(SYS_gettid), "call()");
-    std::unique_lock ul(mutex_child);
     const long tid            = syscall_no_intercept(SYS_gettid);
-    bool found_thread         = false;
-    syscall_no_intercept_flag = true;
-    do {
-        std::this_thread::sleep_for(std::chrono::milliseconds(100));
-        std::lock_guard lock(mutex_child);
-        found_thread = std::find(initialized_children.begin(), initialized_children.end(), tid) !=
-                       initialized_children.end();
-    } while (!found_thread);
     syscall_no_intercept_flag = false;
+    std::cout << "child thread " << tid << "entered hook clone child" << std::endl;
+    std::unique_lock ul(mutex_child);
+    child_continue_execution.wait(ul, [&]() {
+        std::cout << std::endl << std::endl << "MY TID: " << tid << std::endl;
+        for (const auto th : initialized_children) {
+            std::cout << "INIT TH: " << th << std::endl;
+        }
+        return std::find(initialized_children.begin(), initialized_children.end(), tid) !=
+               initialized_children.end();
+    });
+    syscall_no_intercept_flag = true;
 
     LOG("Parent unlocked thread");
     initialize_new_thread();
@@ -66,8 +67,12 @@ inline void hook_clone_parent(const long child_tid) {
     START_LOG(parent_tid, "call(parent_tid=%d, child_pid=%d)", parent_tid, child_tid);
     clone_request(parent_tid, child_tid);
 
-    std::lock_guard lg(mutex_child);
-    initialized_children.emplace_back(child_tid);
+    {
+        std::lock_guard lg(mutex_child);
+        initialized_children.push_back(child_tid);
+    }
+
+    child_continue_execution.notify_all();
 }
 
 #endif // CAPIO_POSIX_UTILS_CLONE_HPP
