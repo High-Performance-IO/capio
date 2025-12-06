@@ -113,15 +113,15 @@ inline void handshake_anonymous_request(const long tid, const long pid) {
 }
 
 inline void handshake_named_request(const long tid, const long pid, const std::string &app_name,
-                                    bool after_clone = false) {
+                                    const bool wait = false) {
     START_LOG(capio_syscall(SYS_gettid), "call(tid=%ld, pid=%ld, app_name=%s)", tid, pid,
               app_name.c_str());
     char req[CAPIO_REQ_MAX_SIZE];
     sprintf(req, "%04d %ld %ld %s %d", CAPIO_REQUEST_HANDSHAKE_NAMED, tid, pid, app_name.c_str(),
-            after_clone ? 1 : 0);
+            wait ? 1 : 0);
     buf_requests->write(req, CAPIO_REQ_MAX_SIZE);
 
-    if (after_clone) {
+    if (wait) {
         off64_t res;
         buff_response->read(&res);
     }
