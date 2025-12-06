@@ -112,12 +112,19 @@ inline void handshake_anonymous_request(const long tid, const long pid) {
     buf_requests->write(req, CAPIO_REQ_MAX_SIZE);
 }
 
-inline void handshake_named_request(const long tid, const long pid, const std::string &app_name) {
+inline void handshake_named_request(const long tid, const long pid, const std::string &app_name,
+                                    bool after_clone = false) {
     START_LOG(capio_syscall(SYS_gettid), "call(tid=%ld, pid=%ld, app_name=%s)", tid, pid,
               app_name.c_str());
     char req[CAPIO_REQ_MAX_SIZE];
-    sprintf(req, "%04d %ld %ld %s", CAPIO_REQUEST_HANDSHAKE_NAMED, tid, pid, app_name.c_str());
+    sprintf(req, "%04d %ld %ld %s %d", CAPIO_REQUEST_HANDSHAKE_NAMED, tid, pid, app_name.c_str(),
+            after_clone ? 1 : 0);
     buf_requests->write(req, CAPIO_REQ_MAX_SIZE);
+
+    if (after_clone) {
+        off64_t res;
+        buff_response->read(&res);
+    }
 }
 
 inline CPStatResponse_t fstat_request(const int fd, const long tid) {
