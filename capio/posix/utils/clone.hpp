@@ -1,14 +1,16 @@
 #ifndef CAPIO_POSIX_UTILS_CLONE_HPP
 #define CAPIO_POSIX_UTILS_CLONE_HPP
 #include <condition_variable>
+#include <future>
 
 #include "common/syscall.hpp"
 #include "data.hpp"
 #include "requests.hpp"
 
+
 inline std::mutex mutex_child;
 inline std::condition_variable child_continue_execution;
-inline std::vector<long> initialized_children;
+inline std::unordered_map<long, std::shared_ptr<std::promise<void>>> child_promises;
 
 /**
  * Initialize the required data structures for the new child thread, and then proceed to execute a
@@ -31,48 +33,32 @@ inline void initialize_new_thread() {
     LOG("Starting child thread %d", tid);
 }
 
-/**
- * Entry point after a SYS_clone occurs. This function wraps around the initialize_new_thread()
- * routine to allow the hook_clone_parent() routine to issue a clone_request before allowing the
- * child to execute. This ensures that before processing the handshake from the child, the
- * capio_server has cloned all the file descriptors from the parent to the children.
- */
-inline void hook_clone_child() {
-    START_LOG(capio_syscall(SYS_gettid), "call()");
-    const long tid            = syscall_no_intercept(SYS_gettid);
-    syscall_no_intercept_flag = false;
-    std::cout << "child thread " << tid << "entered hook clone child" << std::endl;
-    std::unique_lock ul(mutex_child);
-    child_continue_execution.wait(ul, [&]() {
-        std::cout << std::endl << std::endl << "MY TID: " << tid << std::endl;
-        for (const auto th : initialized_children) {
-            std::cout << "INIT TH: " << th << std::endl;
-        }
-        return std::find(initialized_children.begin(), initialized_children.end(), tid) !=
-               initialized_children.end();
-    });
-    syscall_no_intercept_flag = true;
 
-    LOG("Parent unlocked thread");
-    initialize_new_thread();
-}
 
-/**
- * Routine given to syscall_intercept to handle the execution of a clone syscall. After issuing a
- * clone request, it increases by one the sem_post semaphore unlocking the children thread.
- * @param child_tid
- */
-inline void hook_clone_parent(const long child_tid) {
-    const auto parent_tid = syscall_no_intercept(SYS_gettid);
-    START_LOG(parent_tid, "call(parent_tid=%d, child_pid=%d)", parent_tid, child_tid);
-    clone_request(parent_tid, child_tid);
+inline void hook_clone_parent(long child_tid) {
+    auto p = std::make_shared<std::promise<void>>();
 
     {
-        std::lock_guard lg(mutex_child);
-        initialized_children.push_back(child_tid);
+        std::lock_guard<std::mutex> lg(mutex_child);
+        child_promises[child_tid] = p;
     }
 
-    child_continue_execution.notify_all();
+    p->set_value();
+}
+
+inline void hook_clone_child() {
+    const long tid = syscall(SYS_gettid); // raw syscall
+    std::shared_ptr<std::promise<void>> p;
+
+    {
+        std::unique_lock<std::mutex> ul(mutex_child);
+        child_continue_execution.wait(ul, [&]() { return child_promises.count(tid) > 0; });
+        p = child_promises[tid];
+    }
+
+    p->get_future().wait();
+
+    initialize_new_thread();
 }
 
 #endif // CAPIO_POSIX_UTILS_CLONE_HPP
