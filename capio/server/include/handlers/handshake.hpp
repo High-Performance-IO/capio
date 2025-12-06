@@ -48,7 +48,7 @@ void handshake_named_handler(const char *const str) {
     int tid, pid, wait;
     char app_name[1024];
     sscanf(str, "%d %d %s %d", &tid, &pid, app_name, &wait);
-    handle_handshake_named(tid, pid, app_name, wait);
+    handle_handshake_named(tid, pid, app_name, static_cast<bool>(wait));
 }
 
 #endif // CAPIO_SERVER_HANDLERS_HANDSHAKE_HPP
