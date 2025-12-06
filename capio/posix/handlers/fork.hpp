@@ -8,8 +8,7 @@
 
 int fork_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg5, long *result) {
     auto pid        = static_cast<pid_t>(syscall_no_intercept(SYS_fork));
-    long parent_tid = syscall_no_intercept(SYS_gettid);
-    START_LOG(parent_tid, "call(pid=%ld)", pid);
+    START_LOG(syscall_no_intercept(SYS_gettid), "call(pid=%ld)", pid);
 
     if (pid == 0) { // child
         initialize_new_thread();

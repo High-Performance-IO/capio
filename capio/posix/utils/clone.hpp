@@ -6,11 +6,13 @@
 #include "data.hpp"
 #include "requests.hpp"
 
-/// @brief Counting Semaphore used to allow child execution only after parent has issued a
-/// clone_request. This is required as the parent thread must first call the clone_request.
-/// This request cannot be issued from the child thread, as when issuing a syscall(SYS_getppid) from
-/// a child thread (not a child process), the returned thread might be the process that started the
-/// whole program and not the actual parent thread.
+/**
+ * @brief Counting Semaphore used to allow child execution only after parent has issued a
+ * clone_request. This is required as the parent thread must first call the clone_request.
+ * This request cannot be issued from the child thread, as when issuing a syscall(SYS_getppid) from
+ * a child thread (not a child process), the returned thread might be the process that started the
+ * whole program and not the actual parent thread.
+ */
 sem_t semaphore_children_continue_after_clone;
 
 /**
