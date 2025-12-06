@@ -364,20 +364,16 @@ static int hook(long syscall_number, long arg0, long arg1, long arg2, long arg3,
 }
 
 static __attribute__((constructor)) void init() {
-    init_client();
-    init_data_plane();
+
+    const long tid = syscall_no_intercept(SYS_gettid);
+
+    init_client(tid);
     init_filesystem();
-    init_threading_support();
+    initialize_new_thread();
 
-    long tid = syscall_no_intercept(SYS_gettid);
-
-    int *fd_shm = get_fd_snapshot(tid);
-    if (fd_shm != nullptr) {
+    if (const int *fd_shm = get_fd_snapshot(tid); fd_shm != nullptr) {
         initialize_from_snapshot(fd_shm, tid);
     }
-
-    init_process(tid);
-    register_capio_tid(tid);
 
     intercept_hook_point_clone_child  = hook_clone_child;
     intercept_hook_point_clone_parent = hook_clone_parent;

@@ -23,8 +23,8 @@ inline int getdents_handler_impl(long arg0, long arg1, long arg2, long *result, 
         if (count >= SSIZE_MAX) {
             ERR_EXIT("src does not support read bigger than SSIZE_MAX yet");
         }
-        get_write_cache(tid).flush();
-        *result = get_read_cache(tid).read(fd, buffer, count, true, is64bit);
+        write_cache->flush();
+        *result = read_cache->read(fd, buffer, count, true, is64bit);
 
         DBG(tid, [](char *buf, off64_t count) {
             START_LOG(syscall_no_intercept(SYS_gettid), "call (count=%ld)", count);
