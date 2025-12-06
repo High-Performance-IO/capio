@@ -150,9 +150,6 @@ int fstat_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long ar
 
 int fstatat_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg5,
                     long *result) {
-    if (arg1 == NULL || arg2 == NULL) {
-        return CAPIO_POSIX_SYSCALL_SKIP;
-    }
     auto dirfd = static_cast<int>(arg0);
     const std::string_view pathname(reinterpret_cast<const char *>(arg1));
     auto *statbuf = reinterpret_cast<struct stat *>(arg2);
@@ -163,10 +160,6 @@ int fstatat_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long 
 }
 
 int lstat_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg5, long *result) {
-    if (arg0 == NULL) {
-        return CAPIO_POSIX_SYSCALL_SKIP;
-    }
-
     const std::string_view pathname(reinterpret_cast<const char *>(arg0));
     auto *buf = reinterpret_cast<struct stat *>(arg1);
     long tid  = syscall_no_intercept(SYS_gettid);
@@ -175,9 +168,6 @@ int lstat_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long ar
 }
 
 int stat_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg5, long *result) {
-    if (arg0 == NULL) {
-        return CAPIO_POSIX_SYSCALL_SKIP;
-    }
     const std::string_view pathname(reinterpret_cast<const char *>(arg0));
     auto *buf = reinterpret_cast<struct stat *>(arg1);
     long tid  = syscall_no_intercept(SYS_gettid);

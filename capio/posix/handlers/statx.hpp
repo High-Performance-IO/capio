@@ -102,11 +102,6 @@ inline int capio_statx(int dirfd, const std::string_view &pathname, int flags, i
 }
 
 int statx_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg5, long *result) {
-
-    if (arg1 == NULL) {
-        return CAPIO_POSIX_SYSCALL_SKIP;
-    }
-
     auto dirfd = static_cast<int>(arg0);
     const std::string_view pathname(reinterpret_cast<const char *>(arg1));
     auto flags = static_cast<int>(arg2);
