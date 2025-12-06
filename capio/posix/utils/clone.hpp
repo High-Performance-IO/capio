@@ -7,7 +7,6 @@
 #include "data.hpp"
 #include "requests.hpp"
 
-
 inline std::mutex mutex_child;
 inline std::condition_variable child_continue_execution;
 inline std::unordered_map<long, std::shared_ptr<std::promise<void>>> child_promises;
@@ -33,10 +32,10 @@ inline void initialize_new_thread() {
     LOG("Starting child thread %d", tid);
 }
 
-
-
 inline void hook_clone_parent(long child_tid) {
-    auto p = std::make_shared<std::promise<void>>();
+    const auto tid = syscall_no_intercept(SYS_gettid);
+    clone_request(tid, child_tid);
+    const auto p = std::make_shared<std::promise<void>>();
 
     {
         std::lock_guard<std::mutex> lg(mutex_child);
@@ -47,7 +46,7 @@ inline void hook_clone_parent(long child_tid) {
 }
 
 inline void hook_clone_child() {
-    const long tid = syscall(SYS_gettid); // raw syscall
+    const long tid = syscall_no_intercept(SYS_gettid);
     std::shared_ptr<std::promise<void>> p;
 
     {
