@@ -142,7 +142,10 @@ void wait_for_file(const std::filesystem::path &path, int tid, int fd, off64_t c
     }
 }
 
-inline void handle_read(int tid, int fd, off64_t count) {
+void read_handler(const char *const str) {
+    int tid, fd;
+    off64_t count;
+    sscanf(str, "%d %d %ld", &tid, &fd, &count);
     START_LOG(gettid(), "call(tid=%d, fd=%d, count=%ld)", tid, fd, count);
 
     const std::filesystem::path &path      = get_capio_file_path(tid, fd);
@@ -182,13 +185,6 @@ inline void handle_read(int tid, int fd, off64_t count) {
         LOG("Delegating to backend remote read");
         request_remote_read(tid, fd, count);
     }
-}
-
-void read_handler(const char *const str) {
-    int tid, fd;
-    off64_t count;
-    sscanf(str, "%d %d %ld", &tid, &fd, &count);
-    handle_read(tid, fd, count);
 }
 
 #endif // CAPIO_SERVER_HANDLERS_READ_HPP

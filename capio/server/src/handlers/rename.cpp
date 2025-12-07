@@ -8,10 +8,12 @@
 
 extern ClientManager *client_manager;
 
-void handle_rename(int tid, const std::filesystem::path &oldpath,
-                   const std::filesystem::path &newpath) {
-    START_LOG(gettid(), "call(tid=%d, oldpath=%s, newpath=%s)", tid, oldpath.c_str(),
-              newpath.c_str());
+void rename_handler(const char *const str) {
+    char oldpath[PATH_MAX];
+    char newpath[PATH_MAX];
+    int tid;
+    sscanf(str, "%s %s %d", oldpath, newpath, &tid);
+    START_LOG(gettid(), "call(tid=%d, oldpath=%s, newpath=%s)", tid, oldpath, newpath);
 
     // FIXME: this doesn't work if a node renames a file handled by another node
     if (auto c_file_opt = get_capio_file_opt(oldpath)) {
@@ -25,14 +27,6 @@ void handle_rename(int tid, const std::filesystem::path &oldpath,
     } else {
         client_manager->replyToClient(tid, 1);
     }
-}
-
-void rename_handler(const char *const str) {
-    char oldpath[PATH_MAX];
-    char newpath[PATH_MAX];
-    int tid;
-    sscanf(str, "%s %s %d", oldpath, newpath, &tid);
-    handle_rename(tid, oldpath, newpath);
 }
 
 #endif // CAPIO_SERVER_HANDLERS_RENAME_HPP

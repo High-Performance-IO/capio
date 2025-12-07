@@ -30,7 +30,7 @@ void write_handler(const char *const str);
 /// Function required by other handlers.
 /// TODO: Remove this functions and move them to dedicated classes
 
-inline void handle_close(int tid, int fd);
-inline void reply_stat(int tid, const std::filesystem::path &path);
+void handle_close(int tid, int fd);
+void reply_stat(int tid, const std::filesystem::path &path);
 
 #endif // CAPIO_SERVER_HANDLERS_HPP

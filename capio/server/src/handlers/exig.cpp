@@ -9,7 +9,9 @@
 
 extern ClientManager *client_manager;
 
-inline void handle_exit_group(int tid) {
+void exit_group_handler(const char *const str) {
+    int tid;
+    sscanf(str, "%d", &tid);
     START_LOG(gettid(), "call(tid=%d)", tid);
 
     LOG("retrieving files from writers for process with pid = %d", tid);
@@ -40,12 +42,6 @@ inline void handle_exit_group(int tid) {
         handle_close(tid, fd);
     }
     client_manager->removeClient(tid);
-}
-
-void exit_group_handler(const char *const str) {
-    int tid;
-    sscanf(str, "%d", &tid);
-    handle_exit_group(tid);
 }
 
 #endif // CAPIO_SERVER_HANDLERS_EXITG_HPP

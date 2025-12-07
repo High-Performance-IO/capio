@@ -31,38 +31,6 @@ inline void update_file_metadata(const std::filesystem::path &path, int tid, int
     }
 }
 
-inline void handle_create(int tid, int fd, const std::filesystem::path &path) {
-    START_LOG(gettid(), "call(tid=%d, fd=%d, path_cstr=%s)", tid, fd, path.c_str());
-
-    bool is_creat = !(get_file_location_opt(path) || load_file_location(path));
-    update_file_metadata(path, tid, fd, is_creat, 0);
-    client_manager->replyToClient(tid, 0);
-}
-
-inline void handle_create_exclusive(int tid, int fd, const std::filesystem::path &path) {
-    START_LOG(gettid(), "call(tid=%d, fd=%d, path_cstr=%s)", tid, fd, path.c_str());
-
-    if (get_capio_file_opt(path)) {
-        client_manager->replyToClient(tid, 1);
-    } else {
-        client_manager->replyToClient(tid, 0);
-        update_file_metadata(path, tid, fd, true, 0);
-    }
-}
-
-inline void handle_open(int tid, int fd, const std::filesystem::path &path) {
-    START_LOG(gettid(), "call(tid=%d, fd=%d, path_cstr=%s)", tid, fd, path.c_str());
-
-    // it is important that check_files_location is the last because is the
-    // slowest (short circuit evaluation)
-    if (get_file_location_opt(path) || load_file_location(path)) {
-        update_file_metadata(path, tid, fd, false, 0);
-    } else {
-        client_manager->replyToClient(tid, 1);
-    }
-    client_manager->replyToClient(tid, 0);
-}
-
 void create_handler(const char *const str) {
     int tid, fd;
     char path[PATH_MAX];
@@ -71,7 +39,11 @@ void create_handler(const char *const str) {
         client_manager->replyToClient(tid, CAPIO_POSIX_SYSCALL_REQUEST_SKIP);
         return;
     }
-    handle_create(tid, fd, path);
+    START_LOG(gettid(), "call(tid=%d, fd=%d, path_cstr=%s)", tid, fd, path);
+
+    bool is_creat = !(get_file_location_opt(path) || load_file_location(path));
+    update_file_metadata(path, tid, fd, is_creat, 0);
+    client_manager->replyToClient(tid, 0);
 }
 
 void create_exclusive_handler(const char *const str) {
@@ -82,7 +54,14 @@ void create_exclusive_handler(const char *const str) {
         client_manager->replyToClient(tid, CAPIO_POSIX_SYSCALL_REQUEST_SKIP);
         return;
     }
-    handle_create_exclusive(tid, fd, path);
+    START_LOG(gettid(), "call(tid=%d, fd=%d, path_cstr=%s)", tid, fd, path);
+
+    if (get_capio_file_opt(path)) {
+        client_manager->replyToClient(tid, 1);
+    } else {
+        client_manager->replyToClient(tid, 0);
+        update_file_metadata(path, tid, fd, true, 0);
+    }
 }
 
 void open_handler(const char *const str) {
@@ -93,7 +72,16 @@ void open_handler(const char *const str) {
         client_manager->replyToClient(tid, CAPIO_POSIX_SYSCALL_REQUEST_SKIP);
         return;
     }
-    handle_open(tid, fd, path);
+    START_LOG(gettid(), "call(tid=%d, fd=%d, path_cstr=%s)", tid, fd, path);
+
+    // it is important that check_files_location is the last because is the
+    // slowest (short circuit evaluation)
+    if (get_file_location_opt(path) || load_file_location(path)) {
+        update_file_metadata(path, tid, fd, false, 0);
+    } else {
+        client_manager->replyToClient(tid, 1);
+    }
+    client_manager->replyToClient(tid, 0);
 }
 
 #endif // CAPIO_SERVER_HANDLERS_OPEN_HPP
