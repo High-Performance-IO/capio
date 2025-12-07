@@ -10,7 +10,7 @@ extern std::string workflow_name;
 #include "utils/common.hpp"
 
 ClientManager::ClientManager()
-    : requests(SHM_COMM_CHAN_NAME, CAPIO_REQ_BUFF_CNT, CAPIO_REQ_MAX_SIZE, workflow_name) {
+    : requests{SHM_COMM_CHAN_NAME, CAPIO_REQ_BUFF_CNT, CAPIO_REQ_MAX_SIZE, workflow_name} {
     server_println(CAPIO_LOG_SERVER_CLI_LEVEL_INFO, "ClientManager initialization completed.");
 }
 
