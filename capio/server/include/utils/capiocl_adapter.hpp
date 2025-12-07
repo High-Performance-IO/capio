@@ -6,7 +6,7 @@
 class CapioCLEngine final {
   public:
     /// @brief Get a const reference to capiocl::Engine instance
-    inline const static capiocl::Engine &get();
+    const static capiocl::Engine &get();
 };
 
 #endif // CAPIO_CAPIOCL_ADAPTER_HPP

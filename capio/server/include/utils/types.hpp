@@ -1,6 +1,7 @@
 #ifndef CAPIO_SERVER_UTILS_TYPES_HPP
 #define CAPIO_SERVER_UTILS_TYPES_HPP
 
+#include <list>
 #include <string>
 #include <unordered_map>
 #include <unordered_set>

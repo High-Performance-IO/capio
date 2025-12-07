@@ -1,6 +1,7 @@
 #ifndef CAPIO_SERVER_HANDLERS_OPEN_HPP
 #define CAPIO_SERVER_HANDLERS_OPEN_HPP
 
+#include "utils/env.hpp"
 #include "utils/filesystem.hpp"
 #include "utils/location.hpp"
 #include "utils/metadata.hpp"

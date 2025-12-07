@@ -1,6 +1,10 @@
 #ifndef CAPIO_SERVER_HANDLERS_CLONE_HPP
 #define CAPIO_SERVER_HANDLERS_CLONE_HPP
 
+#include "client-manager/client_manager.hpp"
+#include "utils/metadata.hpp"
+extern ClientManager *client_manager;
+
 void clone_handler(const char *const str) {
     pid_t parent_tid, child_tid;
     sscanf(str, "%d %d", &parent_tid, &child_tid);

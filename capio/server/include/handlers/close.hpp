@@ -5,6 +5,10 @@
 
 #include "utils/filesystem.hpp"
 
+extern std::mutex nfiles_mutex;
+extern CSClientsRemotePendingNFilesMap_t clients_remote_pending_nfiles;
+extern CSFilesSentMap_t files_sent;
+
 inline void handle_pending_remote_nfiles(const std::filesystem::path &path) {
     START_LOG(gettid(), "call(%s)", path.c_str());
 

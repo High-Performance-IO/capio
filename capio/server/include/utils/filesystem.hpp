@@ -20,8 +20,8 @@
  * type == 2 -> ".." entry
  */
 
-void write_entry_dir(int tid, const std::filesystem::path &file_path, const std::string &dir,
-                     int type) {
+inline void write_entry_dir(int tid, const std::filesystem::path &file_path, const std::string &dir,
+                            int type) {
     START_LOG(gettid(), "call(file_path=%s, dir=%s, type=%d)", file_path.c_str(), dir.c_str(),
               type);
 
@@ -69,7 +69,7 @@ void write_entry_dir(int tid, const std::filesystem::path &file_path, const std:
     }
 }
 
-void update_dir(int tid, const std::filesystem::path &file_path) {
+inline void update_dir(int tid, const std::filesystem::path &file_path) {
     START_LOG(gettid(), "call(file_path=%s)", file_path.c_str());
     const std::filesystem::path dir = get_parent_dir_path(file_path);
     CapioFile &c_file               = get_capio_file(dir.c_str());
@@ -80,7 +80,7 @@ void update_dir(int tid, const std::filesystem::path &file_path) {
     write_entry_dir(tid, file_path, dir, 0);
 }
 
-off64_t create_dir(int tid, const std::filesystem::path &path) {
+inline off64_t create_dir(int tid, const std::filesystem::path &path) {
     START_LOG(tid, "call(path=%s)", path.c_str());
 
     if (!get_file_location_opt(path)) {

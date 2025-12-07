@@ -8,12 +8,8 @@
 #include "common/filesystem.hpp"
 #include "utils/types.hpp"
 
-// FIXME: Remove the inline specifier for all the following
-//        global variables using extern specifier and defining then in capio_server.cpp
-inline CSFilesMetadata_t files_metadata;
-
-// FIXME: Remove the inline specifier by using extern
-inline std::mutex files_metadata_mutex;
+extern CSFilesMetadata_t files_metadata;
+extern std::mutex files_metadata_mutex;
 
 // FIXME: Remove the inline specifier by using extern
 inline std::unordered_map<int,
