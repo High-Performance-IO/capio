@@ -1,6 +1,6 @@
 #ifndef CAPIO_SERVER_HANDLERS_DUP_HPP
 #define CAPIO_SERVER_HANDLERS_DUP_HPP
-
+#include "client-manager/handlers.hpp"
 #include "utils/metadata.hpp"
 
 void dup_handler(const char *const str) {

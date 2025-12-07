@@ -1,7 +1,7 @@
 #ifndef CAPIO_SERVER_HANDLERS_CLONE_HPP
 #define CAPIO_SERVER_HANDLERS_CLONE_HPP
-
 #include "client-manager/client_manager.hpp"
+#include "client-manager/handlers.hpp"
 #include "utils/metadata.hpp"
 extern ClientManager *client_manager;
 

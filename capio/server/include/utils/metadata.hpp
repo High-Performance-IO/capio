@@ -6,6 +6,7 @@
 #include <optional>
 
 #include "common/filesystem.hpp"
+#include "utils/capiocl_adapter.hpp"
 #include "utils/types.hpp"
 
 extern CSFilesMetadata_t files_metadata;

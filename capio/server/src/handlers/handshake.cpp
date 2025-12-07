@@ -1,6 +1,9 @@
 #ifndef CAPIO_SERVER_HANDLERS_HANDSHAKE_HPP
 #define CAPIO_SERVER_HANDLERS_HANDSHAKE_HPP
-#include "clone.hpp"
+
+#include "client-manager/client_manager.hpp"
+#include "client-manager/handlers.hpp"
+extern ClientManager *client_manager;
 
 void handshake_anonymous_handler(const char *const str) {
     int tid, pid;

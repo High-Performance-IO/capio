@@ -1,5 +1,12 @@
 #ifndef CAPIO_REMOTE_REQUESTS_HPP
 #define CAPIO_REMOTE_REQUESTS_HPP
+#include "common/requests.hpp"
+#include "utils/capio_file.hpp"
+#include "utils/location.hpp"
+#include "utils/metadata.hpp"
+#include <vector>
+
+extern char *node_name;
 
 inline void serve_remote_stat_request(const std::filesystem::path &path, int source_tid,
                                       off64_t file_size, bool is_dir, const std::string &dest) {

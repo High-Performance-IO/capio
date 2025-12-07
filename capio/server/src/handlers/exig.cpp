@@ -1,5 +1,13 @@
 #ifndef CAPIO_SERVER_HANDLERS_EXITG_HPP
 #define CAPIO_SERVER_HANDLERS_EXITG_HPP
+#include "client-manager/client_manager.hpp"
+#include "client-manager/handlers.hpp"
+#include "common/logger.hpp"
+#include "utils/capio_file.hpp"
+#include "utils/capiocl_adapter.hpp"
+#include "utils/metadata.hpp"
+
+extern ClientManager *client_manager;
 
 inline void handle_exit_group(int tid) {
     START_LOG(gettid(), "call(tid=%d)", tid);

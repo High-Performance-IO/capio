@@ -1,7 +1,11 @@
 #ifndef CAPIO_SERVER_HANDLERS_RENAME_HPP
 #define CAPIO_SERVER_HANDLERS_RENAME_HPP
 
+#include "client-manager/client_manager.hpp"
+#include "client-manager/handlers.hpp"
 #include "utils/location.hpp"
+#include "utils/metadata.hpp"
+
 extern ClientManager *client_manager;
 
 void handle_rename(int tid, const std::filesystem::path &oldpath,

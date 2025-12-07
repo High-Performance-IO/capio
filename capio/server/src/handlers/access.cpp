@@ -1,7 +1,7 @@
 #ifndef CAPIO_SERVER_HANDLERS_ACCESS_HPP
 #define CAPIO_SERVER_HANDLERS_ACCESS_HPP
-
 #include "client-manager/client_manager.hpp"
+#include "client-manager/handlers.hpp"
 #include "utils/capiocl_adapter.hpp"
 #include "utils/location.hpp"
 

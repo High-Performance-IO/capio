@@ -6,7 +6,9 @@
 #include "common/constants.hpp"
 #include "common/dirent.hpp"
 
+#include "client-manager/client_manager.hpp"
 #include "utils/capio_file.hpp"
+#include "utils/capiocl_adapter.hpp"
 #include "utils/metadata.hpp"
 #include "utils/types.hpp"
 

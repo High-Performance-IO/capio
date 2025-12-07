@@ -1,7 +1,11 @@
 #ifndef CAPIO_SERVER_HANDLERS_RMDIR_HPP
 #define CAPIO_SERVER_HANDLERS_RMDIR_HPP
 
+#include "client-manager/client_manager.hpp"
+#include "client-manager/handlers.hpp"
+#include "utils/capiocl_adapter.hpp"
 #include "utils/location.hpp"
+#include "utils/metadata.hpp"
 extern ClientManager *client_manager;
 
 void rmdir_handler(const char *const str) {

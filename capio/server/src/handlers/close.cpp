@@ -1,8 +1,8 @@
 #ifndef CAPIO_SERVER_HANDLERS_CLOSE_HPP
 #define CAPIO_SERVER_HANDLERS_CLOSE_HPP
 
-#include "read.hpp"
-
+#include "client-manager/handlers.hpp"
+#include "utils/capiocl_adapter.hpp"
 #include "utils/filesystem.hpp"
 
 extern std::mutex nfiles_mutex;
@@ -41,7 +41,7 @@ inline void handle_pending_remote_nfiles(const std::filesystem::path &path) {
     }
 }
 
-inline void handle_close(int tid, int fd) {
+void handle_close(int tid, int fd) {
     START_LOG(gettid(), "call(tid=%d, fd=%d)", tid, fd);
 
     const std::filesystem::path path = get_capio_file_path(tid, fd);

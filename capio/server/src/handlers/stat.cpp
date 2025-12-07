@@ -1,14 +1,17 @@
 #ifndef CAPIO_SERVER_HANDLERS_STAT_HPP
 #define CAPIO_SERVER_HANDLERS_STAT_HPP
 
+#include "client-manager/client_manager.hpp"
+
 #include <mutex>
 #include <thread>
 
 #include "remote/backend.hpp"
-
 #include "remote/requests.hpp"
-
+#include "utils/capiocl_adapter.hpp"
+#include "utils/env.hpp"
 #include "utils/location.hpp"
+#include "utils/metadata.hpp"
 #include "utils/types.hpp"
 
 extern ClientManager *client_manager;

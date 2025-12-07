@@ -5,9 +5,11 @@
 
 #include "posix/utils/env.hpp"
 
+#include "client-manager/handlers.hpp"
 #include "remote/backend.hpp"
 #include "remote/requests.hpp"
-
+#include "utils/capiocl_adapter.hpp"
+#include "utils/common.hpp"
 #include "utils/location.hpp"
 #include "utils/metadata.hpp"
 

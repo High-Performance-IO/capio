@@ -1,6 +1,7 @@
 
 #include "client-manager/request_handlers.hpp"
-#include "handlers.hpp"
+#include "client-manager/handlers.hpp"
+#include "utils/common.hpp"
 
 constexpr std::array<CSHandler_t, CAPIO_NR_REQUESTS>
 RequestHandler::build_request_handlers_table() {

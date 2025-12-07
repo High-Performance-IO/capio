@@ -7,6 +7,9 @@
 #include "remote/backend.hpp"
 #include "remote/requests.hpp"
 
+#include "client-manager/client_manager.hpp"
+#include "client-manager/handlers.hpp"
+#include "utils/capiocl_adapter.hpp"
 #include "utils/location.hpp"
 #include "utils/metadata.hpp"
 

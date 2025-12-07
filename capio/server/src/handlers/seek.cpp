@@ -1,7 +1,9 @@
 #ifndef CAPIO_SERVER_HANDLERS_SEEK_HPP
 #define CAPIO_SERVER_HANDLERS_SEEK_HPP
+#include "client-manager/client_manager.hpp"
+#include "client-manager/handlers.hpp"
+#include "utils/metadata.hpp"
 
-#include "stat.hpp"
 extern ClientManager *client_manager;
 
 inline void handle_lseek(int tid, int fd, off64_t offset) {

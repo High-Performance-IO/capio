@@ -1,10 +1,14 @@
 #ifndef CAPIO_SERVER_HANDLERS_OPEN_HPP
 #define CAPIO_SERVER_HANDLERS_OPEN_HPP
 
+#include "client-manager/client_manager.hpp"
+#include "client-manager/handlers.hpp"
+#include "utils/capiocl_adapter.hpp"
 #include "utils/env.hpp"
 #include "utils/filesystem.hpp"
 #include "utils/location.hpp"
 #include "utils/metadata.hpp"
+
 extern ClientManager *client_manager;
 
 inline void update_file_metadata(const std::filesystem::path &path, int tid, int fd, bool is_creat,
