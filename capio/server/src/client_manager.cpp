@@ -175,9 +175,10 @@ int ClientManager::readNextRequest(char *str) {
     if (ec == std::errc()) {
         strcpy(str, ptr + 1);
     } else {
-        std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_ERROR << "Received invalid code: " << code
-                  << std::endl;
-        ERR_EXIT("Invalid request %d%s", code, ptr);
+        std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_ERROR << "Received invalid request: " << str
+                  << std::endl
+                  << CAPIO_LOG_SERVER_CLI_LEVEL_ERROR << "Code " << code
+                  << " is not mapped to a valid request handler" << std::endl;
     }
     return code;
 }
