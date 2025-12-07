@@ -10,6 +10,16 @@
  * @brief Class to handle libcapio_posix clients applications
  */
 class ClientManager {
+
+    /**
+     * Request and Response buffer variables
+     */
+    CircularBuffer<char> *requests;
+    std::unordered_map<int, CircularBuffer<off64_t> *> *responses;
+
+    /**
+     * Data buffers variables
+     */
     struct ClientDataBuffers {
         mutable SPSCQueue *ClientToServer;
         mutable SPSCQueue *ServerToClient;
@@ -111,9 +121,32 @@ class ClientManager {
      */
     [[nodiscard]] const std::string &getAppName(pid_t tid) const;
 
+    /**
+     * Get the data queues associated with a give process id
+     * @param tid
+     * @return
+     */
     [[nodiscard]] SPSCQueue &getClientToServerDataBuffers(pid_t tid) const;
 
+    /**
+     * Get the number of connected posix clients
+     * @return
+     */
     const size_t getConnectedPosixClients() const;
+
+    /**
+     * Send an offset as a reply to a request to a connected client
+     * @param tid
+     * @param offset
+     */
+    void reply(pid_t tid, off64_t offset) const;
+
+    /**
+     * Fetch next request from a connected posix client
+     * @param str Allocated char buffer where the content of the request will be available
+     * @return request code
+     */
+    int readNextRequest(char *str) const;
 };
 
 #endif // CLIENT_MANAGER_HPP
