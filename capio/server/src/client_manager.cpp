@@ -29,8 +29,8 @@ void ClientManager::registerClient(pid_t tid, const std::string &app_name, const
 
     data_buffers.emplace(tid, buffers);
     app_names.emplace(tid, app_name);
-    files_created_by_producer.emplace(tid, std::initializer_list<std::string>());
-    files_created_by_app_name.emplace(app_name, std::initializer_list<std::string>());
+    files_created_by_producer.emplace(tid, std::initializer_list<std::string>{});
+    files_created_by_app_name.emplace(app_name, std::initializer_list<std::string>{});
 
     responses.try_emplace(tid, SHM_COMM_CHAN_NAME_RESP + std::to_string(tid), CAPIO_REQ_BUFF_CNT,
                           sizeof(off_t), workflow_name);
