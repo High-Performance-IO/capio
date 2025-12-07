@@ -76,13 +76,13 @@ void ClientManager::removeClient(const pid_t tid) {
     }
 }
 
-void ClientManager::replyToClient(const pid_t tid, const off64_t offset) {
+void ClientManager::replyToClient(const pid_t tid, const off64_t offset) const {
     START_LOG(gettid(), "call(tid=%d, offset=%ld)", tid, offset);
     responses.at(tid).write(&offset);
 }
 
 void ClientManager::replyToClient(const int tid, const off64_t offset, char *buf,
-                                  const off64_t count) {
+                                  const off64_t count) const {
     START_LOG(gettid(), "call(tid=%d, buf=0x%08x, offset=%ld, count=%ld)", tid, buf, offset, count);
 
     if (const auto out = data_buffers.find(tid); out != data_buffers.end()) {
@@ -170,7 +170,7 @@ SPSCQueue &ClientManager::getClientToServerDataBuffers(const pid_t tid) const {
 
 const size_t ClientManager::getConnectedPosixClients() const { return data_buffers.size(); }
 
-int ClientManager::readNextRequest(char *str) {
+int ClientManager::readNextRequest(char *str) const {
     char req[CAPIO_REQ_MAX_SIZE];
     requests.read(req);
     START_LOG(gettid(), "call(req=%s)", req);

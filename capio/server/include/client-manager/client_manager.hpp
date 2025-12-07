@@ -14,8 +14,8 @@ class ClientManager {
     /**
      * Request and Response buffer variables
      */
-    CircularBuffer<char> requests;
-    std::unordered_map<int, CircularBuffer<off64_t>> responses;
+    mutable CircularBuffer<char> requests;
+    mutable std::unordered_map<int, CircularBuffer<off64_t>> responses;
 
     /**
      * Data buffers variables
@@ -85,14 +85,14 @@ class ClientManager {
      * @param count
      * @return
      */
-    void replyToClient(int tid, off64_t offset, char *buf, off64_t count);
+    void replyToClient(int tid, off64_t offset, char *buf, off64_t count) const;
 
     /**
      * Send an offset as a reply to a request to a connected client
      * @param tid
      * @param offset
      */
-    void replyToClient(pid_t tid, off64_t offset);
+    void replyToClient(pid_t tid, off64_t offset) const;
 
     /**
      * @brief Add a file that is not yet ready to be consumed by a process to a list of files
@@ -146,7 +146,7 @@ class ClientManager {
      * @param str Allocated char buffer where the content of the request will be available
      * @return request code
      */
-    int readNextRequest(char *str);
+    int readNextRequest(char *str) const;
 };
 
 #endif // CLIENT_MANAGER_HPP
