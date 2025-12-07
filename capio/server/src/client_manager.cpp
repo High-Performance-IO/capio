@@ -179,6 +179,7 @@ int ClientManager::readNextRequest(char *str) {
                   << std::endl
                   << CAPIO_LOG_SERVER_CLI_LEVEL_ERROR << "Code " << code
                   << " is not mapped to a valid request handler" << std::endl;
+        return -1;
     }
     return code;
 }
