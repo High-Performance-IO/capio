@@ -25,12 +25,12 @@ std::string workflow_name;
 #include "client-manager/client_manager.hpp"
 #include "common/env.hpp"
 #include "common/logger.hpp"
+#include "common/requests.hpp"
 #include "common/semaphore.hpp"
 #include "utils/capio_file.hpp"
 #include "utils/common.hpp"
 #include "utils/env.hpp"
 #include "utils/metadata.hpp"
-#include "utils/requests.hpp"
 #include "utils/types.hpp"
 
 ClientManager *client_manager;
@@ -103,14 +103,12 @@ static constexpr std::array<CSHandler_t, CAPIO_NR_REQUESTS> build_request_handle
 
     create_dir(getpid(), get_capio_dir());
 
-    init_server();
-
     internal_server_sem.unlock();
 
     auto str = std::unique_ptr<char[]>(new char[CAPIO_REQ_MAX_SIZE]);
     while (true) {
         LOG(CAPIO_LOG_SERVER_REQUEST_START);
-        int code = read_next_request(str.get());
+        int code = client_manager->readNextRequest(str.get());
         if (code < 0 || code > CAPIO_NR_REQUESTS) {
             std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_ERROR << "Received invalid code: " << code
                       << std::endl;

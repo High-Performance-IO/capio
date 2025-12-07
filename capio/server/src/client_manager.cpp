@@ -9,7 +9,8 @@ extern std::string workflow_name;
 #include "common/queue.hpp"
 #include "utils/common.hpp"
 
-ClientManager::ClientManager() {
+ClientManager::ClientManager()
+    : requests{SHM_COMM_CHAN_NAME, CAPIO_REQ_BUFF_CNT, CAPIO_REQ_MAX_SIZE, workflow_name} {
     server_println(CAPIO_LOG_SERVER_CLI_LEVEL_INFO, "ClientManager initialization completed.");
 }
 
@@ -28,9 +29,11 @@ void ClientManager::registerClient(pid_t tid, const std::string &app_name, const
 
     data_buffers.emplace(tid, buffers);
     app_names.emplace(tid, app_name);
-    files_created_by_producer[tid];
-    files_created_by_app_name[app_name];
-    register_listener(tid);
+    files_created_by_producer.emplace(tid, std::initializer_list<std::string>{});
+    files_created_by_app_name.emplace(app_name, std::initializer_list<std::string>{});
+
+    responses.try_emplace(tid, SHM_COMM_CHAN_NAME_RESP + std::to_string(tid), CAPIO_REQ_BUFF_CNT,
+                          sizeof(off_t), workflow_name);
 
     if (wait) {
         std::thread t([&, target_tid = tid]() {
@@ -40,7 +43,7 @@ void ClientManager::registerClient(pid_t tid, const std::string &app_name, const
                                  thread_allowed_to_continue.end(),
                                  target_tid) != thread_allowed_to_continue.end();
             });
-            write_response(target_tid, 1);
+            this->replyToClient(target_tid, 1);
             const auto it = std::find(thread_allowed_to_continue.begin(),
                                       thread_allowed_to_continue.end(), target_tid);
             thread_allowed_to_continue.erase(it);
@@ -67,15 +70,23 @@ void ClientManager::removeClient(const pid_t tid) {
     const std::string &app_name = this->getAppName(tid);
     files_created_by_producer.erase(tid);
     files_created_by_app_name.erase(app_name);
-    remove_listener(tid);
+
+    if (const auto response_buffer = responses.find(tid); response_buffer != responses.end()) {
+        responses.erase(response_buffer);
+    }
 }
 
-void ClientManager::replyToClient(const int tid, char *buf, const off64_t offset,
-                                  const off64_t count) const {
+void ClientManager::replyToClient(const pid_t tid, const off64_t offset) {
+    START_LOG(gettid(), "call(tid=%d, offset=%ld)", tid, offset);
+    responses.at(tid).write(&offset);
+}
+
+void ClientManager::replyToClient(const int tid, const off64_t offset, char *buf,
+                                  const off64_t count) {
     START_LOG(gettid(), "call(tid=%d, buf=0x%08x, offset=%ld, count=%ld)", tid, buf, offset, count);
 
     if (const auto out = data_buffers.find(tid); out != data_buffers.end()) {
-        write_response(tid, offset + count);
+        this->replyToClient(tid, offset + count);
         out->second.ServerToClient->write(buf + offset, count);
         return;
     }
@@ -137,11 +148,7 @@ bool ClientManager::isProducer(const pid_t tid, const std::filesystem::path &pat
 
 const std::vector<std::string> &ClientManager::getProducedFiles(const pid_t tid) const {
     START_LOG(gettid(), "call(tid=%ld)", tid);
-    if (const auto itm = files_created_by_producer.find(tid);
-        itm == files_created_by_producer.end()) {
-        files_created_by_producer[tid];
-    }
-    return files_created_by_producer.at(tid);
+    return files_created_by_producer[tid];
 }
 
 const std::string &ClientManager::getAppName(const pid_t tid) const {
@@ -153,8 +160,26 @@ const std::string &ClientManager::getAppName(const pid_t tid) const {
     return default_app_name;
 }
 
-SPSCQueue &ClientManager::getClientToServerDataBuffers(const pid_t tid) const {
+SPSCQueue &ClientManager::getClientToServerDataBuffers(const pid_t tid) {
     return *data_buffers.at(tid).ClientToServer;
 }
 
-const size_t ClientManager::getConnectedPosixClients() const { return data_buffers.size(); }
+size_t ClientManager::getConnectedPosixClients() const { return data_buffers.size(); }
+
+int ClientManager::readNextRequest(char *str) {
+    char req[CAPIO_REQ_MAX_SIZE];
+    requests.read(req);
+    START_LOG(gettid(), "call(req=%s)", req);
+    int code       = -1;
+    auto [ptr, ec] = std::from_chars(req, req + 4, code);
+    if (ec == std::errc()) {
+        strcpy(str, ptr + 1);
+    } else {
+        std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_ERROR << "Received invalid request: " << str
+                  << std::endl
+                  << CAPIO_LOG_SERVER_CLI_LEVEL_ERROR << "Code " << code
+                  << " is not mapped to a valid request handler" << std::endl;
+        return -1;
+    }
+    return code;
+}

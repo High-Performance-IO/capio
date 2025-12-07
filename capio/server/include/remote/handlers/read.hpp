@@ -93,7 +93,7 @@ inline void handle_read_reply(int tid, int fd, long count, off64_t file_size, of
     if (is_getdents) {
         send_dirent_to_client(tid, fd, c_file, offset, bytes_read);
     } else {
-        client_manager->replyToClient(tid, c_file.get_buffer(), offset, count);
+        client_manager->replyToClient(tid, offset, c_file.get_buffer(), count);
         set_capio_file_offset(tid, fd, offset + count);
     }
 }

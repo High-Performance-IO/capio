@@ -11,6 +11,8 @@
 #include "utils/location.hpp"
 #include "utils/types.hpp"
 
+extern ClientManager *client_manager;
+
 void wait_for_file_completion(int tid, const std::filesystem::path &path) {
     START_LOG(gettid(), "call(tid=%d, path=%s)", tid, path.c_str());
 
@@ -22,8 +24,8 @@ void wait_for_file_completion(int tid, const std::filesystem::path &path) {
     if (c_file.is_complete() || CapioCLEngine::get().isFirable(path) ||
         strcmp(std::get<0>(get_file_location(path)), node_name) == 0) {
 
-        write_response(tid, c_file.get_file_size());
-        write_response(tid, static_cast<int>(c_file.is_dir() ? 1 : 0));
+        client_manager->replyToClient(tid, c_file.get_file_size());
+        client_manager->replyToClient(tid, static_cast<int>(c_file.is_dir() ? 1 : 0));
 
     } else {
         handle_remote_stat_request(tid, path);
@@ -45,8 +47,8 @@ inline void reply_stat(int tid, const std::filesystem::path &path) {
                 CapioCLEngine::get().isProducer(path, app_name)) {
                 LOG("Metadata do not contains file or globs did not contain file or app is "
                     "producer.");
-                write_response(tid, -1); // return size
-                write_response(tid, -1);
+                client_manager->replyToClient(tid, -1); // return size
+                client_manager->replyToClient(tid, -1);
             } else {
                 LOG("File found but not ready yet. Starting a thread to wait for file %s",
                     path.c_str());
@@ -69,8 +71,8 @@ inline void reply_stat(int tid, const std::filesystem::path &path) {
     if (c_file.is_complete() || strcmp(std::get<0>(file_location_opt->get()), node_name) == 0 ||
         CapioCLEngine::get().isFirable(path) || capio_dir == path) {
         LOG("Sending response to client");
-        write_response(tid, c_file.get_file_size());
-        write_response(tid, static_cast<int>(c_file.is_dir() ? 1 : 0));
+        client_manager->replyToClient(tid, c_file.get_file_size());
+        client_manager->replyToClient(tid, static_cast<int>(c_file.is_dir() ? 1 : 0));
     } else {
         LOG("Delegating backend to reply to remote stats");
         // send a request for file. then start a thread to wait for the request completion
@@ -91,7 +93,7 @@ void stat_handler(const char *const str) {
     int tid;
     sscanf(str, "%d %s", &tid, path);
     if (CapioCLEngine::get().isExcluded(path)) {
-        write_response(tid, CAPIO_POSIX_SYSCALL_REQUEST_SKIP);
+        client_manager->replyToClient(tid, CAPIO_POSIX_SYSCALL_REQUEST_SKIP);
         return;
     }
     reply_stat(tid, path);

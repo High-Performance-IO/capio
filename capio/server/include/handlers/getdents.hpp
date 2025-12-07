@@ -28,7 +28,7 @@ inline void request_remote_getdents(int tid, int fd, off64_t count) {
     } else if (end_of_read <= end_of_sector) {
         LOG("?");
         c_file.create_buffer_if_needed(path, false);
-        client_manager->replyToClient(tid, c_file.get_buffer(), offset, count);
+        client_manager->replyToClient(tid, offset, c_file.get_buffer(), count);
         set_capio_file_offset(tid, fd, offset + count);
     } else {
         LOG("Delegating to backend remote read");

@@ -12,6 +12,8 @@
 
 std::mutex local_read_mutex;
 
+extern ClientManager *client_manager;
+
 inline void handle_pending_read(int tid, int fd, long int process_offset, long int count) {
     START_LOG(gettid(), "call(tid=%d, fd=%d, process_offset=%ld, count=%ld)", tid, fd,
               process_offset, count);
@@ -29,7 +31,7 @@ inline void handle_pending_read(int tid, int fd, long int process_offset, long i
     }
 
     c_file.create_buffer_if_needed(path, false);
-    client_manager->replyToClient(tid, c_file.get_buffer(), process_offset, bytes_read);
+    client_manager->replyToClient(tid, process_offset, c_file.get_buffer(), bytes_read);
     set_capio_file_offset(tid, fd, process_offset + bytes_read);
 
     // TODO: check if the file was moved to the disk
@@ -69,19 +71,19 @@ inline void handle_local_read(int tid, int fd, off64_t count, bool is_prod) {
             LOG("Data is available.");
             if (end_of_sector == -1) {
                 LOG("End of sector is -1. returning process_offset without serving data");
-                write_response(tid, process_offset);
+                client_manager->replyToClient(tid, process_offset);
                 return;
             }
             c_file.create_buffer_if_needed(path, false);
 
-            client_manager->replyToClient(tid, c_file.get_buffer(), process_offset,
+            client_manager->replyToClient(tid, process_offset, c_file.get_buffer(),
                                           end_of_sector - process_offset);
             set_capio_file_offset(tid, fd, end_of_sector);
         }
     } else {
         c_file.create_buffer_if_needed(path, false);
 
-        client_manager->replyToClient(tid, c_file.get_buffer(), process_offset,
+        client_manager->replyToClient(tid, process_offset, c_file.get_buffer(),
                                       end_of_sector - process_offset);
         set_capio_file_offset(tid, fd, process_offset + count);
     }
@@ -105,7 +107,7 @@ inline void request_remote_read(int tid, int fd, off64_t count) {
         LOG("Data is present locally and can be served to client");
         c_file.create_buffer_if_needed(path, false);
 
-        client_manager->replyToClient(tid, c_file.get_buffer(), offset, count);
+        client_manager->replyToClient(tid, offset, c_file.get_buffer(), count);
         set_capio_file_offset(tid, fd, offset + count);
     } else {
         LOG("Delegating to backend remote read");

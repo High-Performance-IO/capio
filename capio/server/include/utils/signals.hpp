@@ -37,8 +37,6 @@ void sig_term_handler(int signum, siginfo_t *info, void *ptr) {
     __gcov_dump();
 #endif
 
-    destroy_server();
-
     delete backend;
     delete shm_canary;
 

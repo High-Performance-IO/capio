@@ -10,9 +10,19 @@
  * @brief Class to handle libcapio_posix clients applications
  */
 class ClientManager {
+
+    /**
+     * Request and Response buffer variables
+     */
+    CircularBuffer<char> requests;
+    std::unordered_map<int, CircularBuffer<off64_t>> responses;
+
+    /**
+     * Data buffers variables
+     */
     struct ClientDataBuffers {
-        mutable SPSCQueue *ClientToServer;
-        mutable SPSCQueue *ServerToClient;
+        SPSCQueue *ClientToServer;
+        SPSCQueue *ServerToClient;
     };
 
     std::unordered_map<long, ClientDataBuffers> data_buffers;
@@ -35,7 +45,7 @@ class ClientManager {
      * applications with same app name when doing IO operations on files, and for
      * Commit On Termination fallback rule
      */
-    std::unordered_map<std::string, std::vector<std::string>> files_created_by_app_name;
+    mutable std::unordered_map<std::string, std::vector<std::string>> files_created_by_app_name;
 
   public:
     ClientManager();
@@ -68,14 +78,21 @@ class ClientManager {
     void removeClient(pid_t tid);
 
     /**
-     * Write offset to response buffer of process @param tid
+     * Send an offset and associate data to client identified by tid
      * @param tid
-     * @param buf
      * @param offset
+     * @param buf
      * @param count
      * @return
      */
-    void replyToClient(int tid, char *buf, off64_t offset, off64_t count) const;
+    void replyToClient(int tid, off64_t offset, char *buf, off64_t count);
+
+    /**
+     * Send an offset as a reply to a request to a connected client
+     * @param tid
+     * @param offset
+     */
+    void replyToClient(pid_t tid, off64_t offset);
 
     /**
      * @brief Add a file that is not yet ready to be consumed by a process to a list of files
@@ -111,9 +128,25 @@ class ClientManager {
      */
     [[nodiscard]] const std::string &getAppName(pid_t tid) const;
 
-    [[nodiscard]] SPSCQueue &getClientToServerDataBuffers(pid_t tid) const;
+    /**
+     * Get the data queues associated with a give process id
+     * @param tid
+     * @return
+     */
+    [[nodiscard]] SPSCQueue &getClientToServerDataBuffers(pid_t tid);
 
-    const size_t getConnectedPosixClients() const;
+    /**
+     * Get the number of connected posix clients
+     * @return
+     */
+    size_t getConnectedPosixClients() const;
+
+    /**
+     * Fetch next request from a connected posix client
+     * @param str Allocated char buffer where the content of the request will be available
+     * @return request code
+     */
+    int readNextRequest(char *str);
 };
 
 #endif // CLIENT_MANAGER_HPP
