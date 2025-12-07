@@ -76,13 +76,13 @@ void ClientManager::removeClient(const pid_t tid) {
     }
 }
 
-void ClientManager::replyToClient(const pid_t tid, const off64_t offset) const {
+void ClientManager::replyToClient(const pid_t tid, const off64_t offset) {
     START_LOG(gettid(), "call(tid=%d, offset=%ld)", tid, offset);
     responses.at(tid).write(&offset);
 }
 
 void ClientManager::replyToClient(const int tid, const off64_t offset, char *buf,
-                                  const off64_t count) const {
+                                  const off64_t count) {
     START_LOG(gettid(), "call(tid=%d, buf=0x%08x, offset=%ld, count=%ld)", tid, buf, offset, count);
 
     if (const auto out = data_buffers.find(tid); out != data_buffers.end()) {
@@ -146,7 +146,7 @@ bool ClientManager::isProducer(const pid_t tid, const std::filesystem::path &pat
     return is_producer;
 }
 
-const std::vector<std::string> &ClientManager::getProducedFiles(const pid_t tid) const {
+const std::vector<std::string> &ClientManager::getProducedFiles(const pid_t tid) {
     START_LOG(gettid(), "call(tid=%ld)", tid);
     if (const auto itm = files_created_by_producer.find(tid);
         itm == files_created_by_producer.end()) {
@@ -164,13 +164,13 @@ const std::string &ClientManager::getAppName(const pid_t tid) const {
     return default_app_name;
 }
 
-SPSCQueue &ClientManager::getClientToServerDataBuffers(const pid_t tid) const {
+SPSCQueue &ClientManager::getClientToServerDataBuffers(const pid_t tid) {
     return *data_buffers.at(tid).ClientToServer;
 }
 
-const size_t ClientManager::getConnectedPosixClients() const { return data_buffers.size(); }
+size_t ClientManager::getConnectedPosixClients() const { return data_buffers.size(); }
 
-int ClientManager::readNextRequest(char *str) const {
+int ClientManager::readNextRequest(char *str) {
     char req[CAPIO_REQ_MAX_SIZE];
     requests.read(req);
     START_LOG(gettid(), "call(req=%s)", req);
