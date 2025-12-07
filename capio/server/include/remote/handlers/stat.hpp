@@ -60,8 +60,8 @@ inline void handle_remote_stat_reply(const std::filesystem::path &path, int sour
     START_LOG(gettid(), "call(path=%s, source_tid=%d, size=%ld, dir=%s)", path.c_str(), source_tid,
               size, dir ? "true" : "false");
 
-    client_manager->reply(source_tid, size);
-    client_manager->reply(source_tid, static_cast<off64_t>(dir));
+    client_manager->replyToClient(source_tid, size);
+    client_manager->replyToClient(source_tid, static_cast<off64_t>(dir));
 }
 
 void remote_stat_handler(const RemoteRequest &request) {

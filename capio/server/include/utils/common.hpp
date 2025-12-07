@@ -40,12 +40,12 @@ inline off64_t send_dirent_to_client(int tid, int fd, CapioFile &c_file, off64_t
             LOG("DIRENT NAME: %s - TARGET NAME: %s", dir_entity->d_name, current_dirent.d_name);
         }
 
-        client_manager->replyToClient(tid, reinterpret_cast<char *>(dirents.get()) - offset, offset,
+        client_manager->replyToClient(tid, offset, reinterpret_cast<char *>(dirents.get()) - offset,
                                       actual_size);
         set_capio_file_offset(tid, fd, offset + actual_size);
 
     } else {
-        client_manager->reply(tid, offset);
+        client_manager->replyToClient(tid, offset);
     }
 
     return actual_size;

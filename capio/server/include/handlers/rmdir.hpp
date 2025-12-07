@@ -10,12 +10,12 @@ void rmdir_handler(const char *const str) {
     sscanf(str, "%s %d", dir_to_remove, &tid);
     START_LOG(gettid(), "call(path=%s tid=%d)", dir_to_remove, tid);
     if (CapioCLEngine::get().isExcluded(dir_to_remove)) {
-        client_manager->reply(tid, CAPIO_POSIX_SYSCALL_REQUEST_SKIP);
+        client_manager->replyToClient(tid, CAPIO_POSIX_SYSCALL_REQUEST_SKIP);
         return;
     }
     delete_capio_file(dir_to_remove);
     int res = delete_from_files_location(dir_to_remove);
-    client_manager->reply(tid, res);
+    client_manager->replyToClient(tid, res);
 }
 
 #endif // CAPIO_SERVER_HANDLERS_RMDIR_HPP

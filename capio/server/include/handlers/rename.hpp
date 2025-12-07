@@ -17,9 +17,9 @@ void handle_rename(int tid, const std::filesystem::path &oldpath,
             write_file_location(newpath);
         }
         rename_file_location(oldpath, newpath);
-        client_manager->reply(tid, 0);
+        client_manager->replyToClient(tid, 0);
     } else {
-        client_manager->reply(tid, 1);
+        client_manager->replyToClient(tid, 1);
     }
 }
 

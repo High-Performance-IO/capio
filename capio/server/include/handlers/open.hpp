@@ -6,7 +6,6 @@
 #include "utils/metadata.hpp"
 extern ClientManager *client_manager;
 
-
 inline void update_file_metadata(const std::filesystem::path &path, int tid, int fd, bool is_creat,
                                  off64_t offset) {
     START_LOG(gettid(), "call(path=%s, client_tid=%d fd=%d, is_creat=%s, offset=%ld)", path.c_str(),
@@ -32,16 +31,16 @@ inline void handle_create(int tid, int fd, const std::filesystem::path &path) {
 
     bool is_creat = !(get_file_location_opt(path) || load_file_location(path));
     update_file_metadata(path, tid, fd, is_creat, 0);
-    client_manager->reply(tid, 0);
+    client_manager->replyToClient(tid, 0);
 }
 
 inline void handle_create_exclusive(int tid, int fd, const std::filesystem::path &path) {
     START_LOG(gettid(), "call(tid=%d, fd=%d, path_cstr=%s)", tid, fd, path.c_str());
 
     if (get_capio_file_opt(path)) {
-        client_manager->reply(tid, 1);
+        client_manager->replyToClient(tid, 1);
     } else {
-        client_manager->reply(tid, 0);
+        client_manager->replyToClient(tid, 0);
         update_file_metadata(path, tid, fd, true, 0);
     }
 }
@@ -54,9 +53,9 @@ inline void handle_open(int tid, int fd, const std::filesystem::path &path) {
     if (get_file_location_opt(path) || load_file_location(path)) {
         update_file_metadata(path, tid, fd, false, 0);
     } else {
-        client_manager->reply(tid, 1);
+        client_manager->replyToClient(tid, 1);
     }
-    client_manager->reply(tid, 0);
+    client_manager->replyToClient(tid, 0);
 }
 
 void create_handler(const char *const str) {
@@ -64,7 +63,7 @@ void create_handler(const char *const str) {
     char path[PATH_MAX];
     sscanf(str, "%d %d %s", &tid, &fd, path);
     if (CapioCLEngine::get().isExcluded(path)) {
-        client_manager->reply(tid, CAPIO_POSIX_SYSCALL_REQUEST_SKIP);
+        client_manager->replyToClient(tid, CAPIO_POSIX_SYSCALL_REQUEST_SKIP);
         return;
     }
     handle_create(tid, fd, path);
@@ -75,7 +74,7 @@ void create_exclusive_handler(const char *const str) {
     char path[PATH_MAX];
     sscanf(str, "%d %d %s", &tid, &fd, path);
     if (CapioCLEngine::get().isExcluded(path)) {
-        client_manager->reply(tid, CAPIO_POSIX_SYSCALL_REQUEST_SKIP);
+        client_manager->replyToClient(tid, CAPIO_POSIX_SYSCALL_REQUEST_SKIP);
         return;
     }
     handle_create_exclusive(tid, fd, path);
@@ -86,7 +85,7 @@ void open_handler(const char *const str) {
     char path[PATH_MAX];
     sscanf(str, "%d %d %s", &tid, &fd, path);
     if (CapioCLEngine::get().isExcluded(path)) {
-        client_manager->reply(tid, CAPIO_POSIX_SYSCALL_REQUEST_SKIP);
+        client_manager->replyToClient(tid, CAPIO_POSIX_SYSCALL_REQUEST_SKIP);
         return;
     }
     handle_open(tid, fd, path);

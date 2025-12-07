@@ -9,16 +9,12 @@ extern std::string workflow_name;
 #include "common/queue.hpp"
 #include "utils/common.hpp"
 
-ClientManager::ClientManager() {
-    requests  = new CSBufRequest_t(SHM_COMM_CHAN_NAME, CAPIO_REQ_BUFF_CNT, CAPIO_REQ_MAX_SIZE,
-                                   workflow_name);
-    responses = new std::unordered_map<int, CircularBuffer<off64_t> *>();
+ClientManager::ClientManager()
+    : requests(SHM_COMM_CHAN_NAME, CAPIO_REQ_BUFF_CNT, CAPIO_REQ_MAX_SIZE, workflow_name) {
     server_println(CAPIO_LOG_SERVER_CLI_LEVEL_INFO, "ClientManager initialization completed.");
 }
 
 ClientManager::~ClientManager() {
-    delete requests;
-    delete responses;
     server_println(CAPIO_LOG_SERVER_CLI_LEVEL_WARNING, "ClientManager teardown completed.");
 }
 
@@ -36,9 +32,8 @@ void ClientManager::registerClient(pid_t tid, const std::string &app_name, const
     files_created_by_producer[tid];
     files_created_by_app_name[app_name];
 
-    responses->insert(std::make_pair(
-        tid, new CircularBuffer<off_t>(SHM_COMM_CHAN_NAME_RESP + std::to_string(tid),
-                                       CAPIO_REQ_BUFF_CNT, sizeof(off_t), workflow_name)));
+    responses.try_emplace(tid, SHM_COMM_CHAN_NAME_RESP + std::to_string(tid), CAPIO_REQ_BUFF_CNT,
+                          sizeof(off_t), workflow_name);
 
     if (wait) {
         std::thread t([&, target_tid = tid]() {
@@ -48,7 +43,7 @@ void ClientManager::registerClient(pid_t tid, const std::string &app_name, const
                                  thread_allowed_to_continue.end(),
                                  target_tid) != thread_allowed_to_continue.end();
             });
-            this->reply(target_tid, 1);
+            this->replyToClient(target_tid, 1);
             const auto it = std::find(thread_allowed_to_continue.begin(),
                                       thread_allowed_to_continue.end(), target_tid);
             thread_allowed_to_continue.erase(it);
@@ -76,19 +71,22 @@ void ClientManager::removeClient(const pid_t tid) {
     files_created_by_producer.erase(tid);
     files_created_by_app_name.erase(app_name);
 
-    auto response_buffer = responses->find(tid);
-    if (response_buffer != responses->end()) {
-        delete response_buffer->second;
-        responses->erase(response_buffer);
+    if (const auto response_buffer = responses.find(tid); response_buffer != responses.end()) {
+        responses.erase(response_buffer);
     }
 }
 
-void ClientManager::replyToClient(const int tid, char *buf, const off64_t offset,
-                                  const off64_t count) const {
+void ClientManager::replyToClient(const pid_t tid, const off64_t offset) {
+    START_LOG(gettid(), "call(tid=%d, offset=%ld)", tid, offset);
+    responses.at(tid).write(&offset);
+}
+
+void ClientManager::replyToClient(const int tid, const off64_t offset, char *buf,
+                                  const off64_t count) {
     START_LOG(gettid(), "call(tid=%d, buf=0x%08x, offset=%ld, count=%ld)", tid, buf, offset, count);
 
     if (const auto out = data_buffers.find(tid); out != data_buffers.end()) {
-        this->reply(tid, offset + count);
+        this->replyToClient(tid, offset + count);
         out->second.ServerToClient->write(buf + offset, count);
         return;
     }
@@ -172,14 +170,9 @@ SPSCQueue &ClientManager::getClientToServerDataBuffers(const pid_t tid) const {
 
 const size_t ClientManager::getConnectedPosixClients() const { return data_buffers.size(); }
 
-void ClientManager::reply(const pid_t tid, const off64_t offset) const {
-    START_LOG(gettid(), "call(tid=%d, offset=%ld)", tid, offset);
-    responses->at(tid)->write(&offset);
-}
-
-int ClientManager::readNextRequest(char *str) const {
+int ClientManager::readNextRequest(char *str) {
     char req[CAPIO_REQ_MAX_SIZE];
-    requests->read(req);
+    requests.read(req);
     START_LOG(gettid(), "call(req=%s)", req);
     int code       = -1;
     auto [ptr, ec] = std::from_chars(req, req + 4, code);
