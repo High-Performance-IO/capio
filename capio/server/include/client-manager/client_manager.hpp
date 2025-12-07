@@ -38,14 +38,14 @@ class ClientManager {
     /**
      * Files that are produced by a given pid. Used for Commit On Termination fallback rule
      */
-    std::unordered_map<pid_t, std::vector<std::string>> files_created_by_producer;
+    mutable std::unordered_map<pid_t, std::vector<std::string>> files_created_by_producer;
 
     /**
      * Files that are produced by a given app_name. Used to non block execution of multithreaded
      * applications with same app name when doing IO operations on files, and for
      * Commit On Termination fallback rule
      */
-    std::unordered_map<std::string, std::vector<std::string>> files_created_by_app_name;
+    mutable std::unordered_map<std::string, std::vector<std::string>> files_created_by_app_name;
 
   public:
     ClientManager();
@@ -118,7 +118,7 @@ class ClientManager {
      * @param tid
      * @return auto
      */
-    [[nodiscard]] const std::vector<std::string> &getProducedFiles(pid_t tid);
+    [[nodiscard]] const std::vector<std::string> &getProducedFiles(pid_t tid) const;
 
     /**
      * @brief Get the app name given a process pid

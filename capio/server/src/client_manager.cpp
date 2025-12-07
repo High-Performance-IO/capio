@@ -29,8 +29,8 @@ void ClientManager::registerClient(pid_t tid, const std::string &app_name, const
 
     data_buffers.emplace(tid, buffers);
     app_names.emplace(tid, app_name);
-    files_created_by_producer[tid];
-    files_created_by_app_name[app_name];
+    files_created_by_producer.emplace(tid, std::initializer_list<std::string>());
+    files_created_by_app_name.emplace(app_name, std::initializer_list<std::string>());
 
     responses.try_emplace(tid, SHM_COMM_CHAN_NAME_RESP + std::to_string(tid), CAPIO_REQ_BUFF_CNT,
                           sizeof(off_t), workflow_name);
@@ -146,13 +146,9 @@ bool ClientManager::isProducer(const pid_t tid, const std::filesystem::path &pat
     return is_producer;
 }
 
-const std::vector<std::string> &ClientManager::getProducedFiles(const pid_t tid) {
+const std::vector<std::string> &ClientManager::getProducedFiles(const pid_t tid) const {
     START_LOG(gettid(), "call(tid=%ld)", tid);
-    if (const auto itm = files_created_by_producer.find(tid);
-        itm == files_created_by_producer.end()) {
-        files_created_by_producer[tid];
-    }
-    return files_created_by_producer.at(tid);
+    return files_created_by_producer[tid];
 }
 
 const std::string &ClientManager::getAppName(const pid_t tid) const {
