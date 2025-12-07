@@ -12,6 +12,8 @@
 
 std::mutex local_read_mutex;
 
+extern ClientManager *client_manager;
+
 inline void handle_pending_read(int tid, int fd, long int process_offset, long int count) {
     START_LOG(gettid(), "call(tid=%d, fd=%d, process_offset=%ld, count=%ld)", tid, fd,
               process_offset, count);
@@ -69,7 +71,7 @@ inline void handle_local_read(int tid, int fd, off64_t count, bool is_prod) {
             LOG("Data is available.");
             if (end_of_sector == -1) {
                 LOG("End of sector is -1. returning process_offset without serving data");
-                write_response(tid, process_offset);
+                client_manager->reply(tid, process_offset);
                 return;
             }
             c_file.create_buffer_if_needed(path, false);

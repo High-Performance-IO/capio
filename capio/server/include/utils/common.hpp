@@ -8,7 +8,6 @@
 
 #include "utils/capio_file.hpp"
 #include "utils/metadata.hpp"
-#include "utils/requests.hpp"
 #include "utils/types.hpp"
 
 extern ClientManager *client_manager;
@@ -46,7 +45,7 @@ inline off64_t send_dirent_to_client(int tid, int fd, CapioFile &c_file, off64_t
         set_capio_file_offset(tid, fd, offset + actual_size);
 
     } else {
-        write_response(tid, offset);
+        client_manager->reply(tid, offset);
     }
 
     return actual_size;
