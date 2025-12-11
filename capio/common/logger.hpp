@@ -10,13 +10,9 @@
 #include <string>
 #include <sys/mman.h>
 #include <unistd.h>
-#include <utility>
 
-#include "common/syscall.hpp"
 #include "constants.hpp"
-
-// FIXME: Remove the inline specifier
-inline bool continue_on_error = false; // change behaviour of ERR_EXIT to continue if set to true
+#include "syscall.hpp"
 
 template <typename T> std::string demangled_name(const T &obj) {
     int status;
@@ -25,6 +21,8 @@ template <typename T> std::string demangled_name(const T &obj) {
         abi::__cxa_demangle(mangled, nullptr, nullptr, &status), std::free);
     return status == 0 ? demangled.get() : mangled;
 }
+
+inline bool continue_on_error = false; // change behaviour of ERR_EXIT to continue if set to true
 
 #if defined(CAPIO_LOG) && defined(__CAPIO_POSIX)
 #include "syscallnames.h"
@@ -37,7 +35,6 @@ inline thread_local std::ofstream logfile; // if building for server, self conta
 inline std::string log_master_dir_name = CAPIO_DEFAULT_LOG_FOLDER;
 inline std::string logfile_prefix      = CAPIO_SERVER_DEFAULT_LOG_FILE_PREFIX;
 #else
-// FIXME: Remove the inline specifier by splitting into header and source code
 inline thread_local bool logfileOpen = false;
 inline thread_local int logfileFD    = -1;
 inline thread_local char logfile_path[PATH_MAX]{'\0'};
@@ -61,6 +58,10 @@ inline int CAPIO_LOG_LEVEL = CAPIO_MAX_LOG_LEVEL;
 inline auto open_server_logfile() {
     auto hostname = new char[HOST_NAME_MAX];
     gethostname(hostname, HOST_NAME_MAX);
+
+    if (log_master_dir_name.empty()) {
+        log_master_dir_name = CAPIO_DEFAULT_LOG_FOLDER;
+    }
 
     const std::filesystem::path output_folder =
         std::string{log_master_dir_name + "/server/" + hostname};
@@ -144,6 +145,18 @@ inline void setup_posix_log_filename() {
 }
 #endif
 
+inline long long current_time_in_millis() {
+    timespec ts{};
+    static long long start_time = -1;
+    if (start_time == -1) {
+        capio_syscall(SYS_clock_gettime, CLOCK_REALTIME, &ts);
+        start_time = static_cast<long long>(ts.tv_sec) * 1000 + (ts.tv_nsec) / 1000000;
+    }
+    capio_syscall(SYS_clock_gettime, CLOCK_REALTIME, &ts);
+    const auto time_now = static_cast<long long>(ts.tv_sec) * 1000 + (ts.tv_nsec) / 1000000;
+    return time_now - start_time;
+}
+
 inline void log_write_to(char *buffer, size_t bufflen) {
 #ifdef __CAPIO_POSIX
     if (current_log_level < CAPIO_MAX_LOG_LEVEL || CAPIO_MAX_LOG_LEVEL < 0) {
@@ -152,19 +165,29 @@ inline void log_write_to(char *buffer, size_t bufflen) {
     }
 #else
     if (current_log_level < CAPIO_LOG_LEVEL || CAPIO_LOG_LEVEL < 0) {
-        logfile << buffer << "\n";
+        logfile << buffer << std::endl;
         logfile.flush();
     }
 
 #endif
 }
 
+/**
+ * @brief Class used to suspend the logging capabilities of CAPIO, by setting the logging_syscall
+ * flag to false at instantiation, and restarting the logging at destruction
+ *
+ */
 class SyscallLoggingSuspender {
   public:
     SyscallLoggingSuspender() { logging_syscall = false; }
     ~SyscallLoggingSuspender() { logging_syscall = true; }
 };
 
+/**
+ * @brief Class that provides logging capabilities to CAPIO. It uses the STL it the component is not
+ * the intercepting library, otherwise it uses POSIX defined systemcalls.
+ *
+ */
 class Logger {
   private:
     char invoker[256]{0};
@@ -183,12 +206,22 @@ class Logger {
 #else
         if (!logfileOpen) {
             setup_posix_log_filename();
-
+            current_log_level = 0; // reset after clone log level, so to not inherit it
+#if defined(SYS_mkdir)
             capio_syscall(SYS_mkdir, get_log_dir(), 0755);
             capio_syscall(SYS_mkdir, get_posix_log_dir(), 0755);
             capio_syscall(SYS_mkdir, get_host_log_dir(), 0755);
-
+#elif defined(SYS_mkdirat)
+            capio_syscall(SYS_mkdirat, AT_FDCWD, get_log_dir(), 0755);
+            capio_syscall(SYS_mkdirat, AT_FDCWD, get_posix_log_dir(), 0755);
+            capio_syscall(SYS_mkdirat, AT_FDCWD, get_host_log_dir(), 0755);
+#endif
+#if defined(SYS_open)
             logfileFD = capio_syscall(SYS_open, logfile_path, O_CREAT | O_WRONLY | O_TRUNC, 0644);
+#elif defined(SYS_openat)
+            logfileFD = capio_syscall(SYS_openat, AT_FDCWD, logfile_path,
+                                      O_CREAT | O_WRONLY | O_TRUNC, 0644);
+#endif
 
             if (logfileFD == -1) {
                 capio_syscall(SYS_write, fileno(stdout),
@@ -198,9 +231,8 @@ class Logger {
                 capio_syscall(SYS_write, fileno(stdout), strerror(errno), strlen(strerror(errno)));
                 capio_syscall(SYS_write, fileno(stdout), "\n", 1);
                 exit(EXIT_FAILURE);
-            } else {
-                logfileOpen = true;
             }
+            logfileOpen = true;
         }
 #endif
         strncpy(this->invoker, invoker, sizeof(this->invoker));
@@ -208,8 +240,8 @@ class Logger {
 
         va_list argp, argpc;
 
-        sprintf(format, CAPIO_LOG_PRE_MSG, this->invoker);
-        size_t pre_msg_len = strlen(format);
+        sprintf(format, CAPIO_LOG_PRE_MSG, current_time_in_millis(), this->invoker);
+        const size_t pre_msg_len = strlen(format);
 
         strcpy(format + pre_msg_len, message);
 
@@ -218,8 +250,15 @@ class Logger {
 
 #if defined(CAPIO_LOG) && defined(__CAPIO_POSIX)
         if (current_log_level == 0 && logging_syscall) {
-            int syscallNumber = va_arg(argp, int);
-            auto buf1         = reinterpret_cast<char *>(capio_syscall(
+            int syscallNumber;
+
+            if (strcmp(invoker, "hook_clone_child") == 0) {
+                syscallNumber = SYS_clone;
+            } else {
+                syscallNumber = va_arg(argp, int);
+            }
+
+            auto buf1 = reinterpret_cast<char *>(capio_syscall(
                 SYS_mmap, nullptr, 50, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0));
             sprintf(buf1, CAPIO_LOG_POSIX_SYSCALL_START, sys_num_to_string(syscallNumber),
                     syscallNumber);
@@ -246,7 +285,7 @@ class Logger {
 
     inline ~Logger() {
         current_log_level--;
-        sprintf(format, CAPIO_LOG_PRE_MSG, this->invoker);
+        sprintf(format, CAPIO_LOG_PRE_MSG, current_time_in_millis(), this->invoker);
         size_t pre_msg_len = strlen(format);
         strcpy(format + pre_msg_len, "returned");
 
@@ -262,8 +301,8 @@ class Logger {
     inline void log(const char *message, ...) {
         va_list argp, argpc;
 
-        sprintf(format, CAPIO_LOG_PRE_MSG, this->invoker);
-        size_t pre_msg_len = strlen(format);
+        sprintf(format, CAPIO_LOG_PRE_MSG, current_time_in_millis(), this->invoker);
+        const size_t pre_msg_len = strlen(format);
 
         strcpy(format + pre_msg_len, message);
 
@@ -279,12 +318,11 @@ class Logger {
 
         va_start(argp, message);
         va_copy(argpc, argp);
-        int size = vsnprintf(nullptr, 0U, format, argp);
-        auto buf = reinterpret_cast<char *>(capio_syscall(SYS_mmap, nullptr, size + 1,
-                                                          PROT_READ | PROT_WRITE,
-                                                          MAP_PRIVATE | MAP_ANONYMOUS, -1, 0));
+        const int size = vsnprintf(nullptr, 0U, format, argp);
+        const auto buf = reinterpret_cast<char *>(
+            capio_syscall(SYS_mmap, nullptr, size + 1, PROT_READ | PROT_WRITE,
+                          MAP_PRIVATE | MAP_ANONYMOUS, -1, 0));
         vsnprintf(buf, size + 1, format, argpc);
-
         log_write_to(buf, strlen(buf));
 
         va_end(argp);
