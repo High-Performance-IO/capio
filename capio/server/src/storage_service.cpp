@@ -1,6 +1,7 @@
 #include <dirent.h>
 #include <filesystem>
 #include <list>
+#include <unordered_map>
 
 #include "common/dirent.hpp"
 #include "common/filesystem.hpp"
@@ -68,7 +69,9 @@ void StorageService::addDirectoryEntry(int tid, const std::filesystem::path &fil
         c_file.set_complete();
     }
 }
-StorageService::StorageService() {}
+StorageService::StorageService() {
+    server_println(CAPIO_LOG_SERVER_CLI_LEVEL_INFO, "StorageServer initialization completed.");
+}
 
 StorageService::~StorageService() {
     for (auto &it : getFileDescriptors()) {
@@ -76,6 +79,7 @@ StorageService::~StorageService() {
             removeFromTid(it.first, fd);
         }
     }
+    server_println(CAPIO_LOG_SERVER_CLI_LEVEL_INFO, "StorageServer teardown completed.");
 }
 
 std::optional<std::reference_wrapper<CapioFile>>

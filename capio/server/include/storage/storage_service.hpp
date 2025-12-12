@@ -11,7 +11,7 @@
 
 class StorageService {
     std::mutex _node_storage_mutex;
-    std::unordered_map<std::filesystem::path, CapioFile *> _node_storage;
+    std::unordered_map<std::string, CapioFile *> _node_storage;
 
     std::mutex processes_files_mutex;
     std::unordered_map<int, std::unordered_map<int, std::filesystem::path>>
@@ -26,7 +26,6 @@ class StorageService {
   public:
     StorageService();
     ~StorageService();
-
 
     std::optional<std::reference_wrapper<CapioFile>>
     getCapioFile(const std::filesystem::path &path);

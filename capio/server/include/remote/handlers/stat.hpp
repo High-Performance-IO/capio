@@ -1,10 +1,10 @@
 #ifndef CAPIO_SERVER_REMOTE_HANDLERS_STAT_HPP
 #define CAPIO_SERVER_REMOTE_HANDLERS_STAT_HPP
 
+#include "client-manager/client_manager.hpp"
 #include "remote/backend.hpp"
 #include "remote/requests.hpp"
 #include "storage/storage_service.hpp"
-#include "client-manager/client_manager.hpp"
 extern StorageService *storage_service;
 extern ClientManager *client_manager;
 

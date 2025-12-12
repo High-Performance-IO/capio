@@ -1,20 +1,15 @@
 #ifndef CAPIO_SERVER_UTILS_TYPES_HPP
 #define CAPIO_SERVER_UTILS_TYPES_HPP
 
+#include <list>
 #include <string>
 #include <unordered_map>
 #include <unordered_set>
 #include <vector>
-#include <list>
 
 #include "common/queue.hpp"
 
-#include "utils/capio_file.hpp"
-
 typedef std::unordered_map<std::string, std::unordered_set<std::string>> CSFilesSentMap_t;
-typedef std::unordered_map<int, std::unordered_map<int, std::filesystem::path>>
-    CSProcessFileMetadataMap_t;
-typedef std::unordered_map<std::string, CapioFile *> CSFilesMetadata_t;
 typedef std::unordered_map<int, std::unordered_map<std::string, bool>> CSWritersMap_t;
 typedef std::unordered_map<std::string,
                            std::list<std::tuple<const std::filesystem::path, size_t, std::string,

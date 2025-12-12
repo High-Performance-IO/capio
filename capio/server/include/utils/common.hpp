@@ -3,10 +3,10 @@
 
 #include <string>
 
+#include "client-manager/client_manager.hpp"
 #include "common/constants.hpp"
 #include "common/dirent.hpp"
 #include "storage/storage_service.hpp"
-#include "client-manager/client_manager.hpp"
 #include "utils/capio_file.hpp"
 #include "utils/types.hpp"
 
