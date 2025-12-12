@@ -13,7 +13,7 @@ inline void handle_exit_group(int tid) {
 
         LOG("Handling file %s", path.c_str());
         if (CapioCLEngine::get().getCommitRule(path) == capiocl::commit_rules::ON_TERMINATION) {
-            CapioFile &c_file = storage_service->getCapioFile(path).value();
+            CapioFile &c_file = storage_service->getFile(path).value();
             if (c_file.is_dir()) {
                 LOG("file %s is dir", path.c_str());
                 long int n_committed = c_file.n_files_expected;

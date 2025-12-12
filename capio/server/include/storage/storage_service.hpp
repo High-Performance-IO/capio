@@ -11,14 +11,21 @@
 
 class StorageService {
     std::mutex _node_storage_mutex;
+
     std::unordered_map<std::string, CapioFile *> _node_storage;
 
-    std::mutex processes_files_mutex;
-    std::unordered_map<int, std::unordered_map<int, std::filesystem::path>>
-        processes_files_metadata;
-    std::unordered_map<int,
-                       std::unordered_map<int, std::pair<CapioFile *, std::shared_ptr<off64_t>>>>
-        processes_files;
+    struct CapioFileState {
+        CapioFile *file_pointer; /// Pointer to the actual stored file in _node_storage
+        std::shared_ptr<off64_t> thread_offset;
+        std::filesystem::path file_path;
+    };
+
+    /**
+     * Map that stores the association between file descriptors and file path for each thread id.
+     * Indexed by [thread_id][file_descriptor]
+     */
+    std::unordered_map<pid_t, std::unordered_map<int, CapioFileState>> _opened_fd_map;
+
 
     void addDirectoryEntry(int tid, const std::filesystem::path &file_path, const std::string &dir,
                            int type);
@@ -27,8 +34,7 @@ class StorageService {
     StorageService();
     ~StorageService();
 
-    std::optional<std::reference_wrapper<CapioFile>>
-    getCapioFile(const std::filesystem::path &path);
+    std::optional<std::reference_wrapper<CapioFile>> getFile(const std::filesystem::path &path);
     const std::filesystem::path &getFilePath(int tid, int fd);
     std::vector<int> getFileDescriptors(int tid);
     std::unordered_map<int, std::vector<int>> getFileDescriptors();

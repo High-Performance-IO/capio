@@ -47,7 +47,7 @@ inline void handle_close(int tid, int fd) {
         return;
     }
 
-    CapioFile &c_file = storage_service->getCapioFile(path).value();
+    CapioFile &c_file = storage_service->getFile(path).value();
     c_file.close();
     LOG("File with path %s was closed", path.c_str());
 
