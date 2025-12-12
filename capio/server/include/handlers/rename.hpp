@@ -1,7 +1,10 @@
 #ifndef CAPIO_SERVER_HANDLERS_RENAME_HPP
 #define CAPIO_SERVER_HANDLERS_RENAME_HPP
-
+#include "client-manager/client_manager.hpp"
+#include "storage/storage_service.hpp"
 #include "utils/location.hpp"
+
+extern StorageService *storage_service;
 extern ClientManager *client_manager;
 
 void handle_rename(int tid, const std::filesystem::path &oldpath,
@@ -10,8 +13,8 @@ void handle_rename(int tid, const std::filesystem::path &oldpath,
               newpath.c_str());
 
     // FIXME: this doesn't work if a node renames a file handled by another node
-    if (auto c_file_opt = get_capio_file_opt(oldpath)) {
-        rename_capio_file(oldpath, newpath);
+    if (auto c_file_opt = storage_service->getCapioFile(oldpath)) {
+        storage_service->renameFile(oldpath, newpath);
         delete_from_files_location(oldpath);
         if (!get_file_location_opt(newpath)) {
             write_file_location(newpath);

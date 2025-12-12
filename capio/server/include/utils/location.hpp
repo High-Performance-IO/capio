@@ -6,15 +6,20 @@
 
 #include "utils/types.hpp"
 
+extern char *node_name;
+
 constexpr char CAPIO_SERVER_FILES_LOCATION_NAME[]     = "files_location_%s.txt";
 constexpr char CAPIO_SERVER_INVALIDATE_FILE_PATH_CHAR = '#';
 
-std::unordered_map<std::string, std::pair<const char *const, off64_t>> files_location;
-std::mutex files_location_mutex;
+// TODO: Remove the inline specifier both from variables as well from the methods as soon as
+//       possible. this work as the file locations are used into a single assembly unit and not
+//       across different ones
 
-int files_location_fd;
-FILE *files_location_fp;
-std::unordered_map<std::string, FILE *> files_location_fps;
+inline std::unordered_map<std::string, std::pair<const char *const, off64_t>> files_location;
+inline std::mutex files_location_mutex;
+inline int files_location_fd;
+inline FILE *files_location_fp;
+inline std::unordered_map<std::string, FILE *> files_location_fps;
 
 class Flock {
   private:
@@ -88,7 +93,7 @@ inline std::optional<std::reference_wrapper<std::pair<const char *const, long in
 get_file_location_opt(const std::filesystem::path &path) {
     START_LOG(gettid(), "path=%s", path.c_str());
 
-    const std::lock_guard<std::mutex> lg(files_metadata_mutex);
+    const std::lock_guard<std::mutex> lg(files_location_mutex);
     auto it = files_location.find(path);
     if (it == files_location.end()) {
         LOG("File was not found in files_locations. returning empty object");
@@ -117,13 +122,13 @@ inline void add_file_location(const std::filesystem::path &path, const char *con
     files_location.emplace(path, std::make_pair(p_node_str, offset));
 }
 
-void erase_from_files_location(const std::filesystem::path &path) {
+inline void erase_from_files_location(const std::filesystem::path &path) {
     const std::lock_guard<std::mutex> lg(files_location_mutex);
     files_location.erase(path);
 }
 
-void rename_file_location(const std::filesystem::path &oldpath,
-                          const std::filesystem::path &newpath) {
+inline void rename_file_location(const std::filesystem::path &oldpath,
+                                 const std::filesystem::path &newpath) {
     const std::lock_guard<std::mutex> lg(files_location_mutex);
     auto node_2 = files_location.extract(oldpath);
     if (!node_2.empty()) {
@@ -137,7 +142,7 @@ void rename_file_location(const std::filesystem::path &oldpath,
  * @param path_to_load
  * @return true if path_to_load is present on any node, false otherwise
  */
-bool load_file_location(const std::filesystem::path &path_to_load) {
+inline bool load_file_location(const std::filesystem::path &path_to_load) {
     START_LOG(gettid(), "call(path_to_load=%s)", path_to_load.c_str());
     bool found = false;
     auto line  = reinterpret_cast<char *>(malloc((PATH_MAX + HOST_NAME_MAX + 10) * sizeof(char)));
@@ -190,7 +195,7 @@ bool load_file_location(const std::filesystem::path &path_to_load) {
  * Returns 1 if the location of the file path_to_check is found
  * Returns 2 otherwise
  */
-int delete_from_files_location(const std::filesystem::path &path) {
+inline int delete_from_files_location(const std::filesystem::path &path) {
     START_LOG(gettid(), "call(%s)", path.c_str());
 
     int result           = 2;
@@ -251,7 +256,7 @@ int delete_from_files_location(const std::filesystem::path &path) {
     return result;
 }
 
-void loop_load_file_location(const std::filesystem::path &path_to_load) {
+inline void loop_load_file_location(const std::filesystem::path &path_to_load) {
     START_LOG(gettid(), "call(path_to_load=%s)", path_to_load.c_str());
 
     while (!load_file_location(path_to_load)) {
@@ -259,7 +264,7 @@ void loop_load_file_location(const std::filesystem::path &path_to_load) {
     }
 }
 
-void open_files_location() {
+inline void open_files_location() {
     START_LOG(gettid(), "call()");
 
     std::string file_location_name = get_file_location_name(node_name);
@@ -278,7 +283,7 @@ void open_files_location() {
     files_location_fps.emplace(file_location_name, files_location_fp);
 }
 
-void write_file_location(const std::filesystem::path &path_to_write) {
+inline void write_file_location(const std::filesystem::path &path_to_write) {
     START_LOG(gettid(), "call(path_to_write=%s)", path_to_write.c_str());
 
     Flock file_lock(files_location_fd, F_WRLCK);

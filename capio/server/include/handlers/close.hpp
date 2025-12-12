@@ -3,7 +3,7 @@
 
 #include "read.hpp"
 
-#include "utils/filesystem.hpp"
+extern StorageService *storage_service;
 
 inline void handle_pending_remote_nfiles(const std::filesystem::path &path) {
     START_LOG(gettid(), "call(%s)", path.c_str());
@@ -40,14 +40,14 @@ inline void handle_pending_remote_nfiles(const std::filesystem::path &path) {
 inline void handle_close(int tid, int fd) {
     START_LOG(gettid(), "call(tid=%d, fd=%d)", tid, fd);
 
-    const std::filesystem::path path = get_capio_file_path(tid, fd);
+    const std::filesystem::path path = storage_service->getFilePath(tid, fd);
     if (path.empty()) { // avoid to try to close a file that does not exists
         // (example: try to close() on a dir
         LOG("Path is empty. might be a directory. returning");
         return;
     }
 
-    CapioFile &c_file = get_capio_file(path);
+    CapioFile &c_file = storage_service->getCapioFile(path).value();
     c_file.close();
     LOG("File with path %s was closed", path.c_str());
 
@@ -62,7 +62,7 @@ inline void handle_close(int tid, int fd) {
     }
 
     LOG("Deleting capio file %s from tid=%d", path.c_str(), tid);
-    delete_capio_file_from_tid(tid, fd);
+    storage_service->removeFromTid(tid, fd);
 }
 
 void close_handler(const char *str) {

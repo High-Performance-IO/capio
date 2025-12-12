@@ -21,14 +21,11 @@ void sig_term_handler(int signum, siginfo_t *info, void *ptr) {
     }
 
     // free all the memory used
-    for (auto &it : get_capio_fds()) {
-        for (auto &fd : it.second) {
-            delete_capio_file_from_tid(it.first, fd);
-        }
-    }
+
     std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_WARNING << "shm cleanup completed" << std::endl;
 
     delete client_manager;
+    delete storage_service;
 
     std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_WARNING << "data_buffers cleanup completed"
               << std::endl;
