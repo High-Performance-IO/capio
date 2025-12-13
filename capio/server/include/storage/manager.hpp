@@ -1,5 +1,5 @@
-#ifndef CAPIO_STORAGE_SERVICE_HPP
-#define CAPIO_STORAGE_SERVICE_HPP
+#ifndef CAPIO_STORAGE_MANAGER_HPP
+#define CAPIO_STORAGE_MANAGER_HPP
 #include <filesystem>
 #include <mutex>
 #include <optional>
@@ -18,7 +18,7 @@
  * of thread IDs (TIDs) and file descriptors (FDs) to the actual file objects
  * and their respective offsets.
  */
-class StorageService {
+class StorageManager {
     /**
      * @brief Mutex to protect access to internal data structures, primarily
      * _storage and _opened_fd_map.
@@ -70,7 +70,7 @@ class StorageService {
      *
      * Initializes the server and logs its completion.
      */
-    StorageService();
+    StorageManager();
 
     /**
      * @brief Destroys the StorageService instance.
@@ -78,7 +78,7 @@ class StorageService {
      * Iterates through all open file descriptors and removes them, ensuring
      * proper cleanup of resources before destruction.
      */
-    ~StorageService();
+    ~StorageManager();
 
     /**
      * @brief Retrieves a reference to a CapioFile object from storage.
@@ -262,4 +262,4 @@ class StorageService {
     void updateDirectory(pid_t tid, const std::filesystem::path &file_path);
 };
 
-#endif // CAPIO_STORAGE_SERVICE_HPP
+#endif // CAPIO_STORAGE_MANAGER_HPP

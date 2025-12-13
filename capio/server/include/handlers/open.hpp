@@ -4,7 +4,7 @@
 #include "utils/location.hpp"
 
 extern ClientManager *client_manager;
-extern StorageService *storage_service;
+extern StorageManager *storage_manager;
 
 inline void update_file_metadata(const std::filesystem::path &path, int tid, int fd, bool is_creat,
                                  off64_t offset) {
@@ -13,16 +13,16 @@ inline void update_file_metadata(const std::filesystem::path &path, int tid, int
 
     // TODO: check the size that the user wrote in the configuration file
     //*caching_info[tid].second += 2;
-    auto c_file_opt   = storage_service->tryGet(path);
+    auto c_file_opt   = storage_manager->tryGet(path);
     CapioFile &c_file = (c_file_opt) ? c_file_opt->get()
-                                     : storage_service->add(path, false, get_file_initial_size());
-    storage_service->addFileToTid(tid, fd, path, offset);
+                                     : storage_manager->add(path, false, get_file_initial_size());
+    storage_manager->addFileToTid(tid, fd, path, offset);
 
     if (c_file.first_write && is_creat) {
         client_manager->registerProducedFile(tid, path);
         c_file.first_write = false;
         write_file_location(path);
-        storage_service->updateDirectory(tid, path);
+        storage_manager->updateDirectory(tid, path);
     }
 }
 
@@ -37,7 +37,7 @@ inline void handle_create(int tid, int fd, const std::filesystem::path &path) {
 inline void handle_create_exclusive(int tid, int fd, const std::filesystem::path &path) {
     START_LOG(gettid(), "call(tid=%d, fd=%d, path_cstr=%s)", tid, fd, path.c_str());
 
-    if (storage_service->tryGet(path)) {
+    if (storage_manager->tryGet(path)) {
         client_manager->replyToClient(tid, 1);
     } else {
         client_manager->replyToClient(tid, 0);

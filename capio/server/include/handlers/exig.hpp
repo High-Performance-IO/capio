@@ -1,8 +1,8 @@
 #ifndef CAPIO_SERVER_HANDLERS_EXITG_HPP
 #define CAPIO_SERVER_HANDLERS_EXITG_HPP
 
-#include "storage/storage_service.hpp"
-extern StorageService *storage_service;
+#include "storage/manager.hpp"
+extern StorageManager *storage_manager;
 
 inline void handle_exit_group(int tid) {
     START_LOG(gettid(), "call(tid=%d)", tid);
@@ -13,7 +13,7 @@ inline void handle_exit_group(int tid) {
 
         LOG("Handling file %s", path.c_str());
         if (CapioCLEngine::get().getCommitRule(path) == capiocl::commit_rules::ON_TERMINATION) {
-            CapioFile &c_file = storage_service->get(path);
+            CapioFile &c_file = storage_manager->get(path);
             if (c_file.is_dir()) {
                 LOG("file %s is dir", path.c_str());
                 long int n_committed = c_file.n_files_expected;
@@ -30,8 +30,8 @@ inline void handle_exit_group(int tid) {
         }
     }
 
-    for (auto &fd : storage_service->getFileDescriptors(tid)) {
-        std::string path = storage_service->getPath(tid, fd);
+    for (auto &fd : storage_manager->getFileDescriptors(tid)) {
+        std::string path = storage_manager->getPath(tid, fd);
         handle_close(tid, fd);
     }
     client_manager->removeClient(tid);

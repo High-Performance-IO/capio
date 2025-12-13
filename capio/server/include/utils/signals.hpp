@@ -25,7 +25,7 @@ void sig_term_handler(int signum, siginfo_t *info, void *ptr) {
     std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_WARNING << "shm cleanup completed" << std::endl;
 
     delete client_manager;
-    delete storage_service;
+    delete storage_manager;
 
     std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_WARNING << "data_buffers cleanup completed"
               << std::endl;

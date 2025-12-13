@@ -12,9 +12,9 @@
 #include "utils/types.hpp"
 
 #include "client-manager/client_manager.hpp"
-#include "storage/storage_service.hpp"
+#include "storage/manager.hpp"
 
-extern StorageService *storage_service;
+extern StorageManager *storage_manager;
 extern ClientManager *client_manager;
 
 void wait_for_file_completion(int tid, const std::filesystem::path &path) {
@@ -22,7 +22,7 @@ void wait_for_file_completion(int tid, const std::filesystem::path &path) {
 
     loop_load_file_location(path);
     // check if the file is local or remote
-    CapioFile &c_file = storage_service->get(path);
+    CapioFile &c_file = storage_manager->get(path);
 
     // if file is streamable
     if (c_file.is_complete() || CapioCLEngine::get().isFirable(path) ||
@@ -62,9 +62,9 @@ inline void reply_stat(int tid, const std::filesystem::path &path) {
             return;
         }
     }
-    auto c_file_opt   = storage_service->tryGet(path);
+    auto c_file_opt   = storage_manager->tryGet(path);
     CapioFile &c_file = (c_file_opt) ? c_file_opt->get()
-                                     : storage_service->add(path, false, get_file_initial_size());
+                                     : storage_manager->add(path, false, get_file_initial_size());
     LOG("Obtained capio file. ready to reply to client");
     const std::filesystem::path &capio_dir = get_capio_dir();
     LOG("Obtained capio_dir");
@@ -89,7 +89,7 @@ void fstat_handler(const char *const str) {
     int tid, fd;
     sscanf(str, "%d %d", &tid, &fd);
 
-    reply_stat(tid, storage_service->getPath(tid, fd));
+    reply_stat(tid, storage_manager->getPath(tid, fd));
 }
 
 void stat_handler(const char *const str) {

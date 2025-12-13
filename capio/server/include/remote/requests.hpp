@@ -1,8 +1,8 @@
 #ifndef CAPIO_REMOTE_REQUESTS_HPP
 #define CAPIO_REMOTE_REQUESTS_HPP
 
-#include "storage/storage_service.hpp"
-extern StorageService *storage_service;
+#include "storage/manager.hpp"
+extern StorageManager *storage_manager;
 
 inline void serve_remote_stat_request(const std::filesystem::path &path, int source_tid,
                                       off64_t file_size, bool is_dir, const std::string &dest) {
@@ -45,7 +45,7 @@ inline void send_files_batch_request(const std::string &prefix, int tid, int fd,
             count, is_getdents);
     std::string message(header.get());
     for (const std::string &path : *files_to_send) {
-        CapioFile &c_file = storage_service->get(path);
+        CapioFile &c_file = storage_manager->get(path);
         message.append(" " + path.substr(prefix.length()) + " " +
                        std::to_string(c_file.get_stored_size()));
     }
@@ -79,7 +79,7 @@ inline void handle_remote_read_batch_request(int tid, int fd, off64_t count,
               tid, fd, count, app_name.c_str(), prefix.c_str(), batch_size,
               is_getdents ? "true" : "false");
 
-    const std::filesystem::path &path = storage_service->getPath(tid, fd);
+    const std::filesystem::path &path = storage_manager->getPath(tid, fd);
     std::string dest                  = std::get<0>(get_file_location(path));
 
     const char *const format = "%04d %s %d %d %ld %ld %s %s %d";
@@ -98,8 +98,8 @@ inline void handle_remote_read_request(int tid, int fd, off64_t count, bool is_g
               is_getdents ? "true" : "false");
 
     // If it is not in cache then send the request to the remote node
-    const std::filesystem::path &path = storage_service->getPath(tid, fd);
-    off64_t offset                    = storage_service->getFileOffset(tid, fd);
+    const std::filesystem::path &path = storage_manager->getPath(tid, fd);
+    off64_t offset                    = storage_manager->getFileOffset(tid, fd);
     std::string dest                  = std::get<0>(get_file_location(path));
 
     const char *const format = "%04d %s %d %d %ld %ld %d";

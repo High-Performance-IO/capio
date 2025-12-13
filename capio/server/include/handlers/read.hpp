@@ -12,14 +12,14 @@
 std::mutex local_read_mutex;
 
 extern ClientManager *client_manager;
-extern StorageService *storage_service;
+extern StorageManager *storage_manager;
 
 inline void handle_pending_read(int tid, int fd, long int process_offset, long int count) {
     START_LOG(gettid(), "call(tid=%d, fd=%d, process_offset=%ld, count=%ld)", tid, fd,
               process_offset, count);
 
-    const std::filesystem::path &path = storage_service->getPath(tid, fd);
-    CapioFile &c_file                 = storage_service->get(path);
+    const std::filesystem::path &path = storage_manager->getPath(tid, fd);
+    CapioFile &c_file                 = storage_manager->get(path);
     off64_t end_of_sector             = c_file.get_sector_end(process_offset);
     off64_t end_of_read               = process_offset + count;
 
@@ -32,7 +32,7 @@ inline void handle_pending_read(int tid, int fd, long int process_offset, long i
 
     c_file.create_buffer_if_needed(path, false);
     client_manager->replyToClient(tid, process_offset, c_file.get_buffer(), bytes_read);
-    storage_service->setFileOffset(tid, fd, process_offset + bytes_read);
+    storage_manager->setFileOffset(tid, fd, process_offset + bytes_read);
 
     // TODO: check if the file was moved to the disk
 }
@@ -42,9 +42,9 @@ inline void handle_local_read(int tid, int fd, off64_t count, bool is_prod) {
               is_prod ? "true" : "false");
 
     const std::lock_guard<std::mutex> lg(local_read_mutex);
-    const std::filesystem::path &path = storage_service->getPath(tid, fd);
-    CapioFile &c_file                 = storage_service->get(path);
-    off64_t process_offset            = storage_service->getFileOffset(tid, fd);
+    const std::filesystem::path &path = storage_manager->getPath(tid, fd);
+    CapioFile &c_file                 = storage_manager->get(path);
+    off64_t process_offset            = storage_manager->getFileOffset(tid, fd);
     off64_t end_of_sector             = c_file.get_sector_end(process_offset);
     off64_t end_of_read               = process_offset + count;
 
@@ -78,23 +78,23 @@ inline void handle_local_read(int tid, int fd, off64_t count, bool is_prod) {
 
             client_manager->replyToClient(tid, process_offset, c_file.get_buffer(),
                                           end_of_sector - process_offset);
-            storage_service->setFileOffset(tid, fd, end_of_sector);
+            storage_manager->setFileOffset(tid, fd, end_of_sector);
         }
     } else {
         c_file.create_buffer_if_needed(path, false);
 
         client_manager->replyToClient(tid, process_offset, c_file.get_buffer(),
                                       end_of_sector - process_offset);
-        storage_service->setFileOffset(tid, fd, process_offset + count);
+        storage_manager->setFileOffset(tid, fd, process_offset + count);
     }
 }
 
 inline void request_remote_read(int tid, int fd, off64_t count) {
     START_LOG(gettid(), "call(tid=%d, fd=%d, count=%ld)", tid, fd, count);
 
-    const std::filesystem::path &path = storage_service->getPath(tid, fd);
-    CapioFile &c_file                 = storage_service->get(path);
-    off64_t offset                    = storage_service->getFileOffset(tid, fd);
+    const std::filesystem::path &path = storage_manager->getPath(tid, fd);
+    CapioFile &c_file                 = storage_manager->get(path);
+    off64_t offset                    = storage_manager->getFileOffset(tid, fd);
     off64_t end_of_read               = offset + count;
     off64_t end_of_sector             = c_file.get_sector_end(offset);
 
@@ -108,7 +108,7 @@ inline void request_remote_read(int tid, int fd, off64_t count) {
         c_file.create_buffer_if_needed(path, false);
 
         client_manager->replyToClient(tid, offset, c_file.get_buffer(), count);
-        storage_service->setFileOffset(tid, fd, offset + count);
+        storage_manager->setFileOffset(tid, fd, offset + count);
     } else {
         LOG("Delegating to backend remote read");
         handle_remote_read_request(tid, fd, count, false);
@@ -124,7 +124,7 @@ void wait_for_file(const std::filesystem::path &path, int tid, int fd, off64_t c
     if (strcmp(std::get<0>(get_file_location(path)), node_name) == 0) {
         handle_local_read(tid, fd, count, false);
     } else {
-        const CapioFile &c_file = storage_service->get(path);
+        const CapioFile &c_file = storage_manager->get(path);
         const auto &remote_app  = client_manager->getAppName(tid);
         if (!c_file.is_complete()) {
             std::string prefix = path.parent_path();
@@ -142,7 +142,7 @@ void wait_for_file(const std::filesystem::path &path, int tid, int fd, off64_t c
 inline void handle_read(int tid, int fd, off64_t count) {
     START_LOG(gettid(), "call(tid=%d, fd=%d, count=%ld)", tid, fd, count);
 
-    const std::filesystem::path &path      = storage_service->getPath(tid, fd);
+    const std::filesystem::path &path      = storage_manager->getPath(tid, fd);
     const std::filesystem::path &capio_dir = get_capio_dir();
     const std::string &app_name            = client_manager->getAppName(tid);
     bool is_prod =
@@ -162,7 +162,7 @@ inline void handle_read(int tid, int fd, off64_t count) {
         handle_local_read(tid, fd, count, is_prod);
     } else {
         LOG("File is remote");
-        CapioFile &c_file = storage_service->get(path);
+        CapioFile &c_file = storage_manager->get(path);
         if (!c_file.is_complete()) {
             LOG("File not complete");
             const std::string &app_name = client_manager->getAppName(tid);

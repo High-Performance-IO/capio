@@ -33,7 +33,7 @@ std::string workflow_name;
 #include "utils/types.hpp"
 
 ClientManager *client_manager;
-StorageService *storage_service;
+StorageManager *storage_manager;
 
 int n_servers;
 // name of the node
@@ -101,7 +101,7 @@ static constexpr std::array<CSHandler_t, CAPIO_NR_REQUESTS> build_request_handle
     setup_signal_handlers();
     backend->handshake_servers();
 
-    storage_service->addDirectory(getpid(), get_capio_dir());
+    storage_manager->addDirectory(getpid(), get_capio_dir());
 
     internal_server_sem.unlock();
 
@@ -294,7 +294,7 @@ int main(int argc, char **argv) {
     open_files_location();
 
     shm_canary      = new CapioShmCanary(workflow_name);
-    storage_service = new StorageService();
+    storage_manager = new StorageManager();
     client_manager  = new ClientManager();
 
     std::thread server_thread(capio_server, std::ref(internal_server_sem));

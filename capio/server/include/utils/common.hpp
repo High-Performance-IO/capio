@@ -6,12 +6,12 @@
 #include "client-manager/client_manager.hpp"
 #include "common/constants.hpp"
 #include "common/dirent.hpp"
-#include "storage/storage_service.hpp"
+#include "storage/manager.hpp"
 #include "utils/capio_file.hpp"
 #include "utils/types.hpp"
 
 extern ClientManager *client_manager;
-extern StorageService *storage_service;
+extern StorageManager *storage_manager;
 
 inline off64_t send_dirent_to_client(int tid, int fd, CapioFile &c_file, off64_t offset,
                                      off64_t count) {
@@ -43,7 +43,7 @@ inline off64_t send_dirent_to_client(int tid, int fd, CapioFile &c_file, off64_t
 
         client_manager->replyToClient(tid, offset, reinterpret_cast<char *>(dirents.get()) - offset,
                                       actual_size);
-        storage_service->setFileOffset(tid, fd, offset + actual_size);
+        storage_manager->setFileOffset(tid, fd, offset + actual_size);
 
     } else {
         client_manager->replyToClient(tid, offset);

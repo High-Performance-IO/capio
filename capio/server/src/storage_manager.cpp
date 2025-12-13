@@ -6,7 +6,7 @@
 #include "common/dirent.hpp"
 #include "common/filesystem.hpp"
 #include "common/logger.hpp"
-#include "storage/storage_service.hpp"
+#include "storage/manager.hpp"
 #include "utils/capio_file.hpp"
 #include "utils/capiocl_adapter.hpp"
 #include "utils/common.hpp"
@@ -15,7 +15,7 @@
 
 extern char *node_name;
 
-void StorageService::addDirectoryEntry(const pid_t tid, const std::filesystem::path &file_path,
+void StorageManager::addDirectoryEntry(const pid_t tid, const std::filesystem::path &file_path,
                                        const std::string &dir, int type) {
 
     START_LOG(gettid(), "call(file_path=%s, dir=%s, type=%d)", file_path.c_str(), dir.c_str(),
@@ -64,11 +64,11 @@ void StorageService::addDirectoryEntry(const pid_t tid, const std::filesystem::p
         c_file.set_complete();
     }
 }
-StorageService::StorageService() {
+StorageManager::StorageManager() {
     server_println(CAPIO_LOG_SERVER_CLI_LEVEL_INFO, "StorageServer initialization completed.");
 }
 
-StorageService::~StorageService() {
+StorageManager::~StorageManager() {
     for (auto &[tid, fds] : getFileDescriptors()) {
         for (const auto &fd : fds) {
             removeFromTid(tid, fd);
@@ -78,7 +78,7 @@ StorageService::~StorageService() {
 }
 
 std::optional<std::reference_wrapper<CapioFile>>
-StorageService::tryGet(const std::filesystem::path &path) {
+StorageManager::tryGet(const std::filesystem::path &path) {
     START_LOG(gettid(), "call(path=%s)", path.c_str());
     const std::lock_guard lg(_mutex);
     if (const auto it = _storage.find(path); it == _storage.end()) {
@@ -89,7 +89,7 @@ StorageService::tryGet(const std::filesystem::path &path) {
         return {it->second};
     }
 }
-CapioFile &StorageService::get(const std::filesystem::path &path) {
+CapioFile &StorageManager::get(const std::filesystem::path &path) {
     START_LOG(gettid(), "call(path=%s)", path.c_str());
     std::lock_guard lg(_mutex);
     if (_storage.find(path) == _storage.end()) {
@@ -98,7 +98,7 @@ CapioFile &StorageService::get(const std::filesystem::path &path) {
 
     return _storage.at(path);
 }
-CapioFile &StorageService::get(const pid_t pid, const int fd) {
+CapioFile &StorageManager::get(const pid_t pid, const int fd) {
     START_LOG(gettid(), "call(pid=%d, fd=%d)", pid, fd);
     const std::lock_guard lg(_mutex);
 
@@ -109,12 +109,12 @@ CapioFile &StorageService::get(const pid_t pid, const int fd) {
     return *_opened_fd_map[pid][fd]._pointer;
 }
 
-const std::filesystem::path &StorageService::getPath(const pid_t tid, const int fd) {
+const std::filesystem::path &StorageManager::getPath(const pid_t tid, const int fd) {
     const std::lock_guard lg(_mutex);
     return _opened_fd_map[tid][fd]._path;
 }
 
-std::vector<int> StorageService::getFileDescriptors(const pid_t tid) {
+std::vector<int> StorageManager::getFileDescriptors(const pid_t tid) {
     const std::lock_guard lg(_mutex);
     std::vector<int> fds;
     for (const auto &[file_descriptor, _] : _opened_fd_map[tid]) {
@@ -123,7 +123,7 @@ std::vector<int> StorageService::getFileDescriptors(const pid_t tid) {
     return fds;
 }
 
-std::unordered_map<int, std::vector<int>> StorageService::getFileDescriptors() {
+std::unordered_map<int, std::vector<int>> StorageManager::getFileDescriptors() {
     const std::lock_guard lg(_mutex);
     std::unordered_map<int, std::vector<int>> tid_fd_pairs;
     for (auto &[thread_id, opened_files] : _opened_fd_map) {
@@ -134,19 +134,19 @@ std::unordered_map<int, std::vector<int>> StorageService::getFileDescriptors() {
     return tid_fd_pairs;
 }
 
-off64_t StorageService::setFileOffset(const pid_t tid, const int fd, const off64_t offset) {
+off64_t StorageManager::setFileOffset(const pid_t tid, const int fd, const off64_t offset) {
     START_LOG(gettid(), "call(tid=%d, fd=%d, offset=%ld)", tid, fd, offset);
 
     const std::lock_guard lg(_mutex);
     return *_opened_fd_map[tid][fd]._offset = offset;
 }
 
-off64_t StorageService::getFileOffset(int tid, int fd) {
+off64_t StorageManager::getFileOffset(int tid, int fd) {
     const std::lock_guard lg(_mutex);
     return *_opened_fd_map[tid][fd]._offset;
 }
 
-void StorageService::rename(const std::filesystem::path &oldpath,
+void StorageManager::rename(const std::filesystem::path &oldpath,
                             const std::filesystem::path &newpath) {
     START_LOG(gettid(), "call(oldpath=%s, newpath=%s)", oldpath.c_str(), newpath.c_str());
 
@@ -165,7 +165,7 @@ void StorageService::rename(const std::filesystem::path &oldpath,
     _storage.insert(std::move(node));
 }
 
-CapioFile &StorageService::add(const std::filesystem::path &path, bool is_dir, size_t init_size) {
+CapioFile &StorageManager::add(const std::filesystem::path &path, bool is_dir, size_t init_size) {
 
     START_LOG(gettid(), "call(path=%s, is_dir=%s, init_size=%ld)", path.c_str(),
               is_dir ? "true" : "false", init_size);
@@ -187,7 +187,7 @@ CapioFile &StorageService::add(const std::filesystem::path &path, bool is_dir, s
     return _storage[path];
 }
 
-void StorageService::dup(const pid_t tid, const int old_fd, const int new_fd) {
+void StorageManager::dup(const pid_t tid, const int old_fd, const int new_fd) {
     START_LOG(gettid(), "call(old_fd=%d, new_fd=%d)", old_fd, new_fd);
     const std::lock_guard lg(_mutex);
 
@@ -199,7 +199,7 @@ void StorageService::dup(const pid_t tid, const int old_fd, const int new_fd) {
     _opened_fd_map[tid][new_fd]._pointer->add_fd(tid, new_fd);
 }
 
-void StorageService::clone(const pid_t parent_tid, const pid_t child_tid) {
+void StorageManager::clone(const pid_t parent_tid, const pid_t child_tid) {
     START_LOG(gettid(), "call(parent_tid=%d, child_tid=%d)", parent_tid, child_tid);
 
     for (auto &fd : getFileDescriptors(parent_tid)) {
@@ -207,7 +207,7 @@ void StorageService::clone(const pid_t parent_tid, const pid_t child_tid) {
                      getFileOffset(parent_tid, fd));
     }
 }
-std::vector<std::filesystem::path> StorageService::getPaths() {
+std::vector<std::filesystem::path> StorageManager::getPaths() {
     const std::lock_guard lg(_mutex);
     std::vector<std::filesystem::path> paths(_storage.size());
     for (const auto &[file_path, _] : _storage) {
@@ -215,7 +215,7 @@ std::vector<std::filesystem::path> StorageService::getPaths() {
     }
     return paths;
 }
-void StorageService::remove(const std::filesystem::path &path) {
+void StorageManager::remove(const std::filesystem::path &path) {
     START_LOG(gettid(), "call(path=%s)", path.c_str());
 
     const CapioFile &c_file = get(path);
@@ -226,7 +226,7 @@ void StorageService::remove(const std::filesystem::path &path) {
     const std::lock_guard lg(_mutex);
     _storage.erase(path);
 }
-void StorageService::removeFromTid(const pid_t tid, const int fd) {
+void StorageManager::removeFromTid(const pid_t tid, const int fd) {
     START_LOG(gettid(), "call(tid=%d, fd=%d)", tid, fd);
 
     const std::lock_guard lg(_mutex);
@@ -240,7 +240,7 @@ void StorageService::removeFromTid(const pid_t tid, const int fd) {
     _opened_fd_map[tid].erase(fd);
 }
 
-void StorageService::addFileToTid(const pid_t tid, const int fd, const std::filesystem::path &path,
+void StorageManager::addFileToTid(const pid_t tid, const int fd, const std::filesystem::path &path,
                                   off64_t offset) {
     START_LOG(gettid(), "call(tid=%d, fd=%d, path=%s, offset=%ld)", tid, fd, path.c_str(), offset);
 
@@ -254,7 +254,7 @@ void StorageService::addFileToTid(const pid_t tid, const int fd, const std::file
     _opened_fd_map[tid][fd]._offset  = std::make_shared<off64_t>(offset);
 }
 
-off64_t StorageService::addDirectory(const pid_t tid, const std::filesystem::path &path) {
+off64_t StorageManager::addDirectory(const pid_t tid, const std::filesystem::path &path) {
     START_LOG(tid, "call(path=%s)", path.c_str());
 
     if (!get_file_location_opt(path)) {
@@ -277,7 +277,7 @@ off64_t StorageService::addDirectory(const pid_t tid, const std::filesystem::pat
     return 1;
 }
 
-void StorageService::updateDirectory(const pid_t tid, const std::filesystem::path &file_path) {
+void StorageManager::updateDirectory(const pid_t tid, const std::filesystem::path &file_path) {
     START_LOG(gettid(), "call(file_path=%s)", file_path.c_str());
     const std::filesystem::path dir = get_parent_dir_path(file_path);
     if (CapioFile &c_file = get(dir.c_str()); c_file.first_write) {
