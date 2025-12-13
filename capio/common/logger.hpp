@@ -253,8 +253,9 @@ class Logger {
 #if defined(CAPIO_LOG) && defined(__CAPIO_POSIX)
         if (current_log_level == 0 && logging_syscall) {
             int syscallNumber;
-
             if (strcmp(invoker, "hook_clone_child") == 0) {
+                // Explicitly propagate SYS_clone to child thread after clone
+                // to avoid spurious unknown syscall logs
                 syscallNumber = SYS_clone;
             } else {
                 syscallNumber = va_arg(argp, int);
