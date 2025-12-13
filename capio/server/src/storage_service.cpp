@@ -98,6 +98,17 @@ CapioFile &StorageService::get(const std::filesystem::path &path) {
 
     return _storage.at(path);
 }
+CapioFile &StorageService::get(const pid_t pid, const int fd) {
+    START_LOG(gettid(), "call(pid=%d, fd=%d)", pid, fd);
+    const std::lock_guard lg(_mutex);
+
+    if (_opened_fd_map[pid].find(fd) == _opened_fd_map[pid].end()) {
+        throw std::runtime_error("File descriptor " + std::to_string(fd) +
+                                 " is not opened for process with tid " + std::to_string(pid));
+    }
+
+    return *_opened_fd_map[pid][fd]._pointer;
+}
 
 const std::filesystem::path &StorageService::getPath(const pid_t tid, const int fd) {
     const std::lock_guard lg(_mutex);

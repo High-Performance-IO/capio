@@ -14,11 +14,10 @@ extern StorageService *storage_service;
 inline void request_remote_getdents(int tid, int fd, off64_t count) {
     START_LOG(gettid(), "call(tid=%d, fd=%d, count=%ld)", tid, fd, count);
 
-    const std::filesystem::path &path = storage_service->getPath(tid, fd);
-    CapioFile &c_file                 = storage_service->get(path);
-    off64_t offset                    = storage_service->getFileOffset(tid, fd);
-    off64_t end_of_read               = offset + count;
-    off64_t end_of_sector             = c_file.get_sector_end(offset);
+    CapioFile &c_file     = storage_service->get(tid, fd);
+    off64_t offset        = storage_service->getFileOffset(tid, fd);
+    off64_t end_of_read   = offset + count;
+    off64_t end_of_sector = c_file.get_sector_end(offset);
 
     if (c_file.is_complete() &&
         (end_of_read <= end_of_sector ||
@@ -27,7 +26,7 @@ inline void request_remote_getdents(int tid, int fd, off64_t count) {
         send_dirent_to_client(tid, fd, c_file, offset, count);
     } else if (end_of_read <= end_of_sector) {
         LOG("?");
-        c_file.create_buffer_if_needed(path, false);
+        c_file.create_buffer_if_needed(storage_service->getPath(tid, fd), false);
         client_manager->replyToClient(tid, offset, c_file.get_buffer(), count);
         storage_service->setFileOffset(tid, fd, offset + count);
     } else {

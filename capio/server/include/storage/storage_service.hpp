@@ -102,6 +102,17 @@ class StorageService {
     CapioFile &get(const std::filesystem::path &path);
 
     /**
+     * @brief Retrieves a reference to a CapioFile object from storage.
+     *
+     * This method searches for the file associated with the given thread id and file descriptor
+     * @param pid Thread id of the calling process
+     * @param fd File descriptor of the file associated
+     * @throws std::runtime_error If the file associated with the thread id and pid is not found
+     * @return reference to CapioFile instance
+     */
+    CapioFile &get(pid_t pid, int fd);
+
+    /**
      * @brief Gets the path associated with a specific file descriptor and thread ID.
      *
      * @param tid The thread ID.

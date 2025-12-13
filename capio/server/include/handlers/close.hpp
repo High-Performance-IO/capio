@@ -47,9 +47,9 @@ inline void handle_close(int tid, int fd) {
         return;
     }
 
-    CapioFile &c_file = storage_service->get(path);
+    CapioFile &c_file = storage_service->get(tid, fd);
     c_file.close();
-    LOG("File with path %s was closed", path.c_str());
+    LOG("File was closed", path.c_str());
 
     if (CapioCLEngine::get().getCommitRule(path) == capiocl::commit_rules::ON_CLOSE &&
         c_file.is_closed()) {
