@@ -93,7 +93,7 @@ CapioFile &StorageService::get(const std::filesystem::path &path) {
     START_LOG(gettid(), "call(path=%s)", path.c_str());
     std::lock_guard lg(_mutex);
     if (_storage.find(path) == _storage.end()) {
-        throw std::runtime_error("File " + path.string() + " was not found in local storage");
+        ERR_EXIT("File %s was not found in local storage", path.c_str());
     }
 
     return _storage.at(path);
@@ -103,8 +103,7 @@ CapioFile &StorageService::get(const pid_t pid, const int fd) {
     const std::lock_guard lg(_mutex);
 
     if (_opened_fd_map[pid].find(fd) == _opened_fd_map[pid].end()) {
-        throw std::runtime_error("File descriptor " + std::to_string(fd) +
-                                 " is not opened for process with tid " + std::to_string(pid));
+        ERR_EXIT("File descriptor %d is not opened for process with tid %d", fd, pid);
     }
 
     return *_opened_fd_map[pid][fd]._pointer;
