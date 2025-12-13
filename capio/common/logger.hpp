@@ -22,7 +22,7 @@ template <typename T> std::string demangled_name(const T &obj) {
     return status == 0 ? demangled.get() : mangled;
 }
 
-inline bool continue_on_error = false; // change behaviour of ERR_EXIT to continue if set to true
+inline bool continue_on_error = false; // if set to true, CAPIO does not terminate on ERR_EXIT
 
 #if defined(CAPIO_LOG) && defined(__CAPIO_POSIX)
 #include "syscallnames.h"
