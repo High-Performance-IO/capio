@@ -207,7 +207,8 @@ class Logger {
 #else
         if (!logfileOpen) {
             setup_posix_log_filename();
-            current_log_level = 0; // reset log level after clone, avoiding propagation to child threads
+            current_log_level =
+                0; // reset log level after clone, avoiding propagation to child threads
 #if defined(SYS_mkdir)
             capio_syscall(SYS_mkdir, get_log_dir(), 0755);
             capio_syscall(SYS_mkdir, get_posix_log_dir(), 0755);
