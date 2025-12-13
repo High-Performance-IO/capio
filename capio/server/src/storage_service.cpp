@@ -15,14 +15,9 @@
 
 extern char *node_name;
 
-void StorageService::addDirectoryEntry(int tid, const std::filesystem::path &file_path,
+void StorageService::addDirectoryEntry(const pid_t tid, const std::filesystem::path &file_path,
                                        const std::string &dir, int type) {
 
-    /*
-     * type == 0 -> regular entry
-     * type == 1 -> "." entry
-     * type == 2 -> ".." entry
-     */
     START_LOG(gettid(), "call(file_path=%s, dir=%s, type=%d)", file_path.c_str(), dir.c_str(),
               type);
 
@@ -85,8 +80,8 @@ StorageService::~StorageService() {
 std::optional<std::reference_wrapper<CapioFile>>
 StorageService::get(const std::filesystem::path &path) {
     START_LOG(gettid(), "call(path=%s)", path.c_str());
-    const std::lock_guard lg(_node_storage_mutex);
-    if (const auto it = _node_storage.find(path); it == _node_storage.end()) {
+    const std::lock_guard lg(_mutex);
+    if (const auto it = _storage.find(path); it == _storage.end()) {
         LOG("File %s was not found in files_metadata. returning empty object", path.c_str());
         return {};
     } else {
@@ -95,13 +90,13 @@ StorageService::get(const std::filesystem::path &path) {
     }
 }
 
-const std::filesystem::path &StorageService::getPath(const int tid, const int fd) {
-    const std::lock_guard lg(_node_storage_mutex);
-    return _opened_fd_map[tid][fd].file_path;
+const std::filesystem::path &StorageService::getPath(const pid_t tid, const int fd) {
+    const std::lock_guard lg(_mutex);
+    return _opened_fd_map[tid][fd]._path;
 }
 
-std::vector<int> StorageService::getFileDescriptors(const int tid) {
-    const std::lock_guard lg(_node_storage_mutex);
+std::vector<int> StorageService::getFileDescriptors(const pid_t tid) {
+    const std::lock_guard lg(_mutex);
     std::vector<int> fds;
     for (const auto &[file_descriptor, _] : _opened_fd_map[tid]) {
         fds.push_back(file_descriptor);
@@ -110,7 +105,7 @@ std::vector<int> StorageService::getFileDescriptors(const int tid) {
 }
 
 std::unordered_map<int, std::vector<int>> StorageService::getFileDescriptors() {
-    const std::lock_guard lg(_node_storage_mutex);
+    const std::lock_guard lg(_mutex);
     std::unordered_map<int, std::vector<int>> tid_fd_pairs;
     for (auto &[thread_id, opened_files] : _opened_fd_map) {
         for (auto &[file_descriptor, _] : opened_files) {
@@ -120,35 +115,35 @@ std::unordered_map<int, std::vector<int>> StorageService::getFileDescriptors() {
     return tid_fd_pairs;
 }
 
-off64_t StorageService::setFileOffset(const int tid, const int fd, const off64_t offset) {
+off64_t StorageService::setFileOffset(const pid_t tid, const int fd, const off64_t offset) {
     START_LOG(gettid(), "call(tid=%d, fd=%d, offset=%ld)", tid, fd, offset);
 
-    const std::lock_guard lg(_node_storage_mutex);
-    return *_opened_fd_map[tid][fd].thread_offset = offset;
+    const std::lock_guard lg(_mutex);
+    return *_opened_fd_map[tid][fd]._offset = offset;
 }
 
 off64_t StorageService::getFileOffset(int tid, int fd) {
-    const std::lock_guard lg(_node_storage_mutex);
-    return *_opened_fd_map[tid][fd].thread_offset;
+    const std::lock_guard lg(_mutex);
+    return *_opened_fd_map[tid][fd]._offset;
 }
 
 void StorageService::rename(const std::filesystem::path &oldpath,
                             const std::filesystem::path &newpath) {
     START_LOG(gettid(), "call(oldpath=%s, newpath=%s)", oldpath.c_str(), newpath.c_str());
 
-    const std::lock_guard lg(_node_storage_mutex);
+    const std::lock_guard lg(_mutex);
 
     for (auto &[thread_id, opened_files] : _opened_fd_map) {
         for (auto &[file_descriptor, capio_file_repr] : opened_files) {
-            if (capio_file_repr.file_path == oldpath) {
-                capio_file_repr.file_path = newpath;
+            if (capio_file_repr._path == oldpath) {
+                capio_file_repr._path = newpath;
             }
         }
     }
 
-    auto node  = _node_storage.extract(oldpath);
+    auto node  = _storage.extract(oldpath);
     node.key() = newpath;
-    _node_storage.insert(std::move(node));
+    _storage.insert(std::move(node));
 }
 
 CapioFile &StorageService::add(const std::filesystem::path &path, bool is_dir, size_t init_size) {
@@ -168,35 +163,35 @@ CapioFile &StorageService::add(const std::filesystem::path &path, bool is_dir, s
         init_size = CAPIO_DEFAULT_DIR_INITIAL_SIZE;
     }
 
-    const std::lock_guard lg(_node_storage_mutex);
-    _node_storage.try_emplace(path, is_dir, n_file, permanent, init_size, n_close_count);
-    return _node_storage[path];
+    const std::lock_guard lg(_mutex);
+    _storage.try_emplace(path, is_dir, n_file, permanent, init_size, n_close_count);
+    return _storage[path];
 }
 
-void StorageService::dup(int tid, int old_fd, int new_fd) {
+void StorageService::dup(const pid_t tid, const int old_fd, const int new_fd) {
     START_LOG(gettid(), "call(old_fd=%d, new_fd=%d)", old_fd, new_fd);
-    const std::lock_guard lg(_node_storage_mutex);
+    const std::lock_guard lg(_mutex);
 
-    _opened_fd_map[tid][new_fd].file_path     = _opened_fd_map[tid][old_fd].file_path;
-    _opened_fd_map[tid][new_fd].file_pointer  = _opened_fd_map[tid][old_fd].file_pointer;
-    _opened_fd_map[tid][new_fd].thread_offset = _opened_fd_map[tid][old_fd].thread_offset;
+    _opened_fd_map[tid][new_fd]._path    = _opened_fd_map[tid][old_fd]._path;
+    _opened_fd_map[tid][new_fd]._pointer = _opened_fd_map[tid][old_fd]._pointer;
+    _opened_fd_map[tid][new_fd]._offset  = _opened_fd_map[tid][old_fd]._offset;
 
-    _opened_fd_map[tid][new_fd].file_pointer->open();
-    _opened_fd_map[tid][new_fd].file_pointer->add_fd(tid, new_fd);
+    _opened_fd_map[tid][new_fd]._pointer->open();
+    _opened_fd_map[tid][new_fd]._pointer->add_fd(tid, new_fd);
 }
 
 void StorageService::clone(const pid_t parent_tid, const pid_t child_tid) {
     START_LOG(gettid(), "call(parent_tid=%d, child_tid=%d)", parent_tid, child_tid);
 
     for (auto &fd : getFileDescriptors(parent_tid)) {
-        addFileToTid(child_tid, fd, _opened_fd_map[parent_tid][fd].file_path,
+        addFileToTid(child_tid, fd, _opened_fd_map[parent_tid][fd]._path,
                      getFileOffset(parent_tid, fd));
     }
 }
 std::vector<std::filesystem::path> StorageService::getPaths() {
-    const std::lock_guard lg(_node_storage_mutex);
-    std::vector<std::filesystem::path> paths(_node_storage.size());
-    for (const auto &[file_path, _] : _node_storage) {
+    const std::lock_guard lg(_mutex);
+    std::vector<std::filesystem::path> paths(_storage.size());
+    for (const auto &[file_path, _] : _storage) {
         paths.emplace_back(file_path);
     }
     return paths;
@@ -209,38 +204,38 @@ void StorageService::remove(const std::filesystem::path &path) {
         removeFromTid(tid, fd);
     }
 
-    const std::lock_guard lg(_node_storage_mutex);
-    _node_storage.erase(path);
+    const std::lock_guard lg(_mutex);
+    _storage.erase(path);
 }
-void StorageService::removeFromTid(const int tid, const int fd) {
+void StorageService::removeFromTid(const pid_t tid, const int fd) {
     START_LOG(gettid(), "call(tid=%d, fd=%d)", tid, fd);
 
-    const std::lock_guard lg(_node_storage_mutex);
+    const std::lock_guard lg(_mutex);
 
-    if (_opened_fd_map[tid][fd].file_path.empty()) {
+    if (_opened_fd_map[tid][fd]._path.empty()) {
         LOG("PATH is empty. returning");
         return;
     }
 
-    _opened_fd_map[tid][fd].file_pointer->remove_fd(tid, fd);
+    _opened_fd_map[tid][fd]._pointer->remove_fd(tid, fd);
     _opened_fd_map[tid].erase(fd);
 }
 
-void StorageService::addFileToTid(int tid, int fd, const std::filesystem::path &path,
+void StorageService::addFileToTid(const pid_t tid, const int fd, const std::filesystem::path &path,
                                   off64_t offset) {
     START_LOG(gettid(), "call(tid=%d, fd=%d, path=%s, offset=%ld)", tid, fd, path.c_str(), offset);
 
-    const std::lock_guard lg(_node_storage_mutex);
+    const std::lock_guard lg(_mutex);
 
-    _node_storage[path].open();
-    _node_storage[path].add_fd(tid, fd);
+    _storage[path].open();
+    _storage[path].add_fd(tid, fd);
 
-    _opened_fd_map[tid][fd].file_path     = path;
-    _opened_fd_map[tid][fd].file_pointer  = &_node_storage[path];
-    _opened_fd_map[tid][fd].thread_offset = std::make_shared<off64_t>(offset);
+    _opened_fd_map[tid][fd]._path    = path;
+    _opened_fd_map[tid][fd]._pointer = &_storage[path];
+    _opened_fd_map[tid][fd]._offset  = std::make_shared<off64_t>(offset);
 }
 
-off64_t StorageService::addDirectory(int tid, const std::filesystem::path &path) {
+off64_t StorageService::addDirectory(const pid_t tid, const std::filesystem::path &path) {
     START_LOG(tid, "call(path=%s)", path.c_str());
 
     if (!get_file_location_opt(path)) {
@@ -263,7 +258,7 @@ off64_t StorageService::addDirectory(int tid, const std::filesystem::path &path)
     return 1;
 }
 
-void StorageService::updateDirectory(int tid, const std::filesystem::path &file_path) {
+void StorageService::updateDirectory(const pid_t tid, const std::filesystem::path &file_path) {
     START_LOG(gettid(), "call(file_path=%s)", file_path.c_str());
     const std::filesystem::path dir = get_parent_dir_path(file_path);
     CapioFile &c_file               = get(dir.c_str()).value();
