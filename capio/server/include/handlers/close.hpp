@@ -40,14 +40,14 @@ inline void handle_pending_remote_nfiles(const std::filesystem::path &path) {
 inline void handle_close(int tid, int fd) {
     START_LOG(gettid(), "call(tid=%d, fd=%d)", tid, fd);
 
-    const std::filesystem::path path = storage_service->getFilePath(tid, fd);
+    const std::filesystem::path path = storage_service->getPath(tid, fd);
     if (path.empty()) { // avoid to try to close a file that does not exists
         // (example: try to close() on a dir
         LOG("Path is empty. might be a directory. returning");
         return;
     }
 
-    CapioFile &c_file = storage_service->getFile(path).value();
+    CapioFile &c_file = storage_service->get(path).value();
     c_file.close();
     LOG("File with path %s was closed", path.c_str());
 

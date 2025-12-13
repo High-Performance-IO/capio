@@ -12,7 +12,7 @@
 class StorageService {
     std::mutex _node_storage_mutex;
 
-    std::unordered_map<std::string, CapioFile *> _node_storage;
+    std::unordered_map<std::string, CapioFile> _node_storage;
 
     struct CapioFileState {
         CapioFile *file_pointer; /// Pointer to the actual stored file in _node_storage
@@ -26,7 +26,6 @@ class StorageService {
      */
     std::unordered_map<pid_t, std::unordered_map<int, CapioFileState>> _opened_fd_map;
 
-
     void addDirectoryEntry(int tid, const std::filesystem::path &file_path, const std::string &dir,
                            int type);
 
@@ -34,14 +33,13 @@ class StorageService {
     StorageService();
     ~StorageService();
 
-    std::optional<std::reference_wrapper<CapioFile>> getFile(const std::filesystem::path &path);
-    const std::filesystem::path &getFilePath(int tid, int fd);
+    std::optional<std::reference_wrapper<CapioFile>> get(const std::filesystem::path &path);
+    const std::filesystem::path &getPath(int tid, int fd);
     std::vector<int> getFileDescriptors(int tid);
     std::unordered_map<int, std::vector<int>> getFileDescriptors();
     off64_t setFileOffset(int tid, int fd, off64_t offset);
     off64_t getFileOffset(int tid, int fd);
-    void renameFile(const std::filesystem::path &oldpath, const std::filesystem::path &newpath);
-    void add(const std::filesystem::path &path, CapioFile *c_file);
+    void rename(const std::filesystem::path &oldpath, const std::filesystem::path &newpath);
     CapioFile &add(const std::filesystem::path &path, bool is_dir, size_t init_size);
     void dup(int tid, int old_fd, int new_fd);
     void clone(pid_t parent_tid, pid_t child_tid);

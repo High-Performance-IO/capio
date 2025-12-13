@@ -18,7 +18,7 @@ inline void serve_remote_read(const std::filesystem::path &path, const std::stri
 
     // Send all the rest of the file not only the number of bytes requested
     // Useful for caching
-    CapioFile &c_file          = storage_service->getFile(path).value();
+    CapioFile &c_file          = storage_service->get(path).value();
     long int nbytes            = c_file.get_stored_size() - offset;
     off64_t prefetch_data_size = get_prefetch_data_size();
 
@@ -40,7 +40,7 @@ std::vector<std::string> *files_available(const std::string &prefix, const std::
 
     auto files_to_send                     = new std::vector<std::string>;
     std::unordered_set<std::string> &files = files_sent[app_name];
-    auto capio_file_opt                    = storage_service->getFile(path);
+    auto capio_file_opt                    = storage_service->get(path);
 
     if (capio_file_opt) {
         if (capio_file_opt->get().is_complete()) {
@@ -58,7 +58,7 @@ std::vector<std::string> *files_available(const std::string &prefix, const std::
             strcmp(std::get<0>(file_location_opt->get()), node_name) == 0 &&
             file_path.native().compare(0, prefix.length(), prefix) == 0) {
 
-            CapioFile &c_file = storage_service->getFile(file_path).value();
+            CapioFile &c_file = storage_service->get(file_path).value();
             if (c_file.is_complete() && !c_file.is_dir()) {
                 files_to_send->emplace_back(file_path);
                 files.insert(file_path);
@@ -76,8 +76,8 @@ inline void handle_read_reply(int tid, int fd, long count, off64_t file_size, of
         tid, fd, count, file_size, nbytes, complete ? "true" : "false",
         is_getdents ? "true" : "false");
 
-    const std::filesystem::path &path = storage_service->getFilePath(tid, fd);
-    CapioFile &c_file                 = storage_service->getFile(path).value();
+    const std::filesystem::path &path = storage_service->getPath(tid, fd);
+    CapioFile &c_file                 = storage_service->get(path).value();
     off64_t offset                    = storage_service->getFileOffset(tid, fd);
     c_file.real_file_size             = file_size;
     c_file.insert_sector(offset, offset + nbytes);
@@ -107,7 +107,7 @@ void wait_for_data(const std::filesystem::path &path, const std::string &dest, i
               "call(path=%s, dest=%s, tid=%d, fs=%d, count=%ld, offset=%ld, is_getdents=%s)",
               path.c_str(), dest.c_str(), tid, fd, count, offset, is_getdents ? "true" : "false");
 
-    const CapioFile &c_file = storage_service->getFile(path).value();
+    const CapioFile &c_file = storage_service->get(path).value();
     // wait that nbytes are written
     c_file.wait_for_data(offset + count);
     serve_remote_read(path, dest, tid, fd, count, offset, c_file.is_complete(), is_getdents);
@@ -125,7 +125,7 @@ inline void send_files_batch(const std::string &prefix, const std::string &dest,
     // send data
     for (const std::string &path : *files_to_send) {
         LOG("Sending file %s to target %s", path.c_str(), dest.c_str());
-        CapioFile &c_file = storage_service->getFile(path).value();
+        CapioFile &c_file = storage_service->get(path).value();
         backend->send_file(c_file.get_buffer(), c_file.get_stored_size(), dest);
     }
 }
@@ -184,7 +184,7 @@ handle_remote_read_batch_reply(const std::string &source, int tid, int fd, off64
               tid, fd, count, is_getdents ? "true" : "false");
 
     for (const auto &[path, nbytes] : files) {
-        auto c_file_opt = storage_service->getFile(path);
+        auto c_file_opt = storage_service->get(path);
         if (c_file_opt) {
             CapioFile &c_file = c_file_opt->get();
             c_file.create_buffer_if_needed(path, false);
@@ -213,7 +213,7 @@ inline void handle_remote_read(const std::filesystem::path &path, const std::str
               "call(path=%s, source=%s, tid=%d, fd=%d, count=%ld, offset=%ld, is_getdents=%s)",
               path.c_str(), source.c_str(), tid, fd, count, offset, is_getdents ? "true" : "false");
 
-    CapioFile &c_file   = storage_service->getFile(path).value();
+    CapioFile &c_file   = storage_service->get(path).value();
     bool data_available = (offset + count <= c_file.get_stored_size());
     if (c_file.is_complete() || (CapioCLEngine::get().isFirable(path) && data_available)) {
         serve_remote_read(path, source, tid, fd, count, offset, c_file.is_complete(), is_getdents);
@@ -232,9 +232,9 @@ inline void handle_remote_read_reply(const std::string &source, int tid, int fd,
               source.c_str(), tid, fd, count, nbytes, file_size, complete ? "true" : "false",
               is_getdents ? "true" : "false");
 
-    const std::filesystem::path &path = storage_service->getFilePath(tid, fd);
+    const std::filesystem::path &path = storage_service->getPath(tid, fd);
     off64_t offset                    = storage_service->getFileOffset(tid, fd);
-    CapioFile &c_file                 = storage_service->getFile(path).value();
+    CapioFile &c_file                 = storage_service->get(path).value();
 
     c_file.create_buffer_if_needed(path, false);
     if (nbytes != 0) {

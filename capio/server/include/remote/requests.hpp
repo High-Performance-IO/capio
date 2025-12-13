@@ -45,7 +45,7 @@ inline void send_files_batch_request(const std::string &prefix, int tid, int fd,
             count, is_getdents);
     std::string message(header.get());
     for (const std::string &path : *files_to_send) {
-        CapioFile &c_file = storage_service->getFile(path).value();
+        CapioFile &c_file = storage_service->get(path).value();
         message.append(" " + path.substr(prefix.length()) + " " +
                        std::to_string(c_file.get_stored_size()));
     }
@@ -79,7 +79,7 @@ inline void handle_remote_read_batch_request(int tid, int fd, off64_t count,
               tid, fd, count, app_name.c_str(), prefix.c_str(), batch_size,
               is_getdents ? "true" : "false");
 
-    const std::filesystem::path &path = storage_service->getFilePath(tid, fd);
+    const std::filesystem::path &path = storage_service->getPath(tid, fd);
     std::string dest                  = std::get<0>(get_file_location(path));
 
     const char *const format = "%04d %s %d %d %ld %ld %s %s %d";
@@ -98,7 +98,7 @@ inline void handle_remote_read_request(int tid, int fd, off64_t count, bool is_g
               is_getdents ? "true" : "false");
 
     // If it is not in cache then send the request to the remote node
-    const std::filesystem::path &path = storage_service->getFilePath(tid, fd);
+    const std::filesystem::path &path = storage_service->getPath(tid, fd);
     off64_t offset                    = storage_service->getFileOffset(tid, fd);
     std::string dest                  = std::get<0>(get_file_location(path));
 

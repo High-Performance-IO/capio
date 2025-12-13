@@ -26,7 +26,7 @@ void StorageService::addDirectoryEntry(int tid, const std::filesystem::path &fil
     START_LOG(gettid(), "call(file_path=%s, dir=%s, type=%d)", file_path.c_str(), dir.c_str(),
               type);
 
-    struct linux_dirent64 ld;
+    linux_dirent64 ld;
     ld.d_ino = std::hash<std::string>{}(file_path);
     std::filesystem::path file_name;
     if (type == 0) {
@@ -42,7 +42,7 @@ void StorageService::addDirectoryEntry(int tid, const std::filesystem::path &fil
     LOG("FILENAME LD: %s", ld.d_name);
     ld.d_reclen = sizeof(linux_dirent64);
 
-    CapioFile &c_file = getFile(dir).value();
+    CapioFile &c_file = get(dir).value();
     c_file.create_buffer_if_needed(dir, true);
     void *file_shm       = c_file.get_buffer();
     off64_t file_size    = c_file.get_stored_size();
@@ -57,7 +57,7 @@ void StorageService::addDirectoryEntry(int tid, const std::filesystem::path &fil
     ld.d_type = (c_file.is_dir() ? DT_DIR : DT_REG);
 
     memcpy((char *) file_shm + file_size, &ld, sizeof(ld));
-    off64_t base_offset = file_size;
+    const off64_t base_offset = file_size;
 
     LOG("STORED FILENAME LD: %s",
         reinterpret_cast<linux_dirent64 *>(static_cast<char *>(file_shm) + file_size)->d_name);
@@ -83,7 +83,7 @@ StorageService::~StorageService() {
 }
 
 std::optional<std::reference_wrapper<CapioFile>>
-StorageService::getFile(const std::filesystem::path &path) {
+StorageService::get(const std::filesystem::path &path) {
     START_LOG(gettid(), "call(path=%s)", path.c_str());
     const std::lock_guard lg(_node_storage_mutex);
     if (const auto it = _node_storage.find(path); it == _node_storage.end()) {
@@ -91,11 +91,11 @@ StorageService::getFile(const std::filesystem::path &path) {
         return {};
     } else {
         LOG("File found. returning contained item");
-        return {*it->second};
+        return {it->second};
     }
 }
 
-const std::filesystem::path &StorageService::getFilePath(const int tid, const int fd) {
+const std::filesystem::path &StorageService::getPath(const int tid, const int fd) {
     const std::lock_guard lg(_node_storage_mutex);
     return _opened_fd_map[tid][fd].file_path;
 }
@@ -132,8 +132,8 @@ off64_t StorageService::getFileOffset(int tid, int fd) {
     return *_opened_fd_map[tid][fd].thread_offset;
 }
 
-void StorageService::renameFile(const std::filesystem::path &oldpath,
-                                const std::filesystem::path &newpath) {
+void StorageService::rename(const std::filesystem::path &oldpath,
+                            const std::filesystem::path &newpath) {
     START_LOG(gettid(), "call(oldpath=%s, newpath=%s)", oldpath.c_str(), newpath.c_str());
 
     const std::lock_guard lg(_node_storage_mutex);
@@ -151,14 +151,6 @@ void StorageService::renameFile(const std::filesystem::path &oldpath,
     _node_storage.insert(std::move(node));
 }
 
-void StorageService::add(const std::filesystem::path &path, CapioFile *c_file) {
-    START_LOG(gettid(), "call(path=%s, capio_file=%ld)", path.c_str(), c_file);
-    const std::lock_guard lg(_node_storage_mutex);
-    _node_storage[path] = c_file;
-    LOG("Capio file added to files_metadata. capio_file==nullptr? %s",
-        c_file == nullptr ? "TRUE" : "FALSE");
-}
-
 CapioFile &StorageService::add(const std::filesystem::path &path, bool is_dir, size_t init_size) {
 
     START_LOG(gettid(), "call(path=%s, is_dir=%s, init_size=%ld)", path.c_str(),
@@ -167,8 +159,6 @@ CapioFile &StorageService::add(const std::filesystem::path &path, bool is_dir, s
     std::string shm_name = path;
     std::replace(shm_name.begin(), shm_name.end(), '/', '_');
 
-    auto commit_rule   = CapioCLEngine::get().getCommitRule(path);
-    auto fire_rule     = CapioCLEngine::get().getFireRule(path);
     auto n_file        = CapioCLEngine::get().getDirectoryFileCount(path);
     auto permanent     = CapioCLEngine::get().isPermanent(path);
     auto n_close_count = CapioCLEngine::get().getCommitCloseCount(path);
@@ -178,9 +168,9 @@ CapioFile &StorageService::add(const std::filesystem::path &path, bool is_dir, s
         init_size = CAPIO_DEFAULT_DIR_INITIAL_SIZE;
     }
 
-    const auto c_file = new CapioFile(is_dir, n_file, permanent, init_size, n_close_count);
-    add(path, c_file);
-    return *c_file;
+    const std::lock_guard lg(_node_storage_mutex);
+    _node_storage.try_emplace(path, is_dir, n_file, permanent, init_size, n_close_count);
+    return _node_storage[path];
 }
 
 void StorageService::dup(int tid, int old_fd, int new_fd) {
@@ -214,7 +204,7 @@ std::vector<std::filesystem::path> StorageService::getPaths() {
 void StorageService::remove(const std::filesystem::path &path) {
     START_LOG(gettid(), "call(path=%s)", path.c_str());
 
-    CapioFile &c_file = getFile(path).value();
+    CapioFile &c_file = get(path).value();
     for (auto &[tid, fd] : c_file.get_fds()) {
         removeFromTid(tid, fd);
     }
@@ -242,11 +232,11 @@ void StorageService::addFileToTid(int tid, int fd, const std::filesystem::path &
 
     const std::lock_guard lg(_node_storage_mutex);
 
-    _node_storage[path]->open();
-    _node_storage[path]->add_fd(tid, fd);
+    _node_storage[path].open();
+    _node_storage[path].add_fd(tid, fd);
 
     _opened_fd_map[tid][fd].file_path     = path;
-    _opened_fd_map[tid][fd].file_pointer  = _node_storage[path];
+    _opened_fd_map[tid][fd].file_pointer  = &_node_storage[path];
     _opened_fd_map[tid][fd].thread_offset = std::make_shared<off64_t>(offset);
 }
 
@@ -276,7 +266,7 @@ off64_t StorageService::addDirectory(int tid, const std::filesystem::path &path)
 void StorageService::updateDirectory(int tid, const std::filesystem::path &file_path) {
     START_LOG(gettid(), "call(file_path=%s)", file_path.c_str());
     const std::filesystem::path dir = get_parent_dir_path(file_path);
-    CapioFile &c_file               = getFile(dir.c_str()).value();
+    CapioFile &c_file               = get(dir.c_str()).value();
     if (c_file.first_write) {
         c_file.first_write = false;
         write_file_location(dir);
