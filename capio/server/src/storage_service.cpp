@@ -37,7 +37,7 @@ void StorageService::addDirectoryEntry(const pid_t tid, const std::filesystem::p
     LOG("FILENAME LD: %s", ld.d_name);
     ld.d_reclen = sizeof(linux_dirent64);
 
-    CapioFile &c_file = get(dir).value();
+    CapioFile &c_file = get(dir);
     c_file.create_buffer_if_needed(dir, true);
     void *file_shm       = c_file.get_buffer();
     off64_t file_size    = c_file.get_stored_size();
@@ -78,7 +78,7 @@ StorageService::~StorageService() {
 }
 
 std::optional<std::reference_wrapper<CapioFile>>
-StorageService::get(const std::filesystem::path &path) {
+StorageService::tryGet(const std::filesystem::path &path) {
     START_LOG(gettid(), "call(path=%s)", path.c_str());
     const std::lock_guard lg(_mutex);
     if (const auto it = _storage.find(path); it == _storage.end()) {
@@ -88,6 +88,15 @@ StorageService::get(const std::filesystem::path &path) {
         LOG("File found. returning contained item");
         return {it->second};
     }
+}
+CapioFile &StorageService::get(const std::filesystem::path &path) {
+    START_LOG(gettid(), "call(path=%s)", path.c_str());
+    std::lock_guard lg(_mutex);
+    if (_storage.find(path) == _storage.end()) {
+        throw std::runtime_error("File " + path.string() + " was not found in local storage");
+    }
+
+    return _storage.at(path);
 }
 
 const std::filesystem::path &StorageService::getPath(const pid_t tid, const int fd) {
@@ -199,7 +208,7 @@ std::vector<std::filesystem::path> StorageService::getPaths() {
 void StorageService::remove(const std::filesystem::path &path) {
     START_LOG(gettid(), "call(path=%s)", path.c_str());
 
-    CapioFile &c_file = get(path).value();
+    const CapioFile &c_file = get(path);
     for (auto &[tid, fd] : c_file.get_fds()) {
         removeFromTid(tid, fd);
     }
@@ -261,8 +270,7 @@ off64_t StorageService::addDirectory(const pid_t tid, const std::filesystem::pat
 void StorageService::updateDirectory(const pid_t tid, const std::filesystem::path &file_path) {
     START_LOG(gettid(), "call(file_path=%s)", file_path.c_str());
     const std::filesystem::path dir = get_parent_dir_path(file_path);
-    CapioFile &c_file               = get(dir.c_str()).value();
-    if (c_file.first_write) {
+    if (CapioFile &c_file = get(dir.c_str()); c_file.first_write) {
         c_file.first_write = false;
         write_file_location(dir);
     }

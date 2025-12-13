@@ -13,7 +13,7 @@ inline void update_file_metadata(const std::filesystem::path &path, int tid, int
 
     // TODO: check the size that the user wrote in the configuration file
     //*caching_info[tid].second += 2;
-    auto c_file_opt   = storage_service->get(path);
+    auto c_file_opt   = storage_service->tryGet(path);
     CapioFile &c_file = (c_file_opt) ? c_file_opt->get()
                                      : storage_service->add(path, false, get_file_initial_size());
     storage_service->addFileToTid(tid, fd, path, offset);
@@ -37,7 +37,7 @@ inline void handle_create(int tid, int fd, const std::filesystem::path &path) {
 inline void handle_create_exclusive(int tid, int fd, const std::filesystem::path &path) {
     START_LOG(gettid(), "call(tid=%d, fd=%d, path_cstr=%s)", tid, fd, path.c_str());
 
-    if (storage_service->get(path)) {
+    if (storage_service->tryGet(path)) {
         client_manager->replyToClient(tid, 1);
     } else {
         client_manager->replyToClient(tid, 0);

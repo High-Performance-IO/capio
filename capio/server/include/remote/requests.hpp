@@ -45,7 +45,7 @@ inline void send_files_batch_request(const std::string &prefix, int tid, int fd,
             count, is_getdents);
     std::string message(header.get());
     for (const std::string &path : *files_to_send) {
-        CapioFile &c_file = storage_service->get(path).value();
+        CapioFile &c_file = storage_service->get(path);
         message.append(" " + path.substr(prefix.length()) + " " +
                        std::to_string(c_file.get_stored_size()));
     }

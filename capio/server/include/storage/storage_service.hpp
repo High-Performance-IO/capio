@@ -87,7 +87,19 @@ class StorageService {
      * @return An `std::optional` containing an `std::reference_wrapper<CapioFile>`
      * if the file exists, or an empty optional otherwise.
      */
-    std::optional<std::reference_wrapper<CapioFile>> get(const std::filesystem::path &path);
+    std::optional<std::reference_wrapper<CapioFile>> tryGet(const std::filesystem::path &path);
+
+    /**
+     * @brief Retrieves a reference to a CapioFile object from storage.
+     *
+     * This method searches for the file associated with the given path in the
+     * internal storage map, accessing it under a lock.
+     *
+     * @param path The path of the file to retrieve.
+     * @return A direct reference to the associated CapioFile object.
+     * @throws std::runtime_error If the file associated with the path is not present in storage.
+     */
+    CapioFile &get(const std::filesystem::path &path);
 
     /**
      * @brief Gets the path associated with a specific file descriptor and thread ID.

@@ -15,7 +15,7 @@ inline void request_remote_getdents(int tid, int fd, off64_t count) {
     START_LOG(gettid(), "call(tid=%d, fd=%d, count=%ld)", tid, fd, count);
 
     const std::filesystem::path &path = storage_service->getPath(tid, fd);
-    CapioFile &c_file                 = storage_service->get(path)->get();
+    CapioFile &c_file                 = storage_service->get(path);
     off64_t offset                    = storage_service->getFileOffset(tid, fd);
     off64_t end_of_read               = offset + count;
     off64_t end_of_sector             = c_file.get_sector_end(offset);
@@ -55,7 +55,7 @@ inline void handle_getdents(int tid, int fd, long int count) {
             if (strcmp(std::get<0>(get_file_location(path_to_check)), node_name) == 0) {
                 handle_getdents(tid, fd, count);
             } else {
-                const CapioFile &c_file = storage_service->get(path_to_check)->get();
+                const CapioFile &c_file = storage_service->get(path_to_check);
                 const auto &remote_app  = client_manager->getAppName(tid);
                 if (!c_file.is_complete()) {
                     if (const off64_t batch_size =
@@ -73,12 +73,12 @@ inline void handle_getdents(int tid, int fd, long int count) {
         t.detach();
     } else if (is_prod || strcmp(std::get<0>(file_location_opt->get()), node_name) == 0 ||
                capio_dir == path) {
-        CapioFile &c_file = storage_service->get(path).value();
+        CapioFile &c_file = storage_service->get(path);
         off64_t offset    = storage_service->getFileOffset(tid, fd);
         send_dirent_to_client(tid, fd, c_file, offset, count);
     } else {
         LOG("File is remote");
-        CapioFile &c_file = storage_service->get(path).value();
+        CapioFile &c_file = storage_service->get(path);
 
         if (!c_file.is_complete()) {
             LOG("File not complete");

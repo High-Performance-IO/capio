@@ -22,7 +22,7 @@ void wait_for_file_completion(int tid, const std::filesystem::path &path) {
 
     loop_load_file_location(path);
     // check if the file is local or remote
-    CapioFile &c_file = storage_service->get(path).value();
+    CapioFile &c_file = storage_service->get(path);
 
     // if file is streamable
     if (c_file.is_complete() || CapioCLEngine::get().isFirable(path) ||
@@ -62,7 +62,7 @@ inline void reply_stat(int tid, const std::filesystem::path &path) {
             return;
         }
     }
-    auto c_file_opt   = storage_service->get(path);
+    auto c_file_opt   = storage_service->tryGet(path);
     CapioFile &c_file = (c_file_opt) ? c_file_opt->get()
                                      : storage_service->add(path, false, get_file_initial_size());
     LOG("Obtained capio file. ready to reply to client");

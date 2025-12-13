@@ -13,7 +13,7 @@ void unlink_handler(const char *const str) {
         client_manager->replyToClient(tid, CAPIO_POSIX_SYSCALL_REQUEST_SKIP);
         return;
     }
-    auto c_file_opt = storage_service->get(path);
+    const auto c_file_opt = storage_service->tryGet(path);
     if (c_file_opt) { // TODO: it works only in the local case
         CapioFile &c_file = c_file_opt->get();
         if (c_file.is_deletable()) {
