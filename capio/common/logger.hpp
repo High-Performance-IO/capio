@@ -184,8 +184,9 @@ class SyscallLoggingSuspender {
 };
 
 /**
- * @brief Class that provides logging capabilities to CAPIO. It uses the STL it the component is not
- * the intercepting library, otherwise it uses POSIX defined systemcalls.
+ * @brief Class that provides logging capabilities to CAPIO.
+ * When compiled with the CAPIO intercepting library, it uses
+ * direct POSIX system calls. Otherwise, it relies on the STL.
  *
  */
 class Logger {
