@@ -1,6 +1,7 @@
 #ifndef CAPIO_SERVER_HANDLERS_SEEK_HPP
 #define CAPIO_SERVER_HANDLERS_SEEK_HPP
 
+#include "client-manager/client_manager.hpp"
 #include "stat.hpp"
 extern ClientManager *client_manager;
 

@@ -11,6 +11,7 @@
 #include "utils/location.hpp"
 #include "utils/types.hpp"
 
+#include "client-manager/client_manager.hpp"
 extern ClientManager *client_manager;
 
 void wait_for_file_completion(int tid, const std::filesystem::path &path) {

@@ -1,6 +1,7 @@
 #ifndef CAPIO_SERVER_HANDLERS_UNLINK_HPP
 #define CAPIO_SERVER_HANDLERS_UNLINK_HPP
 
+#include "client-manager/client_manager.hpp"
 extern ClientManager *client_manager;
 
 void unlink_handler(const char *const str) {
