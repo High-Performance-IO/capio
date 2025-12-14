@@ -65,7 +65,7 @@ void StorageManager::addDirectoryEntry(const pid_t tid, const std::filesystem::p
     }
 }
 StorageManager::StorageManager() {
-    server_println(CAPIO_LOG_SERVER_CLI_LEVEL_INFO, "StorageServer initialization completed.");
+    server_println(CAPIO_LOG_SERVER_CLI_LEVEL_INFO, "StorageManager initialization completed.");
 }
 
 StorageManager::~StorageManager() {
@@ -74,7 +74,7 @@ StorageManager::~StorageManager() {
             removeFromTid(tid, fd);
         }
     }
-    server_println(CAPIO_LOG_SERVER_CLI_LEVEL_INFO, "StorageServer teardown completed.");
+    server_println(CAPIO_LOG_SERVER_CLI_LEVEL_INFO, "StorageManager teardown completed.");
 }
 
 std::optional<std::reference_wrapper<CapioFile>>
