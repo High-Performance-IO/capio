@@ -3,7 +3,7 @@
 #include <capio/env.hpp>
 #include <capio/queue.hpp>
 #include <capiocl.hpp>
-#include <engine.h>
+#include <capiocl/engine.h>
 #include <include/storage-service/capio_file.hpp>
 #include <include/storage-service/capio_storage_service.hpp>
 extern capiocl::engine::Engine *capio_cl_engine;

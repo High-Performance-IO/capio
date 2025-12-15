@@ -14,8 +14,8 @@
 #include <unordered_set>
 
 #include <capiocl.hpp>
-#include <engine.h>
-#include <parser.h>
+#include <capiocl/engine.h>
+#include <capiocl/parser.h>
 capiocl::engine::Engine *capio_cl_engine;
 
 #include <include/utils/configuration.hpp>
