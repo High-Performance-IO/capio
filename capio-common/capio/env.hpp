@@ -11,6 +11,9 @@
 
 #ifndef __CAPIO_POSIX
 #include <include/utils/configuration.hpp>
+#include "capiocl.hpp"
+#include "capiocl/engine.h"
+extern capiocl::engine::Engine *capio_cl_engine;
 #endif
 
 #include "logger.hpp"
