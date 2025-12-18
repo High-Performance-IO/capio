@@ -50,7 +50,9 @@ int main(int argc, char **argv) {
     setup_signal_handlers();
 
     capio_cl_engine =
-        capiocl::parser::Parser::parse(config_path, std::filesystem::path(resolve_prefix));
+        config_path.empty()
+            ? new capiocl::engine::Engine()
+            : capiocl::parser::Parser::parse(config_path, std::filesystem::path(resolve_prefix));
 
     capio_global_configuration->workflow_name = capio_cl_engine->getWorkflowName();
 
