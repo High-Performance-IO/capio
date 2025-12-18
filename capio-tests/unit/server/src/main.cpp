@@ -1,6 +1,7 @@
 #include <capio/constants.hpp>
 #include <capiocl.hpp>
-#include <engine.h>
+#include <capiocl.hpp>
+#include "capiocl/engine.h"
 #include <gtest/gtest.h>
 #include <include/utils/configuration.hpp>
 #define syscall_no_intercept syscall
