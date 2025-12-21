@@ -10,6 +10,7 @@
 #include "utils/capio_file.hpp"
 #include "utils/types.hpp"
 
+#include "client-manager/client_manager.hpp"
 extern ClientManager *client_manager;
 extern StorageManager *storage_manager;
 
