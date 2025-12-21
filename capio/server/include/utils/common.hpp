@@ -10,6 +10,7 @@
 #include "utils/metadata.hpp"
 #include "utils/types.hpp"
 
+#include "client-manager/client_manager.hpp"
 extern ClientManager *client_manager;
 
 inline off64_t send_dirent_to_client(int tid, int fd, CapioFile &c_file, off64_t offset,

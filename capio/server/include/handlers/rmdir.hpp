@@ -1,6 +1,7 @@
 #ifndef CAPIO_SERVER_HANDLERS_RMDIR_HPP
 #define CAPIO_SERVER_HANDLERS_RMDIR_HPP
 
+#include "client-manager/client_manager.hpp"
 #include "utils/location.hpp"
 extern ClientManager *client_manager;
 

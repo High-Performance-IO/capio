@@ -1,6 +1,7 @@
 #ifndef CAPIO_SERVER_HANDLERS_RENAME_HPP
 #define CAPIO_SERVER_HANDLERS_RENAME_HPP
 
+#include "client-manager/client_manager.hpp"
 #include "utils/location.hpp"
 extern ClientManager *client_manager;
 
