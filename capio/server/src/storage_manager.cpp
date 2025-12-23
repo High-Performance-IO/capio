@@ -109,12 +109,12 @@ CapioFile &StorageManager::get(const pid_t pid, const int fd) {
     return *_opened_fd_map[pid][fd]._pointer;
 }
 
-const std::filesystem::path &StorageManager::getPath(const pid_t tid, const int fd) {
+const std::filesystem::path &StorageManager::getPath(const pid_t tid, const int fd) const {
     const std::lock_guard lg(_mutex);
     return _opened_fd_map[tid][fd]._path;
 }
 
-std::vector<int> StorageManager::getFileDescriptors(const pid_t tid) {
+std::vector<int> StorageManager::getFileDescriptors(const pid_t tid) const {
     const std::lock_guard lg(_mutex);
     std::vector<int> fds;
     for (const auto &[file_descriptor, _] : _opened_fd_map[tid]) {
@@ -123,7 +123,7 @@ std::vector<int> StorageManager::getFileDescriptors(const pid_t tid) {
     return fds;
 }
 
-std::unordered_map<int, std::vector<int>> StorageManager::getFileDescriptors() {
+std::unordered_map<int, std::vector<int>> StorageManager::getFileDescriptors() const {
     const std::lock_guard lg(_mutex);
     std::unordered_map<int, std::vector<int>> tid_fd_pairs;
     for (auto &[thread_id, opened_files] : _opened_fd_map) {
@@ -134,14 +134,14 @@ std::unordered_map<int, std::vector<int>> StorageManager::getFileDescriptors() {
     return tid_fd_pairs;
 }
 
-off64_t StorageManager::setFileOffset(const pid_t tid, const int fd, const off64_t offset) {
+off64_t StorageManager::setFileOffset(const pid_t tid, const int fd, const off64_t offset) const {
     START_LOG(gettid(), "call(tid=%d, fd=%d, offset=%ld)", tid, fd, offset);
 
     const std::lock_guard lg(_mutex);
     return *_opened_fd_map[tid][fd]._offset = offset;
 }
 
-off64_t StorageManager::getFileOffset(int tid, int fd) {
+off64_t StorageManager::getFileOffset(const int tid, const int fd) const {
     const std::lock_guard lg(_mutex);
     return *_opened_fd_map[tid][fd]._offset;
 }

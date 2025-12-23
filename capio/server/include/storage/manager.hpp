@@ -23,7 +23,7 @@ class StorageManager {
      * @brief Mutex to protect access to internal data structures, primarily
      * _storage and _opened_fd_map.
      */
-    std::mutex _mutex;
+    mutable std::mutex _mutex;
 
     /**
      * @brief The core storage map. Stores CapioFile objects, indexed by their
@@ -44,7 +44,7 @@ class StorageManager {
      * @brief Map that stores the association between file descriptors and CapioFiles for each
      * thread ID. Indexed by: `[thread_id][file_descriptor]`
      */
-    std::unordered_map<pid_t, std::unordered_map<int, ThreadFileDescriptor>> _opened_fd_map;
+    mutable std::unordered_map<pid_t, std::unordered_map<int, ThreadFileDescriptor>> _opened_fd_map;
 
     /**
      * Enum with the kind of entry that is being used.
@@ -124,7 +124,7 @@ class StorageManager {
      * @param fd The file descriptor.
      * @return A constant reference to the file path.
      */
-    const std::filesystem::path &getPath(int tid, int fd);
+    const std::filesystem::path &getPath(int tid, int fd) const;
 
     /**
      * @brief Retrieves a list of all file descriptors opened by a specific thread.
@@ -132,7 +132,7 @@ class StorageManager {
      * @param tid The thread ID.
      * @return A vector of file descriptors (integers).
      */
-    std::vector<int> getFileDescriptors(int tid);
+    std::vector<int> getFileDescriptors(int tid) const;
 
     /**
      * @brief Retrieves a map of all open file descriptors across all tracked threads.
@@ -140,7 +140,7 @@ class StorageManager {
      * @return An unordered map where keys are thread IDs and values are vectors
      * of file descriptors opened by that thread.
      */
-    std::unordered_map<pid_t, std::vector<int>> getFileDescriptors();
+    std::unordered_map<pid_t, std::vector<int>> getFileDescriptors() const;
 
     /**
      * @brief Sets the file offset (seek position) for an opened file descriptor.
@@ -150,7 +150,7 @@ class StorageManager {
      * @param offset The new file offset.
      * @return The updated file offset.
      */
-    off64_t setFileOffset(pid_t tid, int fd, off64_t offset);
+    off64_t setFileOffset(pid_t tid, int fd, off64_t offset) const;
 
     /**
      * @brief Gets the current file offset (seek position) for an opened file descriptor.
@@ -159,7 +159,7 @@ class StorageManager {
      * @param fd The file descriptor.
      * @return The current file offset.
      */
-    off64_t getFileOffset(pid_t tid, int fd);
+    off64_t getFileOffset(pid_t tid, int fd) const;
 
     /**
      * @brief Renames a file by updating its path in both the main storage map and
