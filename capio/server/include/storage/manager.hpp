@@ -41,10 +41,15 @@ class StorageManager {
     };
 
     /**
-     * @brief Map that stores the association between file descriptors and CapioFiles for each thread
-     * ID. Indexed by: `[thread_id][file_descriptor]`
+     * @brief Map that stores the association between file descriptors and CapioFiles for each
+     * thread ID. Indexed by: `[thread_id][file_descriptor]`
      */
     std::unordered_map<pid_t, std::unordered_map<int, ThreadFileDescriptor>> _opened_fd_map;
+
+    /**
+     * Enum with the kind of entry that is being used.
+     */
+    typedef enum { REGULAR_ENTRY = 0, DOT_ENTRY = 1, DOT_DOT_ENTRY = 2 } ManagerDirEntryType;
 
     /**
      * @brief Adds a new directory entry (a file or a directory) to the directory's data buffer.
@@ -59,10 +64,10 @@ class StorageManager {
      * @param tid The ID of the thread performing the operation.
      * @param file_path The path of the file/directory being added as an entry.
      * @param dir The path of the directory file where the entry is being added.
-     * @param type The type of the entry (0: regular, 1: ".", 2: "..").
+     * @param type The type of the entry
      */
     void addDirectoryEntry(int tid, const std::filesystem::path &file_path, const std::string &dir,
-                           int type);
+                           ManagerDirEntryType type);
 
   public:
     /**

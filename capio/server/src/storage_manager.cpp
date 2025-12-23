@@ -16,7 +16,7 @@
 extern char *node_name;
 
 void StorageManager::addDirectoryEntry(const pid_t tid, const std::filesystem::path &file_path,
-                                       const std::string &dir, int type) {
+                                       const std::string &dir, const ManagerDirEntryType type) {
 
     START_LOG(gettid(), "call(file_path=%s, dir=%s, type=%d)", file_path.c_str(), dir.c_str(),
               type);
@@ -24,10 +24,10 @@ void StorageManager::addDirectoryEntry(const pid_t tid, const std::filesystem::p
     linux_dirent64 ld;
     ld.d_ino = std::hash<std::string>{}(file_path);
     std::filesystem::path file_name;
-    if (type == 0) {
+    if (type == REGULAR_ENTRY) {
         file_name = file_path.filename();
         LOG("FILENAME: %s", file_name.c_str());
-    } else if (type == 1) {
+    } else if (type == DOT_ENTRY) {
         file_name = ".";
     } else {
         file_name = "..";
@@ -182,8 +182,10 @@ CapioFile &StorageManager::add(const std::filesystem::path &path, bool is_dir, s
         init_size = CAPIO_DEFAULT_DIR_INITIAL_SIZE;
     }
 
-    const std::lock_guard lg(_mutex);
-    _storage.try_emplace(path, is_dir, n_file, permanent, init_size, n_close_count);
+    {
+        const std::lock_guard lg(_mutex);
+        _storage.try_emplace(path, is_dir, n_file, permanent, init_size, n_close_count);
+    }
     return _storage[path];
 }
 
@@ -268,9 +270,9 @@ off64_t StorageManager::addDirectory(const pid_t tid, const std::filesystem::pat
                 write_file_location(path);
                 updateDirectory(tid, path);
             }
-            addDirectoryEntry(tid, path, path, 1);
+            addDirectoryEntry(tid, path, path, DOT_ENTRY);
             const std::filesystem::path parent_dir = get_parent_dir_path(path);
-            addDirectoryEntry(tid, parent_dir, path, 2);
+            addDirectoryEntry(tid, parent_dir, path, DOT_DOT_ENTRY);
         }
         return 0;
     }
@@ -284,5 +286,5 @@ void StorageManager::updateDirectory(const pid_t tid, const std::filesystem::pat
         c_file.first_write = false;
         write_file_location(dir);
     }
-    addDirectoryEntry(tid, file_path, dir, 0);
+    addDirectoryEntry(tid, file_path, dir, REGULAR_ENTRY);
 }
