@@ -41,7 +41,7 @@ class StorageManager {
     };
 
     /**
-     * @brief Map that stores the association between file descriptors and CapioFile for each thread
+     * @brief Map that stores the association between file descriptors and CapioFiles for each thread
      * ID. Indexed by: `[thread_id][file_descriptor]`
      */
     std::unordered_map<pid_t, std::unordered_map<int, ThreadFileDescriptor>> _opened_fd_map;
