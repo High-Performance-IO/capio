@@ -92,7 +92,8 @@ class StorageManager {
      * @return An `std::optional` containing an `std::reference_wrapper<CapioFile>`
      * if the file exists, or an empty optional otherwise.
      */
-    std::optional<std::reference_wrapper<CapioFile>> tryGet(const std::filesystem::path &path);
+    std::optional<std::reference_wrapper<CapioFile>>
+    tryGet(const std::filesystem::path &path) const;
 
     /**
      * @brief Retrieves a reference to a CapioFile object from storage.
@@ -104,7 +105,7 @@ class StorageManager {
      * @return A direct reference to the associated CapioFile object.
      * @throws std::runtime_error If the file associated with the path is not present in storage.
      */
-    CapioFile &get(const std::filesystem::path &path);
+    CapioFile &get(const std::filesystem::path &path) const;
 
     /**
      * @brief Retrieves a reference to a CapioFile object from storage.
@@ -115,7 +116,7 @@ class StorageManager {
      * @throws std::runtime_error If the file associated with the thread id and pid is not found
      * @return reference to CapioFile instance
      */
-    CapioFile &get(pid_t pid, int fd);
+    CapioFile &get(pid_t pid, int fd) const;
 
     /**
      * @brief Gets the path associated with a specific file descriptor and thread ID.

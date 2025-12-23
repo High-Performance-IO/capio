@@ -78,7 +78,7 @@ StorageManager::~StorageManager() {
 }
 
 std::optional<std::reference_wrapper<CapioFile>>
-StorageManager::tryGet(const std::filesystem::path &path) {
+StorageManager::tryGet(const std::filesystem::path &path) const {
     START_LOG(gettid(), "call(path=%s)", path.c_str());
     const std::lock_guard lg(_mutex);
     if (const auto it = _storage.find(path); it == _storage.end()) {
@@ -86,19 +86,19 @@ StorageManager::tryGet(const std::filesystem::path &path) {
         return {};
     } else {
         LOG("File found. returning contained item");
-        return {it->second};
+        return {const_cast<CapioFile &>(it->second)};
     }
 }
-CapioFile &StorageManager::get(const std::filesystem::path &path) {
+CapioFile &StorageManager::get(const std::filesystem::path &path) const {
     START_LOG(gettid(), "call(path=%s)", path.c_str());
     std::lock_guard lg(_mutex);
     if (_storage.find(path) == _storage.end()) {
         ERR_EXIT("File %s was not found in local storage", path.c_str());
     }
 
-    return _storage.at(path);
+    return const_cast<CapioFile &>(_storage.at(path));
 }
-CapioFile &StorageManager::get(const pid_t pid, const int fd) {
+CapioFile &StorageManager::get(const pid_t pid, const int fd) const {
     START_LOG(gettid(), "call(pid=%d, fd=%d)", pid, fd);
     const std::lock_guard lg(_mutex);
 
