@@ -48,6 +48,9 @@ class StorageManager {
 
     /**
      * Enum with the kind of entry that is being used.
+     * REGULAR_ENTRY = Any kind of entry, like files or directories
+     * DOT_ENTRY     = The dot entry of the directory content
+     * DOT_DOT_ENTRY = The reference to the parent directory
      */
     typedef enum { REGULAR_ENTRY = 0, DOT_ENTRY = 1, DOT_DOT_ENTRY = 2 } ManagerDirEntryType;
 
@@ -55,11 +58,8 @@ class StorageManager {
      * @brief Adds a new directory entry (a file or a directory) to the directory's data buffer.
      *
      * This function manually constructs a `linux_dirent64` structure and appends it
-     * to the `CapioFile` object representing the directory. It handles regular entries,
-     * the "." entry, and the ".." entry, and types are dictated according to this table:
-     * type == 0 -> regular entry
-     * type == 1 -> "." entry
-     * type == 2 -> ".." entry
+     * to the `CapioFile` object representing the directory. Handled types of entries are dictated
+     * accordingly to what the ManagerDirEntryType type allows.
      *
      * @param tid The ID of the thread performing the operation.
      * @param file_path The path of the file/directory being added as an entry.
