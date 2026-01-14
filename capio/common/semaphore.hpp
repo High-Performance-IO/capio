@@ -9,7 +9,7 @@
 
 class NoLock {
   public:
-    NoLock(const std::string &name, unsigned int init_value) {
+    NoLock(const std::string &name, unsigned int init_value, const bool cleanup) {
         START_LOG(capio_syscall(SYS_gettid), "call(name=%s, initial_value=%d)", name.c_str(),
                   init_value);
     }
@@ -27,9 +27,11 @@ class NamedSemaphore {
   private:
     const std::string _name;
     sem_t *_sem;
+    bool _cleanup = true;
 
   public:
-    NamedSemaphore(std::string name, unsigned int init_value) : _name(std::move(name)) {
+    NamedSemaphore(std::string name, unsigned int init_value, const bool cleanup = true)
+        : _name(std::move(name)), _cleanup(cleanup) {
         START_LOG(capio_syscall(SYS_gettid), " call(name=%s, init_value=%d)", _name.c_str(),
                   init_value);
 
@@ -43,14 +45,16 @@ class NamedSemaphore {
     NamedSemaphore &operator=(const NamedSemaphore &) = delete;
     ~NamedSemaphore() {
         START_LOG(capio_syscall(SYS_gettid), "call()");
-        if (sem_destroy(_sem) != 0) {
-            ERR_EXIT(" destruction of semaphore %s failed", _name.c_str());
+        if (_cleanup) {
+            if (sem_destroy(_sem) != 0) {
+                ERR_EXIT(" destruction of semaphore %s failed", _name.c_str());
+            }
+            LOG(" Destroyed shared semaphore %s", _name.c_str());
+            if (sem_unlink(_name.c_str()) != 0) {
+                ERR_EXIT(" destruction of semaphore %s failed", _name.c_str());
+            }
+            LOG(" Unlinked shared semaphore %s", _name.c_str());
         }
-        LOG(" Destroyed shared semaphore %s", _name.c_str());
-        if (sem_unlink(_name.c_str()) != 0) {
-            ERR_EXIT(" destruction of semaphore %s failed", _name.c_str());
-        }
-        LOG(" Unlinked shared semaphore %s", _name.c_str());
     }
 
     inline void lock() {
