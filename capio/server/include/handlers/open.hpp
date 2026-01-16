@@ -26,6 +26,14 @@ inline void update_file_metadata(const std::filesystem::path &path, int tid, int
     }
 }
 
+inline void wait_for_file_creation(const std::filesystem::path &path, pid_t tid, int fd) {
+    START_LOG(gettid(), "call(%s)", path.c_str());
+    loop_load_file_location(path);
+    LOG("File %s exists. Allowing execution of posix client", path.c_str());
+    update_file_metadata(path, tid, fd, false, 0);
+    client_manager->replyToClient(tid, 0);
+}
+
 inline void handle_create(int tid, int fd, const std::filesystem::path &path) {
     START_LOG(gettid(), "call(tid=%d, fd=%d, path_cstr=%s)", tid, fd, path.c_str());
 
@@ -52,10 +60,12 @@ inline void handle_open(int tid, int fd, const std::filesystem::path &path) {
     // slowest (short circuit evaluation)
     if (get_file_location_opt(path) || load_file_location(path)) {
         update_file_metadata(path, tid, fd, false, 0);
+        client_manager->replyToClient(tid, 0);
     } else {
-        client_manager->replyToClient(tid, 1);
+        LOG("File does not yet exists. Halting execution of posix client.");
+        std::thread t(wait_for_file_creation, path, tid, fd);
+        t.detach();
     }
-    client_manager->replyToClient(tid, 0);
 }
 
 void create_handler(const char *const str) {

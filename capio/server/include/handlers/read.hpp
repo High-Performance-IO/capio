@@ -48,7 +48,7 @@ inline void handle_local_read(int tid, int fd, off64_t count, bool is_prod) {
     off64_t end_of_sector             = c_file.get_sector_end(process_offset);
     off64_t end_of_read               = process_offset + count;
 
-    if (CapioCLEngine::get().isFirable(path) && !c_file.is_complete() && !is_prod) {
+    if (!CapioCLEngine::get().isFirable(path) && !c_file.is_complete() && !is_prod) {
         // wait for file to be completed and then do what is done inside handle pending read
         LOG("Starting async thread to wait for file availability");
         std::thread t([&c_file, tid, fd, count, process_offset] {
@@ -60,6 +60,7 @@ inline void handle_local_read(int tid, int fd, off64_t count, bool is_prod) {
         if (!is_prod && !c_file.is_complete()) {
             LOG("Mode is NO_UPDATE. awaiting for data on separate thread before sending it to "
                 "client");
+            LOG("Process offset = %ld", process_offset);
             // here if mode is NO_UPDATE, wait for data and then send it
             std::thread t([&c_file, tid, fd, count, process_offset] {
                 c_file.wait_for_data(process_offset + count);
