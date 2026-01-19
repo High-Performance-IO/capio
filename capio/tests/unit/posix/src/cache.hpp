@@ -117,10 +117,22 @@ TEST_F(CapioServerEnvironment, testReadWrite1GBFileBy4kBuffer) {
     open_handler(reinterpret_cast<long>(pathname), O_RDWR, 0, 0, 0, 0, &fd);
     EXPECT_GT(fd, 3);
 
-    read_handler(fd, reinterpret_cast<long>(read_buffer), FILE_SIZE, 0, 0, 0, &result);
+    size_t total_read    = 0;
+    const long read_size = 2 * 4096;
+
+    while (total_read < FILE_SIZE) {
+        read_handler(fd, reinterpret_cast<long>(read_buffer + total_read), read_size, 0, 0, 0,
+                     &result);
+        total_read += read_size;
+    }
+
     close_handler(fd, 0, 0, 0, 0, 0, &result);
 
     for (auto i = 0; i < FILE_SIZE; i++) {
+        if (read_buffer[i] != write_buffer[i]) {
+            std::cout << "i=" << i << " read_buffer[i]=" << read_buffer[i]
+                      << " write_buffer[i]=" << write_buffer[i] << std::endl;
+        }
         EXPECT_EQ(read_buffer[i], write_buffer[i]);
     }
 
