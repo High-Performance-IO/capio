@@ -84,13 +84,12 @@ inline void handle_local_read(int tid, int fd, off64_t count, bool is_prod) {
     }
 
     // Ensure it is never served more than the cache line
-    const auto end_of_read = std::min(count, end_of_sector - process_offset);
-    LOG("Requested read within end of sector, and data is available. Serving %ld bytes",
-        end_of_read);
+    const auto read_size = std::min(count, end_of_sector - process_offset);
+    LOG("Requested read within end of sector, and data is available. Serving %ld bytes", read_size);
 
     c_file.create_buffer_if_needed(path, false);
-    client_manager->replyToClient(tid, process_offset, c_file.get_buffer(), end_of_read);
-    set_capio_file_offset(tid, fd, end_of_read);
+    client_manager->replyToClient(tid, process_offset, c_file.get_buffer(), read_size);
+    set_capio_file_offset(tid, fd, process_offset + read_size);
 }
 
 inline void request_remote_read(int tid, int fd, off64_t count) {
