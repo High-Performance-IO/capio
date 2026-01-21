@@ -75,18 +75,25 @@ inline void handle_local_read(int tid, int fd, off64_t count, bool is_prod) {
                 client_manager->replyToClient(tid, process_offset);
                 return;
             }
-            c_file.create_buffer_if_needed(path, false);
 
-            client_manager->replyToClient(tid, process_offset, c_file.get_buffer(),
-                                          end_of_sector - process_offset);
-            set_capio_file_offset(tid, fd, end_of_sector);
+            // Ensure it is never served more than the cache line
+            end_of_read = std::min(count, end_of_sector - process_offset);
+            LOG("Serving %ld bytes", end_of_read);
+
+            c_file.create_buffer_if_needed(path, false);
+            client_manager->replyToClient(tid, process_offset, c_file.get_buffer(), end_of_read);
+            set_capio_file_offset(tid, fd, end_of_read);
         }
     } else {
-        c_file.create_buffer_if_needed(path, false);
+        LOG("Requested read within end of sector, and data is available. serving data.");
 
-        client_manager->replyToClient(tid, process_offset, c_file.get_buffer(),
-                                      end_of_sector - process_offset);
-        set_capio_file_offset(tid, fd, process_offset + count);
+        // Ensure it is never served more than the cache line
+        end_of_read = std::min(count, end_of_sector - process_offset);
+        LOG("Serving %ld bytes", end_of_read);
+
+        c_file.create_buffer_if_needed(path, false);
+        client_manager->replyToClient(tid, process_offset, c_file.get_buffer(), end_of_read);
+        set_capio_file_offset(tid, fd, end_of_read);
     }
 }
 
