@@ -46,48 +46,51 @@ inline void handle_local_read(int tid, int fd, off64_t count, bool is_prod) {
     CapioFile &c_file                 = get_capio_file(path);
     off64_t process_offset            = get_capio_file_offset(tid, fd);
 
-    if (CapioCLEngine::get().isFirable(path) || c_file.is_complete() || is_prod) {
-        LOG("Data can be served. Condition met: %s %s %s", is_prod ? "is_prod" : "",
-            c_file.is_complete() ? "c_file.is_complete()" : "",
-            CapioCLEngine::get().isFirable(path) ? "CapioCLEngine::get().isFirable(path)" : "");
+    // if a process is a producer of a file, then the file is always complete for that process
+    const bool file_complete = c_file.is_complete() || is_prod;
 
-        const off64_t end_of_sector = c_file.get_sector_end(process_offset);
-        if (end_of_sector == -1) {
-            LOG("End of sector is -1. returning process_offset without serving data");
-            client_manager->replyToClient(tid, process_offset);
-            return;
-        }
-
-        if ((process_offset + count > end_of_sector) && !is_prod && !c_file.is_complete()) {
-            LOG("Mode is NO_UPDATE, but not enough data is available. Awaiting for data on "
-                "separate thread before sending it to client");
-            std::thread t([&c_file, tid, fd, count, process_offset] {
-                c_file.wait_for_data(process_offset + count);
-                handle_pending_read(tid, fd, process_offset, count);
-            });
-            t.detach();
-            return;
-        }
-
-        // Ensure it is never served more than the cache line
-        const auto end_of_read = std::min(count, end_of_sector - process_offset);
-        LOG("Requested read within end of sector, and data is available. Serving %ld bytes",
-            end_of_read);
-
-        c_file.create_buffer_if_needed(path, false);
-        client_manager->replyToClient(tid, process_offset, c_file.get_buffer(), end_of_read);
-        set_capio_file_offset(tid, fd, end_of_read);
-
+    // NOTE: do not apply De Morgan laws here as they do not apply due to the composition of
+    //       file_complete variable
+    if (!CapioCLEngine::get().isFirable(path) && !file_complete) {
+        // wait for file to be completed and then do what is done inside handle pending read
+        LOG("Data is not yet available. Starting async thread to wait for file availability");
+        std::thread t([&c_file, tid, fd, count, process_offset] {
+            c_file.wait_for_completion();
+            handle_pending_read(tid, fd, process_offset, count);
+        });
+        t.detach();
         return;
     }
 
-    // wait for file to be completed and then do what is done inside handle pending read
-    LOG("Data is not yet available. Starting async thread to wait for file availability");
-    std::thread t([&c_file, tid, fd, count, process_offset] {
-        c_file.wait_for_completion();
-        handle_pending_read(tid, fd, process_offset, count);
-    });
-    t.detach();
+    LOG("Data can be served. Condition met: %% %s", file_complete ? "c_file.is_complete()" : "",
+        CapioCLEngine::get().isFirable(path) ? "CapioCLEngine::get().isFirable(path)" : "");
+
+    const off64_t end_of_sector = c_file.get_sector_end(process_offset);
+    if (end_of_sector == -1) {
+        LOG("End of sector is -1. returning process_offset without serving data");
+        client_manager->replyToClient(tid, process_offset);
+        return;
+    }
+
+    if (process_offset + count > end_of_sector && !file_complete) {
+        LOG("Mode is NO_UPDATE, but not enough data is available. Awaiting for data on "
+            "separate thread before sending it to client");
+        std::thread t([&c_file, tid, fd, count, process_offset] {
+            c_file.wait_for_data(process_offset + count);
+            handle_pending_read(tid, fd, process_offset, count);
+        });
+        t.detach();
+        return;
+    }
+
+    // Ensure it is never served more than the cache line
+    const auto end_of_read = std::min(count, end_of_sector - process_offset);
+    LOG("Requested read within end of sector, and data is available. Serving %ld bytes",
+        end_of_read);
+
+    c_file.create_buffer_if_needed(path, false);
+    client_manager->replyToClient(tid, process_offset, c_file.get_buffer(), end_of_read);
+    set_capio_file_offset(tid, fd, end_of_read);
 }
 
 inline void request_remote_read(int tid, int fd, off64_t count) {
