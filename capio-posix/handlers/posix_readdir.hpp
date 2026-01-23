@@ -181,8 +181,8 @@ DIR *opendir(const char *name) {
 
     const auto name_length = strlen(name);
     for (auto i = 0; i < name_length; i++) {
-        if (name[i] == '(' || name[i] == ')') {
-            LOG("Path %s contains '(' or ')': skip", name);
+        if (name[i] == '(' || name[i] == ')' || name[i] < 32 || name[i] > 126) {
+            LOG("Path %s contains invalid ASCII chars: %d. Skippind", name, name[i]);
             syscall_no_intercept_flag = true;
             auto dir                  = real_opendir(name);
             syscall_no_intercept_flag = false;
