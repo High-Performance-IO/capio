@@ -40,12 +40,16 @@ int creat_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long ar
     mode_t mode = static_cast<int>(arg2);
     START_LOG(tid, "call(path=%s, flags=%d, mode=%d)", pathname.data(), flags, mode);
 
-    std::string path = compute_abs_path(pathname.data(), -1);
-
-    if (path.find('(') == std::string::npos || path.find(')') == std::string::npos) {
-        LOG("Path %s contains '(' or ')': skip", path.data());
-        return CAPIO_POSIX_SYSCALL_REQUEST_SKIP;
+    const auto name_length = pathname.size();
+    for (auto i = 0; i < name_length; i++) {
+        if (pathname[i] == '(' || pathname[i] == ')' || pathname[i] < 32 || pathname[i] > 126) {
+            LOG("Path %s contains invalid ASCII chars: %d. Skippind", pathname.c_str(),
+                pathname[i]);
+            return CAPIO_POSIX_SYSCALL_REQUEST_SKIP;
+        }
     }
+
+    std::string path = compute_abs_path(pathname.data(), -1);
 
     if (!is_capio_path(path)) {
         LOG("Path %s is forbidden: skip", path.data());
@@ -81,12 +85,16 @@ int open_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg
     auto tid    = static_cast<pid_t>(syscall_no_intercept(SYS_gettid));
     START_LOG(tid, "call(path=%s, flags=%d, mode=%d)", pathname.data(), flags, mode);
 
-    std::string path = compute_abs_path(pathname.data(), -1);
-
-    if (path.find('(') == std::string::npos || path.find(')') == std::string::npos) {
-        LOG("Path %s contains '(' or ')': skip", path.data());
-        return CAPIO_POSIX_SYSCALL_REQUEST_SKIP;
+    const auto name_length = pathname.size();
+    for (auto i = 0; i < name_length; i++) {
+        if (pathname[i] == '(' || pathname[i] == ')' || pathname[i] < 32 || pathname[i] > 126) {
+            LOG("Path %s contains invalid ASCII chars: %d. Skippind", pathname.c_str(),
+                pathname[i]);
+            return CAPIO_POSIX_SYSCALL_REQUEST_SKIP;
+        }
     }
+
+    std::string path = compute_abs_path(pathname.data(), -1);
 
     if (!is_capio_path(path)) {
         LOG("Path %s is not a capio path: skip", path.data());
@@ -129,6 +137,15 @@ int openat_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long a
     START_LOG(tid, "call(dirfd=%ld, path=%s, flags=%d, mode=%d)", dirfd, pathname.data(), flags,
               mode);
 
+    const auto name_length = pathname.size();
+    for (auto i = 0; i < name_length; i++) {
+        if (pathname[i] == '(' || pathname[i] == ')' || pathname[i] < 32 || pathname[i] > 126) {
+            LOG("Path %s contains invalid ASCII chars: %d. Skippind", pathname.c_str(),
+                pathname[i]);
+            return CAPIO_POSIX_SYSCALL_REQUEST_SKIP;
+        }
+    }
+
     std::string path = compute_abs_path(pathname.data(), dirfd);
     if (!is_capio_path(path)) {
         LOG("Path %s is not a capio path: skip", path.data());
@@ -136,11 +153,6 @@ int openat_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long a
     }
 
     std::string resolved_path = resolve_possible_symlink(path);
-
-    if (path.find('(') == std::string::npos || path.find(')') == std::string::npos) {
-        LOG("Path %s contains '(' or ')': skip", path.data());
-        return CAPIO_POSIX_SYSCALL_REQUEST_SKIP;
-    }
 
     if ((flags & O_CREAT) == O_CREAT) {
         LOG("O_CREAT");
