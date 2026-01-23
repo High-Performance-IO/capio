@@ -179,19 +179,23 @@ inline struct dirent64 *capio_internal_readdir(DIR *dirp, long pid) {
 DIR *opendir(const char *name) {
     START_LOG(capio_syscall(SYS_gettid), "call(path=%s)", name);
 
+    const auto name_length = strlen(name);
+    for (auto i = 0; i < name_length; i++) {
+        if (name[i] == '(' || name[i] == ')') {
+            LOG("Path %s contains '(' or ')': skip", name);
+            syscall_no_intercept_flag = true;
+            auto dir                  = real_opendir(name);
+            syscall_no_intercept_flag = false;
+
+            return dir;
+        }
+    }
+
+    LOG("Path %s does not contain '(' or ')': proceeding with resolution", name);
+
     auto absolute_path = capio_absolute(name);
 
     LOG("Resolved absolute path = %s", absolute_path.c_str());
-
-    if (absolute_path.string().find('(') == std::string::npos ||
-        absolute_path.string().find(')') == std::string::npos) {
-        LOG("Path %s contains '(' or ')': skip", absolute_path.string().data());
-        syscall_no_intercept_flag = true;
-        auto dir                  = real_opendir(absolute_path.c_str());
-        syscall_no_intercept_flag = false;
-
-        return dir;
-    }
 
     if (!is_capio_path(absolute_path)) {
         LOG("Not a CAPIO path. continuing execution");
