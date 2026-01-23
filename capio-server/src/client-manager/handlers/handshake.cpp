@@ -1,6 +1,8 @@
 #include "capio/constants.hpp"
 #include <include/storage-service/capio_storage_service.hpp>
 #include <include/client-manager/client_manager.hpp>
+extern ClientManager *client_manager;
+extern CapioStorageService *storage_service;
 
 void handshake_handler(const char *const str) {
     pid_t tid, pid;

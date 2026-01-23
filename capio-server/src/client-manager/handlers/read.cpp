@@ -8,6 +8,9 @@
 #include <include/client-manager/client_manager.hpp>
 
 extern capiocl::engine::Engine *capio_cl_engine;
+extern ClientManager *client_manager;
+extern CapioFileManager *file_manager;
+extern CapioStorageService *storage_service;
 
 void read_handler(const char *const str) {
     long tid;

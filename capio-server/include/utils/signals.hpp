@@ -6,6 +6,13 @@
 
 #include <csignal>
 
+extern ClientManager *client_manager;
+extern CapioAPIServer *api_server;
+extern CapioFileManager *file_manager;
+extern FileSystemMonitor *fs_monitor;
+extern RequestHandlerEngine *request_handlers_engine;
+extern CapioStorageService *storage_service;
+
 #ifdef CAPIO_COVERAGE
 extern "C" void __gcov_dump(void);
 #endif

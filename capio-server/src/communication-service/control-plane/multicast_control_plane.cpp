@@ -9,7 +9,7 @@
 #include <netinet/in.h>
 #include <sys/socket.h>
 #include <sys/types.h>
-
+extern CapioStorageService *storage_service;
 void MulticastControlPlane::multicast_server_aliveness_thread(
     const bool *continue_execution, std::vector<std::string> *token_used_to_connect,
     std::mutex *token_used_to_connect_mutex, int dataplane_backend_port) {

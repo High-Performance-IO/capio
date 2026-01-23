@@ -32,6 +32,4 @@ class FileSystemMonitor {
     ~FileSystemMonitor();
 };
 
-inline FileSystemMonitor *fs_monitor;
-
 #endif // CAPIO_FS_FILE_SYSTEM_MONITOR_HPP

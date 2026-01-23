@@ -3,6 +3,9 @@
 #include <include/client-manager/handlers.hpp>
 #include <include/client-manager/request_handler_engine.hpp>
 
+extern ClientManager *client_manager;
+extern RequestHandlerEngine *request_handlers_engine;
+
 constexpr std::array<CSHandler_t, CAPIO_NR_REQUESTS>
 RequestHandlerEngine::build_request_handlers_table() {
     std::array<CSHandler_t, CAPIO_NR_REQUESTS> _request_handlers{0};

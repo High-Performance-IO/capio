@@ -6,6 +6,8 @@
 #include <include/utils/configuration.hpp>
 #include <mtcl.hpp>
 
+extern CapioFileManager *file_manager;
+extern CapioStorageService *storage_service;
 int MTCLBackend::read_next_request(char *req, char *args) {
 
     START_LOG(gettid(), "call(req=%s)", req);

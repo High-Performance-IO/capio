@@ -126,6 +126,4 @@ class CapioStorageService {
                                 char *buffer, capio_off64_t count) const;
 };
 
-inline CapioStorageService *storage_service;
-
 #endif // CAPIO_STORAGE_SERVICE_H

@@ -35,6 +35,4 @@ class RequestHandlerEngine {
     void start() const;
 };
 
-inline RequestHandlerEngine *request_handlers_engine;
-
 #endif // CAPIO_CL_ENGINE_MAIN_HPP

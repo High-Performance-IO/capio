@@ -1,6 +1,8 @@
 #include <capio/constants.hpp>
 #include <include/api-server/api-server.hpp>
 #include <include/client-manager/client_manager.hpp>
+extern ClientManager *client_manager;
+extern CapioAPIServer *api_server;
 
 CapioAPIServer::CapioAPIServer(int server_port) {
     th = new std::thread(api_server_main_func, server_port, &httplib_server_instance);

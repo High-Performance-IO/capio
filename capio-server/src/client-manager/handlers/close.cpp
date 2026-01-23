@@ -7,6 +7,8 @@
 #include <filesystem>
 #include <include/file-manager/file_manager.hpp>
 extern capiocl::engine::Engine *capio_cl_engine;
+extern ClientManager *client_manager;
+extern CapioFileManager *file_manager;
 
 void close_handler(const char *const str) {
     pid_t tid;

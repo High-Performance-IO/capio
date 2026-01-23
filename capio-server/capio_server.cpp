@@ -34,6 +34,13 @@ CapioGlobalConfiguration *capio_global_configuration;
 #include <include/utils/command_line_parser.hpp>
 #include <include/utils/signals.hpp>
 
+ClientManager *client_manager;
+CapioAPIServer *api_server;
+CapioFileManager *file_manager;
+FileSystemMonitor *fs_monitor;
+RequestHandlerEngine *request_handlers_engine;
+CapioStorageService *storage_service;
+
 int main(int argc, char **argv) {
     std::cout << CAPIO_LOG_SERVER_BANNER;
     capio_global_configuration                        = new CapioGlobalConfiguration();

@@ -54,6 +54,5 @@ class CapioAPIServer {
     ~CapioAPIServer();
 };
 
-inline CapioAPIServer *api_server;
 
 #endif // CAPIO_API_SERVER_HPP

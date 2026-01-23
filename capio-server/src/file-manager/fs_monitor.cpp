@@ -3,6 +3,9 @@
 #include <include/file-manager/fs_monitor.hpp>
 #include <include/utils/configuration.hpp>
 
+extern CapioFileManager *file_manager;
+extern FileSystemMonitor *fs_monitor;
+
 FileSystemMonitor::FileSystemMonitor() {
     START_LOG(gettid(), "call()");
     *continue_execution = true;

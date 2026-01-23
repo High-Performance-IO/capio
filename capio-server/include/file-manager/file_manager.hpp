@@ -136,6 +136,4 @@ class CapioFileManager {
     void checkDirectoriesNFiles() const;
 };
 
-inline CapioFileManager *file_manager;
-
 #endif // FILE_MANAGER_HEADER_HPP

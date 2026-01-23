@@ -6,7 +6,9 @@
 #include <include/storage-service/capio_storage_service.hpp>
 #include <include/client-manager/client_manager.hpp>
 extern capiocl::engine::Engine *capio_cl_engine;
-
+extern ClientManager *client_manager;
+extern CapioFileManager *file_manager;
+extern CapioStorageService *storage_service;
 void posix_readdir_handler(const char *const str) {
     pid_t pid;
     char path[PATH_MAX];

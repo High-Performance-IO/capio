@@ -9,6 +9,9 @@
 #include <include/utils/distributed_semaphore.hpp>
 
 extern capiocl::engine::Engine *capio_cl_engine;
+extern ClientManager *client_manager;
+extern CapioFileManager *file_manager;
+extern CapioStorageService *storage_service;
 
 std::string CapioFileManager::getMetadataPath(const std::string &path) {
     START_LOG(gettid(), "call(path=%s)", path.c_str());

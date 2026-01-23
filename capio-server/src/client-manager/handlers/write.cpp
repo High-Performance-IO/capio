@@ -1,8 +1,9 @@
 #include <capio/logger.hpp>
-#include <climits>
 #include <capiocl.hpp>
+#include <climits>
 #include <include/storage-service/capio_storage_service.hpp>
 
+extern CapioStorageService *storage_service;
 void write_handler(const char *const str) {
     pid_t tid;
     int fd;
