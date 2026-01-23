@@ -31,8 +31,6 @@ void FileSystemMonitor::print_message_error(const std::string &func,
                  "EXCEPTION\033[0m]~~~~~~~~~~~~~~"
               << std::endl
               << std::endl;
-
-    ERR_EXIT("%s", exception.what());
 }
 
 void FileSystemMonitor::_main(const bool *continue_execution) {
