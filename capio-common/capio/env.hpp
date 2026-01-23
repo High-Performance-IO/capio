@@ -10,9 +10,9 @@
 #include <sys/stat.h>
 
 #ifndef __CAPIO_POSIX
-#include <include/utils/configuration.hpp>
 #include "capiocl.hpp"
 #include "capiocl/engine.h"
+#include <include/utils/configuration.hpp>
 extern capiocl::engine::Engine *capio_cl_engine;
 #endif
 
@@ -106,12 +106,14 @@ inline std::string get_capio_workflow_name() {
 #else
         if (capio_cl_engine != nullptr) {
             name = capio_cl_engine->getWorkflowName();
+        } else {
+            name = capiocl::CAPIO_CL_DEFAULT_WF_NAME;
         }
-        name = capiocl::CAPIO_CL_DEFAULT_WF_NAME;
 
 #endif
     }
 
+    LOG("Returning workflow_name=%s", name.c_str());
     return name;
 }
 
