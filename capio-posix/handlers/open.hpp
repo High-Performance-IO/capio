@@ -42,6 +42,11 @@ int creat_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long ar
 
     std::string path = compute_abs_path(pathname.data(), -1);
 
+    if (path.find('(') == std::string::npos || path.find(')') == std::string::npos) {
+        LOG("Path %s contains '(' or ')': skip", path.data());
+        return CAPIO_POSIX_SYSCALL_REQUEST_SKIP;
+    }
+
     if (!is_capio_path(path)) {
         LOG("Path %s is forbidden: skip", path.data());
         return CAPIO_POSIX_SYSCALL_REQUEST_SKIP;
@@ -77,6 +82,11 @@ int open_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg
     START_LOG(tid, "call(path=%s, flags=%d, mode=%d)", pathname.data(), flags, mode);
 
     std::string path = compute_abs_path(pathname.data(), -1);
+
+    if (path.find('(') == std::string::npos || path.find(')') == std::string::npos) {
+        LOG("Path %s contains '(' or ')': skip", path.data());
+        return CAPIO_POSIX_SYSCALL_REQUEST_SKIP;
+    }
 
     if (!is_capio_path(path)) {
         LOG("Path %s is not a capio path: skip", path.data());
@@ -126,6 +136,11 @@ int openat_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long a
     }
 
     std::string resolved_path = resolve_possible_symlink(path);
+
+    if (path.find('(') == std::string::npos || path.find(')') == std::string::npos) {
+        LOG("Path %s contains '(' or ')': skip", path.data());
+        return CAPIO_POSIX_SYSCALL_REQUEST_SKIP;
+    }
 
     if ((flags & O_CREAT) == O_CREAT) {
         LOG("O_CREAT");

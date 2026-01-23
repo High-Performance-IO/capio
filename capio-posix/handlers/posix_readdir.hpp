@@ -183,6 +183,16 @@ DIR *opendir(const char *name) {
 
     LOG("Resolved absolute path = %s", absolute_path.c_str());
 
+    if (absolute_path.string().find('(') == std::string::npos ||
+        absolute_path.string().find(')') == std::string::npos) {
+        LOG("Path %s contains '(' or ')': skip", absolute_path.string().data());
+        syscall_no_intercept_flag = true;
+        auto dir                  = real_opendir(absolute_path.c_str());
+        syscall_no_intercept_flag = false;
+
+        return dir;
+    }
+
     if (!is_capio_path(absolute_path)) {
         LOG("Not a CAPIO path. continuing execution");
         syscall_no_intercept_flag = true;
