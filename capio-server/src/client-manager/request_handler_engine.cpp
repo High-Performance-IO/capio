@@ -19,7 +19,6 @@ RequestHandlerEngine::build_request_handlers_table() {
     _request_handlers[CAPIO_REQUEST_OPEN]                = open_handler;
     _request_handlers[CAPIO_REQUEST_READ]                = read_handler;
     _request_handlers[CAPIO_REQUEST_RENAME]              = rename_handler;
-    _request_handlers[CAPIO_REQUEST_WRITE]               = write_handler;
     _request_handlers[CAPIO_REQUEST_QUERY_MEM_FILE]      = files_to_store_in_memory_handler;
     _request_handlers[CAPIO_REQUEST_READ_MEM]            = read_mem_handler;
     _request_handlers[CAPIO_REQUEST_WRITE_MEM]           = write_mem_handler;
