@@ -353,9 +353,9 @@ void CapioFileManager::checkDirectoriesNFiles() const {
      */
 
     for (const auto loc = capio_cl_engine->getPaths(); const std::string &path : loc) {
-        if (capio_cl_engine->isFile(path)) {
+        if (capio_cl_engine->isFile(path) || capio_cl_engine->isExcluded(path)) {
             /*
-             * In this case we are trying to check for a file.
+             * In this case we are trying to check for a file, or an excluded path.
              * skip this check and go to the next path.
              */
             continue;
