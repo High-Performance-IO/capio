@@ -258,14 +258,14 @@ bool CapioFileManager::isCommitted(const std::filesystem::path &path) {
         LOG("Commit rule is ON_CLOSE");
 
         if (!std::filesystem::exists(metadata_computed_path)) {
-            LOG("Commit file does not yet exists.");
+            LOG("Commit file (%s) does not yet exists.", metadata_computed_path.c_str());
             LOG("Committed: FALSE");
             return false;
         }
 
         int commit_count = capio_cl_engine->getCommitCloseCount(path);
         LOG("Expected close count is: %d", commit_count);
-        if (commit_count == -1) {
+        if (commit_count <= 0) {
             LOG("File needs to be closed exactly once and token exists. returning");
             LOG("Committed: TRUE");
             return true;
