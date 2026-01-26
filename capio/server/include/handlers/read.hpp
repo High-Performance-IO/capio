@@ -74,7 +74,7 @@ inline void handle_local_read(int tid, int fd, off64_t count, bool is_prod) {
 
     if (process_offset + count > end_of_sector && !file_complete) {
         LOG("Mode is NO_UPDATE, but not enough data is available. Awaiting for data on "
-            "separate thread before sending it to client");
+            "a separate thread before sending it to client");
         std::thread t([&c_file, tid, fd, count, process_offset] {
             c_file.wait_for_data(process_offset + count);
             handle_pending_read(tid, fd, process_offset, count);
