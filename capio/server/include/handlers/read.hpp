@@ -49,7 +49,7 @@ inline void handle_local_read(int tid, int fd, off64_t count, bool is_prod) {
     // if a process is the producer of a file, then the file is always complete for that process
     const bool file_complete = c_file.is_complete() || is_prod;
 
-    if (!CapioCLEngine::get().isFirable(path) && !file_complete) {
+    if (!(file_complete || CapioCLEngine::get().isFirable(path))) {
         // wait for file to be completed and then do what is done inside handle pending read
         LOG("Data is not available yet. Starting async thread to wait for file availability");
         std::thread t([&c_file, tid, fd, count, process_offset] {
