@@ -53,7 +53,7 @@ inline void handle_local_read(int tid, int fd, off64_t count, bool is_prod) {
     //       file_complete variable
     if (!CapioCLEngine::get().isFirable(path) && !file_complete) {
         // wait for file to be completed and then do what is done inside handle pending read
-        LOG("Data is not yet available. Starting async thread to wait for file availability");
+        LOG("Data is not available yet. Starting async thread to wait for file availability");
         std::thread t([&c_file, tid, fd, count, process_offset] {
             c_file.wait_for_completion();
             handle_pending_read(tid, fd, process_offset, count);
