@@ -60,7 +60,7 @@ inline void handle_local_read(int tid, int fd, off64_t count, bool is_prod) {
         return;
     }
 
-    LOG("Data can be served. Condition met: %% %s", file_complete ? "c_file.is_complete()" : "",
+    LOG("Data can be served. Condition met: %s %s", file_complete ? "c_file.is_complete()" : "",
         CapioCLEngine::get().isFirable(path) ? "CapioCLEngine::get().isFirable(path)" : "");
 
     const off64_t end_of_sector = c_file.get_sector_end(process_offset);
