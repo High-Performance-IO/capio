@@ -27,7 +27,7 @@ inline void update_file_metadata(const std::filesystem::path &path, int tid, int
 }
 
 inline void wait_for_file_creation(const std::filesystem::path &path, pid_t tid, int fd) {
-    START_LOG(gettid(), "call(%s)", path.c_str());
+    START_LOG(gettid(), "wait_for_file_creation(%s, %ld, %d)", path.c_str(), tid, fd);
     loop_load_file_location(path);
     LOG("File %s exists. Allowing execution of posix client", path.c_str());
     update_file_metadata(path, tid, fd, false, 0);
