@@ -83,7 +83,7 @@ inline void handle_local_read(int tid, int fd, off64_t count, bool is_prod) {
         return;
     }
 
-    // Ensure it is never served more than the cache line
+    // Never serve more than the cache line
     const auto read_size = std::min(count, end_of_sector - process_offset);
     LOG("Requested read within end of sector, and data is available. Serving %ld bytes", read_size);
 
