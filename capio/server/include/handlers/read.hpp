@@ -46,7 +46,7 @@ inline void handle_local_read(int tid, int fd, off64_t count, bool is_prod) {
     CapioFile &c_file                 = get_capio_file(path);
     off64_t process_offset            = get_capio_file_offset(tid, fd);
 
-    // if a process is a producer of a file, then the file is always complete for that process
+    // if a process is the producer of a file, then the file is always complete for that process
     const bool file_complete = c_file.is_complete() || is_prod;
 
     // NOTE: do not apply De Morgan laws here as they do not apply due to the composition of
