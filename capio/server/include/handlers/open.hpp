@@ -62,7 +62,7 @@ inline void handle_open(int tid, int fd, const std::filesystem::path &path) {
         update_file_metadata(path, tid, fd, false, 0);
         client_manager->replyToClient(tid, 0);
     } else {
-        LOG("File does not yet exists. Halting execution of posix client.");
+        LOG("File does not exist yet. Halting execution of POSIX client.");
         std::thread t(wait_for_file_creation, path, tid, fd);
         t.detach();
     }
