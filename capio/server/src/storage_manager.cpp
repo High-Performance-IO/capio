@@ -273,7 +273,7 @@ off64_t StorageManager::addDirectory(const pid_t tid, const std::filesystem::pat
                 updateDirectory(tid, path);
             }
             addDirectoryEntry(tid, path, path, DOT_ENTRY);
-            const std::filesystem::path parent_dir = get_parent_dir_path(path);
+            const auto &parent_dir = get_parent_dir_path(path);
             addDirectoryEntry(tid, parent_dir, path, DOT_DOT_ENTRY);
         }
         return 0;
@@ -283,7 +283,7 @@ off64_t StorageManager::addDirectory(const pid_t tid, const std::filesystem::pat
 
 void StorageManager::updateDirectory(const pid_t tid, const std::filesystem::path &file_path) {
     START_LOG(gettid(), "call(file_path=%s)", file_path.c_str());
-    const std::filesystem::path dir = get_parent_dir_path(file_path);
+    const auto &dir = get_parent_dir_path(file_path);
     if (CapioFile &c_file = get(dir.c_str()); c_file.first_write) {
         c_file.first_write = false;
         write_file_location(dir);
