@@ -209,7 +209,7 @@ class StorageManager {
      *
      * @return A vector of `std::filesystem::path` objects.
      */
-    std::vector<std::filesystem::path> getPaths();
+    std::vector<std::filesystem::path> getPaths() const;
 
     /**
      * @brief Removes a file from the storage map.

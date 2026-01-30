@@ -209,7 +209,7 @@ void StorageManager::clone(const pid_t parent_tid, const pid_t child_tid) {
                      getFileOffset(parent_tid, fd));
     }
 }
-std::vector<std::filesystem::path> StorageManager::getPaths() {
+std::vector<std::filesystem::path> StorageManager::getPaths() const {
     const std::lock_guard lg(_mutex);
     std::vector<std::filesystem::path> paths(_storage.size());
     for (const auto &[file_path, _] : _storage) {
