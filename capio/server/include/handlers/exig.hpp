@@ -30,8 +30,7 @@ inline void handle_exit_group(int tid) {
         }
     }
 
-    for (auto &fd : storage_manager->getFileDescriptors(tid)) {
-        std::string path = storage_manager->getPath(tid, fd);
+    for (const auto fd : storage_manager->getFileDescriptors(tid)) {
         handle_close(tid, fd);
     }
     client_manager->removeClient(tid);
