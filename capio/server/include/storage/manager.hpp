@@ -171,6 +171,8 @@ class StorageManager {
      */
     void rename(const std::filesystem::path &oldpath, const std::filesystem::path &newpath);
 
+    // TODO: Remove parameter is_dir and make an explicit add for file and one for directories
+    // TODO: Rename this method to addFile
     /**
      * @brief Adds a new CapioFile object to the storage map.
      *

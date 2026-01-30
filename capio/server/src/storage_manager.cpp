@@ -165,6 +165,8 @@ void StorageManager::rename(const std::filesystem::path &oldpath,
     _storage.insert(std::move(node));
 }
 
+// TODO: Remove parameter is_dir and make an explicit add for file and one for directories
+// TODO: Rename this method to addFile
 CapioFile &StorageManager::add(const std::filesystem::path &path, bool is_dir, size_t init_size) {
 
     START_LOG(gettid(), "call(path=%s, is_dir=%s, init_size=%ld)", path.c_str(),
