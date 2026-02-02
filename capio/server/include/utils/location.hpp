@@ -6,6 +6,8 @@
 
 #include "utils/types.hpp"
 
+extern char *node_name;
+
 constexpr char CAPIO_SERVER_FILES_LOCATION_NAME[]     = "files_location_%s.txt";
 constexpr char CAPIO_SERVER_INVALIDATE_FILE_PATH_CHAR = '#';
 
@@ -15,7 +17,6 @@ constexpr char CAPIO_SERVER_INVALIDATE_FILE_PATH_CHAR = '#';
 
 inline std::unordered_map<std::string, std::pair<const char *const, off64_t>> files_location;
 inline std::mutex files_location_mutex;
-
 inline int files_location_fd;
 inline FILE *files_location_fp;
 inline std::unordered_map<std::string, FILE *> files_location_fps;
@@ -92,7 +93,7 @@ inline std::optional<std::reference_wrapper<std::pair<const char *const, long in
 get_file_location_opt(const std::filesystem::path &path) {
     START_LOG(gettid(), "path=%s", path.c_str());
 
-    const std::lock_guard<std::mutex> lg(files_metadata_mutex);
+    const std::lock_guard<std::mutex> lg(files_location_mutex);
     auto it = files_location.find(path);
     if (it == files_location.end()) {
         LOG("File was not found in files_locations. returning empty object");
