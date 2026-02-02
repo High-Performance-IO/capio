@@ -11,6 +11,7 @@
 #include "utils/capiocl_adapter.hpp"
 #include "utils/common.hpp"
 #include "utils/location.hpp"
+#include "utils/shared_mutex.hpp"
 #include "utils/types.hpp"
 
 extern char *node_name;
@@ -39,11 +40,11 @@ void StorageManager::addDirectoryEntry(const pid_t tid, const std::filesystem::p
 
     CapioFile &c_file = get(dir);
     c_file.create_buffer_if_needed(dir, true);
-    void *file_shm       = c_file.get_buffer();
-    off64_t file_size    = c_file.get_stored_size();
-    off64_t data_size    = file_size + ld.d_reclen;
-    size_t file_shm_size = c_file.get_buf_size();
-    ld.d_off             = data_size;
+    void *file_shm             = c_file.get_buffer();
+    const off64_t file_size    = c_file.get_stored_size();
+    const off64_t data_size    = file_size + ld.d_reclen;
+    const size_t file_shm_size = c_file.get_buf_size();
+    ld.d_off                   = data_size;
 
     if (data_size > file_shm_size) {
         file_shm = c_file.expand_buffer(data_size);
@@ -80,7 +81,7 @@ StorageManager::~StorageManager() {
 std::optional<std::reference_wrapper<CapioFile>>
 StorageManager::tryGet(const std::filesystem::path &path) const {
     START_LOG(gettid(), "call(path=%s)", path.c_str());
-    const std::lock_guard lg(_mutex);
+    const shared_lock_guard slg(_mutex_storage);
     if (const auto it = _storage.find(path); it == _storage.end()) {
         LOG("File %s was not found in files_metadata. returning empty object", path.c_str());
         return {};
@@ -91,7 +92,7 @@ StorageManager::tryGet(const std::filesystem::path &path) const {
 }
 CapioFile &StorageManager::get(const std::filesystem::path &path) const {
     START_LOG(gettid(), "call(path=%s)", path.c_str());
-    std::lock_guard lg(_mutex);
+    const shared_lock_guard slg(_mutex_storage);
     if (_storage.find(path) == _storage.end()) {
         ERR_EXIT("File %s was not found in local storage", path.c_str());
     }
@@ -100,7 +101,7 @@ CapioFile &StorageManager::get(const std::filesystem::path &path) const {
 }
 CapioFile &StorageManager::get(const pid_t pid, const int fd) const {
     START_LOG(gettid(), "call(pid=%d, fd=%d)", pid, fd);
-    const std::lock_guard lg(_mutex);
+    const shared_lock_guard slg(_mutex_opened_fd_map);
 
     if (_opened_fd_map[pid].find(fd) == _opened_fd_map[pid].end()) {
         ERR_EXIT("File descriptor %d is not opened for process with tid %d", fd, pid);
@@ -110,12 +111,12 @@ CapioFile &StorageManager::get(const pid_t pid, const int fd) const {
 }
 
 const std::filesystem::path &StorageManager::getPath(const pid_t tid, const int fd) const {
-    const std::lock_guard lg(_mutex);
+    const shared_lock_guard slg(_mutex_opened_fd_map);
     return _opened_fd_map[tid][fd]._path;
 }
 
 std::vector<int> StorageManager::getFileDescriptors(const pid_t tid) const {
-    const std::lock_guard lg(_mutex);
+    const shared_lock_guard slg(_mutex_opened_fd_map);
     std::vector<int> fds;
     for (const auto &[file_descriptor, _] : _opened_fd_map[tid]) {
         fds.push_back(file_descriptor);
@@ -124,7 +125,7 @@ std::vector<int> StorageManager::getFileDescriptors(const pid_t tid) const {
 }
 
 std::unordered_map<int, std::vector<int>> StorageManager::getFileDescriptors() const {
-    const std::lock_guard lg(_mutex);
+    const shared_lock_guard slg(_mutex_opened_fd_map);
     std::unordered_map<int, std::vector<int>> tid_fd_pairs;
     for (auto &[thread_id, opened_files] : _opened_fd_map) {
         for (auto &[file_descriptor, _] : opened_files) {
@@ -137,12 +138,12 @@ std::unordered_map<int, std::vector<int>> StorageManager::getFileDescriptors() c
 off64_t StorageManager::setFileOffset(const pid_t tid, const int fd, const off64_t offset) const {
     START_LOG(gettid(), "call(tid=%d, fd=%d, offset=%ld)", tid, fd, offset);
 
-    const std::lock_guard lg(_mutex);
+    const std::lock_guard lg(_mutex_opened_fd_map);
     return *_opened_fd_map[tid][fd]._offset = offset;
 }
 
 off64_t StorageManager::getFileOffset(const int tid, const int fd) const {
-    const std::lock_guard lg(_mutex);
+    const shared_lock_guard slg(_mutex_opened_fd_map);
     return *_opened_fd_map[tid][fd]._offset;
 }
 
@@ -150,7 +151,7 @@ void StorageManager::rename(const std::filesystem::path &oldpath,
                             const std::filesystem::path &newpath) {
     START_LOG(gettid(), "call(oldpath=%s, newpath=%s)", oldpath.c_str(), newpath.c_str());
 
-    const std::lock_guard lg(_mutex);
+    const std::lock_guard lg(_mutex_opened_fd_map);
 
     for (auto &[thread_id, opened_files] : _opened_fd_map) {
         for (auto &[file_descriptor, capio_file_repr] : opened_files) {
@@ -185,7 +186,7 @@ CapioFile &StorageManager::add(const std::filesystem::path &path, bool is_dir, s
     }
 
     {
-        const std::lock_guard lg(_mutex);
+        const std::lock_guard lg(_mutex_storage);
         _storage.try_emplace(path, is_dir, n_file, permanent, init_size, n_close_count);
     }
     return _storage[path];
@@ -193,7 +194,7 @@ CapioFile &StorageManager::add(const std::filesystem::path &path, bool is_dir, s
 
 void StorageManager::dup(const pid_t tid, const int old_fd, const int new_fd) {
     START_LOG(gettid(), "call(old_fd=%d, new_fd=%d)", old_fd, new_fd);
-    const std::lock_guard lg(_mutex);
+    const std::lock_guard lg(_mutex_opened_fd_map);
 
     _opened_fd_map[tid][new_fd]._path    = _opened_fd_map[tid][old_fd]._path;
     _opened_fd_map[tid][new_fd]._pointer = _opened_fd_map[tid][old_fd]._pointer;
@@ -205,20 +206,20 @@ void StorageManager::dup(const pid_t tid, const int old_fd, const int new_fd) {
 
 void StorageManager::clone(const pid_t parent_tid, const pid_t child_tid) {
     START_LOG(gettid(), "call(parent_tid=%d, child_tid=%d)", parent_tid, child_tid);
-
-    for (auto &fd : getFileDescriptors(parent_tid)) {
-        addFileToTid(child_tid, fd, _opened_fd_map[parent_tid][fd]._path,
-                     getFileOffset(parent_tid, fd));
+    for (const auto &fd : getFileDescriptors(parent_tid)) {
+        addFileToTid(child_tid, fd, getPath(parent_tid, fd), getFileOffset(parent_tid, fd));
     }
 }
+
 std::vector<std::filesystem::path> StorageManager::getPaths() const {
-    const std::lock_guard lg(_mutex);
+    const shared_lock_guard slg(_mutex_storage);
     std::vector<std::filesystem::path> paths(_storage.size());
     for (const auto &[file_path, _] : _storage) {
         paths.emplace_back(file_path);
     }
     return paths;
 }
+
 void StorageManager::remove(const std::filesystem::path &path) {
     START_LOG(gettid(), "call(path=%s)", path.c_str());
 
@@ -227,13 +228,13 @@ void StorageManager::remove(const std::filesystem::path &path) {
         removeFromTid(tid, fd);
     }
 
-    const std::lock_guard lg(_mutex);
+    const std::lock_guard lg(_mutex_storage);
     _storage.erase(path);
 }
 void StorageManager::removeFromTid(const pid_t tid, const int fd) {
     START_LOG(gettid(), "call(tid=%d, fd=%d)", tid, fd);
 
-    const std::lock_guard lg(_mutex);
+    const std::lock_guard lg(_mutex_opened_fd_map);
 
     if (_opened_fd_map[tid][fd]._path.empty()) {
         LOG("PATH is empty. returning");
@@ -248,14 +249,18 @@ void StorageManager::addFileToTid(const pid_t tid, const int fd, const std::file
                                   off64_t offset) {
     START_LOG(gettid(), "call(tid=%d, fd=%d, path=%s, offset=%ld)", tid, fd, path.c_str(), offset);
 
-    const std::lock_guard lg(_mutex);
+    {
+        const std::lock_guard lg(_mutex_storage);
+        _storage[path].open();
+        _storage[path].add_fd(tid, fd);
+    }
 
-    _storage[path].open();
-    _storage[path].add_fd(tid, fd);
-
-    _opened_fd_map[tid][fd]._path    = path;
-    _opened_fd_map[tid][fd]._pointer = &_storage[path];
-    _opened_fd_map[tid][fd]._offset  = std::make_shared<off64_t>(offset);
+    {
+        const std::lock_guard lg(_mutex_opened_fd_map);
+        _opened_fd_map[tid][fd]._path    = path;
+        _opened_fd_map[tid][fd]._pointer = &_storage[path];
+        _opened_fd_map[tid][fd]._offset  = std::make_shared<off64_t>(offset);
+    }
 }
 
 off64_t StorageManager::addDirectory(const pid_t tid, const std::filesystem::path &path) {

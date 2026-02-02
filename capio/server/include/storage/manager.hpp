@@ -5,6 +5,7 @@
 #include <optional>
 
 #include "utils/capio_file.hpp"
+#include "utils/shared_mutex.hpp"
 
 #include <unordered_map>
 #include <vector>
@@ -20,10 +21,14 @@
  */
 class StorageManager {
     /**
-     * @brief Mutex to protect access to internal data structures, primarily
-     * _storage and _opened_fd_map.
+     * @brief Mutex to protect access to _storage internal data structure.
      */
-    mutable std::mutex _mutex;
+    mutable std::shared_mutex _mutex_storage;
+
+    /**
+     * @brief Mutex to protect access to _opened_fd_map internal data structure.
+     */
+    mutable std::shared_mutex _mutex_opened_fd_map;
 
     /**
      * @brief The core storage map. Stores CapioFile objects, indexed by their
