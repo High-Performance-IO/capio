@@ -70,9 +70,15 @@ StorageManager::StorageManager() {
 }
 
 StorageManager::~StorageManager() {
-    for (auto &[tid, fds] : getFileDescriptors()) {
+
+    const auto file_descriptors = getFileDescriptors();
+
+    std::lock_guard lg1(_mutex_opened_fd_map);
+    std::lock_guard lg2(_mutex_storage);
+
+    for (auto &[tid, fds] : file_descriptors) {
         for (const auto &fd : fds) {
-            removeFromTid(tid, fd);
+            _removeFromTid(tid, fd);
         }
     }
     server_println(CAPIO_LOG_SERVER_CLI_LEVEL_INFO, "StorageManager teardown completed.");
@@ -206,8 +212,17 @@ void StorageManager::dup(const pid_t tid, const int old_fd, const int new_fd) {
 
 void StorageManager::clone(const pid_t parent_tid, const pid_t child_tid) {
     START_LOG(gettid(), "call(parent_tid=%d, child_tid=%d)", parent_tid, child_tid);
-    for (const auto &fd : getFileDescriptors(parent_tid)) {
-        addFileToTid(child_tid, fd, getPath(parent_tid, fd), getFileOffset(parent_tid, fd));
+    const auto file_descriptors = getFileDescriptors(parent_tid);
+
+    std::lock_guard lg_opened_fd_map(_mutex_opened_fd_map);
+    std::lock_guard lg_storage(_mutex_storage);
+
+    for (const auto &fd : file_descriptors) {
+        const auto path   = _opened_fd_map[parent_tid][fd]._path;
+        const auto offset = *_opened_fd_map[parent_tid][fd]._offset;
+
+        _addNewFdToStorage(child_tid, fd, path);
+        _addNewFdToMap(child_tid, fd, path, offset);
     }
 }
 
@@ -222,20 +237,22 @@ std::vector<std::filesystem::path> StorageManager::getPaths() const {
 
 void StorageManager::remove(const std::filesystem::path &path) {
     START_LOG(gettid(), "call(path=%s)", path.c_str());
-
     const CapioFile &c_file = get(path);
-    for (auto &[tid, fd] : c_file.get_fds()) {
-        removeFromTid(tid, fd);
+
+    {
+        std::lock_guard lg(_mutex_opened_fd_map);
+        for (auto &[tid, fd] : c_file.get_fds()) {
+            _removeFromTid(tid, fd);
+        }
     }
 
-    const std::lock_guard lg(_mutex_storage);
-    _storage.erase(path);
+    {
+        const std::lock_guard lg(_mutex_storage);
+        _storage.erase(path);
+    }
 }
-void StorageManager::removeFromTid(const pid_t tid, const int fd) {
+void StorageManager::_removeFromTid(const pid_t tid, const int fd) {
     START_LOG(gettid(), "call(tid=%d, fd=%d)", tid, fd);
-
-    const std::lock_guard lg(_mutex_opened_fd_map);
-
     if (_opened_fd_map[tid][fd]._path.empty()) {
         LOG("PATH is empty. returning");
         return;
@@ -245,21 +262,37 @@ void StorageManager::removeFromTid(const pid_t tid, const int fd) {
     _opened_fd_map[tid].erase(fd);
 }
 
+void StorageManager::removeFromTid(const pid_t tid, const int fd) {
+    START_LOG(gettid(), "call(tid=%d, fd=%d)", tid, fd);
+    const std::lock_guard lg(_mutex_opened_fd_map);
+    _removeFromTid(tid, fd);
+}
+
+void StorageManager::_addNewFdToMap(const pid_t tid, const int fd,
+                                    const std::filesystem::path &path, off64_t offset) {
+    _opened_fd_map[tid][fd]._path    = path;
+    _opened_fd_map[tid][fd]._pointer = &_storage[path];
+    _opened_fd_map[tid][fd]._offset  = std::make_shared<off64_t>(offset);
+}
+
+void StorageManager::_addNewFdToStorage(const pid_t tid, const int fd,
+                                        const std::filesystem::path &path) {
+    _storage[path].open();
+    _storage[path].add_fd(tid, fd);
+}
+
 void StorageManager::addFileToTid(const pid_t tid, const int fd, const std::filesystem::path &path,
-                                  off64_t offset) {
+                                  const off64_t offset) {
     START_LOG(gettid(), "call(tid=%d, fd=%d, path=%s, offset=%ld)", tid, fd, path.c_str(), offset);
 
     {
         const std::lock_guard lg(_mutex_storage);
-        _storage[path].open();
-        _storage[path].add_fd(tid, fd);
+        _addNewFdToStorage(tid, fd, path);
     }
 
     {
         const std::lock_guard lg(_mutex_opened_fd_map);
-        _opened_fd_map[tid][fd]._path    = path;
-        _opened_fd_map[tid][fd]._pointer = &_storage[path];
-        _opened_fd_map[tid][fd]._offset  = std::make_shared<off64_t>(offset);
+        _addNewFdToMap(tid, fd, path, offset);
     }
 }
 

@@ -74,6 +74,31 @@ class StorageManager {
     void addDirectoryEntry(int tid, const std::filesystem::path &file_path, const std::string &dir,
                            ManagerDirEntryType type);
 
+    /**
+     * Private method to remove file descriptor from a tid without acquiring a lock
+     * @param tid
+     * @param fd
+     */
+    void _removeFromTid(pid_t tid, int fd);
+
+    /**
+     * Add a new file descriptor to the map of opened file descriptors for threads without obtaining
+     * a lock
+     * @param tid The thread ID.
+     * @param fd The file descriptor number.
+     * @param path The path of the file being opened.
+     * @param offset The initial file offset (typically 0).
+     */
+    void _addNewFdToMap(pid_t tid, int fd, const std::filesystem::path &path, off64_t offset);
+
+    /**
+     * Register a new file descriptor within the CapioFile object
+     * @param tid The thread ID.
+     * @param fd The file descriptor number.
+     * @param path The path of the file being opened.
+     */
+    void _addNewFdToStorage(pid_t tid, int fd, const std::filesystem::path &path);
+
   public:
     /**
      * @brief Constructs a new StorageService instance.
