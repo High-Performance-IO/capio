@@ -2,20 +2,22 @@
 #define CAPIO_SERVER_UTILS_COMMON_HPP
 
 #include <string>
+#include <thread>
 
+#include "capiocl_adapter.hpp"
 #include "client-manager/client_manager.hpp"
-#include "common/constants.hpp"
 #include "common/dirent.hpp"
 #include "storage/manager.hpp"
 #include "utils/capio_file.hpp"
-#include "utils/types.hpp"
 
-#include "client-manager/client_manager.hpp"
 extern ClientManager *client_manager;
 extern StorageManager *storage_manager;
 
-inline off64_t send_dirent_to_client(int tid, int fd, CapioFile &c_file, off64_t offset,
-                                     off64_t count) {
+void wait_for_dirent_data(off64_t wait_size, int wait_tid, int wait_fd, int wait_count,
+                          CapioFile &wait_c_file);
+
+inline void send_dirent_to_client(int tid, int fd, CapioFile &c_file, off64_t offset,
+                                  off64_t count) {
     START_LOG(gettid(), "call(tid=%d, fd=%d, offset=%ld, count=%ld)", tid, fd, offset, count);
 
     struct linux_dirent64 *dir_entity;
@@ -45,12 +47,29 @@ inline off64_t send_dirent_to_client(int tid, int fd, CapioFile &c_file, off64_t
         client_manager->replyToClient(tid, offset, reinterpret_cast<char *>(dirents.get()) - offset,
                                       actual_size);
         storage_manager->setFileOffset(tid, fd, offset + actual_size);
-
-    } else {
-        client_manager->replyToClient(tid, offset);
+        return;
     }
 
-    return actual_size;
+    const auto &path_to_check = storage_manager->getPath(tid, fd);
+    if (!c_file.is_complete() && CapioCLEngine::get().isFirable(path_to_check)) {
+        LOG("File %s has mode no_update and not enough data is available", path_to_check.c_str());
+        std::thread t(wait_for_dirent_data, (last_entry + 1) * sizeof(linux_dirent64), tid, fd,
+                      count, std::ref(c_file));
+        t.detach();
+        return;
+    }
+
+    client_manager->replyToClient(tid, offset);
+}
+
+inline void wait_for_dirent_data(const off64_t wait_size, const int wait_tid, const int wait_fd,
+                                 const int wait_count, CapioFile &wait_c_file) {
+    const auto current_size = storage_manager->getFileOffset(wait_tid, wait_fd);
+    START_LOG(gettid(), "call(wait_size=%d, current_size = %ld, wait_fd=%d, wait_count=%d)",
+              wait_size, current_size, wait_fd, wait_count);
+    wait_c_file.wait_for_data(wait_size);
+    LOG("New capio file size = %ld", wait_c_file.get_stored_size());
+    send_dirent_to_client(wait_tid, wait_fd, wait_c_file, current_size, wait_count);
 }
 
 inline bool is_int(const std::string &s) {
