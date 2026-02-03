@@ -130,15 +130,16 @@ jobs:
         if: ${{ startsWith(matrix.compiler, 'gcc:') }}
         run: |
           apt update
-          apt remove --purge -y gfortran gfortran-10 libgfortran5 libgfortran-10-dev || true
-          apt install -y gfortran
-          update-alternatives --install /usr/bin/gfortran gfortran /usr/bin/gfortran-10 100 
+          apt install -y gfortran || true
+          update-alternatives --install /usr/bin/gfortran gfortran /usr/bin/gfortran-* 100
 
       - name: "Install packages"
         run: |
           apt update
           apt install -y  \
             libcapstone-dev   \
+            openmpi-bin       \
+            libopenmpi-dev    \
             ninja-build       \
             cmake             \
             make              \
@@ -149,7 +150,9 @@ jobs:
             pkg-config        \
             build-essential   \
             wget              \
-            tar
+            tar               \
+            python3           \
+            python3-pip
 
       - name: "Run CMake"
         shell: bash
