@@ -123,7 +123,7 @@ class CapioFile {
         LOG("Thread waiting for data to be available");
         std::unique_lock<std::mutex> lock(_mutex);
         _data_avail_cv.wait(lock, [offset, this] {
-            return (offset <= this->_get_stored_size()) || this->_complete;
+            return (offset >= this->_get_stored_size()) || this->_complete;
         });
     }
 
