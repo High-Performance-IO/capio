@@ -2,15 +2,15 @@
 
 #include "utils/capiocl_adapter.hpp"
 
-extern std::string workflow_name;
-
 #include "client-manager/client_manager.hpp"
 #include "common/constants.hpp"
 #include "common/queue.hpp"
+#include "utils/capiocl_adapter.hpp"
 #include "utils/common.hpp"
 
 ClientManager::ClientManager()
-    : requests{SHM_COMM_CHAN_NAME, CAPIO_REQ_BUFF_CNT, CAPIO_REQ_MAX_SIZE, workflow_name} {
+    : requests{SHM_COMM_CHAN_NAME, CAPIO_REQ_BUFF_CNT, CAPIO_REQ_MAX_SIZE,
+               CapioCLEngine::get().getWorkflowName()} {
     server_println(CAPIO_LOG_SERVER_CLI_LEVEL_INFO, "ClientManager initialization completed.");
 }
 
@@ -23,9 +23,9 @@ void ClientManager::registerClient(pid_t tid, const std::string &app_name, const
 
     ClientDataBuffers buffers{
         new SPSCQueue(SHM_SPSC_PREFIX_WRITE + std::to_string(tid), get_cache_lines(),
-                      get_cache_line_size(), workflow_name),
+                      get_cache_line_size(), CapioCLEngine::get().getWorkflowName()),
         new SPSCQueue(SHM_SPSC_PREFIX_READ + std::to_string(tid), get_cache_lines(),
-                      get_cache_line_size(), workflow_name)};
+                      get_cache_line_size(), CapioCLEngine::get().getWorkflowName())};
 
     data_buffers.emplace(tid, buffers);
     app_names.emplace(tid, app_name);
@@ -33,7 +33,7 @@ void ClientManager::registerClient(pid_t tid, const std::string &app_name, const
     files_created_by_app_name.emplace(app_name, std::initializer_list<std::string>{});
 
     responses.try_emplace(tid, SHM_COMM_CHAN_NAME_RESP + std::to_string(tid), CAPIO_REQ_BUFF_CNT,
-                          sizeof(off_t), workflow_name);
+                          sizeof(off_t), CapioCLEngine::get().getWorkflowName());
 
     if (wait) {
         std::thread t([&, target_tid = tid]() {

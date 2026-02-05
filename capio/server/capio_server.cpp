@@ -1,3 +1,5 @@
+
+
 #include <algorithm>
 #include <args.hxx>
 #include <array>
@@ -18,9 +20,10 @@
 #include <unordered_set>
 #include <vector>
 
+#include "capiocl.hpp"
+#include "capiocl/engine.h"
+#include "capiocl/parser.h"
 #include "utils/capiocl_adapter.hpp"
-
-std::string workflow_name;
 
 #include "client-manager/client_manager.hpp"
 #include "common/env.hpp"
@@ -57,8 +60,8 @@ std::mutex nfiles_mutex;
  * can only access it through a const reference. This prevents any modifications to the engine
  * outside of those permitted by the capiocl::Engine class itself.
  */
-capiocl::Engine *capio_cl_engine;
-const capiocl::Engine &CapioCLEngine::get() { return *capio_cl_engine; }
+capiocl::engine::Engine *capio_cl_engine;
+const capiocl::engine::Engine &CapioCLEngine::get() { return *capio_cl_engine; }
 
 static constexpr std::array<CSHandler_t, CAPIO_NR_REQUESTS> build_request_handlers_table() {
     std::array<CSHandler_t, CAPIO_NR_REQUESTS> _request_handlers{0};
@@ -226,11 +229,10 @@ int parseCLI(int argc, char **argv) {
         std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_INFO << "parsing config file: " << token
                   << std::endl;
 
-        std::tie(workflow_name, capio_cl_engine) =
-            capiocl::Parser::parse(token, resolve_path, store_all_in_memory);
+        capio_cl_engine = capiocl::parser::Parser::parse(token, resolve_path, store_all_in_memory);
     } else if (noConfigFile) {
-        workflow_name   = std::string_view(get_capio_workflow_name());
-        capio_cl_engine = new capiocl::Engine();
+        capio_cl_engine->setWorkflowName(get_capio_workflow_name());
+        capio_cl_engine = new capiocl::engine::Engine();
         if (store_all_in_memory) {
             capio_cl_engine->setAllStoreInMemory();
         }
@@ -239,7 +241,7 @@ int parseCLI(int argc, char **argv) {
                   << std::endl
                   << CAPIO_LOG_SERVER_CLI_LEVEL_WARNING
                   << "Obtained from environment variable current workflow name: "
-                  << workflow_name.data() << std::endl;
+                  << capio_cl_engine->getWorkflowName() << std::endl;
     } else {
         std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_ERROR
                   << "Error: no config file provided. To skip config file use --no-config option!"
@@ -293,7 +295,7 @@ int main(int argc, char **argv) {
 
     open_files_location();
 
-    shm_canary      = new CapioShmCanary(workflow_name);
+    shm_canary      = new CapioShmCanary(capio_cl_engine->getWorkflowName());
     storage_manager = new StorageManager();
     client_manager  = new ClientManager();
 

@@ -51,7 +51,7 @@ inline void handle_close(int tid, int fd) {
     c_file.close();
     LOG("File was closed", path.c_str());
 
-    if (CapioCLEngine::get().getCommitRule(path) == capiocl::commit_rules::ON_CLOSE &&
+    if (CapioCLEngine::get().getCommitRule(path) == capiocl::commitRules::ON_CLOSE &&
         c_file.is_closed()) {
         LOG("Capio File %s is closed and commit rule is on_close. setting it to complete and "
             "starting batch handling",
