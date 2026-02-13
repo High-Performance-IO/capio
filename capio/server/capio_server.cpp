@@ -231,8 +231,8 @@ int parseCLI(int argc, char **argv) {
 
         capio_cl_engine = capiocl::parser::Parser::parse(token, resolve_path, store_all_in_memory);
     } else if (noConfigFile) {
-        capio_cl_engine->setWorkflowName(get_capio_workflow_name());
         capio_cl_engine = new capiocl::engine::Engine();
+        capio_cl_engine->setWorkflowName(get_capio_workflow_name());
         if (store_all_in_memory) {
             capio_cl_engine->setAllStoreInMemory();
         }
