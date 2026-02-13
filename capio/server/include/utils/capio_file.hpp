@@ -369,7 +369,11 @@ class CapioFile {
         return _n_close_expected == -1 || _n_close == _n_close_expected;
     }
 
-    [[nodiscard]] inline bool is_deletable() const { return _n_opens <= 0; }
+    [[nodiscard]] inline bool is_deletable() const {
+        START_LOG(gettid(), "call()");
+        LOG("_n_opens=%d", _n_opens);
+        return _n_opens <= 0;
+    }
 
     [[nodiscard]] inline bool is_dir() const { return _directory; }
 
