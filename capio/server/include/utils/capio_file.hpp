@@ -377,7 +377,11 @@ class CapioFile {
 
     [[nodiscard]] inline bool is_dir() const { return _directory; }
 
-    inline void open() { _n_opens++; }
+    inline void open() {
+        START_LOG(gettid(), "call()");
+        _n_opens++;
+        LOG("_n_opens=%d", _n_opens);
+    }
 
     /*
      * From the manual:
