@@ -5,7 +5,9 @@
 #include <thread>
 
 #include "utils/types.hpp"
+#include "remote/backend.hpp"
 
+extern Backend *backend;
 extern char *node_name;
 
 constexpr char CAPIO_SERVER_FILES_LOCATION_NAME[]     = "files_location_%s.txt";

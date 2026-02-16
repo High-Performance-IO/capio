@@ -38,6 +38,7 @@ class MPIBackend : public Backend {
         nodes.emplace(node_name);
         rank_nodes_equivalence[std::to_string(rank)] = node_name;
         rank_nodes_equivalence[node_name]            = std::to_string(rank);
+        MPI_Comm_size(MPI_COMM_WORLD, &n_servers);
     }
 
     ~MPIBackend() override {

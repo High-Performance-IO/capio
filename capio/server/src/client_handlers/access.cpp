@@ -1,11 +1,14 @@
 #ifndef CAPIO_SERVER_HANDLERS_ACCESS_HPP
 #define CAPIO_SERVER_HANDLERS_ACCESS_HPP
 
+#include "client/manager.hpp"
+#include "client/request.hpp"
+#include "utils/capiocl_adapter.hpp"
 #include "utils/location.hpp"
 
 extern ClientManager *client_manager;
 
-void access_handler(const char *const str) {
+void ClientRequestManager::ClientHandlers::access_handler(const char *const str) {
     START_LOG(gettid(), "call(str=%s)", str);
     long tid;
     char path[PATH_MAX];

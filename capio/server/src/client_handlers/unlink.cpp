@@ -1,12 +1,15 @@
 #ifndef CAPIO_SERVER_HANDLERS_UNLINK_HPP
 #define CAPIO_SERVER_HANDLERS_UNLINK_HPP
-#include "client-manager/client_manager.hpp"
+#include "client/manager.hpp"
+#include "client/request.hpp"
 #include "storage/manager.hpp"
+#include "utils/capiocl_adapter.hpp"
+#include "utils/location.hpp"
 
 extern StorageManager *storage_manager;
 extern ClientManager *client_manager;
 
-void unlink_handler(const char *const str) {
+void ClientRequestManager::ClientHandlers::unlink_handler(const char *const str) {
     char path[PATH_MAX];
     int tid;
     sscanf(str, "%d %s", &tid, path);

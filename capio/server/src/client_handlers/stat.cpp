@@ -4,15 +4,15 @@
 #include <mutex>
 #include <thread>
 
+#include "client/manager.hpp"
+#include "client/request.hpp"
 #include "remote/backend.hpp"
-
 #include "remote/requests.hpp"
-
+#include "storage/manager.hpp"
+#include "utils/capiocl_adapter.hpp"
+#include "utils/env.hpp"
 #include "utils/location.hpp"
 #include "utils/types.hpp"
-
-#include "client-manager/client_manager.hpp"
-#include "storage/manager.hpp"
 
 extern StorageManager *storage_manager;
 extern ClientManager *client_manager;
@@ -36,7 +36,7 @@ void wait_for_file_completion(int tid, const std::filesystem::path &path) {
     }
 }
 
-inline void reply_stat(int tid, const std::filesystem::path &path) {
+void ClientRequestManager::ClientUtilities::reply_stat(int tid, const std::filesystem::path &path) {
     START_LOG(gettid(), "call(tid=%d, path=%s)", tid, path.c_str());
 
     auto file_location_opt = get_file_location_opt(path);
@@ -85,14 +85,14 @@ inline void reply_stat(int tid, const std::filesystem::path &path) {
     }
 }
 
-void fstat_handler(const char *const str) {
+void ClientRequestManager::ClientHandlers::fstat_handler(const char *const str) {
     int tid, fd;
     sscanf(str, "%d %d", &tid, &fd);
 
-    reply_stat(tid, storage_manager->getPath(tid, fd));
+    ClientUtilities::reply_stat(tid, storage_manager->getPath(tid, fd));
 }
 
-void stat_handler(const char *const str) {
+void ClientRequestManager::ClientHandlers::stat_handler(const char *const str) {
     char path[2048];
     int tid;
     sscanf(str, "%d %s", &tid, path);
@@ -100,7 +100,7 @@ void stat_handler(const char *const str) {
         client_manager->replyToClient(tid, CAPIO_POSIX_SYSCALL_REQUEST_SKIP);
         return;
     }
-    reply_stat(tid, path);
+    ClientUtilities::reply_stat(tid, path);
 }
 
 #endif // CAPIO_SERVER_HANDLERS_STAT_HPP

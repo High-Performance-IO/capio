@@ -1,9 +1,15 @@
 #ifndef CAPIO_SERVER_HANDLERS_WRITE_HPP
 #define CAPIO_SERVER_HANDLERS_WRITE_HPP
 
+#include "client/manager.hpp"
+#include "client/request.hpp"
+#include "storage/manager.hpp"
 #include "utils/location.hpp"
 
-void write_handler(const char *const str) {
+extern StorageManager *storage_manager;
+extern ClientManager *client_manager;
+
+void ClientRequestManager::ClientHandlers::write_handler(const char *const str) {
     std::string request;
     int tid, fd;
     off64_t count;

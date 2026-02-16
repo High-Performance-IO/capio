@@ -2,8 +2,11 @@
 #define CAPIO_REMOTE_REQUESTS_HPP
 
 #include "storage/manager.hpp"
+#include "common/requests.hpp"
+#include "utils/location.hpp"
 
 extern StorageManager *storage_manager;
+extern char *node_name;
 
 inline void serve_remote_stat_request(const std::filesystem::path &path, int source_tid,
                                       off64_t file_size, bool is_dir, const std::string &dest) {

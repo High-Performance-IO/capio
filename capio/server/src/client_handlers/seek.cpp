@@ -1,14 +1,14 @@
 #ifndef CAPIO_SERVER_HANDLERS_SEEK_HPP
 #define CAPIO_SERVER_HANDLERS_SEEK_HPP
 
-#include "client-manager/client_manager.hpp"
-#include "stat.hpp"
+#include "client/manager.hpp"
+#include "client/request.hpp"
 #include "storage/manager.hpp"
 
 extern ClientManager *client_manager;
 extern StorageManager *storage_manager;
 
-inline void handle_lseek(int tid, int fd, off64_t offset) {
+void handle_lseek(int tid, int fd, off64_t offset) {
     START_LOG(gettid(), "call(tid=%d, fd=%d, offset=%ld)", tid, fd, offset);
 
     storage_manager->setFileOffset(tid, fd, offset);
@@ -24,14 +24,14 @@ void handle_seek_data(int tid, int fd, off64_t offset) {
     client_manager->replyToClient(tid, offset);
 }
 
-inline void handle_seek_end(int tid, int fd) {
+void ClientRequestManager::ClientUtilities::handle_seek_end(int tid, int fd) {
     START_LOG(gettid(), "call(tid=%d, fd=%d)", tid, fd);
 
     // seek_end here behaves as stat because we want the file size
-    reply_stat(tid, storage_manager->getPath(tid, fd));
+    ClientRequestManager::ClientUtilities::reply_stat(tid, storage_manager->getPath(tid, fd));
 }
 
-inline void handle_seek_hole(int tid, int fd, off64_t offset) {
+void handle_seek_hole(int tid, int fd, off64_t offset) {
     START_LOG(gettid(), "call(tid=%d, fd=%d, offset=%ld)", tid, fd, offset);
 
     CapioFile &c_file = storage_manager->get(tid, fd);
@@ -40,27 +40,27 @@ inline void handle_seek_hole(int tid, int fd, off64_t offset) {
     client_manager->replyToClient(tid, offset);
 }
 
-void lseek_handler(const char *const str) {
+void ClientRequestManager::ClientHandlers::lseek_handler(const char *const str) {
     int tid, fd;
     off64_t offset;
     sscanf(str, "%d %d %ld", &tid, &fd, &offset);
     handle_lseek(tid, fd, offset);
 }
 
-void seek_data_handler(const char *const str) {
+void ClientRequestManager::ClientHandlers::seek_data_handler(const char *const str) {
     int tid, fd;
     off64_t offset;
     sscanf(str, "%d %d %ld", &tid, &fd, &offset);
     handle_seek_data(tid, fd, offset);
 }
 
-void seek_end_handler(const char *const str) {
+void ClientRequestManager::ClientHandlers::seek_end_handler(const char *const str) {
     int tid, fd;
     sscanf(str, "%d %d", &tid, &fd);
-    handle_seek_end(tid, fd);
+    ClientUtilities::handle_seek_end(tid, fd);
 }
 
-void seek_hole_handler(const char *const str) {
+void ClientRequestManager::ClientHandlers::seek_hole_handler(const char *const str) {
     int tid, fd;
     off64_t offset;
     sscanf(str, "%d %d %ld", &tid, &fd, &offset);
