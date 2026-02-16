@@ -1,6 +1,7 @@
 #ifndef CAPIO_SERVER_HANDLERS_RENAME_HPP
 #define CAPIO_SERVER_HANDLERS_RENAME_HPP
-#include "client-manager/client_manager.hpp"
+#include "client/manager.hpp"
+#include "client/request.hpp"
 #include "storage/manager.hpp"
 #include "utils/location.hpp"
 
@@ -26,7 +27,7 @@ void handle_rename(int tid, const std::filesystem::path &oldpath,
     }
 }
 
-void rename_handler(const char *const str) {
+void ClientRequestManager::ClientHandlers::rename_handler(const char *const str) {
     char oldpath[PATH_MAX];
     char newpath[PATH_MAX];
     int tid;

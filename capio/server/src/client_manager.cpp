@@ -2,7 +2,7 @@
 
 #include "utils/capiocl_adapter.hpp"
 
-#include "client-manager/client_manager.hpp"
+#include "client/manager.hpp"
 #include "common/constants.hpp"
 #include "common/queue.hpp"
 #include "utils/capiocl_adapter.hpp"

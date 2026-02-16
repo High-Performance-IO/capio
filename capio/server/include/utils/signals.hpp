@@ -4,12 +4,17 @@
 #include <csignal>
 
 #include "remote/backend.hpp"
+#include "client/manager.hpp"
+#include "client/request.hpp"
+
+extern ClientManager *client_manager;
+extern StorageManager *storage_manager;
 
 #ifdef CAPIO_COVERAGE
 extern "C" void __gcov_dump(void);
 #endif
 
-void sig_term_handler(int signum, siginfo_t *info, void *ptr) {
+inline void sig_term_handler(int signum, siginfo_t *info, void *ptr) {
     START_LOG(gettid(), "call(signal=[%d] (%s) from process with pid=%ld)", signum,
               strsignal(signum), info != nullptr ? info->si_pid : -1);
 
@@ -41,7 +46,7 @@ void sig_term_handler(int signum, siginfo_t *info, void *ptr) {
     exit(EXIT_SUCCESS);
 }
 
-void setup_signal_handlers() {
+inline void setup_signal_handlers() {
     START_LOG(gettid(), "call()");
     static struct sigaction sigact;
     memset(&sigact, 0, sizeof(sigact));
