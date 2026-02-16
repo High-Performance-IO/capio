@@ -221,7 +221,7 @@ void StorageManager::clone(const pid_t parent_tid, const pid_t child_tid) {
         const auto path   = _opened_fd_map[parent_tid][fd]._path;
         const auto offset = *_opened_fd_map[parent_tid][fd]._offset;
 
-        _addNewFdToStorage(child_tid, fd, path);
+        _addNewFdToStorage(child_tid, fd, path, false);
         _addNewFdToMap(child_tid, fd, path, offset);
     }
 }
@@ -276,8 +276,11 @@ void StorageManager::_addNewFdToMap(const pid_t tid, const int fd,
 }
 
 void StorageManager::_addNewFdToStorage(const pid_t tid, const int fd,
-                                        const std::filesystem::path &path) {
-    _storage[path].open();
+                                        const std::filesystem::path &path,
+                                        const bool register_open) {
+    if (register_open) {
+        _storage[path].open();
+    }
     _storage[path].add_fd(tid, fd);
 }
 
@@ -287,7 +290,7 @@ void StorageManager::addFileToTid(const pid_t tid, const int fd, const std::file
 
     {
         const std::lock_guard lg(_mutex_storage);
-        _addNewFdToStorage(tid, fd, path);
+        _addNewFdToStorage(tid, fd, path, true);
     }
 
     {

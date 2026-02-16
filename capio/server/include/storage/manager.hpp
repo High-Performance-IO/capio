@@ -96,8 +96,9 @@ class StorageManager {
      * @param tid The thread ID.
      * @param fd The file descriptor number.
      * @param path The path of the file being opened.
+     * @param register_open
      */
-    void _addNewFdToStorage(pid_t tid, int fd, const std::filesystem::path &path);
+    void _addNewFdToStorage(pid_t tid, int fd, const std::filesystem::path &path, bool register_open);
 
   public:
     /**
