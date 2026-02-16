@@ -147,8 +147,10 @@ class CapioFile {
     }
 
     inline void close() {
+        START_LOG(gettid(), "call()");
         _n_close++;
         _n_opens--;
+        LOG("after: _n_close=%d, n_opens=%d", _n_close, _n_opens);
     }
 
     void commit() {
@@ -380,7 +382,7 @@ class CapioFile {
     inline void open() {
         START_LOG(gettid(), "call()");
         _n_opens++;
-        LOG("_n_opens=%d", _n_opens);
+        LOG("after: _n_opens=%d", _n_opens);
     }
 
     /*
