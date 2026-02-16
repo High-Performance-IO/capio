@@ -9,7 +9,7 @@
 extern ClientManager *client_manager;
 extern StorageManager *storage_manager;
 
-void ClientRequestManager::ClientHandlers::rmdir_handler(const char *const str) {
+void ClientRequestManager::MemHandlers::rmdir_handler(const char *const str) {
     char dir_to_remove[PATH_MAX];
     int tid;
     sscanf(str, "%s %d", dir_to_remove, &tid);

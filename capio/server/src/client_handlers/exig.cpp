@@ -40,7 +40,7 @@ void ClientRequestManager::ClientUtilities::handle_exit_group(int tid) {
     client_manager->removeClient(tid);
 }
 
-void ClientRequestManager::ClientHandlers::exit_group_handler(const char *const str) {
+void ClientRequestManager::Handlers::exit_group_handler(const char *const str) {
     int tid;
     sscanf(str, "%d", &tid);
     ClientUtilities::handle_exit_group(tid);

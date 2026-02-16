@@ -85,14 +85,14 @@ void ClientRequestManager::ClientUtilities::reply_stat(int tid, const std::files
     }
 }
 
-void ClientRequestManager::ClientHandlers::fstat_handler(const char *const str) {
+void ClientRequestManager::MemHandlers::fstat_handler(const char *const str) {
     int tid, fd;
     sscanf(str, "%d %d", &tid, &fd);
 
     ClientUtilities::reply_stat(tid, storage_manager->getPath(tid, fd));
 }
 
-void ClientRequestManager::ClientHandlers::stat_handler(const char *const str) {
+void ClientRequestManager::MemHandlers::stat_handler(const char *const str) {
     char path[2048];
     int tid;
     sscanf(str, "%d %s", &tid, path);

@@ -97,7 +97,7 @@ inline void handle_getdents(int tid, int fd, long int count) {
     }
 }
 
-void ClientRequestManager::ClientHandlers::getdents_handler(const char *const str) {
+void ClientRequestManager::MemHandlers::getdents_handler(const char *const str) {
     int tid, fd;
     off64_t count;
     sscanf(str, "%d %d %ld", &tid, &fd, &count);

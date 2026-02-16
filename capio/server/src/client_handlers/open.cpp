@@ -73,7 +73,7 @@ inline void handle_open(int tid, int fd, const std::filesystem::path &path) {
     }
 }
 
-void ClientRequestManager::ClientHandlers::create_handler(const char *const str) {
+void ClientRequestManager::MemHandlers::create_handler(const char *const str) {
     int tid, fd;
     char path[PATH_MAX];
     sscanf(str, "%d %d %s", &tid, &fd, path);
@@ -84,7 +84,7 @@ void ClientRequestManager::ClientHandlers::create_handler(const char *const str)
     handle_create(tid, fd, path);
 }
 
-void ClientRequestManager::ClientHandlers::create_exclusive_handler(const char *const str) {
+void ClientRequestManager::MemHandlers::create_exclusive_handler(const char *const str) {
     int tid, fd;
     char path[PATH_MAX];
     sscanf(str, "%d %d %s", &tid, &fd, path);
@@ -95,7 +95,7 @@ void ClientRequestManager::ClientHandlers::create_exclusive_handler(const char *
     handle_create_exclusive(tid, fd, path);
 }
 
-void ClientRequestManager::ClientHandlers::open_handler(const char *const str) {
+void ClientRequestManager::MemHandlers::open_handler(const char *const str) {
     int tid, fd;
     char path[PATH_MAX];
     sscanf(str, "%d %d %s", &tid, &fd, path);

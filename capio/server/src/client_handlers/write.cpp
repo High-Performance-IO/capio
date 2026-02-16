@@ -9,7 +9,7 @@
 extern StorageManager *storage_manager;
 extern ClientManager *client_manager;
 
-void ClientRequestManager::ClientHandlers::write_handler(const char *const str) {
+void ClientRequestManager::MemHandlers::write_handler(const char *const str) {
     std::string request;
     int tid, fd;
     off64_t count;
