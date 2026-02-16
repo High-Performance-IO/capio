@@ -184,7 +184,7 @@ inline void handle_read(int tid, int fd, off64_t count) {
     }
 }
 
-void ClientRequestManager::ClientHandlers::read_handler(const char *const str) {
+void ClientRequestManager::MemHandlers::read_handler(const char *const str) {
     int tid, fd;
     off64_t count;
     sscanf(str, "%d %d %ld", &tid, &fd, &count);

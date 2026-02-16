@@ -73,7 +73,7 @@ void ClientRequestManager::ClientUtilities::handle_close(int tid, int fd) {
     storage_manager->removeFromTid(tid, fd);
 }
 
-void ClientRequestManager::ClientHandlers::close_handler(const char *str) {
+void ClientRequestManager::MemHandlers::close_handler(const char *str) {
     int tid, fd;
     sscanf(str, "%d %d", &tid, &fd);
     ClientUtilities::handle_close(tid, fd);

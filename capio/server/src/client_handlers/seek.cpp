@@ -40,27 +40,27 @@ void handle_seek_hole(int tid, int fd, off64_t offset) {
     client_manager->replyToClient(tid, offset);
 }
 
-void ClientRequestManager::ClientHandlers::lseek_handler(const char *const str) {
+void ClientRequestManager::MemHandlers::lseek_handler(const char *const str) {
     int tid, fd;
     off64_t offset;
     sscanf(str, "%d %d %ld", &tid, &fd, &offset);
     handle_lseek(tid, fd, offset);
 }
 
-void ClientRequestManager::ClientHandlers::seek_data_handler(const char *const str) {
+void ClientRequestManager::MemHandlers::seek_data_handler(const char *const str) {
     int tid, fd;
     off64_t offset;
     sscanf(str, "%d %d %ld", &tid, &fd, &offset);
     handle_seek_data(tid, fd, offset);
 }
 
-void ClientRequestManager::ClientHandlers::seek_end_handler(const char *const str) {
+void ClientRequestManager::MemHandlers::seek_end_handler(const char *const str) {
     int tid, fd;
     sscanf(str, "%d %d", &tid, &fd);
     ClientUtilities::handle_seek_end(tid, fd);
 }
 
-void ClientRequestManager::ClientHandlers::seek_hole_handler(const char *const str) {
+void ClientRequestManager::MemHandlers::seek_hole_handler(const char *const str) {
     int tid, fd;
     off64_t offset;
     sscanf(str, "%d %d %ld", &tid, &fd, &offset);

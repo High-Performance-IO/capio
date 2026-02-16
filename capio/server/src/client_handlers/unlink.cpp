@@ -9,7 +9,7 @@
 extern StorageManager *storage_manager;
 extern ClientManager *client_manager;
 
-void ClientRequestManager::ClientHandlers::unlink_handler(const char *const str) {
+void ClientRequestManager::MemHandlers::unlink_handler(const char *const str) {
     char path[PATH_MAX];
     int tid;
     sscanf(str, "%d %s", &tid, path);

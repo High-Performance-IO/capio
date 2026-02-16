@@ -105,13 +105,6 @@ inline off64_t getdents_request(const int fd, const off64_t count, bool is64bit,
     return res;
 }
 
-inline void handshake_anonymous_request(const long tid, const long pid) {
-    START_LOG(capio_syscall(SYS_gettid), "call(tid=%ld, pid=%ld)", tid, pid);
-    char req[CAPIO_REQ_MAX_SIZE];
-    sprintf(req, "%04d %ld %ld", CAPIO_REQUEST_HANDSHAKE_ANONYMOUS, tid, pid);
-    buf_requests->write(req, CAPIO_REQ_MAX_SIZE);
-}
-
 inline void handshake_named_request(const long tid, const long pid, const std::string &app_name,
                                     const bool wait = false) {
     START_LOG(capio_syscall(SYS_gettid), "call(tid=%ld, pid=%ld, app_name=%s)", tid, pid,

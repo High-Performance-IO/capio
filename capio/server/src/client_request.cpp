@@ -11,30 +11,29 @@ constexpr std::array<ClientRequestManager::CSHandler_t, CAPIO_NR_REQUESTS>
 ClientRequestManager::build_request_handlers_table() {
     std::array<CSHandler_t, CAPIO_NR_REQUESTS> _request_handlers{0};
 
-    _request_handlers[CAPIO_REQUEST_ACCESS]              = ClientHandlers::access_handler;
-    _request_handlers[CAPIO_REQUEST_CLONE]               = ClientHandlers::clone_handler;
-    _request_handlers[CAPIO_REQUEST_CLOSE]               = ClientHandlers::close_handler;
-    _request_handlers[CAPIO_REQUEST_CREATE]              = ClientHandlers::create_handler;
-    _request_handlers[CAPIO_REQUEST_CREATE_EXCLUSIVE]    = ClientHandlers::create_exclusive_handler;
-    _request_handlers[CAPIO_REQUEST_DUP]                 = ClientHandlers::dup_handler;
-    _request_handlers[CAPIO_REQUEST_EXIT_GROUP]          = ClientHandlers::exit_group_handler;
-    _request_handlers[CAPIO_REQUEST_FSTAT]               = ClientHandlers::fstat_handler;
-    _request_handlers[CAPIO_REQUEST_GETDENTS]            = ClientHandlers::getdents_handler;
-    _request_handlers[CAPIO_REQUEST_GETDENTS64]          = ClientHandlers::getdents_handler;
-    _request_handlers[CAPIO_REQUEST_HANDSHAKE_NAMED]     = ClientHandlers::handshake_named_handler;
-    _request_handlers[CAPIO_REQUEST_HANDSHAKE_ANONYMOUS] = ClientHandlers::handshake_anonymous_handler;
-    _request_handlers[CAPIO_REQUEST_MKDIR]               = ClientHandlers::mkdir_handler;
-    _request_handlers[CAPIO_REQUEST_OPEN]                = ClientHandlers::open_handler;
-    _request_handlers[CAPIO_REQUEST_READ]                = ClientHandlers::read_handler;
-    _request_handlers[CAPIO_REQUEST_RENAME]              = ClientHandlers::rename_handler;
-    _request_handlers[CAPIO_REQUEST_RMDIR]               = ClientHandlers::rmdir_handler;
-    _request_handlers[CAPIO_REQUEST_SEEK]                = ClientHandlers::lseek_handler;
-    _request_handlers[CAPIO_REQUEST_SEEK_DATA]           = ClientHandlers::seek_data_handler;
-    _request_handlers[CAPIO_REQUEST_SEEK_END]            = ClientHandlers::seek_end_handler;
-    _request_handlers[CAPIO_REQUEST_SEEK_HOLE]           = ClientHandlers::seek_hole_handler;
-    _request_handlers[CAPIO_REQUEST_STAT]                = ClientHandlers::stat_handler;
-    _request_handlers[CAPIO_REQUEST_UNLINK]              = ClientHandlers::unlink_handler;
-    _request_handlers[CAPIO_REQUEST_WRITE]               = ClientHandlers::write_handler;
+    _request_handlers[CAPIO_REQUEST_ACCESS]           = MemHandlers::access_handler;
+    _request_handlers[CAPIO_REQUEST_CLONE]            = MemHandlers::clone_handler;
+    _request_handlers[CAPIO_REQUEST_CLOSE]            = MemHandlers::close_handler;
+    _request_handlers[CAPIO_REQUEST_CREATE]           = MemHandlers::create_handler;
+    _request_handlers[CAPIO_REQUEST_CREATE_EXCLUSIVE] = MemHandlers::create_exclusive_handler;
+    _request_handlers[CAPIO_REQUEST_DUP]              = MemHandlers::dup_handler;
+    _request_handlers[CAPIO_REQUEST_EXIT_GROUP]       = Handlers::exit_group_handler;
+    _request_handlers[CAPIO_REQUEST_FSTAT]            = MemHandlers::fstat_handler;
+    _request_handlers[CAPIO_REQUEST_GETDENTS]         = MemHandlers::getdents_handler;
+    _request_handlers[CAPIO_REQUEST_GETDENTS64]       = MemHandlers::getdents_handler;
+    _request_handlers[CAPIO_REQUEST_HANDSHAKE_NAMED]  = Handlers::handshake_named_handler;
+    _request_handlers[CAPIO_REQUEST_MKDIR]            = MemHandlers::mkdir_handler;
+    _request_handlers[CAPIO_REQUEST_OPEN]             = MemHandlers::open_handler;
+    _request_handlers[CAPIO_REQUEST_READ]             = MemHandlers::read_handler;
+    _request_handlers[CAPIO_REQUEST_RENAME]           = MemHandlers::rename_handler;
+    _request_handlers[CAPIO_REQUEST_RMDIR]            = MemHandlers::rmdir_handler;
+    _request_handlers[CAPIO_REQUEST_SEEK]             = MemHandlers::lseek_handler;
+    _request_handlers[CAPIO_REQUEST_SEEK_DATA]        = MemHandlers::seek_data_handler;
+    _request_handlers[CAPIO_REQUEST_SEEK_END]         = MemHandlers::seek_end_handler;
+    _request_handlers[CAPIO_REQUEST_SEEK_HOLE]        = MemHandlers::seek_hole_handler;
+    _request_handlers[CAPIO_REQUEST_STAT]             = MemHandlers::stat_handler;
+    _request_handlers[CAPIO_REQUEST_UNLINK]           = MemHandlers::unlink_handler;
+    _request_handlers[CAPIO_REQUEST_WRITE]            = MemHandlers::write_handler;
 
     return _request_handlers;
 }

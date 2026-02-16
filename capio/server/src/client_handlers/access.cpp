@@ -8,7 +8,7 @@
 
 extern ClientManager *client_manager;
 
-void ClientRequestManager::ClientHandlers::access_handler(const char *const str) {
+void ClientRequestManager::MemHandlers::access_handler(const char *const str) {
     START_LOG(gettid(), "call(str=%s)", str);
     long tid;
     char path[PATH_MAX];

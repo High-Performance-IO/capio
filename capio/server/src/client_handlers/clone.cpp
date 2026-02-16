@@ -7,7 +7,7 @@
 extern ClientManager *client_manager;
 extern StorageManager *storage_manager;
 
-void ClientRequestManager::ClientHandlers::clone_handler(const char *const str) {
+void ClientRequestManager::MemHandlers::clone_handler(const char *const str) {
     pid_t parent_tid, child_tid;
     sscanf(str, "%d %d", &parent_tid, &child_tid);
     START_LOG(gettid(), "call(parent_tid=%d, child_tid=%d)", parent_tid, child_tid);

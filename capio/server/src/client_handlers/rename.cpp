@@ -27,7 +27,7 @@ void handle_rename(int tid, const std::filesystem::path &oldpath,
     }
 }
 
-void ClientRequestManager::ClientHandlers::rename_handler(const char *const str) {
+void ClientRequestManager::MemHandlers::rename_handler(const char *const str) {
     char oldpath[PATH_MAX];
     char newpath[PATH_MAX];
     int tid;
