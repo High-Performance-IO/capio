@@ -3,10 +3,11 @@
 
 #include <thread>
 
+#include "client/manager.hpp"
+#include "client/request.hpp"
 #include "posix/utils/env.hpp"
-
-#include "remote/backend.hpp"
 #include "remote/requests.hpp"
+#include "utils/common.hpp"
 #include "utils/location.hpp"
 
 extern StorageManager *storage_manager;
@@ -96,7 +97,7 @@ inline void handle_getdents(int tid, int fd, long int count) {
     }
 }
 
-void getdents_handler(const char *const str) {
+void ClientRequestManager::MemHandlers::getdents_handler(const char *const str) {
     int tid, fd;
     off64_t count;
     sscanf(str, "%d %d %ld", &tid, &fd, &count);

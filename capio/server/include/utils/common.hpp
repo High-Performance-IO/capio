@@ -5,7 +5,7 @@
 #include <thread>
 
 #include "capiocl_adapter.hpp"
-#include "client-manager/client_manager.hpp"
+#include "client/manager.hpp"
 #include "common/dirent.hpp"
 #include "storage/manager.hpp"
 #include "utils/capio_file.hpp"

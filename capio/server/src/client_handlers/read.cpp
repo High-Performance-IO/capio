@@ -4,9 +4,11 @@
 #include <mutex>
 #include <thread>
 
+#include "client/manager.hpp"
+#include "client/request.hpp"
 #include "remote/backend.hpp"
 #include "remote/requests.hpp"
-
+#include "utils/capiocl_adapter.hpp"
 #include "utils/location.hpp"
 
 std::mutex local_read_mutex;
@@ -182,7 +184,7 @@ inline void handle_read(int tid, int fd, off64_t count) {
     }
 }
 
-void read_handler(const char *const str) {
+void ClientRequestManager::MemHandlers::read_handler(const char *const str) {
     int tid, fd;
     off64_t count;
     sscanf(str, "%d %d %ld", &tid, &fd, &count);

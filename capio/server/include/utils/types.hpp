@@ -16,6 +16,4 @@ typedef std::unordered_map<std::string,
                                                 std::vector<std::string> *, Semaphore *>>>
     CSClientsRemotePendingNFilesMap_t;
 
-typedef void (*CSHandler_t)(const char *const);
-
 #endif // CAPIO_SERVER_UTILS_TYPES_HPP

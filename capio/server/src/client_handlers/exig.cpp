@@ -1,10 +1,14 @@
 #ifndef CAPIO_SERVER_HANDLERS_EXITG_HPP
 #define CAPIO_SERVER_HANDLERS_EXITG_HPP
-
+#include "client/manager.hpp"
+#include "client/request.hpp"
 #include "storage/manager.hpp"
+#include "utils/capiocl_adapter.hpp"
+
+extern ClientManager *client_manager;
 extern StorageManager *storage_manager;
 
-inline void handle_exit_group(int tid) {
+void ClientRequestManager::ClientUtilities::handle_exit_group(int tid) {
     START_LOG(gettid(), "call(tid=%d)", tid);
 
     LOG("retrieving files from writers for process with pid = %d", tid);
@@ -12,7 +16,7 @@ inline void handle_exit_group(int tid) {
     for (auto &path : files) {
 
         LOG("Handling file %s", path.c_str());
-        if (CapioCLEngine::get().getCommitRule(path) == capiocl::commit_rules::ON_TERMINATION) {
+        if (CapioCLEngine::get().getCommitRule(path) == capiocl::commitRules::ON_TERMINATION) {
             CapioFile &c_file = storage_manager->get(path);
             if (c_file.is_dir()) {
                 LOG("file %s is dir", path.c_str());
@@ -36,10 +40,10 @@ inline void handle_exit_group(int tid) {
     client_manager->removeClient(tid);
 }
 
-void exit_group_handler(const char *const str) {
+void ClientRequestManager::Handlers::exit_group_handler(const char *const str) {
     int tid;
     sscanf(str, "%d", &tid);
-    handle_exit_group(tid);
+    ClientUtilities::handle_exit_group(tid);
 }
 
 #endif // CAPIO_SERVER_HANDLERS_EXITG_HPP

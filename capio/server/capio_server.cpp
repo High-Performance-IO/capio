@@ -1,3 +1,5 @@
+
+
 #include <algorithm>
 #include <args.hxx>
 #include <array>
@@ -18,11 +20,13 @@
 #include <unordered_set>
 #include <vector>
 
+#include "capiocl.hpp"
+#include "capiocl/engine.h"
+#include "capiocl/parser.h"
 #include "utils/capiocl_adapter.hpp"
 
-std::string workflow_name;
-
-#include "client-manager/client_manager.hpp"
+#include "client/manager.hpp"
+#include "client/request.hpp"
 #include "common/env.hpp"
 #include "common/logger.hpp"
 #include "common/requests.hpp"
@@ -34,6 +38,7 @@ std::string workflow_name;
 
 ClientManager *client_manager;
 StorageManager *storage_manager;
+ClientRequestManager *request_manager;
 
 int n_servers;
 // name of the node
@@ -46,7 +51,6 @@ CSClientsRemotePendingNFilesMap_t clients_remote_pending_nfiles;
 
 std::mutex nfiles_mutex;
 
-#include "handlers.hpp"
 #include "utils/location.hpp"
 #include "utils/signals.hpp"
 
@@ -57,68 +61,8 @@ std::mutex nfiles_mutex;
  * can only access it through a const reference. This prevents any modifications to the engine
  * outside of those permitted by the capiocl::Engine class itself.
  */
-capiocl::Engine *capio_cl_engine;
-const capiocl::Engine &CapioCLEngine::get() { return *capio_cl_engine; }
-
-static constexpr std::array<CSHandler_t, CAPIO_NR_REQUESTS> build_request_handlers_table() {
-    std::array<CSHandler_t, CAPIO_NR_REQUESTS> _request_handlers{0};
-
-    _request_handlers[CAPIO_REQUEST_ACCESS]              = access_handler;
-    _request_handlers[CAPIO_REQUEST_CLONE]               = clone_handler;
-    _request_handlers[CAPIO_REQUEST_CLOSE]               = close_handler;
-    _request_handlers[CAPIO_REQUEST_CREATE]              = create_handler;
-    _request_handlers[CAPIO_REQUEST_CREATE_EXCLUSIVE]    = create_exclusive_handler;
-    _request_handlers[CAPIO_REQUEST_DUP]                 = dup_handler;
-    _request_handlers[CAPIO_REQUEST_EXIT_GROUP]          = exit_group_handler;
-    _request_handlers[CAPIO_REQUEST_FSTAT]               = fstat_handler;
-    _request_handlers[CAPIO_REQUEST_GETDENTS]            = getdents_handler;
-    _request_handlers[CAPIO_REQUEST_GETDENTS64]          = getdents_handler;
-    _request_handlers[CAPIO_REQUEST_HANDSHAKE_NAMED]     = handshake_named_handler;
-    _request_handlers[CAPIO_REQUEST_HANDSHAKE_ANONYMOUS] = handshake_anonymous_handler;
-    _request_handlers[CAPIO_REQUEST_MKDIR]               = mkdir_handler;
-    _request_handlers[CAPIO_REQUEST_OPEN]                = open_handler;
-    _request_handlers[CAPIO_REQUEST_READ]                = read_handler;
-    _request_handlers[CAPIO_REQUEST_RENAME]              = rename_handler;
-    _request_handlers[CAPIO_REQUEST_RMDIR]               = rmdir_handler;
-    _request_handlers[CAPIO_REQUEST_SEEK]                = lseek_handler;
-    _request_handlers[CAPIO_REQUEST_SEEK_DATA]           = seek_data_handler;
-    _request_handlers[CAPIO_REQUEST_SEEK_END]            = seek_end_handler;
-    _request_handlers[CAPIO_REQUEST_SEEK_HOLE]           = seek_hole_handler;
-    _request_handlers[CAPIO_REQUEST_STAT]                = stat_handler;
-    _request_handlers[CAPIO_REQUEST_UNLINK]              = unlink_handler;
-    _request_handlers[CAPIO_REQUEST_WRITE]               = write_handler;
-
-    return _request_handlers;
-}
-
-[[noreturn]] void capio_server(Semaphore &internal_server_sem) {
-    static const std::array<CSHandler_t, CAPIO_NR_REQUESTS> request_handlers =
-        build_request_handlers_table();
-
-    START_LOG(gettid(), "call()");
-
-    MPI_Comm_size(MPI_COMM_WORLD, &n_servers);
-    setup_signal_handlers();
-    backend->handshake_servers();
-
-    storage_manager->addDirectory(getpid(), get_capio_dir());
-
-    internal_server_sem.unlock();
-
-    auto str = std::unique_ptr<char[]>(new char[CAPIO_REQ_MAX_SIZE]);
-    while (true) {
-        LOG(CAPIO_LOG_SERVER_REQUEST_START);
-        int code = client_manager->readNextRequest(str.get());
-        if (code < 0 || code > CAPIO_NR_REQUESTS) {
-            std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_ERROR << "Received invalid code: " << code
-                      << std::endl;
-
-            ERR_EXIT("Error: received invalid request code");
-        }
-        request_handlers[code](str.get());
-        LOG(CAPIO_LOG_SERVER_REQUEST_END);
-    }
-}
+capiocl::engine::Engine *capio_cl_engine;
+const capiocl::engine::Engine &CapioCLEngine::get() { return *capio_cl_engine; }
 
 int parseCLI(int argc, char **argv) {
     Logger *log;
@@ -226,11 +170,10 @@ int parseCLI(int argc, char **argv) {
         std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_INFO << "parsing config file: " << token
                   << std::endl;
 
-        std::tie(workflow_name, capio_cl_engine) =
-            capiocl::Parser::parse(token, resolve_path, store_all_in_memory);
+        capio_cl_engine = capiocl::parser::Parser::parse(token, resolve_path, store_all_in_memory);
     } else if (noConfigFile) {
-        workflow_name   = std::string_view(get_capio_workflow_name());
-        capio_cl_engine = new capiocl::Engine();
+        capio_cl_engine = new capiocl::engine::Engine();
+        capio_cl_engine->setWorkflowName(get_capio_workflow_name());
         if (store_all_in_memory) {
             capio_cl_engine->setAllStoreInMemory();
         }
@@ -239,7 +182,7 @@ int parseCLI(int argc, char **argv) {
                   << std::endl
                   << CAPIO_LOG_SERVER_CLI_LEVEL_WARNING
                   << "Obtained from environment variable current workflow name: "
-                  << workflow_name.data() << std::endl;
+                  << capio_cl_engine->getWorkflowName() << std::endl;
     } else {
         std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_ERROR
                   << "Error: no config file provided. To skip config file use --no-config option!"
@@ -276,16 +219,16 @@ int parseCLI(int argc, char **argv) {
     }
     backend = select_backend(backend_name_str, argc, argv);
 
-    std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_INFO << "server initialization completed!" << std::endl
+    std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_INFO << "Completed parse of CLI args!" << std::endl
               << std::flush;
     return 0;
 }
 
 int main(int argc, char **argv) {
 
-    Semaphore internal_server_sem(0);
-
     std::cout << CAPIO_LOG_SERVER_BANNER;
+
+    setup_signal_handlers();
 
     parseCLI(argc, argv);
 
@@ -293,17 +236,24 @@ int main(int argc, char **argv) {
 
     open_files_location();
 
-    shm_canary      = new CapioShmCanary(workflow_name);
+    shm_canary      = new CapioShmCanary(capio_cl_engine->getWorkflowName());
     storage_manager = new StorageManager();
     client_manager  = new ClientManager();
+    request_manager = new ClientRequestManager();
 
-    std::thread server_thread(capio_server, std::ref(internal_server_sem));
-    LOG("capio_server thread started");
-    std::thread remote_listener_thread(capio_remote_listener, std::ref(internal_server_sem));
+    backend->handshake_servers();
+    storage_manager->addDirectory(getpid(), get_capio_dir());
+
+    std::thread remote_listener_thread(capio_remote_listener);
     LOG("capio_remote_listener thread started.");
-    server_thread.join();
+
+    request_manager->start();
     remote_listener_thread.join();
 
     delete backend;
+    delete storage_manager;
+    delete client_manager;
+    delete request_manager;
+
     return 0;
 }
