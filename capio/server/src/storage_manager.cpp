@@ -187,7 +187,7 @@ CapioFile &StorageManager::add(const std::filesystem::path &path, bool is_dir, s
     auto n_close_count = CapioCLEngine::get().getCommitCloseCount(path);
 
     if (n_file > 1) {
-        // NODE: This is probably because it needs to be filled even when dealing with directories
+        // NOTE: This is probably because it needs to be filled even when dealing with directories
         init_size = CAPIO_DEFAULT_DIR_INITIAL_SIZE;
     }
 
