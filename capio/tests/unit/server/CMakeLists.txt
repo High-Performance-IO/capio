@@ -4,7 +4,7 @@
 set(TARGET_NAME capio_server_unit_tests)
 set(TARGET_INCLUDE_FOLDER "${PROJECT_SOURCE_DIR}/capio/server")
 set(TARGET_SOURCES
-        src/capio_file.cpp
+        src/main.cpp
 )
 
 #####################################

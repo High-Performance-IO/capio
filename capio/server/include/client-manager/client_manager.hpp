@@ -21,8 +21,13 @@ class ClientManager {
      * Data buffers variables
      */
     struct ClientDataBuffers {
-        SPSCQueue *ClientToServer;
-        SPSCQueue *ServerToClient;
+        SPSCQueue ClientToServer;
+        SPSCQueue ServerToClient;
+
+        /// @brief Constructor for struct so that try_emplace can be called with no explicit call to
+        /// new()
+        ClientDataBuffers(const std::string &clientToServerName,
+                          const std::string &serverToClientName, const std::string &workflow_name);
     };
 
     std::unordered_map<long, ClientDataBuffers> data_buffers;

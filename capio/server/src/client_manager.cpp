@@ -8,6 +8,12 @@
 #include "utils/capiocl_adapter.hpp"
 #include "utils/common.hpp"
 
+ClientManager::ClientDataBuffers::ClientDataBuffers(const std::string &clientToServerName,
+                                                    const std::string &serverToClientName,
+                                                    const std::string &wf_name)
+    : ClientToServer(clientToServerName, get_cache_lines(), get_cache_line_size(), wf_name),
+      ServerToClient(serverToClientName, get_cache_lines(), get_cache_line_size(), wf_name) {}
+
 ClientManager::ClientManager()
     : requests{SHM_COMM_CHAN_NAME, CAPIO_REQ_BUFF_CNT, CAPIO_REQ_MAX_SIZE,
                CapioCLEngine::get().getWorkflowName()} {
@@ -21,13 +27,9 @@ ClientManager::~ClientManager() {
 void ClientManager::registerClient(pid_t tid, const std::string &app_name, const bool wait) {
     START_LOG(gettid(), "call(tid=%ld, app_name=%s)", tid, app_name.c_str());
 
-    ClientDataBuffers buffers{
-        new SPSCQueue(SHM_SPSC_PREFIX_WRITE + std::to_string(tid), get_cache_lines(),
-                      get_cache_line_size(), CapioCLEngine::get().getWorkflowName()),
-        new SPSCQueue(SHM_SPSC_PREFIX_READ + std::to_string(tid), get_cache_lines(),
-                      get_cache_line_size(), CapioCLEngine::get().getWorkflowName())};
-
-    data_buffers.emplace(tid, buffers);
+    data_buffers.try_emplace(tid, SHM_SPSC_PREFIX_WRITE + std::to_string(tid),
+                             SHM_SPSC_PREFIX_READ + std::to_string(tid),
+                             CapioCLEngine::get().getWorkflowName());
     app_names.emplace(tid, app_name);
     files_created_by_producer.emplace(tid, std::initializer_list<std::string>{});
     files_created_by_app_name.emplace(app_name, std::initializer_list<std::string>{});
@@ -63,8 +65,6 @@ void ClientManager::unlockClonedChild(const pid_t tid) {
 void ClientManager::removeClient(const pid_t tid) {
     START_LOG(gettid(), "call(tid=%ld)", tid);
     if (const auto it_resp = data_buffers.find(tid); it_resp != data_buffers.end()) {
-        delete it_resp->second.ClientToServer;
-        delete it_resp->second.ServerToClient;
         data_buffers.erase(it_resp);
     }
     const std::string &app_name = this->getAppName(tid);
@@ -87,7 +87,7 @@ void ClientManager::replyToClient(const int tid, const off64_t offset, char *buf
 
     if (const auto out = data_buffers.find(tid); out != data_buffers.end()) {
         this->replyToClient(tid, offset + count);
-        out->second.ServerToClient->write(buf + offset, count);
+        out->second.ServerToClient.write(buf + offset, count);
         return;
     }
     LOG("Err: no such buffer for provided tid");
@@ -161,7 +161,7 @@ const std::string &ClientManager::getAppName(const pid_t tid) const {
 }
 
 SPSCQueue &ClientManager::getClientToServerDataBuffers(const pid_t tid) {
-    return *data_buffers.at(tid).ClientToServer;
+    return data_buffers.at(tid).ClientToServer;
 }
 
 size_t ClientManager::getConnectedPosixClients() const { return data_buffers.size(); }
