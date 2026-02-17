@@ -17,6 +17,9 @@ class ClientManager {
     CircularBuffer<char> requests;
     std::unordered_map<int, CircularBuffer<off64_t>> responses;
 
+    /// @brief default app name
+    const std::string default_app_name = CAPIO_DEFAULT_APP_NAME;
+
     /**
      * Data buffers variables
      */

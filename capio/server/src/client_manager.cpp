@@ -153,7 +153,6 @@ const std::vector<std::string> &ClientManager::getProducedFiles(const pid_t tid)
 
 const std::string &ClientManager::getAppName(const pid_t tid) const {
     START_LOG(gettid(), "call(tid=%ld)", tid);
-    static std::string default_app_name = CAPIO_DEFAULT_APP_NAME;
     if (const auto itm = app_names.find(tid); itm != app_names.end()) {
         return itm->second;
     } else {
