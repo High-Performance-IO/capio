@@ -12,3 +12,4 @@ const capiocl::Engine &CapioCLEngine::get() { return capio_cl_engine; }
 
 #include "capio_file.hpp"
 #include "client_manager.hpp"
+#include "storage_manager.hpp"

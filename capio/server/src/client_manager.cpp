@@ -115,16 +115,16 @@ void ClientManager::registerProducedFile(const pid_t tid, std::string path) {
 }
 
 void ClientManager::removeProducedFile(const pid_t tid, const std::filesystem::path &path) {
-    const auto itm0 = files_created_by_producer.find(tid);
-    if (itm0 != files_created_by_producer.end()) {
-        auto &v = itm0->second;
+    if (const auto itm = files_created_by_producer.find(tid);
+        itm != files_created_by_producer.end()) {
+        auto &v = itm->second;
         v.erase(std::remove(v.begin(), v.end(), path), v.end());
     }
 
     const std::string &app_name = this->getAppName(tid);
-    const auto itm1             = files_created_by_app_name.find(app_name);
-    if (itm1 != files_created_by_app_name.end()) {
-        auto &v = itm1->second;
+    if (const auto itm = files_created_by_app_name.find(app_name);
+        itm != files_created_by_app_name.end()) {
+        auto &v = itm->second;
         v.erase(std::remove(v.begin(), v.end(), path), v.end());
     }
 }
