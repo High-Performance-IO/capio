@@ -47,4 +47,19 @@ TEST(ClientManagerTestSuite, testFailedRequestCode) {
     EXPECT_EQ(client_manager.readNextRequest(new_req), -1);
 }
 
+TEST(ClientManagerTestSuite, testAddAndRemoveProducedFiles) {
+    ClientManager client_manager;
+
+    client_manager.registerClient(1234, "test_app");
+    client_manager.registerProducedFile(1234, "test.txt");
+
+    EXPECT_TRUE(client_manager.isProducer(1234, "test.txt"));
+
+    client_manager.removeProducedFile(1234, "test.txt");
+    EXPECT_FALSE(client_manager.isProducer(1234, "test.txt"));
+
+    client_manager.registerProducedFile(1111, "test1.txt");
+    EXPECT_FALSE(client_manager.isProducer(1111, "test1.txt"));
+}
+
 #endif // CAPIO_CLIENT_MANAGER_HPP
