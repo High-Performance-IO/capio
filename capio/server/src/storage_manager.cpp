@@ -60,12 +60,12 @@ void StorageManager::addDirectoryEntry(const pid_t tid, const std::filesystem::p
 
     c_file.insert_sector(base_offset, data_size);
     ++c_file.n_files;
-    client_manager->registerProducedFile(tid, dir);
+    _client_manager->registerProducedFile(tid, dir);
     if (c_file.n_files == c_file.n_files_expected) {
         c_file.set_complete();
     }
 }
-StorageManager::StorageManager() {
+StorageManager::StorageManager(ClientManager *client_manager) : _client_manager(client_manager) {
     server_println(CAPIO_LOG_SERVER_CLI_LEVEL_INFO, "StorageManager initialization completed.");
 }
 

@@ -7,6 +7,8 @@
 #include "utils/capio_file.hpp"
 #include "utils/shared_mutex.hpp"
 
+#include "client-manager/client_manager.hpp"
+
 #include <unordered_map>
 #include <vector>
 
@@ -20,6 +22,10 @@
  * and their respective offsets.
  */
 class StorageManager {
+
+    ///@brief reference to ClientManager to avoid using the global instanced variable
+    ClientManager *_client_manager;
+
     /**
      * @brief Mutex to protect access to _storage internal data structure.
      */
@@ -109,8 +115,9 @@ class StorageManager {
      * @brief Constructs a new StorageService instance.
      *
      * Initializes the server and logs its completion.
+     * @param  client_manager Reference to ClientManager instance
      */
-    StorageManager();
+    StorageManager(ClientManager *client_manager);
 
     /**
      * @brief Destroys the StorageService instance.

@@ -90,7 +90,7 @@ void ClientManager::replyToClient(const int tid, const off64_t offset, char *buf
         out->second.ServerToClient.write(buf + offset, count);
         return;
     }
-    LOG("Err: no such buffer for provided tid");
+    throw std::runtime_error("Err: no such buffer for provided tid");
 }
 
 // NOTE: do not use const reference for path here as the emplace method leaves the original in an
