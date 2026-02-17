@@ -230,9 +230,7 @@ std::vector<std::filesystem::path> StorageManager::getPaths() const {
     const shared_lock_guard slg(_mutex_storage);
     std::vector<std::filesystem::path> paths;
     for (const auto &[file_path, _] : _storage) {
-        if (!file_path.empty()) {
-            paths.emplace_back(file_path);
-        }
+        paths.emplace_back(file_path);
     }
     return paths;
 }

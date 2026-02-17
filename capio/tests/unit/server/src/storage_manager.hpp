@@ -3,7 +3,7 @@
 #include "storage/manager.hpp"
 #include "utils/location.hpp"
 
-TEST(StorageMAnagerTestSuite, testGetPaths) {
+TEST(StorageManagerTestSuite, testGetPaths) {
     ClientManager client_manager;
     StorageManager storage_manager(&client_manager);
 
@@ -27,7 +27,7 @@ TEST(StorageMAnagerTestSuite, testGetPaths) {
     }
 }
 
-TEST(StorageMAnagerTestSuite, testExceptions) {
+TEST(StorageManagerTestSuite, testExceptions) {
     ClientManager client_manager;
     StorageManager storage_manager(&client_manager);
 
@@ -35,7 +35,7 @@ TEST(StorageMAnagerTestSuite, testExceptions) {
     EXPECT_THROW(storage_manager.get(1234, 1234), std::runtime_error);
 }
 
-TEST(StorageMAnagerTestSuite, testInitDirectory) {
+TEST(StorageManagerTestSuite, testInitDirectory) {
     ClientManager client_manager;
     StorageManager storage_manager(&client_manager);
     node_name = new char[HOST_NAME_MAX];
@@ -57,7 +57,7 @@ TEST(StorageMAnagerTestSuite, testInitDirectory) {
     EXPECT_FALSE(dir1.first_write);
 }
 
-TEST(StorageMAnagerTestSuite, testAddDirectoryFailure) {
+TEST(StorageManagerTestSuite, testAddDirectoryFailure) {
     char *old_capio_dir = getenv("CAPIO_DIR");
     setenv("CAPIO_DIR", "/", 1);
     node_name = new char[HOST_NAME_MAX];
@@ -71,6 +71,23 @@ TEST(StorageMAnagerTestSuite, testAddDirectoryFailure) {
     if (old_capio_dir != nullptr) {
         setenv("CAPIO_DIR", old_capio_dir, 1);
     }
+}
+
+TEST(StorageManagerTestSuite, testRemameFile) {
+    ClientManager client_manager;
+    StorageManager storage_manager(&client_manager);
+
+    storage_manager.add("oldName", false, 0);
+    storage_manager.add("oldNameNoChange", false, 0);
+
+    storage_manager.addFileToTid(1234, 3, "oldName", 0);
+    storage_manager.addFileToTid(1234, 4, "oldNameNoChange", 0);
+
+    storage_manager.add("oldNameNoChange", false, 0);
+    storage_manager.rename("oldName", "newName");
+
+    EXPECT_THROW(storage_manager.get("oldName"), std::runtime_error);
+    EXPECT_NO_THROW(storage_manager.get("oldNameNoChange"));
 }
 
 #endif // CAPIO_STORAGE_MANAGER_TEST_HPP
