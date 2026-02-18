@@ -277,7 +277,7 @@ void StorageManager::_addNewFdToMap(const pid_t tid, const int fd,
 
 void StorageManager::_addNewFdToStorage(const pid_t tid, const int fd,
                                         const std::filesystem::path &path,
-                                        const bool register_open) {
+                                        const bool register_open = true) {
     if (register_open) {
         _storage[path].open();
     }
@@ -290,7 +290,7 @@ void StorageManager::addFileToTid(const pid_t tid, const int fd, const std::file
 
     {
         const std::lock_guard lg(_mutex_storage);
-        _addNewFdToStorage(tid, fd, path, true);
+        _addNewFdToStorage(tid, fd, path);
     }
 
     {

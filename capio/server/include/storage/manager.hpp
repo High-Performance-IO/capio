@@ -96,7 +96,8 @@ class StorageManager {
      * @param tid The thread ID.
      * @param fd The file descriptor number.
      * @param path The path of the file being opened.
-     * @param register_open Whether this operation should also call open() on the CapioFile instance
+     * @param register_open Whether this operation should also call open() on the CapioFile
+     * instance. defaults to true
      */
     void _addNewFdToStorage(pid_t tid, int fd, const std::filesystem::path &path,
                             bool register_open);
