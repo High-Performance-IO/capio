@@ -3,7 +3,7 @@
 #include "storage/manager.hpp"
 #include "utils/location.hpp"
 
-TEST(StorageManagerTestSuite, testGetPaths) {
+TEST_F(CapioServerUnitTestEnviron, testGetPaths) {
     ClientManager client_manager;
     StorageManager storage_manager(&client_manager);
 
@@ -27,7 +27,7 @@ TEST(StorageManagerTestSuite, testGetPaths) {
     }
 }
 
-TEST(StorageManagerTestSuite, testExceptions) {
+TEST_F(CapioServerUnitTestEnviron, testExceptions) {
     ClientManager client_manager;
     StorageManager storage_manager(&client_manager);
 
@@ -35,15 +35,15 @@ TEST(StorageManagerTestSuite, testExceptions) {
     EXPECT_THROW(storage_manager.get(1234, 1234), std::runtime_error);
 }
 
-TEST(StorageManagerTestSuite, testInitDirectory) {
+TEST_F(CapioServerUnitTestEnviron, testInitDirectory) {
     ClientManager client_manager;
     StorageManager storage_manager(&client_manager);
     node_name = new char[HOST_NAME_MAX];
     gethostname(node_name, HOST_NAME_MAX);
     open_files_location();
 
-    capio_cl_engine.setDirectory("myDirectory");
-    capio_cl_engine.setDirectoryFileCount("myDirectory", 10);
+    capio_cl_engine->setDirectory("myDirectory");
+    capio_cl_engine->setDirectoryFileCount("myDirectory", 10);
 
     storage_manager.add("myDirectory", true, 0);
 
@@ -57,7 +57,7 @@ TEST(StorageManagerTestSuite, testInitDirectory) {
     EXPECT_FALSE(dir1.first_write);
 }
 
-TEST(StorageManagerTestSuite, testAddDirectoryFailure) {
+TEST_F(CapioServerUnitTestEnviron, testAddDirectoryFailure) {
     char *old_capio_dir = getenv("CAPIO_DIR");
     setenv("CAPIO_DIR", "/", 1);
     node_name = new char[HOST_NAME_MAX];
@@ -73,7 +73,7 @@ TEST(StorageManagerTestSuite, testAddDirectoryFailure) {
     }
 }
 
-TEST(StorageManagerTestSuite, testRemameFile) {
+TEST_F(CapioServerUnitTestEnviron, testRemameFile) {
     ClientManager client_manager;
     StorageManager storage_manager(&client_manager);
 
@@ -90,7 +90,7 @@ TEST(StorageManagerTestSuite, testRemameFile) {
     EXPECT_NO_THROW(storage_manager.get("oldNameNoChange"));
 }
 
-TEST(StorageManagerTestSuite, testNumberOfOpensAfterClone) {
+TEST_F(CapioServerUnitTestEnviron, testNumberOfOpensAfterClone) {
 
     ClientManager client_manager;
     StorageManager storage_manager(&client_manager);

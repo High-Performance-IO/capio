@@ -5,13 +5,13 @@
 
 #include <thread>
 
-TEST(clientManagerTestSuite, testReplyToNonClient) {
+TEST_F(CapioServerUnitTestEnviron, testReplyToNonClient) {
     ClientManager client_manager;
     char buffer[1024];
     EXPECT_THROW(client_manager.replyToClient(-1, 0, buffer, 0), std::runtime_error);
 }
 
-TEST(clientManagerTestSuite, testGetNumberOfConnectedClients) {
+TEST_F(CapioServerUnitTestEnviron, testGetNumberOfConnectedClients) {
     ClientManager client_manager;
     EXPECT_EQ(client_manager.getConnectedPosixClients(), 0);
 
@@ -24,7 +24,7 @@ TEST(clientManagerTestSuite, testGetNumberOfConnectedClients) {
     EXPECT_EQ(client_manager.getConnectedPosixClients(), 0);
 }
 
-TEST(ClientManagerTestSuite, testFailedRequestCode) {
+TEST_F(CapioServerUnitTestEnviron, testFailedRequestCode) {
 
     ClientManager client_manager;
 
@@ -47,7 +47,7 @@ TEST(ClientManagerTestSuite, testFailedRequestCode) {
     EXPECT_EQ(client_manager.readNextRequest(new_req), -1);
 }
 
-TEST(ClientManagerTestSuite, testAddAndRemoveProducedFiles) {
+TEST_F(CapioServerUnitTestEnviron, testAddAndRemoveProducedFiles) {
     ClientManager client_manager;
 
     client_manager.registerClient(1234, "test_app");
