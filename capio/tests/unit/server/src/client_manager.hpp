@@ -1,32 +1,23 @@
 #ifndef CAPIO_CLIENT_MANAGER_HPP
 #define CAPIO_CLIENT_MANAGER_HPP
 
-#include "client-manager/client_manager.hpp"
-
-#include <thread>
-
-TEST_F(CapioServerUnitTestEnviron, testReplyToNonClient) {
-    ClientManager client_manager;
+TEST_F(ClientManagerTestEnvironment, testReplyToNonClient) {
     char buffer[1024];
-    EXPECT_THROW(client_manager.replyToClient(-1, 0, buffer, 0), std::runtime_error);
+    EXPECT_THROW(client_manager->replyToClient(-1, 0, buffer, 0), std::runtime_error);
 }
 
-TEST_F(CapioServerUnitTestEnviron, testGetNumberOfConnectedClients) {
-    ClientManager client_manager;
-    EXPECT_EQ(client_manager.getConnectedPosixClients(), 0);
+TEST_F(ClientManagerTestEnvironment, testGetNumberOfConnectedClients) {
 
-    client_manager.registerClient(1234);
+    EXPECT_EQ(client_manager->getConnectedPosixClients(), 0);
 
-    EXPECT_EQ(client_manager.getConnectedPosixClients(), 1);
+    client_manager->registerClient(1234);
+    EXPECT_EQ(client_manager->getConnectedPosixClients(), 1);
 
-    client_manager.removeClient(1234);
-
-    EXPECT_EQ(client_manager.getConnectedPosixClients(), 0);
+    client_manager->removeClient(1234);
+    EXPECT_EQ(client_manager->getConnectedPosixClients(), 0);
 }
 
-TEST_F(CapioServerUnitTestEnviron, testFailedRequestCode) {
-
-    ClientManager client_manager;
+TEST_F(ClientManagerTestEnvironment, testFailedRequestCode) {
 
     // NOTE: there is no need to delete this object as it is only attaching to the shm allocated by
     // client_manager. Also calling delete on this raises std::terminate as an exception is thrown
@@ -39,27 +30,26 @@ TEST_F(CapioServerUnitTestEnviron, testFailedRequestCode) {
     sprintf(req, "123 aaaa bbbb cccc");
     request_queue->write(req, CAPIO_REQ_MAX_SIZE);
 
-    EXPECT_EQ(client_manager.readNextRequest(new_req), 123);
+    EXPECT_EQ(client_manager->readNextRequest(new_req), 123);
 
     sprintf(req, "abc aaaa bbbb cccc");
     request_queue->write(req, CAPIO_REQ_MAX_SIZE);
 
-    EXPECT_EQ(client_manager.readNextRequest(new_req), -1);
+    EXPECT_EQ(client_manager->readNextRequest(new_req), -1);
 }
 
-TEST_F(CapioServerUnitTestEnviron, testAddAndRemoveProducedFiles) {
-    ClientManager client_manager;
+TEST_F(ClientManagerTestEnvironment, testAddAndRemoveProducedFiles) {
 
-    client_manager.registerClient(1234, "test_app");
-    client_manager.registerProducedFile(1234, "test.txt");
+    client_manager->registerClient(1234, "test_app");
+    client_manager->registerProducedFile(1234, "test.txt");
 
-    EXPECT_TRUE(client_manager.isProducer(1234, "test.txt"));
+    EXPECT_TRUE(client_manager->isProducer(1234, "test.txt"));
 
-    client_manager.removeProducedFile(1234, "test.txt");
-    EXPECT_FALSE(client_manager.isProducer(1234, "test.txt"));
+    client_manager->removeProducedFile(1234, "test.txt");
+    EXPECT_FALSE(client_manager->isProducer(1234, "test.txt"));
 
-    client_manager.registerProducedFile(1111, "test1.txt");
-    EXPECT_FALSE(client_manager.isProducer(1111, "test1.txt"));
+    client_manager->registerProducedFile(1111, "test1.txt");
+    EXPECT_FALSE(client_manager->isProducer(1111, "test1.txt"));
 }
 
 #endif // CAPIO_CLIENT_MANAGER_HPP
