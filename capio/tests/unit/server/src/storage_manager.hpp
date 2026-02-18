@@ -90,4 +90,23 @@ TEST(StorageManagerTestSuite, testRemameFile) {
     EXPECT_NO_THROW(storage_manager.get("oldNameNoChange"));
 }
 
+TEST(StorageManagerTestSuite, testNumberOfOpensAfterClone) {
+
+    ClientManager client_manager;
+    StorageManager storage_manager(&client_manager);
+
+    storage_manager.add("myFile", false, 0);
+    storage_manager.addFileToTid(1234, 3, "myFile", 0);
+    storage_manager.clone(1234, 5678);
+
+    EXPECT_FALSE(storage_manager.get("myFile").is_deletable());
+
+    storage_manager.removeFromTid(1234, 3);
+    EXPECT_FALSE(storage_manager.get("myFile").is_deletable());
+
+    storage_manager.removeFromTid(5678, 3);
+
+    EXPECT_TRUE(storage_manager.get("myFile").is_deletable());
+}
+
 #endif // CAPIO_STORAGE_MANAGER_TEST_HPP
