@@ -13,30 +13,12 @@ char *node_name;
 capiocl::engine::Engine *capio_cl_engine;
 const capiocl::engine::Engine &CapioCLEngine::get() { return *capio_cl_engine; }
 
-class CapioServerUnitTestEnviron : public testing::Test {
-  protected:
-    void SetUp() override {
-        capio_cl_engine = new capiocl::engine::Engine(true);
-        node_name       = new char[HOST_NAME_MAX];
-        gethostname(node_name, HOST_NAME_MAX);
-        open_files_location();
-    }
-
-    void TearDown() override { delete capio_cl_engine; }
-};
-
-class ClientManagerTestEnvironment : public CapioServerUnitTestEnviron {
+class ClientManagerTestEnvironment : public testing::Test {
   protected:
     ClientManager *client_manager = nullptr;
-    void SetUp() override {
-        CapioServerUnitTestEnviron::SetUp();
-        client_manager = new ClientManager();
-    }
+    void SetUp() override { client_manager = new ClientManager(); }
 
-    void TearDown() override {
-        delete client_manager;
-        CapioServerUnitTestEnviron::TearDown();
-    }
+    void TearDown() override { delete client_manager; }
 };
 
 class StorageManagerTestEnvironment : public ClientManagerTestEnvironment {
@@ -58,3 +40,16 @@ class StorageManagerTestEnvironment : public ClientManagerTestEnvironment {
 #include "capio_file.hpp"
 #include "client_manager.hpp"
 #include "storage_manager.hpp"
+
+int main(int argc, char **argv, char **envp) {
+    testing::InitGoogleTest(&argc, argv);
+
+    capio_cl_engine = new capiocl::engine::Engine(true);
+    node_name       = new char[HOST_NAME_MAX];
+    gethostname(node_name, HOST_NAME_MAX);
+    open_files_location();
+
+    const int test_result = RUN_ALL_TESTS();
+    delete capio_cl_engine;
+    return test_result;
+}
