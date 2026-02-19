@@ -98,7 +98,7 @@ class StorageManager {
      * @param path The path of the file being opened.
      * @param register_open Whether this operation should also call open() on the CapioFile
      * instance. defaults to true
-     * TODO: support flag CLONE_FILES which will directly affect directly the behaviour of
+     * TODO: support flag CLONE_FILES which will directly affect the behaviour of
      *       register_open.
      */
     void _addNewFdToStorage(pid_t tid, int fd, const std::filesystem::path &path,
