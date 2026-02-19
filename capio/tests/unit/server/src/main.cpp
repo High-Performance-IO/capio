@@ -19,6 +19,7 @@ class CapioServerUnitTestEnviron : public testing::Test {
         capio_cl_engine = new capiocl::engine::Engine(true);
         node_name       = new char[HOST_NAME_MAX];
         gethostname(node_name, HOST_NAME_MAX);
+        open_files_location();
     }
 
     void TearDown() override { delete capio_cl_engine; }
@@ -42,7 +43,6 @@ class StorageManagerTestEnvironment : public ClientManagerTestEnvironment {
   protected:
     StorageManager *storage_manager = nullptr;
     void SetUp() override {
-        open_files_location();
         ClientManagerTestEnvironment::SetUp();
         storage_manager = new StorageManager(client_manager);
     }

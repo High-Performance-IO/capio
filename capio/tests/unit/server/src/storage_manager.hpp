@@ -74,6 +74,21 @@ TEST_F(StorageManagerTestEnvironment, testRemameFile) {
     EXPECT_NO_THROW(storage_manager->get("oldNameNoChange"));
 }
 
+TEST_F(StorageManagerTestEnvironment, testNumberOfOpensAndCloses) {
+
+    storage_manager->add("myFile", false, 0);
+    storage_manager->addFileToTid(1234, 3, "myFile", 0);
+    storage_manager->addFileToTid(1234, 4, "myFile", 0);
+
+    EXPECT_FALSE(storage_manager->get("myFile").is_deletable());
+
+    storage_manager->get("myFile").close();
+    EXPECT_FALSE(storage_manager->get("myFile").is_deletable());
+
+    storage_manager->get("myFile").close();
+    EXPECT_TRUE(storage_manager->get("myFile").is_deletable());
+}
+
 TEST_F(StorageManagerTestEnvironment, testNumberOfOpensAfterClone) {
 
     storage_manager->add("myFile", false, 0);
@@ -86,6 +101,7 @@ TEST_F(StorageManagerTestEnvironment, testNumberOfOpensAfterClone) {
     EXPECT_FALSE(storage_manager->get("myFile").is_deletable());
 
     storage_manager->removeFromTid(5678, 3);
+    storage_manager->get("myFile").close();
 
     EXPECT_TRUE(storage_manager->get("myFile").is_deletable());
 }
