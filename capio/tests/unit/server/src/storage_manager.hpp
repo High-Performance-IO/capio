@@ -1,7 +1,7 @@
 #ifndef CAPIO_STORAGE_MANAGER_TEST_HPP
 #define CAPIO_STORAGE_MANAGER_TEST_HPP
 
-TEST_F(StorageManagerTestEnvironment, testGetPaths) {
+TEST(StorageManagerTestEnvironment, testGetPaths) {
 
     std::vector<std::string> test_file_paths = {
         "test1.txt",
@@ -23,13 +23,13 @@ TEST_F(StorageManagerTestEnvironment, testGetPaths) {
     }
 }
 
-TEST_F(StorageManagerTestEnvironment, testExceptions) {
+TEST(StorageManagerTestEnvironment, testExceptions) {
 
     EXPECT_THROW(storage_manager->get("test.txt"), std::runtime_error);
     EXPECT_THROW(storage_manager->get(1234, 1234), std::runtime_error);
 }
 
-TEST_F(StorageManagerTestEnvironment, testInitDirectory) {
+TEST(StorageManagerTestEnvironment, testInitDirectory) {
 
     capio_cl_engine->setDirectory("myDirectory");
     capio_cl_engine->setDirectoryFileCount("myDirectory", 10);
@@ -46,7 +46,7 @@ TEST_F(StorageManagerTestEnvironment, testInitDirectory) {
     EXPECT_FALSE(dir1.first_write);
 }
 
-TEST_F(StorageManagerTestEnvironment, testAddDirectoryFailure) {
+TEST(StorageManagerTestEnvironment, testAddDirectoryFailure) {
     char *old_capio_dir = getenv("CAPIO_DIR");
     setenv("CAPIO_DIR", "/", 1);
     open_files_location();
@@ -59,7 +59,7 @@ TEST_F(StorageManagerTestEnvironment, testAddDirectoryFailure) {
     }
 }
 
-TEST_F(StorageManagerTestEnvironment, testRemameFile) {
+TEST(StorageManagerTestEnvironment, testRemameFile) {
 
     storage_manager->add("oldName", false, 0);
     storage_manager->add("oldNameNoChange", false, 0);
@@ -74,7 +74,7 @@ TEST_F(StorageManagerTestEnvironment, testRemameFile) {
     EXPECT_NO_THROW(storage_manager->get("oldNameNoChange"));
 }
 
-TEST_F(StorageManagerTestEnvironment, testNumberOfOpensAndCloses) {
+TEST(StorageManagerTestEnvironment, testNumberOfOpensAndCloses) {
 
     storage_manager->add("myFile", false, 0);
     storage_manager->addFileToTid(1234, 3, "myFile", 0);
@@ -89,7 +89,7 @@ TEST_F(StorageManagerTestEnvironment, testNumberOfOpensAndCloses) {
     EXPECT_TRUE(storage_manager->get("myFile").is_deletable());
 }
 
-TEST_F(StorageManagerTestEnvironment, testNumberOfOpensAfterClone) {
+TEST(StorageManagerTestEnvironment, testNumberOfOpensAfterClone) {
 
     storage_manager->add("myFile", false, 0);
     storage_manager->addFileToTid(1234, 3, "myFile", 0);

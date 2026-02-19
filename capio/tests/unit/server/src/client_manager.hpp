@@ -1,12 +1,12 @@
 #ifndef CAPIO_CLIENT_MANAGER_HPP
 #define CAPIO_CLIENT_MANAGER_HPP
 
-TEST_F(ClientManagerTestEnvironment, testReplyToNonClient) {
+TEST(ClientManagerTestEnvironment, testReplyToNonClient) {
     char buffer[1024];
     EXPECT_THROW(client_manager->replyToClient(-1, 0, buffer, 0), std::runtime_error);
 }
 
-TEST_F(ClientManagerTestEnvironment, testGetNumberOfConnectedClients) {
+TEST(ClientManagerTestEnvironment, testGetNumberOfConnectedClients) {
 
     EXPECT_EQ(client_manager->getConnectedPosixClients(), 0);
 
@@ -17,7 +17,7 @@ TEST_F(ClientManagerTestEnvironment, testGetNumberOfConnectedClients) {
     EXPECT_EQ(client_manager->getConnectedPosixClients(), 0);
 }
 
-TEST_F(ClientManagerTestEnvironment, testFailedRequestCode) {
+TEST(ClientManagerTestEnvironment, testFailedRequestCode) {
 
     // NOTE: there is no need to delete this object as it is only attaching to the shm allocated by
     // client_manager. Also calling delete on this raises std::terminate as an exception is thrown
@@ -38,7 +38,7 @@ TEST_F(ClientManagerTestEnvironment, testFailedRequestCode) {
     EXPECT_EQ(client_manager->readNextRequest(new_req), -1);
 }
 
-TEST_F(ClientManagerTestEnvironment, testAddAndRemoveProducedFiles) {
+TEST(ClientManagerTestEnvironment, testAddAndRemoveProducedFiles) {
 
     client_manager->registerClient(1234, "test_app");
     client_manager->registerProducedFile(1234, "test.txt");
