@@ -27,10 +27,12 @@ TEST(ClientManagerTestEnvironment, testFailedRequestCode) {
         new CircularBuffer<char>(SHM_COMM_CHAN_NAME, CAPIO_REQ_BUFF_CNT, CAPIO_REQ_MAX_SIZE);
 
     char req[CAPIO_REQ_MAX_SIZE], new_req[CAPIO_REQ_MAX_SIZE];
-    sprintf(req, "123 aaaa bbbb cccc");
+    constexpr int TEST_REQ_CODE = 123;
+    sprintf(req, "%04d aaaa bbbb cccc", TEST_REQ_CODE);
     request_queue->write(req, CAPIO_REQ_MAX_SIZE);
-
-    EXPECT_EQ(client_manager->readNextRequest(new_req), 123);
+    const auto return_code = client_manager->readNextRequest(new_req);
+    std::cout << new_req << std::endl;
+    EXPECT_EQ(return_code, TEST_REQ_CODE);
 
     sprintf(req, "abc aaaa bbbb cccc");
     request_queue->write(req, CAPIO_REQ_MAX_SIZE);

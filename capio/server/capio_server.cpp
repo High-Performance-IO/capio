@@ -296,8 +296,8 @@ int main(int argc, char **argv) {
     open_files_location();
 
     shm_canary      = new CapioShmCanary(capio_cl_engine->getWorkflowName());
+    storage_manager = new StorageManager();
     client_manager  = new ClientManager();
-    storage_manager = new StorageManager(client_manager);
 
     std::thread server_thread(capio_server, std::ref(internal_server_sem));
     LOG("capio_server thread started");

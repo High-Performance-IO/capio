@@ -21,13 +21,13 @@ class ServerUnitTestEnvironment : public testing::Environment {
     explicit ServerUnitTestEnvironment() = default;
 
     void SetUp() override {
-        capio_cl_engine = new capiocl::engine::Engine(true);
+        capio_cl_engine = new capiocl::engine::Engine(false);
         node_name       = new char[HOST_NAME_MAX];
         gethostname(node_name, HOST_NAME_MAX);
         open_files_location();
 
         client_manager  = new ClientManager();
-        storage_manager = new StorageManager(client_manager);
+        storage_manager = new StorageManager();
     }
 
     void TearDown() override {
