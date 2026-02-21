@@ -229,7 +229,7 @@ jobs:
       - name: "Generate coverage report"
         if: ${{ matrix.build_type == 'Debug' }}
         run: |
-          pip install --upgrade gcovr
+          pip install --upgrade gcovr --break-system-packages
           gcovr \
             --exclude-throw-branches \
             --xml coverage.xml \

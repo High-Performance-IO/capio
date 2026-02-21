@@ -290,7 +290,7 @@ void StorageManager::addFileToTid(const pid_t tid, const int fd, const std::file
 
     {
         const std::lock_guard lg(_mutex_storage);
-        _addNewFdToStorage(tid, fd, path, true);
+        _addNewFdToStorage(tid, fd, path);
     }
 
     {
