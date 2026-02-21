@@ -67,7 +67,7 @@ jobs:
               --env LD_PRELOAD=libcapio_posix.so  \
               --name capio-docker                 \
               alphaunito/capio:latest             \
-            capio_server_unit_tests               \
+            capio_syscall_unit_tests              \
               --gtest_break_on_failure            \
               --gtest_print_time=1
           
