@@ -214,19 +214,6 @@ jobs:
         if: ${{ always() && steps.run-tests.outcome == 'failure' && matrix.build_type == 'Debug' }}
         run: tail -v -n +1 capio_logs/server/$(hostname)/server_thread_*.log
 
-      - name: "Select gcov tool"
-        shell: bash
-        run: |
-          COMPILER="${{ matrix.compiler }}"
-
-          if [[ "$COMPILER" == silkeh/clang:* ]]; then
-            VERSION="${COMPILER#*:}"
-            echo "GCOV=llvm-cov-$VERSION gcov" >> "$GITHUB_ENV"
-          else
-            VERSION="${COMPILER#*:}"
-            echo "GCOV=gcov-$VERSION" >> "$GITHUB_ENV"
-          fi
-
       - name: "Generate coverage report"
         if: ${{ matrix.build_type == 'Debug' }}
         run: |
@@ -238,14 +225,23 @@ jobs:
             --xml coverage.xml        \
             --gcov-executable gcov    \
             ../build
+
+      - name: "Compute Valid Artifact Name"
+        if: ${{ matrix.build_type == 'Debug' }}
+        id: calc-name
+        run: |
+          CLEAN_NAME=$(echo "${{ matrix.compiler }}" | tr '/:.' '-' | sed 's/--/-/g')
+          echo "artifact_name=${CLEAN_NAME}-tests" >> $GITHUB_OUTPUT
+
       - name: "Upload coverage report"
         if: ${{ matrix.build_type == 'Debug' }}
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ format('{0}-tests', matrix.compiler) }}
+          name: ${{ steps.calc-name.outputs.artifact_name }}
           path: ./coverage.xml
           retention-days: 1
           if-no-files-found: error
+
   upload-to-codecov:
     name: "Codecov report upload"
     needs: [ "unit-tests" , "codespell-check" , "format-check" ]
