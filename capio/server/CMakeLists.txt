@@ -19,12 +19,6 @@ FetchContent_Declare(
 set(ARGS_BUILD_EXAMPLE OFF CACHE INTERNAL "")
 set(ARGS_BUILD_UNITTESTS OFF CACHE INTERNAL "")
 
-FetchContent_Declare(
-        capio_cl
-        GIT_REPOSITORY https://github.com/High-Performance-IO/CAPIO-CL.git
-        GIT_TAG v1.3.4
-)
-
 FetchContent_MakeAvailable(args capio_cl)
 
 #####################################
