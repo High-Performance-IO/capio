@@ -12,14 +12,14 @@ concurrency:
 jobs:
   codespell-check:
     name: "Check codespell conformance"
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
       - name: "Run codespell"
         uses: codespell-project/actions-codespell@v2
   docker-check:
     name: "Check Docker image"
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     strategy:
       matrix:
         cmake-build-type:
@@ -84,7 +84,7 @@ jobs:
 
   format-check:
     name: "Check ${{ matrix.path }} clang-format conformance"
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     strategy:
       matrix:
         path:
@@ -101,60 +101,63 @@ jobs:
           extensions: 'h,cpp,c,hpp'
           clangFormatVersion: 16
   unit-tests:
-    name: "Build ${{ matrix.build_type }} with ${{ matrix.cxx }}"
-    runs-on: ubuntu-22.04
+    name: "Build ${{ matrix.build_type }} with ${{ matrix.compiler }}"
+    runs-on: ubuntu-24.04
     strategy:
       matrix:
         build_type:
           - Debug
           - Release
-        cxx:
-          - g++-9
-          - g++-10
-          - g++-11
-          - g++-12
-          - g++-13
-          - clang-13
-          - clang-14
-          - clang-15
-          - clang-16
-          - clang-17
-          - clang-18
+        compiler:
+          - gcc:9
+          - gcc:10
+          - gcc:11
+          - gcc:12
+          - gcc:13
+          - zhongruoyu/llvm-ports:13.0-trixie
+          - zhongruoyu/llvm-ports:14.0-trixie
+          - zhongruoyu/llvm-ports:15.0-trixie
+          - zhongruoyu/llvm-ports:16.0-trixie
+          - zhongruoyu/llvm-ports:17.0-trixie
+          - zhongruoyu/llvm-ports:18-trixie
+
+    container:
+      image: ${{ matrix.compiler }}
+
     steps:
       - uses: actions/checkout@v4
+
+      - name: "Install gfortran (OpenMPI dependency)"
+        if: ${{ startsWith(matrix.compiler, 'gcc:') }}
+        run: |
+          apt update
+          apt install -y gfortran || true
+          update-alternatives --install /usr/bin/gfortran gfortran /usr/bin/gfortran-* 100
+
       - name: "Install packages"
         run: |
-          sudo apt install -y \
-            libcapstone-dev \
-            libopenmpi-dev \
-            ninja-build \
-            openmpi-bin \
-            pkg-config
-      - name: "Get compiler version"
-        run: |
-          IFS='-' read -r -a COMPILER <<< "${{ matrix.cxx }}"
-          echo "CXX_VERSION=${COMPILER[1]}" >> $GITHUB_ENV
-      - name: "Install Clang"
-        if: ${{ startsWith(matrix.cxx, 'clang-') }}
-        run: |
-          wget -O /tmp/llvm.sh https://apt.llvm.org/llvm.sh
-          chmod u+x /tmp/llvm.sh
-          sudo /tmp/llvm.sh ${{ env.CXX_VERSION }}
-          rm -f /tmp/llvm.sh
-      - name: "Fix missing libclang_rt.profile for Clang 14"
-        if: ${{ matrix.cxx == 'clang-14' }}
-        run: |
-          sudo apt download libclang-rt-14-dev
-          sudo dpkg --force-all -i libclang-rt-14-dev*
-      - name: "Install GCC"
-        if: ${{ startsWith(matrix.cxx, 'g++-') }}
-        run: |
-          sudo add-apt-repository ppa:ubuntu-toolchain-r/test
-          sudo apt update
-          sudo apt install -y ${{ matrix.cxx }}
+          apt update
+          apt install -y      \
+            libcapstone-dev   \
+            openmpi-bin       \
+            libopenmpi-dev    \
+            ninja-build       \
+            cmake             \
+            make              \
+            sudo              \
+            bash              \
+            git               \
+            jq                \
+            pkg-config        \
+            build-essential   \
+            wget              \
+            tar               \
+            python3           \
+            python3-pip       \
+            python3-venv
+
       - name: "Run CMake"
-        env:
-          CXX: ${{ startsWith(matrix.cxx, 'clang-') && 'clang++' || 'g++' }}-${{ env.CXX_VERSION }}
+        shell: bash
         run: |
           cmake -DCMAKE_BUILD_TYPE=${{ matrix.build_type }} \
                 -DCAPIO_LOG=${{ matrix.build_type == 'Debug' && 'ON' || 'OFF' }} \
@@ -167,6 +170,7 @@ jobs:
           sudo cmake --install ../build --prefix /usr/local
       - name: "Run tests"
         id: run-tests
+        shell: bash
         timeout-minutes: 5
         env:
           CAPIO_DIR: ${{ github.workspace }}
@@ -209,27 +213,39 @@ jobs:
       - name: "Show server logs on failure"
         if: ${{ always() && steps.run-tests.outcome == 'failure' && matrix.build_type == 'Debug' }}
         run: tail -v -n +1 capio_logs/server/$(hostname)/server_thread_*.log
+
       - name: "Generate coverage report"
         if: ${{ matrix.build_type == 'Debug' }}
         run: |
+          python3 -m venv venv
+          . venv/bin/activate
           pip install --upgrade gcovr
           gcovr \
-            --exclude-throw-branches \
-            --xml coverage.xml \
-            --gcov-executable "${{ startsWith(matrix.cxx, 'clang-') && format('llvm-cov-{0} gcov', env.CXX_VERSION) || format('gcov-{0}', env.CXX_VERSION) }}" \
+            --exclude-throw-branches  \
+            --xml coverage.xml        \
+            --gcov-executable gcov    \
             ../build
+
+      - name: "Compute Valid Artifact Name"
+        if: ${{ matrix.build_type == 'Debug' }}
+        id: calc-name
+        run: |
+          CLEAN_NAME=$(echo "${{ matrix.compiler }}" | tr '/:.' '-' | sed 's/--/-/g')
+          echo "artifact_name=${CLEAN_NAME}-tests" >> $GITHUB_OUTPUT
+
       - name: "Upload coverage report"
         if: ${{ matrix.build_type == 'Debug' }}
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ format('{0}-tests', matrix.cxx) }}
+          name: ${{ steps.calc-name.outputs.artifact_name }}
           path: ./coverage.xml
           retention-days: 1
           if-no-files-found: error
+
   upload-to-codecov:
     name: "Codecov report upload"
     needs: [ "unit-tests" , "codespell-check" , "format-check" ]
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
       - name: "Download artifacts"
