@@ -277,7 +277,7 @@ void StorageManager::_addNewFdToMap(const pid_t tid, const int fd,
 
 void StorageManager::_addNewFdToStorage(const pid_t tid, const int fd,
                                         const std::filesystem::path &path,
-                                        const bool register_open) {
+                                        const bool register_open = true) {
     if (register_open) {
         _storage[path].open();
     }
