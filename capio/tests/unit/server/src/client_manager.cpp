@@ -1,5 +1,10 @@
 #ifndef CAPIO_CLIENT_MANAGER_HPP
 #define CAPIO_CLIENT_MANAGER_HPP
+#include <gtest/gtest.h>
+
+#include <client-manager/client_manager.hpp>
+
+extern ClientManager *client_manager;
 
 TEST(ClientManagerTestEnvironment, testReplyToNonClient) {
     char buffer[1024];

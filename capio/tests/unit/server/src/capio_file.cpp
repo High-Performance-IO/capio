@@ -1,7 +1,8 @@
 #ifndef CAPIO_CAPIO_FILE_HPP
 #define CAPIO_CAPIO_FILE_HPP
-#include "common/env.hpp"
 #include "utils/capio_file.hpp"
+#include "common/env.hpp"
+#include <gtest/gtest.h>
 
 TEST(ServerTest, TestInsertSingleSector) {
     CapioFile c_file;

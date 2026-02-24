@@ -13,6 +13,9 @@ file(GLOB_RECURSE SERVER_SOURCES
 
 set(TARGET_SOURCES
         src/main.cpp
+        src/capio_file.cpp
+        src/client_manager.cpp
+        src/storage_manager.cpp
         ${SERVER_SOURCES}
 )
 

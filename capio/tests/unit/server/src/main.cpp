@@ -37,12 +37,6 @@ class ServerUnitTestEnvironment : public testing::Environment {
     }
 };
 
-/// Include test sources
-
-#include "capio_file.hpp"
-#include "client_manager.hpp"
-#include "storage_manager.hpp"
-
 int main(int argc, char **argv, char **envp) {
     testing::InitGoogleTest(&argc, argv);
 

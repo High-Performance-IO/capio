@@ -1,5 +1,15 @@
 #ifndef CAPIO_STORAGE_MANAGER_TEST_HPP
 #define CAPIO_STORAGE_MANAGER_TEST_HPP
+#include <gtest/gtest.h>
+
+#include "capiocl.hpp"
+#include "capiocl/engine.h"
+#include "storage/manager.hpp"
+#include "utils/capiocl_adapter.hpp"
+#include "utils/location.hpp"
+
+extern StorageManager *storage_manager;
+extern capiocl::engine::Engine *capio_cl_engine;
 
 TEST(StorageManagerTestEnvironment, testGetPaths) {
 
