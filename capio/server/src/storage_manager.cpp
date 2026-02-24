@@ -229,6 +229,7 @@ void StorageManager::clone(const pid_t parent_tid, const pid_t child_tid) {
 std::vector<std::filesystem::path> StorageManager::getPaths() const {
     const shared_lock_guard slg(_mutex_storage);
     std::vector<std::filesystem::path> paths;
+    paths.reserve(_storage.size());
     for (const auto &[file_path, _] : _storage) {
         paths.emplace_back(file_path);
     }

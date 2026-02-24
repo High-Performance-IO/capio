@@ -10,9 +10,9 @@ char *node_name;
 #include "utils/capiocl_adapter.hpp"
 #include "utils/location.hpp"
 
-capiocl::engine::Engine *capio_cl_engine;
-StorageManager *storage_manager = nullptr;
-ClientManager *client_manager   = nullptr;
+capiocl::engine::Engine *capio_cl_engine = nullptr;
+StorageManager *storage_manager          = nullptr;
+ClientManager *client_manager            = nullptr;
 
 const capiocl::engine::Engine &CapioCLEngine::get() { return *capio_cl_engine; }
 
