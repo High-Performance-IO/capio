@@ -2,7 +2,7 @@
 # Target information
 #####################################
 set(TARGET_NAME capio_syscall_unit_tests)
-file(GLOB_RECURSE TARGET_SOURCES
+file(GLOB TARGET_SOURCES
         "${CMAKE_CURRENT_SOURCE_DIR}/src/*.cpp"
 )
 
