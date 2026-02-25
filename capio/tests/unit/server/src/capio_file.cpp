@@ -1,9 +1,8 @@
-#include <gtest/gtest.h>
-
-#include <iostream>
-
-#include "common/env.hpp"
+#ifndef CAPIO_CAPIO_FILE_HPP
+#define CAPIO_CAPIO_FILE_HPP
 #include "utils/capio_file.hpp"
+#include "common/env.hpp"
+#include <gtest/gtest.h>
 
 TEST(ServerTest, TestInsertSingleSector) {
     CapioFile c_file;
@@ -60,3 +59,4 @@ TEST(ServerTest, TestInsertTwoOverlappingSectorsNested) {
     EXPECT_EQ(sectors.size(), 1);
     EXPECT_NE(sectors.find({1L, 4L}), sectors.end());
 }
+#endif // CAPIO_CAPIO_FILE_HPP
