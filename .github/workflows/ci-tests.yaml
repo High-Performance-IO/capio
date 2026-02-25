@@ -114,12 +114,17 @@ jobs:
           - gcc:11
           - gcc:12
           - gcc:13
+          - gcc:14
+          - gcc:15
           - zhongruoyu/llvm-ports:13.0-trixie
           - zhongruoyu/llvm-ports:14.0-trixie
           - zhongruoyu/llvm-ports:15.0-trixie
           - zhongruoyu/llvm-ports:16.0-trixie
           - zhongruoyu/llvm-ports:17.0-trixie
           - zhongruoyu/llvm-ports:18-trixie
+          - zhongruoyu/llvm-ports:19.1-bullseye
+          - zhongruoyu/llvm-ports:20.1-bullseye
+          - zhongruoyu/llvm-ports:21.1-bullseye
 
     container:
       image: ${{ matrix.compiler }}
