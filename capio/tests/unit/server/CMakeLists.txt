@@ -11,18 +11,14 @@ file(GLOB_RECURSE SERVER_SOURCES
         "${CMAKE_SOURCE_DIR}/capio/server/**/*.cpp"
 )
 
-set(TARGET_SOURCES
-        src/main.cpp
-        src/capio_file.cpp
-        src/client_manager.cpp
-        src/storage_manager.cpp
-        ${SERVER_SOURCES}
+file(GLOB_RECURSE TARGET_TEST_SOURCE
+    "${CMAKE_CURRENT_SOURCE_DIR}/**/*.cpp"
 )
 
 #####################################
 # Target definition
 #####################################
-add_executable(${TARGET_NAME} ${TARGET_SOURCES})
+add_executable(${TARGET_NAME} ${TARGET_TEST_SOURCE} ${SERVER_SOURCES} )
 
 #####################################
 # Include files and directories
