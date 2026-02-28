@@ -3,9 +3,9 @@
 
 #include <csignal>
 
-#include "remote/backend.hpp"
 #include "client/manager.hpp"
 #include "client/request.hpp"
+#include "remote/backend.hpp"
 
 extern ClientManager *client_manager;
 extern StorageManager *storage_manager;

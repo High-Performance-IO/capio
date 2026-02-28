@@ -1,8 +1,8 @@
 #ifndef CAPIO_REMOTE_REQUESTS_HPP
 #define CAPIO_REMOTE_REQUESTS_HPP
 
-#include "storage/manager.hpp"
 #include "common/requests.hpp"
+#include "storage/manager.hpp"
 #include "utils/location.hpp"
 
 extern StorageManager *storage_manager;

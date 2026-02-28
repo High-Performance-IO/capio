@@ -4,8 +4,8 @@
 #include <mutex>
 #include <thread>
 
-#include "utils/types.hpp"
 #include "remote/backend.hpp"
+#include "utils/types.hpp"
 
 extern Backend *backend;
 extern char *node_name;

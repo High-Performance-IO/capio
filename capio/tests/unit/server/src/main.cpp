@@ -4,11 +4,15 @@ char *node_name;
 
 #include "capiocl.hpp"
 #include "capiocl/engine.h"
-#include "client-manager/client_manager.hpp"
+#include "client/manager.hpp"
 #include "common/constants.hpp"
 #include "storage/manager.hpp"
 #include "utils/capiocl_adapter.hpp"
 #include "utils/location.hpp"
+
+CSFilesSentMap_t files_sent;
+CSClientsRemotePendingNFilesMap_t clients_remote_pending_nfiles;
+std::mutex nfiles_mutex;
 
 capiocl::engine::Engine *capio_cl_engine = nullptr;
 StorageManager *storage_manager          = nullptr;

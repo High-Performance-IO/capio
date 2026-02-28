@@ -2,7 +2,7 @@
 #define CAPIO_CLIENT_MANAGER_HPP
 #include <gtest/gtest.h>
 
-#include <client-manager/client_manager.hpp>
+#include <client/manager.hpp>
 
 extern ClientManager *client_manager;
 
