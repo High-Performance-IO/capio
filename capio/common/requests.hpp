@@ -30,13 +30,11 @@ constexpr const int CAPIO_NR_REQUESTS = 24;
 
 /*REQUESTS FOR SERVER TO SERVER COMMUNICATION*/
 
-constexpr const int CAPIO_SERVER_REQUEST_READ             = 0;
-constexpr const int CAPIO_SERVER_REQUEST_READ_REPLY       = 1;
-constexpr const int CAPIO_SERVER_REQUEST_READ_BATCH       = 2;
-constexpr const int CAPIO_SERVER_REQUEST_READ_BATCH_REPLY = 3;
-constexpr const int CAPIO_SERVER_REQUEST_STAT             = 4;
-constexpr const int CAPIO_SERVER_REQUEST_STAT_REPLY       = 5;
+constexpr const int CAPIO_SERVER_REQUEST_READ       = 0;
+constexpr const int CAPIO_SERVER_REQUEST_READ_REPLY = 1;
+constexpr const int CAPIO_SERVER_REQUEST_STAT       = 2;
+constexpr const int CAPIO_SERVER_REQUEST_STAT_REPLY = 3;
 
-constexpr const int CAPIO_SERVER_NR_REQUEST = 6;
+constexpr const int CAPIO_SERVER_NR_REQUEST = 4;
 
 #endif // CAPIO_COMMON_REQUESTS_HPP

@@ -42,13 +42,6 @@ int n_servers;
 // name of the node
 char *node_name;
 
-// application name -> set of files already sent
-CSFilesSentMap_t files_sent;
-
-CSClientsRemotePendingNFilesMap_t clients_remote_pending_nfiles;
-
-std::mutex nfiles_mutex;
-
 #include "handlers.hpp"
 #include "utils/location.hpp"
 #include "utils/signals.hpp"
