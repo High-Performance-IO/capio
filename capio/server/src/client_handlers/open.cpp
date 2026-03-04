@@ -1,6 +1,11 @@
 #ifndef CAPIO_SERVER_HANDLERS_OPEN_HPP
 #define CAPIO_SERVER_HANDLERS_OPEN_HPP
 
+#include "client/manager.hpp"
+#include "client/request.hpp"
+#include "storage/manager.hpp"
+#include "utils/capiocl_adapter.hpp"
+#include "utils/env.hpp"
 #include "utils/location.hpp"
 
 extern ClientManager *client_manager;
@@ -68,7 +73,7 @@ inline void handle_open(int tid, int fd, const std::filesystem::path &path) {
     }
 }
 
-void create_handler(const char *const str) {
+void ClientRequestManager::MemHandlers::create_handler(const char *const str) {
     int tid, fd;
     char path[PATH_MAX];
     sscanf(str, "%d %d %s", &tid, &fd, path);
@@ -79,7 +84,7 @@ void create_handler(const char *const str) {
     handle_create(tid, fd, path);
 }
 
-void create_exclusive_handler(const char *const str) {
+void ClientRequestManager::MemHandlers::create_exclusive_handler(const char *const str) {
     int tid, fd;
     char path[PATH_MAX];
     sscanf(str, "%d %d %s", &tid, &fd, path);
@@ -90,7 +95,7 @@ void create_exclusive_handler(const char *const str) {
     handle_create_exclusive(tid, fd, path);
 }
 
-void open_handler(const char *const str) {
+void ClientRequestManager::MemHandlers::open_handler(const char *const str) {
     int tid, fd;
     char path[PATH_MAX];
     sscanf(str, "%d %d %s", &tid, &fd, path);
