@@ -96,13 +96,21 @@ StorageManager::tryGet(const std::filesystem::path &path) const {
         return {const_cast<CapioFile &>(it->second)};
     }
 }
-CapioFile &StorageManager::get(const std::filesystem::path &path) const {
+CapioFile &StorageManager::get(const std::filesystem::path &path) {
     START_LOG(gettid(), "call(path=%s)", path.c_str());
-    const shared_lock_guard slg(_mutex_storage);
-    if (_storage.find(path) == _storage.end()) {
-        ERR_EXIT("File %s was not found in local storage", path.c_str());
+    bool require_add = false;
+    {
+        const shared_lock_guard slg(_mutex_storage);
+        if (_storage.find(path) == _storage.end()) {
+            LOG("File %s was not found in local storage", path.c_str());
+            require_add = true;
+        }
+    }
+    if (require_add) {
+        this->add(path, true, CAPIO_DEFAULT_DIR_INITIAL_SIZE);
     }
 
+    const shared_lock_guard slg(_mutex_storage);
     return const_cast<CapioFile &>(_storage.at(path));
 }
 CapioFile &StorageManager::get(const pid_t pid, const int fd) const {
