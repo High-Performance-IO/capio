@@ -30,7 +30,7 @@ inline void handle_pending_read(int tid, int fd, long int process_offset, long i
         bytes_read = end_of_sector - process_offset;
     }
 
-    c_file.createBufferIfNeeded(path, false);
+    c_file.createBuffer(path, false);
     client_manager->replyToClient(tid, process_offset, c_file.getBuffer(), bytes_read);
     storage_manager->setFileOffset(tid, fd, process_offset + bytes_read);
 
@@ -47,13 +47,13 @@ inline void handle_local_read(int tid, int fd, off64_t count, bool is_prod) {
     off64_t process_offset            = storage_manager->getFileOffset(tid, fd);
 
     // if a process is the producer of a file, then the file is always complete for that process
-    const bool file_complete = c_file.complete() || is_prod;
+    const bool file_complete = c_file.isCommitted() || is_prod;
 
     if (!(file_complete || CapioCLEngine::get().isFirable(path))) {
         // wait for file to be completed and then do what is done inside handle pending read
         LOG("Data is not available yet. Starting async thread to wait for file availability");
         std::thread t([&c_file, tid, fd, count, process_offset] {
-            c_file.waitForCompletion();
+            c_file.waitForCommit();
             handle_pending_read(tid, fd, process_offset, count);
         });
         t.detach();
@@ -85,7 +85,7 @@ inline void handle_local_read(int tid, int fd, off64_t count, bool is_prod) {
     const auto read_size = std::min(count, end_of_sector - process_offset);
     LOG("Requested read within end of sector, and data is available. Serving %ld bytes", read_size);
 
-    c_file.createBufferIfNeeded(path, false);
+    c_file.createBuffer(path, false);
     client_manager->replyToClient(tid, process_offset, c_file.getBuffer(), read_size);
     storage_manager->setFileOffset(tid, fd, process_offset + read_size);
 }
@@ -99,13 +99,14 @@ inline void request_remote_read(int tid, int fd, off64_t count) {
     off64_t end_of_read               = offset + count;
     off64_t end_of_sector             = c_file.getSectorEnd(offset);
 
-    if (c_file.complete() && (end_of_read <= end_of_sector ||
-                              (end_of_sector == -1 ? 0 : end_of_sector) == c_file.real_file_size)) {
+    if (c_file.isCommitted() &&
+        (end_of_read <= end_of_sector ||
+         (end_of_sector == -1 ? 0 : end_of_sector) == c_file.getRealFileSize())) {
         LOG("Handling local read");
         handle_local_read(tid, fd, count, true);
     } else if (end_of_read <= end_of_sector) {
         LOG("Data is present locally and can be served to client");
-        c_file.createBufferIfNeeded(path, false);
+        c_file.createBuffer(path, false);
 
         client_manager->replyToClient(tid, offset, c_file.getBuffer(), count);
         storage_manager->setFileOffset(tid, fd, offset + count);
