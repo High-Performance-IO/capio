@@ -34,28 +34,6 @@ inline void serve_remote_read_request(int tid, int fd, int count, long int nbyte
     backend->send_request(message.get(), size + 1, dest);
 }
 
-inline void send_files_batch_request(const std::string &prefix, int tid, int fd, int count,
-                                     bool is_getdents, const std::string &dest,
-                                     const std::vector<std::string> *files_to_send) {
-    START_LOG(gettid(), "call()");
-    const char *const format = "%04d %s %d %d %d %d";
-    const int size           = snprintf(nullptr, 0, format, CAPIO_SERVER_REQUEST_READ_BATCH_REPLY,
-                                        prefix.c_str(), tid, fd, count, is_getdents);
-    const std::unique_ptr<char[]> header(new char[size + 1]);
-    sprintf(header.get(), format, CAPIO_SERVER_REQUEST_READ_BATCH_REPLY, prefix.c_str(), tid, fd,
-            count, is_getdents);
-    std::string message(header.get());
-    for (const std::string &path : *files_to_send) {
-        CapioFile &c_file = storage_manager->get(path);
-        message.append(" " + path.substr(prefix.length()) + " " +
-                       std::to_string(c_file.get_stored_size()));
-    }
-    LOG("Message = %s", message.c_str());
-
-    // send request
-    backend->send_request(message.c_str(), message.length(), dest);
-}
-
 inline void handle_remote_stat_request(int tid, const std::filesystem::path &path) {
     START_LOG(gettid(), "call(tid=%d, path=%s)", tid, path.c_str());
 
@@ -69,29 +47,6 @@ inline void handle_remote_stat_request(int tid, const std::filesystem::path &pat
 
     backend->send_request(message.get(), size + 1, dest);
     LOG("message sent");
-}
-
-inline void handle_remote_read_batch_request(int tid, int fd, off64_t count,
-                                             const std::string &app_name, const std::string &prefix,
-                                             off64_t batch_size, bool is_getdents) {
-    START_LOG(gettid(),
-              "call(tid=%d, fd=%d, count=%ld, app_name=%s, prefix=%s, "
-              "batch_size=%ld, is_getdents=%s)",
-              tid, fd, count, app_name.c_str(), prefix.c_str(), batch_size,
-              is_getdents ? "true" : "false");
-
-    const std::filesystem::path &path = storage_manager->getPath(tid, fd);
-    std::string dest                  = std::get<0>(get_file_location(path));
-
-    const char *const format = "%04d %s %d %d %ld %ld %s %s %d";
-    const int size =
-        snprintf(nullptr, 0, format, CAPIO_SERVER_REQUEST_READ_BATCH, path.c_str(), tid, fd, count,
-                 batch_size, app_name.c_str(), prefix.c_str(), is_getdents);
-    const std::unique_ptr<char[]> message(new char[size + 1]);
-    sprintf(message.get(), format, CAPIO_SERVER_REQUEST_READ_BATCH, path.c_str(), tid, fd, count,
-            batch_size, app_name.c_str(), prefix.c_str(), is_getdents);
-    LOG("Message = %s", message.get());
-    backend->send_request(message.get(), size + 1, dest);
 }
 
 inline void handle_remote_read_request(int tid, int fd, off64_t count, bool is_getdents) {

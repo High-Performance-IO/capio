@@ -125,17 +125,6 @@ void wait_for_file(const std::filesystem::path &path, int tid, int fd, off64_t c
     if (strcmp(std::get<0>(get_file_location(path)), node_name) == 0) {
         handle_local_read(tid, fd, count, false);
     } else {
-        const CapioFile &c_file = storage_manager->get(path);
-        const auto &remote_app  = client_manager->getAppName(tid);
-        if (!c_file.is_complete()) {
-            std::string prefix = path.parent_path();
-            off64_t batch_size = CapioCLEngine::get().getDirectoryFileCount(path);
-            if (batch_size > 0) {
-                handle_remote_read_batch_request(tid, fd, count, remote_app, prefix, batch_size,
-                                                 false);
-                return;
-            }
-        }
         request_remote_read(tid, fd, count);
     }
 }
@@ -163,20 +152,6 @@ inline void handle_read(int tid, int fd, off64_t count) {
         handle_local_read(tid, fd, count, is_prod);
     } else {
         LOG("File is remote");
-        CapioFile &c_file = storage_manager->get(path);
-        if (!c_file.is_complete()) {
-            LOG("File not complete");
-            const std::string &app_name = client_manager->getAppName(tid);
-
-            std::string prefix = path.parent_path();
-            off64_t batch_size = CapioCLEngine::get().getDirectoryFileCount(path);
-            if (batch_size > 0) {
-                LOG("Handling batch file");
-                handle_remote_read_batch_request(tid, fd, count, app_name, prefix, batch_size,
-                                                 false);
-                return;
-            }
-        }
         LOG("Delegating to backend remote read");
         request_remote_read(tid, fd, count);
     }
