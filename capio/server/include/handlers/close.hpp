@@ -23,8 +23,8 @@ inline void handle_close(int tid, int fd) {
         c_file.closed()) {
         LOG("Capio File %s is closed and commit rule is on_close. setting it to complete",
             path.c_str());
-        c_file.setComplete();
-        c_file.commit();
+        c_file.setCommitted();
+        c_file.dump();
     }
 
     LOG("Deleting capio file %s from tid=%d", path.c_str(), tid);

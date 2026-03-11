@@ -49,7 +49,7 @@ class CapioFile {
     std::set<std::pair<off64_t, off64_t>, compare> _sectors;
     // vector of (tid, fd)
     std::vector<std::pair<int, int>> _threads_fd;
-    bool _complete = false; // whether the file is completed / committed
+    bool _committed = false; // whether the file is completed / committed
 
     /*sync variables*/
     mutable std::mutex _mutex;
@@ -105,33 +105,34 @@ class CapioFile {
         }
     }
 
-    [[nodiscard]] bool complete() const {
-        START_LOG(gettid(), "capio_file is complete? %s", this->_complete ? "true" : "false");
+    [[nodiscard]] bool isCommitted() const {
+        START_LOG(gettid(), "capio_file is complete? %s", this->_committed ? "true" : "false");
         std::lock_guard lg(_mutex);
-        return this->_complete;
+        return this->_committed;
     }
 
     void waitForCompletion() const {
         START_LOG(gettid(), "call()");
         LOG("Thread waiting for file to be committed");
         std::unique_lock lock(_mutex);
-        _complete_cv.wait(lock, [this] { return _complete; });
+        _complete_cv.wait(lock, [this] { return _committed; });
     }
 
     void waitForData(long offset) const {
         START_LOG(gettid(), "call()");
         LOG("Thread waiting for data to be available");
         std::unique_lock lock(_mutex);
-        _data_avail_cv.wait(
-            lock, [offset, this] { return (offset >= this->_getStoredSize()) || this->_complete; });
+        _data_avail_cv.wait(lock, [offset, this] {
+            return (offset >= this->_getStoredSize()) || this->_committed;
+        });
     }
 
-    void setComplete(bool complete = true) {
+    void setCommitted(bool complete = true) {
         START_LOG(gettid(), "setting capio_file._complete=%s", complete ? "true" : "false");
         std::lock_guard lg(_mutex);
-        if (this->_complete != complete) {
-            this->_complete = complete;
-            if (this->_complete) {
+        if (this->_committed != complete) {
+            this->_committed = complete;
+            if (this->_committed) {
                 _complete_cv.notify_all();
                 _data_avail_cv.notify_all();
             }
@@ -150,7 +151,7 @@ class CapioFile {
         _n_opens--;
     }
 
-    void commit() {
+    void dump() {
         START_LOG(gettid(), "call()");
 
         if (_permanent && !_directory && _home_node) {
@@ -173,36 +174,32 @@ class CapioFile {
         START_LOG(gettid(), "call(path=%s, home_node=%s)", path.c_str(),
                   home_node ? "true" : "false");
         std::lock_guard lock(_mutex);
-        // TODO: will use malloc in order to be able to use realloc
-        _home_node = home_node;
-        if (_permanent && home_node) {
-            if (_directory) {
-                std::filesystem::create_directory(path);
-                std::filesystem::permissions(path, std::filesystem::perms::owner_all);
-                _buf = new char[_buf_size];
-            } else {
-                LOG("creating mem mapped file");
-                _fd = ::open(path.c_str(), O_RDWR | O_CREAT, S_IRWXU | S_IRGRP | S_IROTH);
-                if (_fd == -1) {
-                    ERR_EXIT("open %s CapioFile constructor", path.c_str());
-                }
-                if (ftruncate(_fd, _buf_size) == -1) {
-                    ERR_EXIT("ftruncate CapioFile constructor");
-                }
-                _buf =
-                    (char *) mmap(nullptr, _buf_size, PROT_READ | PROT_WRITE, MAP_SHARED, _fd, 0);
-                if (_buf == MAP_FAILED) {
-                    ERR_EXIT("mmap CapioFile constructor");
-                }
-            }
-        } else {
-            _buf = new char[_buf_size];
-        }
-    }
-
-    void createBufferIfNeeded(const std::filesystem::path &path, bool home_node) {
         if (bufToAllocate()) {
-            createBuffer(path, home_node);
+            // TODO: will use malloc in order to be able to use realloc
+            _home_node = home_node;
+            if (_permanent && home_node) {
+                if (_directory) {
+                    std::filesystem::create_directory(path);
+                    std::filesystem::permissions(path, std::filesystem::perms::owner_all);
+                    _buf = new char[_buf_size];
+                } else {
+                    LOG("creating mem mapped file");
+                    _fd = ::open(path.c_str(), O_RDWR | O_CREAT, S_IRWXU | S_IRGRP | S_IROTH);
+                    if (_fd == -1) {
+                        ERR_EXIT("open %s CapioFile constructor", path.c_str());
+                    }
+                    if (ftruncate(_fd, _buf_size) == -1) {
+                        ERR_EXIT("ftruncate CapioFile constructor");
+                    }
+                    _buf = (char *) mmap(nullptr, _buf_size, PROT_READ | PROT_WRITE, MAP_SHARED,
+                                         _fd, 0);
+                    if (_buf == MAP_FAILED) {
+                        ERR_EXIT("mmap CapioFile constructor");
+                    }
+                }
+            } else {
+                _buf = new char[_buf_size];
+            }
         }
     }
 
@@ -368,7 +365,7 @@ class CapioFile {
 
     [[nodiscard]] bool deletable() const { return _n_opens <= 0; }
 
-    [[nodiscard]] bool directory() const { return _directory; }
+    [[nodiscard]] bool isDirectory() const { return _directory; }
 
     void open() { _n_opens++; }
 

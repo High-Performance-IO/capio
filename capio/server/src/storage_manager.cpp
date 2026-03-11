@@ -39,7 +39,7 @@ void StorageManager::addDirectoryEntry(const pid_t tid, const std::filesystem::p
     ld.d_reclen = sizeof(linux_dirent64);
 
     CapioFile &c_file = get(dir);
-    c_file.createBufferIfNeeded(dir, true);
+    c_file.createBuffer(dir, true);
     void *file_shm             = c_file.getBuffer();
     const off64_t file_size    = c_file.getStoredSize();
     const off64_t data_size    = file_size + ld.d_reclen;
@@ -50,7 +50,7 @@ void StorageManager::addDirectoryEntry(const pid_t tid, const std::filesystem::p
         file_shm = c_file.expandBuffer(data_size);
     }
 
-    ld.d_type = (c_file.directory() ? DT_DIR : DT_REG);
+    ld.d_type = (c_file.isDirectory() ? DT_DIR : DT_REG);
 
     memcpy((char *) file_shm + file_size, &ld, sizeof(ld));
     const off64_t base_offset = file_size;
@@ -62,7 +62,7 @@ void StorageManager::addDirectoryEntry(const pid_t tid, const std::filesystem::p
     ++c_file.n_files;
     client_manager->registerProducedFile(tid, dir);
     if (c_file.n_files == c_file.n_files_expected) {
-        c_file.setComplete();
+        c_file.setCommitted();
     }
 }
 StorageManager::StorageManager() {

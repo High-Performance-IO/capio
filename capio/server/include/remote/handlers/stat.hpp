@@ -16,7 +16,7 @@ inline void serve_remote_stat(const std::filesystem::path &path, const std::stri
 
     const CapioFile &c_file = storage_manager->get(path);
     off64_t file_size       = c_file.getFileSize();
-    bool is_dir             = c_file.directory();
+    bool is_dir             = c_file.isDirectory();
     serve_remote_stat_request(path, source_tid, file_size, is_dir, dest);
 }
 
@@ -39,7 +39,7 @@ inline void handle_remote_stat(int source_tid, const std::filesystem::path &path
     const auto c_file = storage_manager->tryGet(path);
     if (c_file) {
         LOG("File %s is present on capio file system", path.c_str());
-        if (c_file->get().complete() || CapioCLEngine::get().isFirable(path)) {
+        if (c_file->get().isCommitted() || CapioCLEngine::get().isFirable(path)) {
             LOG("file is complete. serving file");
             serve_remote_stat(path, dest, source_tid);
         } else { // wait for completion

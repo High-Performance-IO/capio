@@ -51,7 +51,7 @@ inline void send_dirent_to_client(int tid, int fd, CapioFile &c_file, off64_t of
     }
 
     const auto &path_to_check = storage_manager->getPath(tid, fd);
-    if (!c_file.complete() && CapioCLEngine::get().isFirable(path_to_check)) {
+    if (!c_file.isCommitted() && CapioCLEngine::get().isFirable(path_to_check)) {
         LOG("File %s has mode no_update and not enough data is available", path_to_check.c_str());
         std::thread t(wait_for_dirent_data, (last_entry + 1) * sizeof(linux_dirent64), tid, fd,
                       count, std::ref(c_file));

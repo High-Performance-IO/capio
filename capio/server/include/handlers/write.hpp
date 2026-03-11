@@ -18,7 +18,7 @@ void write_handler(const char *const str) {
     off64_t file_shm_size             = c_file.getBufferSize();
     SPSCQueue &data_buf               = client_manager->getClientToServerDataBuffers(tid);
 
-    c_file.createBufferIfNeeded(path, true);
+    c_file.createBuffer(path, true);
     if (end_of_write > file_shm_size) {
         c_file.expandBuffer(end_of_write);
     }
