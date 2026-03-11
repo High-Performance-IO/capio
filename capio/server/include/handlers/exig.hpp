@@ -16,8 +16,8 @@ inline void handle_exit_group(int tid) {
             CapioFile &c_file = storage_manager->get(path);
             if (c_file.isDirectory()) {
                 LOG("file %s is dir", path.c_str());
-                long int n_committed = c_file.n_files_expected;
-                if (n_committed <= c_file.n_files) {
+                long int n_committed = c_file.getDirectoryExpectedFileCount();
+                if (n_committed <= c_file.getDirectoryContainedFileCount()) {
                     LOG("Setting file %s to complete", path.c_str());
                     c_file.setCommitted();
                 }

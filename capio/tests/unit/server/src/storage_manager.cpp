@@ -53,7 +53,7 @@ TEST(StorageManagerTestEnvironment, testInitDirectory) {
     storage_manager->updateDirectory(1, "myDirectory");
     const auto &dir1 = storage_manager->get("myDirectory");
 
-    EXPECT_FALSE(dir1.first_write);
+    EXPECT_FALSE(dir1.isFirstWrite());
 }
 
 TEST(StorageManagerTestEnvironment, testAddDirectoryFailure) {

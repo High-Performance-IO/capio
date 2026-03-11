@@ -59,9 +59,9 @@ void StorageManager::addDirectoryEntry(const pid_t tid, const std::filesystem::p
         reinterpret_cast<linux_dirent64 *>(static_cast<char *>(file_shm) + file_size)->d_name);
 
     c_file.insertSector(base_offset, data_size);
-    ++c_file.n_files;
+    c_file.incrementDirFileCnt();
     client_manager->registerProducedFile(tid, dir);
-    if (c_file.n_files == c_file.n_files_expected) {
+    if (c_file.getDirectoryContainedFileCount() == c_file.getDirectoryExpectedFileCount()) {
         c_file.setCommitted();
     }
 }
@@ -305,8 +305,8 @@ off64_t StorageManager::addDirectory(const pid_t tid, const std::filesystem::pat
 
     if (!get_file_location_opt(path)) {
         CapioFile &c_file = add(path, true, CAPIO_DEFAULT_DIR_INITIAL_SIZE);
-        if (c_file.first_write) {
-            c_file.first_write = false;
+        if (c_file.isFirstWrite()) {
+            c_file.registerFirstWrite();
             // TODO: it works only if there is one prod per file
             if (is_capio_dir(path)) {
                 add_file_location(path, node_name, -1);
@@ -326,8 +326,8 @@ off64_t StorageManager::addDirectory(const pid_t tid, const std::filesystem::pat
 void StorageManager::updateDirectory(const pid_t tid, const std::filesystem::path &file_path) {
     START_LOG(gettid(), "call(file_path=%s)", file_path.c_str());
     const auto &dir = get_parent_dir_path(file_path);
-    if (CapioFile &c_file = get(dir.c_str()); c_file.first_write) {
-        c_file.first_write = false;
+    if (CapioFile &c_file = get(dir.c_str()); c_file.isFirstWrite()) {
+        c_file.registerFirstWrite();
         write_file_location(dir);
     }
     addDirectoryEntry(tid, file_path, dir, REGULAR_ENTRY);

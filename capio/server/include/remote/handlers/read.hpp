@@ -44,7 +44,7 @@ inline void handle_read_reply(int tid, int fd, long count, off64_t file_size, of
     const std::filesystem::path &path = storage_manager->getPath(tid, fd);
     CapioFile &c_file                 = storage_manager->get(path);
     off64_t offset                    = storage_manager->getFileOffset(tid, fd);
-    c_file.real_file_size             = file_size;
+    c_file.setRealFileSize(file_size);
     c_file.insertSector(offset, offset + nbytes);
     c_file.setCommitted(complete);
 

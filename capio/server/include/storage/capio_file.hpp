@@ -56,29 +56,29 @@ class CapioFile {
     mutable std::condition_variable _complete_cv;
     mutable std::condition_variable _data_avail_cv;
 
-    inline off64_t _getStoredSize() const {
+    off64_t _getStoredSize() const {
         auto it = _sectors.rbegin();
         return (it == _sectors.rend()) ? 0 : it->second;
     }
+    bool _first_write      = true;
+    long _n_files          = 0;  // useful for directories
+    long _n_files_expected = -1; // useful for directories
 
-  public:
-    bool first_write          = true;
-    long int n_files          = 0;  // useful for directories
-    long int n_files_expected = -1; // useful for directories
     /*
      * file size in the home node. In a given moment could not be up-to-date.
      * This member is useful because a node different from the home node
      * could need to known the size of the file but not its content
      */
 
-    std::size_t real_file_size = 0;
+    std::size_t _real_file_size = 0;
 
+  public:
     CapioFile() : _buf_size(0), _directory(false), _permanent(false) {}
 
     CapioFile(bool directory, long int n_files_expected, bool permanent, off64_t init_size,
               long int n_close_expected)
         : _buf_size(init_size), _directory(directory), _n_close_expected(n_close_expected),
-          _permanent(permanent), n_files_expected(n_files_expected + 2) {}
+          _permanent(permanent), _n_files_expected(n_files_expected + 2) {}
 
     CapioFile(bool directory, bool permanent, off64_t init_size, long int n_close_expected = -1)
         : _buf_size(init_size), _directory(directory), _n_close_expected(n_close_expected),
@@ -469,6 +469,20 @@ class CapioFile {
         queue.read(_buf + offset, num_bytes);
         _data_avail_cv.notify_all();
     }
+
+    std::size_t getRealFileSize() const { return this->_real_file_size; }
+
+    void setRealFileSize(const off64_t size) { this->_real_file_size = size; }
+
+    bool isFirstWrite() const { return this->_first_write; }
+
+    void registerFirstWrite() { this->_first_write = false; }
+
+    void incrementDirFileCnt(const int count = 1) { this->_n_files += count; }
+
+    long getDirectoryContainedFileCount() const { return this->_n_files; }
+
+    long getDirectoryExpectedFileCount() const { return this->_n_files_expected; }
 };
 
 #endif // CAPIO_SERVER_STORAGE_CAPIO_FILE_HPP

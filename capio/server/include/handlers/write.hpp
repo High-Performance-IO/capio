@@ -26,8 +26,8 @@ void write_handler(const char *const str) {
 
     client_manager->registerProducedFile(tid, path);
     c_file.insertSector(offset, end_of_write);
-    if (c_file.first_write) {
-        c_file.first_write = false;
+    if (c_file.isFirstWrite()) {
+        c_file.registerFirstWrite();
         write_file_location(path);
         // TODO: it works only if there is one prod per file
         storage_manager->updateDirectory(tid, path);

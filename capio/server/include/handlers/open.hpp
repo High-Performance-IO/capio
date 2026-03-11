@@ -18,9 +18,9 @@ inline void update_file_metadata(const std::filesystem::path &path, int tid, int
                                      : storage_manager->add(path, false, get_file_initial_size());
     storage_manager->addFileToTid(tid, fd, path, offset);
 
-    if (c_file.first_write && is_creat) {
+    if (c_file.isFirstWrite() && is_creat) {
         client_manager->registerProducedFile(tid, path);
-        c_file.first_write = false;
+        c_file.registerFirstWrite();
         write_file_location(path);
         storage_manager->updateDirectory(tid, path);
     }
