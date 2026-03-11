@@ -15,8 +15,8 @@ inline void serve_remote_stat(const std::filesystem::path &path, const std::stri
               source_tid);
 
     const CapioFile &c_file = storage_manager->get(path);
-    off64_t file_size       = c_file.get_file_size();
-    bool is_dir             = c_file.is_dir();
+    off64_t file_size       = c_file.getFileSize();
+    bool is_dir             = c_file.directory();
     serve_remote_stat_request(path, source_tid, file_size, is_dir, dest);
 }
 
@@ -26,7 +26,7 @@ void wait_for_completion(const std::filesystem::path &path, int source_tid,
               dest.c_str());
 
     const CapioFile &c_file = storage_manager->get(path);
-    c_file.wait_for_completion();
+    c_file.waitForCompletion();
     LOG("File %s has been completed. serving stats data", path.c_str());
     serve_remote_stat(path, dest, source_tid);
 }
@@ -39,7 +39,7 @@ inline void handle_remote_stat(int source_tid, const std::filesystem::path &path
     const auto c_file = storage_manager->tryGet(path);
     if (c_file) {
         LOG("File %s is present on capio file system", path.c_str());
-        if (c_file->get().is_complete() || CapioCLEngine::get().isFirable(path)) {
+        if (c_file->get().complete() || CapioCLEngine::get().isFirable(path)) {
             LOG("file is complete. serving file");
             serve_remote_stat(path, dest, source_tid);
         } else { // wait for completion

@@ -20,7 +20,7 @@ inline void handle_pending_read(int tid, int fd, long int process_offset, long i
 
     const std::filesystem::path &path = storage_manager->getPath(tid, fd);
     CapioFile &c_file                 = storage_manager->get(path);
-    off64_t end_of_sector             = c_file.get_sector_end(process_offset);
+    off64_t end_of_sector             = c_file.getSectorEnd(process_offset);
     off64_t end_of_read               = process_offset + count;
 
     off64_t bytes_read;
@@ -30,8 +30,8 @@ inline void handle_pending_read(int tid, int fd, long int process_offset, long i
         bytes_read = end_of_sector - process_offset;
     }
 
-    c_file.create_buffer_if_needed(path, false);
-    client_manager->replyToClient(tid, process_offset, c_file.get_buffer(), bytes_read);
+    c_file.createBufferIfNeeded(path, false);
+    client_manager->replyToClient(tid, process_offset, c_file.getBuffer(), bytes_read);
     storage_manager->setFileOffset(tid, fd, process_offset + bytes_read);
 
     // TODO: check if the file was moved to the disk
@@ -47,13 +47,13 @@ inline void handle_local_read(int tid, int fd, off64_t count, bool is_prod) {
     off64_t process_offset            = storage_manager->getFileOffset(tid, fd);
 
     // if a process is the producer of a file, then the file is always complete for that process
-    const bool file_complete = c_file.is_complete() || is_prod;
+    const bool file_complete = c_file.complete() || is_prod;
 
     if (!(file_complete || CapioCLEngine::get().isFirable(path))) {
         // wait for file to be completed and then do what is done inside handle pending read
         LOG("Data is not available yet. Starting async thread to wait for file availability");
         std::thread t([&c_file, tid, fd, count, process_offset] {
-            c_file.wait_for_completion();
+            c_file.waitForCompletion();
             handle_pending_read(tid, fd, process_offset, count);
         });
         t.detach();
@@ -63,7 +63,7 @@ inline void handle_local_read(int tid, int fd, off64_t count, bool is_prod) {
     LOG("Data can be served. Condition met: %s %s", file_complete ? "c_file.is_complete()" : "",
         CapioCLEngine::get().isFirable(path) ? "CapioCLEngine::get().isFirable(path)" : "");
 
-    const off64_t end_of_sector = c_file.get_sector_end(process_offset);
+    const off64_t end_of_sector = c_file.getSectorEnd(process_offset);
     if (end_of_sector == -1) {
         LOG("End of sector is -1. returning process_offset without serving data");
         client_manager->replyToClient(tid, process_offset);
@@ -74,7 +74,7 @@ inline void handle_local_read(int tid, int fd, off64_t count, bool is_prod) {
         LOG("Mode is NO_UPDATE, but not enough data is available. Awaiting for data on "
             "a separate thread before sending it to client");
         std::thread t([&c_file, tid, fd, count, process_offset] {
-            c_file.wait_for_data(process_offset + count);
+            c_file.waitForData(process_offset + count);
             handle_pending_read(tid, fd, process_offset, count);
         });
         t.detach();
@@ -85,8 +85,8 @@ inline void handle_local_read(int tid, int fd, off64_t count, bool is_prod) {
     const auto read_size = std::min(count, end_of_sector - process_offset);
     LOG("Requested read within end of sector, and data is available. Serving %ld bytes", read_size);
 
-    c_file.create_buffer_if_needed(path, false);
-    client_manager->replyToClient(tid, process_offset, c_file.get_buffer(), read_size);
+    c_file.createBufferIfNeeded(path, false);
+    client_manager->replyToClient(tid, process_offset, c_file.getBuffer(), read_size);
     storage_manager->setFileOffset(tid, fd, process_offset + read_size);
 }
 
@@ -97,18 +97,17 @@ inline void request_remote_read(int tid, int fd, off64_t count) {
     CapioFile &c_file                 = storage_manager->get(path);
     off64_t offset                    = storage_manager->getFileOffset(tid, fd);
     off64_t end_of_read               = offset + count;
-    off64_t end_of_sector             = c_file.get_sector_end(offset);
+    off64_t end_of_sector             = c_file.getSectorEnd(offset);
 
-    if (c_file.is_complete() &&
-        (end_of_read <= end_of_sector ||
-         (end_of_sector == -1 ? 0 : end_of_sector) == c_file.real_file_size)) {
+    if (c_file.complete() && (end_of_read <= end_of_sector ||
+                              (end_of_sector == -1 ? 0 : end_of_sector) == c_file.real_file_size)) {
         LOG("Handling local read");
         handle_local_read(tid, fd, count, true);
     } else if (end_of_read <= end_of_sector) {
         LOG("Data is present locally and can be served to client");
-        c_file.create_buffer_if_needed(path, false);
+        c_file.createBufferIfNeeded(path, false);
 
-        client_manager->replyToClient(tid, offset, c_file.get_buffer(), count);
+        client_manager->replyToClient(tid, offset, c_file.getBuffer(), count);
         storage_manager->setFileOffset(tid, fd, offset + count);
     } else {
         LOG("Delegating to backend remote read");
@@ -151,8 +150,7 @@ inline void handle_read(int tid, int fd, off64_t count) {
         LOG("File is local. handling local read");
         handle_local_read(tid, fd, count, is_prod);
     } else {
-        LOG("File is remote");
-        LOG("Delegating to backend remote read");
+        LOG("File is remote. Delegating to backend remote read");
         request_remote_read(tid, fd, count);
     }
 }

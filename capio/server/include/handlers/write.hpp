@@ -15,17 +15,17 @@ void write_handler(const char *const str) {
     off64_t end_of_write              = offset + count;
     const std::filesystem::path &path = storage_manager->getPath(tid, fd);
     CapioFile &c_file                 = storage_manager->get(path);
-    off64_t file_shm_size             = c_file.get_buf_size();
+    off64_t file_shm_size             = c_file.getBufferSize();
     SPSCQueue &data_buf               = client_manager->getClientToServerDataBuffers(tid);
 
-    c_file.create_buffer_if_needed(path, true);
+    c_file.createBufferIfNeeded(path, true);
     if (end_of_write > file_shm_size) {
-        c_file.expand_buffer(end_of_write);
+        c_file.expandBuffer(end_of_write);
     }
-    c_file.read_from_queue(data_buf, offset, count);
+    c_file.readFromQueue(data_buf, offset, count);
 
     client_manager->registerProducedFile(tid, path);
-    c_file.insert_sector(offset, end_of_write);
+    c_file.insertSector(offset, end_of_write);
     if (c_file.first_write) {
         c_file.first_write = false;
         write_file_location(path);

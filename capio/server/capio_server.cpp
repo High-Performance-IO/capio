@@ -30,7 +30,7 @@
 #include "common/logger.hpp"
 #include "common/requests.hpp"
 #include "common/semaphore.hpp"
-#include "utils/capio_file.hpp"
+#include "storage/capio_file.hpp"
 #include "utils/common.hpp"
 #include "utils/env.hpp"
 #include "utils/types.hpp"
