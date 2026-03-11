@@ -1,5 +1,5 @@
-#ifndef CAPIO_SERVER_UTILS_CAPIO_FILE_HPP
-#define CAPIO_SERVER_UTILS_CAPIO_FILE_HPP
+#ifndef CAPIO_SERVER_STORAGE_CAPIO_FILE_HPP
+#define CAPIO_SERVER_STORAGE_CAPIO_FILE_HPP
 
 #include <algorithm>
 #include <condition_variable>
@@ -33,7 +33,6 @@ struct compare {
 };
 
 class CapioFile {
-  private:
     char *_buf = nullptr; // buffer containing the data
     off64_t _buf_size;
     bool _directory            = false;
@@ -57,7 +56,7 @@ class CapioFile {
     mutable std::condition_variable _complete_cv;
     mutable std::condition_variable _data_avail_cv;
 
-    inline off64_t _get_stored_size() const {
+    inline off64_t _getStoredSize() const {
         auto it = _sectors.rbegin();
         return (it == _sectors.rend()) ? 0 : it->second;
     }
@@ -106,31 +105,30 @@ class CapioFile {
         }
     }
 
-    [[nodiscard]] inline bool is_complete() const {
+    [[nodiscard]] bool complete() const {
         START_LOG(gettid(), "capio_file is complete? %s", this->_complete ? "true" : "false");
-        std::lock_guard<std::mutex> lg(_mutex);
+        std::lock_guard lg(_mutex);
         return this->_complete;
     }
 
-    inline void wait_for_completion() const {
+    void waitForCompletion() const {
         START_LOG(gettid(), "call()");
         LOG("Thread waiting for file to be committed");
-        std::unique_lock<std::mutex> lock(_mutex);
+        std::unique_lock lock(_mutex);
         _complete_cv.wait(lock, [this] { return _complete; });
     }
 
-    inline void wait_for_data(long offset) const {
+    void waitForData(long offset) const {
         START_LOG(gettid(), "call()");
         LOG("Thread waiting for data to be available");
-        std::unique_lock<std::mutex> lock(_mutex);
-        _data_avail_cv.wait(lock, [offset, this] {
-            return (offset >= this->_get_stored_size()) || this->_complete;
-        });
+        std::unique_lock lock(_mutex);
+        _data_avail_cv.wait(
+            lock, [offset, this] { return (offset >= this->_getStoredSize()) || this->_complete; });
     }
 
-    inline void set_complete(bool complete = true) {
+    void setComplete(bool complete = true) {
         START_LOG(gettid(), "setting capio_file._complete=%s", complete ? "true" : "false");
-        std::lock_guard<std::mutex> lg(_mutex);
+        std::lock_guard lg(_mutex);
         if (this->_complete != complete) {
             this->_complete = complete;
             if (this->_complete) {
@@ -140,14 +138,14 @@ class CapioFile {
         }
     }
 
-    inline void add_fd(int tid, int fd) { _threads_fd.emplace_back(tid, fd); }
+    void addFd(int tid, int fd) { _threads_fd.emplace_back(tid, fd); }
 
-    [[nodiscard]] inline bool buf_to_allocate() const {
-        std::lock_guard<std::mutex> lg(_mutex);
+    [[nodiscard]] bool bufToAllocate() const {
+        std::lock_guard lg(_mutex);
         return _buf == nullptr;
     }
 
-    inline void close() {
+    void close() {
         _n_close++;
         _n_opens--;
     }
@@ -156,7 +154,7 @@ class CapioFile {
         START_LOG(gettid(), "call()");
 
         if (_permanent && !_directory && _home_node) {
-            off64_t size = get_file_size();
+            off64_t size = getFileSize();
             if (ftruncate(_fd, size) == -1) {
                 ERR_EXIT("ftruncate commit capio_file");
             }
@@ -171,10 +169,10 @@ class CapioFile {
      * To be called when a process
      * execute a read or a write syscall
      */
-    void create_buffer(const std::filesystem::path &path, bool home_node) {
+    void createBuffer(const std::filesystem::path &path, bool home_node) {
         START_LOG(gettid(), "call(path=%s, home_node=%s)", path.c_str(),
                   home_node ? "true" : "false");
-        std::lock_guard<std::mutex> lock(_mutex);
+        std::lock_guard lock(_mutex);
         // TODO: will use malloc in order to be able to use realloc
         _home_node = home_node;
         if (_permanent && home_node) {
@@ -202,13 +200,13 @@ class CapioFile {
         }
     }
 
-    inline void create_buffer_if_needed(const std::filesystem::path &path, bool home_node) {
-        if (buf_to_allocate()) {
-            create_buffer(path, home_node);
+    void createBufferIfNeeded(const std::filesystem::path &path, bool home_node) {
+        if (bufToAllocate()) {
+            createBuffer(path, home_node);
         }
     }
 
-    void memcpy_capio_file(char *new_p, char *old_p) const {
+    void memcopyCapioFile(char *new_p, char *old_p) const {
         for (auto &sector : _sectors) {
             off64_t lbound        = sector.first;
             off64_t ubound        = sector.second;
@@ -217,31 +215,29 @@ class CapioFile {
         }
     }
 
-    char *expand_buffer(off64_t data_size) { // TODO: use realloc
+    char *expandBuffer(off64_t data_size) { // TODO: use realloc
         off64_t double_size = _buf_size * 2;
         off64_t new_size    = data_size > double_size ? data_size : double_size;
         char *new_buf       = new char[new_size];
-        std::lock_guard<std::mutex> lock(_mutex);
+        std::lock_guard lock(_mutex);
         //	memcpy(new_p, old_p, file_shm_size); //TODO memcpy only the
         // sector
         // stored in CapioFile
-        memcpy_capio_file(new_buf, _buf);
+        memcopyCapioFile(new_buf, _buf);
         delete[] _buf;
         _buf      = new_buf;
         _buf_size = new_size;
         return new_buf;
     }
 
-    inline char *get_buffer() { return _buf; }
+    char *getBuffer() { return _buf; }
 
-    [[nodiscard]] inline off64_t get_buf_size() const { return _buf_size; }
+    [[nodiscard]] off64_t getBufferSize() const { return _buf_size; }
 
-    [[nodiscard]] inline const std::vector<std::pair<int, int>> &get_fds() const {
-        return _threads_fd;
-    }
+    [[nodiscard]] const std::vector<std::pair<int, int>> &getFds() const { return _threads_fd; }
 
-    [[nodiscard]] inline off64_t get_file_size() const {
-        std::lock_guard<std::mutex> lock(_mutex);
+    [[nodiscard]] off64_t getFileSize() const {
+        std::lock_guard lock(_mutex);
         if (!_sectors.empty()) {
             return _sectors.rbegin()->second;
         } else {
@@ -255,7 +251,7 @@ class CapioFile {
      * sector, -1 otherwise
      *
      */
-    [[nodiscard]] off64_t get_sector_end(off64_t offset) const {
+    [[nodiscard]] off64_t getSectorEnd(off64_t offset) const {
         START_LOG(gettid(), "call(offset=%ld)", offset);
 
         off64_t sector_end = -1;
@@ -271,7 +267,7 @@ class CapioFile {
         return sector_end;
     }
 
-    [[nodiscard]] inline const std::set<std::pair<off64_t, off64_t>, compare> &get_sectors() const {
+    [[nodiscard]] const std::set<std::pair<off64_t, off64_t>, compare> &getSectors() const {
         return _sectors;
     }
 
@@ -280,9 +276,9 @@ class CapioFile {
      * If the node is the home node then this is equals to
      * the real size of the file
      */
-    [[nodiscard]] inline off64_t get_stored_size() const {
-        std::lock_guard<std::mutex> lock(_mutex);
-        return this->_get_stored_size();
+    [[nodiscard]] off64_t getStoredSize() const {
+        std::lock_guard lock(_mutex);
+        return this->_getStoredSize();
     }
 
     /*
@@ -297,11 +293,11 @@ class CapioFile {
      * in undefined
      *
      */
-    void insert_sector(off64_t new_start, off64_t new_end) {
+    void insertSector(off64_t new_start, off64_t new_end) {
         START_LOG(gettid(), "call(new_start=%ld, new_end=%ld)", new_start, new_end);
 
         auto p = std::make_pair(new_start, new_end);
-        std::lock_guard<std::mutex> lock(_mutex);
+        std::lock_guard lock(_mutex);
 
         if (_sectors.empty()) {
             LOG("Insert sector <%ld, %ld>", p.first, p.second);
@@ -366,15 +362,15 @@ class CapioFile {
         }
     }
 
-    [[nodiscard]] inline bool is_closed() const {
+    [[nodiscard]] bool closed() const {
         return _n_close_expected == -1 || _n_close == _n_close_expected;
     }
 
-    [[nodiscard]] inline bool is_deletable() const { return _n_opens <= 0; }
+    [[nodiscard]] bool deletable() const { return _n_opens <= 0; }
 
-    [[nodiscard]] inline bool is_dir() const { return _directory; }
+    [[nodiscard]] bool directory() const { return _directory; }
 
-    inline void open() { _n_opens++; }
+    void open() { _n_opens++; }
 
     /*
      * From the manual:
@@ -387,7 +383,7 @@ class CapioFile {
      * Fails if offset points past the end of the file.
      *
      */
-    off64_t seek_data(off64_t offset) {
+    off64_t seekData(off64_t offset) {
         if (_sectors.empty()) {
             if (offset == 0) {
                 return 0;
@@ -426,7 +422,7 @@ class CapioFile {
      * Fails if offset points past the end of the file.
      *
      */
-    [[nodiscard]] off64_t seek_hole(off64_t offset) const {
+    [[nodiscard]] off64_t seekHole(off64_t offset) const {
         if (_sectors.empty()) {
             if (offset == 0) {
                 return 0;
@@ -451,7 +447,7 @@ class CapioFile {
         }
     }
 
-    inline void remove_fd(int tid, int fd) {
+    void removeFd(int tid, int fd) {
         auto it = std::find(_threads_fd.begin(), _threads_fd.end(), std::make_pair(tid, fd));
         if (it != _threads_fd.end()) {
             _threads_fd.erase(it);
@@ -463,19 +459,19 @@ class CapioFile {
      * @param buffer
      * @return
      */
-    inline void read_from_node(const std::string &dest, off64_t offset, off64_t buffer_size) {
-        std::unique_lock<std::mutex> lock(_mutex);
+    void readFromNode(const std::string &dest, off64_t offset, off64_t buffer_size) {
+        std::unique_lock lock(_mutex);
         backend->recv_file(_buf + offset, dest, buffer_size);
         _data_avail_cv.notify_all();
     }
 
-    inline void read_from_queue(SPSCQueue &queue, size_t offset, long int num_bytes) {
+    void readFromQueue(SPSCQueue &queue, size_t offset, long int num_bytes) {
         START_LOG(gettid(), "call()");
 
-        std::unique_lock<std::mutex> lock(_mutex);
+        std::unique_lock lock(_mutex);
         queue.read(_buf + offset, num_bytes);
         _data_avail_cv.notify_all();
     }
 };
 
-#endif // CAPIO_SERVER_UTILS_CAPIO_FILE_HPP
+#endif // CAPIO_SERVER_STORAGE_CAPIO_FILE_HPP

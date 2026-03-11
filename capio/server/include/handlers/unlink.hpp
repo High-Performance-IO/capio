@@ -17,7 +17,7 @@ void unlink_handler(const char *const str) {
     const auto c_file_opt = storage_manager->tryGet(path);
     if (c_file_opt) { // TODO: it works only in the local case
         CapioFile &c_file = c_file_opt->get();
-        if (c_file.is_deletable()) {
+        if (c_file.deletable()) {
             storage_manager->remove(path);
             delete_from_files_location(path);
         }

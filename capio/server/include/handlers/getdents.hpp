@@ -17,17 +17,16 @@ inline void request_remote_getdents(int tid, int fd, off64_t count) {
     CapioFile &c_file     = storage_manager->get(tid, fd);
     off64_t offset        = storage_manager->getFileOffset(tid, fd);
     off64_t end_of_read   = offset + count;
-    off64_t end_of_sector = c_file.get_sector_end(offset);
+    off64_t end_of_sector = c_file.getSectorEnd(offset);
 
-    if (c_file.is_complete() &&
-        (end_of_read <= end_of_sector ||
-         (end_of_sector == -1 ? 0 : end_of_sector) == c_file.real_file_size)) {
+    if (c_file.complete() && (end_of_read <= end_of_sector ||
+                              (end_of_sector == -1 ? 0 : end_of_sector) == c_file.real_file_size)) {
         LOG("Handling local read");
         send_dirent_to_client(tid, fd, c_file, offset, count);
     } else if (end_of_read <= end_of_sector) {
         LOG("?");
-        c_file.create_buffer_if_needed(storage_manager->getPath(tid, fd), false);
-        client_manager->replyToClient(tid, offset, c_file.get_buffer(), count);
+        c_file.createBufferIfNeeded(storage_manager->getPath(tid, fd), false);
+        client_manager->replyToClient(tid, offset, c_file.getBuffer(), count);
         storage_manager->setFileOffset(tid, fd, offset + count);
     } else {
         LOG("Delegating to backend remote read");
@@ -53,6 +52,7 @@ inline void handle_getdents(int tid, int fd, long int count) {
             if (strcmp(std::get<0>(get_file_location(path_to_check)), node_name) == 0) {
                 handle_getdents(tid, fd, count);
             } else {
+
                 request_remote_getdents(tid, fd, count);
             }
         });
@@ -63,8 +63,7 @@ inline void handle_getdents(int tid, int fd, long int count) {
         off64_t offset    = storage_manager->getFileOffset(tid, fd);
         send_dirent_to_client(tid, fd, c_file, offset, count);
     } else {
-        LOG("File is remote");
-        LOG("Delegating to backend remote read");
+        LOG("File is remote. Delegating to backend remote read");
         request_remote_getdents(tid, fd, count);
     }
 }

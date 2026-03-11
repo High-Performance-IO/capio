@@ -48,7 +48,7 @@ TEST(StorageManagerTestEnvironment, testInitDirectory) {
 
     const auto &dir = storage_manager->get("myDirectory");
 
-    EXPECT_EQ(dir.get_buf_size(), CAPIO_DEFAULT_DIR_INITIAL_SIZE);
+    EXPECT_EQ(dir.getBufferSize(), CAPIO_DEFAULT_DIR_INITIAL_SIZE);
 
     storage_manager->updateDirectory(1, "myDirectory");
     const auto &dir1 = storage_manager->get("myDirectory");
@@ -90,13 +90,13 @@ TEST(StorageManagerTestEnvironment, testNumberOfOpensAndCloses) {
     storage_manager->addFileToTid(1234, 3, "myFile", 0);
     storage_manager->addFileToTid(1234, 4, "myFile", 0);
 
-    EXPECT_FALSE(storage_manager->get("myFile").is_deletable());
+    EXPECT_FALSE(storage_manager->get("myFile").deletable());
 
     storage_manager->get("myFile").close();
-    EXPECT_FALSE(storage_manager->get("myFile").is_deletable());
+    EXPECT_FALSE(storage_manager->get("myFile").deletable());
 
     storage_manager->get("myFile").close();
-    EXPECT_TRUE(storage_manager->get("myFile").is_deletable());
+    EXPECT_TRUE(storage_manager->get("myFile").deletable());
 }
 
 TEST(StorageManagerTestEnvironment, testNumberOfOpensAfterClone) {
@@ -105,15 +105,15 @@ TEST(StorageManagerTestEnvironment, testNumberOfOpensAfterClone) {
     storage_manager->addFileToTid(1234, 3, "myFile", 0);
     storage_manager->clone(1234, 5678);
 
-    EXPECT_FALSE(storage_manager->get("myFile").is_deletable());
+    EXPECT_FALSE(storage_manager->get("myFile").deletable());
 
     storage_manager->removeFromTid(1234, 3);
-    EXPECT_FALSE(storage_manager->get("myFile").is_deletable());
+    EXPECT_FALSE(storage_manager->get("myFile").deletable());
 
     storage_manager->removeFromTid(5678, 3);
     storage_manager->get("myFile").close();
 
-    EXPECT_TRUE(storage_manager->get("myFile").is_deletable());
+    EXPECT_TRUE(storage_manager->get("myFile").deletable());
 }
 
 #endif // CAPIO_STORAGE_MANAGER_TEST_HPP

@@ -7,8 +7,8 @@
 #include "capiocl_adapter.hpp"
 #include "client-manager/client_manager.hpp"
 #include "common/dirent.hpp"
+#include "storage/capio_file.hpp"
 #include "storage/manager.hpp"
-#include "utils/capio_file.hpp"
 
 extern ClientManager *client_manager;
 extern StorageManager *storage_manager;
@@ -22,9 +22,9 @@ inline void send_dirent_to_client(int tid, int fd, CapioFile &c_file, off64_t of
 
     struct linux_dirent64 *dir_entity;
 
-    char *incoming      = c_file.get_buffer();
+    char *incoming      = c_file.getBuffer();
     int first_entry     = static_cast<int>(offset / sizeof(linux_dirent64));
-    off64_t end_of_read = std::min(offset + count, c_file.get_stored_size());
+    off64_t end_of_read = std::min(offset + count, c_file.getStoredSize());
     int last_entry      = static_cast<int>(end_of_read / sizeof(linux_dirent64));
     off64_t actual_size = (last_entry - first_entry) * static_cast<off64_t>(sizeof(linux_dirent64));
 
@@ -51,7 +51,7 @@ inline void send_dirent_to_client(int tid, int fd, CapioFile &c_file, off64_t of
     }
 
     const auto &path_to_check = storage_manager->getPath(tid, fd);
-    if (!c_file.is_complete() && CapioCLEngine::get().isFirable(path_to_check)) {
+    if (!c_file.complete() && CapioCLEngine::get().isFirable(path_to_check)) {
         LOG("File %s has mode no_update and not enough data is available", path_to_check.c_str());
         std::thread t(wait_for_dirent_data, (last_entry + 1) * sizeof(linux_dirent64), tid, fd,
                       count, std::ref(c_file));
@@ -67,8 +67,8 @@ inline void wait_for_dirent_data(const off64_t wait_size, const int wait_tid, co
     const auto current_size = storage_manager->getFileOffset(wait_tid, wait_fd);
     START_LOG(gettid(), "call(wait_size=%d, current_size = %ld, wait_fd=%d, wait_count=%d)",
               wait_size, current_size, wait_fd, wait_count);
-    wait_c_file.wait_for_data(wait_size);
-    LOG("New capio file size = %ld", wait_c_file.get_stored_size());
+    wait_c_file.waitForData(wait_size);
+    LOG("New capio file size = %ld", wait_c_file.getStoredSize());
     send_dirent_to_client(wait_tid, wait_fd, wait_c_file, current_size, wait_count);
 }
 

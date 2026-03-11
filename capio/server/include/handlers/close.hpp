@@ -20,10 +20,10 @@ inline void handle_close(int tid, int fd) {
     LOG("File was closed", path.c_str());
 
     if (CapioCLEngine::get().getCommitRule(path) == capiocl::commitRules::ON_CLOSE &&
-        c_file.is_closed()) {
+        c_file.closed()) {
         LOG("Capio File %s is closed and commit rule is on_close. setting it to complete",
             path.c_str());
-        c_file.set_complete();
+        c_file.setComplete();
         c_file.commit();
     }
 

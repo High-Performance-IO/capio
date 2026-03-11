@@ -6,8 +6,8 @@
 #include "common/dirent.hpp"
 #include "common/filesystem.hpp"
 #include "common/logger.hpp"
+#include "storage/capio_file.hpp"
 #include "storage/manager.hpp"
-#include "utils/capio_file.hpp"
 #include "utils/capiocl_adapter.hpp"
 #include "utils/common.hpp"
 #include "utils/location.hpp"
@@ -39,18 +39,18 @@ void StorageManager::addDirectoryEntry(const pid_t tid, const std::filesystem::p
     ld.d_reclen = sizeof(linux_dirent64);
 
     CapioFile &c_file = get(dir);
-    c_file.create_buffer_if_needed(dir, true);
-    void *file_shm             = c_file.get_buffer();
-    const off64_t file_size    = c_file.get_stored_size();
+    c_file.createBufferIfNeeded(dir, true);
+    void *file_shm             = c_file.getBuffer();
+    const off64_t file_size    = c_file.getStoredSize();
     const off64_t data_size    = file_size + ld.d_reclen;
-    const size_t file_shm_size = c_file.get_buf_size();
+    const size_t file_shm_size = c_file.getBufferSize();
     ld.d_off                   = data_size;
 
     if (data_size > file_shm_size) {
-        file_shm = c_file.expand_buffer(data_size);
+        file_shm = c_file.expandBuffer(data_size);
     }
 
-    ld.d_type = (c_file.is_dir() ? DT_DIR : DT_REG);
+    ld.d_type = (c_file.directory() ? DT_DIR : DT_REG);
 
     memcpy((char *) file_shm + file_size, &ld, sizeof(ld));
     const off64_t base_offset = file_size;
@@ -58,11 +58,11 @@ void StorageManager::addDirectoryEntry(const pid_t tid, const std::filesystem::p
     LOG("STORED FILENAME LD: %s",
         reinterpret_cast<linux_dirent64 *>(static_cast<char *>(file_shm) + file_size)->d_name);
 
-    c_file.insert_sector(base_offset, data_size);
+    c_file.insertSector(base_offset, data_size);
     ++c_file.n_files;
     client_manager->registerProducedFile(tid, dir);
     if (c_file.n_files == c_file.n_files_expected) {
-        c_file.set_complete();
+        c_file.setComplete();
     }
 }
 StorageManager::StorageManager() {
@@ -207,7 +207,7 @@ void StorageManager::dup(const pid_t tid, const int old_fd, const int new_fd) {
     _opened_fd_map[tid][new_fd]._offset  = _opened_fd_map[tid][old_fd]._offset;
 
     _opened_fd_map[tid][new_fd]._pointer->open();
-    _opened_fd_map[tid][new_fd]._pointer->add_fd(tid, new_fd);
+    _opened_fd_map[tid][new_fd]._pointer->addFd(tid, new_fd);
 }
 
 void StorageManager::clone(const pid_t parent_tid, const pid_t child_tid) {
@@ -242,7 +242,7 @@ void StorageManager::remove(const std::filesystem::path &path) {
 
     {
         std::lock_guard lg(_mutex_opened_fd_map);
-        for (auto &[tid, fd] : c_file.get_fds()) {
+        for (auto &[tid, fd] : c_file.getFds()) {
             _removeFromTid(tid, fd);
         }
     }
@@ -259,7 +259,7 @@ void StorageManager::_removeFromTid(const pid_t tid, const int fd) {
         return;
     }
 
-    _opened_fd_map[tid][fd]._pointer->remove_fd(tid, fd);
+    _opened_fd_map[tid][fd]._pointer->removeFd(tid, fd);
     _opened_fd_map[tid].erase(fd);
 }
 
@@ -282,7 +282,7 @@ void StorageManager::_addNewFdToStorage(const pid_t tid, const int fd,
     if (register_open) {
         _storage[path].open();
     }
-    _storage[path].add_fd(tid, fd);
+    _storage[path].addFd(tid, fd);
 }
 
 void StorageManager::addFileToTid(const pid_t tid, const int fd, const std::filesystem::path &path,
