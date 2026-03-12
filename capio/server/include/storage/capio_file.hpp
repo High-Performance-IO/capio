@@ -29,7 +29,7 @@ class CapioFile {
     off64_t _buf_size          = 0;       ///< Allocated size of _buf
     int _fd                    = -1;      ///< File descriptor for permanent/mmap storage
     int _n_links               = 1;       ///< Number of symbolic links to the file
-    long int _n_close_expected = -1;      ///< Target close() operations for commitment
+    long int _n_close_expected = 0;       ///< Target close() operations for commitment
     long int _n_close          = 0;       ///< Current count of close() operations
     int _n_opens               = 0;       ///< Current count of open() operations
     int _n_files               = 0;       ///< Count of dirent64 stored (if directory)

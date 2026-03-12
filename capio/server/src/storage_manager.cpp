@@ -61,7 +61,8 @@ void StorageManager::addDirectoryEntry(const pid_t tid, const std::filesystem::p
     c_file.incrementDirFileCnt();
 
     client_manager->registerProducedFile(tid, dir);
-    if (c_file.getDirectoryContainedFileCount() == c_file.getDirectoryExpectedFileCount()) {
+    if (c_file.getDirectoryContainedFileCount() == c_file.getDirectoryExpectedFileCount() &&
+        CapioCLEngine::get().getCommitRule(file_path) == capiocl::commitRules::ON_N_FILES) {
         c_file.setCommitted();
     }
 }

@@ -1,6 +1,6 @@
+#include "server/include/storage/capio_file.hpp"
 #include "common/logger.hpp"
 #include "remote/backend.hpp"
-#include "server/include/storage/capio_file.hpp"
 #include "utils/common.hpp"
 
 #include <complex>
@@ -257,7 +257,14 @@ void CapioFile::insertSector(off64_t new_start, off64_t new_end) {
     }
 }
 
-bool CapioFile::closed() const { return _n_close_expected == -1 || _n_close == _n_close_expected; }
+bool CapioFile::closed() const {
+    START_LOG(gettid(), "call()");
+    LOG("_n_close_expected = %d", _n_close_expected);
+    LOG("_n_close = %d", _n_close);
+    LOG("_n_opens = %d", _n_opens);
+
+    return _n_close_expected == 0 || _n_close == _n_close_expected;
+}
 
 bool CapioFile::deletable() const { return _n_opens <= 0; }
 
@@ -346,16 +353,37 @@ bool CapioFile::bufferToAllocate() const {
     return _buf == nullptr;
 }
 
-off64_t CapioFile::getRealFileSize() const { return this->_real_file_size; }
+off64_t CapioFile::getRealFileSize() const {
+    std::unique_lock lock(_mutex);
+    return this->_real_file_size;
+}
 
-void CapioFile::setRealFileSize(const off64_t size) { this->_real_file_size = size; }
+void CapioFile::setRealFileSize(const off64_t size) {
+    START_LOG(gettid(), "call(size=%ld)", size);
+    std::unique_lock lock(_mutex);
+    this->_real_file_size = size;
+}
 
-bool CapioFile::isFirstWrite() const { return this->_first_write; }
+bool CapioFile::isFirstWrite() const {
+    std::unique_lock lock(_mutex);
+    return this->_first_write;
+}
 
-void CapioFile::registerFirstWrite() { this->_first_write = false; }
+void CapioFile::registerFirstWrite() {
+    std::unique_lock lock(_mutex);
+    this->_first_write = false;
+}
 
-void CapioFile::incrementDirFileCnt(const int count) { this->_n_files += count; }
+void CapioFile::incrementDirFileCnt(const int count) {
+    START_LOG(gettid(), "call(count=%d)", count);
+    std::unique_lock lock(_mutex);
+    this->_n_files += count;
+    this->_data_avail_cv.notify_all();
+}
 
-int CapioFile::getDirectoryContainedFileCount() const { return this->_n_files; }
+int CapioFile::getDirectoryContainedFileCount() const {
+    std::unique_lock lock(_mutex);
+    return this->_n_files;
+}
 
 int CapioFile::getDirectoryExpectedFileCount() const { return this->_n_files_expected; }
