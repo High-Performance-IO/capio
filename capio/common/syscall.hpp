@@ -3,7 +3,7 @@
 
 #include <syscall.h>
 
-#ifdef __CAPIO_POSIX
+#if defined(__CAPIO_POSIX) && !defined(__CAPIO_POSIX_ALIKE)
 
 #include <libsyscall_intercept_hook_point.h>
 
