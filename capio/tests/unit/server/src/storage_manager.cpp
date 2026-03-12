@@ -48,7 +48,7 @@ TEST(StorageManagerTestEnvironment, testInitDirectory) {
 
     const auto &dir = storage_manager->get("myDirectory");
 
-    EXPECT_EQ(dir.getBufferSize(), CAPIO_DEFAULT_DIR_INITIAL_SIZE);
+    EXPECT_EQ(dir.getBufSize(), CAPIO_DEFAULT_DIR_INITIAL_SIZE);
 
     storage_manager->updateDirectory(1, "myDirectory");
     const auto &dir1 = storage_manager->get("myDirectory");

@@ -15,7 +15,7 @@ void write_handler(const char *const str) {
     off64_t end_of_write              = offset + count;
     const std::filesystem::path &path = storage_manager->getPath(tid, fd);
     CapioFile &c_file                 = storage_manager->get(path);
-    off64_t file_shm_size             = c_file.getBufferSize();
+    off64_t file_shm_size             = c_file.getBufSize();
     SPSCQueue &data_buf               = client_manager->getClientToServerDataBuffers(tid);
 
     c_file.createBuffer(path, true);

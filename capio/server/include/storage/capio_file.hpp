@@ -111,7 +111,7 @@ class CapioFile {
         return this->_committed;
     }
 
-    void waitForCompletion() const {
+    void waitForCommit() const {
         START_LOG(gettid(), "call()");
         LOG("Thread waiting for file to be committed");
         std::unique_lock lock(_mutex);
@@ -173,9 +173,8 @@ class CapioFile {
     void createBuffer(const std::filesystem::path &path, bool home_node) {
         START_LOG(gettid(), "call(path=%s, home_node=%s)", path.c_str(),
                   home_node ? "true" : "false");
-        std::lock_guard lock(_mutex);
         if (bufToAllocate()) {
-            // TODO: will use malloc in order to be able to use realloc
+            std::lock_guard lock(_mutex);
             _home_node = home_node;
             if (_permanent && home_node) {
                 if (_directory) {
@@ -229,7 +228,7 @@ class CapioFile {
 
     char *getBuffer() { return _buf; }
 
-    [[nodiscard]] off64_t getBufferSize() const { return _buf_size; }
+    [[nodiscard]] off64_t getBufSize() const { return _buf_size; }
 
     [[nodiscard]] const std::vector<std::pair<int, int>> &getFds() const { return _threads_fd; }
 

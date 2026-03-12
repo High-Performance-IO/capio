@@ -109,7 +109,7 @@ inline void handle_remote_read_reply(const std::string &source, int tid, int fd,
 
     c_file.createBuffer(path, false);
     if (nbytes != 0) {
-        auto file_shm_size  = c_file.getBufferSize();
+        auto file_shm_size  = c_file.getBufSize();
         auto file_size_recv = offset + nbytes;
         if (file_size_recv > file_shm_size) {
             c_file.expandBuffer(file_size_recv);

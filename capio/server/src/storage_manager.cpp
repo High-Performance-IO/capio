@@ -43,7 +43,7 @@ void StorageManager::addDirectoryEntry(const pid_t tid, const std::filesystem::p
     void *file_shm             = c_file.getBuffer();
     const off64_t file_size    = c_file.getStoredSize();
     const off64_t data_size    = file_size + ld.d_reclen;
-    const size_t file_shm_size = c_file.getBufferSize();
+    const size_t file_shm_size = c_file.getBufSize();
     ld.d_off                   = data_size;
 
     if (data_size > file_shm_size) {

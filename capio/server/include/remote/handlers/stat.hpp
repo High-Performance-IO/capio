@@ -26,7 +26,7 @@ void wait_for_completion(const std::filesystem::path &path, int source_tid,
               dest.c_str());
 
     const CapioFile &c_file = storage_manager->get(path);
-    c_file.waitForCompletion();
+    c_file.waitForCommit();
     LOG("File %s has been completed. serving stats data", path.c_str());
     serve_remote_stat(path, dest, source_tid);
 }
