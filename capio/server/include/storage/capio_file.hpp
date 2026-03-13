@@ -49,36 +49,36 @@ class CapioFile {
     std::set<std::pair<off64_t, off64_t>, compare> _sectors;
     // vector of (tid, fd)
     std::vector<std::pair<int, int>> _threads_fd;
-    bool _complete = false; // whether the file is completed / committed
+    bool _committed = false; // whether the file is completed / committed
 
     /*sync variables*/
     mutable std::mutex _mutex;
     mutable std::condition_variable _complete_cv;
     mutable std::condition_variable _data_avail_cv;
 
-    inline off64_t _getStoredSize() const {
+    off64_t _getStoredSize() const {
         auto it = _sectors.rbegin();
         return (it == _sectors.rend()) ? 0 : it->second;
     }
+    bool _first_write      = true;
+    long _n_files          = 0;  // useful for directories
+    long _n_files_expected = -1; // useful for directories
 
-  public:
-    bool first_write          = true;
-    long int n_files          = 0;  // useful for directories
-    long int n_files_expected = -1; // useful for directories
     /*
      * file size in the home node. In a given moment could not be up-to-date.
      * This member is useful because a node different from the home node
      * could need to known the size of the file but not its content
      */
 
-    std::size_t real_file_size = 0;
+    std::size_t _real_file_size = 0;
 
+  public:
     CapioFile() : _buf_size(0), _directory(false), _permanent(false) {}
 
     CapioFile(bool directory, long int n_files_expected, bool permanent, off64_t init_size,
               long int n_close_expected)
         : _buf_size(init_size), _directory(directory), _n_close_expected(n_close_expected),
-          _permanent(permanent), n_files_expected(n_files_expected + 2) {}
+          _permanent(permanent), _n_files_expected(n_files_expected + 2) {}
 
     CapioFile(bool directory, bool permanent, off64_t init_size, long int n_close_expected = -1)
         : _buf_size(init_size), _directory(directory), _n_close_expected(n_close_expected),
@@ -105,33 +105,34 @@ class CapioFile {
         }
     }
 
-    [[nodiscard]] bool complete() const {
-        START_LOG(gettid(), "capio_file is complete? %s", this->_complete ? "true" : "false");
+    [[nodiscard]] bool isCommitted() const {
+        START_LOG(gettid(), "capio_file is complete? %s", this->_committed ? "true" : "false");
         std::lock_guard lg(_mutex);
-        return this->_complete;
+        return this->_committed;
     }
 
-    void waitForCompletion() const {
+    void waitForCommit() const {
         START_LOG(gettid(), "call()");
         LOG("Thread waiting for file to be committed");
         std::unique_lock lock(_mutex);
-        _complete_cv.wait(lock, [this] { return _complete; });
+        _complete_cv.wait(lock, [this] { return _committed; });
     }
 
     void waitForData(long offset) const {
         START_LOG(gettid(), "call()");
         LOG("Thread waiting for data to be available");
         std::unique_lock lock(_mutex);
-        _data_avail_cv.wait(
-            lock, [offset, this] { return (offset >= this->_getStoredSize()) || this->_complete; });
+        _data_avail_cv.wait(lock, [offset, this] {
+            return (offset >= this->_getStoredSize()) || this->_committed;
+        });
     }
 
-    void setComplete(bool complete = true) {
+    void setCommitted(bool complete = true) {
         START_LOG(gettid(), "setting capio_file._complete=%s", complete ? "true" : "false");
         std::lock_guard lg(_mutex);
-        if (this->_complete != complete) {
-            this->_complete = complete;
-            if (this->_complete) {
+        if (this->_committed != complete) {
+            this->_committed = complete;
+            if (this->_committed) {
                 _complete_cv.notify_all();
                 _data_avail_cv.notify_all();
             }
@@ -140,17 +141,12 @@ class CapioFile {
 
     void addFd(int tid, int fd) { _threads_fd.emplace_back(tid, fd); }
 
-    [[nodiscard]] bool bufToAllocate() const {
-        std::lock_guard lg(_mutex);
-        return _buf == nullptr;
-    }
-
     void close() {
         _n_close++;
         _n_opens--;
     }
 
-    void commit() {
+    void dump() {
         START_LOG(gettid(), "call()");
 
         if (_permanent && !_directory && _home_node) {
@@ -173,36 +169,31 @@ class CapioFile {
         START_LOG(gettid(), "call(path=%s, home_node=%s)", path.c_str(),
                   home_node ? "true" : "false");
         std::lock_guard lock(_mutex);
-        // TODO: will use malloc in order to be able to use realloc
-        _home_node = home_node;
-        if (_permanent && home_node) {
-            if (_directory) {
-                std::filesystem::create_directory(path);
-                std::filesystem::permissions(path, std::filesystem::perms::owner_all);
-                _buf = new char[_buf_size];
+        if (this->_buf == nullptr) {
+            _home_node = home_node;
+            if (_permanent && home_node) {
+                if (_directory) {
+                    std::filesystem::create_directory(path);
+                    std::filesystem::permissions(path, std::filesystem::perms::owner_all);
+                    _buf = new char[_buf_size];
+                } else {
+                    LOG("creating mem mapped file");
+                    _fd = ::open(path.c_str(), O_RDWR | O_CREAT, S_IRWXU | S_IRGRP | S_IROTH);
+                    if (_fd == -1) {
+                        ERR_EXIT("open %s CapioFile constructor", path.c_str());
+                    }
+                    if (ftruncate(_fd, _buf_size) == -1) {
+                        ERR_EXIT("ftruncate CapioFile constructor");
+                    }
+                    _buf = (char *) mmap(nullptr, _buf_size, PROT_READ | PROT_WRITE, MAP_SHARED,
+                                         _fd, 0);
+                    if (_buf == MAP_FAILED) {
+                        ERR_EXIT("mmap CapioFile constructor");
+                    }
+                }
             } else {
-                LOG("creating mem mapped file");
-                _fd = ::open(path.c_str(), O_RDWR | O_CREAT, S_IRWXU | S_IRGRP | S_IROTH);
-                if (_fd == -1) {
-                    ERR_EXIT("open %s CapioFile constructor", path.c_str());
-                }
-                if (ftruncate(_fd, _buf_size) == -1) {
-                    ERR_EXIT("ftruncate CapioFile constructor");
-                }
-                _buf =
-                    (char *) mmap(nullptr, _buf_size, PROT_READ | PROT_WRITE, MAP_SHARED, _fd, 0);
-                if (_buf == MAP_FAILED) {
-                    ERR_EXIT("mmap CapioFile constructor");
-                }
+                _buf = new char[_buf_size];
             }
-        } else {
-            _buf = new char[_buf_size];
-        }
-    }
-
-    void createBufferIfNeeded(const std::filesystem::path &path, bool home_node) {
-        if (bufToAllocate()) {
-            createBuffer(path, home_node);
         }
     }
 
@@ -232,7 +223,7 @@ class CapioFile {
 
     char *getBuffer() { return _buf; }
 
-    [[nodiscard]] off64_t getBufferSize() const { return _buf_size; }
+    [[nodiscard]] off64_t getBufSize() const { return _buf_size; }
 
     [[nodiscard]] const std::vector<std::pair<int, int>> &getFds() const { return _threads_fd; }
 
@@ -368,7 +359,7 @@ class CapioFile {
 
     [[nodiscard]] bool deletable() const { return _n_opens <= 0; }
 
-    [[nodiscard]] bool directory() const { return _directory; }
+    [[nodiscard]] bool isDirectory() const { return _directory; }
 
     void open() { _n_opens++; }
 
@@ -471,6 +462,44 @@ class CapioFile {
         std::unique_lock lock(_mutex);
         queue.read(_buf + offset, num_bytes);
         _data_avail_cv.notify_all();
+    }
+
+    // TODO: Understand the scope of this method and find a better name
+    std::size_t getRealFileSize() const {
+        std::lock_guard lg(_mutex);
+        return this->_real_file_size;
+    }
+
+    void setRealFileSize(const off64_t size) {
+        std::lock_guard lg(_mutex);
+        this->_real_file_size = size;
+    }
+
+    bool isFirstWrite() const {
+        std::lock_guard lg(_mutex);
+        return this->_first_write;
+    }
+
+    // TODO: add a dedicated CapioFile::write() and CapioFile::read() method, remove this method
+    //       from public scope
+    void registerFirstWrite() {
+        std::lock_guard lg(_mutex);
+        this->_first_write = false;
+    }
+
+    void incrementDirectoryFileCount(const int count = 1) {
+        std::lock_guard lg(_mutex);
+        this->_n_files += count;
+    }
+
+    long getCurrentDirectoryFileCount() const {
+        std::lock_guard lg(_mutex);
+        return this->_n_files;
+    }
+
+    long getDirectoryExpectedFileCount() const {
+        std::lock_guard lg(_mutex);
+        return this->_n_files_expected;
     }
 };
 

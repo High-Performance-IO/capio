@@ -14,17 +14,17 @@ inline void handle_exit_group(int tid) {
         LOG("Handling file %s", path.c_str());
         if (CapioCLEngine::get().getCommitRule(path) == capiocl::commitRules::ON_TERMINATION) {
             CapioFile &c_file = storage_manager->get(path);
-            if (c_file.directory()) {
+            if (c_file.isDirectory()) {
                 LOG("file %s is dir", path.c_str());
-                long int n_committed = c_file.n_files_expected;
-                if (n_committed <= c_file.n_files) {
+                long int n_committed = c_file.getDirectoryExpectedFileCount();
+                if (n_committed <= c_file.getCurrentDirectoryFileCount()) {
                     LOG("Setting file %s to complete", path.c_str());
-                    c_file.setComplete();
+                    c_file.setCommitted();
                 }
             } else {
                 LOG("Setting file %s to complete", path.c_str());
-                c_file.setComplete();
-                c_file.commit();
+                c_file.setCommitted();
+                c_file.dump();
             }
             c_file.close();
         }
