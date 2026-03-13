@@ -59,9 +59,9 @@ void StorageManager::addDirectoryEntry(const pid_t tid, const std::filesystem::p
         reinterpret_cast<linux_dirent64 *>(static_cast<char *>(file_shm) + file_size)->d_name);
 
     c_file.insertSector(base_offset, data_size);
-    c_file.incrementDirFileCnt();
+    c_file.incrementDirectoryFileCount();
     client_manager->registerProducedFile(tid, dir);
-    if (c_file.getDirectoryContainedFileCount() == c_file.getDirectoryExpectedFileCount()) {
+    if (c_file.getCurrentDirectoryFileCount() == c_file.getDirectoryExpectedFileCount()) {
         c_file.setCommitted();
     }
 }

@@ -17,7 +17,7 @@ inline void handle_exit_group(int tid) {
             if (c_file.isDirectory()) {
                 LOG("file %s is dir", path.c_str());
                 long int n_committed = c_file.getDirectoryExpectedFileCount();
-                if (n_committed <= c_file.getDirectoryContainedFileCount()) {
+                if (n_committed <= c_file.getCurrentDirectoryFileCount()) {
                     LOG("Setting file %s to complete", path.c_str());
                     c_file.setCommitted();
                 }

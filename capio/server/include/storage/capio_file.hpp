@@ -141,11 +141,6 @@ class CapioFile {
 
     void addFd(int tid, int fd) { _threads_fd.emplace_back(tid, fd); }
 
-    [[nodiscard]] bool bufToAllocate() const {
-        std::lock_guard lg(_mutex);
-        return _buf == nullptr;
-    }
-
     void close() {
         _n_close++;
         _n_opens--;
@@ -173,8 +168,8 @@ class CapioFile {
     void createBuffer(const std::filesystem::path &path, bool home_node) {
         START_LOG(gettid(), "call(path=%s, home_node=%s)", path.c_str(),
                   home_node ? "true" : "false");
-        if (bufToAllocate()) {
-            std::lock_guard lock(_mutex);
+        std::lock_guard lock(_mutex);
+        if (this->_buf == nullptr) {
             _home_node = home_node;
             if (_permanent && home_node) {
                 if (_directory) {
@@ -469,19 +464,43 @@ class CapioFile {
         _data_avail_cv.notify_all();
     }
 
-    std::size_t getRealFileSize() const { return this->_real_file_size; }
+    // TODO: Understand the scope of this method and find a better name
+    std::size_t getRealFileSize() const {
+        std::lock_guard lg(_mutex);
+        return this->_real_file_size;
+    }
 
-    void setRealFileSize(const off64_t size) { this->_real_file_size = size; }
+    void setRealFileSize(const off64_t size) {
+        std::lock_guard lg(_mutex);
+        this->_real_file_size = size;
+    }
 
-    bool isFirstWrite() const { return this->_first_write; }
+    bool isFirstWrite() const {
+        std::lock_guard lg(_mutex);
+        return this->_first_write;
+    }
 
-    void registerFirstWrite() { this->_first_write = false; }
+    // TODO: add a dedicated CapioFile::write() and CapioFile::read() method, remove this method
+    //       from public scope
+    void registerFirstWrite() {
+        std::lock_guard lg(_mutex);
+        this->_first_write = false;
+    }
 
-    void incrementDirFileCnt(const int count = 1) { this->_n_files += count; }
+    void incrementDirectoryFileCount(const int count = 1) {
+        std::lock_guard lg(_mutex);
+        this->_n_files += count;
+    }
 
-    long getDirectoryContainedFileCount() const { return this->_n_files; }
+    long getCurrentDirectoryFileCount() const {
+        std::lock_guard lg(_mutex);
+        return this->_n_files;
+    }
 
-    long getDirectoryExpectedFileCount() const { return this->_n_files_expected; }
+    long getDirectoryExpectedFileCount() const {
+        std::lock_guard lg(_mutex);
+        return this->_n_files_expected;
+    }
 };
 
 #endif // CAPIO_SERVER_STORAGE_CAPIO_FILE_HPP
