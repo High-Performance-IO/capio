@@ -24,7 +24,7 @@ echo "Output path: $OUTPUT_PATH"
 mkdir -p "$OUTPUT_DIRECTORY"
 
 # Create a temporary C file to resolve macro values
-TEMP_C=$(mktemp /tmp/syscall_gen.XXXXXX.c)
+TEMP_C=$(mktemp -t syscall_gen.XXXXXX.c)
 echo "#include <asm/unistd.h>" > "$TEMP_C"
 $CC -E -dM "$TEMP_C" | grep "#define __NR_" | awk '{print $2}' | sort | uniq | while read -r line; do
     echo "VAL_$line=$line" >> "$TEMP_C"
