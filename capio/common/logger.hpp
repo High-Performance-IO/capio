@@ -7,6 +7,7 @@
 #include <cxxabi.h>
 #include <fcntl.h>
 #include <fstream>
+#include <memory>
 #include <string>
 #include <sys/mman.h>
 #include <unistd.h>

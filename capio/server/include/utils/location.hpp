@@ -1,12 +1,15 @@
 #ifndef CAPIO_SERVER_UTILS_LOCATIONS_HPP
 #define CAPIO_SERVER_UTILS_LOCATIONS_HPP
 
+#include "remote/backend.hpp"
+
 #include <mutex>
 #include <thread>
 
 #include "utils/types.hpp"
 
 extern char *node_name;
+extern Backend *backend;
 
 constexpr char CAPIO_SERVER_FILES_LOCATION_NAME[]     = "files_location_%s.txt";
 constexpr char CAPIO_SERVER_INVALIDATE_FILE_PATH_CHAR = '#';
