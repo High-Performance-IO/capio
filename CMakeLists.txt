@@ -52,6 +52,7 @@ IF (CAPIO_LOG)
         execute_process(
                 COMMAND bash "${PROJECT_SOURCE_DIR}/scripts/gen_syscallnames.sh"
                 "${PROJECT_BINARY_DIR}/include/syscall/syscallnames.h"
+                ${CMAKE_CXX_COMPILER}
         )
     ELSE (CMAKE_BUILD_TYPE STREQUAL "Debug")
         message(WARNING "Capio logger enabled in release mode. skipping compilation of CAPIO logger")
