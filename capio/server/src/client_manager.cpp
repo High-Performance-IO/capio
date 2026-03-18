@@ -54,7 +54,7 @@ void ClientManager::registerClient(pid_t tid, const std::string &app_name, const
         t.detach();
     }
 
-    server_println(CAPIO_LOG_SERVER_CLI_LEVEL_INFO, std::string("Registered client: ") + node_name +
+    server_println(CAPIO_LOG_SERVER_CLI_LEVEL_INFO, std::string("[+Client]") + node_name +
                                                         "::" + app_name +
                                                         "::" + std::to_string(tid));
 }
@@ -79,7 +79,7 @@ void ClientManager::removeClient(const pid_t tid) {
     if (const auto response_buffer = responses.find(tid); response_buffer != responses.end()) {
         responses.erase(response_buffer);
     }
-    server_println(CAPIO_LOG_SERVER_CLI_LEVEL_INFO, std::string("Removed client: ") + node_name +
+    server_println(CAPIO_LOG_SERVER_CLI_LEVEL_INFO, std::string("[~Client]") + node_name +
                                                         "::" + app_name +
                                                         "::" + std::to_string(tid));
 }
