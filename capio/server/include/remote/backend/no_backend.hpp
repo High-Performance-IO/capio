@@ -13,7 +13,7 @@ class NoBackend : public Backend {
 
     ~NoBackend() override = default;
 
-    const std::set<std::string> get_nodes() override { return {}; }
+    const std::set<std::string> get_nodes() override { return {node_name}; }
 
     void handshake_servers() override {}
 
