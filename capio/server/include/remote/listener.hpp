@@ -46,6 +46,11 @@ inline Backend *select_backend(const std::string &backend_name, int argc, char *
                   << std::endl;
         return new MPISYNCBackend(argc, argv);
     }
+
+    if (backend_name == "none") {
+        return new NoBackend(argc, argv);
+    }
+
     LOG("Backend %s does not exist in CAPIO. Reverting back to the default MPI backend",
         backend_name.c_str());
     std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_WARNING << " Backend " << backend_name

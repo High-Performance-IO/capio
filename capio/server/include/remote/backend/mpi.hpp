@@ -26,6 +26,7 @@ class MPIBackend : public Backend {
         LOG("Mpi has multithreading support? %s (%d)",
             provided == MPI_THREAD_MULTIPLE ? "yes" : "no", provided);
         MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+        MPI_Comm_size(MPI_COMM_WORLD, &n_servers);
         LOG("node_rank=%d", &rank);
         if (provided != MPI_THREAD_MULTIPLE) {
             LOG("Error: The threading support level is not MPI_THREAD_MULTIPLE (is %d)", provided);
