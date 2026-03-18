@@ -53,14 +53,7 @@ class CapioShmCanary {
         }
         _shm_id = shm_open(_canary_name.data(), O_CREAT | O_EXCL, S_IRUSR | S_IWUSR);
         if (_shm_id == -1) {
-            LOG(CAPIO_SHM_CANARY_ERROR, _canary_name.data());
-#ifndef __CAPIO_POSIX
-            auto message = new char[strlen(CAPIO_SHM_CANARY_ERROR)];
-            sprintf(message, CAPIO_SHM_CANARY_ERROR, _canary_name.data());
-            std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_ERROR << message << std::endl;
-            delete[] message;
-#endif
-            ERR_EXIT("ERR: shm canary flag already exists");
+            ERR_EXIT(CAPIO_SHM_CANARY_ERROR, _canary_name.data());
         }
     };
 
@@ -105,7 +98,7 @@ inline void *get_shm(const std::string &shm_name) {
 
     // if we are not creating a new object, mode is equals to 0
     int fd = shm_open(shm_name.c_str(), O_RDWR, 0); // to be closed
-    struct stat sb {};
+    struct stat sb{};
     if (fd == -1) {
         ERR_EXIT("get_shm shm_open %s", shm_name.c_str());
     }
@@ -130,7 +123,7 @@ inline void *get_shm_if_exist(const std::string &shm_name) {
 
     // if we are not creating a new object, mode is equals to 0
     int fd = shm_open(shm_name.c_str(), O_RDWR, 0); // to be closed
-    struct stat sb {};
+    struct stat sb{};
     if (fd == -1) {
         if (errno == ENOENT) {
             return nullptr;
