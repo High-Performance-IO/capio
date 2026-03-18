@@ -25,21 +25,21 @@ class CapioFile {
                         const std::pair<off64_t, off64_t> &rhs) const;
     };
 
-    char *_buf                 = nullptr; ///< Raw pointer to memory buffer for file content
-    off64_t _buf_size          = 0;       ///< Allocated size of _buf
-    int _fd                    = -1;      ///< File descriptor for permanent/mmap storage
-    int _n_links               = 1;       ///< Number of symbolic links to the file
-    long int _n_close_expected = -1;      ///< Target close() operations for commitment
-    long int _n_close          = 0;       ///< Current count of close() operations
-    int _n_opens               = 0;       ///< Current count of open() operations
-    int _n_files               = 0;       ///< Count of dirent64 stored (if directory)
-    int _n_files_expected      = -1;      ///< Target dirent64 count (if directory)
+    char *_buf                       = nullptr; ///< Raw pointer to memory buffer for file content
+    off64_t _buf_size                = 0;       ///< Allocated size of _buf
+    int _fd                          = -1;      ///< File descriptor for permanent/mmap storage
+    int _n_links                     = 1;       ///< Number of symbolic links to the file
+    const long int _n_close_expected = -1;      ///< Target close() operations for commitment
+    long int _n_close                = 0;       ///< Current count of close() operations
+    int _n_opens                     = 0;       ///< Current count of open() operations
+    int _n_files                     = 0;       ///< Count of dirent64 stored (if directory)
+    const int _n_files_expected      = -1;      ///< Target dirent64 count (if directory)
 
-    bool _home_node   = false; ///< True if this is the home node
-    bool _directory   = false; ///< True if this instance represents a directory
-    bool _permanent   = false; ///< True if file persists after server exit
-    bool _committed   = false; ///< True if file is finalized
-    bool _first_write = true;  ///< True if no data has been written yet
+    bool _home_node       = false; ///< True if this is the home node
+    const bool _directory = false; ///< True if this instance represents a directory
+    const bool _permanent = false; ///< True if file persists after server exit
+    bool _committed       = false; ///< True if file is finalized
+    bool _first_write     = true;  ///< True if no data has been written yet
 
     /// @brief Set of [start, end] pairs representing valid data regions
     std::set<std::pair<off64_t, off64_t>, compareSectors> _sectors;

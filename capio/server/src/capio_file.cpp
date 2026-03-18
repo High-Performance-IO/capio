@@ -377,7 +377,4 @@ int CapioFile::getCurrentDirectoryFileCount() const {
     return this->_n_files;
 }
 
-int CapioFile::getDirectoryExpectedFileCount() const {
-    std::lock_guard lg(_mutex);
-    return this->_n_files_expected;
-}
+int CapioFile::getDirectoryExpectedFileCount() const { return this->_n_files_expected; }
