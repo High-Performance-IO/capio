@@ -194,76 +194,35 @@ off64_t CapioFile::getStoredSize() const {
     return this->_getStoredSize();
 }
 
-// TODO: The logic of this function is most likely incorrect. Recheck it in the future. Also
-//       remember to check that the CapioFile::compareSectors::operator() method is wrong (but
-//       should be ok with this implementation) as the check should be:
-//       return (lhs.second < rhs.first);
 void CapioFile::insertSector(off64_t new_start, off64_t new_end) {
     START_LOG(gettid(), "call(new_start=%ld, new_end=%ld)", new_start, new_end);
-
-    auto p = std::make_pair(new_start, new_end);
     std::lock_guard lock(_mutex_sectors);
 
-    if (_sectors.empty()) {
-        LOG("Insert sector <%ld, %ld>", p.first, p.second);
-        _sectors.insert(p);
-        return;
-    }
-    if (auto it_lbound = _sectors.upper_bound(p); it_lbound == _sectors.begin()) {
-        if (new_end < it_lbound->first) {
-            LOG("Insert sector <%ld, %ld>", p.first, p.second);
-            _sectors.insert(p);
-        } else {
-            auto it         = it_lbound;
-            bool end_before = false;
-            bool end_inside = false;
-            while (it != _sectors.end() && !end_before && !end_inside) {
-                end_before = p.second < it->first;
-                if (!end_before) {
-                    end_inside = p.second <= it->second;
-                    if (!end_inside) {
-                        ++it;
-                    }
-                }
-            }
+    // First sector whose start >= new_start
+    auto it_start = _sectors.lower_bound({new_start, LLONG_MIN});
 
-            if (end_inside) {
-                p.second = it->second;
-                ++it;
-            }
-            _sectors.erase(it_lbound, it);
-            LOG("Insert sector <%ld, %ld>", p.first, p.second);
-            _sectors.insert(p);
+    // Check if the previous sector reaches into our range
+    if (it_start != _sectors.begin()) {
+        if (const auto it_prev = std::prev(it_start); it_prev->second >= new_start) {
+            new_start = it_prev->first;
+            new_end   = std::max(new_end, it_prev->second);
+            it_start  = it_prev;
         }
-    } else {
-        --it_lbound;
-        auto it = it_lbound;
-        if (p.first <= it_lbound->second) {
-            // new sector starts inside a sector
-            p.first = it_lbound->first;
-        } else { // in this way the sector will not be deleted
-            ++it_lbound;
-        }
-        bool end_before = false;
-        bool end_inside = false;
-        while (it != _sectors.end() && !end_before && !end_inside) {
-            end_before = p.second < it->first;
-            if (!end_before) {
-                end_inside = p.second <= it->second;
-                if (!end_inside) {
-                    ++it;
-                }
-            }
-        }
-
-        if (end_inside) {
-            p.second = it->second;
-            ++it;
-        }
-        _sectors.erase(it_lbound, it);
-        LOG("Insert sector <%ld, %ld>", p.first, p.second);
-        _sectors.insert(p);
     }
+
+    // First sector whose start > new_end (adjacent sectors included via +1)
+    const auto it_end = _sectors.upper_bound({new_end + 1, LLONG_MIN});
+
+    // Absorb the right edge of the last overlapping sector if needed
+    if (it_end != _sectors.begin()) {
+        if (const auto it_last = std::prev(it_end); it_last->second > new_end) {
+            new_end = it_last->second;
+        }
+    }
+
+    _sectors.erase(it_start, it_end);
+    LOG("Insert sector <%ld, %ld>", new_start, new_end);
+    _sectors.emplace(new_start, new_end);
 }
 
 bool CapioFile::closed() const { return _n_close_expected == -1 || _n_close == _n_close_expected; }
