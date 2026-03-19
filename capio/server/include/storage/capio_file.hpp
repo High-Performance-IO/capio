@@ -1,11 +1,11 @@
 #ifndef CAPIO_SERVER_CAPIO_FILE_HPP
 #define CAPIO_SERVER_CAPIO_FILE_HPP
-
 #include <atomic>
 #include <condition_variable>
 #include <filesystem>
 #include <mutex>
 #include <set>
+#include <shared_mutex>
 #include <string>
 #include <utility>
 #include <vector>
@@ -44,11 +44,13 @@ class CapioFile {
 
     /// @brief Set of [start, end] pairs representing valid data regions
     std::set<std::pair<off64_t, off64_t>, compareSectors> _sectors;
+    mutable std::shared_mutex _mutex_sectors; ///< Shared lock to get concurrent access to _sectors
 
     std::atomic<off64_t> _real_file_size = 0; ///< Total logical size of the file
 
     /// @brief List of {Thread ID, FD} pairs associated with this file
     std::vector<std::pair<int, int>> _threads_fd;
+    std::mutex _mutex_threads_fd; ///< Mutex to access _threads_fd
 
     mutable std::mutex _mutex;                      ///< Synchronization primitive for thread safety
     mutable std::condition_variable _committed_cv;  ///< Wait for commitment
@@ -241,7 +243,7 @@ class CapioFile {
      * @param offset Start searching from here.
      * @return Offset of data, or error if beyond end of file.
      */
-    off64_t seekData(off64_t offset);
+    off64_t seekData(off64_t offset) const;
 
     /**
      * @brief Finds the next hole in the file.

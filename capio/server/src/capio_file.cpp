@@ -2,6 +2,7 @@
 #include "common/logger.hpp"
 #include "remote/backend.hpp"
 #include "server/include/utils/common.hpp"
+#include "utils/shared_mutex.hpp"
 
 #include <complex>
 
@@ -68,7 +69,7 @@ void CapioFile::setCommitted(const bool commit) {
 
 void CapioFile::addFd(int tid, int fd) {
     START_LOG(gettid(), "call(tid=%d, fd=%d)", tid, fd);
-    std::lock_guard lg(_mutex);
+    std::lock_guard lg(_mutex_threads_fd);
     _threads_fd.emplace_back(tid, fd);
 }
 
@@ -161,7 +162,7 @@ off64_t CapioFile::getBufSize() const { return _buf_size; }
 const std::vector<std::pair<int, int>> &CapioFile::getFds() const { return _threads_fd; }
 
 off64_t CapioFile::getFileSize() const {
-    std::lock_guard lock(_mutex);
+    const shared_lock_guard slg(_mutex_sectors);
     if (!_sectors.empty()) {
         return _sectors.rbegin()->second;
     } else {
@@ -173,7 +174,7 @@ off64_t CapioFile::getSectorEnd(off64_t offset) const {
     START_LOG(gettid(), "call(offset=%ld)", offset);
 
     off64_t sector_end = -1;
-    std::lock_guard lock(_mutex);
+    const shared_lock_guard slg(_mutex_sectors);
     if (auto it = _sectors.upper_bound(std::make_pair(offset, 0));
         !_sectors.empty() && it != _sectors.begin()) {
         --it;
@@ -199,7 +200,7 @@ void CapioFile::insertSector(off64_t new_start, off64_t new_end) {
     START_LOG(gettid(), "call(new_start=%ld, new_end=%ld)", new_start, new_end);
 
     auto p = std::make_pair(new_start, new_end);
-    std::lock_guard lock(_mutex);
+    std::lock_guard lock(_mutex_sectors);
 
     if (_sectors.empty()) {
         LOG("Insert sector <%ld, %ld>", p.first, p.second);
@@ -271,9 +272,9 @@ bool CapioFile::isDirectory() const { return _directory; }
 
 void CapioFile::open() { ++_n_opens; }
 
-off64_t CapioFile::seekData(off64_t offset) {
+off64_t CapioFile::seekData(off64_t offset) const {
     START_LOG(gettid(), "call(offset=%ld)", offset);
-    std::lock_guard lock(_mutex);
+    const shared_lock_guard slg(_mutex_sectors);
     if (_sectors.empty()) {
         if (offset == 0) {
             return 0;
@@ -300,7 +301,7 @@ off64_t CapioFile::seekData(off64_t offset) {
 
 off64_t CapioFile::seekHole(off64_t offset) const {
     START_LOG(gettid(), "call(offset=%ld)", offset);
-    std::lock_guard lock(_mutex);
+    const shared_lock_guard slg(_mutex_sectors);
     if (_sectors.empty()) {
         if (offset == 0) {
             return 0;
@@ -326,7 +327,7 @@ off64_t CapioFile::seekHole(off64_t offset) const {
 }
 
 void CapioFile::removeFd(int tid, int fd) {
-    std::unique_lock lock(_mutex);
+    std::lock_guard lock(_mutex_threads_fd);
     if (const auto it = std::find(_threads_fd.begin(), _threads_fd.end(), std::make_pair(tid, fd));
         it != _threads_fd.end()) {
         _threads_fd.erase(it);
@@ -348,6 +349,7 @@ void CapioFile::readFromQueue(SPSCQueue &queue, size_t offset, long int num_byte
 }
 
 off64_t CapioFile::_getStoredSize() const {
+    const shared_lock_guard slg(_mutex_sectors);
     const auto it = _sectors.rbegin();
     return (it == _sectors.rend()) ? 0 : it->second;
 }
