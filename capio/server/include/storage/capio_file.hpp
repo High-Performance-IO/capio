@@ -26,14 +26,14 @@ class CapioFile {
                         const std::pair<off64_t, off64_t> &rhs) const;
     };
 
-    char *_buf                         = nullptr; ///< Raw pointer to memory buffer for file content
-    off64_t _buf_size                  = 0;       ///< Allocated size of _buf
-    int _fd                            = -1;      ///< File descriptor for permanent/mmap storage
-    std::atomic<unsigned int> _n_close = 0;       ///< Current count of close() operations
-    std::atomic<unsigned int> _n_opens = 0;       ///< Current count of open() operations
-    std::atomic<unsigned int> _n_files = 0;       ///< Count of dirent64 stored (if directory)
-    const int _n_files_expected        = -1;      ///< Target dirent64 count (if directory)
-    const int _n_close_expected        = -1;      ///< Target close() operations for commitment
+    char *_buf                  = nullptr; ///< Raw pointer to memory buffer for file content
+    off64_t _buf_size           = 0;       ///< Allocated size of _buf
+    int _fd                     = -1;      ///< File descriptor for permanent/mmap storage
+    std::atomic<int> _n_close   = 0;       ///< Current count of close() operations
+    std::atomic<int> _n_opens   = 0;       ///< Current count of open() operations
+    std::atomic<int> _n_files   = 0;       ///< Count of dirent64 stored (if directory)
+    const int _n_files_expected = -1;      ///< Target dirent64 count (if directory)
+    const int _n_close_expected = -1;      ///< Target close() operations for commitment
 
     bool _home_node       = false; ///< True if this is the home node
     bool _committed       = false; ///< True if file is finalized

@@ -13,8 +13,8 @@ CapioFile::CapioFile() = default;
 
 CapioFile::CapioFile(const bool directory, const int n_files_expected, const bool permanent,
                      const off64_t init_size, const int n_close_expected)
-    : _buf_size(init_size), _n_close_expected(n_close_expected),
-      _n_files_expected(n_files_expected + 2), _directory(directory), _permanent(permanent) {}
+    : _buf_size(init_size), _n_files_expected(n_files_expected + 2),
+      _n_close_expected(n_close_expected), _directory(directory), _permanent(permanent) {}
 
 CapioFile::CapioFile(const bool directory, const bool permanent, const off64_t init_size,
                      const int n_close_expected)
