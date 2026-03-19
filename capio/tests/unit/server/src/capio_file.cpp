@@ -12,6 +12,16 @@ TEST(ServerTest, TestInsertSingleSector) {
     EXPECT_NE(sectors.find({1L, 3L}), sectors.end());
 }
 
+TEST(ServerTest, TestBufferAllocation) {
+    CapioFile c_file;
+    EXPECT_TRUE(c_file.bufferToAllocate());
+    c_file.createBuffer("test.dat", true);
+    EXPECT_FALSE(c_file.bufferToAllocate());
+    EXPECT_EQ(c_file.getBufSize(), 0);
+    EXPECT_EQ(c_file.getRealFileSize(), 0);
+    EXPECT_NE(nullptr, c_file.getBuffer());
+}
+
 TEST(ServerTest, TestInsertTwoNonOverlappingSectors) {
     CapioFile c_file;
     c_file.insertSector(5, 7);
