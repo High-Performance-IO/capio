@@ -153,10 +153,12 @@ char *CapioFile::expandBuffer(const off64_t data_size) {
     return new_buf;
 }
 
+// TODO: This is a memory leak that may lead to race conditions. remove exposure of internal buffer
 char *CapioFile::getBuffer() const { return _buf; }
 
 off64_t CapioFile::getBufSize() const { return _buf_size; }
 
+// TODO: This is a memory leak that may lead to race conditions. remove exposure of internal buffer
 const std::vector<std::pair<int, int>> &CapioFile::getFds() const { return _threads_fd; }
 
 off64_t CapioFile::getFileSize() const {
@@ -184,6 +186,7 @@ off64_t CapioFile::getSectorEnd(off64_t offset) const {
     return sector_end;
 }
 
+// TODO: This is a memory leak that may lead to race conditions. remove exposure of internal buffer
 const std::set<std::pair<off64_t, off64_t>, CapioFile::compareSectors> &
 CapioFile::getSectors() const {
     return _sectors;
@@ -296,7 +299,7 @@ void CapioFile::removeFd(int tid, int fd) {
 }
 
 void CapioFile::readFromNode(const std::string &dest, off64_t offset, off64_t buffer_size) const {
-    std::unique_lock lock(_mutex);
+    std::lock_guard lock(_mutex);
     backend->recv_file(_buf + offset, dest, buffer_size);
     _data_avail_cv.notify_all();
 }
@@ -304,7 +307,7 @@ void CapioFile::readFromNode(const std::string &dest, off64_t offset, off64_t bu
 void CapioFile::readFromQueue(SPSCQueue &queue, size_t offset, long int num_bytes) const {
     START_LOG(gettid(), "call()");
 
-    std::unique_lock lock(_mutex);
+    std::lock_guard lock(_mutex);
     queue.read(_buf + offset, num_bytes);
     _data_avail_cv.notify_all();
 }

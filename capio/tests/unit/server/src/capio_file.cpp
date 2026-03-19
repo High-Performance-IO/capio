@@ -1,5 +1,6 @@
 #include "server/include/storage/capio_file.hpp"
 #include "common/env.hpp"
+#include "remote/backend.hpp"
 
 #include <gtest/gtest.h>
 #include <thread>
@@ -314,4 +315,37 @@ TEST(ServerTest, TestFileSetCommitToFalse) {
     EXPECT_TRUE(file.isCommitted());
     file.setCommitted(false);
     EXPECT_FALSE(file.isCommitted());
+}
+
+class MockBackend : public Backend {
+  public:
+    void recv_file(char *shm, const std::string &source, const long int bytes_expected) override {
+        for (std::size_t i = 0; i < bytes_expected; ++i) {
+            shm[i] = 33 + (i % 93);
+        }
+    }
+
+    const std::set<std::string> get_nodes() override { return {}; }
+    void handshake_servers() override {}
+    RemoteRequest read_next_request() override { return {nullptr, ""}; }
+    void send_file(char *shm, long int nbytes, const std::string &target) override {}
+    void send_request(const char *message, int message_len, const std::string &target) override {}
+};
+
+TEST(ServerTest, TestReadFromNodeMockBackend) {
+
+    backend = new MockBackend();
+
+    CapioFile file1;
+    file1.createBuffer("testDir", true);
+    file1.expandBuffer(1000);
+    file1.registerFirstWrite();
+    file1.insertSector(0, 1000);
+
+    file1.readFromNode("none", 0, 1000);
+
+    const auto buf = file1.getBuffer();
+    for (std::size_t i = 0; i < 1000; ++i) {
+        EXPECT_EQ(buf[i], 33 + (i % 93));
+    }
 }
