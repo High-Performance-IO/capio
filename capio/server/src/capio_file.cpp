@@ -194,6 +194,10 @@ off64_t CapioFile::getStoredSize() const {
     return this->_getStoredSize();
 }
 
+// TODO: The logic of this function is most likely incorrect. Recheck it in the future. Also
+//       remember to check that the CapioFile::compareSectors::operator() method is wrong (but
+//       should be ok with this implementation) as the check should be:
+//       return (lhs.second < rhs.first);
 void CapioFile::insertSector(off64_t new_start, off64_t new_end) {
     START_LOG(gettid(), "call(new_start=%ld, new_end=%ld)", new_start, new_end);
 
