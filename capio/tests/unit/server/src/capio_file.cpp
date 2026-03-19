@@ -126,6 +126,27 @@ TEST(ServerTest, TestCapioFileWaitForDataMultithreaded) {
     t.join();
 }
 
+TEST(ServerTest, TestCapioFileWaitForDataMultithreadedWithCommit) {
+    CapioFile file;
+
+    SPSCQueue queue("test_queue", get_cache_lines(), get_cache_line_size(), "test_wf");
+
+    std::mutex _lock;
+    _lock.lock();
+
+    std::thread t([&_lock, &file, &queue] {
+        _lock.lock();
+        file.setCommitted();
+    });
+
+    _lock.unlock();
+    file.waitForData(1000);
+
+    EXPECT_EQ(file.getFileSize(), 0);
+
+    t.join();
+}
+
 TEST(ServerTest, TestCapioFileWaitForCompletion) {
     CapioFile file;
 
