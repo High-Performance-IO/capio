@@ -176,6 +176,15 @@ TEST(ServerTest, TestCommitCapioFile) {
     std::filesystem::remove("test.dat");
 }
 
+TEST(ServerTest, TestDumpNotHomeNode) {
+    auto file = new CapioFile(false, true, 1000, 1);
+    file->createBuffer("test.dat", false);
+    file->close();
+    file->dump();
+    delete file;
+    EXPECT_FALSE(std::filesystem::exists("test.dat"));
+}
+
 TEST(ServerTest, TestCommitAndDeleteDirectory) {
     EXPECT_FALSE(std::filesystem::exists("mydir"));
     auto file = new CapioFile(true, true, 1000, 1);
