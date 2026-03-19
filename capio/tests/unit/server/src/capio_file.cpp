@@ -348,4 +348,17 @@ TEST(ServerTest, TestReadFromNodeMockBackend) {
     for (std::size_t i = 0; i < 1000; ++i) {
         EXPECT_EQ(buf[i], 33 + (i % 93));
     }
+
+    delete backend;
+}
+
+TEST(ServerTest, TestGetSectorEnd) {
+    CapioFile file;
+
+    EXPECT_EQ(file.getSectorEnd(1234), -1);
+
+    file.insertSector(0, 1234);
+
+    EXPECT_EQ(file.getSectorEnd(120), 1234);
+    EXPECT_EQ(file.getSectorEnd(12000), -1);
 }

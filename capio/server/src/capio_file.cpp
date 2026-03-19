@@ -173,19 +173,21 @@ off64_t CapioFile::getFileSize() const {
 off64_t CapioFile::getSectorEnd(off64_t offset) const {
     START_LOG(gettid(), "call(offset=%ld)", offset);
 
-    off64_t sector_end = -1;
     const shared_lock_guard slg(_mutex_sectors);
-    if (auto it = _sectors.upper_bound(std::make_pair(offset, 0));
-        !_sectors.empty() && it != _sectors.begin()) {
+
+    if (_sectors.empty()) {
+        return -1;
+    }
+
+    if (auto it = _sectors.upper_bound(std::make_pair(offset, 0)); it != _sectors.begin()) {
         --it;
         if (offset <= it->second) {
-            sector_end = it->second;
+            return it->second;
         }
     }
 
-    return sector_end;
+    return -1;
 }
-
 // TODO: This is a memory leak that may lead to race conditions. remove exposure of internal buffer
 const std::set<std::pair<off64_t, off64_t>, CapioFile::compareSectors> &
 CapioFile::getSectors() const {
