@@ -26,15 +26,15 @@ class CapioFile {
                         const std::pair<off64_t, off64_t> &rhs) const;
     };
 
-    char *_buf                       = nullptr; ///< Raw pointer to memory buffer for file content
-    off64_t _buf_size                = 0;       ///< Allocated size of _buf
-    int _fd                          = -1;      ///< File descriptor for permanent/mmap storage
-    int _n_links                     = 1;       ///< Number of symbolic links to the file
-    const long int _n_close_expected = -1;      ///< Target close() operations for commitment
-    std::atomic<long int> _n_close   = 0;       ///< Current count of close() operations
-    std::atomic<int> _n_opens        = 0;       ///< Current count of open() operations
-    std::atomic<int> _n_files        = 0;       ///< Count of dirent64 stored (if directory)
-    const int _n_files_expected      = -1;      ///< Target dirent64 count (if directory)
+    char *_buf                  = nullptr; ///< Raw pointer to memory buffer for file content
+    off64_t _buf_size           = 0;       ///< Allocated size of _buf
+    int _fd                     = -1;      ///< File descriptor for permanent/mmap storage
+    int _n_links                = 1;       ///< Number of symbolic links to the file
+    const int _n_close_expected = -1;      ///< Target close() operations for commitment
+    std::atomic<int> _n_close   = 0;       ///< Current count of close() operations
+    std::atomic<int> _n_opens   = 0;       ///< Current count of open() operations
+    std::atomic<int> _n_files   = 0;       ///< Count of dirent64 stored (if directory)
+    const int _n_files_expected = -1;      ///< Target dirent64 count (if directory)
 
     bool _home_node                = false; ///< True if this is the home node
     const bool _directory          = false; ///< True if this instance represents a directory
@@ -82,7 +82,7 @@ class CapioFile {
      * @param n_close_expected Expected number of close calls.
      */
     CapioFile(bool directory, int n_files_expected, bool permanent, off64_t init_size,
-              long int n_close_expected);
+              int n_close_expected);
 
     /**
      * @brief Standard constructor for files.
@@ -91,7 +91,7 @@ class CapioFile {
      * @param init_size Initial buffer allocation size.
      * @param n_close_expected Expected number of close calls.
      */
-    CapioFile(bool directory, bool permanent, off64_t init_size, long int n_close_expected);
+    CapioFile(bool directory, bool permanent, off64_t init_size, int n_close_expected);
 
     CapioFile(const CapioFile &)            = delete;
     CapioFile &operator=(const CapioFile &) = delete;
