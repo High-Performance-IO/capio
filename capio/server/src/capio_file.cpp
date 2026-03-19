@@ -2,7 +2,6 @@
 #include "common/logger.hpp"
 #include "remote/backend.hpp"
 #include "server/include/utils/common.hpp"
-#include "utils/common.hpp"
 
 #include <complex>
 
@@ -55,7 +54,7 @@ void CapioFile::waitForData(long offset) const {
                         [offset, this] { return this->_getStoredSize() >= offset || _committed; });
 }
 
-void CapioFile::setCommitted(bool commit) {
+void CapioFile::setCommitted(const bool commit) {
     START_LOG(gettid(), "setting capio_file._complete=%s", commit ? "true" : "false");
     std::lock_guard lg(_mutex);
     if (this->_committed != commit) {
@@ -67,7 +66,11 @@ void CapioFile::setCommitted(bool commit) {
     }
 }
 
-void CapioFile::addFd(int tid, int fd) { _threads_fd.emplace_back(tid, fd); }
+void CapioFile::addFd(int tid, int fd) {
+    START_LOG(gettid(), "call(tid=%d, fd=%d)", tid, fd);
+    std::lock_guard lg(_mutex);
+    _threads_fd.emplace_back(tid, fd);
+}
 
 void CapioFile::waitForCommit() const {
     START_LOG(gettid(), "call()");
@@ -77,15 +80,17 @@ void CapioFile::waitForCommit() const {
 }
 
 void CapioFile::close() {
-    _n_close++;
-    _n_opens--;
+    START_LOG(gettid(), "call()");
+    ++_n_close;
+    --_n_opens;
+    LOG("AFTER: _n_close=%d / _n_opens=%d", _n_close.load(), _n_opens.load());
 }
 
 void CapioFile::dump() {
     START_LOG(gettid(), "call()");
 
     if (_permanent && !_directory && _home_node) {
-        off64_t size = getFileSize();
+        const off64_t size = getFileSize();
         if (ftruncate(_fd, size) == -1) {
             ERR_EXIT("ftruncate commit capio_file");
         }
@@ -115,8 +120,8 @@ void CapioFile::createBuffer(const std::filesystem::path &path, const bool home_
                 if (ftruncate(_fd, _buf_size) == -1) {
                     ERR_EXIT("ftruncate CapioFile constructor");
                 }
-                _buf =
-                    (char *) mmap(nullptr, _buf_size, PROT_READ | PROT_WRITE, MAP_SHARED, _fd, 0);
+                _buf = static_cast<char *>(
+                    mmap(nullptr, _buf_size, PROT_READ | PROT_WRITE, MAP_SHARED, _fd, 0));
                 if (_buf == MAP_FAILED) {
                     ERR_EXIT("mmap CapioFile constructor");
                 }
@@ -127,12 +132,12 @@ void CapioFile::createBuffer(const std::filesystem::path &path, const bool home_
     }
 }
 
-void CapioFile::_memcopyCapioFile(char *new_p, char *old_p) const {
-    for (auto &sector : _sectors) {
-        off64_t lbound        = sector.first;
-        off64_t ubound        = sector.second;
-        off64_t sector_length = ubound - lbound;
-        memcpy(new_p + lbound, old_p + lbound, sector_length);
+void CapioFile::_memcopyCapioFile(char *new_p, const char *old_p) const {
+    // NOTE: do not lock here: this method is private and when reaching control in this function,
+    //       the caller has already locked the mutex
+    START_LOG(gettid(), "call()");
+    for (const auto &[lbound, ubound] : _sectors) {
+        memcpy(new_p + lbound, old_p + lbound, ubound - lbound);
     }
 }
 
@@ -140,6 +145,7 @@ char *CapioFile::expandBuffer(const off64_t data_size) {
     const off64_t double_size = _buf_size * 2;
     const off64_t new_size    = std::max(data_size, double_size);
     const auto new_buf        = new char[new_size];
+
     std::lock_guard lock(_mutex);
     _memcopyCapioFile(new_buf, _buf);
     delete[] _buf;
@@ -167,9 +173,9 @@ off64_t CapioFile::getSectorEnd(off64_t offset) const {
     START_LOG(gettid(), "call(offset=%ld)", offset);
 
     off64_t sector_end = -1;
-    auto it            = _sectors.upper_bound(std::make_pair(offset, 0));
-
-    if (!_sectors.empty() && it != _sectors.begin()) {
+    std::lock_guard lock(_mutex);
+    if (auto it = _sectors.upper_bound(std::make_pair(offset, 0));
+        !_sectors.empty() && it != _sectors.begin()) {
         --it;
         if (offset <= it->second) {
             sector_end = it->second;
@@ -200,8 +206,7 @@ void CapioFile::insertSector(off64_t new_start, off64_t new_end) {
         _sectors.insert(p);
         return;
     }
-    auto it_lbound = _sectors.upper_bound(p);
-    if (it_lbound == _sectors.begin()) {
+    if (auto it_lbound = _sectors.upper_bound(p); it_lbound == _sectors.begin()) {
         if (new_end < it_lbound->first) {
             LOG("Insert sector <%ld, %ld>", p.first, p.second);
             _sectors.insert(p);
@@ -264,9 +269,11 @@ bool CapioFile::deletable() const { return _n_opens <= 0; }
 
 bool CapioFile::isDirectory() const { return _directory; }
 
-void CapioFile::open() { _n_opens++; }
+void CapioFile::open() { ++_n_opens; }
 
 off64_t CapioFile::seekData(off64_t offset) {
+    START_LOG(gettid(), "call(offset=%ld)", offset);
+    std::lock_guard lock(_mutex);
     if (_sectors.empty()) {
         if (offset == 0) {
             return 0;
@@ -292,6 +299,8 @@ off64_t CapioFile::seekData(off64_t offset) {
 }
 
 off64_t CapioFile::seekHole(off64_t offset) const {
+    START_LOG(gettid(), "call(offset=%ld)", offset);
+    std::lock_guard lock(_mutex);
     if (_sectors.empty()) {
         if (offset == 0) {
             return 0;
@@ -317,8 +326,9 @@ off64_t CapioFile::seekHole(off64_t offset) const {
 }
 
 void CapioFile::removeFd(int tid, int fd) {
-    auto it = std::find(_threads_fd.begin(), _threads_fd.end(), std::make_pair(tid, fd));
-    if (it != _threads_fd.end()) {
+    std::unique_lock lock(_mutex);
+    if (const auto it = std::find(_threads_fd.begin(), _threads_fd.end(), std::make_pair(tid, fd));
+        it != _threads_fd.end()) {
         _threads_fd.erase(it);
     }
 }
@@ -347,34 +357,16 @@ bool CapioFile::bufferToAllocate() const {
     return _buf == nullptr;
 }
 
-off64_t CapioFile::getRealFileSize() const {
-    std::lock_guard lg(_mutex);
-    return this->_real_file_size;
-}
+off64_t CapioFile::getRealFileSize() const { return this->_real_file_size; }
 
-void CapioFile::setRealFileSize(const off64_t size) {
-    std::lock_guard lg(_mutex);
-    this->_real_file_size = size;
-}
+void CapioFile::setRealFileSize(const off64_t size) { this->_real_file_size = size; }
 
-bool CapioFile::isFirstWrite() const {
-    std::lock_guard lg(_mutex);
-    return this->_first_write;
-}
+bool CapioFile::isFirstWrite() const { return this->_first_write; }
 
-void CapioFile::registerFirstWrite() {
-    std::lock_guard lg(_mutex);
-    this->_first_write = false;
-}
+void CapioFile::registerFirstWrite() { this->_first_write = false; }
 
-void CapioFile::incrementDirectoryFileCount(const int count) {
-    std::lock_guard lg(_mutex);
-    this->_n_files += count;
-}
+void CapioFile::incrementDirectoryFileCount(const int count) { this->_n_files += count; }
 
-int CapioFile::getCurrentDirectoryFileCount() const {
-    std::lock_guard lg(_mutex);
-    return this->_n_files;
-}
+int CapioFile::getCurrentDirectoryFileCount() const { return this->_n_files; }
 
 int CapioFile::getDirectoryExpectedFileCount() const { return this->_n_files_expected; }

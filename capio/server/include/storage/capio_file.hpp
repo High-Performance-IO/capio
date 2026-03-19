@@ -1,6 +1,7 @@
 #ifndef CAPIO_SERVER_CAPIO_FILE_HPP
 #define CAPIO_SERVER_CAPIO_FILE_HPP
 
+#include <atomic>
 #include <condition_variable>
 #include <filesystem>
 #include <mutex>
@@ -30,21 +31,21 @@ class CapioFile {
     int _fd                          = -1;      ///< File descriptor for permanent/mmap storage
     int _n_links                     = 1;       ///< Number of symbolic links to the file
     const long int _n_close_expected = -1;      ///< Target close() operations for commitment
-    long int _n_close                = 0;       ///< Current count of close() operations
-    int _n_opens                     = 0;       ///< Current count of open() operations
-    int _n_files                     = 0;       ///< Count of dirent64 stored (if directory)
+    std::atomic<long int> _n_close   = 0;       ///< Current count of close() operations
+    std::atomic<int> _n_opens        = 0;       ///< Current count of open() operations
+    std::atomic<int> _n_files        = 0;       ///< Count of dirent64 stored (if directory)
     const int _n_files_expected      = -1;      ///< Target dirent64 count (if directory)
 
-    bool _home_node       = false; ///< True if this is the home node
-    const bool _directory = false; ///< True if this instance represents a directory
-    const bool _permanent = false; ///< True if file persists after server exit
-    bool _committed       = false; ///< True if file is finalized
-    bool _first_write     = true;  ///< True if no data has been written yet
+    bool _home_node                = false; ///< True if this is the home node
+    const bool _directory          = false; ///< True if this instance represents a directory
+    const bool _permanent          = false; ///< True if file persists after server exit
+    bool _committed                = false; ///< True if file is finalized
+    std::atomic<bool> _first_write = true;  ///< True if no data has been written yet
 
     /// @brief Set of [start, end] pairs representing valid data regions
     std::set<std::pair<off64_t, off64_t>, compareSectors> _sectors;
 
-    off64_t _real_file_size = 0; ///< Total logical size of the file
+    std::atomic<off64_t> _real_file_size = 0; ///< Total logical size of the file
 
     /// @brief List of {Thread ID, FD} pairs associated with this file
     std::vector<std::pair<int, int>> _threads_fd;
@@ -64,7 +65,7 @@ class CapioFile {
      * @param new_p The pointer to the newly allocated memory.
      * @param old_p The pointer to the old memory buffer.
      */
-    void _memcopyCapioFile(char *new_p, char *old_p) const;
+    void _memcopyCapioFile(char *new_p, const char *old_p) const;
 
   public:
     /** @brief Default constructor. Initializes an empty file. */
