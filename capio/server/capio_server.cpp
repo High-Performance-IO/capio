@@ -38,10 +38,6 @@
 ClientManager *client_manager;
 StorageManager *storage_manager;
 
-int n_servers;
-// name of the node
-char *node_name;
-
 #include "handlers.hpp"
 #include "utils/location.hpp"
 #include "utils/signals.hpp"
@@ -93,7 +89,6 @@ static constexpr std::array<CSHandler_t, CAPIO_NR_REQUESTS> build_request_handle
 
     START_LOG(gettid(), "call()");
 
-    MPI_Comm_size(MPI_COMM_WORLD, &n_servers);
     setup_signal_handlers();
     backend->handshake_servers();
 

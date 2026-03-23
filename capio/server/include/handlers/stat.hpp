@@ -16,6 +16,7 @@
 
 extern StorageManager *storage_manager;
 extern ClientManager *client_manager;
+extern Backend *backend;
 
 void wait_for_file_completion(int tid, const std::filesystem::path &path) {
     START_LOG(gettid(), "call(tid=%d, path=%s)", tid, path.c_str());
@@ -26,7 +27,7 @@ void wait_for_file_completion(int tid, const std::filesystem::path &path) {
 
     // if file is streamable
     if (c_file.isCommitted() || CapioCLEngine::get().isFirable(path) ||
-        strcmp(std::get<0>(get_file_location(path)), node_name) == 0) {
+        std::get<0>(get_file_location(path)) == backend->getNodeName().c_str()) {
 
         client_manager->replyToClient(tid, c_file.getFileSize());
         client_manager->replyToClient(tid, static_cast<int>(c_file.isDirectory() ? 1 : 0));
@@ -72,7 +73,7 @@ inline void reply_stat(int tid, const std::filesystem::path &path) {
         LOG("File is now present from remote node. retrieving file again.");
         file_location_opt = get_file_location_opt(path);
     }
-    if (c_file.isCommitted() || strcmp(std::get<0>(file_location_opt->get()), node_name) == 0 ||
+    if (c_file.isCommitted() || std::get<0>(file_location_opt->get()) == backend->getNodeName() ||
         CapioCLEngine::get().isFirable(path) || capio_dir == path) {
         LOG("Sending response to client");
         client_manager->replyToClient(tid, c_file.getFileSize());

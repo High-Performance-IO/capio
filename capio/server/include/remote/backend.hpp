@@ -5,7 +5,6 @@
 #include <set>
 
 class RemoteRequest {
-  private:
     char *_buf_recv;
     int _code;
     const std::string _source;
@@ -24,7 +23,7 @@ class RemoteRequest {
         } else {
             this->_code = -1;
         }
-    };
+    }
 
     RemoteRequest(const RemoteRequest &)            = delete;
     RemoteRequest &operator=(const RemoteRequest &) = delete;
@@ -43,14 +42,26 @@ class RemoteRequest {
  * functions in a dedicated backend.
  */
 class Backend {
+
+  protected:
+    int n_servers;
+    std::string node_name;
+
   public:
+    explicit Backend(const unsigned int node_name_max_length)
+        : n_servers(1), node_name(node_name_max_length, '\0') {
+        gethostname(node_name.data(), node_name_max_length);
+    }
+
     virtual ~Backend() = default;
+
+    [[nodiscard]] const std::string &getNodeName() const { return node_name; }
 
     /**
      * Returns the node names of the CAPIO servers
      * @return A set containing the node names of all CAPIO servers
      */
-    virtual const std::set<std::string> get_nodes() = 0;
+    virtual std::set<std::string> get_nodes() { return {node_name}; };
 
     /**
      * Handshake the server applications

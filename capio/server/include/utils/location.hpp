@@ -8,7 +8,6 @@
 
 #include "utils/types.hpp"
 
-extern char *node_name;
 extern Backend *backend;
 
 constexpr char CAPIO_SERVER_FILES_LOCATION_NAME[]     = "files_location_%s.txt";
@@ -270,7 +269,7 @@ inline void loop_load_file_location(const std::filesystem::path &path_to_load) {
 inline void open_files_location() {
     START_LOG(gettid(), "call()");
 
-    std::string file_location_name = get_file_location_name(node_name);
+    std::string file_location_name = get_file_location_name(backend->getNodeName());
     if ((files_location_fp = fopen(file_location_name.c_str(), "w+")) == nullptr) {
         ERR_EXIT("Error opening %s file: %d (%s)", file_location_name.c_str(), errno,
                  strerror(errno));
@@ -296,11 +295,11 @@ inline void write_file_location(const std::filesystem::path &path_to_write) {
     if (offset == -1) {
         ERR_EXIT("lseek in write_file_location");
     }
-    const std::string line = path_to_write.native() + " " + node_name + "\n";
+    const std::string line = path_to_write.native() + " " + backend->getNodeName() + "\n";
     if (write(files_location_fd, line.c_str(), line.length()) == -1) {
         ERR_EXIT("write in write_file_location");
     }
-    add_file_location(path_to_write, node_name, offset);
+    add_file_location(path_to_write, backend->getNodeName().c_str(), offset);
 }
 
 #endif // CAPIO_SERVER_UTILS_LOCATIONS_HPP

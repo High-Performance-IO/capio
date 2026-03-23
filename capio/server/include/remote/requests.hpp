@@ -4,6 +4,7 @@
 #include "storage/manager.hpp"
 
 extern StorageManager *storage_manager;
+extern Backend *backend;
 
 inline void serve_remote_stat_request(const std::filesystem::path &path, int source_tid,
                                       off64_t file_size, bool is_dir, const std::string &dest) {
@@ -39,10 +40,11 @@ inline void handle_remote_stat_request(int tid, const std::filesystem::path &pat
 
     std::string dest         = std::get<0>(get_file_location(path));
     const char *const format = "%04d %d %s %s";
-    const int size =
-        snprintf(nullptr, 0, format, CAPIO_SERVER_REQUEST_STAT, tid, node_name, path.c_str());
+    const int size           = snprintf(nullptr, 0, format, CAPIO_SERVER_REQUEST_STAT, tid,
+                                        backend->getNodeName().c_str(), path.c_str());
     const std::unique_ptr<char[]> message(new char[size + 1]);
-    sprintf(message.get(), format, CAPIO_SERVER_REQUEST_STAT, tid, node_name, path.c_str());
+    sprintf(message.get(), format, CAPIO_SERVER_REQUEST_STAT, tid, backend->getNodeName().c_str(),
+            path.c_str());
     LOG("destination=%s, message=%s", dest.c_str(), message.get());
 
     backend->send_request(message.get(), size + 1, dest);

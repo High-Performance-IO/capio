@@ -18,10 +18,11 @@ class MPIBackend : public Backend {
     static constexpr long MPI_MAX_ELEM_COUNT = 1024L * 1024 * 1024;
 
   public:
-    MPIBackend(int argc, char **argv) {
+    MPIBackend(int argc, char **argv) : Backend(MPI_MAX_PROCESSOR_NAME) {
         int node_name_len, provided;
         START_LOG(gettid(), "call()");
         LOG("Created a MPI backend");
+        MPI_Comm_size(MPI_COMM_WORLD, &n_servers);
         MPI_Init_thread(&argc, &argv, MPI_THREAD_MULTIPLE, &provided);
         LOG("Mpi has multithreading support? %s (%d)",
             provided == MPI_THREAD_MULTIPLE ? "yes" : "no", provided);
@@ -32,9 +33,8 @@ class MPIBackend : public Backend {
             MPI_Abort(MPI_COMM_WORLD, EXIT_FAILURE);
         }
 
-        node_name = new char[MPI_MAX_PROCESSOR_NAME];
-        MPI_Get_processor_name(node_name, &node_name_len);
-        LOG("Node name = %s, length=%d", node_name, node_name_len);
+        MPI_Get_processor_name(node_name.data(), &node_name_len);
+        LOG("Node name = %s, length=%d", node_name.data(), node_name_len);
         nodes.emplace(node_name);
         rank_nodes_equivalence[std::to_string(rank)] = node_name;
         rank_nodes_equivalence[node_name]            = std::to_string(rank);
@@ -45,16 +45,16 @@ class MPIBackend : public Backend {
         MPI_Finalize();
     }
 
-    inline const std::set<std::string> get_nodes() override { return nodes; }
+    std::set<std::string> get_nodes() override { return nodes; }
 
-    inline void handshake_servers() override {
+    void handshake_servers() override {
         START_LOG(gettid(), "call()");
 
         auto buf = std::unique_ptr<char[]>(new char[MPI_MAX_PROCESSOR_NAME]);
         for (int i = 0; i < n_servers; i += 1) {
             if (i != rank) {
                 // TODO: possible deadlock
-                MPI_Send(node_name, strlen(node_name), MPI_CHAR, i, 0, MPI_COMM_WORLD);
+                MPI_Send(node_name.c_str(), node_name.length(), MPI_CHAR, i, 0, MPI_COMM_WORLD);
                 std::fill(buf.get(), buf.get() + MPI_MAX_PROCESSOR_NAME, 0);
                 MPI_Recv(buf.get(), MPI_MAX_PROCESSOR_NAME, MPI_CHAR, i, 0, MPI_COMM_WORLD,
                          MPI_STATUS_IGNORE);
@@ -115,7 +115,7 @@ class MPIBackend : public Backend {
         MPI_Send(message, message_len + 1, MPI_CHAR, std::stoi(mpi_target), 0, MPI_COMM_WORLD);
     }
 
-    inline void recv_file(char *shm, const std::string &source, long int bytes_expected) override {
+    void recv_file(char *shm, const std::string &source, long int bytes_expected) override {
         START_LOG(gettid(), "call(shm=%ld, source=%s, bytes_expected=%ld)", shm, source.c_str(),
                   bytes_expected);
         MPI_Status status;
