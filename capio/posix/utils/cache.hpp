@@ -70,7 +70,8 @@ class ReadCache {
             _read(buffer, remaining_bytes);
             buffer = reinterpret_cast<char *>(buffer) + remaining_bytes;
 
-            if (read_size > _max_line_size) {
+            // NOTE: if getdents send a request for exactly the correct amount of data.
+            if (read_size > _max_line_size || is_getdents) {
                 LOG("count - remaining_bytes %ld > _max_line_size %ld", read_size, _max_line_size);
                 LOG("Reading exactly requested size");
                 off64_t end_of_read = is_getdents ? getdents_request(fd, read_size, is64bit, _tid)
