@@ -37,6 +37,7 @@
 
 ClientManager *client_manager;
 StorageManager *storage_manager;
+Backend *backend;
 
 #include "handlers.hpp"
 #include "utils/location.hpp"
