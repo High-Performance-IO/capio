@@ -2,6 +2,7 @@
 #define CAPIO_SERVER_REMOTE_BACKEND_HPP
 #include "common/logger.hpp"
 #include <charconv>
+#include <set>
 
 class RemoteRequest {
   private:

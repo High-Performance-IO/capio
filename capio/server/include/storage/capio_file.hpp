@@ -1,506 +1,258 @@
-#ifndef CAPIO_SERVER_STORAGE_CAPIO_FILE_HPP
-#define CAPIO_SERVER_STORAGE_CAPIO_FILE_HPP
-
-#include <algorithm>
+#ifndef CAPIO_SERVER_CAPIO_FILE_HPP
+#define CAPIO_SERVER_CAPIO_FILE_HPP
+#include <atomic>
 #include <condition_variable>
+#include <filesystem>
+#include <mutex>
 #include <set>
-#include <string_view>
+#include <shared_mutex>
+#include <string>
 #include <utility>
 #include <vector>
 
-#include <fcntl.h>
-#include <sys/stat.h>
-#include <unistd.h>
-
-#include "common/logger.hpp"
 #include "common/queue.hpp"
 
-#include "remote/backend.hpp"
-
-/*
- * Only the server have all the information
- * A process that only read from a file doesn't have the info on the _sectors
- * A process that writes only have info on the sector that he wrote
- * the file size is in shm because all the processes need this info
- * and it's easy to provide it to them using the shm
+/**
+ * @class CapioFile
+ * @brief Manages file data, sparse sectors, and synchronization for the CAPIO server.
  */
-
-struct compare {
-    bool operator()(const std::pair<off64_t, off64_t> &lhs,
-                    const std::pair<off64_t, off64_t> &rhs) const {
-        return (lhs.first < rhs.first);
-    }
-};
-
 class CapioFile {
-    char *_buf = nullptr; // buffer containing the data
-    off64_t _buf_size;
-    bool _directory            = false;
-    // _fd is useful only when the file is memory-mapped
-    int _fd                    = -1;
-    bool _home_node            = false;
-    int _n_links               = 1;
-    long int _n_close          = 0;
-    long int _n_close_expected = -1;
-    int _n_opens               = 0;
-    bool _permanent            = false;
-    // _sectors stored in memory of the files (only the home node is forced to
-    // be up to date)
-    std::set<std::pair<off64_t, off64_t>, compare> _sectors;
-    // vector of (tid, fd)
-    std::vector<std::pair<int, int>> _threads_fd;
-    bool _committed = false; // whether the file is completed / committed
-
-    /*sync variables*/
-    mutable std::mutex _mutex;
-    mutable std::condition_variable _complete_cv;
-    mutable std::condition_variable _data_avail_cv;
-
-    off64_t _getStoredSize() const {
-        auto it = _sectors.rbegin();
-        return (it == _sectors.rend()) ? 0 : it->second;
-    }
-    bool _first_write      = true;
-    long _n_files          = 0;  // useful for directories
-    long _n_files_expected = -1; // useful for directories
-
-    /*
-     * file size in the home node. In a given moment could not be up-to-date.
-     * This member is useful because a node different from the home node
-     * could need to known the size of the file but not its content
+    /**
+     * @struct compareSectors
+     * @brief Comparator for the sectors set, ordering by offset.
      */
+    struct compareSectors {
+        bool operator()(const std::pair<off64_t, off64_t> &lhs,
+                        const std::pair<off64_t, off64_t> &rhs) const;
+    };
 
-    std::size_t _real_file_size = 0;
+    char *_buf        = nullptr; ///< Raw pointer to memory buffer for file content
+    off64_t _buf_size = 0;       ///< Allocated size of _buf
+    int _fd           = -1;      ///< File descriptor for permanent/mmap storage
+
+    // TODO: check if it is possible to move from int to unsigned int
+    std::atomic<int> _n_close   = 0;  ///< Current count of close() operations
+    std::atomic<int> _n_opens   = 0;  ///< Current count of open() operations
+    std::atomic<int> _n_files   = 0;  ///< Count of dirent64 stored (if directory)
+    const int _n_files_expected = -1; ///< Target dirent64 count (if directory)
+    const int _n_close_expected = -1; ///< Target close() operations for commitment
+
+    bool _home_node       = false; ///< True if this is the home node
+    bool _committed       = false; ///< True if file is finalized
+    const bool _directory = false; ///< True if this instance represents a directory
+    const bool _permanent = false; ///< True if file persists after server exit
+
+    std::atomic<bool> _first_write = true; ///< True if no data has been written yet
+
+    /// @brief Set of [start, end] pairs representing valid data regions
+    std::set<std::pair<off64_t, off64_t>, compareSectors> _sectors;
+    mutable std::shared_mutex _mutex_sectors; ///< Shared lock to get concurrent access to _sectors
+
+    std::atomic<off64_t> _real_file_size = 0; ///< Total logical size of the file
+
+    /// @brief List of {Thread ID, FD} pairs associated with this file
+    std::vector<std::pair<int, int>> _threads_fd;
+    std::mutex _mutex_threads_fd; ///< Mutex to access _threads_fd
+
+    mutable std::mutex _mutex;                      ///< Synchronization primitive for thread safety
+    mutable std::condition_variable _committed_cv;  ///< Wait for commitment
+    mutable std::condition_variable _data_avail_cv; ///< Wait for data at specific offsets
+
+    /**
+     * @brief Internal helper to calculate stored size without locking.
+     * @return Logical size based on the furthest sector end.
+     */
+    off64_t _getStoredSize() const;
+
+    /**
+     * @brief Reallocates the buffer and copies existing sectors to their correct offsets.
+     * @param new_p The pointer to the newly allocated memory.
+     * @param old_p The pointer to the old memory buffer.
+     */
+    void _memcopyCapioFile(char *new_p, const char *old_p) const;
 
   public:
-    CapioFile() : _buf_size(0), _directory(false), _permanent(false) {}
+    /** @brief Default constructor. Initializes an empty file. */
+    CapioFile();
 
-    CapioFile(bool directory, long int n_files_expected, bool permanent, off64_t init_size,
-              long int n_close_expected)
-        : _buf_size(init_size), _directory(directory), _n_close_expected(n_close_expected),
-          _permanent(permanent), _n_files_expected(n_files_expected + 2) {}
+    /**
+     * @brief Explicit constructor for directory-specific initialization.
+     * @param directory Whether the file is a directory.
+     * @param n_files_expected Expected number of entries.
+     * @param permanent Persistence flag.
+     * @param init_size Initial buffer allocation size.
+     * @param n_close_expected Expected number of close calls.
+     */
+    CapioFile(bool directory, int n_files_expected, bool permanent, off64_t init_size,
+              int n_close_expected);
 
-    CapioFile(bool directory, bool permanent, off64_t init_size, long int n_close_expected = -1)
-        : _buf_size(init_size), _directory(directory), _n_close_expected(n_close_expected),
-          _permanent(permanent) {}
+    /**
+     * @brief Standard constructor for files.
+     * @param directory Whether the file is a directory.
+     * @param permanent Persistence flag.
+     * @param init_size Initial buffer allocation size.
+     * @param n_close_expected Expected number of close calls.
+     */
+    CapioFile(bool directory, bool permanent, off64_t init_size, int n_close_expected);
 
     CapioFile(const CapioFile &)            = delete;
     CapioFile &operator=(const CapioFile &) = delete;
 
-    ~CapioFile() {
-        START_LOG(gettid(), "call()");
-        LOG("Deleting capio_file");
+    /** @brief Destructor. Cleans up allocated buffers and file descriptors. */
+    ~CapioFile();
 
-        if (_permanent && _home_node) {
-            if (_directory) {
-                delete[] _buf;
-            } else {
-                int res = munmap(_buf, _buf_size);
-                if (res == -1) {
-                    ERR_EXIT("munmap CapioFile");
-                }
-            }
-        } else {
-            delete[] _buf;
-        }
-    }
+    /** @return True if the file is committed and read-only. */
+    [[nodiscard]] bool isCommitted() const;
 
-    [[nodiscard]] bool isCommitted() const {
-        START_LOG(gettid(), "capio_file is complete? %s", this->_committed ? "true" : "false");
-        std::lock_guard lg(_mutex);
-        return this->_committed;
-    }
+    /** @return True if the internal buffer has not yet been allocated. */
+    [[nodiscard]] bool bufferToAllocate() const;
 
-    void waitForCommit() const {
-        START_LOG(gettid(), "call()");
-        LOG("Thread waiting for file to be committed");
-        std::unique_lock lock(_mutex);
-        _complete_cv.wait(lock, [this] { return _committed; });
-    }
+    /** @return True if the close count matches expected closes. */
+    [[nodiscard]] bool closed() const;
 
-    void waitForData(long offset) const {
-        START_LOG(gettid(), "call()");
-        LOG("Thread waiting for data to be available");
-        std::unique_lock lock(_mutex);
-        _data_avail_cv.wait(lock, [offset, this] {
-            return (offset >= this->_getStoredSize()) || this->_committed;
-        });
-    }
+    /** @return True if the file is ready for removal. */
+    [[nodiscard]] bool deletable() const;
 
-    void setCommitted(bool complete = true) {
-        START_LOG(gettid(), "setting capio_file._complete=%s", complete ? "true" : "false");
-        std::lock_guard lg(_mutex);
-        if (this->_committed != complete) {
-            this->_committed = complete;
-            if (this->_committed) {
-                _complete_cv.notify_all();
-                _data_avail_cv.notify_all();
-            }
-        }
-    }
+    /** @return True if this is a directory. */
+    [[nodiscard]] bool isDirectory() const;
 
-    void addFd(int tid, int fd) { _threads_fd.emplace_back(tid, fd); }
+    /** @return True if no write operations have been performed yet. */
+    [[nodiscard]] bool isFirstWrite() const;
 
-    void close() {
-        _n_close++;
-        _n_opens--;
-    }
-
-    void dump() {
-        START_LOG(gettid(), "call()");
-
-        if (_permanent && !_directory && _home_node) {
-            off64_t size = getFileSize();
-            if (ftruncate(_fd, size) == -1) {
-                ERR_EXIT("ftruncate commit capio_file");
-            }
-            _buf_size = size;
-            if (::close(_fd) == -1) {
-                ERR_EXIT("close commit capio_file");
-            }
-        }
-    }
-
-    /*
-     * To be called when a process
-     * execute a read or a write syscall
-     */
-    void createBuffer(const std::filesystem::path &path, bool home_node) {
-        START_LOG(gettid(), "call(path=%s, home_node=%s)", path.c_str(),
-                  home_node ? "true" : "false");
-        std::lock_guard lock(_mutex);
-        if (this->_buf == nullptr) {
-            _home_node = home_node;
-            if (_permanent && home_node) {
-                if (_directory) {
-                    std::filesystem::create_directory(path);
-                    std::filesystem::permissions(path, std::filesystem::perms::owner_all);
-                    _buf = new char[_buf_size];
-                } else {
-                    LOG("creating mem mapped file");
-                    _fd = ::open(path.c_str(), O_RDWR | O_CREAT, S_IRWXU | S_IRGRP | S_IROTH);
-                    if (_fd == -1) {
-                        ERR_EXIT("open %s CapioFile constructor", path.c_str());
-                    }
-                    if (ftruncate(_fd, _buf_size) == -1) {
-                        ERR_EXIT("ftruncate CapioFile constructor");
-                    }
-                    _buf = (char *) mmap(nullptr, _buf_size, PROT_READ | PROT_WRITE, MAP_SHARED,
-                                         _fd, 0);
-                    if (_buf == MAP_FAILED) {
-                        ERR_EXIT("mmap CapioFile constructor");
-                    }
-                }
-            } else {
-                _buf = new char[_buf_size];
-            }
-        }
-    }
-
-    void memcopyCapioFile(char *new_p, char *old_p) const {
-        for (auto &sector : _sectors) {
-            off64_t lbound        = sector.first;
-            off64_t ubound        = sector.second;
-            off64_t sector_length = ubound - lbound;
-            memcpy(new_p + lbound, old_p + lbound, sector_length);
-        }
-    }
-
-    char *expandBuffer(off64_t data_size) { // TODO: use realloc
-        off64_t double_size = _buf_size * 2;
-        off64_t new_size    = data_size > double_size ? data_size : double_size;
-        char *new_buf       = new char[new_size];
-        std::lock_guard lock(_mutex);
-        //	memcpy(new_p, old_p, file_shm_size); //TODO memcpy only the
-        // sector
-        // stored in CapioFile
-        memcopyCapioFile(new_buf, _buf);
-        delete[] _buf;
-        _buf      = new_buf;
-        _buf_size = new_size;
-        return new_buf;
-    }
-
-    char *getBuffer() { return _buf; }
-
-    [[nodiscard]] off64_t getBufSize() const { return _buf_size; }
-
-    [[nodiscard]] const std::vector<std::pair<int, int>> &getFds() const { return _threads_fd; }
-
-    [[nodiscard]] off64_t getFileSize() const {
-        std::lock_guard lock(_mutex);
-        if (!_sectors.empty()) {
-            return _sectors.rbegin()->second;
-        } else {
-            return 0;
-        }
-    }
-
-    /*
-     * Returns the offset to the end of the sector
-     * if the offset parameter is inside the
-     * sector, -1 otherwise
-     *
-     */
-    [[nodiscard]] off64_t getSectorEnd(off64_t offset) const {
-        START_LOG(gettid(), "call(offset=%ld)", offset);
-
-        off64_t sector_end = -1;
-        auto it            = _sectors.upper_bound(std::make_pair(offset, 0));
-
-        if (!_sectors.empty() && it != _sectors.begin()) {
-            --it;
-            if (offset <= it->second) {
-                sector_end = it->second;
-            }
-        }
-
-        return sector_end;
-    }
-
-    [[nodiscard]] const std::set<std::pair<off64_t, off64_t>, compare> &getSectors() const {
-        return _sectors;
-    }
-
-    /*
-     * get the size of the data stored in this node
-     * If the node is the home node then this is equals to
-     * the real size of the file
-     */
-    [[nodiscard]] off64_t getStoredSize() const {
-        std::lock_guard lock(_mutex);
-        return this->_getStoredSize();
-    }
-
-    /*
-     * Insert the new sector automatically modifying the
-     * existent _sectors if needed.
-     *
-     * Params:
-     * off64_t new_start: the beginning of the sector to insert
-     * off64_t new_end: the beginning of the sector to insert
-     *
-     * new_start must be > new_end otherwise the behaviour
-     * in undefined
-     *
-     */
-    void insertSector(off64_t new_start, off64_t new_end) {
-        START_LOG(gettid(), "call(new_start=%ld, new_end=%ld)", new_start, new_end);
-
-        auto p = std::make_pair(new_start, new_end);
-        std::lock_guard lock(_mutex);
-
-        if (_sectors.empty()) {
-            LOG("Insert sector <%ld, %ld>", p.first, p.second);
-            _sectors.insert(p);
-            return;
-        }
-        auto it_lbound = _sectors.upper_bound(p);
-        if (it_lbound == _sectors.begin()) {
-            if (new_end < it_lbound->first) {
-                LOG("Insert sector <%ld, %ld>", p.first, p.second);
-                _sectors.insert(p);
-            } else {
-                auto it         = it_lbound;
-                bool end_before = false;
-                bool end_inside = false;
-                while (it != _sectors.end() && !end_before && !end_inside) {
-                    end_before = p.second < it->first;
-                    if (!end_before) {
-                        end_inside = p.second <= it->second;
-                        if (!end_inside) {
-                            ++it;
-                        }
-                    }
-                }
-
-                if (end_inside) {
-                    p.second = it->second;
-                    ++it;
-                }
-                _sectors.erase(it_lbound, it);
-                LOG("Insert sector <%ld, %ld>", p.first, p.second);
-                _sectors.insert(p);
-            }
-        } else {
-            --it_lbound;
-            auto it = it_lbound;
-            if (p.first <= it_lbound->second) {
-                // new sector starts inside a sector
-                p.first = it_lbound->first;
-            } else { // in this way the sector will not be deleted
-                ++it_lbound;
-            }
-            bool end_before = false;
-            bool end_inside = false;
-            while (it != _sectors.end() && !end_before && !end_inside) {
-                end_before = p.second < it->first;
-                if (!end_before) {
-                    end_inside = p.second <= it->second;
-                    if (!end_inside) {
-                        ++it;
-                    }
-                }
-            }
-
-            if (end_inside) {
-                p.second = it->second;
-                ++it;
-            }
-            _sectors.erase(it_lbound, it);
-            LOG("Insert sector <%ld, %ld>", p.first, p.second);
-            _sectors.insert(p);
-        }
-    }
-
-    [[nodiscard]] bool closed() const {
-        return _n_close_expected == -1 || _n_close == _n_close_expected;
-    }
-
-    [[nodiscard]] bool deletable() const { return _n_opens <= 0; }
-
-    [[nodiscard]] bool isDirectory() const { return _directory; }
-
-    void open() { _n_opens++; }
-
-    /*
-     * From the manual:
-     *
-     * Adjust the file offset to the next location in the file
-     * greater than or equal to offset containing data.  If
-     * offset points to data, then the file offset is set to
-     * offset.
-     *
-     * Fails if offset points past the end of the file.
-     *
-     */
-    off64_t seekData(off64_t offset) {
-        if (_sectors.empty()) {
-            if (offset == 0) {
-                return 0;
-            } else {
-                return -1;
-            }
-        }
-        auto it = _sectors.upper_bound(std::make_pair(offset, 0));
-        if (it == _sectors.begin()) {
-            return it->first;
-        }
-        --it;
-        if (offset <= it->second) {
-            return offset;
-        } else {
-            ++it;
-            if (it == _sectors.end()) {
-                return -1;
-            } else {
-                return it->first;
-            }
-        }
-    }
-
-    /*
-     * From the manual:
-     *
-     * Adjust the file offset to the next hole in the file
-     * greater than or equal to offset.  If offset points into
-     * the middle of a hole, then the file offset is set to
-     * offset.  If there is no hole past offset, then the file
-     * offset is adjusted to the end of the file (i.e., there is
-     * an implicit hole at the end of any file).
-     *
-     *
-     * Fails if offset points past the end of the file.
-     *
-     */
-    [[nodiscard]] off64_t seekHole(off64_t offset) const {
-        if (_sectors.empty()) {
-            if (offset == 0) {
-                return 0;
-            } else {
-                return -1;
-            }
-        }
-        auto it = _sectors.upper_bound(std::make_pair(offset, 0));
-        if (it == _sectors.begin()) {
-            return offset;
-        }
-        --it;
-        if (offset <= it->second) {
-            return it->second;
-        } else {
-            ++it;
-            if (it == _sectors.end()) {
-                return -1;
-            } else {
-                return offset;
-            }
-        }
-    }
-
-    void removeFd(int tid, int fd) {
-        auto it = std::find(_threads_fd.begin(), _threads_fd.end(), std::make_pair(tid, fd));
-        if (it != _threads_fd.end()) {
-            _threads_fd.erase(it);
-        }
-    }
+    /** @brief Blocks the calling thread until setCommitted() is called. */
+    void waitForCommit() const;
 
     /**
-     * Save data inside the capio_file buffer
-     * @param buffer
-     * @return
+     * @brief Blocks until the requested offset is within a valid sector.
+     * @param offset The file offset to wait for.
      */
-    void readFromNode(const std::string &dest, off64_t offset, off64_t buffer_size) {
-        std::unique_lock lock(_mutex);
-        backend->recv_file(_buf + offset, dest, buffer_size);
-        _data_avail_cv.notify_all();
-    }
+    void waitForData(long offset) const;
 
-    void readFromQueue(SPSCQueue &queue, size_t offset, long int num_bytes) {
-        START_LOG(gettid(), "call()");
+    /**
+     * @brief Marks the file as committed and notifies waiting threads.
+     * @param commit The new status (defaults to true).
+     */
+    void setCommitted(bool commit = true);
 
-        std::unique_lock lock(_mutex);
-        queue.read(_buf + offset, num_bytes);
-        _data_avail_cv.notify_all();
-    }
+    /**
+     * @brief Maps a Thread ID to a specific File Descriptor.
+     * @param tid Thread ID.
+     * @param fd File descriptor.
+     */
+    void addFd(int tid, int fd);
 
-    // TODO: Understand the scope of this method and find a better name
-    std::size_t getRealFileSize() const {
-        std::lock_guard lg(_mutex);
-        return this->_real_file_size;
-    }
+    /**
+     * @brief Removes a Thread ID/FD mapping.
+     * @param tid Thread ID.
+     * @param fd File descriptor.
+     */
+    void removeFd(int tid, int fd);
 
-    void setRealFileSize(const off64_t size) {
-        std::lock_guard lg(_mutex);
-        this->_real_file_size = size;
-    }
+    /** @brief Increments the internal open counter. */
+    void open();
 
-    bool isFirstWrite() const {
-        std::lock_guard lg(_mutex);
-        return this->_first_write;
-    }
+    /** @brief Increments the _n_close counter, while decrementing the _n_open counter. */
+    void close();
 
-    // TODO: add a dedicated CapioFile::write() and CapioFile::read() method, remove this method
-    //       from public scope
-    void registerFirstWrite() {
-        std::lock_guard lg(_mutex);
-        this->_first_write = false;
-    }
+    /**
+     * @brief Initializes the memory buffer or mmap area.
+     * @param path Path to the file.
+     * @param home_node Whether this node is the home for the file.
+     */
+    void createBuffer(const std::filesystem::path &path, bool home_node);
 
-    void incrementDirectoryFileCount(const int count = 1) {
-        std::lock_guard lg(_mutex);
-        this->_n_files += count;
-    }
+    /**
+     * @brief Resizes the internal buffer to accommodate more data.
+     * @param data_size Required additional size.
+     * @return Pointer to the expanded buffer.
+     */
+    char *expandBuffer(off64_t data_size);
 
-    long getCurrentDirectoryFileCount() const {
-        std::lock_guard lg(_mutex);
-        return this->_n_files;
-    }
+    /** @brief Dump _buf buffer to the file system. */
+    void dump();
 
-    long getDirectoryExpectedFileCount() const {
-        std::lock_guard lg(_mutex);
-        return this->_n_files_expected;
-    }
+    /**
+     * @brief Tracks a new data range in the file.
+     * @param new_start Starting offset of the data.
+     * @param new_end Ending offset of the data.
+     */
+    void insertSector(off64_t new_start, off64_t new_end);
+
+    /**
+     * @brief Fetches data from a remote CAPIO node.
+     * @param dest Destination node identifier.
+     * @param offset File offset to read from.
+     * @param buffer_size Amount of data to fetch.
+     */
+    void readFromNode(const std::string &dest, off64_t offset, off64_t buffer_size) const;
+
+    /**
+     * @brief Transfers data from an SPSC queue into the file buffer.
+     * @param queue Source queue.
+     * @param offset Destination offset in this file.
+     * @param num_bytes Number of bytes to transfer.
+     */
+    void readFromQueue(SPSCQueue &queue, size_t offset, long int num_bytes) const;
+
+    /** @brief Explicitly sets the total file size. */
+    void setRealFileSize(off64_t size);
+
+    /** @brief Marks that at least one write has occurred. */
+    void registerFirstWrite();
+
+    /**
+     * @brief Increases the count of files contained in this directory.
+     * @param count the number to increase the internal counter
+     */
+    void incrementDirectoryFileCount(int count = 1);
+
+    /** @return Pointer to the raw memory buffer. */
+    char *getBuffer() const;
+
+    /** @return Vector of TID/FD pairs. */
+    [[nodiscard]] const std::vector<std::pair<int, int>> &getFds() const;
+
+    /** @return The physical size of the current buffer. */
+    [[nodiscard]] off64_t getBufSize() const;
+
+    /** @return The logical size of the file. */
+    [[nodiscard]] off64_t getRealFileSize() const;
+
+    /** @return The total size, accounting for holes and metadata. */
+    [[nodiscard]] off64_t getFileSize() const;
+
+    /** @return Size of data currently residing on this node. */
+    [[nodiscard]] off64_t getStoredSize() const;
+
+    /** @return Count of files currently indexed in this directory. */
+    [[nodiscard]] int getCurrentDirectoryFileCount() const;
+
+    /** @return Expected total files in this directory. */
+    [[nodiscard]] int getDirectoryExpectedFileCount() const;
+
+    /** @return Reference to the internal sector map. */
+    [[nodiscard]] const std::set<std::pair<off64_t, off64_t>, compareSectors> &getSectors() const;
+
+    /**
+     * @brief Finds the end of the sector containing the offset.
+     * @param offset Position to check.
+     * @return End offset of the sector, or -1 if in a hole.
+     */
+    [[nodiscard]] off64_t getSectorEnd(off64_t offset) const;
+
+    /**
+     * @brief Finds the next data segment.
+     * @param offset Start searching from here.
+     * @return Offset of data, or error if beyond end of file.
+     */
+    off64_t seekData(off64_t offset) const;
+
+    /**
+     * @brief Finds the next hole in the file.
+     * @param offset Start searching from here.
+     * @return Offset of the hole.
+     */
+    [[nodiscard]] off64_t seekHole(off64_t offset) const;
 };
 
-#endif // CAPIO_SERVER_STORAGE_CAPIO_FILE_HPP
+#endif // CAPIO_SERVER_CAPIO_FILE_HPP
