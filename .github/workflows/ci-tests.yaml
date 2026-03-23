@@ -233,6 +233,7 @@ jobs:
             --xml coverage.xml        \
             --gcov-executable gcov    \
             --exclude capio/tests     \
+            --gcov-ignore-parse-errors=negative_hits.warn \
             ../build
 
       - name: "Compute Valid Artifact Name"
