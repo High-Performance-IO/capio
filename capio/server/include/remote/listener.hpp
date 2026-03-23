@@ -58,9 +58,16 @@ inline Backend *select_backend(const std::string &backend_name, int argc, char *
     static const std::array<CComsHandler_t, CAPIO_SERVER_NR_REQUEST> server_request_handlers =
         build_server_request_handlers_table();
 
-    START_LOG(gettid(), "call()");
-
     internal_server_sem.lock();
+
+    if (typeid(*backend) == typeid(NoBackend)) {
+        std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_INFO
+                  << " Backend is of type NoBackend. Stopping capio_remote_listener() execution."
+                  << std::endl;
+        return;
+    }
+
+    START_LOG(gettid(), "call()");
 
     while (true) {
         auto request = backend->read_next_request();

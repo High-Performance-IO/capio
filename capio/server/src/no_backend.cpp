@@ -8,10 +8,6 @@ NoBackend::NoBackend(int argc, char **argv) : Backend(HOST_NAME_MAX) {
 
 RemoteRequest NoBackend::read_next_request() {
     START_LOG(gettid(), "call()");
-    LOG("Halting thread execution as NoBackend was chosen");
-    while (true) {
-        std::this_thread::sleep_for(std::chrono::seconds(100));
-    }
     return {nullptr, ""};
 }
 
