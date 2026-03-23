@@ -11,7 +11,6 @@
 #include <string>
 #include <sys/mman.h>
 #include <unistd.h>
-#include <memory>
 
 #include "constants.hpp"
 #include "syscall.hpp"

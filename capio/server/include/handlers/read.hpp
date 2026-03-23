@@ -124,7 +124,7 @@ void wait_for_file(const std::filesystem::path &path, int tid, int fd, off64_t c
     loop_load_file_location(path);
 
     // check if the file is local or remote
-    if (strcmp(std::get<0>(get_file_location(path)), backend->getNodeName().c_str()) == 0) {
+    if (strcmp(std::get<0>(get_file_location(path)), backend->get_node_name().c_str()) == 0) {
         handle_local_read(tid, fd, count, false);
     } else {
         request_remote_read(tid, fd, count);
@@ -149,7 +149,7 @@ inline void handle_read(int tid, int fd, off64_t count) {
         std::thread t(wait_for_file, path, tid, fd, count);
         t.detach();
     } else if (is_prod ||
-               strcmp(std::get<0>(file_location_opt->get()), backend->getNodeName().c_str()) == 0 ||
+               strcmp(std::get<0>(file_location_opt->get()), backend->get_node_name().c_str()) == 0 ||
                capio_dir == path) {
         LOG("File is local. handling local read");
         handle_local_read(tid, fd, count, is_prod);

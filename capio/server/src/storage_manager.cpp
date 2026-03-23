@@ -310,7 +310,7 @@ off64_t StorageManager::addDirectory(const pid_t tid, const std::filesystem::pat
             c_file.registerFirstWrite();
             // TODO: it works only if there is one prod per file
             if (is_capio_dir(path)) {
-                add_file_location(path, backend->getNodeName().c_str(), -1);
+                add_file_location(path, backend->get_node_name().c_str(), -1);
             } else {
                 write_file_location(path);
                 updateDirectory(tid, path);

@@ -5,36 +5,30 @@
 
 #include "common/logger.hpp"
 
-
 class RemoteRequest {
     char *_buf_recv;
     int _code;
     const std::string _source;
 
   public:
-    RemoteRequest(char *buf_recv, const std::string &source) : _source(source) {
-        START_LOG(gettid(), "call(buf_recv=%s, source=%s)", buf_recv, source.c_str());
-        int code;
-        auto [ptr, ec] = std::from_chars(buf_recv, buf_recv + 4, code);
-        if (ec == std::errc()) {
-            this->_code     = code;
-            this->_buf_recv = new char[CAPIO_SERVER_REQUEST_MAX_SIZE];
-            strcpy(this->_buf_recv, ptr + 1);
-            LOG("Received request %d from %s : %s", this->_code, this->_source.c_str(),
-                this->_buf_recv);
-        } else {
-            this->_code = -1;
-        }
-    }
+    /**
+     * Instantiate a new RemoteRequest
+     * @param buf_recv The buffer containing the raw request
+     * @param source The source that generated the request
+     */
+    RemoteRequest(char *buf_recv, const std::string &source);
 
     RemoteRequest(const RemoteRequest &)            = delete;
     RemoteRequest &operator=(const RemoteRequest &) = delete;
 
     ~RemoteRequest() { delete[] _buf_recv; }
 
-    [[nodiscard]] auto get_source() const { return this->_source; }
-    [[nodiscard]] auto get_content() const { return this->_buf_recv; }
-    [[nodiscard]] auto get_code() const { return this->_code; }
+    /// Get the source node name of the request
+    [[nodiscard]] const std::string &get_source() const;
+    /// Get the content of the request
+    [[nodiscard]] const char *get_content() const;
+    /// Get the request code
+    [[nodiscard]] int get_code() const;
 };
 
 /**
@@ -50,20 +44,16 @@ class Backend {
     std::string node_name;
 
   public:
-    explicit Backend(const unsigned int node_name_max_length)
-        : n_servers(1), node_name(node_name_max_length, '\0') {
-        gethostname(node_name.data(), node_name_max_length);
-    }
+    explicit Backend(unsigned int node_name_max_length);
 
     virtual ~Backend() = default;
 
-    [[nodiscard]] const std::string &getNodeName() const { return node_name; }
+    /// Return THIS node name as configured by the derived backend class
+    [[nodiscard]] const std::string &get_node_name() const;
 
-    /**
-     * Returns the node names of the CAPIO servers
-     * @return A set containing the node names of all CAPIO servers
-     */
-    virtual std::set<std::string> get_nodes() { return {node_name}; };
+    /// Get a std::set containing the node names of all CAPIO servers for which a handshake
+    /// occurred (including current instance node name)
+    virtual std::set<std::string> get_nodes();
 
     /**
      * Handshake the server applications

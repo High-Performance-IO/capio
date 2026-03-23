@@ -27,7 +27,7 @@ void wait_for_file_completion(int tid, const std::filesystem::path &path) {
 
     // if file is streamable
     if (c_file.isCommitted() || CapioCLEngine::get().isFirable(path) ||
-        std::get<0>(get_file_location(path)) == backend->getNodeName().c_str()) {
+        std::get<0>(get_file_location(path)) == backend->get_node_name().c_str()) {
 
         client_manager->replyToClient(tid, c_file.getFileSize());
         client_manager->replyToClient(tid, static_cast<int>(c_file.isDirectory() ? 1 : 0));
@@ -73,7 +73,7 @@ inline void reply_stat(int tid, const std::filesystem::path &path) {
         LOG("File is now present from remote node. retrieving file again.");
         file_location_opt = get_file_location_opt(path);
     }
-    if (c_file.isCommitted() || std::get<0>(file_location_opt->get()) == backend->getNodeName() ||
+    if (c_file.isCommitted() || std::get<0>(file_location_opt->get()) == backend->get_node_name() ||
         CapioCLEngine::get().isFirable(path) || capio_dir == path) {
         LOG("Sending response to client");
         client_manager->replyToClient(tid, c_file.getFileSize());

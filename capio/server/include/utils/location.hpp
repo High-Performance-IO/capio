@@ -269,7 +269,7 @@ inline void loop_load_file_location(const std::filesystem::path &path_to_load) {
 inline void open_files_location() {
     START_LOG(gettid(), "call()");
 
-    std::string file_location_name = get_file_location_name(backend->getNodeName());
+    std::string file_location_name = get_file_location_name(backend->get_node_name());
     if ((files_location_fp = fopen(file_location_name.c_str(), "w+")) == nullptr) {
         ERR_EXIT("Error opening %s file: %d (%s)", file_location_name.c_str(), errno,
                  strerror(errno));
@@ -295,11 +295,11 @@ inline void write_file_location(const std::filesystem::path &path_to_write) {
     if (offset == -1) {
         ERR_EXIT("lseek in write_file_location");
     }
-    const std::string line = path_to_write.native() + " " + backend->getNodeName() + "\n";
+    const std::string line = path_to_write.native() + " " + backend->get_node_name() + "\n";
     if (write(files_location_fd, line.c_str(), line.length()) == -1) {
         ERR_EXIT("write in write_file_location");
     }
-    add_file_location(path_to_write, backend->getNodeName().c_str(), offset);
+    add_file_location(path_to_write, backend->get_node_name().c_str(), offset);
 }
 
 #endif // CAPIO_SERVER_UTILS_LOCATIONS_HPP

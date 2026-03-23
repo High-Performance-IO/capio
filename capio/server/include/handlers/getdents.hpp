@@ -51,7 +51,7 @@ inline void handle_getdents(int tid, int fd, long int count) {
 
             loop_load_file_location(path_to_check);
 
-            if (std::get<0>(get_file_location(path_to_check)) == backend->getNodeName()) {
+            if (std::get<0>(get_file_location(path_to_check)) == backend->get_node_name()) {
                 handle_getdents(tid, fd, count);
             } else {
 
@@ -59,7 +59,7 @@ inline void handle_getdents(int tid, int fd, long int count) {
             }
         });
         t.detach();
-    } else if (is_prod || std::get<0>(file_location_opt->get()) == backend->getNodeName() ||
+    } else if (is_prod || std::get<0>(file_location_opt->get()) == backend->get_node_name() ||
                capio_dir == path_to_check) {
         CapioFile &c_file = storage_manager->get(path_to_check);
         off64_t offset    = storage_manager->getFileOffset(tid, fd);

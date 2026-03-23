@@ -41,9 +41,9 @@ inline void handle_remote_stat_request(int tid, const std::filesystem::path &pat
     std::string dest         = std::get<0>(get_file_location(path));
     const char *const format = "%04d %d %s %s";
     const int size           = snprintf(nullptr, 0, format, CAPIO_SERVER_REQUEST_STAT, tid,
-                                        backend->getNodeName().c_str(), path.c_str());
+                                        backend->get_node_name().c_str(), path.c_str());
     const std::unique_ptr<char[]> message(new char[size + 1]);
-    sprintf(message.get(), format, CAPIO_SERVER_REQUEST_STAT, tid, backend->getNodeName().c_str(),
+    sprintf(message.get(), format, CAPIO_SERVER_REQUEST_STAT, tid, backend->get_node_name().c_str(),
             path.c_str());
     LOG("destination=%s, message=%s", dest.c_str(), message.get());
 
