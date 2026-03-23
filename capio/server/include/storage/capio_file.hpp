@@ -31,11 +31,11 @@ class CapioFile {
     int _fd           = -1;      ///< File descriptor for permanent/mmap storage
 
     // TODO: check if it is possible to move from int to unsigned int
-    std::atomic<int> _n_close   = 0;  ///< Current count of close() operations
-    std::atomic<int> _n_opens   = 0;  ///< Current count of open() operations
-    std::atomic<int> _n_files   = 0;  ///< Count of dirent64 stored (if directory)
-    const int _n_files_expected = -1; ///< Target dirent64 count (if directory)
-    const int _n_close_expected = 0;  ///< Target close() operations for commitment
+    std::atomic<int> _n_close            = 0;  ///< Current count of close() operations
+    std::atomic<int> _n_opens            = 0;  ///< Current count of open() operations
+    std::atomic<int> _n_files            = 0;  ///< Count of dirent64 stored (if directory)
+    const int _n_files_expected          = -1; ///< Target dirent64 count (if directory)
+    const unsigned int _n_close_expected = 0;  ///< Target close() operations for commitment
 
     bool _home_node       = false; ///< True if this is the home node
     bool _committed       = false; ///< True if file is finalized
@@ -93,7 +93,7 @@ class CapioFile {
      * @param init_size Initial buffer allocation size.
      * @param n_close_expected Expected number of close calls.
      */
-    CapioFile(bool directory, bool permanent, off64_t init_size, int n_close_expected);
+    CapioFile(bool directory, bool permanent, off64_t init_size, unsigned int n_close_expected);
 
     CapioFile(const CapioFile &)            = delete;
     CapioFile &operator=(const CapioFile &) = delete;

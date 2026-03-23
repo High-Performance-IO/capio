@@ -238,7 +238,7 @@ TEST(ServerTest, TesMemcpyCapioFile) {
 }
 
 TEST(ServerTest, TestCloseCapioFile) {
-    CapioFile file(false, false, 0, -1);
+    CapioFile file(false, false, 0, 0);
     EXPECT_TRUE(file.closed()); // TEST for n_close_expected == -1
 
     CapioFile file1(false, false, 0, 10);
