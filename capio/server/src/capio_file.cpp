@@ -11,8 +11,8 @@ bool CapioFile::compareSectors::operator()(const std::pair<off64_t, off64_t> &lh
 
 CapioFile::CapioFile() = default;
 
-CapioFile::CapioFile(const bool directory, const int n_files_expected, const bool permanent,
-                     const off64_t init_size, const int n_close_expected)
+CapioFile::CapioFile(const bool directory, const unsigned int n_files_expected,
+                     const bool permanent, const off64_t init_size, const int n_close_expected)
     : _buf_size(init_size), _n_files_expected(n_files_expected + 2),
       _n_close_expected(n_close_expected), _directory(directory), _permanent(permanent) {}
 
@@ -340,4 +340,4 @@ void CapioFile::incrementDirectoryFileCount(const int count) {
 
 int CapioFile::getCurrentDirectoryFileCount() const { return this->_n_files; }
 
-int CapioFile::getDirectoryExpectedFileCount() const { return this->_n_files_expected; }
+unsigned int CapioFile::getDirectoryExpectedFileCount() const { return this->_n_files_expected; }
