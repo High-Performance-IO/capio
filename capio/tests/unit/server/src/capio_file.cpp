@@ -5,6 +5,7 @@
 #include "storage/manager.hpp"
 
 extern StorageManager *storage_manager;
+extern Backend *backend;
 
 #include <gtest/gtest.h>
 #include <thread>
@@ -339,6 +340,8 @@ class MockBackend : public Backend {
 };
 
 TEST(ServerTest, TestReadFromNodeMockBackend) {
+    // NOTE: Avoid segfault with delete backend from environment
+    const auto old_backend = backend;
 
     backend = new MockBackend();
 
@@ -356,6 +359,9 @@ TEST(ServerTest, TestReadFromNodeMockBackend) {
     }
 
     delete backend;
+
+    // NOTE: Avoid segfault with delete backend from environment
+    backend = old_backend;
 }
 
 TEST(ServerTest, TestGetSectorEnd) {
