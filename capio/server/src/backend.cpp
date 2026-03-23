@@ -13,4 +13,4 @@ Backend::Backend(const unsigned int node_name_max_length) : n_servers(1) {
     return node_name;
 }
 
-std::set<std::string> Backend::get_nodes() { return {node_name}; }
+const std::set<std::string> Backend::get_nodes() { return {node_name}; }

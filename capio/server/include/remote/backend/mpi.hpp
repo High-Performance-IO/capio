@@ -20,7 +20,7 @@ class MPIBackend : public Backend {
     MPIBackend(int argc, char **argv);
 
     ~MPIBackend() override;
-    std::set<std::string> get_nodes() override;
+    const std::set<std::string> get_nodes() override;
     void handshake_servers() override;
     RemoteRequest read_next_request() override;
     void send_file(char *shm, long int nbytes, const std::string &target) override;

@@ -53,7 +53,7 @@ class Backend {
 
     /// Get a std::set containing the node names of all CAPIO servers for which a handshake
     /// occurred (including current instance node name)
-    virtual std::set<std::string> get_nodes();
+    virtual const std::set<std::string> get_nodes();
 
     /**
      * Handshake the server applications

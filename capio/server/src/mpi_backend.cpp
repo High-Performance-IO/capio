@@ -27,7 +27,7 @@ MPIBackend::~MPIBackend() {
     MPI_Finalize();
 }
 
-std::set<std::string> MPIBackend::get_nodes() { return nodes; }
+const std::set<std::string> MPIBackend::get_nodes() { return nodes; }
 
 void MPIBackend::handshake_servers() {
     START_LOG(gettid(), "call()");

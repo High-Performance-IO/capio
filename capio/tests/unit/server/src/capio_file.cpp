@@ -323,13 +323,15 @@ TEST(ServerTest, TestFileSetCommitToFalse) {
 
 class MockBackend : public Backend {
   public:
+    MockBackend() : Backend(1) {}
+
     void recv_file(char *shm, const std::string &source, const long int bytes_expected) override {
         for (std::size_t i = 0; i < bytes_expected; ++i) {
             shm[i] = 33 + (i % 93);
         }
     }
 
-    const std::set<std::string> get_nodes() override { return {}; }
+    const std::set<std::string> get_nodes() override { return {node_name}; }
     void handshake_servers() override {}
     RemoteRequest read_next_request() override { return {nullptr, ""}; }
     void send_file(char *shm, long int nbytes, const std::string &target) override {}
