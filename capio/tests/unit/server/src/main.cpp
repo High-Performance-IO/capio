@@ -3,8 +3,6 @@
 #include "capiocl.hpp"
 #include "capiocl/engine.h"
 #include "client-manager/client_manager.hpp"
-#include "common/constants.hpp"
-#include "remote/backend/no_backend.hpp"
 #include "storage/manager.hpp"
 #include "utils/capiocl_adapter.hpp"
 #include "utils/location.hpp"
@@ -24,16 +22,12 @@ class ServerUnitTestEnvironment : public testing::Environment {
         capio_cl_engine = new capiocl::engine::Engine(false);
         client_manager  = new ClientManager();
         storage_manager = new StorageManager();
-        backend         = new NoBackend(0, nullptr);
-
-        open_files_location();
     }
 
     void TearDown() override {
         delete storage_manager;
         delete client_manager;
         delete capio_cl_engine;
-        delete backend;
     }
 };
 

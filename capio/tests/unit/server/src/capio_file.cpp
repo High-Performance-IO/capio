@@ -3,6 +3,7 @@
 #include "common/env.hpp"
 #include "remote/backend.hpp"
 #include "storage/manager.hpp"
+#include "utils/location.hpp"
 
 extern StorageManager *storage_manager;
 extern Backend *backend;
@@ -324,7 +325,7 @@ TEST(ServerTest, TestFileSetCommitToFalse) {
 
 class MockBackend : public Backend {
   public:
-    MockBackend() : Backend(1) {}
+    MockBackend() : Backend(HOST_NAME_MAX) {}
 
     void recv_file(char *shm, const std::string &source, const long int bytes_expected) override {
         for (std::size_t i = 0; i < bytes_expected; ++i) {
@@ -339,11 +340,17 @@ class MockBackend : public Backend {
     void send_request(const char *message, int message_len, const std::string &target) override {}
 };
 
-TEST(ServerTest, TestReadFromNodeMockBackend) {
-    // NOTE: Avoid segfault with delete backend from environment
-    const auto old_backend = backend;
+class MockBackendTestFixture : public ::testing::Test {
+  protected:
+    void SetUp() override {
+        backend = new MockBackend();
+        open_files_location();
+    }
 
-    backend = new MockBackend();
+    void TearDown() override { delete backend; }
+};
+
+TEST_F(MockBackendTestFixture, TestReadFromNodeMockBackend) {
 
     CapioFile file1;
     file1.createBuffer("testDir", true);
@@ -357,11 +364,6 @@ TEST(ServerTest, TestReadFromNodeMockBackend) {
     for (std::size_t i = 0; i < 1000; ++i) {
         EXPECT_EQ(buf[i], 33 + (i % 93));
     }
-
-    delete backend;
-
-    // NOTE: Avoid segfault with delete backend from environment
-    backend = old_backend;
 }
 
 TEST(ServerTest, TestGetSectorEnd) {
@@ -375,7 +377,7 @@ TEST(ServerTest, TestGetSectorEnd) {
     EXPECT_EQ(file.getSectorEnd(12000), -1);
 }
 
-TEST(ServerTest, TestSimulateDirectorySrteaming) {
+TEST_F(MockBackendTestFixture, TestSimulateDirectoryStreaming) {
 
     constexpr int NUM_FILES_EXPECTED = 10;
 
