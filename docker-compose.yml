@@ -1,0 +1,49 @@
+services:
+  node1:
+    image: hpio/capio:latest
+    container_name: node1
+    hostname: "node1"
+    tty: true
+    working_dir: /shared
+    volumes:
+      - shared_data:/shared
+    networks:
+      capio_private_net:
+        ipv4_address: 10.10.0.10
+    environment:
+      - CAPIO_LOG_LEVEL=-1
+      - APP_TYPE=writer
+      - CAPIO_DIR=.
+    command: |
+      capio_server -b mtcl --no-config
+
+  node2:
+    image: hpio/capio:latest
+    container_name: node2
+    hostname: "node2"
+    tty: true
+    working_dir: /shared
+    volumes:
+      - shared_data:/shared
+    networks:
+      capio_private_net:
+        ipv4_address: 10.10.0.11
+    environment:
+      - CAPIO_LOG_LEVEL=-1
+      - APP_TYPE=reader
+      - CAPIO_DIR=.
+    command: |
+      capio_server -b mtcl --no-config
+
+volumes:
+  shared_data:
+
+networks:
+  capio_private_net:
+    driver: macvlan
+    driver_opts:
+      parent: dummy0
+    ipam:
+      config:
+        - subnet: 10.10.0.0/24
+          gateway: 10.10.0.1
