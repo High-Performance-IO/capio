@@ -159,6 +159,5 @@ int main(int argc, char **argv) {
     server_thread.join();
     remote_listener_thread.join();
 
-    delete backend;
     return 0;
 }
