@@ -1,6 +1,10 @@
-#include "server/include/storage/capio_file.hpp"
+#include "storage/capio_file.hpp"
+#include "common/dirent.hpp"
 #include "common/env.hpp"
 #include "remote/backend.hpp"
+#include "storage/manager.hpp"
+
+extern StorageManager *storage_manager;
 
 #include <gtest/gtest.h>
 #include <thread>
@@ -234,7 +238,7 @@ TEST(ServerTest, TesMemcpyCapioFile) {
 }
 
 TEST(ServerTest, TestCloseCapioFile) {
-    CapioFile file(false, false, 0, -1);
+    CapioFile file(false, false, 0, 0);
     EXPECT_TRUE(file.closed()); // TEST for n_close_expected == -1
 
     CapioFile file1(false, false, 0, 10);
@@ -361,4 +365,60 @@ TEST(ServerTest, TestGetSectorEnd) {
 
     EXPECT_EQ(file.getSectorEnd(120), 1234);
     EXPECT_EQ(file.getSectorEnd(12000), -1);
+}
+
+TEST(ServerTest, TestSimulateDirectorySrteaming) {
+
+    constexpr int NUM_FILES_EXPECTED = 10;
+
+    const std::filesystem::path CAPIO_DIR        = "/tmp";
+    const std::filesystem::path stream_directory = CAPIO_DIR / "my_streaming_directory";
+
+    setenv("CAPIO_DIR", CAPIO_DIR.c_str(), 1);
+    storage_manager->addDirectory(1234, CAPIO_DIR);
+    storage_manager->addDirectory(1234, stream_directory);
+
+    std::mutex mutex_continue;
+
+    std::thread t([&] {
+        for (auto i = 0; i < NUM_FILES_EXPECTED; ++i) {
+            mutex_continue.lock();
+            const std::string filename = "file." + std::to_string(i);
+            storage_manager->updateDirectory(1234, stream_directory / filename);
+        }
+    });
+
+    const auto &file = storage_manager->get(stream_directory);
+
+    long current_offset = 0;
+
+    linux_dirent64 dirent{};
+
+    file.waitForData(current_offset + sizeof(linux_dirent64));
+    memcpy(&dirent, file.getBuffer() + current_offset, sizeof(linux_dirent64));
+    current_offset += sizeof(linux_dirent64);
+    EXPECT_EQ(strcmp(dirent.d_name, "."), 0);
+    bzero(&dirent, sizeof(linux_dirent64));
+
+    file.waitForData(current_offset + sizeof(linux_dirent64));
+    memcpy(&dirent, file.getBuffer() + current_offset, sizeof(linux_dirent64));
+    current_offset += sizeof(linux_dirent64);
+    EXPECT_EQ(strcmp(dirent.d_name, ".."), 0);
+    bzero(&dirent, sizeof(linux_dirent64));
+
+    for (auto i = 0; i < NUM_FILES_EXPECTED; ++i) {
+
+        file.waitForData(current_offset + sizeof(linux_dirent64));
+        memcpy(&dirent, file.getBuffer() + current_offset, sizeof(linux_dirent64));
+        const std::string expected_filename = "file." + std::to_string(i);
+        EXPECT_EQ(strcmp(dirent.d_name, expected_filename.c_str()), 0);
+        bzero(&dirent, sizeof(linux_dirent64));
+        mutex_continue.unlock();
+        current_offset += sizeof(linux_dirent64);
+    }
+
+    t.join();
+
+    storage_manager->remove(stream_directory);
+    storage_manager->remove(CAPIO_DIR);
 }
