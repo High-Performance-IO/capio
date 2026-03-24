@@ -4,8 +4,8 @@ MPIBackend::MPIBackend(int argc, char **argv) : Backend(MPI_MAX_PROCESSOR_NAME) 
     int node_name_len, provided;
     START_LOG(gettid(), "call()");
     LOG("Created a MPI backend");
-    MPI_Comm_size(MPI_COMM_WORLD, &n_servers);
     MPI_Init_thread(&argc, &argv, MPI_THREAD_MULTIPLE, &provided);
+    MPI_Comm_size(MPI_COMM_WORLD, &n_servers);
     LOG("Mpi has multithreading support? %s (%d)", provided == MPI_THREAD_MULTIPLE ? "yes" : "no",
         provided);
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);

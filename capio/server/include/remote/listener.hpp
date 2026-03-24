@@ -54,7 +54,7 @@ inline Backend *select_backend(const std::string &backend_name, int argc, char *
     return new NoBackend(argc, argv);
 }
 
-[[noreturn]] void capio_remote_listener(Semaphore &internal_server_sem) {
+inline void capio_remote_listener(Semaphore &internal_server_sem) {
     static const std::array<CComsHandler_t, CAPIO_SERVER_NR_REQUEST> server_request_handlers =
         build_server_request_handlers_table();
 
@@ -62,7 +62,8 @@ inline Backend *select_backend(const std::string &backend_name, int argc, char *
 
     if (typeid(*backend) == typeid(NoBackend)) {
         std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_INFO
-                  << " Backend is of type NoBackend. Stopping capio_remote_listener() execution."
+                  << " RemoteListener] backend is of type NoBackend. Stopping "
+                     "capio_remote_listener() execution."
                   << std::endl;
         return;
     }

@@ -2,11 +2,13 @@
 
 #include <iostream>
 
-Backend::Backend(const unsigned int node_name_max_length) : n_servers(1) {
-    const auto node_name_tmp = new char[node_name_max_length]{0};
-    gethostname(node_name_tmp, node_name_max_length);
-    node_name = node_name_tmp;
-    delete[] node_name_tmp;
+Backend::Backend(const unsigned int node_name_max_length)
+    : n_servers(1), node_name(node_name_max_length, '\0') {
+    // Note: default instantiation of node_name. the content of node_name may be changed by specific
+    // derived backend classes.
+
+    gethostname(node_name.data(), node_name_max_length);
+    node_name.resize(strlen(node_name.data()));
 
     std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_INFO << " Backend] Node name: " << node_name
               << std::endl;
