@@ -5,7 +5,7 @@
 #include "server/include/utils/common.hpp"
 #include "utils/shared_mutex.hpp"
 
-extern Backend* backend;
+extern Backend *backend;
 
 bool CapioFile::compareSectors::operator()(const std::pair<off64_t, off64_t> &lhs,
                                            const std::pair<off64_t, off64_t> &rhs) const {
