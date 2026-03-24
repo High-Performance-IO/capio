@@ -17,11 +17,10 @@ class RemoteRequest {
      * @param source The source that generated the request
      */
     RemoteRequest(char *buf_recv, const std::string &source);
-
     RemoteRequest(const RemoteRequest &)            = delete;
     RemoteRequest &operator=(const RemoteRequest &) = delete;
 
-    ~RemoteRequest() { delete[] _buf_recv; }
+    ~RemoteRequest();
 
     /// Get the source node name of the request
     [[nodiscard]] const std::string &get_source() const;
@@ -38,7 +37,6 @@ class RemoteRequest {
  * functions in a dedicated backend.
  */
 class Backend {
-
   protected:
     int n_servers;
     std::string node_name;
@@ -70,7 +68,7 @@ class Backend {
      * Send file
      * @param shm buffer of data to be sent
      * @param nbytes length of @param shm
-     * @param dest target to send files to
+     * @param target target to send files to
      */
     virtual void send_file(char *shm, long int nbytes, const std::string &target) = 0;
 

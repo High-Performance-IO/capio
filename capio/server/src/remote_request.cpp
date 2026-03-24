@@ -15,6 +15,7 @@ RemoteRequest::RemoteRequest(char *buf_recv, const std::string &source) : _sourc
     }
 }
 
+RemoteRequest::~RemoteRequest() { delete[] _buf_recv; }
 const std::string &RemoteRequest::get_source() const { return this->_source; }
 [[nodiscard]] const char *RemoteRequest::get_content() const { return this->_buf_recv; }
 [[nodiscard]] int RemoteRequest::get_code() const { return this->_code; }
