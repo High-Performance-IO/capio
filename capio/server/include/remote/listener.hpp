@@ -40,6 +40,13 @@ inline Backend *select_backend(const std::string &backend_name, int argc, char *
         return new MPIBackend(argc, argv);
     }
 
+    if (backend_name == "mtcl") {
+        LOG("backend selected: MTCL");
+        std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_INFO << "Starting CAPIO with MTCL backend"
+                  << std::endl;
+        return new MTCLBackend("TCP", "1234", 1000000);
+    }
+
     if (backend_name == "mpisync") {
         LOG("backend selected: mpisync");
         std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_INFO << "Starting CAPIO with MPI (SYNC) backend"
