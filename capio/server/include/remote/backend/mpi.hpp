@@ -28,7 +28,7 @@ class MPIBackend : public Backend {
     void recv_file(char *shm, const std::string &source, long int bytes_expected) override;
 };
 
-class MPISYNCBackend : public MPIBackend {
+class MPISYNCBackend final : public MPIBackend {
   public:
     MPISYNCBackend(int argc, char *argv[]);
     ~MPISYNCBackend() override;

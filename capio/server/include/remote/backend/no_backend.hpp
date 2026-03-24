@@ -2,7 +2,7 @@
 #define CAPIO_DEFAULT_HPP
 #include "remote/backend.hpp"
 
-class NoBackend : public Backend {
+class NoBackend final : public Backend {
   public:
     NoBackend(int argc, char **argv);
     ~NoBackend() override = default;
