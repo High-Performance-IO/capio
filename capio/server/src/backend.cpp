@@ -1,10 +1,17 @@
 #include "remote/backend.hpp"
 
+#include <iostream>
+
 Backend::Backend(const unsigned int node_name_max_length) : n_servers(1) {
     const auto node_name_tmp = new char[node_name_max_length]{0};
     gethostname(node_name_tmp, node_name_max_length);
     node_name = node_name_tmp;
     delete[] node_name_tmp;
+
+    std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_INFO << " Backend] Node name: " << node_name
+              << std::endl;
+    std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_INFO << " Backend] Node Count: " << n_servers
+              << std::endl;
 }
 
 [[nodiscard]] const std::string &Backend::get_node_name() const {
