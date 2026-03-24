@@ -32,7 +32,6 @@ class ServerUnitTestEnvironment : public testing::Environment {
         delete storage_manager;
         delete client_manager;
         delete capio_cl_engine;
-        delete backend;
     }
 };
 
