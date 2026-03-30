@@ -212,17 +212,27 @@ int parseCLI(int argc, char **argv) {
     }
 
     if (config) {
-        std::string token                  = args::get(config);
-        std::filesystem::path resolve_path = "";
 
-        if (resolve_prefix) {
-            resolve_path = args::get(resolve_prefix);
+        if (std::string token = args::get(config); token == "dynamic") {
+            std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_INFO
+                      << "Starting CAPIO-CL engine with dynamic configuration" << std::endl;
+
+            capio_cl_engine = new capiocl::engine::Engine();
+            capio_cl_engine->startApiServer();
+        } else {
+            std::filesystem::path resolve_path = "";
+
+            if (resolve_prefix) {
+                resolve_path = args::get(resolve_prefix);
+            }
+
+            std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_INFO << "parsing config file: " << token
+                      << std::endl;
+
+            capio_cl_engine =
+                capiocl::parser::Parser::parse(token, resolve_path, store_all_in_memory);
         }
 
-        std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_INFO << "parsing config file: " << token
-                  << std::endl;
-
-        capio_cl_engine = capiocl::parser::Parser::parse(token, resolve_path, store_all_in_memory);
     } else if (noConfigFile) {
         capio_cl_engine = new capiocl::engine::Engine();
         capio_cl_engine->setWorkflowName(get_capio_workflow_name());
