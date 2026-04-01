@@ -18,8 +18,8 @@ MPIBackend::MPIBackend(int argc, char **argv) : Backend(MPI_MAX_PROCESSOR_NAME) 
     MPI_Get_processor_name(node_name.data(), &node_name_len);
     LOG("Node name = %s, length=%d", node_name.data(), node_name_len);
     nodes.emplace(node_name);
-    rank_nodes_equivalence[std::to_string(rank)] = node_name;
-    rank_nodes_equivalence[node_name]            = std::to_string(rank);
+    rank_to_hostname[rank]      = node_name;
+    hostname_to_rank[node_name] = rank;
 }
 
 MPIBackend::~MPIBackend() {
@@ -41,8 +41,7 @@ void MPIBackend::handshake_servers() {
             MPI_Recv(buf.get(), MPI_MAX_PROCESSOR_NAME, MPI_CHAR, i, 0, MPI_COMM_WORLD,
                      MPI_STATUS_IGNORE);
             nodes.emplace(buf.get());
-            rank_nodes_equivalence.emplace(buf.get(), std::to_string(i));
-            rank_nodes_equivalence.emplace(std::to_string(i), buf.get());
+            hostname_to_rank.emplace(buf.get(), i);
         }
     }
 }
@@ -70,21 +69,21 @@ RemoteRequest MPIBackend::read_next_request() {
     MPI_Get_count(&status, MPI_CHAR, &bytes_received);
 
     LOG("receive completed!");
-    return {buff, rank_nodes_equivalence[std::to_string(status.MPI_SOURCE)]};
+    return {buff, rank_to_hostname[status.MPI_SOURCE]};
 }
 void MPIBackend::send_request(const char *message, int message_len, const std::string &target) {
     START_LOG(gettid(), "call(message=%s, message_len=%d, target=%s)", message, message_len,
               target.c_str());
-    const std::string &mpi_target = rank_nodes_equivalence[target];
-    LOG("MPI_rank for target %s is %s", target.c_str(), mpi_target.c_str());
+    const auto mpi_target = hostname_to_rank[target];
+    LOG("MPI_rank for target %s is %c", target.c_str(), mpi_target);
 
-    MPI_Send(message, message_len + 1, MPI_CHAR, std::stoi(mpi_target), 0, MPI_COMM_WORLD);
+    MPI_Send(message, message_len + 1, MPI_CHAR, mpi_target, 0, MPI_COMM_WORLD);
 }
 
 void MPIBackend::send_file(char *shm, long int nbytes, const std::string &target) {
     START_LOG(gettid(), "call(%.50s, %ld, %s)", shm, nbytes, target.c_str());
     int elem_to_snd = 0;
-    int dest        = std::stoi(rank_nodes_equivalence[target]);
+    int dest        = hostname_to_rank[target];
     for (long int k = 0; k < nbytes; k += elem_to_snd) {
         // Compute the maximum amount to send for this chunk
         elem_to_snd = static_cast<int>(std::min(nbytes - k, MPI_MAX_ELEM_COUNT));
@@ -99,7 +98,7 @@ void MPIBackend::recv_file(char *shm, const std::string &source, long int bytes_
     START_LOG(gettid(), "call(shm=%ld, source=%s, bytes_expected=%ld)", shm, source.c_str(),
               bytes_expected);
     MPI_Status status;
-    int bytes_received = 0, count = 0, source_rank = std::stoi(rank_nodes_equivalence[source]);
+    int bytes_received = 0, count = 0, source_rank = hostname_to_rank[source];
     LOG("Is buffer valid? %s",
         shm != nullptr ? "yes" : "NO! a nullptr was given to recv_file. this will make MPI crash!");
     for (long int k = 0; k < bytes_expected; k += bytes_received) {
@@ -134,5 +133,5 @@ RemoteRequest MPISYNCBackend::read_next_request() {
              &status); // receive from server
 
     LOG("receive completed!");
-    return {buff, rank_nodes_equivalence[std::to_string(status.MPI_SOURCE)]};
+    return {buff, rank_to_hostname[status.MPI_SOURCE]};
 }

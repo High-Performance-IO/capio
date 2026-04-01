@@ -13,7 +13,8 @@ class MPIBackend : public Backend {
 
     /// This structure holds inside the information to convert from hostname to MPI rank
     std::set<std::string> nodes;
-    std::unordered_map<std::string, std::string> rank_nodes_equivalence;
+    std::unordered_map<std::string, int> hostname_to_rank;
+    std::unordered_map<int, std::string> rank_to_hostname;
     static constexpr long MPI_MAX_ELEM_COUNT = 1024L * 1024 * 1024;
 
   public:
