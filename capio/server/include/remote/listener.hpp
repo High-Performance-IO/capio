@@ -25,12 +25,12 @@ build_server_request_handlers_table() {
 inline Backend *select_backend(const std::string &backend_name, int argc, char *argv[]) {
     START_LOG(gettid(), "call(backend_name=%s)", backend_name.c_str());
 
-    if (backend_name.empty()) {
+    if (backend_name.empty() || backend_name == "none") {
         LOG("backend selected: none");
         std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_INFO
-                  << "Starting CAPIO with default backend (MPI) as no preferred backend was chosen"
+                  << "Starting CAPIO with default backend (none) as no preferred backend was chosen"
                   << std::endl;
-        return new MPIBackend(argc, argv);
+        return new NoneBackend(argc, argv);
     }
 
     if (backend_name == "mpi") {
@@ -46,20 +46,29 @@ inline Backend *select_backend(const std::string &backend_name, int argc, char *
                   << std::endl;
         return new MPISYNCBackend(argc, argv);
     }
-    LOG("Backend %s does not exist in CAPIO. Reverting back to the default MPI backend",
+
+    LOG("Backend %s does not exist in CAPIO. Reverting back to the default backend (none)",
         backend_name.c_str());
     std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_WARNING << " Backend " << backend_name
-              << " does not exist. Reverting to the default MPI backend" << std::endl;
-    return new MPIBackend(argc, argv);
+              << " does not exist. Reverting to the default backend (none)" << std::endl;
+    return new NoneBackend(argc, argv);
 }
 
-[[noreturn]] void capio_remote_listener(Semaphore &internal_server_sem) {
+inline void capio_remote_listener(Semaphore &internal_server_sem) {
     static const std::array<CComsHandler_t, CAPIO_SERVER_NR_REQUEST> server_request_handlers =
         build_server_request_handlers_table();
 
-    START_LOG(gettid(), "call()");
-
     internal_server_sem.lock();
+
+    if (typeid(*backend) == typeid(NoneBackend)) {
+        std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_INFO
+                  << " RemoteListener] backend is of type NoneBackend. Stopping "
+                     "capio_remote_listener() execution."
+                  << std::endl;
+        return;
+    }
+
+    START_LOG(gettid(), "call()");
 
     while (true) {
         auto request = backend->read_next_request();

@@ -1,39 +1,33 @@
 #ifndef CAPIO_SERVER_REMOTE_BACKEND_HPP
 #define CAPIO_SERVER_REMOTE_BACKEND_HPP
-#include "common/logger.hpp"
 #include <charconv>
 #include <set>
 
+#include "common/logger.hpp"
+
 class RemoteRequest {
-  private:
     char *_buf_recv;
     int _code;
     const std::string _source;
 
   public:
-    RemoteRequest(char *buf_recv, const std::string &source) : _source(source) {
-        START_LOG(gettid(), "call(buf_recv=%s, source=%s)", buf_recv, source.c_str());
-        int code;
-        auto [ptr, ec] = std::from_chars(buf_recv, buf_recv + 4, code);
-        if (ec == std::errc()) {
-            this->_code     = code;
-            this->_buf_recv = new char[CAPIO_SERVER_REQUEST_MAX_SIZE];
-            strcpy(this->_buf_recv, ptr + 1);
-            LOG("Received request %d from %s : %s", this->_code, this->_source.c_str(),
-                this->_buf_recv);
-        } else {
-            this->_code = -1;
-        }
-    };
-
+    /**
+     * Instantiate a new RemoteRequest
+     * @param buf_recv The buffer containing the raw request
+     * @param source The source that generated the request
+     */
+    RemoteRequest(char *buf_recv, const std::string &source);
     RemoteRequest(const RemoteRequest &)            = delete;
     RemoteRequest &operator=(const RemoteRequest &) = delete;
 
-    ~RemoteRequest() { delete[] _buf_recv; }
+    ~RemoteRequest();
 
-    [[nodiscard]] auto get_source() const { return this->_source; }
-    [[nodiscard]] auto get_content() const { return this->_buf_recv; }
-    [[nodiscard]] auto get_code() const { return this->_code; }
+    /// Get the source node name of the request
+    [[nodiscard]] const std::string &get_source() const;
+    /// Get the content of the request
+    [[nodiscard]] const char *get_content() const;
+    /// Get the request code
+    [[nodiscard]] int get_code() const;
 };
 
 /**
@@ -43,14 +37,21 @@ class RemoteRequest {
  * functions in a dedicated backend.
  */
 class Backend {
+  protected:
+    int n_servers;
+    std::string node_name;
+
   public:
+    explicit Backend(unsigned int node_name_max_length);
+
     virtual ~Backend() = default;
 
-    /**
-     * Returns the node names of the CAPIO servers
-     * @return A set containing the node names of all CAPIO servers
-     */
-    virtual const std::set<std::string> get_nodes() = 0;
+    /// Return THIS node name as configured by the derived backend class
+    [[nodiscard]] const std::string &get_node_name() const;
+
+    /// Get a std::set containing the node names of all CAPIO servers for which a handshake
+    /// occurred (including current instance node name)
+    virtual const std::set<std::string> get_nodes();
 
     /**
      * Handshake the server applications
@@ -67,7 +68,7 @@ class Backend {
      * Send file
      * @param shm buffer of data to be sent
      * @param nbytes length of @param shm
-     * @param dest target to send files to
+     * @param target target to send files to
      */
     virtual void send_file(char *shm, long int nbytes, const std::string &target) = 0;
 
@@ -87,8 +88,5 @@ class Backend {
      */
     virtual void send_request(const char *message, int message_len, const std::string &target) = 0;
 };
-
-// FIXME: Remove the inline specifier
-inline Backend *backend;
 
 #endif // CAPIO_SERVER_REMOTE_BACKEND_HPP
