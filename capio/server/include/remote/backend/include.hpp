@@ -5,5 +5,5 @@
  */
 
 #include "mpi.hpp"
-#include "no_backend.hpp"
+#include "none.hpp"
 #endif // CAPIO_SERVER_REMOTE_BACKEND_INCLUDE_HPP

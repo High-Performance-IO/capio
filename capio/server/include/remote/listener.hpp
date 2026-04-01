@@ -30,7 +30,7 @@ inline Backend *select_backend(const std::string &backend_name, int argc, char *
         std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_INFO
                   << "Starting CAPIO with default backend (none) as no preferred backend was chosen"
                   << std::endl;
-        return new NoBackend(argc, argv);
+        return new NoneBackend(argc, argv);
     }
 
     if (backend_name == "mpi") {
@@ -50,8 +50,8 @@ inline Backend *select_backend(const std::string &backend_name, int argc, char *
     LOG("Backend %s does not exist in CAPIO. Reverting back to the default backend (none)",
         backend_name.c_str());
     std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_WARNING << " Backend " << backend_name
-              << " does not exist. Reverting to the default backend (MPI)" << std::endl;
-    return new NoBackend(argc, argv);
+              << " does not exist. Reverting to the default backend (none)" << std::endl;
+    return new NoneBackend(argc, argv);
 }
 
 inline void capio_remote_listener(Semaphore &internal_server_sem) {
@@ -60,9 +60,9 @@ inline void capio_remote_listener(Semaphore &internal_server_sem) {
 
     internal_server_sem.lock();
 
-    if (typeid(*backend) == typeid(NoBackend)) {
+    if (typeid(*backend) == typeid(NoneBackend)) {
         std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_INFO
-                  << " RemoteListener] backend is of type NoBackend. Stopping "
+                  << " RemoteListener] backend is of type NoneBackend. Stopping "
                      "capio_remote_listener() execution."
                   << std::endl;
         return;

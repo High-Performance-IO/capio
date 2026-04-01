@@ -6,8 +6,8 @@ MPIBackend::MPIBackend(int argc, char **argv) : Backend(MPI_MAX_PROCESSOR_NAME) 
     LOG("Created a MPI backend");
     MPI_Init_thread(&argc, &argv, MPI_THREAD_MULTIPLE, &provided);
     MPI_Comm_size(MPI_COMM_WORLD, &n_servers);
-    LOG("Mpi has multithreading support? %s (%d)", provided == MPI_THREAD_MULTIPLE ? "yes" : "no",
-        provided);
+    LOG("Does MPI has multithreading support? %s (%d)",
+        provided == MPI_THREAD_MULTIPLE ? "yes" : "no", provided);
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
     LOG("node_rank=%d", &rank);
     if (provided != MPI_THREAD_MULTIPLE) {
@@ -101,7 +101,7 @@ void MPIBackend::recv_file(char *shm, const std::string &source, long int bytes_
     MPI_Status status;
     int bytes_received = 0, count = 0, source_rank = std::stoi(rank_nodes_equivalence[source]);
     LOG("Is buffer valid? %s",
-        shm != nullptr ? "yes" : "NO! a nullptr was given to recv_file. this will make mpi crash!");
+        shm != nullptr ? "yes" : "NO! a nullptr was given to recv_file. this will make MPI crash!");
     for (long int k = 0; k < bytes_expected; k += bytes_received) {
 
         count = static_cast<int>(std::min(bytes_expected - k, MPI_MAX_ELEM_COUNT));
@@ -113,4 +113,26 @@ void MPIBackend::recv_file(char *shm, const std::string &source, long int bytes_
         MPI_Get_count(&status, MPI_BYTE, &bytes_received);
         LOG("Chunk size is %ld bytes", bytes_received);
     }
+}
+
+MPISYNCBackend::MPISYNCBackend(int argc, char *argv[]) : MPIBackend(argc, argv) {
+    START_LOG(gettid(), "call()");
+    LOG("Wrapped MPI backend with MPISYC backend");
+}
+
+MPISYNCBackend::~MPISYNCBackend() {
+    START_LOG(gettid(), "Call()");
+    MPI_Finalize();
+}
+
+RemoteRequest MPISYNCBackend::read_next_request() {
+    START_LOG(gettid(), "call()");
+    MPI_Status status;
+    char *buff = new char[CAPIO_SERVER_REQUEST_MAX_SIZE];
+    LOG("initiating a synchronized MPI receive");
+    MPI_Recv(buff, CAPIO_SERVER_REQUEST_MAX_SIZE, MPI_CHAR, MPI_ANY_SOURCE, 0, MPI_COMM_WORLD,
+             &status); // receive from server
+
+    LOG("receive completed!");
+    return {buff, rank_nodes_equivalence[std::to_string(status.MPI_SOURCE)]};
 }
