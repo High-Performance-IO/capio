@@ -100,7 +100,7 @@ void MPIBackend::recv_file(char *shm, const std::string &source, long int bytes_
               bytes_expected);
     MPI_Status status;
     int bytes_received = 0, count = 0, source_rank = std::stoi(rank_nodes_equivalence[source]);
-    LOG("Buffer is valid? %s",
+    LOG("Is buffer valid? %s",
         shm != nullptr ? "yes" : "NO! a nullptr was given to recv_file. this will make mpi crash!");
     for (long int k = 0; k < bytes_expected; k += bytes_received) {
 
