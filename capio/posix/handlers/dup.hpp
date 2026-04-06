@@ -38,7 +38,7 @@ int dup2_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg
 
     if (exists_capio_fd(fd)) {
         int res = static_cast<int>(syscall_no_intercept(
-#ifded SYS_dup2
+#ifdef SYS_dup2
             SYS_dup2, fd, fd2
 #else
             SYS_dup3, fd, fd2, 0
