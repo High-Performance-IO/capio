@@ -27,6 +27,8 @@ set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -O3")
 option(CAPIO_BUILD_TESTS "Build CAPIO test suite" FALSE)
 option(CAPIO_LOG "Enable capio debug logging" FALSE)
 option(ENABLE_COVERAGE "Enable code coverage collection" FALSE)
+option(CAPIO_BUILD_SERVER "Build CAPIO server component" TRUE)
+option(CAPIO_BUILD_POSIX  "Build CAPIO posix component" TRUE)
 
 #####################################
 # CMake module imports
@@ -82,8 +84,16 @@ FetchContent_Declare(
 #####################################
 # Targets
 #####################################
-add_subdirectory(capio/posix)
-add_subdirectory(capio/server)
+
+IF(CAPIO_BUILD_POSIX)
+	message(STATUS "Adding CAPIO posix component")
+	add_subdirectory(capio/posix)
+ENDIF()
+
+IF(CAPIO_BUILD_SERVER)
+	message(STATUS "Adding CAPIO server component")
+	add_subdirectory(capio/server)
+ENDIF()
 
 IF (CAPIO_BUILD_TESTS)
     message(STATUS "Building CAPIO test suite")
