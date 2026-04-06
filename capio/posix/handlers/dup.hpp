@@ -37,7 +37,13 @@ int dup2_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg
     START_LOG(tid, "call(fd=%d, fd2=%d)", fd, fd2);
 
     if (exists_capio_fd(fd)) {
-        int res = static_cast<int>(syscall_no_intercept(SYS_dup2, fd, fd2));
+        int res = static_cast<int>(syscall_no_intercept(
+#ifded SYS_dup2
+            SYS_dup2, fd, fd2
+#else
+            SYS_dup3, fd, fd2, 0
+#endif
+        ));
         if (res == -1) {
             *result = -errno;
             return CAPIO_POSIX_SYSCALL_SUCCESS;
