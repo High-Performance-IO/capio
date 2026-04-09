@@ -8,6 +8,11 @@ python and bash.
 ![CI-Tests](https://github.com/High-Performance-IO/capio/actions/workflows/ci-tests.yaml/badge.svg)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://raw.githubusercontent.com/High-Performance-IO/capio/master/LICENSE)
 
+## Capio Bibliography
+
+- [![CAPIO methodology](https://img.shields.io/badge/CAPIO%20Methodology%20(Use%20this%20to%20cite%20CAPIO)-10.1016/j.future.2025.108159-%23cc5500?logo=doi&logoColor=white&labelColor=2b2b2b)](http://dx.doi.org/10.1016/j.future.2025.108159)
+- [![CAPIO middleware](https://img.shields.io/badge/HiPC%202023%20Paper-10.1109/HiPC58850.2023.00031-%23cc5500?logo=doi&logoColor=white&labelColor=2b2b2b)](http://dx.doi.org/10.1109/HiPC58850.2023.00031)
+
 ## Build and run tests
 
 ### Dependencies
@@ -191,13 +196,8 @@ There are also examples on how to write JSON configuration files for the semanti
 
 Made with :heart: by:
 
-Alberto Riccardo Martinelli <albertoriccardo.martinelli@unito.it> (designer and maintainer) \
 Marco Edoardo Santimaria <marcoedoardo.santimaria@unito.it> (Designer and maintainer) \
 Iacopo Colonnelli <iacopo.colonnelli@unito.it> (Workflows expert and maintainer) \
 Massimo Torquati <massimo.torquati@unipi.it> (Designer) \
-Marco Aldinucci <marco.aldinucci@unito.it> (Designer)
-
-## Papers
-[![CAPIO](https://img.shields.io/badge/CAPIO-10.1109/HiPC58850.2023.00031-red)]([https://arxiv.org/abs/2206.10048](https://dx.doi.org/10.1109/HiPC58850.2023.00031))
-
-
+Marco Aldinucci <marco.aldinucci@unito.it> (Designer) \
+Alberto Riccardo Martinelli <albertoriccardo.martinelli@unito.it> (designer and maintainer) 
