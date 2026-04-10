@@ -256,7 +256,7 @@ class Logger {
 
             auto buf1 = reinterpret_cast<char *>(capio_syscall(
                 SYS_mmap, nullptr, 50, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0));
-            sprintf(buf1, CAPIO_LOG_POSIX_SYSCALL_START, sys_num_to_string(syscallNumber),
+            sprintf(buf1, CAPIO_LOG_POSIX_SYSCALL_START, sys_num_to_string(syscallNumber).c_str(),
                     syscallNumber);
             log_write_to(buf1, strlen(buf1));
             capio_syscall(SYS_munmap, buf1, 50);
