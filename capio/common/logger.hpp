@@ -210,21 +210,13 @@ class Logger {
             setup_posix_log_filename();
             current_log_level =
                 0; // reset log level after clone, avoiding propagation to child threads
-#if defined(SYS_mkdir)
-            capio_syscall(SYS_mkdir, get_log_dir(), 0755);
-            capio_syscall(SYS_mkdir, get_posix_log_dir(), 0755);
-            capio_syscall(SYS_mkdir, get_host_log_dir(), 0755);
-#elif defined(SYS_mkdirat)
+
             capio_syscall(SYS_mkdirat, AT_FDCWD, get_log_dir(), 0755);
             capio_syscall(SYS_mkdirat, AT_FDCWD, get_posix_log_dir(), 0755);
             capio_syscall(SYS_mkdirat, AT_FDCWD, get_host_log_dir(), 0755);
-#endif
-#if defined(SYS_open)
-            logfileFD = capio_syscall(SYS_open, logfile_path, O_CREAT | O_WRONLY | O_TRUNC, 0644);
-#elif defined(SYS_openat)
+
             logfileFD = capio_syscall(SYS_openat, AT_FDCWD, logfile_path,
                                       O_CREAT | O_WRONLY | O_TRUNC, 0644);
-#endif
 
             if (logfileFD == -1) {
                 capio_syscall(SYS_write, fileno(stdout),
