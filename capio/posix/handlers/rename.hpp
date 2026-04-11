@@ -3,31 +3,43 @@
 
 #include "utils/filesystem.hpp"
 
-#if defined(SYS_rename)
+int renameat2_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg5,
+                      long *result) {
+    const auto flags                            = arg4;
+    const std::filesystem::path old_dir_fd_path = get_dir_path(static_cast<int>(arg0));
+    const std::filesystem::path old_path(reinterpret_cast<const char *>(arg1));
+    const std::filesystem::path new_dir_fd_path = get_dir_path(static_cast<int>(arg2));
+    const std::filesystem::path new_path(reinterpret_cast<const char *>(arg3));
+    const long tid = syscall_no_intercept(SYS_gettid);
 
-int rename_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg5, long *result) {
-    const std::filesystem::path oldpath(reinterpret_cast<const char *>(arg0));
-    const std::filesystem::path newpath(reinterpret_cast<const char *>(arg1));
-    long tid = syscall_no_intercept(SYS_gettid);
-    START_LOG(tid, "call(oldpath=%s, newpath=%s)", oldpath.c_str(), newpath.c_str());
+    // TODO: implement handling of FLAGS
 
-    auto oldpath_abs = capio_absolute(oldpath);
-    auto newpath_abs = capio_absolute(newpath);
+    START_LOG(tid,
+              "call(old_dir_fd_path=%s, old_path=%s, new_dir_fd_path=%s, newpath=%s, flags=%d)",
+              old_dir_fd_path.c_str(), old_path.c_str(), new_dir_fd_path.c_str(), new_path.c_str(),
+              flags);
 
-    if (is_prefix(oldpath_abs, newpath_abs)) { // TODO: The check is more complex
+    // Resolve paths relative to path of dir_fd ONLY if input path is not absolute
+    const auto old_path_abs =
+        old_path.is_absolute() ? old_path : capio_absolute(old_dir_fd_path / old_path);
+
+    const auto new_path_abs =
+        new_path.is_absolute() ? new_path : capio_absolute(new_dir_fd_path / new_path);
+
+    if (is_prefix(old_path_abs, new_path_abs)) { // TODO: The check is more complex
         errno   = EINVAL;
         *result = -errno;
         return CAPIO_POSIX_SYSCALL_SUCCESS;
     }
 
-    if (is_capio_path(oldpath_abs)) {
-        rename_capio_path(oldpath_abs, newpath_abs);
-        auto res = rename_request(tid, oldpath_abs, newpath_abs);
+    if (is_capio_path(old_path_abs)) {
+        rename_capio_path(old_path_abs, new_path_abs);
+        auto res = rename_request(tid, old_path_abs, new_path_abs);
         *result  = (res < 0 ? -errno : res);
         return CAPIO_POSIX_SYSCALL_SUCCESS;
     } else {
-        if (is_capio_path(newpath_abs)) {
-            std::filesystem::copy(oldpath_abs, newpath_abs);
+        if (is_capio_path(new_path_abs)) {
+            std::filesystem::copy(old_path_abs, new_path_abs);
             *result = -errno;
             return CAPIO_POSIX_SYSCALL_SUCCESS;
         } else {
@@ -36,49 +48,15 @@ int rename_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long a
     }
 }
 
-#endif // SYS_rename
-
-#if defined(SYS_renameat)
+int rename_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg5, long *result) {
+    // Force flags to zero to ensure that spurious data is being passed to handler
+    return renameat2_handler(AT_FDCWD, arg0, AT_FDCWD, arg1, 0, 0, result);
+}
 
 int renameat_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg5,
                      long *result) {
-    const auto old_dirfd = arg0, new_dirfd = arg2;
-    const std::filesystem::path oldpath(reinterpret_cast<const char *>(arg1));
-    const std::filesystem::path newpath(reinterpret_cast<const char *>(arg3));
-    long tid = syscall_no_intercept(SYS_gettid);
-
-    START_LOG(tid, "call(oldpath=%s, newpath=%s)", oldpath.c_str(), newpath.c_str());
-
-    if (old_dirfd != AT_FDCWD || new_dirfd != AT_FDCWD) {
-        LOG("Rename with dirfd different from current working directory not yet supported");
-        return CAPIO_POSIX_SYSCALL_SKIP;
-    }
-
-    auto oldpath_abs = capio_absolute(oldpath);
-    auto newpath_abs = capio_absolute(newpath);
-
-    if (is_prefix(oldpath_abs, newpath_abs)) { // TODO: The check is more complex
-        errno   = EINVAL;
-        *result = -errno;
-        return CAPIO_POSIX_SYSCALL_SUCCESS;
-    }
-
-    if (is_capio_path(oldpath_abs)) {
-        rename_capio_path(oldpath_abs, newpath_abs);
-        auto res = rename_request(tid, oldpath_abs, newpath_abs);
-        *result  = (res < 0 ? -errno : res);
-        return CAPIO_POSIX_SYSCALL_SUCCESS;
-    } else {
-        if (is_capio_path(newpath_abs)) {
-            std::filesystem::copy(oldpath_abs, newpath_abs);
-            *result = -errno;
-            return CAPIO_POSIX_SYSCALL_SUCCESS;
-        } else {
-            return CAPIO_POSIX_SYSCALL_SKIP;
-        }
-    }
+    // Force flags to zero to ensure that spurious data is being passed to handler
+    return renameat2_handler(arg0, arg1, arg2, arg3, 0, arg5, result);
 }
-
-#endif
 
 #endif // CAPIO_POSIX_HANDLERS_RENAME_HPP

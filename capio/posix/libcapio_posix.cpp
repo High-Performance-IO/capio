@@ -297,7 +297,7 @@ static constexpr std::array<CPHandler_t, CAPIO_NR_SYSCALLS> build_syscall_table(
     _syscallTable[SYS_renameat] = renameat_handler;
 #endif
 #ifdef SYS_renameat2
-    _syscallTable[SYS_renameat2] = renameat_handler;
+    _syscallTable[SYS_renameat2] = renameat2_handler;
 #endif
 #ifdef SYS_rmdir
     _syscallTable[SYS_rmdir] = rmdir_handler;
