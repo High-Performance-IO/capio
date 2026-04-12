@@ -36,7 +36,8 @@ inline int capio_openat(int dirfd, const std::string_view &pathname, int flags, 
     }
 
     if (is_capio_path(path)) {
-        int fd = static_cast<int>(syscall_no_intercept(SYS_open, "/dev/null", O_RDONLY));
+        int fd =
+            static_cast<int>(syscall_no_intercept(SYS_openat, AT_FDCWD, "/dev/null", O_RDONLY));
         if (fd == -1) {
             ERR_EXIT("capio_open, /dev/null opening");
         }

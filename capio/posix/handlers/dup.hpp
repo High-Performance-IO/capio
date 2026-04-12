@@ -27,12 +27,11 @@ int dup_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg5
     return CAPIO_POSIX_SYSCALL_SKIP;
 }
 
+#ifdef SYS_dup2
 int dup2_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg5, long *result) {
     long tid = syscall_no_intercept(SYS_gettid);
     int fd   = static_cast<int>(arg0);
     int fd2  = static_cast<int>(arg1);
-
-    // int res = capio_dup2(fd, fd2, tid);
 
     START_LOG(tid, "call(fd=%d, fd2=%d)", fd, fd2);
 
@@ -51,6 +50,7 @@ int dup2_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg
     }
     return CAPIO_POSIX_SYSCALL_SKIP;
 }
+#endif
 
 int dup3_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg5, long *result) {
     long tid  = syscall_no_intercept(SYS_gettid);
