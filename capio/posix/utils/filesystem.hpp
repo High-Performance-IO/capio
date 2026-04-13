@@ -229,6 +229,11 @@ inline std::vector<int> get_capio_fds() {
 std::filesystem::path get_dir_path(int dirfd) {
     START_LOG(syscall_no_intercept(SYS_gettid), "call(dirfd=%d)", dirfd);
 
+    if (dirfd == AT_FDCWD) {
+        LOG("Returning current CWD");
+        return get_current_dir();
+    }
+
     auto it = capio_files_descriptors->find(dirfd);
     if (it != capio_files_descriptors->end()) {
         LOG("dirfd %d points to path %s", dirfd, it->second.c_str());

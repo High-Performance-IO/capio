@@ -33,7 +33,8 @@ int chdir_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long ar
 
     if (is_capio_path(path)) {
         set_current_dir(path);
-        errno = 0;
+        errno   = 0;
+        *result = 0;
         return CAPIO_POSIX_SYSCALL_SUCCESS;
     }
 
