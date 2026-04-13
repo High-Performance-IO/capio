@@ -117,7 +117,7 @@ class MTCLBackend : public Backend {
         AtomicQueue<std::string> *incoming_request_queue);
 
     /**
-     * Initiate a new MTCL connection with "out of band" communication trough multicast
+     * Initiate a new MTCL connection with "out of band" communication through multicast
      * advertisement. when a multicast advertisement is received, start the MTCL handshake with the
      * remote server instance.
      */
