@@ -31,14 +31,12 @@ class HandleUser;
 // TODO: extend backend class
 class MTCLBackend : public Backend {
 
-    std::string selfToken, connectedHostname, ownPort, usedProtocol;
+    std::string selfToken, ownHostname, ownPort, usedProtocol;
     std::unordered_map<std::string, AtomicQueue<const char *> *> open_connections;
-    std::string ownHostname;
     int thread_sleep_times   = 0;
     bool *continue_execution = new bool;
     std::mutex *_guard;
     std::thread *incoming_MTCL_connection_listener_thread = nullptr;
-    std::thread *incoming_UDP_connection_listener_thread  = nullptr;
     std::vector<std::thread *> connection_threads;
     bool *terminate;
 
@@ -68,18 +66,6 @@ class MTCLBackend : public Backend {
         std::mutex *guard, std::vector<std::thread *> *_connection_threads, bool *terminate,
         AtomicQueue<std::string> *incoming_request_queue);
 
-    /**
-     * Initiate a new MTCL connection with "out of band" communication through multicast
-     * advertisement. when a multicast advertisement is received, start the MTCL handshake with the
-     * remote server instance.
-     */
-    static void incomingUDPConnectionListener(
-        bool *terminate, const std::string &ownHostname, std::string ownPort,
-        std::string usedProtocol,
-        std::unordered_map<std::string, AtomicQueue<const char *> *> *open_connections,
-        std::vector<std::thread *> *connection_threads, int thread_sleep_time,
-        AtomicQueue<std::string> *incoming_request_queue, std::mutex *_guard);
-
   public:
     explicit MTCLBackend(const std::string &proto, const std::string &port, int sleep_time);
 
@@ -96,6 +82,8 @@ class MTCLBackend : public Backend {
     void send_file(char *shm, long int nbytes, const std::string &target) override;
 
     void recv_file(char *shm, const std::string &source, long int bytes_expected) override;
+
+    void connect_to(const std::string &target_token) override;
 };
 
 #endif // MTCL_BACKEND_HPP

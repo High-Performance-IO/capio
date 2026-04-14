@@ -1,19 +1,22 @@
 #include "common/logger.hpp"
 #include "common/requests.hpp"
+#include "remote/backend.hpp"
 #include "remote/backend/mtcl.hpp"
+#include "remote/discovery.hpp"
 #include "storage/manager.hpp"
 #include "utils/common.hpp"
+
 #include <algorithm>
 #include <mtcl.hpp>
 
 // TODO: THERE IS A MASSIVE MEMORY LEAK WHEN SENDING AND RECEIVING CONST CHAR*. FIX IT BEFORE MERGE
 
 // TODO: CLI args (with defaults) instead of hardcoded values
-constexpr char CAPIO_MULTICAST_ADDRESS[] = "224.0.0.2";
-constexpr int CAPIO_MULTICAST_PORT       = 22334;
-constexpr int REUSE_MCAST_SOCKET         = 1;
-constexpr int max_net_op                 = 10;
 
+constexpr int max_net_op = 10;
+
+extern Backend *backend;
+extern DiscoveryService *discovery_service;
 extern StorageManager *storage_service;
 
 RemoteRequest MTCLBackend::read_next_request() {
@@ -140,12 +143,6 @@ void MTCLBackend::incomingMTCLConnectionListener(
 
     std::string selfToken = usedProtocol + ":" + ownHostname + ":" + ownPort;
 
-    const int sockfd = socket(AF_INET, SOCK_DGRAM, 0);
-    sockaddr_in multicast_addr{};
-    multicast_addr.sin_family      = AF_INET;
-    multicast_addr.sin_port        = htons(CAPIO_MULTICAST_PORT);
-    multicast_addr.sin_addr.s_addr = inet_addr(CAPIO_MULTICAST_ADDRESS);
-
     START_LOG(gettid(), "call(sleep_time=%d)", sleep_time);
 
     while (*continue_execution) {
@@ -166,97 +163,14 @@ void MTCLBackend::incomingMTCLConnectionListener(
             _connection_threads->push_back(
                 new std::thread(serverConnectionHandler, std::move(UserManager), connected_hostname,
                                 queue, sleep_time, terminate, incoming_request_queue));
-            server_println(CAPIO_LOG_SERVER_CLI_LEVEL_INFO,
-                           "Connected to " + std::string(connected_hostname));
+            server_println(CAPIO_LOG_SERVER_CLI_LEVEL_INFO, "Connected to " + usedProtocol + ":" +
+                                                                std::string(connected_hostname) +
+                                                                ":" + ownPort);
         } else {
             // broadcast ADV on multicast of me being alive by sending token named selfToken
-            sendto(sockfd, selfToken.data(), selfToken.size(), 0,
-                   reinterpret_cast<sockaddr *>(&multicast_addr), sizeof(multicast_addr));
+            DiscoveryService::advertise(selfToken);
         }
     }
-
-    close(sockfd);
-}
-void MTCLBackend::incomingUDPConnectionListener(
-    bool *terminate, const std::string &ownHostname, std::string ownPort, std::string usedProtocol,
-    std::unordered_map<std::string, AtomicQueue<const char *> *> *open_connections,
-    std::vector<std::thread *> *connection_threads, int thread_sleep_time,
-    AtomicQueue<std::string> *incoming_request_queue, std::mutex *_guard) {
-    START_LOG(gettid(), "call()");
-
-    const std::string selfToken = usedProtocol + ":" + ownHostname + ":" + ownPort;
-
-    int sockfd = socket(AF_INET, SOCK_DGRAM, 0);
-
-    setsockopt(sockfd, SOL_SOCKET, SO_REUSEADDR, &REUSE_MCAST_SOCKET, sizeof(REUSE_MCAST_SOCKET));
-
-    timeval tv;
-    tv.tv_sec  = 0;
-    tv.tv_usec = 100000; // 100,000 microseconds = 100ms
-    setsockopt(sockfd, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv));
-
-    sockaddr_in local_addr{};
-    local_addr.sin_family      = AF_INET;
-    local_addr.sin_port        = htons(CAPIO_MULTICAST_PORT);
-    local_addr.sin_addr.s_addr = htonl(INADDR_ANY);
-    bind(sockfd, reinterpret_cast<sockaddr *>(&local_addr), sizeof(local_addr));
-
-    ip_mreq mreq{};
-    mreq.imr_multiaddr.s_addr = inet_addr(CAPIO_MULTICAST_ADDRESS);
-    mreq.imr_interface.s_addr = htonl(INADDR_ANY);
-    setsockopt(sockfd, IPPROTO_IP, IP_ADD_MEMBERSHIP, &mreq, sizeof(mreq));
-
-    while (!*terminate) {
-        char incoming_token[2 * HOST_NAME_MAX] = {0};
-
-        if (recvfrom(sockfd, incoming_token, sizeof(incoming_token) - 1, 0, nullptr, nullptr) <=
-            0) {
-            continue;
-        }
-
-        std::string hostname_port(incoming_token);
-
-        if (std::string(incoming_token) == selfToken) {
-            LOG("Skipping to connect to self");
-            continue;
-        }
-
-        std::string remoteHost =
-            hostname_port.substr(hostname_port.find(':') + 1, // Drop proto
-                                 hostname_port.find_last_of(':') - hostname_port.find(':') - 1);
-
-        if (open_connections->find(remoteHost) != open_connections->end()) {
-            LOG("Remote host %s is already connected", remoteHost.c_str());
-            continue;
-        }
-
-        LOG("Trying to connect on remote: %s", incoming_token);
-        if (auto UserManager = MTCL::Manager::connect(incoming_token); UserManager.isValid()) {
-            server_println(CAPIO_LOG_SERVER_CLI_LEVEL_INFO,
-                           std::string("Opened connection with ") + incoming_token);
-            LOG("Opened connection with: %s", incoming_token);
-
-            // send my hostname
-            char _ownHotname_cstr[PATH_MAX]{0};
-            sprintf(_ownHotname_cstr, "%s", ownHostname.c_str());
-            UserManager.send(_ownHotname_cstr, HOST_NAME_MAX);
-
-            auto *queue = new AtomicQueue<const char *>();
-            {
-                const std::lock_guard lg(*_guard);
-                open_connections->insert({remoteHost, queue});
-            }
-            connection_threads->push_back(
-                new std::thread(serverConnectionHandler, std::move(UserManager), remoteHost, queue,
-                                thread_sleep_time, terminate, incoming_request_queue));
-            server_println(CAPIO_LOG_SERVER_CLI_LEVEL_INFO, "Connected to " + remoteHost);
-        } else {
-            server_println(CAPIO_LOG_SERVER_CLI_LEVEL_WARNING, "Warning: tried to connect to " +
-                                                                   std::string(remoteHost) +
-                                                                   " but connection is not valid");
-        }
-    }
-    close(sockfd);
 }
 
 MTCLBackend::MTCLBackend(const std::string &proto, const std::string &port, const int sleep_time)
@@ -292,11 +206,6 @@ void MTCLBackend::handshake_servers() {
         new std::thread(incomingMTCLConnectionListener, ownHostname, ownPort, usedProtocol,
                         std::ref(continue_execution), thread_sleep_times, &open_connections, _guard,
                         &connection_threads, terminate, &incoming_request_queue);
-
-    incoming_UDP_connection_listener_thread =
-        new std::thread(incomingUDPConnectionListener, terminate, ownHostname, ownPort,
-                        usedProtocol, &open_connections, &connection_threads, thread_sleep_times,
-                        &incoming_request_queue, _guard);
 }
 
 MTCLBackend::~MTCLBackend() {
@@ -312,11 +221,7 @@ MTCLBackend::~MTCLBackend() {
     pthread_cancel(incoming_MTCL_connection_listener_thread->native_handle());
     incoming_MTCL_connection_listener_thread->join();
 
-    pthread_cancel(incoming_UDP_connection_listener_thread->native_handle());
-    incoming_UDP_connection_listener_thread->join();
-
     delete incoming_MTCL_connection_listener_thread;
-    delete incoming_UDP_connection_listener_thread;
     delete continue_execution;
     delete terminate;
 
@@ -360,4 +265,58 @@ void MTCLBackend::recv_file(char *shm, const std::string &source, long int bytes
     const auto queues = open_connections.at(source);
     const auto data   = queues->pop();
     memcpy(shm, data.object, bytes_expected);
+}
+
+void MTCLBackend::connect_to(const std::string &target_token) {
+    START_LOG(gettid(), "call(target=%s)", target_token.c_str());
+
+    if (std::string(target_token) == selfToken) {
+        LOG("Skipping to connect to self");
+        return;
+    }
+
+    const std::string hostname_port(target_token);
+
+    std::string remoteHostname = hostname_port.substr(
+        hostname_port.find(':') + 1,                                  // Drop proto
+        hostname_port.find_last_of(':') - hostname_port.find(':') - 1 // drop port
+    );
+
+    /*
+     * Connect to remote only if its hostname is lexically smaller than self hostname
+     * If current server hostname is equal to remoteHostname, avoid connection
+     * TODO: extend this to support also different workflows on same nodes. (NB: right now we expect
+             different MCAST groups )
+     */
+    if (ownHostname >= remoteHostname) {
+        return;
+    }
+
+    if (open_connections.find(remoteHostname) != open_connections.end()) {
+        LOG("Remote host %s is already connected", remoteHostname.c_str());
+        return;
+    }
+
+    if (auto UserManager = MTCL::Manager::connect(target_token); UserManager.isValid()) {
+        LOG("Opened connection with: %s", target_token.c_str());
+
+        // send my hostname
+        char _ownHotname_cstr[PATH_MAX]{0};
+        sprintf(_ownHotname_cstr, "%s", ownHostname.c_str());
+        UserManager.send(_ownHotname_cstr, HOST_NAME_MAX);
+
+        auto *queue = new AtomicQueue<const char *>();
+        {
+            const std::lock_guard lg(*_guard);
+            open_connections.insert({remoteHostname, queue});
+        }
+        connection_threads.push_back(
+            new std::thread(serverConnectionHandler, std::move(UserManager), remoteHostname, queue,
+                            thread_sleep_times, terminate, &incoming_request_queue));
+        server_println(CAPIO_LOG_SERVER_CLI_LEVEL_INFO, "Connected to " + target_token);
+    } else {
+        server_println(CAPIO_LOG_SERVER_CLI_LEVEL_WARNING, "Warning: tried to connect to " +
+                                                               std::string(remoteHostname) +
+                                                               " but connection is not valid");
+    }
 }
