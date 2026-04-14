@@ -18,6 +18,8 @@
 #include "remote/atomic_queue.hpp"
 #include "remote/backend.hpp"
 
+#include <shared_mutex>
+
 typedef unsigned long long int capio_off64_t;
 
 /**
@@ -31,14 +33,16 @@ class HandleUser;
 // TODO: extend backend class
 class MTCLBackend : public Backend {
 
-    std::string selfToken, ownHostname, ownPort, usedProtocol;
+    int thread_sleep_times  = 0;
+    bool continue_execution = true;
+
+    const std::string selfToken, ownPort, usedProtocol;
+
+    std::shared_mutex open_connections_lock;
     std::unordered_map<std::string, AtomicQueue<const char *> *> open_connections;
-    int thread_sleep_times   = 0;
-    bool *continue_execution = new bool;
-    std::mutex *_guard;
-    std::thread *incoming_MTCL_connection_listener_thread = nullptr;
+
+    std::thread *incoming_connection = nullptr;
     std::vector<std::thread *> connection_threads;
-    bool *terminate;
 
     AtomicQueue<std::string> incoming_request_queue;
 
@@ -55,15 +59,15 @@ class MTCLBackend : public Backend {
      * @param continue_execution
      * @param sleep_time
      * @param open_connections
-     * @param guard
+     * @param open_connection_guard
      * @param _connection_threads
-     * @param terminate
+     * @param incoming_request_queue
      */
     void static incomingMTCLConnectionListener(
         const std::string &ownHostname, const std::string &ownPort, const std::string &usedProtocol,
         const bool *continue_execution, int sleep_time,
         std::unordered_map<std::string, AtomicQueue<const char *> *> *open_connections,
-        std::mutex *guard, std::vector<std::thread *> *_connection_threads, bool *terminate,
+        std::shared_mutex *open_connection_guard, std::vector<std::thread *> *_connection_threads,
         AtomicQueue<std::string> *incoming_request_queue);
 
   public:
