@@ -44,6 +44,8 @@ inline Backend *select_backend(const std::string &backend_name, int argc, char *
         LOG("backend selected: MTCL");
         std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_INFO << "Starting CAPIO with MTCL backend"
                   << std::endl;
+        char hostname[HOST_NAME_MAX]{0};
+        gethostname(hostname, HOST_NAME_MAX);
         return new MTCLBackend("TCP", "1234", 1000000);
     }
 
