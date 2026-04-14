@@ -34,15 +34,15 @@ void thread_discovery_service(const bool *terminate) {
     mreq.imr_interface.s_addr = htonl(INADDR_ANY);
     setsockopt(sockfd, IPPROTO_IP, IP_ADD_MEMBERSHIP, &mreq, sizeof(mreq));
 
+    char incoming_token[2 * HOST_NAME_MAX] = {0};
+
     while (!*terminate) {
-        char incoming_token[2 * HOST_NAME_MAX] = {0};
 
-        if (recvfrom(sockfd, incoming_token, sizeof(incoming_token) - 1, 0, nullptr, nullptr) <=
-            0) {
-            continue;
+        bzero(incoming_token, 2 * HOST_NAME_MAX);
+
+        if (recvfrom(sockfd, incoming_token, sizeof(incoming_token) - 1, 0, nullptr, nullptr) > 0) {
+            backend->connect_to(incoming_token);
         }
-
-        backend->connect_to(incoming_token);
     }
     close(sockfd);
 }
