@@ -15,58 +15,10 @@
 
 #include "common/constants.hpp"
 #include "common/logger.hpp"
+#include "remote/atomic_queue.hpp"
 #include "remote/backend.hpp"
 
 typedef unsigned long long int capio_off64_t;
-
-template <typename T> class AtomicQueue {
-    // data, sizeof(data), hostname
-    std::queue<std::tuple<T, size_t, std::string>> _queue;
-    std::mutex _mutex;
-    std::condition_variable _lock_cond;
-
-    bool _shutdown = false;
-
-  public:
-    ~AtomicQueue() {
-        {
-            std::lock_guard lg(_mutex);
-            _shutdown = true;
-        }
-        _lock_cond.notify_all();
-    }
-
-    void push(T message, size_t message_size, const std::string &origin) {
-        {
-            std::lock_guard lg(_mutex);
-            if (_shutdown) {
-                return;
-            }
-            _queue.emplace(message, message_size, origin);
-        }
-        _lock_cond.notify_all();
-    }
-
-    std::tuple<T, size_t, std::string> pop() {
-        std::unique_lock lock(_mutex);
-        _lock_cond.wait(lock, [this] { return !_queue.empty() || _shutdown; });
-        auto s = std::move(_queue.front());
-        _queue.pop();
-
-        return s;
-    }
-
-    std::optional<std::tuple<T, size_t, std::string>> try_pop() {
-        std::lock_guard lg(_mutex);
-        if (_queue.empty() || _shutdown) {
-            return std::nullopt;
-        }
-
-        auto s = std::move(_queue.front());
-        _queue.pop();
-        return s;
-    }
-};
 
 /**
  * This avoids it to include the MTCL library here as it is a header-only library.
