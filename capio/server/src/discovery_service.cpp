@@ -9,7 +9,7 @@ extern Backend *backend;
 
 constexpr char CAPIO_MULTICAST_ADDRESS[] = "224.0.0.2";
 constexpr int CAPIO_MULTICAST_PORT       = 22334;
-constexpr int REUSE_MCAST_SOCKET         = 1;
+int REUSE_MCAST_SOCKET                   = 1;
 
 void thread_discovery_service(const bool *terminate) {
     START_LOG(gettid(), "call()");
@@ -65,7 +65,6 @@ DiscoveryService::DiscoveryService() {
 }
 DiscoveryService::~DiscoveryService() {
     terminate = true;
-
-    pthread_cancel(listener_thread->native_handle());
     listener_thread->join();
+    listener_thread = nullptr;
 }

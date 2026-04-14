@@ -41,7 +41,7 @@ class MTCLBackend : public Backend {
     std::shared_mutex open_connections_lock;
     std::unordered_map<std::string, AtomicQueue<const char *> *> open_connections;
 
-    std::thread *incoming_connection = nullptr;
+    std::thread *incoming_connection_thread = nullptr;
     std::vector<std::thread *> connection_threads;
 
     AtomicQueue<std::string> incoming_request_queue;
