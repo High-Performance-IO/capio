@@ -31,6 +31,7 @@
 #include "common/requests.hpp"
 #include "common/semaphore.hpp"
 #include "remote/backend.hpp"
+#include "remote/discovery.hpp"
 #include "storage/capio_file.hpp"
 #include "utils/common.hpp"
 #include "utils/env.hpp"
@@ -39,6 +40,7 @@
 ClientManager *client_manager;
 StorageManager *storage_manager;
 Backend *backend;
+DiscoveryService *discovery_service;
 
 #include "handlers.hpp"
 #include "utils/location.hpp"
@@ -295,9 +297,10 @@ int main(int argc, char **argv) {
 
     open_files_location();
 
-    shm_canary      = new CapioShmCanary(capio_cl_engine->getWorkflowName());
-    storage_manager = new StorageManager();
-    client_manager  = new ClientManager();
+    shm_canary        = new CapioShmCanary(capio_cl_engine->getWorkflowName());
+    storage_manager   = new StorageManager();
+    client_manager    = new ClientManager();
+    discovery_service = new DiscoveryService();
 
     std::thread server_thread(capio_server, std::ref(internal_server_sem));
     LOG("capio_server thread started");

@@ -35,6 +35,7 @@ void sig_term_handler(int signum, siginfo_t *info, void *ptr) {
 #endif
 
     delete backend;
+    delete discovery_service;
     delete shm_canary;
 
     std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_INFO << "shutdown completed" << std::endl;
