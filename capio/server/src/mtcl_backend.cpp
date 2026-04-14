@@ -196,16 +196,14 @@ MTCLBackend::~MTCLBackend() {
     START_LOG(gettid(), "call()");
     continue_execution = false;
 
+    incoming_connection_thread->join();
+
     for (const auto t : connection_threads) {
-        pthread_cancel(t->native_handle());
         t->join();
     }
     LOG("Terminated connection threads");
 
-    pthread_cancel(incoming_connection->native_handle());
-    incoming_connection->join();
-
-    delete incoming_connection;
+    delete incoming_connection_thread;
 
     LOG("Handler closed.");
 
@@ -215,7 +213,7 @@ MTCLBackend::~MTCLBackend() {
 }
 
 void MTCLBackend::handshake_servers() {
-    incoming_connection =
+    incoming_connection_thread =
         new std::thread(incomingMTCLConnectionListener, node_name, ownPort, usedProtocol,
                         &continue_execution, thread_sleep_times, &open_connections,
                         &open_connections_lock, &connection_threads, &incoming_request_queue);
