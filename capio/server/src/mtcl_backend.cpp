@@ -27,7 +27,7 @@ RemoteRequest MTCLBackend::read_next_request() {
 
     auto [req, req_size, source] = optional_request.value();
     LOG("Received %s from %d", req.c_str(), source.c_str());
-    return RemoteRequest(req.data(), source);
+    return {req.data(), source};
 }
 
 /**
@@ -359,5 +359,5 @@ void MTCLBackend::send_file(char *shm, long int nbytes, const std::string &targe
 void MTCLBackend::recv_file(char *shm, const std::string &source, long int bytes_expected) {
     const auto queues = open_connections.at(source);
     const auto data   = queues->pop();
-    memcpy(shm, std::get<0>(data), bytes_expected);
+    memcpy(shm, data.object, bytes_expected);
 }
