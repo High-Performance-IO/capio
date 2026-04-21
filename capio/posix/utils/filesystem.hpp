@@ -66,8 +66,8 @@ inline void add_capio_fd(long tid, const std::string &path, int fd, off64_t offs
  * @param pathname
  * @return
  */
-std::filesystem::path capio_posix_realpath(const std::filesystem::path &pathname) {
-    START_LOG(syscall_no_intercept(SYS_gettid), "call(path=%s)", pathname.c_str());
+std::filesystem::path capio_posix_realpath(pid_t tid, const std::filesystem::path &pathname) {
+    START_LOG(tid, "call(path=%s)", pathname.c_str());
     char *posix_real_path = capio_realpath((char *) pathname.c_str(), nullptr);
 
     // if capio_realpath fails, then it should be a capio_file
@@ -100,8 +100,8 @@ std::filesystem::path capio_posix_realpath(const std::filesystem::path &pathname
  * @param path
  * @return
  */
-inline std::filesystem::path capio_absolute(const std::filesystem::path &path) {
-    return path.is_absolute() ? path : capio_posix_realpath(path);
+inline std::filesystem::path capio_absolute(pid_t tid, const std::filesystem::path &path) {
+    return path.is_absolute() ? path : capio_posix_realpath(tid, path);
 }
 
 /**
@@ -159,8 +159,8 @@ inline void dup_capio_fd(long tid, int oldfd, int newfd, bool is_cloexec) {
  * @param fd
  * @return if the file descriptor exists
  */
-inline bool exists_capio_fd(int fd) {
-    START_LOG(capio_syscall(SYS_gettid), "call(fd=%d)", fd);
+inline bool exists_capio_fd(pid_t tid, int fd) {
+    START_LOG(tid, "call(fd=%d)", fd);
     return files->find(fd) != files->end();
 }
 
@@ -226,8 +226,8 @@ inline std::vector<int> get_capio_fds() {
  * @param dirfd
  * @return the corresponding path
  */
-std::filesystem::path get_dir_path(int dirfd) {
-    START_LOG(syscall_no_intercept(SYS_gettid), "call(dirfd=%d)", dirfd);
+std::filesystem::path get_dir_path(pid_t tid, int dirfd) {
+    START_LOG(tid, "call(dirfd=%d)", dirfd);
 
     if (dirfd == AT_FDCWD) {
         LOG("Returning current CWD");

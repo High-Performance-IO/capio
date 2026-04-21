@@ -3,6 +3,8 @@
  * if -1, and capio logging is enable everything is logged, otherwise, only
  * logs up to CAPIO_MAX_LOG_LEVEL function calls
  */
+#include <unistd.h>
+static thread_local pid_t current_tid = -1;
 
 #include <array>
 #include <string>
@@ -15,11 +17,13 @@
 
 #include "handlers.hpp"
 
+#include <thread>
+
 /**
  * Handler for syscall not handled and interrupt syscall_intercept
  */
-static int not_handled_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg5,
-                               long *result) {
+static int not_handled_handler(pid_t tid, long arg0, long arg1, long arg2, long arg3, long arg4,
+                               long arg5, long *result) {
     return 1;
 }
 
@@ -27,8 +31,8 @@ static int not_handled_handler(long arg0, long arg1, long arg2, long arg3, long 
  * Handler for syscall handled, but not yet implemented and interrupt
  * syscall_intercept
  */
-static int not_implemented_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg5,
-                                   long *result) {
+static int not_implemented_handler(pid_t tid, long arg0, long arg1, long arg2, long arg3, long arg4,
+                                   long arg5, long *result) {
     errno   = ENOTSUP;
     *result = -errno;
     return 0;
@@ -330,6 +334,10 @@ static int hook(long syscall_number, long arg0, long arg1, long arg2, long arg3,
         build_syscall_table();
     static const char *capio_dir = std::getenv("CAPIO_DIR");
 
+    if (current_tid == -1) {
+        current_tid = static_cast<pid_t>(syscall_no_intercept(SYS_gettid));
+    }
+
 #ifdef SYS_futex
     /**
      * Old glibc versions call the SYS_futex syscall when accessing a thread_local
@@ -351,7 +359,7 @@ static int hook(long syscall_number, long arg0, long arg1, long arg2, long arg3,
     CAPIO_LOG_LEVEL = get_capio_log_level();
 #endif
 
-    START_LOG(syscall_no_intercept(SYS_gettid), "call(syscall_number=%ld)", syscall_number);
+    START_LOG(current_tid, "call(syscall_number=%ld)", syscall_number);
 
     // If the syscall_number is higher than the maximum
     // syscall captured by CAPIO, simply return
@@ -367,7 +375,8 @@ static int hook(long syscall_number, long arg0, long arg1, long arg2, long arg3,
     }
 
     try {
-        return syscallTable[syscall_number](arg0, arg1, arg2, arg3, arg4, arg5, result);
+        return syscallTable[syscall_number](current_tid, arg0, arg1, arg2, arg3, arg4, arg5,
+                                            result);
     } catch (const std::exception &exception) {
         syscall_no_intercept_flag = true;
 
@@ -395,14 +404,14 @@ static int hook(long syscall_number, long arg0, long arg1, long arg2, long arg3,
 
 static __attribute__((constructor)) void init() {
 
-    const long tid = syscall_no_intercept(SYS_gettid);
+    current_tid = static_cast<pid_t>(syscall_no_intercept(SYS_gettid));
 
-    init_client(tid);
+    init_client(current_tid);
     init_filesystem();
     initialize_new_thread();
 
-    if (const int *fd_shm = get_fd_snapshot(tid); fd_shm != nullptr) {
-        initialize_from_snapshot(fd_shm, tid);
+    if (const int *fd_shm = get_fd_snapshot(current_tid); fd_shm != nullptr) {
+        initialize_from_snapshot(fd_shm, current_tid);
     }
 
     intercept_hook_point_clone_child  = hook_clone_child;

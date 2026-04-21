@@ -14,8 +14,8 @@ class ReadCache {
     off64_t _max_line_size, _actual_size, _cache_offset;
     SPSCQueue _queue;
 
-    inline void _read(void *buffer, off64_t count) {
-        START_LOG(capio_syscall(SYS_gettid), "call(count=%ld)", count);
+    inline void _read(pid_t tid, void *buffer, off64_t count) {
+        START_LOG(tid, "call(count=%ld)", count);
 
         if (count > 0) {
             memcpy(buffer, _cache + _cache_offset, count);
@@ -30,8 +30,8 @@ class ReadCache {
           _cache_offset(0),
           _queue(SHM_SPSC_PREFIX_READ + std::to_string(tid), lines, line_size, workflow_name) {}
 
-    inline void flush() {
-        START_LOG(capio_syscall(SYS_gettid), "call()");
+    inline void flush(pid_t tid) {
+        START_LOG(tid, "call()");
 
         if (_cache_offset != _actual_size) {
             _actual_size = _cache_offset = 0;
@@ -39,13 +39,14 @@ class ReadCache {
         }
     }
 
-    inline off64_t read(int fd, void *buffer, off64_t count, bool is_getdents, bool is64bit) {
-        START_LOG(capio_syscall(SYS_gettid), "call(fd=%d, count=%ld, is_getdents=%s, is64bit=%s)",
-                  fd, count, is_getdents ? "true" : "false", is64bit ? "true" : "false");
+    inline off64_t read(pid_t tid, int fd, void *buffer, off64_t count, bool is_getdents,
+                        bool is64bit) {
+        START_LOG(tid, "call(fd=%d, count=%ld, is_getdents=%s, is64bit=%s)", fd, count,
+                  is_getdents ? "true" : "false", is64bit ? "true" : "false");
 
         if (_last_fd != fd) {
             LOG("changed fd from %d to %d: flushing", _last_fd, fd);
-            flush();
+            flush(tid);
             _last_fd = fd;
         }
 
@@ -63,11 +64,11 @@ class ReadCache {
 
         if (count <= remaining_bytes) {
             LOG("count %ld <= remaining_bytes %ld", count, remaining_bytes);
-            _read(buffer, count);
+            _read(tid, buffer, count);
             bytes_read = count;
         } else {
             LOG("count %ld > remaining_bytes %ld", count, remaining_bytes);
-            _read(buffer, remaining_bytes);
+            _read(tid, buffer, remaining_bytes);
             buffer = reinterpret_cast<char *>(buffer) + remaining_bytes;
 
             // NOTE: if getdents send a request for exactly the correct amount of data.
@@ -94,11 +95,11 @@ class ReadCache {
                 }
                 if (read_size < _actual_size) {
                     LOG("count - remaining_bytes %ld < _actual_size %ld", read_size, _actual_size);
-                    _read(buffer, read_size);
+                    _read(tid, buffer, read_size);
                     bytes_read = count;
                 } else {
                     LOG("count - remaining_bytes %ld >= _actual_size %ld", read_size, _actual_size);
-                    _read(buffer, _actual_size);
+                    _read(tid, buffer, _actual_size);
                     bytes_read = remaining_bytes + _actual_size;
                 }
             }
@@ -118,8 +119,8 @@ class WriteCache {
     off64_t _max_line_size, _actual_size;
     SPSCQueue _queue;
 
-    inline void _write(off64_t count, const void *buffer) {
-        START_LOG(capio_syscall(SYS_gettid), "call(count=%ld)", count);
+    inline void _write(pid_t tid, off64_t count, const void *buffer) {
+        START_LOG(tid, "call(count=%ld)", count);
 
         if (count > 0) {
             if (_cache == nullptr) {
@@ -128,7 +129,7 @@ class WriteCache {
             memcpy(_cache + _actual_size, buffer, count);
             _actual_size += count;
             if (_actual_size == _max_line_size) {
-                flush();
+                flush(tid);
             }
         }
     }
@@ -138,8 +139,8 @@ class WriteCache {
         : _cache(nullptr), _tid(tid), _fd(-1), _max_line_size(line_size), _actual_size(0),
           _queue(SHM_SPSC_PREFIX_WRITE + std::to_string(tid), lines, line_size, workflow_name) {}
 
-    inline void flush() {
-        START_LOG(capio_syscall(SYS_gettid), "call()");
+    inline void flush(pid_t tid) {
+        START_LOG(tid, "call()");
 
         if (_actual_size != 0) {
             write_request(_fd, _actual_size, _tid);
@@ -148,24 +149,23 @@ class WriteCache {
         }
     }
 
-    inline void write(int fd, const void *buffer, off64_t count) {
-        START_LOG(capio_syscall(SYS_gettid), "call(fd=%d, buffer=0x%08x, count=%ld)", fd, buffer,
-                  count);
+    inline void write(pid_t tid, int fd, const void *buffer, off64_t count) {
+        START_LOG(tid, "call(fd=%d, buffer=0x%08x, count=%ld)", fd, buffer, count);
 
         if (_fd != fd) {
             LOG("changed fd from %d to %d: flushing", _fd, fd);
-            flush();
+            flush(tid);
             _fd = fd;
         }
 
         if (count <= _max_line_size - _actual_size) {
             LOG("count %ld <= _max_line_size - _actual_size %ld", count,
                 _max_line_size - _actual_size);
-            _write(count, buffer);
+            _write(tid, count, buffer);
         } else {
             LOG("count %ld > _max_line_size - _actual_size %ld", count,
                 _max_line_size - _actual_size);
-            flush();
+            flush(tid);
             if (count - _actual_size > _max_line_size) {
                 LOG("count - _actual_size %ld > _max_line_size %ld", count - _actual_size,
                     _max_line_size);
@@ -174,7 +174,7 @@ class WriteCache {
             } else {
                 LOG("count - _actual_size %ld <= _max_line_size %ld", count - _actual_size,
                     _max_line_size);
-                _write(count, buffer);
+                _write(tid, count, buffer);
             }
         }
 
