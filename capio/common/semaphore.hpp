@@ -44,11 +44,11 @@ class NamedSemaphore {
     ~NamedSemaphore() {
         START_LOG(capio_syscall(SYS_gettid), "call()");
         if (sem_destroy(_sem) != 0) {
-            ERR_EXIT(" destruction of semaphore %s failed", _name.c_str());
+            ERR_EXIT_EXCEPT_CHOICE(false, " destruction of semaphore %s failed", _name.c_str());
         }
         LOG(" Destroyed shared semaphore %s", _name.c_str());
         if (sem_unlink(_name.c_str()) != 0) {
-            ERR_EXIT(" destruction of semaphore %s failed", _name.c_str());
+            ERR_EXIT_EXCEPT_CHOICE(false, " destruction of semaphore %s failed", _name.c_str());
         }
         LOG(" Unlinked shared semaphore %s", _name.c_str());
     }
@@ -88,7 +88,7 @@ class Semaphore {
     ~Semaphore() {
         START_LOG(capio_syscall(SYS_gettid), "call()");
         if (sem_destroy(&_sem) != 0) {
-            ERR_EXIT("destruction of unnamed semaphore failed");
+            ERR_EXIT_EXCEPT_CHOICE(false, "destruction of unnamed semaphore failed");
         }
     }
 

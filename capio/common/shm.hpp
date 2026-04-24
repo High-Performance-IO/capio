@@ -15,7 +15,7 @@
 
 #define SHM_DESTROY_CHECK(source_name)                                                             \
     if (shm_unlink(source_name) == -1) {                                                           \
-        ERR_EXIT("Unable to destroy shared mem:  ", source_name);                                  \
+        ERR_EXIT_EXCEPT_CHOICE(false, "Unable to destroy shared mem: %s", source_name);                   \
     };
 
 #define SHM_CREATE_CHECK(condition, source)                                                        \
@@ -105,7 +105,7 @@ inline void *get_shm(const std::string &shm_name) {
 
     // if we are not creating a new object, mode is equals to 0
     int fd = shm_open(shm_name.c_str(), O_RDWR, 0); // to be closed
-    struct stat sb {};
+    struct stat sb{};
     if (fd == -1) {
         ERR_EXIT("get_shm shm_open %s", shm_name.c_str());
     }
@@ -130,7 +130,7 @@ inline void *get_shm_if_exist(const std::string &shm_name) {
 
     // if we are not creating a new object, mode is equals to 0
     int fd = shm_open(shm_name.c_str(), O_RDWR, 0); // to be closed
-    struct stat sb {};
+    struct stat sb{};
     if (fd == -1) {
         if (errno == ENOENT) {
             return nullptr;
