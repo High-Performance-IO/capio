@@ -12,16 +12,17 @@ TEST(SystemCallTest, TestFileCreateWriteClose) {
     constexpr const char *PATHNAME = "test_file.txt";
     constexpr const char *BUFFER =
         "QWERTYUIOPASDFGHJKLZXCVBNM1234567890qwertyuiopasdfghjklzxcvbnm\0";
-    int fd = open(PATHNAME, O_CREAT | O_WRONLY | O_TRUNC, S_IRUSR | S_IWUSR);
+    const auto buf_size = strlen(BUFFER);
+    int fd              = open(PATHNAME, O_CREAT | O_WRONLY | O_TRUNC, S_IRUSR | S_IWUSR);
     EXPECT_NE(fd, -1);
     EXPECT_EQ(access(PATHNAME, F_OK), 0);
-    EXPECT_EQ(write(fd, BUFFER, strlen(BUFFER)), strlen(BUFFER));
+    EXPECT_EQ(write(fd, BUFFER, buf_size), buf_size);
     EXPECT_NE(close(fd), -1);
     fd = open(PATHNAME, O_RDONLY, S_IRUSR | S_IWUSR);
     EXPECT_NE(fd, -1);
-    std::unique_ptr<char[]> buf(new char[strlen(BUFFER)]);
-    EXPECT_EQ(read(fd, buf.get(), strlen(BUFFER)), strlen(BUFFER));
-    buf[strlen(BUFFER)] = '\0';
+    std::unique_ptr<char[]> buf(new char[buf_size + 1]);
+    EXPECT_EQ(read(fd, buf.get(), buf_size), buf_size);
+    buf[buf_size] = '\0';
     EXPECT_EQ(std::string_view(BUFFER), std::string_view(buf.get()));
     EXPECT_NE(close(fd), -1);
     EXPECT_NE(unlink(PATHNAME), -1);

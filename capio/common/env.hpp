@@ -12,6 +12,9 @@
 #include "common/syscall.hpp"
 #include "logger.hpp"
 
+// TODO: remove forward declaration of function by splitting into header and impl. capio/common
+inline bool is_forbidden_path(const std::string_view &path);
+
 inline const std::filesystem::path &get_capio_dir() {
     static std::filesystem::path capio_dir{};
     START_LOG(capio_syscall(SYS_gettid), "call()");
@@ -42,10 +45,9 @@ inline const std::filesystem::path &get_capio_dir() {
             }
         }
         capio_dir = std::filesystem::path(buf.get());
-        for (auto &forbidden_path : CAPIO_DIR_FORBIDDEN_PATHS) {
-            if (capio_dir.native().rfind(forbidden_path, 0) == 0) {
-                ERR_EXIT("CAPIO_DIR inside %s file system is not supported", forbidden_path.data());
-            }
+
+        if (is_forbidden_path(capio_dir.c_str())) {
+            ERR_EXIT("CAPIO_DIR %s is in forbidden path", capio_dir.string().c_str());
         }
     }
     LOG("CAPIO_DIR=%s", capio_dir.c_str());

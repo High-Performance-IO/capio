@@ -10,6 +10,7 @@
 #include "common/logger.hpp"
 #include "common/semaphore.hpp"
 #include "common/shm.hpp"
+#include "filesystem.hpp"
 
 template <class T, class Mutex> class Queue {
   private:
