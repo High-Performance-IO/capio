@@ -234,7 +234,7 @@ void CapioFile::insertSector(off64_t new_start, off64_t new_end) {
 }
 
 bool CapioFile::closed() const {
-    return _n_close_expected <= 0 || static_cast<unsigned int>(_n_close) == _n_close_expected;
+    return _n_close_expected == 0 || _n_close == static_cast<int>(_n_close_expected);
 }
 
 bool CapioFile::deletable() const { return _n_opens <= 0; }
