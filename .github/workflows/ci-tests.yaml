@@ -146,7 +146,6 @@ jobs:
         run: |
           apt update
           apt install -y      \
-            libcapstone-dev   \
             openmpi-bin       \
             libopenmpi-dev    \
             ninja-build       \

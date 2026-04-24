@@ -1,6 +1,8 @@
 #include <gtest/gtest.h>
 #include <linux/limits.h>
 
+#include "common/syscall.hpp"
+
 char **build_args() {
     char **args = (char **) malloc(4 * sizeof(uintptr_t));
 
@@ -66,7 +68,7 @@ class CapioServerEnvironment : public testing::Environment {
     void SetUp() override {
         if (server_pid < 0) {
             ASSERT_NE(std::getenv("CAPIO_DIR"), nullptr);
-            ASSERT_GE(server_pid = fork(), 0);
+            ASSERT_GE(server_pid = capio_syscall(SYS_fork), 0);
             if (server_pid == 0) {
                 execvpe(args[0], args, envp);
                 _exit(127);
