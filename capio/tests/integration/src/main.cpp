@@ -1,6 +1,6 @@
 #include <gtest/gtest.h>
 
-#include "capio/syscall.hpp"
+#include "common/syscall.hpp"
 
 char **build_args() {
     char **args = (char **) malloc(3 * sizeof(uintptr_t));

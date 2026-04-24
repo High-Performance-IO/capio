@@ -1,7 +1,7 @@
 #include <gtest/gtest.h>
 #include <linux/limits.h>
 
-#include "capio/syscall.hpp"
+#include "common/syscall.hpp"
 
 char **build_args() {
     char **args = (char **) malloc(4 * sizeof(uintptr_t));
