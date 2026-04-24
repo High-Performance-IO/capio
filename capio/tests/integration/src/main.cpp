@@ -28,7 +28,7 @@ char **build_env(char **envp) {
     }
 
     char **cleaned_env = (char **) malloc((vars.size() + 2) * sizeof(uintptr_t));
-    for (int i = 0; i < vars.size(); i++) {
+    for (size_t i = 0; i < vars.size(); i++) {
         cleaned_env[i] = strdup(envp[i]);
     }
     cleaned_env[vars.size()]     = strdup("LD_PRELOAD=");
@@ -45,7 +45,7 @@ class CapioServerEnvironment : public testing::Environment {
 
   public:
     explicit CapioServerEnvironment(char **envp)
-        : args(build_args()), envp(build_env(envp)), server_pid(-1){};
+        : args(build_args()), envp(build_env(envp)), server_pid(-1) {};
 
     ~CapioServerEnvironment() override {
         for (int i = 0; args[i] != nullptr; i++) {

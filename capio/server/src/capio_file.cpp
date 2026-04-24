@@ -233,7 +233,9 @@ void CapioFile::insertSector(off64_t new_start, off64_t new_end) {
     _sectors.emplace(new_start, new_end);
 }
 
-bool CapioFile::closed() const { return _n_close_expected <= 0 || _n_close == _n_close_expected; }
+bool CapioFile::closed() const {
+    return _n_close_expected <= 0 || static_cast<unsigned int>(_n_close) == _n_close_expected;
+}
 
 bool CapioFile::deletable() const { return _n_opens <= 0; }
 
@@ -341,6 +343,6 @@ void CapioFile::incrementDirectoryFileCount(const int count) {
     this->_data_avail_cv.notify_all();
 }
 
-int CapioFile::getCurrentDirectoryFileCount() const { return this->_n_files; }
+unsigned int CapioFile::getCurrentDirectoryFileCount() const { return this->_n_files; }
 
 unsigned int CapioFile::getDirectoryExpectedFileCount() const { return this->_n_files_expected; }

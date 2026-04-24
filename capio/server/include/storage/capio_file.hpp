@@ -225,7 +225,7 @@ class CapioFile {
     [[nodiscard]] off64_t getStoredSize() const;
 
     /** @return Count of files currently indexed in this directory. */
-    [[nodiscard]] int getCurrentDirectoryFileCount() const;
+    [[nodiscard]] unsigned int getCurrentDirectoryFileCount() const;
 
     /** @return Expected total files in this directory. */
     [[nodiscard]] unsigned int getDirectoryExpectedFileCount() const;
