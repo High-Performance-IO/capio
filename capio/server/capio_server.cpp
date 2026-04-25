@@ -291,16 +291,17 @@ int main(int argc, char **argv) {
 
     std::cout << CAPIO_LOG_SERVER_BANNER;
 
+    discovery_service = new DiscoveryService();
+
     parseCLI(argc, argv);
 
     START_LOG(gettid(), "call()");
 
     open_files_location();
 
-    shm_canary        = new CapioShmCanary(capio_cl_engine->getWorkflowName());
-    storage_manager   = new StorageManager();
-    client_manager    = new ClientManager();
-    discovery_service = new DiscoveryService();
+    shm_canary      = new CapioShmCanary(capio_cl_engine->getWorkflowName());
+    storage_manager = new StorageManager();
+    client_manager  = new ClientManager();
 
     std::thread server_thread(capio_server, std::ref(internal_server_sem));
     LOG("capio_server thread started");

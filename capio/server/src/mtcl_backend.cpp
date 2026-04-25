@@ -53,7 +53,7 @@ RemoteRequest MTCLBackend::read_next_request() {
  * to signal execution shutdown.
  * @param incoming_request_queue
  */
-void serverConnectionHandler(MTCL::HandleUser HandlerPointer, const std::string &remote_hostname,
+void serverConnectionHandler(MTCL::HandleUser HandlerPointer, const std::string remote_hostname,
                              AtomicQueue<const char *> *queue, const int sleep_time,
                              const bool *continue_execution,
                              AtomicQueue<std::string> *incoming_request_queue) {
@@ -135,13 +135,10 @@ void serverConnectionHandler(MTCL::HandleUser HandlerPointer, const std::string 
 }
 
 void MTCLBackend::incomingMTCLConnectionListener(
-    const std::string &ownHostname, const std::string &ownPort, const std::string &usedProtocol,
-    const bool *continue_execution, int sleep_time,
-    std::unordered_map<std::string, AtomicQueue<const char *> *> *open_connections,
+    const std::string &ownPort, const std::string &usedProtocol, const bool *continue_execution,
+    int sleep_time, std::unordered_map<std::string, AtomicQueue<const char *> *> *open_connections,
     std::shared_mutex *open_connection_guard, std::vector<std::thread *> *_connection_threads,
     AtomicQueue<std::string> *incoming_request_queue) {
-
-    std::string selfToken = usedProtocol + ":" + ownHostname + ":" + ownPort;
 
     START_LOG(gettid(), "call(sleep_time=%d)", sleep_time);
 
@@ -152,25 +149,30 @@ void MTCLBackend::incomingMTCLConnectionListener(
             // received MTCL handle
             LOG("Handle user is valid");
             size_t remoteHostnameSize = -1;
-            UserManager.receive(&remoteHostnameSize, sizeof(remoteHostnameSize));
-            auto remote_hostname = new char[remoteHostnameSize + 1]{0};
-            UserManager.receive(remote_hostname, remoteHostnameSize);
-            LOG("Received connection hostname: %s", remote_hostname);
+            if (UserManager.receive(&remoteHostnameSize, sizeof(remoteHostnameSize)) <= 0 ||
+                remoteHostnameSize == 0 || remoteHostnameSize > HOST_NAME_MAX) {
+                server_println(CAPIO_LOG_SERVER_CLI_LEVEL_WARNING,
+                               "Remote hostname size received is zero or negative");
+                UserManager.close();
+                continue;
+            }
+
+            std::string remote_hostname(remoteHostnameSize, '\0');
+            UserManager.receive(remote_hostname.data(), remoteHostnameSize);
+            LOG("Received connection hostname: %s", remote_hostname.c_str());
 
             auto *queue = new AtomicQueue<const char *>();
             {
                 const std::unique_lock lock(*open_connection_guard);
-                open_connections->insert({remote_hostname, queue});
+                (*open_connections)[remote_hostname] = queue;
             }
-            _connection_threads->push_back(
-                new std::thread(serverConnectionHandler, std::move(UserManager), remote_hostname,
-                                queue, sleep_time, continue_execution, incoming_request_queue));
-            server_println(CAPIO_LOG_SERVER_CLI_LEVEL_INFO, "Connected from " + usedProtocol + ":" +
-                                                                std::string(remote_hostname) + ":" +
-                                                                ownPort);
-        } else {
-            // broadcast ADV on multicast of me being alive by sending token named selfToken
-            DiscoveryService::advertise(selfToken);
+            //    _connection_threads->push_back(
+            //       new std::thread(serverConnectionHandler, std::move(UserManager),
+            //       remote_hostname,
+            //                      queue, sleep_time, continue_execution, incoming_request_queue));
+            server_println(CAPIO_LOG_SERVER_CLI_LEVEL_INFO, "Connected to " + usedProtocol + ":" +
+                                                                remote_hostname + ":" + ownPort +
+                                                                " (incoming)");
         }
     }
 }
@@ -188,8 +190,10 @@ MTCLBackend::MTCLBackend(const std::string &proto, const std::string &port, cons
     MTCL::Manager::init(hostname_id);
 
     MTCL::Manager::listen(selfToken);
-
     server_println(CAPIO_LOG_SERVER_CLI_LEVEL_INFO, "MTCL_backend initialization completed.");
+
+    discovery_service->setAdvertisementToken(usedProtocol + ":" + node_name + ":" + ownPort);
+    discovery_service->start(1000);
 }
 
 MTCLBackend::~MTCLBackend() {
@@ -214,9 +218,9 @@ MTCLBackend::~MTCLBackend() {
 
 void MTCLBackend::handshake_servers() {
     incoming_connection_thread =
-        new std::thread(incomingMTCLConnectionListener, node_name, ownPort, usedProtocol,
-                        &continue_execution, thread_sleep_times, &open_connections,
-                        &open_connections_lock, &connection_threads, &incoming_request_queue);
+        new std::thread(incomingMTCLConnectionListener, ownPort, usedProtocol, &continue_execution,
+                        thread_sleep_times, &open_connections, &open_connections_lock,
+                        &connection_threads, &incoming_request_queue);
 }
 
 const std::set<std::string> MTCLBackend::get_nodes() {
@@ -300,12 +304,14 @@ void MTCLBackend::connect_to(const std::string &target_token) {
         auto *queue = new AtomicQueue<const char *>();
         {
             const std::lock_guard lg(open_connections_lock);
-            open_connections.insert({remoteHostname, queue});
+            open_connections[remoteHostname] = queue;
         }
-        connection_threads.push_back(
-            new std::thread(serverConnectionHandler, std::move(UserManager), remoteHostname, queue,
-                            thread_sleep_times, &continue_execution, &incoming_request_queue));
-        server_println(CAPIO_LOG_SERVER_CLI_LEVEL_INFO, "Connected to " + target_token);
+        //   connection_threads.push_back(
+        //      new std::thread(serverConnectionHandler, std::move(UserManager), remoteHostname,
+        //      queue,
+        //                      thread_sleep_times, &continue_execution, &incoming_request_queue));
+        server_println(CAPIO_LOG_SERVER_CLI_LEVEL_INFO,
+                       "Connected to " + target_token + " (outgoing)");
     } else {
         server_println(CAPIO_LOG_SERVER_CLI_LEVEL_WARNING, "Warning: tried to connect to " +
                                                                std::string(remoteHostname) +
