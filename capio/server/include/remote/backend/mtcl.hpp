@@ -53,7 +53,6 @@ class MTCLBackend : public Backend {
      * parameter, then the method will issue an advertisement on UDP multicast of its alive state
      * so that other servers may instantiate a new connection with me.
      *
-     * @param ownHostname
      * @param ownPort
      * @param usedProtocol
      * @param continue_execution
@@ -64,8 +63,8 @@ class MTCLBackend : public Backend {
      * @param incoming_request_queue
      */
     void static incomingMTCLConnectionListener(
-        const std::string &ownHostname, const std::string &ownPort, const std::string &usedProtocol,
-        const bool *continue_execution, int sleep_time,
+        const std::string &ownPort, const std::string &usedProtocol, const bool *continue_execution,
+        int sleep_time,
         std::unordered_map<std::string, AtomicQueue<const char *> *> *open_connections,
         std::shared_mutex *open_connection_guard, std::vector<std::thread *> *_connection_threads,
         AtomicQueue<std::string> *incoming_request_queue);
