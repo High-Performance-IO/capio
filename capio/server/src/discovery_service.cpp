@@ -143,7 +143,6 @@ void DiscoveryService::start(unsigned int adv_delay, const std::string &token,
 }
 void DiscoveryService::stop() {
     terminate = true;
-<<<<<<< HEAD
 
     if (mcast_listener_thread != nullptr && mcast_listener_thread->joinable()) {
         mcast_listener_thread->join();
@@ -159,10 +158,6 @@ void DiscoveryService::stop() {
         advertisement_thread->join();
         advertisement_thread = nullptr;
     }
-=======
-    listener_thread->join();
-    listener_thread = nullptr;
->>>>>>> 97ef533 (Code cleanup. still problem with munmap)
 }
 
 DiscoveryService::DiscoveryService(const std::string &mcast_addr, const unsigned int mcast_port)

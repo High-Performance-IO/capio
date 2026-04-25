@@ -122,6 +122,7 @@ int main(int argc, char **argv) {
         server_println(line, "", "", "");
     }
 
+<<<<<<< HEAD
     const auto configuration = parseCLI(argc, argv);
 
     if (configuration.capio_cl_dynamic_config) {
@@ -144,11 +145,20 @@ int main(int argc, char **argv) {
 
     discovery_service = new DiscoveryService();
     backend           = select_backend(configuration.backend_name, argc, argv);
+=======
+    discovery_service = new DiscoveryService();
+
+    parseCLI(argc, argv);
+>>>>>>> 78863f6 (fixed discovery service)
 
     START_LOG(gettid(), "call()");
 
     open_files_location();
 
+<<<<<<< HEAD
+=======
+    shm_canary      = new CapioShmCanary(capio_cl_engine->getWorkflowName());
+>>>>>>> 78863f6 (fixed discovery service)
     storage_manager = new StorageManager();
     client_manager  = new ClientManager();
 
