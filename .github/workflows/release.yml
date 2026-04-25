@@ -45,7 +45,7 @@ jobs:
       - name: "Get CAPIO version"
         run: echo "CAPIO_VERSION=$(cat CMakeLists.txt | grep "        VERSION" | awk '{print $2}')" >> $GITHUB_ENV
       - name: "Check tag existence"
-        uses: mukunku/tag-exists-action@v1.6.0
+        uses: mukunku/tag-exists-action@v1.7.0
         id: check-tag
         with:
           tag: ${{ env.CAPIO_VERSION }}
