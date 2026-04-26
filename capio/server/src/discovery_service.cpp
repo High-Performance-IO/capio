@@ -30,7 +30,7 @@ void advertise(const bool *terminate, const unsigned int delay_ms,
     close(advert_sock_fd);
 }
 
-void thread_discovery_service(const bool *terminate) {
+void mcast_thread_discovery_service(const bool *terminate) {
     START_LOG(gettid(), "call()");
 
     int sockfd = socket(AF_INET, SOCK_DGRAM, 0);
@@ -66,12 +66,33 @@ void thread_discovery_service(const bool *terminate) {
     close(sockfd);
 }
 
+void fs_discovery_service(const bool *terminate, const std::filesystem::path &token_directory_path,
+                          const unsigned int delay_ms) {
+    std::vector<std::string> found_paths;
+
+    while (!*terminate) {
+        for (auto &entry : std::filesystem::directory_iterator(token_directory_path)) {
+            if (std::find(found_paths.begin(), found_paths.end(), entry.path().string()) ==
+                found_paths.end()) {
+                found_paths.push_back(entry.path().string());
+                std::ifstream input(entry.path());
+                std::string token;
+                input >> token;
+                backend->connect_to(token);
+            }
+        }
+        std::this_thread::sleep_for(std::chrono::milliseconds(delay_ms));
+    }
+}
+
 void DiscoveryService::start(unsigned int adv_delay) {
     if (advertisement_token.empty()) {
         throw std::runtime_error("Advertisement token is empty");
     }
 
-    listener_thread = new std::thread(thread_discovery_service, &terminate);
+    mcast_listener_thread = new std::thread(mcast_thread_discovery_service, &terminate);
+    fs_listener_thread =
+        new std::thread(fs_discovery_service, &terminate, token_directory_path, adv_delay);
     advertisement_thread =
         new std::thread(advertise, &terminate, adv_delay, std::ref(advertisement_token));
 
@@ -82,12 +103,17 @@ void DiscoveryService::start(unsigned int adv_delay) {
 void DiscoveryService::stop() {
     terminate = true;
 
-    if (listener_thread != nullptr && listener_thread->joinable()) {
-        listener_thread->join();
-        listener_thread = nullptr;
+    if (mcast_listener_thread != nullptr && mcast_listener_thread->joinable()) {
+        mcast_listener_thread->join();
+        mcast_listener_thread = nullptr;
     }
 
-    if (listener_thread != nullptr && advertisement_thread->joinable()) {
+    if (fs_listener_thread != nullptr && fs_listener_thread->joinable()) {
+        fs_listener_thread->join();
+        fs_listener_thread = nullptr;
+    }
+
+    if (advertisement_thread != nullptr && advertisement_thread->joinable()) {
         advertisement_thread->join();
         advertisement_thread = nullptr;
     }

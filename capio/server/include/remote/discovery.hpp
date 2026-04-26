@@ -11,10 +11,12 @@ class DiscoveryService {
     /// @brief Variable used to signal termination to child threads
     bool terminate = false;
 
-    /// @brief Handle for thread listening for other server instances
-    std::thread *listener_thread      = nullptr;
+    /// @brief Handle for multicast based discovery thread
+    std::thread *mcast_listener_thread = nullptr;
+    /// @brief Handle for file system based discovery thread
+    std::thread *fs_listener_thread    = nullptr;
     /// @brief Handle for thread advertising this server instance
-    std::thread *advertisement_thread = nullptr;
+    std::thread *advertisement_thread  = nullptr;
 
     /// @brief Token to be advertised by this server
     std::string advertisement_token;
