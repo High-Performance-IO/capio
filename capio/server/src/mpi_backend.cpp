@@ -113,6 +113,7 @@ void MPIBackend::recv_file(char *shm, const std::string &source, long int bytes_
         LOG("Chunk size is %ld bytes", bytes_received);
     }
 }
+void MPIBackend::connect_to(const std::string &target) { return; }
 
 MPISYNCBackend::MPISYNCBackend(int argc, char *argv[]) : MPIBackend(argc, argv) {
     START_LOG(gettid(), "call()");
