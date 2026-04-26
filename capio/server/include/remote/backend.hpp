@@ -87,6 +87,12 @@ class Backend {
      * @param target
      */
     virtual void send_request(const char *message, int message_len, const std::string &target) = 0;
+
+    /**
+     * Connect this server instance to a remote server instance
+     * @param target Remote server instance identification
+     */
+    virtual void connect_to(const std::string &target) = 0;
 };
 
 #endif // CAPIO_SERVER_REMOTE_BACKEND_HPP

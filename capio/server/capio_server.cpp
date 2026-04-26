@@ -28,6 +28,7 @@
 #include "common/requests.hpp"
 #include "common/semaphore.hpp"
 #include "remote/backend.hpp"
+#include "remote/discovery.hpp"
 #include "storage/capio_file.hpp"
 #include "utils/common.hpp"
 #include "utils/env.hpp"
@@ -36,6 +37,7 @@
 ClientManager *client_manager;
 StorageManager *storage_manager;
 Backend *backend;
+DiscoveryService *discovery_service;
 
 #include "handlers.hpp"
 #include "utils/cli_parser.hpp"
@@ -140,13 +142,13 @@ int main(int argc, char **argv) {
 
     capio_cl_engine->print();
 
-    backend = select_backend(configuration.backend_name, argc, argv);
+    discovery_service = new DiscoveryService();
+    backend           = select_backend(configuration.backend_name, argc, argv);
 
     START_LOG(gettid(), "call()");
 
     open_files_location();
 
-    shm_canary      = new CapioShmCanary(capio_cl_engine->getWorkflowName());
     storage_manager = new StorageManager();
     client_manager  = new ClientManager();
 
