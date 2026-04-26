@@ -95,15 +95,30 @@ void DiscoveryService::stop() {
 
 DiscoveryService::DiscoveryService() {
     shm_canary = new CapioShmCanary(CapioCLEngine::get().getWorkflowName());
+
+    if (!std::filesystem::exists(token_directory_path)) {
+        std::filesystem::create_directory(token_directory_path);
+    }
+
+    std::string node_name(HOST_NAME_MAX, '\0');
+    gethostname(node_name.data(), node_name.size());
+    node_name.resize(strlen(node_name.data()));
+
+    token_filename = node_name + ".capio";
 }
 
 DiscoveryService::~DiscoveryService() {
     if (!terminate) {
         stop();
     }
+    std::filesystem::remove(token_directory_path / token_filename);
     delete shm_canary;
 }
 
 void DiscoveryService::setAdvertisementToken(const std::string &token) {
     this->advertisement_token = token;
+
+    std::ofstream token_file(token_directory_path / token_filename);
+    token_file << token;
+    token_file.close();
 }
