@@ -31,6 +31,7 @@
 #include "common/requests.hpp"
 #include "common/semaphore.hpp"
 #include "remote/backend.hpp"
+#include "remote/discovery.hpp"
 #include "storage/capio_file.hpp"
 #include "utils/common.hpp"
 #include "utils/env.hpp"
@@ -39,6 +40,7 @@
 ClientManager *client_manager;
 StorageManager *storage_manager;
 Backend *backend;
+DiscoveryService *discovery_service;
 
 #include "handlers.hpp"
 #include "utils/location.hpp"
@@ -289,6 +291,8 @@ int main(int argc, char **argv) {
 
     std::cout << CAPIO_LOG_SERVER_BANNER;
 
+    discovery_service = new DiscoveryService();
+
     parseCLI(argc, argv);
 
     START_LOG(gettid(), "call()");
@@ -306,6 +310,5 @@ int main(int argc, char **argv) {
     server_thread.join();
     remote_listener_thread.join();
 
-    delete backend;
     return 0;
 }
