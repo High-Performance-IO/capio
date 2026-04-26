@@ -113,7 +113,7 @@ static int writedata(char *dataptr, size_t datalen, float percent, char *destdir
         perror("malloc");
         return -1;
     }
-    char filepath[strlen(destdir) + maxfilename];
+    auto filepath = new char[strlen(destdir) + maxfilename];
 
     // opening (truncating) all files
     for (int j = 0, i = 0 + dstart; i < (dfiles + dstart); ++i, ++j) {
@@ -125,6 +125,7 @@ static int writedata(char *dataptr, size_t datalen, float percent, char *destdir
             error = -1;
         }
     }
+    delete[] filepath;
 
     if (!error) {
         size_t nbytes = datalen * percent;
@@ -207,7 +208,7 @@ int mergeFunction(ssize_t nfiles, char *sourcedir, char *destdir) {
     EXPECT_NE(stat(destdir, &statbuf), -1);
     EXPECT_TRUE(S_ISDIR(statbuf.st_mode));
 
-    char filepath[strlen(sourcedir) + maxfilename];
+    auto filepath = new char[strlen(sourcedir) + maxfilename];
     for (int i = 0; i < nfiles; ++i) {
         sprintf(filepath, fmtout, sourcedir, i);
         FILE *fp = fopen(filepath, "r");
@@ -219,11 +220,13 @@ int mergeFunction(ssize_t nfiles, char *sourcedir, char *destdir) {
         dataptr = ptr;
         fclose(fp);
     }
+    delete[] filepath;
 
-    char resultpath[strlen(destdir) + strlen("/result.dat")];
+    auto resultpath = new char[strlen(destdir) + strlen("/result.dat")];
     sprintf(resultpath, "%s/result.dat", destdir);
     FILE *fp = fopen(resultpath, "w");
     EXPECT_TRUE(fp);
+    delete[] resultpath;
 
     EXPECT_EQ(fwrite(dataptr, 1, datalen, fp), datalen);
 
@@ -255,8 +258,8 @@ int splitFunction(ssize_t nlines, ssize_t nfiles, char *dirname) {
     char **buffer = (char **) calloc(IO_BUFFER, nfiles);
     EXPECT_TRUE(buffer);
 
-    int error = 0;
-    char filepath[strlen(dirname) + maxfilename];
+    int error     = 0;
+    auto filepath = new char[strlen(dirname) + maxfilename];
     // opening (truncating) all files
     for (int i = 0; i < nfiles; ++i) {
         sprintf(filepath, fmtin, dirname, i);
@@ -265,6 +268,8 @@ int splitFunction(ssize_t nlines, ssize_t nfiles, char *dirname) {
         EXPECT_TRUE(fp[i]);
         EXPECT_EQ(setvbuf(fp[i], buffer[i], _IOFBF, IO_BUFFER), 0);
     }
+    delete[] filepath;
+
     if (!error) {
         char *buffer = (char *) calloc(maxphraselen, 1);
         if (!buffer) {
@@ -321,7 +326,7 @@ int mapReduceFunction(char *sourcedirname, ssize_t sstart, ssize_t sfiles, char 
     EXPECT_GT(percent, 0);
     EXPECT_LE(percent, 1);
 
-    char filepath[strlen(sourcedirname) + maxfilename];
+    auto filepath = new char[strlen(sourcedirname) + maxfilename];
     // concatenating all files in memory (dataptr)
     for (int i = 0 + sstart; i < (sfiles + sstart); ++i) {
         sprintf(filepath, fmtin, sourcedirname, i);
@@ -335,6 +340,7 @@ int mapReduceFunction(char *sourcedirname, ssize_t sstart, ssize_t sfiles, char 
         dataptr = ptr;
         fclose(fp);
     }
+    delete[] filepath;
 
     int r = writedata(dataptr, datalen, percent, destdirname, dstart, dfiles);
     free(dataptr);

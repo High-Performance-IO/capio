@@ -10,8 +10,6 @@
 // CAPIO files constants
 constexpr size_t CAPIO_DEFAULT_DIR_INITIAL_SIZE   = 1024L * 1024 * 1024;
 constexpr off64_t CAPIO_DEFAULT_FILE_INITIAL_SIZE = 1024L * 1024 * 1024 * 4;
-constexpr std::array CAPIO_DIR_FORBIDDEN_PATHS    = {std::string_view{"/proc/"},
-                                                     std::string_view{"/sys/"}};
 
 // CAPIO default values for shared memory
 constexpr char CAPIO_DEFAULT_WORKFLOW_NAME[] = "CAPIO";

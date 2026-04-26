@@ -15,7 +15,7 @@
 
 #define SHM_DESTROY_CHECK(source_name)                                                             \
     if (shm_unlink(source_name) == -1) {                                                           \
-        ERR_EXIT("Unable to destroy shared mem:  ", source_name);                                  \
+        ERR_EXIT_EXCEPT_CHOICE(false, "Unable to destroy shared mem: %s", source_name);            \
     };
 
 #define SHM_CREATE_CHECK(condition, source)                                                        \

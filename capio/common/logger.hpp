@@ -25,6 +25,14 @@ template <typename T> std::string demangled_name(const T &obj) {
 
 inline bool continue_on_error = false; // if set to true, CAPIO does not terminate on ERR_EXIT
 
+inline void raise_termination(const bool raise_exception, const std::string &message) {
+    if (raise_exception) {
+        throw std::runtime_error(message);
+    }
+    capio_syscall(SYS_write, stderr, message.c_str(), message.size());
+    exit(EXIT_FAILURE);
+}
+
 #if defined(CAPIO_LOG) && defined(__CAPIO_POSIX)
 #include "syscallnames.h"
 #endif
@@ -328,15 +336,18 @@ class Logger {
 };
 
 #ifdef CAPIO_LOG
-#define ERR_EXIT(message, ...)                                                                     \
+
+#define ERR_EXIT_EXCEPT_CHOICE(raise_exception, message, ...)                                      \
     log.log(message, ##__VA_ARGS__);                                                               \
     if (!continue_on_error) {                                                                      \
         if (!continue_on_error) {                                                                  \
             char err_msg[CAPIO_LOG_MAX_MSG_LEN];                                                   \
             snprintf(err_msg, CAPIO_LOG_MAX_MSG_LEN, message, ##__VA_ARGS__);                      \
-            throw std::runtime_error(err_msg);                                                     \
+            raise_termination(raise_exception, err_msg);                                           \
         }                                                                                          \
     }
+#define ERR_EXIT(message, ...) ERR_EXIT_EXCEPT_CHOICE(true, message, ##__VA_ARGS__)
+
 #define LOG(message, ...) log.log(message, ##__VA_ARGS__)
 #define START_LOG(tid, message, ...)                                                               \
     Logger log(__func__, __FILE__, __LINE__, tid, message, ##__VA_ARGS__)
@@ -371,12 +382,13 @@ class Logger {
 
 #else
 
-#define ERR_EXIT(message, ...)                                                                     \
+#define ERR_EXIT_EXCEPT_CHOICE(raise_exception, message, ...)                                      \
     if (!continue_on_error) {                                                                      \
         char err_msg[CAPIO_LOG_MAX_MSG_LEN];                                                       \
         snprintf(err_msg, sizeof(err_msg), message, ##__VA_ARGS__);                                \
-        throw std::runtime_error(err_msg);                                                         \
+        raise_termination(raise_exception, err_msg);                                               \
     }
+#define ERR_EXIT(message, ...) ERR_EXIT_EXCEPT_CHOICE(true, message, ##__VA_ARGS__)
 #define LOG(message, ...)
 #define START_LOG(tid, message, ...)
 #define START_SYSCALL_LOGGING()

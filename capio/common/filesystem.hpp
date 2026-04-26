@@ -14,6 +14,9 @@
 #include "common/syscall.hpp"
 #include "env.hpp"
 
+constexpr std::array CAPIO_DIR_FORBIDDEN_PATHS = {std::string_view{"/proc/"},
+                                                  std::string_view{"/sys/"}};
+
 inline std::filesystem::path get_parent_dir_path(const std::filesystem::path &file_path) {
     START_LOG(capio_syscall(SYS_gettid), "call(file_path=%s)", file_path.c_str());
     if (file_path == file_path.root_path()) {

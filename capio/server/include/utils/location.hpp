@@ -110,12 +110,11 @@ inline std::pair<const char *const, long int> &
 get_file_location(const std::filesystem::path &path) {
     START_LOG(gettid(), "path=%s", path.c_str());
 
-    auto file_location_opt = get_file_location_opt(path);
-    if (file_location_opt) {
-        return file_location_opt->get();
-    } else {
+    const auto file_location_opt = get_file_location_opt(path);
+    if (!file_location_opt) {
         ERR_EXIT("error file location %s not present in CAPIO", path.c_str());
     }
+    return file_location_opt->get();
 }
 
 inline void add_file_location(const std::filesystem::path &path, const char *const p_node_str,

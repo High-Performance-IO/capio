@@ -328,7 +328,7 @@ class MockBackend : public Backend {
     MockBackend() : Backend(HOST_NAME_MAX) {}
 
     void recv_file(char *shm, const std::string &source, const long int bytes_expected) override {
-        for (std::size_t i = 0; i < bytes_expected; ++i) {
+        for (long int i = 0; i < bytes_expected; ++i) {
             shm[i] = 33 + (i % 93);
         }
     }
