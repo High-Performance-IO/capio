@@ -1,9 +1,10 @@
+#include "utils/shm_canary.hpp"
+
 #include "common/env.hpp"
 #include "common/logger.hpp"
-#include "remote/discovery.hpp"
 #include "utils/common.hpp"
 
-CapioShmCanary::CapioShmCanary(std::string capio_workflow_name)
+CapioShmCanary::CapioShmCanary(const std::string &capio_workflow_name)
     : _canary_name(capio_workflow_name) {
     START_LOG(capio_syscall(SYS_gettid), "call(capio_workflow_name: %s)", _canary_name.data());
     if (_canary_name.empty()) {
