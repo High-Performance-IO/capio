@@ -53,7 +53,7 @@ RemoteRequest MTCLBackend::read_next_request() {
  * to signal execution shutdown.
  * @param incoming_request_queue
  */
-void serverConnectionHandler(MTCL::HandleUser HandlerPointer, const std::string remote_hostname,
+void serverConnectionHandler(MTCL::HandleUser HandlerPointer, const std::string &remote_hostname,
                              AtomicQueue<const char *> *queue, const int sleep_time,
                              const bool *continue_execution,
                              AtomicQueue<std::string> *incoming_request_queue) {
@@ -166,10 +166,9 @@ void MTCLBackend::incomingMTCLConnectionListener(
                 const std::unique_lock lock(*open_connection_guard);
                 (*open_connections)[remote_hostname] = queue;
             }
-            //    _connection_threads->push_back(
-            //       new std::thread(serverConnectionHandler, std::move(UserManager),
-            //       remote_hostname,
-            //                      queue, sleep_time, continue_execution, incoming_request_queue));
+            _connection_threads->push_back(
+                new std::thread(serverConnectionHandler, std::move(UserManager), remote_hostname,
+                                queue, sleep_time, continue_execution, incoming_request_queue));
             server_println(CAPIO_LOG_SERVER_CLI_LEVEL_INFO, "Connected to " + usedProtocol + ":" +
                                                                 remote_hostname + ":" + ownPort +
                                                                 " (incoming)");
@@ -306,10 +305,9 @@ void MTCLBackend::connect_to(const std::string &target_token) {
             const std::lock_guard lg(open_connections_lock);
             open_connections[remoteHostname] = queue;
         }
-        //   connection_threads.push_back(
-        //      new std::thread(serverConnectionHandler, std::move(UserManager), remoteHostname,
-        //      queue,
-        //                      thread_sleep_times, &continue_execution, &incoming_request_queue));
+        connection_threads.push_back(
+            new std::thread(serverConnectionHandler, std::move(UserManager), remoteHostname, queue,
+                            thread_sleep_times, &continue_execution, &incoming_request_queue));
         server_println(CAPIO_LOG_SERVER_CLI_LEVEL_INFO,
                        "Connected to " + target_token + " (outgoing)");
     } else {
