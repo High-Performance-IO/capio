@@ -119,12 +119,10 @@ void MPIBackend::recv_file(char *shm, const std::string &source, long int bytes_
         LOG("Chunk size is %ld bytes", bytes_received);
     }
 }
-void MPIBackend::connect_to(const std::string &target) { return; }
 
 void MPIBackend::connect_to(const std::string &target) {
     START_LOG(gettid(), "call(target=%s)", target.c_str());
     LOG("connect_to called on backend that is not dynamic. ignoring call");
-    return;
 }
 
 MPISYNCBackend::MPISYNCBackend(int argc, char *argv[]) : MPIBackend(argc, argv) {
