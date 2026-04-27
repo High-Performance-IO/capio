@@ -30,7 +30,7 @@ jobs:
       - uses: docker/setup-qemu-action@v3
       - uses: docker/setup-buildx-action@v4
       - name: "Build Docker image"
-        uses: docker/build-push-action@v5
+        uses: docker/build-push-action@v7
         with:
           build-args: |
             CAPIO_BUILD_TESTS=ON
