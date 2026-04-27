@@ -5,9 +5,9 @@
 #include <string_view>
 
 #include "common/constants.hpp"
-#include "common/env.hpp"
 
-inline void server_println(const std::string_view message_color  = "",
+inline void server_println(const std::string_view workflow_name  = CAPIO_DEFAULT_WORKFLOW_NAME,
+                           const std::string_view message_color  = CAPIO_LOG_SERVER_CLI_LEVEL_RESET,
                            const std::string_view component_name = "CAPIO",
                            const std::string_view message_line   = "") {
 
@@ -28,11 +28,11 @@ inline void server_println(const std::string_view message_color  = "",
     // Get current time
     const auto in_time_t = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
 
-    std::cout << message_color << "[CAPIO-SERVER > " << get_capio_workflow_name() << "]"
-              << CAPIO_LOG_SERVER_CLI_LEVEL_RESET << " ["
-              << std::put_time(std::localtime(&in_time_t), "%Y-%m-%d %H:%M:%S") << "] " << " "
-              << node_name << "@" << std::left << std::setw(20) << component_name.substr(0, 20)
-              << " | " << message_line << "\n"
-              << std::flush;
+    std::cout << message_color << "[CAPIO-SERVER > " << workflow_name << "]";
+    std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_RESET << " [";
+    std::cout << std::put_time(std::localtime(&in_time_t), "%Y-%m-%d %H:%M:%S") << "] ";
+    std::cout << " " << node_name << "@" << std::left << std::setw(20);
+    std::cout << component_name.substr(0, 20) << " | " << message_line << "\n";
+    std::cout << std::flush;
 }
 #endif // CAPIO_PRINT_TEXT_HPP

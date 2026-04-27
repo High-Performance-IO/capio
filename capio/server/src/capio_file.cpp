@@ -34,7 +34,8 @@ CapioFile::~CapioFile() {
             delete[] _buf;
         } else {
             if (munmap(_buf, _buf_size) == -1) {
-                server_println(CAPIO_LOG_SERVER_CLI_LEVEL_WARNING, "CapioFile",
+                server_println(CapioCLEngine::get().getWorkflowName(),
+                               CAPIO_LOG_SERVER_CLI_LEVEL_WARNING, "CapioFile",
                                "WARN: unable to unmap CapioFile: " + std::string(strerror(errno)));
             }
         }

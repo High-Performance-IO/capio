@@ -11,7 +11,6 @@
 
 #include "common/logger.hpp"
 
-
 #ifdef __CAPIO_POSIX
 
 #define SHM_DESTROY_CHECK(source_name)                                                             \
@@ -60,20 +59,23 @@ class CapioShmCanary {
 #ifndef __CAPIO_POSIX
             const auto message = new char[strlen(CAPIO_SHM_CANARY_ERROR)];
             sprintf(message, CAPIO_SHM_CANARY_ERROR, _canary_name.data());
-            server_println(CAPIO_LOG_SERVER_CLI_LEVEL_ERROR, "CapioShmCanary", message);
+            server_println(capio_workflow_name, CAPIO_LOG_SERVER_CLI_LEVEL_ERROR, "CapioShmCanary",
+                           message);
             delete[] message;
 #endif
             ERR_EXIT("ERR: shm canary flag already exists");
         }
-        server_println(CAPIO_LOG_SERVER_CLI_LEVEL_STATUS, "CapioShmCanary",
+#ifndef __CAPIO_POSIX
+        server_println(capio_workflow_name, CAPIO_LOG_SERVER_CLI_LEVEL_STATUS, "CapioShmCanary",
                        "Created Capio SHM canary: " + _canary_name);
+#endif
     };
 
     ~CapioShmCanary() {
         START_LOG(capio_syscall(SYS_gettid), "call()");
-#ifndef __CAPIO_POSIx
-        server_println(CAPIO_LOG_SERVER_CLI_LEVEL_WARNING, "CapioShmCanary",
-                       "Removing shared memory canary flag");
+#ifndef __CAPIO_POSIX
+        server_println(get_capio_workflow_name(), CAPIO_LOG_SERVER_CLI_LEVEL_WARNING,
+                       "CapioShmCanary", "Removing shared memory canary flag");
 #endif
         close(_shm_id);
         SHM_DESTROY_CHECK(_canary_name.c_str());

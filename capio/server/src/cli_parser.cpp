@@ -58,11 +58,12 @@ CapioParsedConfig parseCLI(int argc, char **argv) {
 #ifdef CAPIO_LOG
         continue_on_error = true;
         for (const auto line : CAPIO_LOG_SERVER_CLI_CONT_ON_ERR_WARNING) {
-            server_println(CAPIO_LOG_SERVER_CLI_LEVEL_ERROR, "parseCLI", line);
+            server_println(get_capio_workflow_name(), CAPIO_LOG_SERVER_CLI_LEVEL_ERROR, "parseCLI",
+                           line);
         }
 
 #else
-        server_println(CAPIO_LOG_SERVER_CLI_LEVEL_WARNING, "parseCLI",
+        server_println(get_capio_workflow_name(), CAPIO_LOG_SERVER_CLI_LEVEL_WARNING, "parseCLI",
                        "--continue-on-error flag given, but logger is not compiled into CAPIO. "
                        "Flag is ignored.");
 #endif
@@ -72,7 +73,7 @@ CapioParsedConfig parseCLI(int argc, char **argv) {
 #ifdef CAPIO_LOG
         log_master_dir_name = args::get(logfile_folder);
 #else
-        server_println(CAPIO_LOG_SERVER_CLI_LEVEL_WARNING, "parseCLI",
+        server_println(get_capio_workflow_name(), CAPIO_LOG_SERVER_CLI_LEVEL_WARNING, "parseCLI",
                        "Capio logfile folder, but logging capabilities not compiled into capio!");
 #endif
     }
@@ -87,14 +88,14 @@ CapioParsedConfig parseCLI(int argc, char **argv) {
         }
         logfile_prefix = token;
 #else
-        server_println(CAPIO_LOG_SERVER_CLI_LEVEL_WARNING, "parseCLI",
+        server_println(get_capio_workflow_name(), CAPIO_LOG_SERVER_CLI_LEVEL_WARNING, "parseCLI",
                        "Capio logfile provided, but logging capabilities not compiled into capio!");
 #endif
     }
 #ifdef CAPIO_LOG
     auto logname = open_server_logfile();
     log          = new Logger(__func__, __FILE__, __LINE__, gettid(), "Created new log file");
-    server_println(CAPIO_LOG_SERVER_CLI_LEVEL_INFO, "parseCLI",
+    server_println(get_capio_workflow_name(), CAPIO_LOG_SERVER_CLI_LEVEL_INFO, "parseCLI",
                    "started logging to logfile " + logname.string());
 #endif
 
@@ -107,7 +108,7 @@ CapioParsedConfig parseCLI(int argc, char **argv) {
         capio_config.capio_cl_config_path = args::get(config);
 
         if (std::string token = args::get(config); token == "dynamic") {
-            server_println(CAPIO_LOG_SERVER_CLI_LEVEL_INFO, "parseCLI",
+            server_println(get_capio_workflow_name(), CAPIO_LOG_SERVER_CLI_LEVEL_INFO, "parseCLI",
                            "Starting CAPIO-CL engine with dynamic configuration");
             capio_config.capio_cl_dynamic_config = true;
 
@@ -121,14 +122,14 @@ CapioParsedConfig parseCLI(int argc, char **argv) {
 
     } else if (noConfigFile) {
 
-        server_println(CAPIO_LOG_SERVER_CLI_LEVEL_WARNING, "parseCLI",
+        server_println(get_capio_workflow_name(), CAPIO_LOG_SERVER_CLI_LEVEL_WARNING, "parseCLI",
                        "skipping config file parsing.");
-        server_println(CAPIO_LOG_SERVER_CLI_LEVEL_WARNING, "parseCLI",
+        server_println(get_capio_workflow_name(), CAPIO_LOG_SERVER_CLI_LEVEL_WARNING, "parseCLI",
                        "Obtained from environment variable current workflow name: " +
                            get_capio_workflow_name());
     } else {
         server_println(
-            CAPIO_LOG_SERVER_CLI_LEVEL_ERROR, "parseCLI",
+            get_capio_workflow_name(), CAPIO_LOG_SERVER_CLI_LEVEL_ERROR, "parseCLI",
             "Error: no config file provided. To skip config file use --no-config option!");
 #ifdef CAPIO_LOG
         log->log("no config file provided, and  --no-config not provided");
@@ -136,22 +137,23 @@ CapioParsedConfig parseCLI(int argc, char **argv) {
         exit(EXIT_FAILURE);
     }
 
-    server_println(CAPIO_LOG_SERVER_CLI_LEVEL_INFO, "parseCLI",
+    server_println(get_capio_workflow_name(), CAPIO_LOG_SERVER_CLI_LEVEL_INFO, "parseCLI",
                    "CAPIO_DIR=" + get_capio_dir().string());
 
 #ifdef CAPIO_LOG
     CAPIO_LOG_LEVEL = get_capio_log_level();
-    server_println(CAPIO_LOG_SERVER_CLI_LEVEL_INFO, "parseCLI",
+    server_println(get_capio_workflow_name(), CAPIO_LOG_SERVER_CLI_LEVEL_INFO, "parseCLI",
                    "LOG_LEVEL set to: " + std::to_string(CAPIO_LOG_LEVEL));
     for (const auto &msg : CAPIO_LOG_SERVER_CLI_LOGGING_ENABLED_WARNING) {
-        server_println(CAPIO_LOG_SERVER_CLI_LEVEL_WARNING, "Logger", msg);
+        server_println(get_capio_workflow_name(), CAPIO_LOG_SERVER_CLI_LEVEL_WARNING, "Logger",
+                       msg);
     }
 
     log->log("LOG_LEVEL set to: %d", CAPIO_LOG_LEVEL);
     delete log;
 #else
     if (std::getenv("CAPIO_LOG_LEVEL") != nullptr) {
-        server_println(CAPIO_LOG_SERVER_CLI_LEVEL_WARNING, "parseCLI",
+        server_println(get_capio_workflow_name(), CAPIO_LOG_SERVER_CLI_LEVEL_WARNING, "parseCLI",
                        CAPIO_LOG_SERVER_CLI_LOGGING_NOT_AVAILABLE);
     }
 #endif

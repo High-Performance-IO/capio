@@ -1,9 +1,13 @@
 #include <thread>
 
 #include "remote/backend/none.hpp"
+#include "utils/capiocl_adapter.hpp"
+#include "utils/server_println.hpp"
 
 NoneBackend::NoneBackend(int argc, char **argv) : Backend(HOST_NAME_MAX) {
     START_LOG(gettid(), "call()");
+    server_println(CapioCLEngine::get().getWorkflowName(), CAPIO_LOG_SERVER_CLI_LEVEL_STATUS,
+                   "NoneBackend", "initialization completed.");
 }
 
 RemoteRequest NoneBackend::read_next_request() {
