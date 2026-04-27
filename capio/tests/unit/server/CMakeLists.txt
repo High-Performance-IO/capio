@@ -37,7 +37,7 @@ target_include_directories(${TARGET_NAME} PRIVATE
 #####################################
 # Link libraries
 #####################################
-target_link_libraries(${TARGET_NAME} PRIVATE GTest::gtest_main rt libcapio_cl MPI::MPI_CXX)
+target_link_libraries(${TARGET_NAME} PRIVATE GTest::gtest_main rt libcapio_cl MPI::MPI_CXX args)
 
 #####################################
 # Configure tests

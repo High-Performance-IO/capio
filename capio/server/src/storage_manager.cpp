@@ -67,7 +67,8 @@ void StorageManager::addDirectoryEntry(const pid_t tid, const std::filesystem::p
     }
 }
 StorageManager::StorageManager() {
-    server_println(CAPIO_LOG_SERVER_CLI_LEVEL_STATUS, "StorageManager", "initialization completed.");
+    server_println(CAPIO_LOG_SERVER_CLI_LEVEL_STATUS, "StorageManager",
+                   "initialization completed.");
 }
 
 StorageManager::~StorageManager() {

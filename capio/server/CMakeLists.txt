@@ -37,7 +37,6 @@ target_sources(${TARGET_NAME} PRIVATE
 target_include_directories(${TARGET_NAME} PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}/include
         ${MPI_INCLUDE_PATH}
-        ${args_SOURCE_DIR}
         ${capio_cl_SOURCE_DIR}
 )
 
@@ -55,7 +54,7 @@ ENDIF (MPI_LINK_FLAGS)
 #####################################
 # Link libraries
 #####################################
-target_link_libraries(${TARGET_NAME} PRIVATE ${MPI_LIBRARIES} pthread rt stdc++fs libcapio_cl)
+target_link_libraries(${TARGET_NAME} PRIVATE ${MPI_LIBRARIES} pthread rt stdc++fs libcapio_cl args)
 
 #####################################
 # Install rules
