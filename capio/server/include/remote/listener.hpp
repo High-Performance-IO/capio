@@ -27,30 +27,29 @@ inline Backend *select_backend(const std::string &backend_name, int argc, char *
 
     if (backend_name.empty() || backend_name == "none") {
         LOG("backend selected: none");
-        std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_INFO
-                  << "Starting CAPIO with default backend (none) as no preferred backend was chosen"
-                  << std::endl;
+        server_println(
+            CAPIO_LOG_SERVER_CLI_LEVEL_INFO,
+            "Starting CAPIO with default backend (none) as no preferred backend was chosen");
         return new NoneBackend(argc, argv);
     }
 
     if (backend_name == "mpi") {
         LOG("backend selected: mpi");
-        std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_INFO << "Starting CAPIO with MPI backend"
-                  << std::endl;
+        server_println(CAPIO_LOG_SERVER_CLI_LEVEL_INFO, "Starting CAPIO with MPI backend");
         return new MPIBackend(argc, argv);
     }
 
     if (backend_name == "mpisync") {
         LOG("backend selected: mpisync");
-        std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_INFO << "Starting CAPIO with MPI (SYNC) backend"
-                  << std::endl;
+        server_println(CAPIO_LOG_SERVER_CLI_LEVEL_INFO, "Starting CAPIO with MPI (SYNC) backend");
         return new MPISYNCBackend(argc, argv);
     }
 
     LOG("Backend %s does not exist in CAPIO. Reverting back to the default backend (none)",
         backend_name.c_str());
-    std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_WARNING << " Backend " << backend_name
-              << " does not exist. Reverting to the default backend (none)" << std::endl;
+    server_println(CAPIO_LOG_SERVER_CLI_LEVEL_WARNING,
+                   " Backend " + backend_name +
+                       " does not exist. Reverting to the default backend (none)");
     return new NoneBackend(argc, argv);
 }
 
