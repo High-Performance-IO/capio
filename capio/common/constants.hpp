@@ -73,23 +73,23 @@ constexpr char CAPIO_LOG_POSIX_SYSCALL_END[]             = "~~~~~~~~~  END SYSCA
 
 // CAPIO logger - server
 constexpr char CAPIO_SERVER_DEFAULT_LOG_FILE_PREFIX[] = "server_thread_\0";
-constexpr char CAPIO_LOG_SERVER_BANNER[16][70]        = {
+// Note: Ensure CAPIO_VERSION is defined as a string literal, e.g., #define CAPIO_VERSION "1.0.0"
+constexpr char CAPIO_LOG_SERVER_BANNER[14][80]        = {
     "",
-    "",
-    "\033[1;34m /$$$$$$   /$$$$$$  /$$$$$$$\033[0;96m  /$$$$$$  /$$$$$$ ",
-    "\033[1;34m /$$__  $$ /$$__  $$| $$__  $$\033[0;96m|_  $$_/ /$$__  $$",
+    "\033[1;34m  /$$$$$$   /$$$$$$  /$$$$$$$  \033[0;96m /$$$$$$  /$$$$$$ ",
+    "\033[1;34m /$$__  $$ /$$__  $$| $$__  $$ \033[0;96m|_ $$_/ /$$__  $$",
     "\033[1;34m| $$  \\__/| $$  \\ $$| $$  \\ $$ \033[0;96m | $$  | $$  \\ $$",
     "\033[1;34m| $$      | $$$$$$$$| $$$$$$$/  \033[0;96m| $$  | $$  | $$",
     "\033[1;34m| $$      | $$__  $$| $$____/   \033[0;96m| $$  | $$  | $$",
     "\033[1;34m| $$    $$| $$  | $$| $$        \033[0;96m| $$  | $$  | $$",
-    "\033[1;34m|  $$$$$$/| $$  | $$| $$       \033[0;96m/$$$$$$|  $$$$$$/",
-    "\033[1;34m \\______/ |__/  |__/|__/      \033[0;96m|______/ \\______/",
+    "\033[1;34m|  $$$$$$/| $$  | $$| $$        \033[0;96m/$$$$$$|  $$$$$$/",
+    "\033[1;34m \\______/ |__/  |__/|__/       \033[0;96m|______/ \\______/",
     "",
     "\033[0m   CAPIO - Cross Application Programmable IO         ",
     "",
-    "                    V. " CAPIO_VERSION,
+    "                     V. " CAPIO_VERSION,
     "",
-    ""};
+};
 
 constexpr char CAPIO_LOG_SERVER_CLI_LOGGING_NOT_AVAILABLE[] =
     "CAPIO_LOG set but log support was not compiled into CAPIO!";
@@ -147,9 +147,10 @@ constexpr char CAPIO_SERVER_ARG_PARSER_CONFIG_BACKEND_HELP[] =
     "\n\t> mpi \n\t> mpisync \n\t> none (default)";
 
 // Cli pre messages
-constexpr char CAPIO_LOG_SERVER_CLI_LEVEL_STATUS[]  = "[\033[1;34mCAPIO-SERVER\033[0m ";
-constexpr char CAPIO_LOG_SERVER_CLI_LEVEL_INFO[]    = "[\033[1;32mCAPIO-SERVER\033[0m ";
-constexpr char CAPIO_LOG_SERVER_CLI_LEVEL_WARNING[] = "[\033[1;33mCAPIO-SERVER\033[0m ";
-constexpr char CAPIO_LOG_SERVER_CLI_LEVEL_ERROR[]   = "[\033[1;31mCAPIO-SERVER\033[0m ";
+constexpr char CAPIO_LOG_SERVER_CLI_LEVEL_RESET[]   = "\033[0m";
+constexpr char CAPIO_LOG_SERVER_CLI_LEVEL_STATUS[]  = "\033[1;34m";
+constexpr char CAPIO_LOG_SERVER_CLI_LEVEL_INFO[]    = "\033[1;32m";
+constexpr char CAPIO_LOG_SERVER_CLI_LEVEL_WARNING[] = "\033[1;33m";
+constexpr char CAPIO_LOG_SERVER_CLI_LEVEL_ERROR[]   = "\033[1;31m";
 
 #endif // CAPIO_COMMON_CONSTANTS_HPP

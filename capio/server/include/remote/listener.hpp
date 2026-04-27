@@ -50,7 +50,7 @@ inline Backend *select_backend(const std::string &backend_name, int argc, char *
     LOG("Backend %s does not exist in CAPIO. Reverting back to the default backend (none)",
         backend_name.c_str());
     server_println(CAPIO_LOG_SERVER_CLI_LEVEL_WARNING, "select_backend",
-                   " Backend " + backend_name +
+                   "Backend " + backend_name +
                        " does not exist. Reverting to the default backend (none)");
     return new NoneBackend(argc, argv);
 }
