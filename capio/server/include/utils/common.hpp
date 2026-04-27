@@ -83,13 +83,20 @@ inline bool is_int(const std::string &s) {
     return res;
 }
 
-inline void server_println(const std::string &message_type = "",
-                           const std::string &message_line = "") {
+inline void server_println(const std::string &message_type   = "",
+                           const std::string &component_name = "CAPIO",
+                           const std::string &message_line   = "") {
+    static char *node_name = nullptr;
+    if (node_name == nullptr) {
+        node_name = new char[HOST_NAME_MAX]{0};
+        gethostname(node_name, HOST_NAME_MAX);
+    }
+
     if (message_type.empty()) {
-        std::cout << std::endl;
+        std::cout << message_line << std::endl;
     } else {
-        std::cout << message_type << " " << get_capio_workflow_name() << "] " << message_line
-                  << std::endl
+        std::cout << message_type << " " << node_name << "][" << component_name << "] "
+                  << message_line << std::endl
                   << std::flush;
     }
 }

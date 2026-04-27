@@ -17,11 +17,11 @@ ClientManager::ClientDataBuffers::ClientDataBuffers(const std::string &clientToS
 ClientManager::ClientManager()
     : requests{SHM_COMM_CHAN_NAME, CAPIO_REQ_BUFF_CNT, CAPIO_REQ_MAX_SIZE,
                CapioCLEngine::get().getWorkflowName()} {
-    server_println(CAPIO_LOG_SERVER_CLI_LEVEL_INFO, "ClientManager initialization completed.");
+    server_println(CAPIO_LOG_SERVER_CLI_LEVEL_STATUS, "ClientManager", "initialization completed.");
 }
 
 ClientManager::~ClientManager() {
-    server_println(CAPIO_LOG_SERVER_CLI_LEVEL_WARNING, "ClientManager teardown completed.");
+    server_println(CAPIO_LOG_SERVER_CLI_LEVEL_WARNING, "ClientManager", "teardown completed.");
 }
 
 void ClientManager::registerClient(pid_t tid, const std::string &app_name, const bool wait) {
@@ -175,10 +175,12 @@ int ClientManager::readNextRequest(char *str) {
     if (ec == std::errc()) {
         strcpy(str, ptr + 1);
     } else {
-        std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_ERROR << "Received invalid request: " << str
-                  << std::endl
-                  << CAPIO_LOG_SERVER_CLI_LEVEL_ERROR << "Code " << code
-                  << " is not mapped to a valid request handler" << std::endl;
+        server_println(CAPIO_LOG_SERVER_CLI_LEVEL_ERROR, "readNextRequest",
+                       "Received invalid request: " + std::string(str));
+        server_println(CAPIO_LOG_SERVER_CLI_LEVEL_ERROR, "readNextRequest",
+                       "Code " + std::to_string(code) +
+                           " is not mapped to a valid request handler");
+
         return -1;
     }
     return code;

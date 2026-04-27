@@ -13,22 +13,18 @@ void sig_term_handler(int signum, siginfo_t *info, void *ptr) {
     START_LOG(gettid(), "call(signal=[%d] (%s) from process with pid=%ld)", signum,
               strsignal(signum), info != nullptr ? info->si_pid : -1);
 
-    std::cout << std::endl
-              << CAPIO_LOG_SERVER_CLI_LEVEL_WARNING << "shutting down server" << std::endl;
+    server_println(CAPIO_LOG_SERVER_CLI_LEVEL_WARNING, "shutting down server");
 
     if (signum == SIGSEGV) {
-        std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_ERROR << "Segfault detected!" << std::endl;
+        server_println(CAPIO_LOG_SERVER_CLI_LEVEL_ERROR, "Segfault detected!");
     }
 
     // free all the memory used
 
-    std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_WARNING << "shm cleanup completed" << std::endl;
-
     delete client_manager;
     delete storage_manager;
 
-    std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_WARNING << "data_buffers cleanup completed"
-              << std::endl;
+    server_println(CAPIO_LOG_SERVER_CLI_LEVEL_WARNING, "data_buffers cleanup completed");
 
 #ifdef CAPIO_COVERAGE
     __gcov_dump();
@@ -37,7 +33,7 @@ void sig_term_handler(int signum, siginfo_t *info, void *ptr) {
     delete backend;
     delete shm_canary;
 
-    std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_INFO << "shutdown completed" << std::endl;
+    server_println(CAPIO_LOG_SERVER_CLI_LEVEL_INFO, "shutdown completed");
     exit(EXIT_SUCCESS);
 }
 
