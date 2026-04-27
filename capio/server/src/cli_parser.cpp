@@ -3,6 +3,7 @@
 #include "common/constants.hpp"
 #include "common/logger.hpp"
 #include "utils/common.hpp"
+#include "utils/server_println.hpp"
 
 #include <args.hxx>
 

@@ -11,6 +11,7 @@
 
 #include "common/logger.hpp"
 
+
 #ifdef __CAPIO_POSIX
 
 #define SHM_DESTROY_CHECK(source_name)                                                             \
@@ -24,6 +25,8 @@
     };
 
 #else
+
+#include "utils/server_println.hpp"
 
 #define SHM_DESTROY_CHECK(source_name)                                                             \
     if (shm_unlink(source_name) == -1) {                                                           \
@@ -55,20 +58,22 @@ class CapioShmCanary {
         if (_shm_id == -1) {
             LOG(CAPIO_SHM_CANARY_ERROR, _canary_name.data());
 #ifndef __CAPIO_POSIX
-            auto message = new char[strlen(CAPIO_SHM_CANARY_ERROR)];
+            const auto message = new char[strlen(CAPIO_SHM_CANARY_ERROR)];
             sprintf(message, CAPIO_SHM_CANARY_ERROR, _canary_name.data());
-            std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_ERROR << message << std::endl;
+            server_println(CAPIO_LOG_SERVER_CLI_LEVEL_ERROR, "CapioShmCanary", message);
             delete[] message;
 #endif
             ERR_EXIT("ERR: shm canary flag already exists");
         }
+        server_println(CAPIO_LOG_SERVER_CLI_LEVEL_STATUS, "CapioShmCanary",
+                       "Created Capio SHM canary: " + _canary_name);
     };
 
     ~CapioShmCanary() {
         START_LOG(capio_syscall(SYS_gettid), "call()");
 #ifndef __CAPIO_POSIx
-        std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_WARNING << "Removing shared memory canary flag"
-                  << std::endl;
+        server_println(CAPIO_LOG_SERVER_CLI_LEVEL_WARNING, "CapioShmCanary",
+                       "Removing shared memory canary flag");
 #endif
         close(_shm_id);
         SHM_DESTROY_CHECK(_canary_name.c_str());

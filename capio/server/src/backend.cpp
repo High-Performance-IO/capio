@@ -1,6 +1,7 @@
 #include "remote/backend.hpp"
 
 #include "utils/common.hpp"
+#include "utils/server_println.hpp"
 
 #include <iostream>
 

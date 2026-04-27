@@ -3,6 +3,7 @@
 #include "common/logger.hpp"
 #include "remote/backend.hpp"
 #include "server/include/utils/common.hpp"
+#include "server/include/utils/server_println.hpp"
 #include "utils/shared_mutex.hpp"
 
 extern Backend *backend;
