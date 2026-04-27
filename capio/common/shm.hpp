@@ -5,7 +5,6 @@
 #include <utility>
 
 #include <fcntl.h>
-#include <iostream>
 #include <sys/mman.h>
 #include <sys/stat.h>
 #include <unistd.h>
@@ -43,48 +42,6 @@
     };
 
 #endif
-
-class CapioShmCanary {
-    int _shm_id;
-    std::string _canary_name;
-
-  public:
-    explicit CapioShmCanary(std::string capio_workflow_name) : _canary_name(capio_workflow_name) {
-        START_LOG(capio_syscall(SYS_gettid), "call(capio_workflow_name: %s)", _canary_name.data());
-        if (_canary_name.empty()) {
-            _canary_name = get_capio_workflow_name();
-        }
-        _shm_id = shm_open(_canary_name.data(), O_CREAT | O_EXCL, S_IRUSR | S_IWUSR);
-        if (_shm_id == -1) {
-            LOG(CAPIO_SHM_CANARY_ERROR, _canary_name.data());
-#ifndef __CAPIO_POSIX
-            const auto message = new char[strlen(CAPIO_SHM_CANARY_ERROR)];
-            sprintf(message, CAPIO_SHM_CANARY_ERROR, _canary_name.data());
-            server_println(message, capio_workflow_name, CAPIO_LOG_SERVER_CLI_LEVEL_ERROR,
-                           "CapioShmCanary");
-            delete[] message;
-#endif
-            ERR_EXIT("ERR: shm canary flag already exists");
-        }
-#ifndef __CAPIO_POSIX
-        server_println("Created Capio SHM canary: " + _canary_name, capio_workflow_name,
-                       CAPIO_LOG_SERVER_CLI_LEVEL_STATUS, "CapioShmCanary");
-#endif
-    };
-
-    ~CapioShmCanary() {
-        START_LOG(capio_syscall(SYS_gettid), "call()");
-#ifndef __CAPIO_POSIX
-        server_println("Removing shared memory canary flag", get_capio_workflow_name(),
-                       CAPIO_LOG_SERVER_CLI_LEVEL_WARNING, "CapioShmCanary");
-#endif
-        close(_shm_id);
-        SHM_DESTROY_CHECK(_canary_name.c_str());
-    }
-};
-
-// FIXME: Remove the inline specifier by using extern
-inline CapioShmCanary *shm_canary;
 
 inline void *create_shm(const std::string &shm_name, const long int size) {
     START_LOG(capio_syscall(SYS_gettid), "call(shm_name=%s, size=%ld)", shm_name.c_str(), size);
