@@ -28,7 +28,7 @@ inline void server_println(const std::string_view message_color  = "",
     // Get current time
     const auto in_time_t = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
 
-    std::cout << message_color << "[CAPIO-SERVER ~ " << get_capio_workflow_name() << "]"
+    std::cout << message_color << "[CAPIO-SERVER > " << get_capio_workflow_name() << "]"
               << CAPIO_LOG_SERVER_CLI_LEVEL_RESET << " ["
               << std::put_time(std::localtime(&in_time_t), "%Y-%m-%d %H:%M:%S") << "] " << " "
               << node_name << "@" << std::left << std::setw(20) << component_name.substr(0, 20)

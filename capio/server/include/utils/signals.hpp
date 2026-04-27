@@ -4,6 +4,7 @@
 #include <csignal>
 
 #include "remote/backend.hpp"
+#include "server_println.hpp"
 
 #ifdef CAPIO_COVERAGE
 extern "C" void __gcov_dump(void);
@@ -13,10 +14,10 @@ void sig_term_handler(int signum, siginfo_t *info, void *ptr) {
     START_LOG(gettid(), "call(signal=[%d] (%s) from process with pid=%ld)", signum,
               strsignal(signum), info != nullptr ? info->si_pid : -1);
 
-    server_println(CAPIO_LOG_SERVER_CLI_LEVEL_WARNING, "shutting down server");
+    server_println(CAPIO_LOG_SERVER_CLI_LEVEL_WARNING, "sig_term_handler", "shutting down server");
 
     if (signum == SIGSEGV) {
-        server_println(CAPIO_LOG_SERVER_CLI_LEVEL_ERROR, "Segfault detected!");
+        server_println(CAPIO_LOG_SERVER_CLI_LEVEL_ERROR, "sig_term_handler", "Segfault detected!");
     }
 
     // free all the memory used
@@ -24,7 +25,8 @@ void sig_term_handler(int signum, siginfo_t *info, void *ptr) {
     delete client_manager;
     delete storage_manager;
 
-    server_println(CAPIO_LOG_SERVER_CLI_LEVEL_WARNING, "data_buffers cleanup completed");
+    server_println(CAPIO_LOG_SERVER_CLI_LEVEL_WARNING, "sig_term_handler",
+                   "data_buffers cleanup completed");
 
 #ifdef CAPIO_COVERAGE
     __gcov_dump();
@@ -33,7 +35,7 @@ void sig_term_handler(int signum, siginfo_t *info, void *ptr) {
     delete backend;
     delete shm_canary;
 
-    server_println(CAPIO_LOG_SERVER_CLI_LEVEL_INFO, "shutdown completed");
+    server_println(CAPIO_LOG_SERVER_CLI_LEVEL_INFO, "sig_term_handler", "shutdown completed");
     exit(EXIT_SUCCESS);
 }
 
@@ -54,6 +56,8 @@ void setup_signal_handlers() {
     if (res == -1) {
         ERR_EXIT("sigaction for SIGTERM");
     }
+    server_println(CAPIO_LOG_SERVER_CLI_LEVEL_STATUS, "setup_signal_handlers",
+                   "Installed signal handlers");
 }
 
 #endif // CAPIO_SERVER_HANDLERS_SIGNALS_HPP
