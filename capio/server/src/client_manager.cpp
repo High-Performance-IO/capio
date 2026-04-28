@@ -40,6 +40,12 @@ void ClientManager::registerClient(pid_t tid, const std::string &app_name, const
     responses.try_emplace(tid, SHM_COMM_CHAN_NAME_RESP + std::to_string(tid), CAPIO_REQ_BUFF_CNT,
                           sizeof(off_t), CapioCLEngine::get().getWorkflowName());
 
+    DBG(tid, [](const int tid_app, const std::string &app_name) {
+        server_println(CapioCLEngine::get().getWorkflowName(), CAPIO_LOG_SERVER_CLI_LEVEL_INFO,
+                       "ClientManager",
+                       "Registered PID " + std::to_string(tid_app) + " with app name " + app_name);
+    }(tid, app_name));
+
     if (wait) {
         std::thread t([&, target_tid = tid]() {
             std::unique_lock<std::mutex> lock(mutex_thread_allowed_to_continue);
@@ -77,6 +83,12 @@ void ClientManager::removeClient(const pid_t tid) {
     if (const auto response_buffer = responses.find(tid); response_buffer != responses.end()) {
         responses.erase(response_buffer);
     }
+    DBG(tid, [](const int tid_app, const std::string &app_name) {
+        server_println(CapioCLEngine::get().getWorkflowName(), CAPIO_LOG_SERVER_CLI_LEVEL_WARNING,
+                       "ClientManager"
+                       "Removed PID " +
+                           std::to_string(tid_app) + " with app name " + app_name);
+    }(tid, app_name));
 }
 
 void ClientManager::replyToClient(const pid_t tid, const off64_t offset) {
