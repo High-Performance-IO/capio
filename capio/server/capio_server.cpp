@@ -1,7 +1,4 @@
-
-
 #include <algorithm>
-#include <args.hxx>
 #include <array>
 #include <cstdio>
 #include <cstring>
@@ -41,6 +38,7 @@ StorageManager *storage_manager;
 Backend *backend;
 
 #include "handlers.hpp"
+#include "utils/cli_parser.hpp"
 #include "utils/location.hpp"
 #include "utils/signals.hpp"
 
@@ -103,8 +101,8 @@ static constexpr std::array<CSHandler_t, CAPIO_NR_REQUESTS> build_request_handle
         LOG(CAPIO_LOG_SERVER_REQUEST_START);
         int code = client_manager->readNextRequest(str.get());
         if (code < 0 || code > CAPIO_NR_REQUESTS) {
-            std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_ERROR << "Received invalid code: " << code
-                      << std::endl;
+            server_println(CapioCLEngine::get().getWorkflowName(), CAPIO_LOG_SERVER_CLI_LEVEL_ERROR,
+                           "capio_server", "Received invalid code: " + std::to_string(code));
 
             ERR_EXIT("Error: received invalid request code");
         }
@@ -113,183 +111,35 @@ static constexpr std::array<CSHandler_t, CAPIO_NR_REQUESTS> build_request_handle
     }
 }
 
-int parseCLI(int argc, char **argv) {
-    Logger *log;
-
-    args::ArgumentParser parser(CAPIO_SERVER_ARG_PARSER_PRE, CAPIO_SERVER_ARG_PARSER_EPILOGUE);
-    parser.LongSeparator(" ");
-    parser.LongPrefix("--");
-    parser.ShortPrefix("-");
-
-    args::Group arguments(parser, "Arguments");
-    args::HelpFlag help(arguments, "help", "Display this help menu", {'h', "help"});
-    args::ValueFlag<std::string> logfile_src(arguments, "filename",
-                                             CAPIO_SERVER_ARG_PARSER_LOGILE_OPT_HELP, {'l', "log"});
-    args::ValueFlag<std::string> logfile_folder(
-        arguments, "filename", CAPIO_SERVER_ARG_PARSER_LOGILE_DIR_OPT_HELP, {'d', "log-dir"});
-    args::ValueFlag<std::string> resolve_prefix(arguments, "resolve-prefix",
-                                                CAPIO_SERVER_ARG_PARSER_RESOLVE_PREFIX_OPT_HELP,
-                                                {'r', "resolve-prefix"});
-
-    args::ValueFlag<std::string> config(arguments, "filename",
-                                        CAPIO_SERVER_ARG_PARSER_CONFIG_OPT_HELP, {'c', "config"});
-    args::Flag noConfigFile(arguments, "no-config",
-                            CAPIO_SERVER_ARG_PARSER_CONFIG_NO_CONF_FILE_HELP, {"no-config"});
-    args::ValueFlag<std::string> backend_flag(
-        arguments, "backend", CAPIO_SERVER_ARG_PARSER_CONFIG_BACKEND_HELP, {'b', "backend"});
-
-    args::Flag continueOnErrorFlag(arguments, "continue-on-error",
-                                   CAPIO_SERVER_ARG_PARSER_CONFIG_NCONTINUE_ON_ERROR_HELP,
-                                   {"continue-on-error"});
-    args::Flag mem_only_flag(arguments, "mem-only",
-                             CAPIO_SERVER_ARG_PARSER_STORE_ALL_IN_MEMORY_OPT_HELP, {"mem-only"});
-
-    try {
-        parser.ParseCLI(argc, argv);
-    } catch (args::Help &) {
-        std::cout << CAPIO_SERVER_ARG_PARSER_PRE_COMMAND << parser;
-        exit(EXIT_SUCCESS);
-    } catch (args::ParseError &e) {
-        std::cerr << e.what() << std::endl;
-        std::cerr << parser;
-        exit(EXIT_FAILURE);
-    } catch (args::ValidationError &e) {
-        std::cerr << e.what() << std::endl;
-        std::cerr << parser;
-        exit(EXIT_FAILURE);
-    }
-
-    if (continueOnErrorFlag) {
-#ifdef CAPIO_LOG
-        continue_on_error = true;
-        std::cout << CAPIO_LOG_SERVER_CLI_CONT_ON_ERR_WARNING << std::endl;
-#else
-        std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_WARNING
-                  << "--continue-on-error flag given, but logger is not compiled into CAPIO. Flag "
-                     "is ignored."
-                  << std::endl;
-#endif
-    }
-
-    if (logfile_folder) {
-#ifdef CAPIO_LOG
-        log_master_dir_name = args::get(logfile_folder);
-#else
-        std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_WARNING
-                  << "Capio logfile folder, but logging capabilities not compiled into capio!"
-                  << std::endl;
-#endif
-    }
-
-    if (logfile_src) {
-#ifdef CAPIO_LOG
-        // log file was given
-        std::string token = args::get(logfile_src);
-        if (token.find(".log") != std::string::npos) {
-            token.erase(token.length() - 4); // delete .log if for some reason
-            // is given as parameter
-        }
-        logfile_prefix = token;
-#else
-        std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_WARNING
-                  << "Capio logfile provided, but logging capabilities not compiled into capio!"
-                  << std::endl;
-#endif
-    }
-#ifdef CAPIO_LOG
-    auto logname = open_server_logfile();
-    log          = new Logger(__func__, __FILE__, __LINE__, gettid(), "Created new log file");
-    std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_INFO << "started logging to logfile " << logname
-              << std::endl;
-#endif
-    bool store_all_in_memory = false;
-
-    if (mem_only_flag) {
-        store_all_in_memory = args::get(mem_only_flag);
-    }
-
-    if (config) {
-
-        if (std::string token = args::get(config); token == "dynamic") {
-            std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_INFO
-                      << "Starting CAPIO-CL engine with dynamic configuration" << std::endl;
-
-            capio_cl_engine = new capiocl::engine::Engine();
-            capio_cl_engine->startApiServer();
-        } else {
-            std::filesystem::path resolve_path = "";
-
-            if (resolve_prefix) {
-                resolve_path = args::get(resolve_prefix);
-            }
-
-            std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_INFO << "parsing config file: " << token
-                      << std::endl;
-
-            capio_cl_engine =
-                capiocl::parser::Parser::parse(token, resolve_path, store_all_in_memory);
-        }
-
-    } else if (noConfigFile) {
-        capio_cl_engine = new capiocl::engine::Engine();
-        capio_cl_engine->setWorkflowName(get_capio_workflow_name());
-        if (store_all_in_memory) {
-            capio_cl_engine->setAllStoreInMemory();
-        }
-
-        std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_WARNING << "skipping config file parsing."
-                  << std::endl
-                  << CAPIO_LOG_SERVER_CLI_LEVEL_WARNING
-                  << "Obtained from environment variable current workflow name: "
-                  << capio_cl_engine->getWorkflowName() << std::endl;
-    } else {
-        std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_ERROR
-                  << "Error: no config file provided. To skip config file use --no-config option!"
-                  << std::endl;
-#ifdef CAPIO_LOG
-        log->log("no config file provided, and  --no-config not provided");
-#endif
-        exit(EXIT_FAILURE);
-    }
-
-    std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_INFO << "CAPIO_DIR=" << get_capio_dir().c_str()
-              << std::endl;
-
-    capio_cl_engine->print();
-
-#ifdef CAPIO_LOG
-    CAPIO_LOG_LEVEL = get_capio_log_level();
-    std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_INFO << "LOG_LEVEL set to: " << CAPIO_LOG_LEVEL
-              << std::endl;
-    std::cout << CAPIO_LOG_SERVER_CLI_LOGGING_ENABLED_WARNING;
-    log->log("LOG_LEVEL set to: %d", CAPIO_LOG_LEVEL);
-    delete log;
-#else
-    if (std::getenv("CAPIO_LOG_LEVEL") != nullptr) {
-        std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_WARNING
-                  << CAPIO_LOG_SERVER_CLI_LOGGING_NOT_AVAILABLE << std::endl;
-    }
-#endif
-
-    // Backend selection phase
-    std::string backend_name_str;
-    if (backend_flag) {
-        backend_name_str = args::get(backend_flag);
-    }
-    backend = select_backend(backend_name_str, argc, argv);
-
-    std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_INFO << "server initialization completed!" << std::endl
-              << std::flush;
-    return 0;
-}
-
 int main(int argc, char **argv) {
 
     Semaphore internal_server_sem(0);
 
-    std::cout << CAPIO_LOG_SERVER_BANNER;
+    for (const auto line : CAPIO_LOG_SERVER_BANNER) {
+        server_println("", "", "", line);
+    }
 
-    parseCLI(argc, argv);
+    const auto configuration = parseCLI(argc, argv);
+
+    if (configuration.capio_cl_dynamic_config) {
+        capio_cl_engine = new capiocl::engine::Engine();
+        capio_cl_engine->startApiServer();
+    } else if (!configuration.capio_cl_config_path.empty()) {
+        capio_cl_engine = capiocl::parser::Parser::parse(configuration.capio_cl_config_path,
+                                                         configuration.capio_cl_resolve_path,
+                                                         configuration.store_all_in_memory);
+    } else {
+        capio_cl_engine = new capiocl::engine::Engine();
+        capio_cl_engine->setWorkflowName(get_capio_workflow_name());
+    }
+
+    if (configuration.store_all_in_memory) {
+        capio_cl_engine->setAllStoreInMemory();
+    }
+
+    capio_cl_engine->print();
+
+    backend = select_backend(configuration.backend_name, argc, argv);
 
     START_LOG(gettid(), "call()");
 
@@ -303,6 +153,8 @@ int main(int argc, char **argv) {
     LOG("capio_server thread started");
     std::thread remote_listener_thread(capio_remote_listener, std::ref(internal_server_sem));
     LOG("capio_remote_listener thread started.");
+    server_println(CapioCLEngine::get().getWorkflowName(), CAPIO_LOG_SERVER_CLI_LEVEL_STATUS,
+                   "main", "Server instance successfully started!");
     server_thread.join();
     remote_listener_thread.join();
 
