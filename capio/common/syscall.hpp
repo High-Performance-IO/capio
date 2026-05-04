@@ -7,7 +7,18 @@
 
 #include <libsyscall_intercept_hook_point.h>
 
-#define capio_syscall syscall_no_intercept
+static inline int64_t capio_syscall(long number, ...) {
+    struct wrapper_ret result;
+    va_list args;
+
+    va_start(args, number);
+
+    result = syscall_no_intercept(number, args);
+
+    va_end(args);
+
+    return result.a0;
+}
 
 /* Allows CAPIO to deactivate syscalls hooking. */
 thread_local bool syscall_no_intercept_flag = false;
