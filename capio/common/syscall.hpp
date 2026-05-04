@@ -2,19 +2,17 @@
 #define CAPIO_COMMON_SYSCALL_HPP
 
 #include <syscall.h>
+#include <cstdarg>
 
 #ifdef __CAPIO_POSIX
 
 #include <libsyscall_intercept_hook_point.h>
 
 static inline int64_t capio_syscall(long number, ...) {
-    struct wrapper_ret result;
     va_list args;
 
     va_start(args, number);
-
-    result = syscall_no_intercept(number, args);
-
+    struct wrapper_ret result = syscall_no_intercept(number, args);
     va_end(args);
 
     return result.a0;
