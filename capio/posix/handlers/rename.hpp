@@ -10,7 +10,7 @@ int renameat2_handler(long arg0, long arg1, long arg2, long arg3, long arg4, lon
     const std::filesystem::path old_path(reinterpret_cast<const char *>(arg1));
     const std::filesystem::path new_dir_fd_path = get_dir_path(static_cast<int>(arg2));
     const std::filesystem::path new_path(reinterpret_cast<const char *>(arg3));
-    const long tid = syscall_no_intercept(SYS_gettid);
+    const long tid = capio_syscall(SYS_gettid);
 
     // TODO: implement handling of FLAGS
 

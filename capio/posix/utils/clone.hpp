@@ -13,8 +13,8 @@
  * is called after a SYS_clone is issued.
  */
 inline void initialize_new_thread(const bool wait = false) {
-    const long tid = syscall_no_intercept(SYS_gettid);
-    const long pid = syscall_no_intercept(SYS_getpid);
+    const long tid = capio_syscall(SYS_gettid);
+    const long pid = capio_syscall(SYS_getpid);
 
     syscall_no_intercept_flag = true;
     const auto capio_app_name = get_capio_app_name();
@@ -30,7 +30,7 @@ inline void initialize_new_thread(const bool wait = false) {
 }
 
 inline void hook_clone_parent(long child_tid) {
-    const auto tid = syscall_no_intercept(SYS_gettid);
+    const auto tid = capio_syscall(SYS_gettid);
     clone_request(tid, child_tid);
 }
 

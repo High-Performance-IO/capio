@@ -351,7 +351,7 @@ static int hook(long syscall_number, long arg0, long arg1, long arg2, long arg3,
     CAPIO_LOG_LEVEL = get_capio_log_level();
 #endif
 
-    START_LOG(syscall_no_intercept(SYS_gettid), "call(syscall_number=%ld)", syscall_number);
+    START_LOG(capio_syscall(SYS_gettid), "call(syscall_number=%ld)", syscall_number);
 
     // If the syscall_number is higher than the maximum
     // syscall captured by CAPIO, simply return
@@ -379,9 +379,9 @@ static int hook(long syscall_number, long arg0, long arg1, long arg2, long arg3,
             << "|  syscall(" << syscall_number << ", arg0:" << arg0 << ", arg1:" << arg1
             << ", arg2:" << arg2 << ", arg3:" << arg3 << ", arg4:" << arg4 << ", arg5: " << arg5
             << ")" << std::endl
-            << "|  TID of offending thread: " << syscall_no_intercept(SYS_gettid) << std::endl
-            << "|  PID of offending thread: " << syscall_no_intercept(SYS_getpid) << std::endl
-            << "|  PPID of offending thread: " << syscall_no_intercept(SYS_getppid) << std::endl
+            << "|  TID of offending thread: " << capio_syscall(SYS_gettid) << std::endl
+            << "|  PID of offending thread: " << capio_syscall(SYS_getpid) << std::endl
+            << "|  PPID of offending thread: " << capio_syscall(SYS_getppid) << std::endl
             << "|  " << std::endl
             << "|  `" << demangled_name(exception) << ": " << exception.what() << std::endl
             << "|" << std::endl
@@ -395,7 +395,7 @@ static int hook(long syscall_number, long arg0, long arg1, long arg2, long arg3,
 
 static __attribute__((constructor)) void init() {
 
-    const long tid = syscall_no_intercept(SYS_gettid);
+    const long tid = capio_syscall(SYS_gettid);
 
     init_client(tid);
     init_filesystem();

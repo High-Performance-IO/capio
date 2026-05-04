@@ -16,7 +16,7 @@ inline blkcnt_t get_nblocks(off64_t file_size) {
 }
 
 inline void fill_statbuf(struct stat *statbuf, off_t file_size, bool is_dir, ino_t inode) {
-    START_LOG(syscall_no_intercept(SYS_gettid),
+    START_LOG(capio_syscall(SYS_gettid),
               "call(statbuf=0x%08x, file_size=%ld, is_dir=%s, inode=%ul)", statbuf, file_size,
               is_dir ? "true" : "false", inode);
 
@@ -30,8 +30,8 @@ inline void fill_statbuf(struct stat *statbuf, off_t file_size, bool is_dir, ino
     statbuf->st_dev     = 100;
     statbuf->st_ino     = inode;
     statbuf->st_nlink   = 1;
-    statbuf->st_uid     = syscall_no_intercept(SYS_getuid);
-    statbuf->st_gid     = syscall_no_intercept(SYS_getgid);
+    statbuf->st_uid     = capio_syscall(SYS_getuid);
+    statbuf->st_gid     = capio_syscall(SYS_getgid);
     statbuf->st_rdev    = 0;
     statbuf->st_size    = file_size;
     statbuf->st_blksize = 4096;
@@ -143,7 +143,7 @@ inline int capio_fstatat(int dirfd, const std::string_view &pathname, struct sta
 int fstat_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg5, long *result) {
     auto fd   = static_cast<int>(arg0);
     auto *buf = reinterpret_cast<struct stat *>(arg1);
-    long tid  = syscall_no_intercept(SYS_gettid);
+    long tid  = capio_syscall(SYS_gettid);
 
     return posix_return_value(capio_fstat(fd, buf, tid), result);
 }
@@ -154,7 +154,7 @@ int fstatat_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long 
     const std::string_view pathname(reinterpret_cast<const char *>(arg1));
     auto *statbuf = reinterpret_cast<struct stat *>(arg2);
     auto flags    = static_cast<int>(arg3);
-    long tid      = syscall_no_intercept(SYS_gettid);
+    long tid      = capio_syscall(SYS_gettid);
 
     return posix_return_value(capio_fstatat(dirfd, pathname, statbuf, flags, tid), result);
 }
@@ -162,7 +162,7 @@ int fstatat_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long 
 int lstat_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg5, long *result) {
     const std::string_view pathname(reinterpret_cast<const char *>(arg0));
     auto *buf = reinterpret_cast<struct stat *>(arg1);
-    long tid  = syscall_no_intercept(SYS_gettid);
+    long tid  = capio_syscall(SYS_gettid);
 
     return posix_return_value(capio_lstat_wrapper(pathname, buf, tid), result);
 }
@@ -170,7 +170,7 @@ int lstat_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long ar
 int stat_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg5, long *result) {
     const std::string_view pathname(reinterpret_cast<const char *>(arg0));
     auto *buf = reinterpret_cast<struct stat *>(arg1);
-    long tid  = syscall_no_intercept(SYS_gettid);
+    long tid  = capio_syscall(SYS_gettid);
 
     return posix_return_value(capio_lstat_wrapper(pathname, buf, tid), result);
 }

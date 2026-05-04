@@ -15,7 +15,7 @@
  */
 
 int exit_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg5, long *result) {
-    long tid = syscall_no_intercept(SYS_gettid);
+    long tid = capio_syscall(SYS_gettid);
     START_LOG(tid, "call()");
 
     LOG("Thread %d is a CAPIO thread: clean up", tid);

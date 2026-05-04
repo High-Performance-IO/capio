@@ -63,7 +63,7 @@ inline off64_t capio_unlinkat(int dirfd, const std::string_view &pathname, int f
 
 int unlink_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg5, long *result) {
     const std::string_view pathname(reinterpret_cast<const char *>(arg0));
-    long tid = syscall_no_intercept(SYS_gettid);
+    long tid = capio_syscall(SYS_gettid);
 
     return posix_return_value(capio_unlinkat(AT_FDCWD, pathname, 0, tid), result);
 }
@@ -73,7 +73,7 @@ int unlinkat_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long
     int dirfd = static_cast<int>(arg0);
     const std::string_view pathname(reinterpret_cast<const char *>(arg1));
     int flags = static_cast<int>(arg2);
-    long tid  = syscall_no_intercept(SYS_gettid);
+    long tid  = capio_syscall(SYS_gettid);
 
     return posix_return_value(capio_unlinkat(dirfd, pathname, flags, tid), result);
 }

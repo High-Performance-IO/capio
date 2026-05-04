@@ -37,7 +37,7 @@ inline int capio_openat(int dirfd, const std::string_view &pathname, int flags, 
 
     if (is_capio_path(path)) {
         int fd =
-            static_cast<int>(syscall_no_intercept(SYS_openat, AT_FDCWD, "/dev/null", O_RDONLY));
+            static_cast<int>(capio_syscall(SYS_openat, AT_FDCWD, "/dev/null", O_RDONLY));
         if (fd == -1) {
             ERR_EXIT("capio_open, /dev/null opening");
         }
@@ -82,7 +82,7 @@ inline int capio_openat(int dirfd, const std::string_view &pathname, int flags, 
 
 int creat_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg5, long *result) {
     const std::string_view pathname(reinterpret_cast<const char *>(arg0));
-    long tid = syscall_no_intercept(SYS_gettid);
+    long tid = capio_syscall(SYS_gettid);
 
     return posix_return_value(capio_openat(AT_FDCWD, pathname, O_CREAT | O_WRONLY | O_TRUNC, tid),
                               result);
@@ -91,7 +91,7 @@ int creat_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long ar
 int open_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg5, long *result) {
     const std::string_view pathname(reinterpret_cast<const char *>(arg0));
     int flags = static_cast<int>(arg1);
-    long tid  = syscall_no_intercept(SYS_gettid);
+    long tid  = capio_syscall(SYS_gettid);
 
     return posix_return_value(capio_openat(AT_FDCWD, pathname, flags, tid), result);
 }
@@ -100,7 +100,7 @@ int openat_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long a
     int dirfd = static_cast<int>(arg0);
     const std::string_view pathname(reinterpret_cast<const char *>(arg1));
     int flags = static_cast<int>(arg2);
-    long tid  = syscall_no_intercept(SYS_gettid);
+    long tid  = capio_syscall(SYS_gettid);
 
     return posix_return_value(capio_openat(dirfd, pathname, flags, tid), result);
 }

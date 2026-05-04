@@ -52,7 +52,7 @@ int read_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg
     int fd       = static_cast<int>(arg0);
     void *buffer = reinterpret_cast<void *>(arg1);
     auto count   = static_cast<off64_t>(arg2);
-    long tid     = syscall_no_intercept(SYS_gettid);
+    long tid     = capio_syscall(SYS_gettid);
 
     return posix_return_value(capio_read(fd, buffer, count, tid), result);
 }
@@ -61,7 +61,7 @@ int readv_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long ar
     auto fd         = static_cast<int>(arg0);
     const auto *iov = reinterpret_cast<const struct iovec *>(arg1);
     auto iovcnt     = static_cast<int>(arg2);
-    long tid        = syscall_no_intercept(SYS_gettid);
+    long tid        = capio_syscall(SYS_gettid);
 
     return posix_return_value(capio_readv(fd, iov, iovcnt, tid), result);
 }

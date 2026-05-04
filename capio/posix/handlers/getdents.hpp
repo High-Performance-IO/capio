@@ -12,7 +12,7 @@ inline int getdents_handler_impl(long arg0, long arg1, long arg2, long *result, 
     auto fd      = static_cast<int>(arg0);
     auto *buffer = reinterpret_cast<struct linux_dirent64 *>(arg1);
     auto count   = static_cast<off64_t>(arg2);
-    long tid     = syscall_no_intercept(SYS_gettid);
+    long tid     = capio_syscall(SYS_gettid);
 
     START_LOG(tid, "call(fd=%d, dirp=0x%08x, count=%ld, is64bit=%s)", fd, buffer, count,
               is64bit ? "true" : "false");
@@ -27,7 +27,7 @@ inline int getdents_handler_impl(long arg0, long arg1, long arg2, long *result, 
         *result = read_cache->read(fd, buffer, count, true, is64bit);
 
         DBG(tid, [](char *buf, off64_t count) {
-            START_LOG(syscall_no_intercept(SYS_gettid), "call (count=%ld)", count);
+            START_LOG(capio_syscall(SYS_gettid), "call (count=%ld)", count);
             struct linux_dirent64 *d;
             LOG("%25s %12s %13s %15s   %s", "INODE", "TYPE", "RECORD_LENGTH", "OFFSET", "NAME");
             for (off64_t bpos = 0, i = 0; bpos < count && i < 10; i++) {

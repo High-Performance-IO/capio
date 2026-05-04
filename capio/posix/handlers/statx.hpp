@@ -7,7 +7,7 @@
 
 inline void fill_statxbuf(struct statx *statxbuf, off_t file_size, bool is_dir, ino_t inode,
                           int mask) {
-    START_LOG(syscall_no_intercept(SYS_gettid), "call(filesize=%ld, is_dir=%s, inode=%d, mask=%d)",
+    START_LOG(capio_syscall(SYS_gettid), "call(filesize=%ld, is_dir=%s, inode=%d, mask=%d)",
               file_size, is_dir ? "true" : "false", mask);
 
     statx_timestamp time{1, 1};
@@ -23,8 +23,8 @@ inline void fill_statxbuf(struct statx *statxbuf, off_t file_size, bool is_dir, 
     statxbuf->stx_attributes_mask = 0;
     statxbuf->stx_blksize         = 4096;
     statxbuf->stx_nlink           = 1;
-    statxbuf->stx_uid             = syscall_no_intercept(SYS_getuid);
-    statxbuf->stx_gid             = syscall_no_intercept(SYS_getgid);
+    statxbuf->stx_uid             = capio_syscall(SYS_getuid);
+    statxbuf->stx_gid             = capio_syscall(SYS_getgid);
     statxbuf->stx_ino             = inode;
     statxbuf->stx_size            = file_size;
     statxbuf->stx_blocks          = (file_size < 4096) ? 8 : get_nblocks(file_size);
@@ -107,7 +107,7 @@ int statx_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long ar
     auto flags = static_cast<int>(arg2);
     auto mask  = static_cast<int>(arg3);
     auto *buf  = reinterpret_cast<struct statx *>(arg4);
-    long tid   = syscall_no_intercept(SYS_gettid);
+    long tid   = capio_syscall(SYS_gettid);
 
     return posix_return_value(capio_statx(dirfd, pathname, flags, mask, buf, tid), result);
 }

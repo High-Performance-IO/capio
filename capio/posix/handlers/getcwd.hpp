@@ -6,7 +6,7 @@
 int getcwd_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg5, long *result) {
     auto buf  = reinterpret_cast<char *>(arg0);
     auto size = static_cast<size_t>(arg1);
-    long tid  = syscall_no_intercept(SYS_gettid);
+    long tid  = capio_syscall(SYS_gettid);
 
     START_LOG(tid, "call(buf=0x%08x, size=%ld)", buf, size);
 
