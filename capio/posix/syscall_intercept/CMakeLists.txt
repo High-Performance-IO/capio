@@ -19,7 +19,8 @@ ExternalProject_Add(capstone_project
         -DCMAKE_BUILD_TYPE=Release
         -DCAPSTONE_BUILD_TESTS=OFF
         -DCAPSTONE_BUILD_C99=ON
-        # Ensure it's built and installed locally
+        -DCAPSTONE_ARCHITECTURE_DEFAULT=OFF
+        -DCAPSTONE_RISCV_SUPPORT=ON
 )
 
 #####################################
