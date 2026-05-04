@@ -29,7 +29,7 @@ ExternalProject_Add(capstone_project
 ExternalProject_Add(syscall_intercept
         GIT_REPOSITORY https://github.com/slate5/syscall_intercept.git
         GIT_TAG riscv
-        PREFIX ${CMAKE_CURRENT_BINARY_DIR}/syscall_intercept
+        PREFIX ${CMAKE_CURRENT_BINARY_DIR}/
 
         # This ensures capstone finishes installing before this starts configuring
         DEPENDS capstone_project
