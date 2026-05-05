@@ -393,7 +393,7 @@ static int hook(long syscall_number, long arg0, long arg1, long arg2, long arg3,
     }
 }
 
-static __attribute__((constructor)) void init() {
+static __attribute__((constructor)) void init(void) {
 
     const long tid = capio_syscall(SYS_gettid);
 
@@ -405,8 +405,8 @@ static __attribute__((constructor)) void init() {
         initialize_from_snapshot(fd_shm, tid);
     }
 
-    intercept_hook_point_clone_child  = hook_clone_child;
-    intercept_hook_point_clone_parent = hook_clone_parent;
+//    intercept_hook_point_clone_child  = hook_clone_child;
+//    intercept_hook_point_clone_parent = hook_clone_parent;
     intercept_hook_point              = hook;
     START_SYSCALL_LOGGING();
 }

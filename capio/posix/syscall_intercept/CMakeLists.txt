@@ -27,7 +27,7 @@ ExternalProject_Add(capstone_project
 # 2. Syscall Intercept External Project
 #####################################
 ExternalProject_Add(syscall_intercept
-        GIT_REPOSITORY https://github.com/slate5/syscall_intercept.git
+        GIT_REPOSITORY https://github.com/GekkoFS/syscall_intercept.git
         GIT_TAG riscv
         PREFIX ${CMAKE_CURRENT_BINARY_DIR}/
 
@@ -48,6 +48,6 @@ ExternalProject_Add(syscall_intercept
         -Dcapstone_dir=${EXT_INSTALL_DIR}
 
         # Brute force paths for the compiler/linker
-        -DCMAKE_C_FLAGS=-I${EXT_INSTALL_DIR}/include/capstone
+        -DCMAKE_C_FLAGS=-I${EXT_INSTALL_DIR}/include/
         -DCMAKE_SHARED_LINKER_FLAGS=-L${EXT_INSTALL_DIR}/lib
 )
