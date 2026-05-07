@@ -27,3 +27,4 @@ void NoneBackend::recv_file(char *shm, const std::string &source, const long int
     START_LOG(gettid(), "call(shm=%ld, source=%s, bytes_expected=%ld)", shm, source.c_str(),
               bytes_expected);
 }
+void NoneBackend::connect_to(const std::string &target) { return; }
