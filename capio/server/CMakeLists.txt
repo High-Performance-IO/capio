@@ -19,7 +19,7 @@ FetchContent_Declare(
 set(ARGS_BUILD_EXAMPLE OFF CACHE INTERNAL "")
 set(ARGS_BUILD_UNITTESTS OFF CACHE INTERNAL "")
 
-FetchContent_MakeAvailable(args capio_cl)
+FetchContent_MakeAvailable(args capio_cl mtcl)
 
 #####################################
 # Target definition
@@ -39,6 +39,7 @@ target_include_directories(${TARGET_NAME} PRIVATE
         ${MPI_INCLUDE_PATH}
         ${args_SOURCE_DIR}
         ${capio_cl_SOURCE_DIR}
+        ${mtcl_SOURCE_DIR}/include
 )
 
 #####################################
