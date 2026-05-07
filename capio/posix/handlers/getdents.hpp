@@ -8,26 +8,26 @@
 #include "utils/data.hpp"
 
 // TODO: too similar to capio_read, refactoring needed
-inline int getdents_handler_impl(long arg0, long arg1, long arg2, long *result, bool is64bit) {
+inline int getdents_handler_impl(pid_t tid, long arg0, long arg1, long arg2, long *result,
+                                 bool is64bit) {
     auto fd      = static_cast<int>(arg0);
     auto *buffer = reinterpret_cast<struct linux_dirent64 *>(arg1);
     auto count   = static_cast<off64_t>(arg2);
-    long tid     = syscall_no_intercept(SYS_gettid);
 
     START_LOG(tid, "call(fd=%d, dirp=0x%08x, count=%ld, is64bit=%s)", fd, buffer, count,
               is64bit ? "true" : "false");
 
-    if (exists_capio_fd(fd)) {
+    if (exists_capio_fd(tid, fd)) {
         LOG("fd=%d, is a capio file descriptor", fd);
 
         if (count >= SSIZE_MAX) {
             ERR_EXIT("src does not support read bigger than SSIZE_MAX yet");
         }
-        write_cache->flush();
-        *result = read_cache->read(fd, buffer, count, true, is64bit);
+        write_cache->flush(tid);
+        *result = read_cache->read(tid, fd, buffer, count, true, is64bit);
 
-        DBG(tid, [](char *buf, off64_t count) {
-            START_LOG(syscall_no_intercept(SYS_gettid), "call (count=%ld)", count);
+        DBG(tid, [](pid_t tid, char *buf, off64_t count) {
+            START_LOG(tid, "call (count=%ld)", count);
             struct linux_dirent64 *d;
             LOG("%25s %12s %13s %15s   %s", "INODE", "TYPE", "RECORD_LENGTH", "OFFSET", "NAME");
             for (off64_t bpos = 0, i = 0; bpos < count && i < 10; i++) {
@@ -44,7 +44,7 @@ inline int getdents_handler_impl(long arg0, long arg1, long arg2, long *result, 
                     d->d_reclen, d->d_off, d->d_name);
                 bpos += d->d_reclen;
             }
-        }(reinterpret_cast<char *>(buffer), *result));
+        }(tid, reinterpret_cast<char *>(buffer), *result));
 
         return CAPIO_POSIX_SYSCALL_SUCCESS;
     } else {
@@ -53,14 +53,14 @@ inline int getdents_handler_impl(long arg0, long arg1, long arg2, long *result, 
     return CAPIO_POSIX_SYSCALL_SKIP;
 }
 
-inline int getdents_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg5,
-                            long *result) {
-    return getdents_handler_impl(arg0, arg1, arg2, result, false);
+inline int getdents_handler(pid_t tid, long arg0, long arg1, long arg2, long arg3, long arg4,
+                            long arg5, long *result) {
+    return getdents_handler_impl(tid, arg0, arg1, arg2, result, false);
 }
 
-inline int getdents64_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg5,
-                              long *result) {
-    return getdents_handler_impl(arg0, arg1, arg2, result, true);
+inline int getdents64_handler(pid_t tid, long arg0, long arg1, long arg2, long arg3, long arg4,
+                              long arg5, long *result) {
+    return getdents_handler_impl(tid, arg0, arg1, arg2, result, true);
 }
 
 #endif // SYS_getdents || SYS_getdents64
