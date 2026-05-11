@@ -21,6 +21,7 @@ ExternalProject_Add(capstone_project
         -DCAPSTONE_BUILD_C99=ON
         -DCAPSTONE_ARCHITECTURE_DEFAULT=OFF
         -DCAPSTONE_RISCV_SUPPORT=ON
+	-DCMAKE_POSITION_INDEPENDENT_CODE=ON
 )
 
 #####################################
@@ -49,5 +50,7 @@ ExternalProject_Add(syscall_intercept
 
         # Brute force paths for the compiler/linker
         -DCMAKE_C_FLAGS=-I${EXT_INSTALL_DIR}/include/
-        -DCMAKE_SHARED_LINKER_FLAGS=-L${EXT_INSTALL_DIR}/lib
+        -DCMAKE_SHARED_LINKER_FLAGS=-L${EXT_INSTALL_DIR}/lib 
+
+	-DCMAKE_POSITION_INDEPENDENT_CODE=ON
 )
