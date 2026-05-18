@@ -21,7 +21,7 @@ inline void server_println(const std::string_view workflow_name  = CAPIO_DEFAULT
     }();
 
     if (message_color.empty()) {
-        std::cout << message_line << "\n";
+        std::cout << message_line << std::endl;
         return;
     }
 
