@@ -102,7 +102,7 @@ static constexpr std::array<CSHandler_t, CAPIO_NR_REQUESTS> build_request_handle
         int code = client_manager->readNextRequest(str.get());
         if (code < 0 || code > CAPIO_NR_REQUESTS) {
             server_println(CapioCLEngine::get().getWorkflowName(), CAPIO_LOG_SERVER_CLI_LEVEL_ERROR,
-                           "capio_server", "Received invalid code: " + std::to_string(code));
+                           __func__, "Received invalid code: " + std::to_string(code));
 
             ERR_EXIT("Error: received invalid request code");
         }
