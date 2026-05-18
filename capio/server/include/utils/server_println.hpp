@@ -6,10 +6,10 @@
 
 #include "common/constants.hpp"
 
-inline void server_println(const std::string_view workflow_name  = CAPIO_DEFAULT_WORKFLOW_NAME,
+inline void server_println(const std::string_view message_line,
+                           const std::string_view workflow_name  = CAPIO_DEFAULT_WORKFLOW_NAME,
                            const std::string_view message_color  = CAPIO_LOG_SERVER_CLI_LEVEL_RESET,
-                           const std::string_view component_name = "CAPIO",
-                           const std::string_view message_line   = "") {
+                           const std::string_view component_name = "CAPIO") {
 
     static char node_name[HOST_NAME_MAX];
     // static init once the nodename

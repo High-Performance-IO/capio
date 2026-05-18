@@ -22,15 +22,15 @@ MPIBackend::MPIBackend(int argc, char **argv) : Backend(MPI_MAX_PROCESSOR_NAME) 
     nodes.emplace(node_name);
     rank_to_hostname[rank]      = node_name;
     hostname_to_rank[node_name] = rank;
-    server_println(CapioCLEngine::get().getWorkflowName(), CAPIO_LOG_SERVER_CLI_LEVEL_STATUS,
-                   "MPIBackend", "initialization completed.");
+    server_println("initialization completed.", CapioCLEngine::get().getWorkflowName(),
+                   CAPIO_LOG_SERVER_CLI_LEVEL_STATUS, "MPIBackend");
 }
 
 MPIBackend::~MPIBackend() {
     START_LOG(gettid(), "Call()");
     MPI_Finalize();
-    server_println(CapioCLEngine::get().getWorkflowName(), CAPIO_LOG_SERVER_CLI_LEVEL_INFO,
-                   "MPIBackend", "teardown completed.");
+    server_println("teardown completed.", CapioCLEngine::get().getWorkflowName(),
+                   CAPIO_LOG_SERVER_CLI_LEVEL_INFO, "MPIBackend");
 }
 
 const std::set<std::string> MPIBackend::get_nodes() { return nodes; }
@@ -123,15 +123,15 @@ void MPIBackend::recv_file(char *shm, const std::string &source, long int bytes_
 MPISYNCBackend::MPISYNCBackend(int argc, char *argv[]) : MPIBackend(argc, argv) {
     START_LOG(gettid(), "call()");
     LOG("Wrapped MPI backend with MPISYC backend");
-    server_println(CapioCLEngine::get().getWorkflowName(), CAPIO_LOG_SERVER_CLI_LEVEL_STATUS,
-                   "MPISYNCBackend", "initialization completed.");
+    server_println("initialization completed.", CapioCLEngine::get().getWorkflowName(),
+                   CAPIO_LOG_SERVER_CLI_LEVEL_STATUS, "MPISYNCBackend");
 }
 
 MPISYNCBackend::~MPISYNCBackend() {
     START_LOG(gettid(), "Call()");
     MPI_Finalize();
-    server_println(CapioCLEngine::get().getWorkflowName(), CAPIO_LOG_SERVER_CLI_LEVEL_INFO,
-                   "MPISYNCBackend", "teardown completed.");
+    server_println("teardown completed.", CapioCLEngine::get().getWorkflowName(),
+                   CAPIO_LOG_SERVER_CLI_LEVEL_INFO, "MPISYNCBackend");
 }
 
 RemoteRequest MPISYNCBackend::read_next_request() {

@@ -6,8 +6,8 @@
 
 NoneBackend::NoneBackend(int argc, char **argv) : Backend(HOST_NAME_MAX) {
     START_LOG(gettid(), "call()");
-    server_println(CapioCLEngine::get().getWorkflowName(), CAPIO_LOG_SERVER_CLI_LEVEL_STATUS,
-                   "NoneBackend", "initialization completed.");
+    server_println("initialization completed.", CapioCLEngine::get().getWorkflowName(),
+                   CAPIO_LOG_SERVER_CLI_LEVEL_STATUS, "NoneBackend");
 }
 
 RemoteRequest NoneBackend::read_next_request() {

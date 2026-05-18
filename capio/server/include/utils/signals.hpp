@@ -14,12 +14,12 @@ void sig_term_handler(int signum, siginfo_t *info, void *ptr) {
     START_LOG(gettid(), "call(signal=[%d] (%s) from process with pid=%ld)", signum,
               strsignal(signum), info != nullptr ? info->si_pid : -1);
 
-    server_println(CapioCLEngine::get().getWorkflowName(), CAPIO_LOG_SERVER_CLI_LEVEL_WARNING,
-                   "sig_term_handler", "shutting down server");
+    server_println("shutting down server", CapioCLEngine::get().getWorkflowName(),
+                   CAPIO_LOG_SERVER_CLI_LEVEL_WARNING, __func__);
 
     if (signum == SIGSEGV) {
-        server_println(CapioCLEngine::get().getWorkflowName(), CAPIO_LOG_SERVER_CLI_LEVEL_ERROR,
-                       "sig_term_handler", "Segfault detected!");
+        server_println("Segfault detected!", CapioCLEngine::get().getWorkflowName(),
+                       CAPIO_LOG_SERVER_CLI_LEVEL_ERROR, __func__);
     }
 
     // free all the memory used
@@ -27,8 +27,8 @@ void sig_term_handler(int signum, siginfo_t *info, void *ptr) {
     delete client_manager;
     delete storage_manager;
 
-    server_println(CapioCLEngine::get().getWorkflowName(), CAPIO_LOG_SERVER_CLI_LEVEL_WARNING,
-                   "sig_term_handler", "data_buffers cleanup completed");
+    server_println("data_buffers cleanup completed", CapioCLEngine::get().getWorkflowName(),
+                   CAPIO_LOG_SERVER_CLI_LEVEL_WARNING, __func__);
 
 #ifdef CAPIO_COVERAGE
     __gcov_dump();
@@ -37,8 +37,8 @@ void sig_term_handler(int signum, siginfo_t *info, void *ptr) {
     delete backend;
     delete shm_canary;
 
-    server_println(CapioCLEngine::get().getWorkflowName(), CAPIO_LOG_SERVER_CLI_LEVEL_INFO,
-                   "sig_term_handler", "shutdown completed");
+    server_println("shutdown completed", CapioCLEngine::get().getWorkflowName(),
+                   CAPIO_LOG_SERVER_CLI_LEVEL_INFO, __func__);
     exit(EXIT_SUCCESS);
 }
 
@@ -59,8 +59,8 @@ void setup_signal_handlers() {
     if (res == -1) {
         ERR_EXIT("sigaction for SIGTERM");
     }
-    server_println(CapioCLEngine::get().getWorkflowName(), CAPIO_LOG_SERVER_CLI_LEVEL_STATUS,
-                   "setup_signal_handlers", "Installed signal handlers");
+    server_println("Installed signal handlers", CapioCLEngine::get().getWorkflowName(),
+                   CAPIO_LOG_SERVER_CLI_LEVEL_STATUS, __func__);
 }
 
 #endif // CAPIO_SERVER_HANDLERS_SIGNALS_HPP
