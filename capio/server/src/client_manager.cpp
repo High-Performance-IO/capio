@@ -7,6 +7,7 @@
 #include "common/queue.hpp"
 #include "utils/capiocl_adapter.hpp"
 #include "utils/common.hpp"
+#include "utils/server_println.hpp"
 
 ClientManager::ClientDataBuffers::ClientDataBuffers(const std::string &clientToServerName,
                                                     const std::string &serverToClientName,
@@ -17,11 +18,13 @@ ClientManager::ClientDataBuffers::ClientDataBuffers(const std::string &clientToS
 ClientManager::ClientManager()
     : requests{SHM_COMM_CHAN_NAME, CAPIO_REQ_BUFF_CNT, CAPIO_REQ_MAX_SIZE,
                CapioCLEngine::get().getWorkflowName()} {
-    server_println(CAPIO_LOG_SERVER_CLI_LEVEL_INFO, "ClientManager initialization completed.");
+    server_println("initialization completed.", CapioCLEngine::get().getWorkflowName(),
+                   CAPIO_LOG_SERVER_CLI_LEVEL_STATUS, "ClientManager");
 }
 
 ClientManager::~ClientManager() {
-    server_println(CAPIO_LOG_SERVER_CLI_LEVEL_WARNING, "ClientManager teardown completed.");
+    server_println("teardown completed.", CapioCLEngine::get().getWorkflowName(),
+                   CAPIO_LOG_SERVER_CLI_LEVEL_WARNING, "ClientManager");
 }
 
 void ClientManager::registerClient(pid_t tid, const std::string &app_name, const bool wait) {
@@ -36,6 +39,12 @@ void ClientManager::registerClient(pid_t tid, const std::string &app_name, const
 
     responses.try_emplace(tid, SHM_COMM_CHAN_NAME_RESP + std::to_string(tid), CAPIO_REQ_BUFF_CNT,
                           sizeof(off_t), CapioCLEngine::get().getWorkflowName());
+
+    DBG(tid, [](const int tid_app, const std::string &app_name) {
+        server_println("Registered PID " + std::to_string(tid_app) + " with app name " + app_name,
+                       CapioCLEngine::get().getWorkflowName(), CAPIO_LOG_SERVER_CLI_LEVEL_INFO,
+                       "ClientManager");
+    }(tid, app_name));
 
     if (wait) {
         std::thread t([&, target_tid = tid]() {
@@ -74,6 +83,11 @@ void ClientManager::removeClient(const pid_t tid) {
     if (const auto response_buffer = responses.find(tid); response_buffer != responses.end()) {
         responses.erase(response_buffer);
     }
+    DBG(tid, [](const int tid_app, const std::string &app_name) {
+        server_println("Removed PID " + std::to_string(tid_app) + " with app name " + app_name,
+                       CapioCLEngine::get().getWorkflowName(), CAPIO_LOG_SERVER_CLI_LEVEL_WARNING,
+                       "ClientManager");
+    }(tid, app_name));
 }
 
 void ClientManager::replyToClient(const pid_t tid, const off64_t offset) {
@@ -175,10 +189,13 @@ int ClientManager::readNextRequest(char *str) {
     if (ec == std::errc()) {
         strcpy(str, ptr + 1);
     } else {
-        std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_ERROR << "Received invalid request: " << str
-                  << std::endl
-                  << CAPIO_LOG_SERVER_CLI_LEVEL_ERROR << "Code " << code
-                  << " is not mapped to a valid request handler" << std::endl;
+        server_println("Received invalid request: " + std::string(str),
+                       CapioCLEngine::get().getWorkflowName(), CAPIO_LOG_SERVER_CLI_LEVEL_ERROR,
+                       __func__);
+        server_println("Code " + std::to_string(code) + " is not mapped to a valid request handler",
+                       CapioCLEngine::get().getWorkflowName(), CAPIO_LOG_SERVER_CLI_LEVEL_ERROR,
+                       __func__);
+
         return -1;
     }
     return code;

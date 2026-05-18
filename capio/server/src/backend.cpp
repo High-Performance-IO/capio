@@ -1,5 +1,8 @@
 #include "remote/backend.hpp"
 
+#include "utils/common.hpp"
+#include "utils/server_println.hpp"
+
 #include <iostream>
 
 Backend::Backend(const unsigned int node_name_max_length)
@@ -9,11 +12,11 @@ Backend::Backend(const unsigned int node_name_max_length)
 
     gethostname(node_name.data(), node_name_max_length);
     node_name.resize(strlen(node_name.data()));
-
-    std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_INFO << " Backend] Node name: " << node_name
-              << std::endl;
-    std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_INFO << " Backend] Node Count: " << n_servers
-              << std::endl;
+    server_println("Node name: " + node_name, CapioCLEngine::get().getWorkflowName(),
+                   CAPIO_LOG_SERVER_CLI_LEVEL_INFO, "Backend");
+    server_println("Node count: " + std::to_string(n_servers),
+                   CapioCLEngine::get().getWorkflowName(), CAPIO_LOG_SERVER_CLI_LEVEL_INFO,
+                   "Backend");
 }
 
 [[nodiscard]] const std::string &Backend::get_node_name() const {

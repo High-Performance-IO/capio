@@ -1,6 +1,7 @@
 #ifndef CAPIO_SERVER_UTILS_COMMON_HPP
 #define CAPIO_SERVER_UTILS_COMMON_HPP
 
+#include <iomanip>
 #include <string>
 #include <thread>
 
@@ -81,17 +82,6 @@ inline bool is_int(const std::string &s) {
         res = *p == 0;
     }
     return res;
-}
-
-inline void server_println(const std::string &message_type = "",
-                           const std::string &message_line = "") {
-    if (message_type.empty()) {
-        std::cout << std::endl;
-    } else {
-        std::cout << message_type << " " << get_capio_workflow_name() << "] " << message_line
-                  << std::endl
-                  << std::flush;
-    }
 }
 
 #endif // CAPIO_SERVER_UTILS_COMMON_HPP

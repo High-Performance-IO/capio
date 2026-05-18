@@ -3,6 +3,7 @@
 #include "common/logger.hpp"
 #include "remote/backend.hpp"
 #include "server/include/utils/common.hpp"
+#include "server/include/utils/server_println.hpp"
 #include "utils/shared_mutex.hpp"
 
 extern Backend *backend;
@@ -33,8 +34,9 @@ CapioFile::~CapioFile() {
             delete[] _buf;
         } else {
             if (munmap(_buf, _buf_size) == -1) {
-                server_println(CAPIO_LOG_SERVER_CLI_LEVEL_WARNING,
-                               "WARN: unable to unmap CapioFile: " + std::string(strerror(errno)));
+                server_println("WARN: unable to unmap CapioFile: " + std::string(strerror(errno)),
+                               CapioCLEngine::get().getWorkflowName(),
+                               CAPIO_LOG_SERVER_CLI_LEVEL_WARNING, "CapioFile");
             }
         }
     } else {

@@ -4,6 +4,7 @@
 #include <csignal>
 
 #include "remote/backend.hpp"
+#include "server_println.hpp"
 
 #ifdef CAPIO_COVERAGE
 extern "C" void __gcov_dump(void);
@@ -13,22 +14,21 @@ void sig_term_handler(int signum, siginfo_t *info, void *ptr) {
     START_LOG(gettid(), "call(signal=[%d] (%s) from process with pid=%ld)", signum,
               strsignal(signum), info != nullptr ? info->si_pid : -1);
 
-    std::cout << std::endl
-              << CAPIO_LOG_SERVER_CLI_LEVEL_WARNING << "shutting down server" << std::endl;
+    server_println("shutting down server", CapioCLEngine::get().getWorkflowName(),
+                   CAPIO_LOG_SERVER_CLI_LEVEL_WARNING, __func__);
 
     if (signum == SIGSEGV) {
-        std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_ERROR << "Segfault detected!" << std::endl;
+        server_println("Segfault detected!", CapioCLEngine::get().getWorkflowName(),
+                       CAPIO_LOG_SERVER_CLI_LEVEL_ERROR, __func__);
     }
 
     // free all the memory used
 
-    std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_WARNING << "shm cleanup completed" << std::endl;
-
     delete client_manager;
     delete storage_manager;
 
-    std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_WARNING << "data_buffers cleanup completed"
-              << std::endl;
+    server_println("data_buffers cleanup completed", CapioCLEngine::get().getWorkflowName(),
+                   CAPIO_LOG_SERVER_CLI_LEVEL_WARNING, __func__);
 
 #ifdef CAPIO_COVERAGE
     __gcov_dump();
@@ -37,7 +37,8 @@ void sig_term_handler(int signum, siginfo_t *info, void *ptr) {
     delete backend;
     delete shm_canary;
 
-    std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_INFO << "shutdown completed" << std::endl;
+    server_println("shutdown completed", CapioCLEngine::get().getWorkflowName(),
+                   CAPIO_LOG_SERVER_CLI_LEVEL_INFO, __func__);
     exit(EXIT_SUCCESS);
 }
 
@@ -58,6 +59,8 @@ void setup_signal_handlers() {
     if (res == -1) {
         ERR_EXIT("sigaction for SIGTERM");
     }
+    server_println("Installed signal handlers", CapioCLEngine::get().getWorkflowName(),
+                   CAPIO_LOG_SERVER_CLI_LEVEL_STATUS, __func__);
 }
 
 #endif // CAPIO_SERVER_HANDLERS_SIGNALS_HPP
