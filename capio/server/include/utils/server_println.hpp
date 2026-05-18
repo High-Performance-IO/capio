@@ -32,7 +32,6 @@ inline void server_println(const std::string_view workflow_name  = CAPIO_DEFAULT
     std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_RESET << " [";
     std::cout << std::put_time(std::localtime(&in_time_t), "%Y-%m-%d %H:%M:%S") << "] ";
     std::cout << " " << node_name << "@" << std::left << std::setw(20);
-    std::cout << component_name.substr(0, 20) << " | " << message_line << "\n";
-    std::cout << std::flush;
+    std::cout << component_name.substr(0, 20) << " | " << message_line << std::endl;
 }
 #endif // CAPIO_PRINT_TEXT_HPP
