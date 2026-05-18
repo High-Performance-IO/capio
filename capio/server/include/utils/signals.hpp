@@ -4,6 +4,7 @@
 #include <csignal>
 
 #include "remote/backend.hpp"
+#include "remote/discovery.hpp"
 #include "server_println.hpp"
 
 #ifdef CAPIO_COVERAGE
@@ -23,19 +24,22 @@ void sig_term_handler(int signum, siginfo_t *info, void *ptr) {
     }
 
     // free all the memory used
-
+    discovery_service->stop();
     delete client_manager;
     delete storage_manager;
 
     server_println("data_buffers cleanup completed", CapioCLEngine::get().getWorkflowName(),
                    CAPIO_LOG_SERVER_CLI_LEVEL_WARNING, __func__);
 
+    delete backend;
+    delete client_manager;
+    delete storage_manager;
+
 #ifdef CAPIO_COVERAGE
     __gcov_dump();
 #endif
 
-    delete backend;
-    delete shm_canary;
+    delete discovery_service;
 
     server_println("shutdown completed", CapioCLEngine::get().getWorkflowName(),
                    CAPIO_LOG_SERVER_CLI_LEVEL_INFO, __func__);

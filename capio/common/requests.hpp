@@ -37,4 +37,6 @@ constexpr const int CAPIO_SERVER_REQUEST_STAT_REPLY = 3;
 
 constexpr const int CAPIO_SERVER_NR_REQUEST = 4;
 
+constexpr const int BACKEND_HAVE_FINISH_SEND_REQUEST = 4;
+
 #endif // CAPIO_COMMON_REQUESTS_HPP

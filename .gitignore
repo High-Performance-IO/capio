@@ -48,4 +48,6 @@ capio_logs
 debug
 build
 
+.capio_tokens
+
 cmake_test_discovery*.json

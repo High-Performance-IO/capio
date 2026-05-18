@@ -3,6 +3,7 @@
 #include "capiocl.hpp"
 #include "capiocl/engine.h"
 #include "client-manager/client_manager.hpp"
+#include "remote/discovery.hpp"
 #include "storage/manager.hpp"
 #include "utils/capiocl_adapter.hpp"
 #include "utils/location.hpp"
@@ -11,6 +12,7 @@ capiocl::engine::Engine *capio_cl_engine = nullptr;
 StorageManager *storage_manager          = nullptr;
 ClientManager *client_manager            = nullptr;
 Backend *backend                         = nullptr;
+DiscoveryService *discovery_service      = nullptr;
 
 const capiocl::engine::Engine &CapioCLEngine::get() { return *capio_cl_engine; }
 
@@ -19,15 +21,17 @@ class ServerUnitTestEnvironment : public testing::Environment {
     explicit ServerUnitTestEnvironment() = default;
 
     void SetUp() override {
-        capio_cl_engine = new capiocl::engine::Engine(false);
-        client_manager  = new ClientManager();
-        storage_manager = new StorageManager();
+        capio_cl_engine   = new capiocl::engine::Engine(false);
+        client_manager    = new ClientManager();
+        storage_manager   = new StorageManager();
+        discovery_service = new DiscoveryService();
     }
 
     void TearDown() override {
         delete storage_manager;
         delete client_manager;
         delete capio_cl_engine;
+        delete discovery_service;
     }
 };
 
