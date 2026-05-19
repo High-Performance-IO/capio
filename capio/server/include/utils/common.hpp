@@ -10,6 +10,7 @@
 #include "common/dirent.hpp"
 #include "storage/capio_file.hpp"
 #include "storage/manager.hpp"
+#include "utils/ServerLogger.hpp"
 
 extern ClientManager *client_manager;
 extern StorageManager *storage_manager;

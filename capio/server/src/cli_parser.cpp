@@ -9,7 +9,6 @@
 
 CapioParsedConfig parseCLI(int argc, char **argv) {
     CapioParsedConfig capio_config;
-    Logger *log;
 
     args::ArgumentParser parser(CAPIO_SERVER_ARG_PARSER_PRE, CAPIO_SERVER_ARG_PARSER_EPILOGUE);
     parser.LongSeparator(" ");
@@ -18,10 +17,6 @@ CapioParsedConfig parseCLI(int argc, char **argv) {
 
     args::Group arguments(parser, "Arguments");
     args::HelpFlag help(arguments, "help", "Display this help menu", {'h', "help"});
-    args::ValueFlag<std::string> logfile_src(arguments, "filename",
-                                             CAPIO_SERVER_ARG_PARSER_LOGILE_OPT_HELP, {'l', "log"});
-    args::ValueFlag<std::string> logfile_folder(
-        arguments, "filename", CAPIO_SERVER_ARG_PARSER_LOGILE_DIR_OPT_HELP, {'d', "log-dir"});
     args::ValueFlag<std::string> resolve_prefix(arguments, "resolve-prefix",
                                                 CAPIO_SERVER_ARG_PARSER_RESOLVE_PREFIX_OPT_HELP,
                                                 {'r', "resolve-prefix"});
@@ -69,33 +64,9 @@ CapioParsedConfig parseCLI(int argc, char **argv) {
 #endif
     }
 
-    if (logfile_folder) {
 #ifdef CAPIO_LOG
-        log_master_dir_name = args::get(logfile_folder);
-#else
-        server_println("Capio logfile folder, but logging capabilities not compiled into capio!",
-                       get_capio_workflow_name(), CAPIO_LOG_SERVER_CLI_LEVEL_WARNING, "parseCLI");
-#endif
-    }
-
-    if (logfile_src) {
-#ifdef CAPIO_LOG
-        // log file was given
-        std::string token = args::get(logfile_src);
-        if (token.find(".log") != std::string::npos) {
-            token.erase(token.length() - 4); // delete .log if for some reason
-            // is given as parameter
-        }
-        logfile_prefix = token;
-#else
-        server_println("Capio logfile provided, but logging capabilities not compiled into capio!",
-                       get_capio_workflow_name(), CAPIO_LOG_SERVER_CLI_LEVEL_WARNING, "parseCLI");
-#endif
-    }
-#ifdef CAPIO_LOG
-    auto logname = open_server_logfile();
-    log          = new Logger(__func__, __FILE__, __LINE__, gettid(), "Created new log file");
-    server_println("started logging to logfile " + logname.string(), get_capio_workflow_name(),
+    auto log = new Logger(__func__, __FILE__, __LINE__, gettid(), "Created new log file");
+    server_println("started logging to logfile " + log->getLogFileName(), get_capio_workflow_name(),
                    CAPIO_LOG_SERVER_CLI_LEVEL_INFO, "parseCLI");
 #endif
 

@@ -17,6 +17,8 @@
 #include <unordered_set>
 #include <vector>
 
+#include "utils/ServerLogger.hpp"
+
 #include "capiocl.hpp"
 #include "capiocl/engine.h"
 #include "capiocl/parser.h"
@@ -24,7 +26,6 @@
 
 #include "client-manager/client_manager.hpp"
 #include "common/env.hpp"
-#include "common/logger.hpp"
 #include "common/requests.hpp"
 #include "common/semaphore.hpp"
 #include "remote/backend.hpp"

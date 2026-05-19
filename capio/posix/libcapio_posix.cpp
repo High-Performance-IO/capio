@@ -7,6 +7,8 @@
 #include <array>
 #include <string>
 
+#include "utils/PosixLogger.hpp"
+
 #include "common/syscall.hpp"
 
 #include "utils/clone.hpp"

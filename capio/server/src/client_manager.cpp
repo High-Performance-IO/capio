@@ -1,10 +1,10 @@
 #include <thread>
 
-#include "utils/capiocl_adapter.hpp"
-
 #include "client-manager/client_manager.hpp"
+
 #include "common/constants.hpp"
 #include "common/queue.hpp"
+#include "utils/ServerLogger.hpp"
 #include "utils/capiocl_adapter.hpp"
 #include "utils/common.hpp"
 #include "utils/server_println.hpp"

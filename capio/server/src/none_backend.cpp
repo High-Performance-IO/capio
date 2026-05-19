@@ -1,6 +1,8 @@
 #include <thread>
 
 #include "remote/backend/none.hpp"
+
+#include "utils/ServerLogger.hpp"
 #include "utils/capiocl_adapter.hpp"
 #include "utils/server_println.hpp"
 

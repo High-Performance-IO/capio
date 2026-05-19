@@ -10,7 +10,7 @@
 #include <sys/stat.h>
 
 #include "common/syscall.hpp"
-#include "logger.hpp"
+
 
 // TODO: remove forward declaration of function by splitting into header and impl. capio/common
 inline bool is_forbidden_path(const std::string_view &path);

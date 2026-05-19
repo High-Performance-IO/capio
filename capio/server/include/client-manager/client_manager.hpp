@@ -5,6 +5,8 @@
 #include <unordered_map>
 #include <vector>
 
+#include "utils/ServerLogger.hpp"
+
 #include "common/queue.hpp"
 /**
  * @brief Class to handle libcapio_posix clients applications

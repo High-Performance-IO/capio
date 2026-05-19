@@ -3,11 +3,12 @@
 #include <list>
 #include <unordered_map>
 
+#include "storage/manager.hpp"
+
 #include "common/dirent.hpp"
 #include "common/filesystem.hpp"
-#include "common/logger.hpp"
 #include "storage/capio_file.hpp"
-#include "storage/manager.hpp"
+#include "utils/ServerLogger.hpp"
 #include "utils/capiocl_adapter.hpp"
 #include "utils/common.hpp"
 #include "utils/location.hpp"

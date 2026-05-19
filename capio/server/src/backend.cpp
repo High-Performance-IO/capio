@@ -1,5 +1,6 @@
 #include "remote/backend.hpp"
 
+#include "utils/ServerLogger.hpp"
 #include "utils/common.hpp"
 #include "utils/server_println.hpp"
 

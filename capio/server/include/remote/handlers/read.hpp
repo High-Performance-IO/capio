@@ -4,6 +4,7 @@
 #include "remote/backend.hpp"
 #include "remote/requests.hpp"
 #include "storage/manager.hpp"
+#include "utils/ServerLogger.hpp"
 
 extern StorageManager *storage_manager;
 

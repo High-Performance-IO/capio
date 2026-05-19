@@ -1,4 +1,6 @@
 #include "remote/backend/mpi.hpp"
+
+#include "utils/ServerLogger.hpp"
 #include "utils/capiocl_adapter.hpp"
 #include "utils/server_println.hpp"
 

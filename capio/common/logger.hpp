@@ -6,10 +6,12 @@
 #include <cstring>
 #include <cxxabi.h>
 #include <fcntl.h>
+#include <filesystem>
 #include <fstream>
 #include <memory>
 #include <string>
 #include <sys/mman.h>
+#include <type_traits>
 #include <unistd.h>
 
 #include "constants.hpp"
@@ -37,18 +39,6 @@ inline void raise_termination(const bool raise_exception, const std::string &mes
 #include "syscallnames.h"
 #endif
 
-#ifndef __CAPIO_POSIX
-#include <filesystem>
-// FIXME: Remove the inline specifier by splitting into header and source code
-inline thread_local std::ofstream logfile; // if building for server, self contained logfile
-inline std::string log_master_dir_name = CAPIO_DEFAULT_LOG_FOLDER;
-inline std::string logfile_prefix      = CAPIO_SERVER_DEFAULT_LOG_FILE_PREFIX;
-#else
-inline thread_local bool logfileOpen = false;
-inline thread_local int logfileFD    = -1;
-inline thread_local char logfile_path[PATH_MAX]{'\0'};
-#endif
-
 // FIXME: Remove the inline specifier by splitting into header and source code
 inline thread_local int current_log_level = 0;
 
@@ -63,97 +53,6 @@ inline thread_local bool logging_syscall = false;
 // FIXME: Remove the inline specifier by splitting into header and source code
 inline int CAPIO_LOG_LEVEL = CAPIO_MAX_LOG_LEVEL;
 
-#ifndef __CAPIO_POSIX
-inline auto open_server_logfile() {
-    auto hostname = new char[HOST_NAME_MAX];
-    gethostname(hostname, HOST_NAME_MAX);
-
-    if (log_master_dir_name.empty()) {
-        log_master_dir_name = CAPIO_DEFAULT_LOG_FOLDER;
-    }
-
-    const std::filesystem::path output_folder =
-        std::string{log_master_dir_name + "/server/" + hostname};
-
-    std::filesystem::create_directories(output_folder);
-
-    const std::filesystem::path logfile_name = output_folder.string() + "/" + logfile_prefix +
-                                               std::to_string(capio_syscall(SYS_gettid)) + ".log";
-
-    logfile.open(logfile_name, std::ofstream::out);
-    delete[] hostname;
-
-    return logfile_name;
-}
-#else
-
-inline auto get_hostname() {
-    static char *hostname_prefix = nullptr;
-    if (hostname_prefix == nullptr) {
-        hostname_prefix = new char[HOST_NAME_MAX];
-        gethostname(hostname_prefix, HOST_NAME_MAX);
-    }
-    return hostname_prefix;
-}
-
-inline auto get_log_dir() {
-    static char *posix_log_master_dir_name = nullptr;
-    if (posix_log_master_dir_name == nullptr) {
-        posix_log_master_dir_name = std::getenv("CAPIO_LOG_DIR");
-        if (posix_log_master_dir_name == nullptr) {
-            posix_log_master_dir_name = new char[strlen(CAPIO_DEFAULT_LOG_FOLDER)];
-            strcpy(posix_log_master_dir_name, CAPIO_DEFAULT_LOG_FOLDER);
-        }
-    }
-    return posix_log_master_dir_name;
-}
-
-inline auto get_log_prefix() {
-    static char *posix_logfile_prefix = nullptr;
-    if (posix_logfile_prefix == nullptr) {
-        posix_logfile_prefix = std::getenv("CAPIO_LOG_PREFIX");
-        if (posix_logfile_prefix == nullptr) {
-            posix_logfile_prefix = new char[strlen(CAPIO_LOG_POSIX_DEFAULT_LOG_FILE_PREFIX)];
-            strcpy(posix_logfile_prefix, CAPIO_LOG_POSIX_DEFAULT_LOG_FILE_PREFIX);
-        }
-    }
-    return posix_logfile_prefix;
-}
-
-inline auto get_posix_log_dir() {
-    static char *posix_log_dir_path = nullptr;
-    if (posix_log_dir_path == nullptr) {
-        // allocate space for a path in the following structure (including 10 digits for thread id
-        // max
-        //  log_master_dir_name/posix/hostname/logfile_prefix_<tid>.log
-        auto len           = strlen(get_log_dir()) + 7;
-        posix_log_dir_path = new char[len]{0};
-        sprintf(posix_log_dir_path, "%s/posix", get_log_dir());
-    }
-    return posix_log_dir_path;
-}
-
-inline auto get_host_log_dir() {
-    static char *host_log_dir_path = nullptr;
-    if (host_log_dir_path == nullptr) {
-        // allocate space for a path in the following structure (including 10 digits for thread id
-        // max
-        //  log_master_dir_name/posix/hostname/logfile_prefix_<tid>.log
-        auto len          = strlen(get_posix_log_dir()) + HOST_NAME_MAX;
-        host_log_dir_path = new char[len]{0};
-        sprintf(host_log_dir_path, "%s/%s", get_posix_log_dir(), get_hostname());
-    }
-    return host_log_dir_path;
-}
-
-inline void setup_posix_log_filename() {
-    if (logfile_path[0] == '\0') {
-        sprintf(logfile_path, "%s/%s%ld.log", get_host_log_dir(), get_log_prefix(),
-                capio_syscall(SYS_gettid));
-    }
-}
-#endif
-
 inline long long current_time_in_millis() {
     timespec ts{};
     static long long start_time = -1;
@@ -166,25 +65,9 @@ inline long long current_time_in_millis() {
     return time_now - start_time;
 }
 
-inline void log_write_to(char *buffer, size_t bufflen) {
-#ifdef __CAPIO_POSIX
-    if (current_log_level < CAPIO_MAX_LOG_LEVEL || CAPIO_MAX_LOG_LEVEL < 0) {
-        capio_syscall(SYS_write, logfileFD, buffer, bufflen);
-        capio_syscall(SYS_write, logfileFD, "\n", 1);
-    }
-#else
-    if (current_log_level < CAPIO_LOG_LEVEL || CAPIO_LOG_LEVEL < 0) {
-        logfile << buffer << std::endl;
-        logfile.flush();
-    }
-
-#endif
-}
-
 /**
  * @brief Class used to suspend the logging capabilities of CAPIO, by setting the logging_syscall
  * flag to false at instantiation, and restarting the logging at destruction
- *
  */
 class SyscallLoggingSuspender {
   public:
@@ -194,50 +77,31 @@ class SyscallLoggingSuspender {
 
 /**
  * @brief Class that provides logging capabilities to CAPIO.
- * When compiled with the CAPIO intercepting library, it uses
- * direct POSIX system calls. Otherwise, it relies on the STL.
  *
+ * Parameterised on a LogWriteAdapter so that the I/O strategy (POSIX
+ * syscalls vs. STL streams vs. any custom backend) is a compile-time
+ * choice with no virtual dispatch overhead.
+ *
+ * The default adapter (@ref DefaultLogWriteAdapter) mirrors the behaviour
+ * of the old monolithic Logger class for both the server and POSIX builds.
  */
-class Logger {
-  private:
+template <typename Adapter> class TemplateLogger {
     char invoker[256]{0};
     char file[256]{0};
     char format[CAPIO_LOG_MAX_MSG_LEN]{0};
+    unsigned int line{0};
+    long int tid{0};
+
+    Adapter adapter;
 
   public:
-    inline Logger(const char invoker[], const char file[], int line, long int tid,
-                  const char *message, ...) {
-#ifndef __CAPIO_POSIX
-        if (!logfile.is_open()) {
-            // NOTE: should never get to this point as capio_server opens up the log file while
-            // parsing command line arguments. This is only for failsafe purpose
-            open_server_logfile();
-        }
-#else
-        if (!logfileOpen) {
-            setup_posix_log_filename();
-            current_log_level =
-                0; // reset log level after clone, avoiding propagation to child threads
+    TemplateLogger(const char invoker[], const char file[], unsigned int line, long int tid,
+                   const char *message, ...) {
 
-            capio_syscall(SYS_mkdirat, AT_FDCWD, get_log_dir(), 0755);
-            capio_syscall(SYS_mkdirat, AT_FDCWD, get_posix_log_dir(), 0755);
-            capio_syscall(SYS_mkdirat, AT_FDCWD, get_host_log_dir(), 0755);
+        adapter.openLogFile();
 
-            logfileFD = capio_syscall(SYS_openat, AT_FDCWD, logfile_path,
-                                      O_CREAT | O_WRONLY | O_TRUNC, 0644);
-
-            if (logfileFD == -1) {
-                capio_syscall(SYS_write, fileno(stdout),
-                              "Err fopen file: ", strlen("Err fopen file: "));
-                capio_syscall(SYS_write, fileno(stdout), logfile_path, strlen(logfile_path));
-                capio_syscall(SYS_write, fileno(stdout), " ", 1);
-                capio_syscall(SYS_write, fileno(stdout), strerror(errno), strlen(strerror(errno)));
-                capio_syscall(SYS_write, fileno(stdout), "\n", 1);
-                exit(EXIT_FAILURE);
-            }
-            logfileOpen = true;
-        }
-#endif
+        this->tid  = tid;
+        this->line = line;
         strncpy(this->invoker, invoker, sizeof(this->invoker));
         strncpy(this->file, file, sizeof(this->file));
 
@@ -245,7 +109,6 @@ class Logger {
 
         sprintf(format, CAPIO_LOG_PRE_MSG, current_time_in_millis(), this->invoker);
         const size_t pre_msg_len = strlen(format);
-
         strcpy(format + pre_msg_len, message);
 
         va_start(argp, message);
@@ -266,17 +129,17 @@ class Logger {
                 SYS_mmap, nullptr, 50, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0));
             sprintf(buf1, CAPIO_LOG_POSIX_SYSCALL_START, sys_num_to_string(syscallNumber).c_str(),
                     syscallNumber);
-            log_write_to(buf1, strlen(buf1));
+            adapter.writeRaw(buf1, strlen(buf1));
             capio_syscall(SYS_munmap, buf1, 50);
         }
 #endif
 
-        int size = vsnprintf(nullptr, 0U, format, argp);
-        auto buf = reinterpret_cast<char *>(capio_syscall(SYS_mmap, nullptr, size + 1,
-                                                          PROT_READ | PROT_WRITE,
-                                                          MAP_PRIVATE | MAP_ANONYMOUS, -1, 0));
+        const int size = vsnprintf(nullptr, 0U, format, argp);
+        auto buf       = reinterpret_cast<char *>(capio_syscall(SYS_mmap, nullptr, size + 1,
+                                                                PROT_READ | PROT_WRITE,
+                                                                MAP_PRIVATE | MAP_ANONYMOUS, -1, 0));
         vsnprintf(buf, size + 1, format, argpc);
-        log_write_to(buf, strlen(buf));
+        adapter.write(this->invoker, this->file, this->line, this->tid, buf, strlen(buf));
 
         va_end(argp);
         va_end(argpc);
@@ -284,41 +147,34 @@ class Logger {
         current_log_level++;
     }
 
-    Logger(const Logger &)            = delete;
-    Logger &operator=(const Logger &) = delete;
+    TemplateLogger(const TemplateLogger &)            = delete;
+    TemplateLogger &operator=(const TemplateLogger &) = delete;
 
-    inline ~Logger() {
+    ~TemplateLogger() {
         current_log_level--;
         sprintf(format, CAPIO_LOG_PRE_MSG, current_time_in_millis(), this->invoker);
-        size_t pre_msg_len = strlen(format);
+        const size_t pre_msg_len = strlen(format);
         strcpy(format + pre_msg_len, "returned");
 
-        log_write_to(format, strlen(format));
-#ifdef __CAPIO_POSIX
+        adapter.writeRaw(format, strlen(format));
+
         if (current_log_level == 0 && logging_syscall) {
-            log_write_to(const_cast<char *>(CAPIO_LOG_POSIX_SYSCALL_END),
-                         strlen(CAPIO_LOG_POSIX_SYSCALL_END));
+            adapter.writeSyscallEnd();
         }
-#endif
     }
 
-    inline void log(const char *message, ...) {
+    void log(const char *message, ...) {
         va_list argp, argpc;
 
         sprintf(format, CAPIO_LOG_PRE_MSG, current_time_in_millis(), this->invoker);
         const size_t pre_msg_len = strlen(format);
-
         strcpy(format + pre_msg_len, message);
 
-#ifndef __CAPIO_POSIX
-        // if the log message to serve a new request or concludes, add new spaces
-        if (strcmp(invoker, "capio_server") == 0 &&
-            (strcmp(CAPIO_LOG_SERVER_REQUEST_START, message) == 0 ||
-             strcmp(CAPIO_LOG_SERVER_REQUEST_END, message) == 0)) {
-            logfile << message << std::endl;
+        // Delegate the server request start/end special case to the adapter
+        if (adapter.isServerInvoker(this->invoker, message)) {
+            adapter.writeRaw(format, strlen(format));
             return;
         }
-#endif
 
         va_start(argp, message);
         va_copy(argpc, argp);
@@ -327,24 +183,27 @@ class Logger {
             capio_syscall(SYS_mmap, nullptr, size + 1, PROT_READ | PROT_WRITE,
                           MAP_PRIVATE | MAP_ANONYMOUS, -1, 0));
         vsnprintf(buf, size + 1, format, argpc);
-        log_write_to(buf, strlen(buf));
+        adapter.write(this->invoker, this->file, this->line, this->tid, buf, strlen(buf));
 
         va_end(argp);
         va_end(argpc);
         capio_syscall(SYS_munmap, buf, size);
     }
+
+    std::string getLogFileName() { return adapter.getLogFileName(); }
 };
 
+// ---------------------------------------------------------------------------
+// Macros — identical surface to the old ones; Logger is now a template
+// ---------------------------------------------------------------------------
 #ifdef CAPIO_LOG
 
 #define ERR_EXIT_EXCEPT_CHOICE(raise_exception, message, ...)                                      \
     log.log(message, ##__VA_ARGS__);                                                               \
     if (!continue_on_error) {                                                                      \
-        if (!continue_on_error) {                                                                  \
-            char err_msg[CAPIO_LOG_MAX_MSG_LEN];                                                   \
-            snprintf(err_msg, CAPIO_LOG_MAX_MSG_LEN, message, ##__VA_ARGS__);                      \
-            raise_termination(raise_exception, err_msg);                                           \
-        }                                                                                          \
+        char err_msg[CAPIO_LOG_MAX_MSG_LEN];                                                       \
+        snprintf(err_msg, CAPIO_LOG_MAX_MSG_LEN, message, ##__VA_ARGS__);                          \
+        raise_termination(raise_exception, err_msg);                                               \
     }
 #define ERR_EXIT(message, ...) ERR_EXIT_EXCEPT_CHOICE(true, message, ##__VA_ARGS__)
 
