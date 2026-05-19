@@ -4,7 +4,7 @@
 #include "common/logger.hpp"
 inline thread_local bool fileOpen = false;
 inline thread_local int fileFD    = -1;
-inline thread_local char filePath[PATH_MAX];
+inline thread_local char filePath[PATH_MAX]{'\0'};
 
 struct PosixLogWriteAdapter {
   private:
@@ -61,9 +61,6 @@ struct PosixLogWriteAdapter {
     }
 
     static void writeToFD(const char *buf, const size_t len) {
-        if (!fileOpen) {
-            return;
-        }
         capio_syscall(SYS_write, fileFD, buf, len);
         capio_syscall(SYS_write, fileFD, "\n", 1);
     }
@@ -101,17 +98,16 @@ struct PosixLogWriteAdapter {
         writeToFD(buf, len);
     }
 
-    static void writeRaw(const char *buf, size_t len) { writeToFD(buf, len); }
+    static void write(const char *buf, size_t len) { writeToFD(buf, len); }
 
     static bool isSTLSafe() { return false; }
 
     static void writeOpening() {
-
-        writeRaw(CAPIO_LOG_POSIX_SYSCALL_START, strlen(CAPIO_LOG_POSIX_SYSCALL_START));
+        writeToFD(CAPIO_LOG_POSIX_SYSCALL_START, strlen(CAPIO_LOG_POSIX_SYSCALL_START));
     }
 
     static void writeEpilogue() {
-        writeRaw(CAPIO_LOG_POSIX_SYSCALL_END, strlen(CAPIO_LOG_POSIX_SYSCALL_END));
+        writeToFD(CAPIO_LOG_POSIX_SYSCALL_END, strlen(CAPIO_LOG_POSIX_SYSCALL_END));
     }
 };
 

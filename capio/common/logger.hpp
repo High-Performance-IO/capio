@@ -141,7 +141,7 @@ template <typename Adapter> class TemplateLogger {
         const size_t pre_msg_len = strlen(format);
         strcpy(format + pre_msg_len, "returned");
 
-        adapter.writeRaw(format, strlen(format));
+        adapter.write(format, strlen(format));
 
         if (current_log_level == 1 && enable_logger &&
             (current_log_level < CAPIO_MAX_LOG_LEVEL || CAPIO_MAX_LOG_LEVEL < 0)) {
@@ -172,7 +172,7 @@ template <typename Adapter> class TemplateLogger {
 
         if (current_log_level < CAPIO_MAX_LOG_LEVEL || CAPIO_MAX_LOG_LEVEL < 0) {
             if (adapter.isSTLSafe()) {
-                adapter.writeRaw(format, strlen(format));
+                adapter.write(format, strlen(format));
             } else {
                 adapter.write(this->invoker, this->file, this->line, this->tid, buf, strlen(buf));
             }

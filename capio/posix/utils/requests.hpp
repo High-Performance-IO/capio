@@ -6,7 +6,7 @@
 #include "env.hpp"
 #include "filesystem.hpp"
 #include "types.hpp"
-#include "utils/PosixLogger.hpp"
+#include "utils/posix_logger.hpp"
 
 inline thread_local CircularBuffer<char> *buf_requests;
 inline thread_local CircularBuffer<off_t> *buff_response;
