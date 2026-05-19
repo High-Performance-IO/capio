@@ -2,9 +2,9 @@
 #define CAPIO_POSIXLOGGER_HPP
 
 #include "common/logger.hpp"
-static thread_local bool fileOpen = false;
-static thread_local int fileFD    = -1;
-static thread_local char filePath[PATH_MAX];
+inline thread_local bool fileOpen = false;
+inline thread_local int fileFD    = -1;
+inline thread_local char filePath[PATH_MAX];
 
 struct PosixLogWriteAdapter {
   private:
@@ -69,14 +69,14 @@ struct PosixLogWriteAdapter {
     }
 
   public:
-    [[nodiscard]] static bool isFileOpened() { return fileOpen; }
-
     explicit PosixLogWriteAdapter() {
 
-        if (filePath[0] == '\0') {
-            sprintf(filePath, "%s/%s%ld.log", getHostLogDir(), getLogPrefix(),
-                    capio_syscall(SYS_gettid));
+        if (fileOpen) {
+            return;
         }
+
+        sprintf(filePath, "%s/%s%ld.log", getHostLogDir(), getLogPrefix(),
+                capio_syscall(SYS_gettid));
 
         capio_syscall(SYS_mkdirat, AT_FDCWD, getLogDir(), 0755);
         capio_syscall(SYS_mkdirat, AT_FDCWD, getPosixLogDir(), 0755);
@@ -114,14 +114,6 @@ struct PosixLogWriteAdapter {
         writeRaw(CAPIO_LOG_POSIX_SYSCALL_END, strlen(CAPIO_LOG_POSIX_SYSCALL_END));
     }
 };
-
-// Definitions of the thread_local static members.
-// 'inline' (C++17) ensures a single definition across all translation units
-// that include this header, while thread_local gives each thread its own copy
-// pre-allocated in the TLS block before any user code runs.
-// inline thread_local bool PosixLogWriteAdapter::fileOpen{false};
-// inline thread_local int PosixLogWriteAdapter::fileFD{-1};
-// inline thread_local char PosixLogWriteAdapter::filePath[PATH_MAX]{'\0'};
 
 using Logger = TemplateLogger<PosixLogWriteAdapter>;
 
