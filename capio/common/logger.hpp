@@ -45,7 +45,7 @@ inline thread_local int current_log_level = 0;
 // this variable tells the logger that syscall logging
 // has started, and we are not in setup phase
 // FIXME: Remove the inline specifier by splitting into header and source code
-inline thread_local bool logging_syscall = false;
+inline thread_local bool enable_logger = false;
 
 #ifndef CAPIO_MAX_LOG_LEVEL // capio max log level. defaults to -1, where everything is logged
 #define CAPIO_MAX_LOG_LEVEL -1
@@ -71,8 +71,8 @@ inline long long current_time_in_millis() {
  */
 class SyscallLoggingSuspender {
   public:
-    SyscallLoggingSuspender() { logging_syscall = false; }
-    ~SyscallLoggingSuspender() { logging_syscall = true; }
+    SyscallLoggingSuspender() { enable_logger = false; }
+    ~SyscallLoggingSuspender() { enable_logger = true; }
 };
 
 /**
@@ -98,41 +98,26 @@ template <typename Adapter> class TemplateLogger {
     TemplateLogger(const char invoker[], const char file[], unsigned int line, long int tid,
                    const char *message, ...) {
 
-        adapter.openLogFile();
-
         this->tid  = tid;
         this->line = line;
         strncpy(this->invoker, invoker, sizeof(this->invoker));
         strncpy(this->file, file, sizeof(this->file));
 
         va_list argp, argpc;
+        va_start(argp, message);
+        va_copy(argpc, argp);
+
+        adapter.openLogFile();
+
+#ifdef __CAPIO_POSIX
+        if (!enable_logger) {
+            return;
+        }
+#endif
 
         sprintf(format, CAPIO_LOG_PRE_MSG, current_time_in_millis(), this->invoker);
         const size_t pre_msg_len = strlen(format);
         strcpy(format + pre_msg_len, message);
-
-        va_start(argp, message);
-        va_copy(argpc, argp);
-
-#if defined(CAPIO_LOG) && defined(__CAPIO_POSIX)
-        if (current_log_level == 0 && logging_syscall) {
-            int syscallNumber;
-            if (strcmp(invoker, "hook_clone_child") == 0) {
-                // Explicitly propagate SYS_clone to child thread after clone
-                // to avoid spurious unknown syscall logs
-                syscallNumber = SYS_clone;
-            } else {
-                syscallNumber = va_arg(argp, int);
-            }
-
-            auto buf1 = reinterpret_cast<char *>(capio_syscall(
-                SYS_mmap, nullptr, 50, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0));
-            sprintf(buf1, CAPIO_LOG_POSIX_SYSCALL_START, sys_num_to_string(syscallNumber).c_str(),
-                    syscallNumber);
-            adapter.writeRaw(buf1, strlen(buf1));
-            capio_syscall(SYS_munmap, buf1, 50);
-        }
-#endif
 
         const int size = vsnprintf(nullptr, 0U, format, argp);
         auto buf       = reinterpret_cast<char *>(capio_syscall(SYS_mmap, nullptr, size + 1,
@@ -158,20 +143,24 @@ template <typename Adapter> class TemplateLogger {
 
         adapter.writeRaw(format, strlen(format));
 
-        if (current_log_level == 0 && logging_syscall) {
+        if (current_log_level == 0 && enable_logger) {
             adapter.writeSyscallEnd();
         }
     }
 
     void log(const char *message, ...) {
+#ifdef __CAPIO_POSIX
+        if (!enable_logger) {
+            return;
+        }
+#endif
         va_list argp, argpc;
 
         sprintf(format, CAPIO_LOG_PRE_MSG, current_time_in_millis(), this->invoker);
         const size_t pre_msg_len = strlen(format);
         strcpy(format + pre_msg_len, message);
 
-        // Delegate the server request start/end special case to the adapter
-        if (adapter.isServerInvoker(this->invoker, message)) {
+        if (adapter.isSTLSafe()) {
             adapter.writeRaw(format, strlen(format));
             return;
         }
@@ -210,7 +199,7 @@ template <typename Adapter> class TemplateLogger {
 #define LOG(message, ...) log.log(message, ##__VA_ARGS__)
 #define START_LOG(tid, message, ...)                                                               \
     Logger log(__func__, __FILE__, __LINE__, tid, message, ##__VA_ARGS__)
-#define START_SYSCALL_LOGGING() logging_syscall = true
+#define START_SYSCALL_LOGGING() enable_logger = true
 #define SUSPEND_SYSCALL_LOGGING() SyscallLoggingSuspender sls{};
 
 /**
@@ -257,6 +246,8 @@ template <typename Adapter> class TemplateLogger {
         __SHM_CHECK_CLI_MSG;                                                                       \
     }
 #define DBG(tid, lambda)
+#define START_SYSCALL_LOGGING()
+#define SUSPEND_SYSCALL_LOGGING()
 
 #endif
 

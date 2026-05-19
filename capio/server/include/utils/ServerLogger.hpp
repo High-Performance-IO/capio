@@ -6,11 +6,13 @@
 struct ServerLogWriteAdapter {
   private:
     std::ofstream logfile;
-    std::string logMasterDirName;
-    std::string logfilePrefix;
     std::string logFileName;
 
     void writeToStream(const char *buf) {
+        if (!logfile.is_open()) {
+            return;
+        }
+
         if (current_log_level < CAPIO_LOG_LEVEL || CAPIO_LOG_LEVEL < 0) {
             logfile << buf << std::endl;
             logfile.flush();
@@ -18,23 +20,23 @@ struct ServerLogWriteAdapter {
     }
 
   public:
-    explicit ServerLogWriteAdapter() {
-        if (const char *tmp = std::getenv("CAPIO_LOGGER_MASTER_DIR_NAME"); tmp == nullptr) {
+    void openLogFile() {
+        if (this->logfile.is_open()) {
+            return;
+        }
+        std::string logMasterDirName;
+        std::string logfilePrefix;
+
+        if (const char *tmp = std::getenv("CAPIO_LOG_DIR"); tmp == nullptr) {
             logMasterDirName = CAPIO_DEFAULT_LOG_FOLDER;
         } else {
             logMasterDirName = tmp;
         }
 
-        if (const char *tmp = std::getenv("CAPIO_LOGGER_FILE_PREFIX"); tmp == nullptr) {
+        if (const char *tmp = std::getenv("CAPIO_LOG_PREFIX"); tmp == nullptr) {
             logfilePrefix = CAPIO_SERVER_DEFAULT_LOG_FILE_PREFIX;
         } else {
             logfilePrefix = tmp;
-        }
-    }
-
-    void openLogFile() {
-        if (this->logfile.is_open()) {
-            return;
         }
 
         char hostname[HOST_NAME_MAX];
@@ -47,7 +49,7 @@ struct ServerLogWriteAdapter {
                                                   std::to_string(capio_syscall(SYS_gettid)) +
                                                   ".log";
 
-        logfile.open(logfileName, std::ofstream::out);
+        logfile.open(logfileName, std::ofstream::app);
         this->logFileName = logfileName;
     }
 
@@ -60,11 +62,7 @@ struct ServerLogWriteAdapter {
 
     static void writeSyscallEnd() {}
 
-    static bool isServerInvoker(const char *invoker, const char *message) {
-        return strcmp(invoker, "capio_server") == 0 &&
-               (strcmp(CAPIO_LOG_SERVER_REQUEST_START, message) == 0 ||
-                strcmp(CAPIO_LOG_SERVER_REQUEST_END, message) == 0);
-    }
+    static bool isSTLSafe() { return true; }
 
     const std::string &getLogFileName() { return logFileName; }
 };
