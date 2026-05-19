@@ -114,7 +114,6 @@ static constexpr std::array<CSHandler_t, CAPIO_NR_REQUESTS> build_request_handle
 }
 
 int main(int argc, char **argv) {
-    START_SYSCALL_LOGGING();
 
     Semaphore internal_server_sem(0);
 

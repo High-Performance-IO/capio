@@ -15,6 +15,23 @@ Backend *backend                         = nullptr;
 
 const capiocl::engine::Engine &CapioCLEngine::get() { return *capio_cl_engine; }
 
+class MockBackend : public Backend {
+public:
+    MockBackend() : Backend(HOST_NAME_MAX) {}
+
+    void recv_file(char *shm, const std::string &source, const long int bytes_expected) override {
+        for (long int i = 0; i < bytes_expected; ++i) {
+            shm[i] = 33 + (i % 93);
+        }
+    }
+
+    const std::set<std::string> get_nodes() override { return {node_name}; }
+    void handshake_servers() override {}
+    RemoteRequest read_next_request() override { return {nullptr, ""}; }
+    void send_file(char *shm, long int nbytes, const std::string &target) override {}
+    void send_request(const char *message, int message_len, const std::string &target) override {}
+};
+
 class ServerUnitTestEnvironment : public testing::Environment {
   public:
     explicit ServerUnitTestEnvironment() = default;
@@ -23,7 +40,7 @@ class ServerUnitTestEnvironment : public testing::Environment {
         capio_cl_engine = new capiocl::engine::Engine(false);
         client_manager  = new ClientManager();
         storage_manager = new StorageManager();
-        backend         = new NoneBackend(0, nullptr);
+        backend         = new MockBackend();
         open_files_location();
     }
 
