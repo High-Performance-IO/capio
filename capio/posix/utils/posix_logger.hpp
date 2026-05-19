@@ -8,6 +8,43 @@ struct PosixLogWriteAdapter {
     static thread_local int fileFD;
     static thread_local char filePath[PATH_MAX];
 
+    explicit PosixLogWriteAdapter() {
+
+        if (fileOpen) {
+            return;
+        }
+
+        sprintf(filePath, "%s/%s%ld.log", getHostLogDir(), getLogPrefix(),
+                capio_syscall(SYS_gettid));
+
+        capio_syscall(SYS_mkdirat, AT_FDCWD, getLogDir(), 0755);
+        capio_syscall(SYS_mkdirat, AT_FDCWD, getPosixLogDir(), 0755);
+        capio_syscall(SYS_mkdirat, AT_FDCWD, getHostLogDir(), 0755);
+
+        fileFD = capio_syscall(SYS_openat, AT_FDCWD, filePath, O_CREAT | O_WRONLY | O_APPEND, 0644);
+
+        if (fileFD == -1) {
+            capio_syscall(SYS_write, fileno(stdout),
+                          "Err fopen file: ", strlen("Err fopen file: "));
+            capio_syscall(SYS_write, fileno(stdout), filePath, strlen(filePath));
+            capio_syscall(SYS_write, fileno(stdout), " ", 1);
+            capio_syscall(SYS_write, fileno(stdout), strerror(errno), strlen(strerror(errno)));
+            capio_syscall(SYS_write, fileno(stdout), "\n", 1);
+            exit(EXIT_FAILURE);
+        }
+        fileOpen = true;
+    }
+
+    static void write(const char *buf, const size_t len) { writeToFD(buf, len); }
+
+    static void writeOpening() {
+        writeToFD(CAPIO_LOG_POSIX_SYSCALL_START, strlen(CAPIO_LOG_POSIX_SYSCALL_START));
+    }
+
+    static void writeEpilogue() {
+        writeToFD(CAPIO_LOG_POSIX_SYSCALL_END, strlen(CAPIO_LOG_POSIX_SYSCALL_END));
+    }
+
   private:
     static const char *getHostname() {
         static char hostname[HOST_NAME_MAX]{'\0'};
@@ -64,44 +101,6 @@ struct PosixLogWriteAdapter {
     static void writeToFD(const char *buf, const size_t len) {
         capio_syscall(SYS_write, fileFD, buf, len);
         capio_syscall(SYS_write, fileFD, "\n", 1);
-    }
-
-  public:
-    explicit PosixLogWriteAdapter() {
-
-        if (fileOpen) {
-            return;
-        }
-
-        sprintf(filePath, "%s/%s%ld.log", getHostLogDir(), getLogPrefix(),
-                capio_syscall(SYS_gettid));
-
-        capio_syscall(SYS_mkdirat, AT_FDCWD, getLogDir(), 0755);
-        capio_syscall(SYS_mkdirat, AT_FDCWD, getPosixLogDir(), 0755);
-        capio_syscall(SYS_mkdirat, AT_FDCWD, getHostLogDir(), 0755);
-
-        fileFD = capio_syscall(SYS_openat, AT_FDCWD, filePath, O_CREAT | O_WRONLY | O_APPEND, 0644);
-
-        if (fileFD == -1) {
-            capio_syscall(SYS_write, fileno(stdout),
-                          "Err fopen file: ", strlen("Err fopen file: "));
-            capio_syscall(SYS_write, fileno(stdout), filePath, strlen(filePath));
-            capio_syscall(SYS_write, fileno(stdout), " ", 1);
-            capio_syscall(SYS_write, fileno(stdout), strerror(errno), strlen(strerror(errno)));
-            capio_syscall(SYS_write, fileno(stdout), "\n", 1);
-            exit(EXIT_FAILURE);
-        }
-        fileOpen = true;
-    }
-
-    static void write(const char *buf, const size_t len) { writeToFD(buf, len); }
-
-    static void writeOpening() {
-        writeToFD(CAPIO_LOG_POSIX_SYSCALL_START, strlen(CAPIO_LOG_POSIX_SYSCALL_START));
-    }
-
-    static void writeEpilogue() {
-        writeToFD(CAPIO_LOG_POSIX_SYSCALL_END, strlen(CAPIO_LOG_POSIX_SYSCALL_END));
     }
 };
 
