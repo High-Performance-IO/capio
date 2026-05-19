@@ -3,7 +3,6 @@
 #include "capiocl.hpp"
 #include "capiocl/engine.h"
 #include "client-manager/client_manager.hpp"
-#include "remote/backend/none.hpp"
 #include "storage/manager.hpp"
 #include "utils/capiocl_adapter.hpp"
 #include "utils/location.hpp"
@@ -16,7 +15,7 @@ Backend *backend                         = nullptr;
 const capiocl::engine::Engine &CapioCLEngine::get() { return *capio_cl_engine; }
 
 class MockBackend : public Backend {
-public:
+  public:
     MockBackend() : Backend(HOST_NAME_MAX) {}
 
     void recv_file(char *shm, const std::string &source, const long int bytes_expected) override {
