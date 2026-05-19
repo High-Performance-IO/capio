@@ -12,8 +12,8 @@
 
 #include "common/env.hpp"
 #include "common/filesystem.hpp"
-#include "common/logger.hpp"
 #include "common/syscall.hpp"
+#include "utils/PosixLogger.hpp"
 
 #include "types.hpp"
 

@@ -4,6 +4,8 @@
 
 #include <fcntl.h>
 
+#include "posix/utils/PosixLogger.hpp"
+
 #include "utils/filesystem.hpp"
 
 class RealpathPosixTest : public testing::Test {
