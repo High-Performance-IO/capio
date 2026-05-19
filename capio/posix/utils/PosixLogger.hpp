@@ -5,22 +5,9 @@
 
 struct PosixLogWriteAdapter {
   private:
-    // These three fields MUST be thread_local static rather than instance
-    // members. The adapter is constructed inside Logger, which is a stack
-    // variable instantiated at the first intercepted syscall — potentially
-    // before the C++ runtime has finished setting up TLS for the new thread
-    // (dl_init fires before __cxa_thread_atexit is live). The linker
-    // pre-allocates thread_local storage in the TLS block for every thread
-    // before any user code runs, so reading/writing these is always safe,
-    // even at the earliest possible call site.
     static thread_local bool fileOpen;
-    static thread_local int  fileFD;
+    static thread_local int fileFD;
     static thread_local char filePath[PATH_MAX];
-
-    // ---- path helpers ------------------------------------------------------
-    // Kept as static methods so they have no dependency on 'this' and their
-    // internal statics are initialised lazily on first call from a stable
-    // context, not during struct construction.
 
     static const char *getHostname() {
         static char hostname[HOST_NAME_MAX]{'\0'};
@@ -74,15 +61,6 @@ struct PosixLogWriteAdapter {
         return dir;
     }
 
-    static void setupLogFilename() {
-        if (filePath[0] == '\0') {
-            sprintf(filePath, "%s/%s%ld.log", getHostLogDir(), getLogPrefix(),
-                    capio_syscall(SYS_gettid));
-        }
-    }
-
-    // ---- write helper ------------------------------------------------------
-
     static void writeToFD(const char *buf, const size_t len) {
         if (!fileOpen) {
             return;
@@ -94,16 +72,18 @@ struct PosixLogWriteAdapter {
   public:
     [[nodiscard]] static bool isFileOpened() { return fileOpen; }
 
-    static void openLogFile() {
-        setupLogFilename();
-        current_log_level = 0; // reset log level after clone, avoiding propagation to child threads
+    explicit PosixLogWriteAdapter() {
+
+        if (filePath[0] == '\0') {
+            sprintf(filePath, "%s/%s%ld.log", getHostLogDir(), getLogPrefix(),
+                    capio_syscall(SYS_gettid));
+        }
 
         capio_syscall(SYS_mkdirat, AT_FDCWD, getLogDir(), 0755);
         capio_syscall(SYS_mkdirat, AT_FDCWD, getPosixLogDir(), 0755);
         capio_syscall(SYS_mkdirat, AT_FDCWD, getHostLogDir(), 0755);
 
-        fileFD = capio_syscall(SYS_openat, AT_FDCWD, filePath,
-                               O_CREAT | O_WRONLY | O_APPEND, 0644);
+        fileFD = capio_syscall(SYS_openat, AT_FDCWD, filePath, O_CREAT | O_WRONLY | O_APPEND, 0644);
 
         if (fileFD == -1) {
             capio_syscall(SYS_write, fileno(stdout),
@@ -119,22 +99,21 @@ struct PosixLogWriteAdapter {
 
     static void write(const char * /*invoker*/, const char * /*file*/, unsigned int /*line*/,
                       long int /*tid*/, const char *buf, size_t len) {
-        if (current_log_level < CAPIO_MAX_LOG_LEVEL || CAPIO_MAX_LOG_LEVEL < 0) {
-            writeToFD(buf, len);
-        }
+        writeToFD(buf, len);
     }
 
-    static void writeRaw(const char *buf, size_t len) {
-        if (current_log_level < CAPIO_MAX_LOG_LEVEL || CAPIO_MAX_LOG_LEVEL < 0) {
-            writeToFD(buf, len);
-        }
-    }
-
-    static void writeSyscallEnd() {
-        writeRaw(CAPIO_LOG_POSIX_SYSCALL_END, strlen(CAPIO_LOG_POSIX_SYSCALL_END));
-    }
+    static void writeRaw(const char *buf, size_t len) { writeToFD(buf, len); }
 
     static bool isSTLSafe() { return false; }
+
+    static void writeOpening() {
+
+        writeRaw(CAPIO_LOG_POSIX_SYSCALL_START, strlen(CAPIO_LOG_POSIX_SYSCALL_START));
+    }
+
+    static void writeEpilogue() {
+        writeRaw(CAPIO_LOG_POSIX_SYSCALL_END, strlen(CAPIO_LOG_POSIX_SYSCALL_END));
+    }
 };
 
 // Definitions of the thread_local static members.
@@ -142,7 +121,7 @@ struct PosixLogWriteAdapter {
 // that include this header, while thread_local gives each thread its own copy
 // pre-allocated in the TLS block before any user code runs.
 inline thread_local bool PosixLogWriteAdapter::fileOpen{false};
-inline thread_local int  PosixLogWriteAdapter::fileFD{-1};
+inline thread_local int PosixLogWriteAdapter::fileFD{-1};
 inline thread_local char PosixLogWriteAdapter::filePath[PATH_MAX]{'\0'};
 
 using Logger = TemplateLogger<PosixLogWriteAdapter>;

@@ -68,7 +68,7 @@ constexpr char CAPIO_SHM_OPEN_ERROR[] =
 
 // CAPIO logger - POSIX
 constexpr char CAPIO_LOG_POSIX_DEFAULT_LOG_FILE_PREFIX[] = "posix_thread_\0";
-constexpr char CAPIO_LOG_POSIX_SYSCALL_START[]           = "\n+++++++++ SYSCALL %s (%d) +++++++++";
+constexpr char CAPIO_LOG_POSIX_SYSCALL_START[]           = "\n+++++++++ START SYSCALL +++++++++";
 constexpr char CAPIO_LOG_POSIX_SYSCALL_END[]             = "~~~~~~~~~  END SYSCALL ~~~~~~~~~\n";
 
 // CAPIO logger - server

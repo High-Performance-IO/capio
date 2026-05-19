@@ -353,7 +353,8 @@ static int hook(long syscall_number, long arg0, long arg1, long arg2, long arg3,
     CAPIO_LOG_LEVEL = get_capio_log_level();
 #endif
 
-    START_LOG(syscall_no_intercept(SYS_gettid), "call(syscall_number=%ld)", syscall_number);
+    START_LOG(syscall_no_intercept(SYS_gettid), "call(syscall_number=%ld, syscall_name=%s)",
+              syscall_number, sys_num_to_string(syscall_number).c_str());
 
     // If the syscall_number is higher than the maximum
     // syscall captured by CAPIO, simply return

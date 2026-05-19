@@ -39,9 +39,6 @@ inline void raise_termination(const bool raise_exception, const std::string &mes
 #include "syscallnames.h"
 #endif
 
-// FIXME: Remove the inline specifier by splitting into header and source code
-inline thread_local int current_log_level = 0;
-
 // this variable tells the logger that syscall logging
 // has started, and we are not in setup phase
 // FIXME: Remove the inline specifier by splitting into header and source code
@@ -86,6 +83,7 @@ class SyscallLoggingSuspender {
  * of the old monolithic Logger class for both the server and POSIX builds.
  */
 template <typename Adapter> class TemplateLogger {
+    static thread_local int current_log_level;
     char invoker[256]{0};
     char file[256]{0};
     char format[CAPIO_LOG_MAX_MSG_LEN]{0};
@@ -97,7 +95,7 @@ template <typename Adapter> class TemplateLogger {
   public:
     TemplateLogger(const char invoker[], const char file[], unsigned int line, long int tid,
                    const char *message, ...) {
-
+        current_log_level++;
         this->tid  = tid;
         this->line = line;
         strncpy(this->invoker, invoker, sizeof(this->invoker));
@@ -106,8 +104,6 @@ template <typename Adapter> class TemplateLogger {
         va_list argp, argpc;
         va_start(argp, message);
         va_copy(argpc, argp);
-
-        adapter.openLogFile();
 
 #ifdef __CAPIO_POSIX
         if (!enable_logger) {
@@ -124,28 +120,34 @@ template <typename Adapter> class TemplateLogger {
                                                                 PROT_READ | PROT_WRITE,
                                                                 MAP_PRIVATE | MAP_ANONYMOUS, -1, 0));
         vsnprintf(buf, size + 1, format, argpc);
-        adapter.write(this->invoker, this->file, this->line, this->tid, buf, strlen(buf));
+
+        if (current_log_level < CAPIO_MAX_LOG_LEVEL || CAPIO_MAX_LOG_LEVEL < 0) {
+            if (current_log_level == 1) {
+                adapter.writeOpening();
+            }
+            adapter.write(this->invoker, this->file, this->line, this->tid, buf, strlen(buf));
+        }
 
         va_end(argp);
         va_end(argpc);
         capio_syscall(SYS_munmap, buf, size);
-        current_log_level++;
     }
 
     TemplateLogger(const TemplateLogger &)            = delete;
     TemplateLogger &operator=(const TemplateLogger &) = delete;
 
     ~TemplateLogger() {
-        current_log_level--;
         sprintf(format, CAPIO_LOG_PRE_MSG, current_time_in_millis(), this->invoker);
         const size_t pre_msg_len = strlen(format);
         strcpy(format + pre_msg_len, "returned");
 
         adapter.writeRaw(format, strlen(format));
 
-        if (current_log_level == 0 && enable_logger) {
-            adapter.writeSyscallEnd();
+        if (current_log_level == 1 && enable_logger &&
+            (current_log_level < CAPIO_MAX_LOG_LEVEL || CAPIO_MAX_LOG_LEVEL < 0)) {
+            adapter.writeEpilogue();
         }
+        current_log_level--;
     }
 
     void log(const char *message, ...) {
@@ -160,11 +162,6 @@ template <typename Adapter> class TemplateLogger {
         const size_t pre_msg_len = strlen(format);
         strcpy(format + pre_msg_len, message);
 
-        if (adapter.isSTLSafe()) {
-            adapter.writeRaw(format, strlen(format));
-            return;
-        }
-
         va_start(argp, message);
         va_copy(argpc, argp);
         const int size = vsnprintf(nullptr, 0U, format, argp);
@@ -172,7 +169,14 @@ template <typename Adapter> class TemplateLogger {
             capio_syscall(SYS_mmap, nullptr, size + 1, PROT_READ | PROT_WRITE,
                           MAP_PRIVATE | MAP_ANONYMOUS, -1, 0));
         vsnprintf(buf, size + 1, format, argpc);
-        adapter.write(this->invoker, this->file, this->line, this->tid, buf, strlen(buf));
+
+        if (current_log_level < CAPIO_MAX_LOG_LEVEL || CAPIO_MAX_LOG_LEVEL < 0) {
+            if (adapter.isSTLSafe()) {
+                adapter.writeRaw(format, strlen(format));
+            } else {
+                adapter.write(this->invoker, this->file, this->line, this->tid, buf, strlen(buf));
+            }
+        }
 
         va_end(argp);
         va_end(argpc);
@@ -181,6 +185,8 @@ template <typename Adapter> class TemplateLogger {
 
     std::string getLogFileName() { return adapter.getLogFileName(); }
 };
+
+template <typename T> inline thread_local int TemplateLogger<T>::current_log_level = 0;
 
 // ---------------------------------------------------------------------------
 // Macros — identical surface to the old ones; Logger is now a template

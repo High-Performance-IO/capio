@@ -13,14 +13,13 @@ struct ServerLogWriteAdapter {
             return;
         }
 
-        if (current_log_level < CAPIO_LOG_LEVEL || CAPIO_LOG_LEVEL < 0) {
-            logfile << buf << std::endl;
-            logfile.flush();
-        }
+        logfile << buf << std::endl;
+        logfile.flush();
     }
 
   public:
-    void openLogFile() {
+    explicit ServerLogWriteAdapter() {
+
         if (this->logfile.is_open()) {
             return;
         }
@@ -60,11 +59,13 @@ struct ServerLogWriteAdapter {
 
     void writeRaw(const char *buf, size_t /*len*/) { writeToStream(buf); }
 
-    static void writeSyscallEnd() {}
-
     static bool isSTLSafe() { return true; }
 
     const std::string &getLogFileName() { return logFileName; }
+
+    static void writeOpening() {}
+
+    static void writeEpilogue() {}
 };
 
 using Logger = TemplateLogger<ServerLogWriteAdapter>;
