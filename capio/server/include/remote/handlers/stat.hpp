@@ -5,7 +5,7 @@
 #include "remote/backend.hpp"
 #include "remote/requests.hpp"
 #include "storage/manager.hpp"
-#include "utils/ServerLogger.hpp"
+#include "utils/server_logger.hpp"
 
 extern StorageManager *storage_manager;
 extern ClientManager *client_manager;

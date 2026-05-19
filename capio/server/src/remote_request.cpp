@@ -1,6 +1,6 @@
 #include "remote/backend.hpp"
 
-#include "utils/ServerLogger.hpp"
+#include "utils/server_logger.hpp"
 
 RemoteRequest::RemoteRequest(char *buf_recv, const std::string &source) : _source(source) {
     START_LOG(gettid(), "call(buf_recv=%s, source=%s)", buf_recv, source.c_str());

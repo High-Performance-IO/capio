@@ -2,8 +2,8 @@
 
 #include "remote/backend/none.hpp"
 
-#include "utils/ServerLogger.hpp"
 #include "utils/capiocl_adapter.hpp"
+#include "utils/server_logger.hpp"
 #include "utils/server_println.hpp"
 
 NoneBackend::NoneBackend(int argc, char **argv) : Backend(HOST_NAME_MAX) {

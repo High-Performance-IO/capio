@@ -8,10 +8,10 @@
 #include "common/dirent.hpp"
 #include "common/filesystem.hpp"
 #include "storage/capio_file.hpp"
-#include "utils/ServerLogger.hpp"
 #include "utils/capiocl_adapter.hpp"
 #include "utils/common.hpp"
 #include "utils/location.hpp"
+#include "utils/server_logger.hpp"
 #include "utils/shared_mutex.hpp"
 #include "utils/types.hpp"
 

@@ -5,7 +5,7 @@
 
 #include "remote/backend.hpp"
 #include "server_println.hpp"
-#include "utils/ServerLogger.hpp"
+#include "utils/server_logger.hpp"
 
 #ifdef CAPIO_COVERAGE
 extern "C" void __gcov_dump(void);

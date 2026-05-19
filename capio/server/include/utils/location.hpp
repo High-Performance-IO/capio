@@ -5,7 +5,7 @@
 
 #include "remote/backend.hpp"
 
-#include "utils/ServerLogger.hpp"
+#include "utils/server_logger.hpp"
 #include "utils/types.hpp"
 
 extern Backend *backend;

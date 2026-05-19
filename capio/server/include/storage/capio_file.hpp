@@ -10,7 +10,7 @@
 #include <utility>
 #include <vector>
 
-#include "utils/ServerLogger.hpp"
+#include "utils/server_logger.hpp"
 
 #include "common/queue.hpp"
 

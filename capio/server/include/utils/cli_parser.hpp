@@ -1,7 +1,7 @@
 #ifndef CAPIO_CLI_PARSER_HPP
 #define CAPIO_CLI_PARSER_HPP
+#include "utils/server_logger.hpp"
 #include <string>
-#include "utils/ServerLogger.hpp"
 
 struct CapioParsedConfig {
     std::string backend_name;

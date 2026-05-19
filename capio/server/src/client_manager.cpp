@@ -4,9 +4,9 @@
 
 #include "common/constants.hpp"
 #include "common/queue.hpp"
-#include "utils/ServerLogger.hpp"
 #include "utils/capiocl_adapter.hpp"
 #include "utils/common.hpp"
+#include "utils/server_logger.hpp"
 #include "utils/server_println.hpp"
 
 ClientManager::ClientDataBuffers::ClientDataBuffers(const std::string &clientToServerName,
