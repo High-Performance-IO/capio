@@ -2,13 +2,12 @@
 #define CAPIO_POSIXLOGGER_HPP
 
 #include "common/logger.hpp"
+static thread_local bool fileOpen = false;
+static thread_local int fileFD    = -1;
+static thread_local char filePath[PATH_MAX];
 
 struct PosixLogWriteAdapter {
   private:
-    static thread_local bool fileOpen;
-    static thread_local int fileFD;
-    static thread_local char filePath[PATH_MAX];
-
     static const char *getHostname() {
         static char hostname[HOST_NAME_MAX]{'\0'};
         if (hostname[0] == '\0') {
@@ -120,9 +119,9 @@ struct PosixLogWriteAdapter {
 // 'inline' (C++17) ensures a single definition across all translation units
 // that include this header, while thread_local gives each thread its own copy
 // pre-allocated in the TLS block before any user code runs.
-inline thread_local bool PosixLogWriteAdapter::fileOpen{false};
-inline thread_local int PosixLogWriteAdapter::fileFD{-1};
-inline thread_local char PosixLogWriteAdapter::filePath[PATH_MAX]{'\0'};
+// inline thread_local bool PosixLogWriteAdapter::fileOpen{false};
+// inline thread_local int PosixLogWriteAdapter::fileFD{-1};
+// inline thread_local char PosixLogWriteAdapter::filePath[PATH_MAX]{'\0'};
 
 using Logger = TemplateLogger<PosixLogWriteAdapter>;
 
