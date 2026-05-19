@@ -2,11 +2,12 @@
 #define CAPIO_POSIXLOGGER_HPP
 
 #include "common/logger.hpp"
-inline thread_local bool fileOpen = false;
-inline thread_local int fileFD    = -1;
-inline thread_local char filePath[PATH_MAX]{'\0'};
 
 struct PosixLogWriteAdapter {
+    static thread_local bool fileOpen;
+    static thread_local int fileFD;
+    static thread_local char filePath[PATH_MAX];
+
   private:
     static const char *getHostname() {
         static char hostname[HOST_NAME_MAX]{'\0'};
@@ -93,7 +94,7 @@ struct PosixLogWriteAdapter {
         fileOpen = true;
     }
 
-    static void write(const char * /*invoker*/, const char * /*file*/, unsigned int /*line*/,
+    static void writeFormatted(const char * /*invoker*/, const char * /*file*/, unsigned int /*line*/,
                       long int /*tid*/, const char *buf, size_t len) {
         writeToFD(buf, len);
     }
@@ -110,6 +111,10 @@ struct PosixLogWriteAdapter {
         writeToFD(CAPIO_LOG_POSIX_SYSCALL_END, strlen(CAPIO_LOG_POSIX_SYSCALL_END));
     }
 };
+
+thread_local bool PosixLogWriteAdapter::fileOpen           = false;
+thread_local int PosixLogWriteAdapter::fileFD              = -1;
+thread_local char PosixLogWriteAdapter::filePath[PATH_MAX] = {'\0'};
 
 using Logger = TemplateLogger<PosixLogWriteAdapter>;
 

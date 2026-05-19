@@ -125,7 +125,7 @@ template <typename Adapter> class TemplateLogger {
             if (current_log_level == 1) {
                 adapter.writeOpening();
             }
-            adapter.write(this->invoker, this->file, this->line, this->tid, buf, strlen(buf));
+            adapter.writeFormatted(this->invoker, this->file, this->line, this->tid, buf, strlen(buf));
         }
 
         va_end(argp);
@@ -174,7 +174,7 @@ template <typename Adapter> class TemplateLogger {
             if (adapter.isSTLSafe()) {
                 adapter.write(format, strlen(format));
             } else {
-                adapter.write(this->invoker, this->file, this->line, this->tid, buf, strlen(buf));
+                adapter.writeFormatted(this->invoker, this->file, this->line, this->tid, buf, strlen(buf));
             }
         }
 

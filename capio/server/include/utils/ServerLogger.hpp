@@ -52,12 +52,12 @@ struct ServerLogWriteAdapter {
         this->logFileName = logfileName;
     }
 
-    void write(const char * /*invoker*/, const char * /*file*/, unsigned int /*line*/,
+    void writeFormatted(const char * /*invoker*/, const char * /*file*/, unsigned int /*line*/,
                long int /*tid*/, const char *buf, size_t /*len*/) {
         writeToStream(buf);
     }
 
-    void writeRaw(const char *buf, size_t /*len*/) { writeToStream(buf); }
+    void write(const char *buf, size_t /*len*/) { writeToStream(buf); }
 
     static bool isSTLSafe() { return true; }
 
