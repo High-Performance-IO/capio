@@ -94,14 +94,7 @@ struct PosixLogWriteAdapter {
         fileOpen = true;
     }
 
-    static void writeFormatted(const char * /*invoker*/, const char * /*file*/, unsigned int /*line*/,
-                      long int /*tid*/, const char *buf, size_t len) {
-        writeToFD(buf, len);
-    }
-
-    static void write(const char *buf, size_t len) { writeToFD(buf, len); }
-
-    static bool isSTLSafe() { return false; }
+    static void write(const char *buf, const size_t len) { writeToFD(buf, len); }
 
     static void writeOpening() {
         writeToFD(CAPIO_LOG_POSIX_SYSCALL_START, strlen(CAPIO_LOG_POSIX_SYSCALL_START));

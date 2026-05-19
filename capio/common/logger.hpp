@@ -125,7 +125,7 @@ template <typename Adapter> class TemplateLogger {
             if (current_log_level == 1) {
                 adapter.writeOpening();
             }
-            adapter.writeFormatted(this->invoker, this->file, this->line, this->tid, buf, strlen(buf));
+            adapter.write(buf, strlen(buf));
         }
 
         va_end(argp);
@@ -171,11 +171,7 @@ template <typename Adapter> class TemplateLogger {
         vsnprintf(buf, size + 1, format, argpc);
 
         if (current_log_level < CAPIO_MAX_LOG_LEVEL || CAPIO_MAX_LOG_LEVEL < 0) {
-            if (adapter.isSTLSafe()) {
-                adapter.write(format, strlen(format));
-            } else {
-                adapter.writeFormatted(this->invoker, this->file, this->line, this->tid, buf, strlen(buf));
-            }
+            adapter.write(buf, strlen(buf));
         }
 
         va_end(argp);
@@ -188,9 +184,6 @@ template <typename Adapter> class TemplateLogger {
 
 template <typename T> inline thread_local int TemplateLogger<T>::current_log_level = 0;
 
-// ---------------------------------------------------------------------------
-// Macros — identical surface to the old ones; Logger is now a template
-// ---------------------------------------------------------------------------
 #ifdef CAPIO_LOG
 
 #define ERR_EXIT_EXCEPT_CHOICE(raise_exception, message, ...)                                      \

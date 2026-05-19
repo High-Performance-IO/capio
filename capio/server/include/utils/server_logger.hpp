@@ -52,14 +52,7 @@ struct ServerLogWriteAdapter {
         this->logFileName = logfileName;
     }
 
-    void writeFormatted(const char * /*invoker*/, const char * /*file*/, unsigned int /*line*/,
-               long int /*tid*/, const char *buf, size_t /*len*/) {
-        writeToStream(buf);
-    }
-
     void write(const char *buf, size_t /*len*/) { writeToStream(buf); }
-
-    static bool isSTLSafe() { return true; }
 
     const std::string &getLogFileName() { return logFileName; }
 
