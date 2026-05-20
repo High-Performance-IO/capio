@@ -6,7 +6,8 @@
 #include "utils/clone.hpp"
 #include "utils/requests.hpp"
 
-int fork_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg5, long *result) {
+int fork_handler(pid_t tid, long arg0, long arg1, long arg2, long arg3, long arg4, long arg5,
+                 long *result) {
     auto pid = static_cast<pid_t>(syscall_no_intercept(SYS_fork));
     START_LOG(syscall_no_intercept(SYS_gettid), "call(pid=%ld)", pid);
 

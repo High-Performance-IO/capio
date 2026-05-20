@@ -6,12 +6,12 @@
 #include "utils/common.hpp"
 
 // TODO: EOVERFLOW is not addressed
-inline off64_t capio_lseek(int fd, off64_t offset, int whence, long tid) {
+inline off64_t capio_lseek(int fd, off64_t offset, int whence, pid_t tid) {
     START_LOG(tid, "call(fd=%d, offset=%ld, whence=%d)", fd, offset, whence);
 
-    if (exists_capio_fd(fd)) {
-        read_cache->flush();
-        write_cache->flush();
+    if (exists_capio_fd(tid, fd)) {
+        read_cache->flush(tid);
+        write_cache->flush(tid);
         off64_t file_offset = get_capio_fd_offset(fd);
         if (whence == SEEK_SET) {
             LOG("whence %d is SEEK_SET", whence);
@@ -65,13 +65,13 @@ inline off64_t capio_lseek(int fd, off64_t offset, int whence, long tid) {
     }
 }
 
-int lseek_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg5, long *result) {
+int lseek_handler(pid_t tid, long arg0, long arg1, long arg2, long arg3, long arg4, long arg5,
+                  long *result) {
     int fd      = static_cast<int>(arg0);
     auto offset = static_cast<off64_t>(arg1);
     int whence  = static_cast<int>(arg2);
-    long tid    = syscall_no_intercept(SYS_gettid);
 
-    return posix_return_value(capio_lseek(fd, offset, whence, tid), result);
+    return posix_return_value(tid, capio_lseek(fd, offset, whence, tid), result);
 }
 
 #endif // SYS_lseek

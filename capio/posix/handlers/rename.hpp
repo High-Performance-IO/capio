@@ -3,14 +3,13 @@
 
 #include "utils/filesystem.hpp"
 
-int renameat2_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg5,
+int renameat2_handler(pid_t tid, long arg0, long arg1, long arg2, long arg3, long arg4, long arg5,
                       long *result) {
     const auto flags                            = arg4;
-    const std::filesystem::path old_dir_fd_path = get_dir_path(static_cast<int>(arg0));
+    const std::filesystem::path old_dir_fd_path = get_dir_path(tid, static_cast<int>(arg0));
     const std::filesystem::path old_path(reinterpret_cast<const char *>(arg1));
-    const std::filesystem::path new_dir_fd_path = get_dir_path(static_cast<int>(arg2));
+    const std::filesystem::path new_dir_fd_path = get_dir_path(tid, static_cast<int>(arg2));
     const std::filesystem::path new_path(reinterpret_cast<const char *>(arg3));
-    const long tid = syscall_no_intercept(SYS_gettid);
 
     // TODO: implement handling of FLAGS
 
@@ -21,10 +20,10 @@ int renameat2_handler(long arg0, long arg1, long arg2, long arg3, long arg4, lon
 
     // Resolve paths relative to path of dir_fd ONLY if input path is not absolute
     const auto old_path_abs =
-        old_path.is_absolute() ? old_path : capio_absolute(old_dir_fd_path / old_path);
+        old_path.is_absolute() ? old_path : capio_absolute(tid, old_dir_fd_path / old_path);
 
     const auto new_path_abs =
-        new_path.is_absolute() ? new_path : capio_absolute(new_dir_fd_path / new_path);
+        new_path.is_absolute() ? new_path : capio_absolute(tid, new_dir_fd_path / new_path);
 
     if (is_prefix(old_path_abs, new_path_abs)) { // TODO: The check is more complex
         errno   = EINVAL;
@@ -48,15 +47,16 @@ int renameat2_handler(long arg0, long arg1, long arg2, long arg3, long arg4, lon
     }
 }
 
-int rename_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg5, long *result) {
+int rename_handler(pid_t tid, long arg0, long arg1, long arg2, long arg3, long arg4, long arg5,
+                   long *result) {
     // Force flags to zero to ensure that spurious data is being passed to handler
-    return renameat2_handler(AT_FDCWD, arg0, AT_FDCWD, arg1, 0, 0, result);
+    return renameat2_handler(tid, AT_FDCWD, arg0, AT_FDCWD, arg1, 0, 0, result);
 }
 
-int renameat_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg5,
+int renameat_handler(pid_t tid, long arg0, long arg1, long arg2, long arg3, long arg4, long arg5,
                      long *result) {
     // Force flags to zero to ensure that spurious data is being passed to handler
-    return renameat2_handler(arg0, arg1, arg2, arg3, 0, arg5, result);
+    return renameat2_handler(tid, arg0, arg1, arg2, arg3, 0, arg5, result);
 }
 
 #endif // CAPIO_POSIX_HANDLERS_RENAME_HPP

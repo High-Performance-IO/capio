@@ -13,20 +13,20 @@
  * is called after a SYS_clone is issued.
  */
 inline void initialize_new_thread(const bool wait = false) {
-    const long tid = syscall_no_intercept(SYS_gettid);
+    current_tid    = static_cast<pid_t>(syscall_no_intercept(SYS_gettid));
     const long pid = syscall_no_intercept(SYS_getpid);
 
     syscall_no_intercept_flag = true;
     const auto capio_app_name = get_capio_app_name();
     syscall_no_intercept_flag = false;
 
-    START_LOG(tid, "call(tid=%d, pid=%d, app_name=%s)", tid, pid, capio_app_name);
+    START_LOG(current_tid, "call(tid=%d, pid=%d, app_name=%s)", current_tid, pid, capio_app_name);
 
-    initialize_data_queues(tid);
-    init_client(tid);
+    initialize_data_queues(current_tid);
+    init_client(current_tid);
 
-    handshake_named_request(tid, pid, capio_app_name, wait);
-    LOG("Starting child thread %d", tid);
+    handshake_named_request(current_tid, pid, capio_app_name, wait);
+    LOG("Starting child thread %d", current_tid);
 }
 
 inline void hook_clone_parent(long child_tid) {

@@ -11,9 +11,9 @@
  * to the kernel.
  */
 
-int chdir_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg5, long *result) {
+int chdir_handler(pid_t tid, long arg0, long arg1, long arg2, long arg3, long arg4, long arg5,
+                  long *result) {
     const std::string_view pathname(reinterpret_cast<const char *>(arg0));
-    long tid = syscall_no_intercept(SYS_gettid);
 
     START_LOG(tid, "call(path=%s)", pathname.data());
 
@@ -24,7 +24,7 @@ int chdir_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long ar
 
     std::filesystem::path path(pathname);
     if (path.is_relative()) {
-        path = capio_posix_realpath(path);
+        path = capio_posix_realpath(tid, path);
         if (path.empty()) {
             *result = -errno;
             return CAPIO_POSIX_SYSCALL_SUCCESS;
