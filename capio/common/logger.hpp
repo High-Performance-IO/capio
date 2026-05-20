@@ -25,7 +25,7 @@ template <typename T> std::string demangled_name(const T &obj) {
     return status == 0 ? demangled.get() : mangled;
 }
 
-inline bool continue_on_error = false; // if set to true, CAPIO does not terminate on ERR_EXIT
+inline bool continue_on_error = false;
 
 inline void raise_termination(const bool raise_exception, const std::string &message) {
     if (raise_exception) {
@@ -39,15 +39,18 @@ inline void raise_termination(const bool raise_exception, const std::string &mes
 #include "syscallnames.h"
 #endif
 
-// this variable tells the logger that syscall logging
-// has started, and we are not in setup phase
-// FIXME: Remove the inline specifier by splitting into header and source code
+#ifdef __CAPIO_POSIX
+// POSIX interceptor: logging starts disabled and is enabled explicitly
+// after setup to prevent re-entrancy into the interceptor itself.
 inline thread_local bool enable_logger = false;
+#else
+// Server / non-POSIX: logging is always active from the first call.
+inline thread_local bool enable_logger = true;
+#endif
 
-#ifndef CAPIO_MAX_LOG_LEVEL // capio max log level. defaults to -1, where everything is logged
+#ifndef CAPIO_MAX_LOG_LEVEL
 #define CAPIO_MAX_LOG_LEVEL -1
 #endif
-// FIXME: Remove the inline specifier by splitting into header and source code
 inline int CAPIO_LOG_LEVEL = CAPIO_MAX_LOG_LEVEL;
 
 inline long long current_time_in_millis() {
@@ -58,14 +61,9 @@ inline long long current_time_in_millis() {
         start_time = static_cast<long long>(ts.tv_sec) * 1000 + (ts.tv_nsec) / 1000000;
     }
     capio_syscall(SYS_clock_gettime, CLOCK_REALTIME, &ts);
-    const auto time_now = static_cast<long long>(ts.tv_sec) * 1000 + (ts.tv_nsec) / 1000000;
-    return time_now - start_time;
+    return static_cast<long long>(ts.tv_sec) * 1000 + (ts.tv_nsec) / 1000000 - start_time;
 }
 
-/**
- * @brief Class used to suspend the logging capabilities of CAPIO, by setting the logging_syscall
- * flag to false at instantiation, and restarting the logging at destruction
- */
 class SyscallLoggingSuspender {
   public:
     SyscallLoggingSuspender() { enable_logger = false; }
@@ -73,20 +71,33 @@ class SyscallLoggingSuspender {
 };
 
 /**
- * @brief Class that provides logging capabilities to CAPIO.
+ * @brief Logging front-end, parameterised on an Adapter for the I/O backend.
  *
- * Parameterised on a LogWriteAdapter so that the I/O strategy (POSIX
- * syscalls vs. STL streams vs. any custom backend) is a compile-time
- * choice with no virtual dispatch overhead.
+ * Adapter contract
+ * ----------------
+ *   // Called once on entry (current_log_level == 1 after increment).
+ *   // Receives all metadata so the adapter can open a structured record.
+ *   static void writeOpening(unsigned long ts, const char *invoker,
+ *                             const char *file, int line,
+ *                             const char *message_format, va_list args);
  *
- * The default adapter (@ref DefaultLogWriteAdapter) mirrors the behaviour
- * of the old monolithic Logger class for both the server and POSIX builds.
+ *   // Called for every LOG() inside a scope.
+ *   static void printFormatted(unsigned long ts, const char *invoker,
+ *                               const char *file, int line,
+ *                               const char *output_template,
+ *                               const char *message_format, va_list args);
+ *
+ *   // Called on scope exit to close the structured record.
+ *   static void writeEpilogue();
+ *
+ *   // Legacy write — kept for ERR_EXIT paths; adapters may ignore it.
+ *   static void write(const char *buf, size_t len);
  */
 template <typename Adapter> class TemplateLogger {
     static thread_local int current_log_level;
+
     char invoker[256]{0};
     char file[256]{0};
-    char format[CAPIO_LOG_MAX_MSG_LEN]{0};
     unsigned int line{0};
     long int tid{0};
 
@@ -95,90 +106,83 @@ template <typename Adapter> class TemplateLogger {
   public:
     TemplateLogger(const char invoker[], const char file[], unsigned int line, long int tid,
                    const char *message, ...) {
-        current_log_level++;
         this->tid  = tid;
         this->line = line;
-        strncpy(this->invoker, invoker, sizeof(this->invoker));
-        strncpy(this->file, file, sizeof(this->file));
+        strncpy(this->invoker, invoker, sizeof(this->invoker) - 1);
+        strncpy(this->file, file, sizeof(this->file) - 1);
 
-        va_list argp, argpc;
-        va_start(argp, message);
-        va_copy(argpc, argp);
-
+        // Only track nesting when logging is actually active on this thread.
+        // If we incremented unconditionally, a START_LOG during the setup
+        // phase (before ENABLE_LOGGER) would leave current_log_level at 1
+        // for the rest of the thread's lifetime, making every subsequent
+        // top-level call look like a nested one.
         if (!enable_logger) {
             return;
         }
 
-
-        sprintf(format, CAPIO_LOG_PRE_MSG, current_time_in_millis(), this->invoker);
-        const size_t pre_msg_len = strlen(format);
-        strcpy(format + pre_msg_len, message);
-
-        const int size = vsnprintf(nullptr, 0U, format, argp);
-        auto buf       = reinterpret_cast<char *>(capio_syscall(SYS_mmap, nullptr, size + 1,
-                                                                PROT_READ | PROT_WRITE,
-                                                                MAP_PRIVATE | MAP_ANONYMOUS, -1, 0));
-        vsnprintf(buf, size + 1, format, argpc);
+        current_log_level++;
 
         if (current_log_level < CAPIO_MAX_LOG_LEVEL || CAPIO_MAX_LOG_LEVEL < 0) {
-            if (current_log_level == 1) {
-                adapter.writeOpening();
-            }
-            adapter.write(buf, strlen(buf));
-        }
+            va_list argp;
+            va_start(argp, message);
 
-        va_end(argp);
-        va_end(argpc);
-        capio_syscall(SYS_munmap, buf, size);
+            if (current_log_level == 1) {
+                adapter.writeOpening(current_time_in_millis(), this->invoker, this->file,
+                                     this->line, message, argp);
+            } else {
+                adapter.printFormatted(current_time_in_millis(), this->invoker, this->file,
+                                       this->line, CAPIO_LOG_PRE_MSG, message, argp);
+            }
+
+            va_end(argp);
+        }
     }
 
     TemplateLogger(const TemplateLogger &)            = delete;
     TemplateLogger &operator=(const TemplateLogger &) = delete;
 
     ~TemplateLogger() {
-        sprintf(format, CAPIO_LOG_PRE_MSG, current_time_in_millis(), this->invoker);
-        const size_t pre_msg_len = strlen(format);
-        strcpy(format + pre_msg_len, "returned");
+        if (!enable_logger) {
+            return; // level was never incremented for this instance
+        }
 
-        adapter.write(format, strlen(format));
-
-        if (current_log_level == 1 && enable_logger &&
+        if (current_log_level == 1 &&
             (current_log_level < CAPIO_MAX_LOG_LEVEL || CAPIO_MAX_LOG_LEVEL < 0)) {
-            adapter.writeEpilogue();
+            // Capture the exit timestamp here, as close to the actual return
+            // as possible, and pass it into the adapter so it doesn't need
+            // to call current_time_in_millis() itself.
+            adapter.writeEpilogue(static_cast<unsigned long>(current_time_in_millis()));
         }
         current_log_level--;
     }
 
     void log(const char *message, ...) {
-
         if (!enable_logger) {
             return;
         }
 
-        va_list argp, argpc;
-
-        sprintf(format, CAPIO_LOG_PRE_MSG, current_time_in_millis(), this->invoker);
-        const size_t pre_msg_len = strlen(format);
-        strcpy(format + pre_msg_len, message);
-
-        va_start(argp, message);
-        va_copy(argpc, argp);
-        const int size = vsnprintf(nullptr, 0U, format, argp);
-        const auto buf = reinterpret_cast<char *>(
-            capio_syscall(SYS_mmap, nullptr, size + 1, PROT_READ | PROT_WRITE,
-                          MAP_PRIVATE | MAP_ANONYMOUS, -1, 0));
-        vsnprintf(buf, size + 1, format, argpc);
-
+        // current_log_level is only incremented when enable_logger is true,
+        // so this check is always consistent with the constructor.
         if (current_log_level < CAPIO_MAX_LOG_LEVEL || CAPIO_MAX_LOG_LEVEL < 0) {
-            adapter.write(buf, strlen(buf));
+            va_list argp;
+            va_start(argp, message);
+            adapter.printFormatted(current_time_in_millis(), this->invoker, this->file, this->line,
+                                   CAPIO_LOG_PRE_MSG, message, argp);
+            va_end(argp);
         }
-
-        va_end(argp);
-        va_end(argpc);
-        capio_syscall(SYS_munmap, buf, size);
     }
 
     std::string getLogFileName() { return adapter.getLogFileName(); }
+
+    /**
+     * Resets the per-thread nesting counter to zero.
+     * Called by the server-side START_LOG macro before constructing a new
+     * Logger, so that every top-level server call always opens a fresh
+     * JSON object even when invoked from inside an existing Logger scope
+     * (e.g. the server main loop calling helper functions that also use
+     * START_LOG).  Not used in the POSIX build where nesting is meaningful.
+     */
+    static void reset_log_level() { current_log_level = 0; }
 };
 
 template <typename T> inline thread_local int TemplateLogger<T>::current_log_level = 0;
@@ -195,30 +199,26 @@ template <typename T> inline thread_local int TemplateLogger<T>::current_log_lev
 #define ERR_EXIT(message, ...) ERR_EXIT_EXCEPT_CHOICE(true, message, ##__VA_ARGS__)
 
 #define LOG(message, ...) log.log(message, ##__VA_ARGS__)
+
+// On the POSIX build, enable_logger starts false and is flipped explicitly;
+// nesting is meaningful so current_log_level is never reset.
+// On the server build, enable_logger starts true (see declaration above) and
+// current_log_level is reset to 0 on every START_LOG so that each top-level
+// request handler always opens its own JSON object, even when called from
+// inside an outer Logger scope.
+#ifdef __CAPIO_POSIX
 #define START_LOG(tid, message, ...)                                                               \
     Logger log(__func__, __FILE__, __LINE__, tid, message, ##__VA_ARGS__)
-#define ENABLE_LOGGER() enable_logger = true
-#define DISABLE_LOGGER() SyscallLoggingSuspender sls{};
+#else
+#define START_LOG(tid, message, ...)                                                               \
+    Logger::reset_log_level();                                                                     \
+    Logger log(__func__, __FILE__, __LINE__, tid, message, ##__VA_ARGS__)
+#endif
 
-/**
- * This macro is used to inject code into debug mode. It needs a self calling lambda function,
- * that is a lambda in the following form:
- *
- * [](){}()
- *
- * For example, a debug code to print a value might be injected in this way:
- *
- * int value = 10;
- * DBG(tid, [](int i){printf("%d", i);}(value) );
- *
- * This is useful to print or run debug actions with variables defined outside
- * of the scope of the given lambda function Be careful that the code defined inside the DBG
- * macro is not compiled when building in Release.
- *
- * Be even MORE CAREFUL to not use any STL code inside the DBG lambda function as it could be
- * captured by syscall_intercept (ie do not use std::cout unless you are 100% sure of what you are
- * doing)
- */
+#define ENABLE_LOGGER() enable_logger = true
+#define DISABLE_LOGGER()                                                                           \
+    SyscallLoggingSuspender sls {}
+
 #define DBG(tid, lambda)                                                                           \
     {                                                                                              \
         START_LOG(tid, "[  DBG  ]~~~~~~~~~~~~ START ~~~~~~~~~~~~~~[  DBG  ]");                     \

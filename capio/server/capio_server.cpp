@@ -114,7 +114,6 @@ static constexpr std::array<CSHandler_t, CAPIO_NR_REQUESTS> build_request_handle
 }
 
 int main(int argc, char **argv) {
-    ENABLE_LOGGER();
 
     Semaphore internal_server_sem(0);
 

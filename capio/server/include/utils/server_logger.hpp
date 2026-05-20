@@ -1,65 +1,69 @@
 #ifndef CAPIO_SERVERLOGGER_HPP
 #define CAPIO_SERVERLOGGER_HPP
 
-#include <common/logger.hpp>
+#include "common/logger.hpp"
+#include "common/json_base_logger.hpp"
 
-struct ServerLogWriteAdapter {
-  private:
-    std::ofstream logfile;
-    std::string logFileName;
+struct ServerLogWriteAdapter : JsonLogBase<ServerLogWriteAdapter> {
 
-    void writeToStream(const char *buf) {
-        if (!logfile.is_open()) {
-            return;
-        }
+    static thread_local std::ofstream *logfile;
+    static thread_local std::string   *logFileName;
 
-        logfile << buf << std::endl;
-        logfile.flush();
+    explicit ServerLogWriteAdapter() { ensureFileOpen(); }
+
+    std::string getLogFileName() const {
+        return logFileName ? *logFileName : std::string{};
     }
 
-  public:
-    explicit ServerLogWriteAdapter() {
+    // ------------------------------------------------------------------ //
+    //  I/O primitives required by JsonLogBase
+    // ------------------------------------------------------------------ //
 
-        if (this->logfile.is_open()) {
-            return;
-        }
-        std::string logMasterDirName;
-        std::string logfilePrefix;
+    static void rawWriteBytes(const char *buf, int len) {
+        ensureFileOpen();
+        logfile->write(buf, len);
+        logfile->flush();
+    }
 
-        if (const char *tmp = std::getenv("CAPIO_LOG_DIR"); tmp == nullptr) {
-            logMasterDirName = CAPIO_DEFAULT_LOG_FOLDER;
+    static void rawWriteStr(const char *buf) {
+        rawWriteBytes(buf, static_cast<int>(strlen(buf)));
+    }
+
+  private:
+    static void ensureFileOpen() {
+        if (logfile != nullptr && logfile->is_open()) { return; }
+
+        std::string logDir;
+        std::string prefix;
+
+        if (const char *tmp = std::getenv("CAPIO_LOG_DIR"); tmp != nullptr) {
+            logDir = tmp;
         } else {
-            logMasterDirName = tmp;
+            logDir = CAPIO_DEFAULT_LOG_FOLDER;
         }
 
-        if (const char *tmp = std::getenv("CAPIO_LOG_PREFIX"); tmp == nullptr) {
-            logfilePrefix = CAPIO_SERVER_DEFAULT_LOG_FILE_PREFIX;
+        if (const char *tmp = std::getenv("CAPIO_LOG_PREFIX"); tmp != nullptr) {
+            prefix = tmp;
         } else {
-            logfilePrefix = tmp;
+            prefix = CAPIO_SERVER_DEFAULT_LOG_FILE_PREFIX;
         }
 
         char hostname[HOST_NAME_MAX];
         gethostname(hostname, HOST_NAME_MAX);
 
-        const std::filesystem::path outputFolder{logMasterDirName + "/server/" + hostname};
+        const std::filesystem::path outputFolder{logDir + "/server/" + hostname};
         std::filesystem::create_directories(outputFolder);
 
-        const std::filesystem::path logfileName = outputFolder.string() + "/" + logfilePrefix +
-                                                  std::to_string(capio_syscall(SYS_gettid)) +
-                                                  ".log";
+        const std::filesystem::path path =
+            outputFolder / (prefix + std::to_string(capio_syscall(SYS_gettid)) + ".log");
 
-        logfile.open(logfileName, std::ofstream::app);
-        this->logFileName = logfileName;
+        logfile     = new std::ofstream(path, std::ofstream::app);
+        logFileName = new std::string(path.string());
     }
-
-    void write(const char *buf, size_t /*len*/) { writeToStream(buf); }
-
-    const std::string &getLogFileName() { return logFileName; }
-
-    static void writeOpening() {}
-
-    static void writeEpilogue() {}
 };
+
+inline thread_local std::ofstream *ServerLogWriteAdapter::logfile     = nullptr;
+inline thread_local std::string   *ServerLogWriteAdapter::logFileName = nullptr;
 
 using Logger = TemplateLogger<ServerLogWriteAdapter>;
 
