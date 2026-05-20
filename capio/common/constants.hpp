@@ -134,11 +134,4 @@ constexpr char CAPIO_SERVER_ARG_PARSER_CONFIG_BACKEND_HELP[] =
     "Backend used in CAPIO. The value [backend] can be one of the following implemented backends: "
     "\n\t> mpi \n\t> mpisync \n\t> none (default)";
 
-// Cli pre messages
-constexpr char CAPIO_LOG_SERVER_CLI_LEVEL_RESET[]   = "\033[0m";
-constexpr char CAPIO_LOG_SERVER_CLI_LEVEL_STATUS[]  = "\033[1;34m";
-constexpr char CAPIO_LOG_SERVER_CLI_LEVEL_INFO[]    = "\033[1;32m";
-constexpr char CAPIO_LOG_SERVER_CLI_LEVEL_WARNING[] = "\033[1;33m";
-constexpr char CAPIO_LOG_SERVER_CLI_LEVEL_ERROR[]   = "\033[1;31m";
-
 #endif // CAPIO_COMMON_CONSTANTS_HPP

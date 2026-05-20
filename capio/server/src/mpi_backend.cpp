@@ -1,8 +1,10 @@
 #include "remote/backend/mpi.hpp"
 
+#include "captura/StdOutLogger.h"
 #include "captura/StlLogger.h"
+
+#include "common/constants.hpp"
 #include "utils/capiocl_adapter.hpp"
-#include "utils/server_println.hpp"
 
 MPIBackend::MPIBackend(int argc, char **argv) : Backend(MPI_MAX_PROCESSOR_NAME) {
     int node_name_len, provided;
@@ -24,15 +26,13 @@ MPIBackend::MPIBackend(int argc, char **argv) : Backend(MPI_MAX_PROCESSOR_NAME) 
     nodes.emplace(node_name);
     rank_to_hostname[rank]      = node_name;
     hostname_to_rank[node_name] = rank;
-    server_println("initialization completed.", CapioCLEngine::get().getWorkflowName(),
-                   CAPIO_LOG_SERVER_CLI_LEVEL_STATUS, "MPIBackend");
+    CAPTURA_PRINT_COLOR(CAPTURA_CLI_LEVEL_STATUS, "initialization completed.");
 }
 
 MPIBackend::~MPIBackend() {
     START_LOG(gettid(), "Call()");
     MPI_Finalize();
-    server_println("teardown completed.", CapioCLEngine::get().getWorkflowName(),
-                   CAPIO_LOG_SERVER_CLI_LEVEL_INFO, "MPIBackend");
+    CAPTURA_PRINT_COLOR(CAPTURA_CLI_LEVEL_INFO, "teardown completed.");
 }
 
 const std::set<std::string> MPIBackend::get_nodes() { return nodes; }
@@ -125,15 +125,13 @@ void MPIBackend::recv_file(char *shm, const std::string &source, long int bytes_
 MPISYNCBackend::MPISYNCBackend(int argc, char *argv[]) : MPIBackend(argc, argv) {
     START_LOG(gettid(), "call()");
     LOG("Wrapped MPI backend with MPISYC backend");
-    server_println("initialization completed.", CapioCLEngine::get().getWorkflowName(),
-                   CAPIO_LOG_SERVER_CLI_LEVEL_STATUS, "MPISYNCBackend");
+    CAPTURA_PRINT_COLOR(CAPTURA_CLI_LEVEL_STATUS, "initialization completed.");
 }
 
 MPISYNCBackend::~MPISYNCBackend() {
     START_LOG(gettid(), "Call()");
     MPI_Finalize();
-    server_println("teardown completed.", CapioCLEngine::get().getWorkflowName(),
-                   CAPIO_LOG_SERVER_CLI_LEVEL_INFO, "MPISYNCBackend");
+    CAPTURA_PRINT_COLOR(CAPTURA_CLI_LEVEL_INFO, "teardown completed.");
 }
 
 RemoteRequest MPISYNCBackend::read_next_request() {

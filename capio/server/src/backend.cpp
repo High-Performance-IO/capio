@@ -1,8 +1,8 @@
 #include "remote/backend.hpp"
 
+#include "captura/StdOutLogger.h"
 #include "captura/StlLogger.h"
 #include "utils/common.hpp"
-#include "utils/server_println.hpp"
 
 #include <iostream>
 
@@ -13,11 +13,8 @@ Backend::Backend(const unsigned int node_name_max_length)
 
     gethostname(node_name.data(), node_name_max_length);
     node_name.resize(strlen(node_name.data()));
-    server_println("Node name: " + node_name, CapioCLEngine::get().getWorkflowName(),
-                   CAPIO_LOG_SERVER_CLI_LEVEL_INFO, "Backend");
-    server_println("Node count: " + std::to_string(n_servers),
-                   CapioCLEngine::get().getWorkflowName(), CAPIO_LOG_SERVER_CLI_LEVEL_INFO,
-                   "Backend");
+    CAPTURA_PRINT_COLOR(CAPTURA_CLI_LEVEL_INFO, "Node name: %s", node_name.c_str());
+    CAPTURA_PRINT_COLOR(CAPTURA_CLI_LEVEL_INFO, "Node count: %d", n_servers);
 }
 
 [[nodiscard]] const std::string &Backend::get_node_name() const {

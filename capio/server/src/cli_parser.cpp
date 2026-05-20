@@ -1,9 +1,10 @@
 #include "utils/cli_parser.hpp"
 
+#include "captura/StdOutLogger.h"
 #include "captura/StlLogger.h"
+
 #include "common/constants.hpp"
 #include "utils/common.hpp"
-#include "utils/server_println.hpp"
 
 #include <args.hxx>
 
@@ -53,21 +54,20 @@ CapioParsedConfig parseCLI(int argc, char **argv) {
 #ifdef CAPIO_LOG
         continue_on_error = true;
         for (const auto line : CAPIO_LOG_SERVER_CLI_CONT_ON_ERR_WARNING) {
-            server_println(line, get_capio_workflow_name(), CAPIO_LOG_SERVER_CLI_LEVEL_ERROR,
-                           __func__);
+            CAPTURA_PRINT("%s", line);
         }
 
 #else
-        server_println("--continue-on-error flag given, but logger is not compiled into CAPIO. "
-                       "Flag is ignored.",
-                       get_capio_workflow_name(), CAPIO_LOG_SERVER_CLI_LEVEL_WARNING, "parseCLI");
+        CAPTURA_PRINT_COLOR(CAPTURA_CLI_LEVEL_WARNING,
+                            "--continue-on-error flag given, but logger is not compiled into "
+                            "CAPIO. Flag is ignored.");
 #endif
     }
 
 #ifdef CAPIO_LOG
     auto log = new Logger(__func__, __FILE__, __LINE__, gettid(), "Created new log file");
-    server_println("started logging to logfile " + log->getLogFileName(), get_capio_workflow_name(),
-                   CAPIO_LOG_SERVER_CLI_LEVEL_INFO, "parseCLI");
+    CAPTURA_PRINT_COLOR(CAPTURA_CLI_LEVEL_INFO, "started logging to logfile %s",
+                        log->getLogFileName().c_str());
 #endif
 
     if (mem_only_flag) {
@@ -79,8 +79,8 @@ CapioParsedConfig parseCLI(int argc, char **argv) {
         capio_config.capio_cl_config_path = args::get(config);
 
         if (std::string token = args::get(config); token == "dynamic") {
-            server_println("Starting CAPIO-CL engine with dynamic configuration",
-                           get_capio_workflow_name(), CAPIO_LOG_SERVER_CLI_LEVEL_INFO, __func__);
+            CAPTURA_PRINT_COLOR(CAPTURA_CLI_LEVEL_INFO,
+                                "Starting CAPIO-CL engine with dynamic configuration");
             capio_config.capio_cl_dynamic_config = true;
 
         } else {
@@ -92,25 +92,21 @@ CapioParsedConfig parseCLI(int argc, char **argv) {
         }
 
     } else if (noConfigFile) {
-
-        server_println("skipping config file parsing.", get_capio_workflow_name(),
-                       CAPIO_LOG_SERVER_CLI_LEVEL_WARNING, __func__);
-        server_println("Obtained from environment variable current workflow name: " +
-                           get_capio_workflow_name(),
-                       get_capio_workflow_name(), CAPIO_LOG_SERVER_CLI_LEVEL_WARNING, __func__);
+        CAPTURA_PRINT_COLOR(CAPTURA_CLI_LEVEL_WARNING, "skipping config file parsing.");
+        CAPTURA_PRINT_COLOR(CAPTURA_CLI_LEVEL_WARNING,
+                            "Obtained from environment variable current workflow name: %s",
+                            get_capio_workflow_name().c_str());
     } else {
-        server_println(
-            "Error: no config file provided. To skip config file use --no-config option!",
-            get_capio_workflow_name(), CAPIO_LOG_SERVER_CLI_LEVEL_ERROR, __func__);
+        CAPTURA_PRINT_COLOR(
+            CAPTURA_CLI_LEVEL_ERROR,
+            "Error: no config file provided. To skip config file use --no-config option!");
 #ifdef CAPIO_LOG
         log->log("no config file provided, and  --no-config not provided");
 #endif
         exit(EXIT_FAILURE);
     }
 
-    server_println("CAPIO_DIR=" + get_capio_dir().string(), get_capio_workflow_name(),
-                   CAPIO_LOG_SERVER_CLI_LEVEL_INFO, __func__);
-
+    CAPTURA_PRINT_COLOR(CAPTURA_CLI_LEVEL_INFO, "CAPIO_DIR=%s", get_capio_dir().c_str());
     // Backend selection phase
     if (backend_flag) {
         capio_config.backend_name = args::get(backend_flag);

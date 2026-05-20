@@ -3,9 +3,10 @@
 
 #include <csignal>
 
+#include "captura/StdOutLogger.h"
 #include "captura/StlLogger.h"
+
 #include "remote/backend.hpp"
-#include "server_println.hpp"
 
 #ifdef CAPIO_COVERAGE
 extern "C" void __gcov_dump(void);
@@ -14,22 +15,17 @@ extern "C" void __gcov_dump(void);
 void sig_term_handler(int signum, siginfo_t *info, void *ptr) {
     START_LOG(gettid(), "call(signal=[%d] (%s) from process with pid=%ld)", signum,
               strsignal(signum), info != nullptr ? info->si_pid : -1);
-
-    server_println("shutting down server", CapioCLEngine::get().getWorkflowName(),
-                   CAPIO_LOG_SERVER_CLI_LEVEL_WARNING, __func__);
+    CAPTURA_PRINT_COLOR(CAPTURA_CLI_LEVEL_WARNING, "shutting down server");
 
     if (signum == SIGSEGV) {
-        server_println("Segfault detected!", CapioCLEngine::get().getWorkflowName(),
-                       CAPIO_LOG_SERVER_CLI_LEVEL_ERROR, __func__);
+        CAPTURA_PRINT_COLOR(CAPTURA_CLI_LEVEL_ERROR, "Segfault detected!");
     }
 
     // free all the memory used
 
     delete client_manager;
     delete storage_manager;
-
-    server_println("data_buffers cleanup completed", CapioCLEngine::get().getWorkflowName(),
-                   CAPIO_LOG_SERVER_CLI_LEVEL_WARNING, __func__);
+    CAPTURA_PRINT_COLOR(CAPTURA_CLI_LEVEL_WARNING, "data_buffers cleanup completed");
 
 #ifdef CAPIO_COVERAGE
     __gcov_dump();
@@ -38,8 +34,8 @@ void sig_term_handler(int signum, siginfo_t *info, void *ptr) {
     delete backend;
     delete shm_canary;
 
-    server_println("shutdown completed", CapioCLEngine::get().getWorkflowName(),
-                   CAPIO_LOG_SERVER_CLI_LEVEL_INFO, __func__);
+    CAPTURA_PRINT_COLOR(CAPTURA_CLI_LEVEL_INFO, "shutdown completed");
+
     exit(EXIT_SUCCESS);
 }
 
@@ -60,8 +56,8 @@ void setup_signal_handlers() {
     if (res == -1) {
         ERR_EXIT("sigaction for SIGTERM");
     }
-    server_println("Installed signal handlers", CapioCLEngine::get().getWorkflowName(),
-                   CAPIO_LOG_SERVER_CLI_LEVEL_STATUS, __func__);
+
+    CAPTURA_PRINT_COLOR(CAPTURA_CLI_LEVEL_STATUS, "Installed signal handlers");
 }
 
 #endif // CAPIO_SERVER_HANDLERS_SIGNALS_HPP

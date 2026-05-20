@@ -5,7 +5,9 @@
 
 #include "storage/manager.hpp"
 
+#include "captura/StdOutLogger.h"
 #include "captura/StlLogger.h"
+
 #include "common/dirent.hpp"
 #include "common/filesystem.hpp"
 #include "storage/capio_file.hpp"
@@ -68,8 +70,7 @@ void StorageManager::addDirectoryEntry(const pid_t tid, const std::filesystem::p
     }
 }
 StorageManager::StorageManager() {
-    server_println("initialization completed.", CapioCLEngine::get().getWorkflowName(),
-                   CAPIO_LOG_SERVER_CLI_LEVEL_STATUS, "StorageManager");
+    CAPTURA_PRINT_COLOR(CAPTURA_CLI_LEVEL_STATUS, "initialization completed.");
 }
 
 StorageManager::~StorageManager() {
@@ -84,8 +85,7 @@ StorageManager::~StorageManager() {
             _removeFromTid(tid, fd);
         }
     }
-    server_println("teardown completed.", CapioCLEngine::get().getWorkflowName(),
-                   CAPIO_LOG_SERVER_CLI_LEVEL_INFO, "StorageManager");
+    CAPTURA_PRINT_COLOR(CAPTURA_CLI_LEVEL_INFO, "teardown completed.");
 }
 
 std::optional<std::reference_wrapper<CapioFile>>

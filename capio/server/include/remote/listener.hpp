@@ -1,7 +1,9 @@
 #ifndef CAPIO_SERVER_REMOTE_LISTENER_HPP
 #define CAPIO_SERVER_REMOTE_LISTENER_HPP
 
+#include "captura/StdOutLogger.h"
 #include "captura/StlLogger.h"
+
 #include "remote/backend.hpp"
 #include "remote/backend/include.hpp"
 #include "remote/handlers/read.hpp"
@@ -26,34 +28,29 @@ inline Backend *select_backend(const std::string &backend_name, int argc, char *
 
     if (backend_name.empty() || backend_name == "none") {
         LOG("backend selected: none");
-        server_println(
-            "Starting CAPIO with default backend (none) as no preferred backend was chosen",
-            CapioCLEngine::get().getWorkflowName(), CAPIO_LOG_SERVER_CLI_LEVEL_INFO,
-            "select_backend");
+        CAPTURA_PRINT_COLOR(
+            CAPTURA_CLI_LEVEL_INFO,
+            "Starting CAPIO with default backend (none) as no preferred backend was chosen");
         return new NoneBackend(argc, argv);
     }
 
     if (backend_name == "mpi") {
         LOG("backend selected: mpi");
-        server_println("Starting CAPIO with MPI backend", CapioCLEngine::get().getWorkflowName(),
-                       CAPIO_LOG_SERVER_CLI_LEVEL_INFO, "select_backend");
+        CAPTURA_PRINT_COLOR(CAPTURA_CLI_LEVEL_INFO, "Starting CAPIO with MPI backend");
         return new MPIBackend(argc, argv);
     }
 
     if (backend_name == "mpisync") {
         LOG("backend selected: mpisync");
-        server_println("Starting CAPIO with MPI (SYNC) backend",
-                       CapioCLEngine::get().getWorkflowName(), CAPIO_LOG_SERVER_CLI_LEVEL_INFO,
-                       "select_backend");
+        CAPTURA_PRINT_COLOR(CAPTURA_CLI_LEVEL_INFO, "Starting CAPIO with MPI (SYNC) backend");
         return new MPISYNCBackend(argc, argv);
     }
 
     LOG("Backend %s does not exist in CAPIO. Reverting back to the default backend (none)",
         backend_name.c_str());
-    server_println("Backend " + backend_name +
-                       " does not exist. Reverting to the default backend (none)",
-                   CapioCLEngine::get().getWorkflowName(), CAPIO_LOG_SERVER_CLI_LEVEL_WARNING,
-                   "select_backend");
+    CAPTURA_PRINT_COLOR(CAPTURA_CLI_LEVEL_WARNING,
+                        "Backend %s does not exist. Reverting to the default backend (none)",
+                        backend_name.c_str());
     return new NoneBackend(argc, argv);
 }
 
@@ -64,10 +61,10 @@ inline void capio_remote_listener(Semaphore &internal_server_sem) {
     internal_server_sem.lock();
 
     if (typeid(*backend) == typeid(NoneBackend)) {
-        server_println(
-            "backend is of type NoneBackend. Stopping capio_remote_listener() execution.",
-            CapioCLEngine::get().getWorkflowName(), CAPIO_LOG_SERVER_CLI_LEVEL_INFO,
-            "capio_remote_listener");
+
+        CAPTURA_PRINT_COLOR(
+            CAPTURA_CLI_LEVEL_INFO,
+            "backend is of type NoneBackend. Stopping capio_remote_listener() execution.");
         return;
     }
 

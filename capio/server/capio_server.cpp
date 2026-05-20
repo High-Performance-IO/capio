@@ -45,6 +45,8 @@ Backend *backend;
 
 #include "remote/listener.hpp"
 
+#include "captura/StdOutLogger.h"
+
 /**
  * The capio_cl_engine is declared here to ensure that other components of the CAPIO server
  * can only access it through a const reference. This prevents any modifications to the engine
@@ -102,9 +104,7 @@ static constexpr std::array<CSHandler_t, CAPIO_NR_REQUESTS> build_request_handle
         LOG(CAPIO_LOG_SERVER_REQUEST_START);
         int code = client_manager->readNextRequest(str.get());
         if (code < 0 || code > CAPIO_NR_REQUESTS) {
-            server_println("Received invalid code: " + std::to_string(code),
-                           CapioCLEngine::get().getWorkflowName(), CAPIO_LOG_SERVER_CLI_LEVEL_ERROR,
-                           __func__);
+            CAPTURA_PRINT_COLOR(CAPTURA_CLI_LEVEL_ERROR, "Received invalid code: %d", code);
 
             ERR_EXIT("Error: received invalid request code");
         }
@@ -115,10 +115,13 @@ static constexpr std::array<CSHandler_t, CAPIO_NR_REQUESTS> build_request_handle
 
 int main(int argc, char **argv) {
 
+    StdoutLogger::options.componentName = "SERVER";
+    StdoutLogger::options.workflowName  = "";
+
     Semaphore internal_server_sem(0);
 
     for (const auto line : CAPIO_LOG_SERVER_BANNER) {
-        server_println(line, "", "", "");
+        CAPTURA_PRINT("%s", line);
     }
 
     const auto configuration = parseCLI(argc, argv);
@@ -134,6 +137,8 @@ int main(int argc, char **argv) {
         capio_cl_engine = new capiocl::engine::Engine();
         capio_cl_engine->setWorkflowName(get_capio_workflow_name());
     }
+
+    StdoutLogger::options.workflowName = capio_cl_engine->getWorkflowName();
 
     if (configuration.store_all_in_memory) {
         capio_cl_engine->setAllStoreInMemory();
@@ -155,8 +160,7 @@ int main(int argc, char **argv) {
     LOG("capio_server thread started");
     std::thread remote_listener_thread(capio_remote_listener, std::ref(internal_server_sem));
     LOG("capio_remote_listener thread started.");
-    server_println("Server instance successfully started!", CapioCLEngine::get().getWorkflowName(),
-                   CAPIO_LOG_SERVER_CLI_LEVEL_STATUS, "main");
+    CAPTURA_PRINT_COLOR(CAPTURA_CLI_LEVEL_STATUS, "Server instance successfully started!");
     server_thread.join();
     remote_listener_thread.join();
 
