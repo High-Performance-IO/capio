@@ -6,10 +6,16 @@
 #include <cstdlib>
 #include <filesystem>
 #include <iostream>
-
 #include <sys/stat.h>
 
+#include "common/constants.hpp"
 #include "common/syscall.hpp"
+
+#ifdef __CAPIO_POSIX
+#include <SyscallLogger.h>
+#else
+#include <StlLogger.h>
+#endif
 
 // TODO: remove forward declaration of function by splitting into header and impl. capio/common
 inline bool is_forbidden_path(const std::string_view &path);

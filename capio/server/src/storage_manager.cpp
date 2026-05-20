@@ -11,7 +11,7 @@
 #include "utils/capiocl_adapter.hpp"
 #include "utils/common.hpp"
 #include "utils/location.hpp"
-#include "utils/server_logger.hpp"
+#include "StlLogger.h"
 #include "utils/shared_mutex.hpp"
 #include "utils/types.hpp"
 

@@ -17,7 +17,7 @@
 #include <unordered_set>
 #include <vector>
 
-#include "utils/server_logger.hpp"
+#include <StlLogger.h>
 
 #include "capiocl.hpp"
 #include "capiocl/engine.h"

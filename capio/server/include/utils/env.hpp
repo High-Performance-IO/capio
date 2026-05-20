@@ -4,7 +4,7 @@
 #include <cstdlib>
 
 #include "common/constants.hpp"
-#include "utils/server_logger.hpp"
+#include "StlLogger.h"
 
 off64_t get_file_initial_size() {
     START_LOG(gettid(), "call()");

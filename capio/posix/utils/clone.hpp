@@ -4,7 +4,7 @@
 #include "common/syscall.hpp"
 #include "data.hpp"
 #include "requests.hpp"
-#include "utils/posix_logger.hpp"
+#include "SyscallLogger.h"
 
 /**
  * Initialize the required data structures for the new child thread, and then proceed to execute a

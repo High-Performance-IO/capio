@@ -4,7 +4,7 @@
 
 #include <fcntl.h>
 
-#include "posix/utils/posix_logger.hpp"
+#include "SyscallLogger.h"
 
 #include "utils/filesystem.hpp"
 

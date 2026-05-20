@@ -7,8 +7,6 @@
 #include <array>
 #include <string>
 
-#include "utils/posix_logger.hpp"
-
 #include "common/syscall.hpp"
 
 #include "utils/clone.hpp"
@@ -16,6 +14,10 @@
 #include "utils/snapshot.hpp"
 
 #include "handlers.hpp"
+
+#ifdef CAPIO_LOG
+#include "syscallnames.h"
+#endif
 
 /**
  * Handler for syscall not handled and interrupt syscall_intercept
@@ -349,10 +351,6 @@ static int hook(long syscall_number, long arg0, long arg1, long arg2, long arg3,
         return 1;
     }
 
-#ifdef CAPIO_LOG
-    CAPIO_LOG_LEVEL = get_capio_log_level();
-#endif
-
     START_LOG(syscall_no_intercept(SYS_gettid), "call(syscall_number=%ld, syscall_name=%s)",
               syscall_number, sys_num_to_string(syscall_number).c_str());
 
@@ -411,5 +409,7 @@ static __attribute__((constructor)) void init() {
     intercept_hook_point_clone_child  = hook_clone_child;
     intercept_hook_point_clone_parent = hook_clone_parent;
     intercept_hook_point              = hook;
+
+    SyscallLogger::setSyscallFn(syscall_no_intercept);
     ENABLE_LOGGER();
 }

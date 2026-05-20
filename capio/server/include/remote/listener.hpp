@@ -1,7 +1,7 @@
 #ifndef CAPIO_SERVER_REMOTE_LISTENER_HPP
 #define CAPIO_SERVER_REMOTE_LISTENER_HPP
 
-#include "common/logger.hpp"
+#include "StlLogger.h"
 
 #include "remote/backend.hpp"
 #include "remote/backend/include.hpp"

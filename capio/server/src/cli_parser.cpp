@@ -1,7 +1,7 @@
 #include "utils/cli_parser.hpp"
 
+#include "StlLogger.h"
 #include "common/constants.hpp"
-#include "common/logger.hpp"
 #include "utils/common.hpp"
 #include "utils/server_println.hpp"
 
@@ -110,24 +110,6 @@ CapioParsedConfig parseCLI(int argc, char **argv) {
 
     server_println("CAPIO_DIR=" + get_capio_dir().string(), get_capio_workflow_name(),
                    CAPIO_LOG_SERVER_CLI_LEVEL_INFO, __func__);
-
-#ifdef CAPIO_LOG
-    CAPIO_LOG_LEVEL = get_capio_log_level();
-    server_println("LOG_LEVEL set to: " + std::to_string(CAPIO_LOG_LEVEL),
-                   get_capio_workflow_name(), CAPIO_LOG_SERVER_CLI_LEVEL_INFO, __func__);
-    for (const auto &msg : CAPIO_LOG_SERVER_CLI_LOGGING_ENABLED_WARNING) {
-        server_println(msg, get_capio_workflow_name(), CAPIO_LOG_SERVER_CLI_LEVEL_WARNING,
-                       __func__);
-    }
-
-    log->log("LOG_LEVEL set to: %d", CAPIO_LOG_LEVEL);
-    delete log;
-#else
-    if (std::getenv("CAPIO_LOG_LEVEL") != nullptr) {
-        server_println(CAPIO_LOG_SERVER_CLI_LOGGING_NOT_AVAILABLE, get_capio_workflow_name(),
-                       CAPIO_LOG_SERVER_CLI_LEVEL_WARNING, __func__);
-    }
-#endif
 
     // Backend selection phase
     if (backend_flag) {

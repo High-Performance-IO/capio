@@ -1,7 +1,7 @@
 #include "remote/backend/mpi.hpp"
 
 #include "utils/capiocl_adapter.hpp"
-#include "utils/server_logger.hpp"
+#include "StlLogger.h"
 #include "utils/server_println.hpp"
 
 MPIBackend::MPIBackend(int argc, char **argv) : Backend(MPI_MAX_PROCESSOR_NAME) {

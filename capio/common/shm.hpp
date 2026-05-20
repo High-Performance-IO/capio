@@ -9,7 +9,11 @@
 #include <sys/stat.h>
 #include <unistd.h>
 
-#include "common/logger.hpp"
+#ifdef __CAPIO_POSIX
+#include <SyscallLogger.h>
+#else
+#include <StlLogger.h>
+#endif
 
 #ifdef __CAPIO_POSIX
 

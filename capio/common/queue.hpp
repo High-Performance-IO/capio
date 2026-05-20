@@ -7,7 +7,11 @@
 #include <semaphore.h>
 
 #include "common/env.hpp"
-#include "common/logger.hpp"
+#ifdef __CAPIO_POSIX
+#include <SyscallLogger.h>
+#else
+#include <StlLogger.h>
+#endif
 #include "common/semaphore.hpp"
 #include "common/shm.hpp"
 #include "filesystem.hpp"

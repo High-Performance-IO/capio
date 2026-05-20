@@ -32,7 +32,6 @@ constexpr char LOG_CAPIO_START_REQUEST[]            = "\n+++++++++++ SYSCALL %s 
 constexpr char LOG_CAPIO_END_REQUEST[]              = "----------- END SYSCALL ----------\n";
 constexpr char CAPIO_SERVER_LOG_START_REQUEST_MSG[] = "+++++++++++++++++REQUEST+++++++++++++++++";
 constexpr char CAPIO_SERVER_LOG_END_REQUEST_MSG[]   = "~~~~~~~~~~~~~~~END REQUEST~~~~~~~~~~~~~~~";
-constexpr int CAPIO_LOG_MAX_MSG_LEN                 = 2048;
 constexpr int CAPIO_SEM_RETRIES                     = 100;
 constexpr int THEORETICAL_SIZE_DIRENT64             = sizeof(ino64_t) + sizeof(off64_t) +
                                           sizeof(unsigned short) + sizeof(unsigned char) +
@@ -43,10 +42,6 @@ constexpr int CAPIO_POSIX_SYSCALL_ERRNO        = -1;
 constexpr int CAPIO_POSIX_SYSCALL_REQUEST_SKIP = -2;
 constexpr int CAPIO_POSIX_SYSCALL_SKIP         = 1;
 constexpr int CAPIO_POSIX_SYSCALL_SUCCESS      = 0;
-
-// CAPIO logger - common
-constexpr char CAPIO_LOG_PRE_MSG[]        = "at[%.15llu][%.40s]: ";
-constexpr char CAPIO_DEFAULT_LOG_FOLDER[] = "capio_logs\0";
 
 // CAPIO common - shared memory constant names
 constexpr char SHM_FIRST_ELEM[]        = "_first_elem_";
@@ -66,15 +61,8 @@ constexpr char CAPIO_SHM_OPEN_ERROR[] =
     "Unable to open shared memory segment. Could it be that another instance of capio server is "
     "running with the same WORKFLOW_NAME?";
 
-// CAPIO logger - POSIX
-constexpr char CAPIO_LOG_POSIX_DEFAULT_LOG_FILE_PREFIX[] = "posix_thread_\0";
-constexpr char CAPIO_LOG_POSIX_SYSCALL_START[]           = "\n+++++++++ START SYSCALL +++++++++";
-constexpr char CAPIO_LOG_POSIX_SYSCALL_END[]             = "~~~~~~~~~  END SYSCALL ~~~~~~~~~\n";
-
-// CAPIO logger - server
-constexpr char CAPIO_SERVER_DEFAULT_LOG_FILE_PREFIX[] = "server_thread_\0";
 // Note: Ensure CAPIO_VERSION is defined as a string literal, e.g., #define CAPIO_VERSION "1.0.0"
-constexpr char CAPIO_LOG_SERVER_BANNER[14][80]        = {
+constexpr char CAPIO_LOG_SERVER_BANNER[14][80] = {
     "",
     "\033[1;34m  /$$$$$$   /$$$$$$  /$$$$$$$  \033[0;96m /$$$$$$  /$$$$$$ ",
     "\033[1;34m /$$__  $$ /$$__  $$| $$__  $$ \033[0;96m|_ $$_/ /$$__  $$",

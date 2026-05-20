@@ -5,7 +5,11 @@
 
 #include <utility>
 
-#include "common/logger.hpp"
+#ifdef __CAPIO_POSIX
+#include <SyscallLogger.h>
+#else
+#include <StlLogger.h>
+#endif
 
 class NoLock {
   public:
