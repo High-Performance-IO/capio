@@ -2,11 +2,11 @@
 
 #include "client-manager/client_manager.hpp"
 
+#include "captura/StlLogger.h"
 #include "common/constants.hpp"
 #include "common/queue.hpp"
 #include "utils/capiocl_adapter.hpp"
 #include "utils/common.hpp"
-#include "captura/StlLogger.h"
 #include "utils/server_println.hpp"
 
 ClientManager::ClientDataBuffers::ClientDataBuffers(const std::string &clientToServerName,

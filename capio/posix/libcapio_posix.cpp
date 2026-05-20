@@ -19,6 +19,14 @@
 #include "syscallnames.h"
 #endif
 
+template <typename T> std::string demangled_name(const T &obj) {
+    int status;
+    const char *mangled = typeid(obj).name();
+    std::unique_ptr<char, void (*)(void *)> demangled(
+        abi::__cxa_demangle(mangled, nullptr, nullptr, &status), std::free);
+    return status == 0 ? demangled.get() : mangled;
+}
+
 /**
  * Handler for syscall not handled and interrupt syscall_intercept
  */
@@ -410,6 +418,6 @@ static __attribute__((constructor)) void init() {
     intercept_hook_point_clone_parent = hook_clone_parent;
     intercept_hook_point              = hook;
 
-    SyscallLogger::setSyscallFn(syscall_no_intercept);
+    SET_CAPTURA_SYSCALL_HANDLER(syscall_no_intercept);
     ENABLE_LOGGER();
 }

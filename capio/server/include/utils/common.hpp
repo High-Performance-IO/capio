@@ -6,11 +6,11 @@
 #include <thread>
 
 #include "capiocl_adapter.hpp"
+#include "captura/StlLogger.h"
 #include "client-manager/client_manager.hpp"
 #include "common/dirent.hpp"
 #include "storage/capio_file.hpp"
 #include "storage/manager.hpp"
-#include "captura/StlLogger.h"
 
 extern ClientManager *client_manager;
 extern StorageManager *storage_manager;

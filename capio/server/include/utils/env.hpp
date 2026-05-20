@@ -3,8 +3,8 @@
 
 #include <cstdlib>
 
-#include "common/constants.hpp"
 #include "captura/StlLogger.h"
+#include "common/constants.hpp"
 
 off64_t get_file_initial_size() {
     START_LOG(gettid(), "call()");
