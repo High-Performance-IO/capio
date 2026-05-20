@@ -90,8 +90,6 @@ static constexpr std::array<CSHandler_t, CAPIO_NR_REQUESTS> build_request_handle
     static const std::array<CSHandler_t, CAPIO_NR_REQUESTS> request_handlers =
         build_request_handlers_table();
 
-    START_LOG(gettid(), "call()");
-
     setup_signal_handlers();
     backend->handshake_servers();
 
@@ -101,7 +99,7 @@ static constexpr std::array<CSHandler_t, CAPIO_NR_REQUESTS> build_request_handle
 
     auto str = std::unique_ptr<char[]>(new char[CAPIO_REQ_MAX_SIZE]);
     while (true) {
-        LOG(CAPIO_LOG_SERVER_REQUEST_START);
+        START_LOG(gettid(), "call()");
         int code = client_manager->readNextRequest(str.get());
         if (code < 0 || code > CAPIO_NR_REQUESTS) {
             CAPTURA_PRINT_COLOR(CAPTURA_CLI_LEVEL_ERROR, "Received invalid code: %d", code);
@@ -109,7 +107,6 @@ static constexpr std::array<CSHandler_t, CAPIO_NR_REQUESTS> build_request_handle
             ERR_EXIT("Error: received invalid request code");
         }
         request_handlers[code](str.get());
-        LOG(CAPIO_LOG_SERVER_REQUEST_END);
     }
 }
 

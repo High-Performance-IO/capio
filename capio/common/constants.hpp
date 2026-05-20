@@ -28,12 +28,8 @@ constexpr int CAPIO_CACHE_LINE_SIZE_DEFAULT    = 256 * 1024;
 constexpr size_t CAPIO_SERVER_REQUEST_MAX_SIZE = sizeof(char) * (PATH_MAX + 81920);
 constexpr size_t CAPIO_REQ_MAX_SIZE            = 256 * sizeof(char);
 
-constexpr char LOG_CAPIO_START_REQUEST[]            = "\n+++++++++++ SYSCALL %s (%d) +++++++++++";
-constexpr char LOG_CAPIO_END_REQUEST[]              = "----------- END SYSCALL ----------\n";
-constexpr char CAPIO_SERVER_LOG_START_REQUEST_MSG[] = "+++++++++++++++++REQUEST+++++++++++++++++";
-constexpr char CAPIO_SERVER_LOG_END_REQUEST_MSG[]   = "~~~~~~~~~~~~~~~END REQUEST~~~~~~~~~~~~~~~";
-constexpr int CAPIO_SEM_RETRIES                     = 100;
-constexpr int THEORETICAL_SIZE_DIRENT64             = sizeof(ino64_t) + sizeof(off64_t) +
+constexpr int CAPIO_SEM_RETRIES         = 100;
+constexpr int THEORETICAL_SIZE_DIRENT64 = sizeof(ino64_t) + sizeof(off64_t) +
                                           sizeof(unsigned short) + sizeof(unsigned char) +
                                           sizeof(char) * NAME_MAX;
 
@@ -79,27 +75,24 @@ constexpr char CAPIO_LOG_SERVER_BANNER[14][80] = {
     "",
 };
 
-constexpr char CAPIO_LOG_SERVER_CLI_LOGGING_NOT_AVAILABLE[] =
-    "CAPIO_LOG set but log support was not compiled into CAPIO!";
-constexpr char CAPIO_LOG_SERVER_REQUEST_START[] = "\n+++++++++++ REQUEST +++++++++++";
-constexpr char CAPIO_LOG_SERVER_REQUEST_END[]   = "~~~~~~~~~ END REQUEST ~~~~~~~~~\n";
-
 // Server - Warning banners
-constexpr char CAPIO_LOG_SERVER_CLI_LOGGING_ENABLED_WARNING[5][80] = {
+constexpr char CAPIO_LOG_SERVER_CLI_LOGGING_ENABLED_WARNING[6][80] = {
     "\033[1;33m|==================================================================|\033[0m",
     "\033[1;33m| you are running a build of CAPIO with logging enabled.           |\033[0m",
     "\033[1;33m| this will have impact on performance. you should recompile CAPIO |\033[0m",
     "\033[1;33m| with -DCAPIO_LOG=FALSE                                           |\033[0m",
-    "\033[1;33m|==================================================================|\033[0m"};
+    "\033[1;33m|==================================================================|\033[0m",
+    ""};
 
-constexpr char CAPIO_LOG_SERVER_CLI_CONT_ON_ERR_WARNING[7][80] = {
+constexpr char CAPIO_LOG_SERVER_CLI_CONT_ON_ERR_WARNING[8][80] = {
     "\033[1;31m|==================================================================|\033[0m",
     "\033[1;31m|           you are running CAPIO with --continue-on-error         |\033[0m",
     "\033[1;31m|       This is extremely dangerous as CAPIO server will continue  |\033[0m",
     "\033[1;31m|              its execution even if it should terminate.          |\033[0m",
     "\033[1;31m|                                                                  |\033[0m",
     "\033[1;31m|                     USE IT AT YOUR OWN RISK                      |\033[0m",
-    "\033[1;31m|==================================================================|\033[0m"};
+    "\033[1;31m|==================================================================|\033[0m",
+    ""};
 
 // CAPIO server argument parser
 constexpr char CAPIO_SERVER_ARG_PARSER_PRE[] =

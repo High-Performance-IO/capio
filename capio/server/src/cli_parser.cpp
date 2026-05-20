@@ -65,6 +65,10 @@ CapioParsedConfig parseCLI(int argc, char **argv) {
     }
 
 #ifdef CAPIO_LOG
+    for (const auto line : CAPIO_LOG_SERVER_CLI_LOGGING_ENABLED_WARNING) {
+        CAPTURA_PRINT_COLOR(CAPTURA_CLI_LEVEL_WARNING, "%s", line);
+    }
+
     auto log = new Logger(__func__, __FILE__, __LINE__, gettid(), "Created new log file");
     CAPTURA_PRINT_COLOR(CAPTURA_CLI_LEVEL_INFO, "started logging to logfile %s",
                         log->getLogFileName().c_str());
