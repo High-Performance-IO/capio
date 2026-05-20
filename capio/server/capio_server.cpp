@@ -17,7 +17,7 @@
 #include <unordered_set>
 #include <vector>
 
-#include <StlLogger.h>
+#include "captura/StlLogger.h"
 
 #include "capiocl.hpp"
 #include "capiocl/engine.h"

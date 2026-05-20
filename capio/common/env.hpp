@@ -12,9 +12,9 @@
 #include "common/syscall.hpp"
 
 #ifdef __CAPIO_POSIX
-#include <SyscallLogger.h>
+#include "captura/SyscallLogger.h"
 #else
-#include <StlLogger.h>
+#include "captura/StlLogger.h"
 #endif
 
 // TODO: remove forward declaration of function by splitting into header and impl. capio/common

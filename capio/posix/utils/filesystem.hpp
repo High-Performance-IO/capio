@@ -13,7 +13,7 @@
 #include "common/env.hpp"
 #include "common/filesystem.hpp"
 #include "common/syscall.hpp"
-#include "SyscallLogger.h"
+#include "captura/SyscallLogger.h"
 
 #include "types.hpp"
 

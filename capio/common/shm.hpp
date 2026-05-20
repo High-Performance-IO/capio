@@ -10,9 +10,9 @@
 #include <unistd.h>
 
 #ifdef __CAPIO_POSIX
-#include <SyscallLogger.h>
+#include "captura/SyscallLogger.h"
 #else
-#include <StlLogger.h>
+#include "captura/StlLogger.h"
 #endif
 
 #ifdef __CAPIO_POSIX

@@ -1,11 +1,11 @@
 #ifndef CAPIO_SERVER_REMOTE_HANDLERS_STAT_HPP
 #define CAPIO_SERVER_REMOTE_HANDLERS_STAT_HPP
 
+#include "captura/StlLogger.h"
 #include "client-manager/client_manager.hpp"
 #include "remote/backend.hpp"
 #include "remote/requests.hpp"
 #include "storage/manager.hpp"
-#include "StlLogger.h"
 
 extern StorageManager *storage_manager;
 extern ClientManager *client_manager;

@@ -4,7 +4,7 @@
 
 #include <fcntl.h>
 
-#include "SyscallLogger.h"
+#include "captura/SyscallLogger.h"
 
 #include "utils/filesystem.hpp"
 

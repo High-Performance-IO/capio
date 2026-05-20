@@ -3,9 +3,9 @@
 
 #include <csignal>
 
+#include "captura/StlLogger.h"
 #include "remote/backend.hpp"
 #include "server_println.hpp"
-#include "StlLogger.h"
 
 #ifdef CAPIO_COVERAGE
 extern "C" void __gcov_dump(void);

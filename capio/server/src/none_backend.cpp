@@ -3,7 +3,7 @@
 #include "remote/backend/none.hpp"
 
 #include "utils/capiocl_adapter.hpp"
-#include "StlLogger.h"
+#include "captura/StlLogger.h"
 #include "utils/server_println.hpp"
 
 NoneBackend::NoneBackend(int argc, char **argv) : Backend(HOST_NAME_MAX) {

@@ -6,7 +6,7 @@
 #include "common/queue.hpp"
 #include "utils/capiocl_adapter.hpp"
 #include "utils/common.hpp"
-#include "StlLogger.h"
+#include "captura/StlLogger.h"
 #include "utils/server_println.hpp"
 
 ClientManager::ClientDataBuffers::ClientDataBuffers(const std::string &clientToServerName,

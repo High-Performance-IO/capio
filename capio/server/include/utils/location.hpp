@@ -5,7 +5,7 @@
 
 #include "remote/backend.hpp"
 
-#include "StlLogger.h"
+#include "captura/StlLogger.h"
 #include "utils/types.hpp"
 
 extern Backend *backend;
