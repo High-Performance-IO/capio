@@ -105,11 +105,10 @@ template <typename Adapter> class TemplateLogger {
         va_start(argp, message);
         va_copy(argpc, argp);
 
-#ifdef __CAPIO_POSIX
         if (!enable_logger) {
             return;
         }
-#endif
+
 
         sprintf(format, CAPIO_LOG_PRE_MSG, current_time_in_millis(), this->invoker);
         const size_t pre_msg_len = strlen(format);
@@ -151,11 +150,11 @@ template <typename Adapter> class TemplateLogger {
     }
 
     void log(const char *message, ...) {
-#ifdef __CAPIO_POSIX
+
         if (!enable_logger) {
             return;
         }
-#endif
+
         va_list argp, argpc;
 
         sprintf(format, CAPIO_LOG_PRE_MSG, current_time_in_millis(), this->invoker);
@@ -198,8 +197,8 @@ template <typename T> inline thread_local int TemplateLogger<T>::current_log_lev
 #define LOG(message, ...) log.log(message, ##__VA_ARGS__)
 #define START_LOG(tid, message, ...)                                                               \
     Logger log(__func__, __FILE__, __LINE__, tid, message, ##__VA_ARGS__)
-#define START_SYSCALL_LOGGING() enable_logger = true
-#define SUSPEND_SYSCALL_LOGGING() SyscallLoggingSuspender sls{};
+#define ENABLE_LOGGER() enable_logger = true
+#define DISABLE_LOGGER() SyscallLoggingSuspender sls{};
 
 /**
  * This macro is used to inject code into debug mode. It needs a self calling lambda function,
@@ -238,15 +237,13 @@ template <typename T> inline thread_local int TemplateLogger<T>::current_log_lev
 #define ERR_EXIT(message, ...) ERR_EXIT_EXCEPT_CHOICE(true, message, ##__VA_ARGS__)
 #define LOG(message, ...)
 #define START_LOG(tid, message, ...)
-#define START_SYSCALL_LOGGING()
-#define SUSPEND_SYSCALL_LOGGING()
 #define SEM_CREATE_CHECK(sem, source)                                                              \
     if (sem == SEM_FAILED) {                                                                       \
         __SHM_CHECK_CLI_MSG;                                                                       \
     }
 #define DBG(tid, lambda)
-#define START_SYSCALL_LOGGING()
-#define SUSPEND_SYSCALL_LOGGING()
+#define ENABLE_LOGGER()
+#define DISABLE_LOGGER()
 
 #endif
 
