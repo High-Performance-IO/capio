@@ -5,8 +5,8 @@
 #include <string>
 #include <tuple>
 
-#include "types.hpp"
 #include "captura/SyscallLogger.h"
+#include "types.hpp"
 
 inline int *get_fd_snapshot(long tid) {
     return static_cast<int *>(get_shm_if_exist("capio_snapshot_" + std::to_string(tid)));

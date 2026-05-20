@@ -1,10 +1,10 @@
 #ifndef CAPIO_POSIX_UTILS_CLONE_HPP
 #define CAPIO_POSIX_UTILS_CLONE_HPP
 
+#include "captura/SyscallLogger.h"
 #include "common/syscall.hpp"
 #include "data.hpp"
 #include "requests.hpp"
-#include "captura/SyscallLogger.h"
 
 /**
  * Initialize the required data structures for the new child thread, and then proceed to execute a

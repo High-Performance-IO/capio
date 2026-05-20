@@ -3,10 +3,10 @@
 
 #include "common/requests.hpp"
 
+#include "captura/SyscallLogger.h"
 #include "env.hpp"
 #include "filesystem.hpp"
 #include "types.hpp"
-#include "captura/SyscallLogger.h"
 
 inline thread_local CircularBuffer<char> *buf_requests;
 inline thread_local CircularBuffer<off_t> *buff_response;
