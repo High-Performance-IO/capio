@@ -1,7 +1,7 @@
 #include "server/include/storage/capio_file.hpp"
 
-#include "captura/StdOutLogger.h"
-#include "captura/StlLogger.h"
+#include "calf/StdOutLogger.h"
+#include "calf/StlLogger.h"
 
 #include "remote/backend.hpp"
 #include "server/include/utils/common.hpp"
@@ -35,8 +35,8 @@ CapioFile::~CapioFile() {
             delete[] _buf;
         } else {
             if (munmap(_buf, _buf_size) == -1) {
-                CAPTURA_PRINT_COLOR(CAPTURA_CLI_LEVEL_WARNING,
-                                    "WARN: unable to unmap CapioFile: %s", strerror(errno));
+                CALF_PRINT_COLOR(CALF_CLI_LEVEL_WARNING, "WARN: unable to unmap CapioFile: %s",
+                                 strerror(errno));
             }
         }
     } else {

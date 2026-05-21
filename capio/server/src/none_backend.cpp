@@ -2,13 +2,13 @@
 
 #include "remote/backend/none.hpp"
 
-#include "captura/StdOutLogger.h"
-#include "captura/StlLogger.h"
+#include "calf/StdOutLogger.h"
+#include "calf/StlLogger.h"
 #include "utils/capiocl_adapter.hpp"
 
 NoneBackend::NoneBackend(int argc, char **argv) : Backend(HOST_NAME_MAX) {
     START_LOG(gettid(), "call()");
-    CAPTURA_PRINT_COLOR(CAPTURA_CLI_LEVEL_STATUS, "initialization completed.");
+    CALF_PRINT_COLOR(CALF_CLI_LEVEL_STATUS, "initialization completed.");
 }
 
 RemoteRequest NoneBackend::read_next_request() {

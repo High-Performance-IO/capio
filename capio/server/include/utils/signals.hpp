@@ -3,8 +3,8 @@
 
 #include <csignal>
 
-#include "captura/StdOutLogger.h"
-#include "captura/StlLogger.h"
+#include "calf/StdOutLogger.h"
+#include "calf/StlLogger.h"
 
 #include "remote/backend.hpp"
 
@@ -15,17 +15,17 @@ extern "C" void __gcov_dump(void);
 void sig_term_handler(int signum, siginfo_t *info, void *ptr) {
     START_LOG(gettid(), "call(signal=[%d] (%s) from process with pid=%ld)", signum,
               strsignal(signum), info != nullptr ? info->si_pid : -1);
-    CAPTURA_PRINT_COLOR(CAPTURA_CLI_LEVEL_WARNING, "shutting down server");
+    CALF_PRINT_COLOR(CALF_CLI_LEVEL_WARNING, "shutting down server");
 
     if (signum == SIGSEGV) {
-        CAPTURA_PRINT_COLOR(CAPTURA_CLI_LEVEL_ERROR, "Segfault detected!");
+        CALF_PRINT_COLOR(CALF_CLI_LEVEL_ERROR, "Segfault detected!");
     }
 
     // free all the memory used
 
     delete client_manager;
     delete storage_manager;
-    CAPTURA_PRINT_COLOR(CAPTURA_CLI_LEVEL_WARNING, "data_buffers cleanup completed");
+    CALF_PRINT_COLOR(CALF_CLI_LEVEL_WARNING, "data_buffers cleanup completed");
 
 #ifdef CAPIO_COVERAGE
     __gcov_dump();
@@ -34,7 +34,7 @@ void sig_term_handler(int signum, siginfo_t *info, void *ptr) {
     delete backend;
     delete shm_canary;
 
-    CAPTURA_PRINT_COLOR(CAPTURA_CLI_LEVEL_INFO, "shutdown completed");
+    CALF_PRINT_COLOR(CALF_CLI_LEVEL_INFO, "shutdown completed");
 
     exit(EXIT_SUCCESS);
 }
@@ -57,7 +57,7 @@ void setup_signal_handlers() {
         ERR_EXIT("sigaction for SIGTERM");
     }
 
-    CAPTURA_PRINT_COLOR(CAPTURA_CLI_LEVEL_STATUS, "Installed signal handlers");
+    CALF_PRINT_COLOR(CALF_CLI_LEVEL_STATUS, "Installed signal handlers");
 }
 
 #endif // CAPIO_SERVER_HANDLERS_SIGNALS_HPP

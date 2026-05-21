@@ -81,7 +81,7 @@ set_target_properties(${TARGET_NAME} PROPERTIES
 # Link libraries
 #####################################
 target_link_directories(${TARGET_NAME} PRIVATE ${SYSCALL_INTERCEPT_LIB_FOLDER})
-target_link_libraries(${TARGET_NAME} PRIVATE rt syscall_intercept captura::syscall)
+target_link_libraries(${TARGET_NAME} PRIVATE rt syscall_intercept calf::syscall)
 
 #####################################
 # Install rules

@@ -42,7 +42,7 @@ cmake-build-*
 #logfies and capio files
 *.log
 files_location*.txt
-captura_logs
+calf_logs
 
 # Other
 debug

@@ -82,16 +82,16 @@ FetchContent_Declare(
 )
 
 FetchContent_Declare(
-        captura
-        GIT_REPOSITORY https://github.com/High-Performance-IO/captura.git
+        calf
+        GIT_REPOSITORY https://github.com/High-Performance-IO/calf.git
         GIT_TAG        main
 )
 
-set(CAPTURA_LOG           ${CAPIO_LOG}  CACHE BOOL "" FORCE)
-set(CAPTURA_BUILD_STL     ON  CACHE BOOL "" FORCE)
-set(CAPTURA_BUILD_SYSCALL ON  CACHE BOOL "" FORCE)
+set(CALF_LOG           ${CAPIO_LOG}  CACHE BOOL "" FORCE)
+set(CALF_BUILD_STL     ON  CACHE BOOL "" FORCE)
+set(CALF_BUILD_SYSCALL ON  CACHE BOOL "" FORCE)
 
-FetchContent_MakeAvailable(captura)
+FetchContent_MakeAvailable(calf)
 
 #####################################
 # Targets

@@ -46,7 +46,7 @@ target_include_directories(${TARGET_NAME} PRIVATE
 # Link libraries
 #####################################
 target_link_directories(${TARGET_NAME} PRIVATE ${SYSCALL_INTERCEPT_LIB_FOLDER})
-target_link_libraries(${TARGET_NAME} PRIVATE rt syscall_intercept GTest::gtest_main captura::syscall)
+target_link_libraries(${TARGET_NAME} PRIVATE rt syscall_intercept GTest::gtest_main calf::syscall)
 
 #####################################
 # Configure tests

@@ -11,9 +11,9 @@
 #include <sys/stat.h>
 
 #ifdef __CAPIO_POSIX
-#include "captura/SyscallLogger.h"
+#include "calf/SyscallLogger.h"
 #else
-#include "captura/StlLogger.h"
+#include "calf/StlLogger.h"
 #endif
 
 #include "common/syscall.hpp"

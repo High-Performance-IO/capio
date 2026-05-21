@@ -10,9 +10,9 @@
 #include <unistd.h>
 
 #ifdef __CAPIO_POSIX
-#include "captura/SyscallLogger.h"
+#include "calf/SyscallLogger.h"
 #else
-#include "captura/StlLogger.h"
+#include "calf/StlLogger.h"
 #endif
 
 #ifdef __CAPIO_POSIX
@@ -29,18 +29,18 @@
 
 #else
 
-#include "captura/StdOutLogger.h"
+#include "calf/StdOutLogger.h"
 
 #define SHM_DESTROY_CHECK(source_name)                                                             \
     if (shm_unlink(source_name) == -1) {                                                           \
-        std::cout << CAPTURA_CLI_LEVEL_WARNING << "Unable to destroy shared mem: '" << source_name \
+        std::cout << CALF_CLI_LEVEL_WARNING << "Unable to destroy shared mem: '" << source_name    \
                   << "' (" << strerror(errno) << ")" << std::endl;                                 \
     };
 
 #define SHM_CREATE_CHECK(condition, source)                                                        \
     if (condition) {                                                                               \
         LOG("error while creating %s", source);                                                    \
-        std::cout << CAPTURA_CLI_LEVEL_ERROR << "Unable to create shm: " << source << std::endl;   \
+        std::cout << CALF_CLI_LEVEL_ERROR << "Unable to create shm: " << source << std::endl;      \
         ERR_EXIT("Unable to open shm: %s", source);                                                \
     };
 
@@ -62,21 +62,21 @@ class CapioShmCanary {
 #ifndef __CAPIO_POSIX
             const auto message = new char[strlen(CAPIO_SHM_CANARY_ERROR)];
             sprintf(message, CAPIO_SHM_CANARY_ERROR, _canary_name.data());
-            CAPTURA_PRINT_COLOR(CAPTURA_CLI_LEVEL_ERROR, "%s", message);
+            CALF_PRINT_COLOR(CALF_CLI_LEVEL_ERROR, "%s", message);
             delete[] message;
 #endif
             ERR_EXIT("ERR: shm canary flag already exists");
         }
 #ifndef __CAPIO_POSIX
-        CAPTURA_PRINT_COLOR(CAPTURA_CLI_LEVEL_STATUS, "Created Capio SHM canary: %s",
-                            _canary_name.c_str());
+        CALF_PRINT_COLOR(CALF_CLI_LEVEL_STATUS, "Created Capio SHM canary: %s",
+                         _canary_name.c_str());
 #endif
     };
 
     ~CapioShmCanary() {
         START_LOG(capio_syscall(SYS_gettid), "call()");
 #ifndef __CAPIO_POSIX
-        CAPTURA_PRINT_COLOR(CAPTURA_CLI_LEVEL_WARNING, "Removing shared memory canary flag");
+        CALF_PRINT_COLOR(CALF_CLI_LEVEL_WARNING, "Removing shared memory canary flag");
 #endif
         close(_shm_id);
         SHM_DESTROY_CHECK(_canary_name.c_str());

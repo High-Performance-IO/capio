@@ -418,6 +418,6 @@ static __attribute__((constructor)) void init() {
     intercept_hook_point_clone_parent = hook_clone_parent;
     intercept_hook_point              = hook;
 
-    SET_CAPTURA_SYSCALL_HANDLER(syscall_no_intercept);
+    SET_CALF_SYSCALL_HANDLER(syscall_no_intercept);
     ENABLE_LOGGER();
 }

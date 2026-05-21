@@ -5,8 +5,8 @@
 
 #include "storage/manager.hpp"
 
-#include "captura/StdOutLogger.h"
-#include "captura/StlLogger.h"
+#include "calf/StdOutLogger.h"
+#include "calf/StlLogger.h"
 
 #include "common/dirent.hpp"
 #include "common/filesystem.hpp"
@@ -70,7 +70,7 @@ void StorageManager::addDirectoryEntry(const pid_t tid, const std::filesystem::p
     }
 }
 StorageManager::StorageManager() {
-    CAPTURA_PRINT_COLOR(CAPTURA_CLI_LEVEL_STATUS, "initialization completed.");
+    CALF_PRINT_COLOR(CALF_CLI_LEVEL_STATUS, "initialization completed.");
 }
 
 StorageManager::~StorageManager() {
@@ -85,7 +85,7 @@ StorageManager::~StorageManager() {
             _removeFromTid(tid, fd);
         }
     }
-    CAPTURA_PRINT_COLOR(CAPTURA_CLI_LEVEL_INFO, "teardown completed.");
+    CALF_PRINT_COLOR(CALF_CLI_LEVEL_INFO, "teardown completed.");
 }
 
 std::optional<std::reference_wrapper<CapioFile>>

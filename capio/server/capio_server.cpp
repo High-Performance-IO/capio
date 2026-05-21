@@ -17,7 +17,7 @@
 #include <unordered_set>
 #include <vector>
 
-#include "captura/StlLogger.h"
+#include "calf/StlLogger.h"
 
 #include "capiocl.hpp"
 #include "capiocl/engine.h"
@@ -45,7 +45,7 @@ Backend *backend;
 
 #include "remote/listener.hpp"
 
-#include "captura/StdOutLogger.h"
+#include "calf/StdOutLogger.h"
 
 /**
  * The capio_cl_engine is declared here to ensure that other components of the CAPIO server
@@ -102,7 +102,7 @@ static constexpr std::array<CSHandler_t, CAPIO_NR_REQUESTS> build_request_handle
         START_LOG(gettid(), "call()");
         int code = client_manager->readNextRequest(str.get());
         if (code < 0 || code > CAPIO_NR_REQUESTS) {
-            CAPTURA_PRINT_COLOR(CAPTURA_CLI_LEVEL_ERROR, "Received invalid code: %d", code);
+            CALF_PRINT_COLOR(CALF_CLI_LEVEL_ERROR, "Received invalid code: %d", code);
 
             ERR_EXIT("Error: received invalid request code");
         }
@@ -118,7 +118,7 @@ int main(int argc, char **argv) {
     Semaphore internal_server_sem(0);
 
     for (const auto line : CAPIO_LOG_SERVER_BANNER) {
-        CAPTURA_PRINT("%s", line);
+        CALF_PRINT("%s", line);
     }
 
     const auto configuration = parseCLI(argc, argv);
@@ -157,7 +157,7 @@ int main(int argc, char **argv) {
     LOG("capio_server thread started");
     std::thread remote_listener_thread(capio_remote_listener, std::ref(internal_server_sem));
     LOG("capio_remote_listener thread started.");
-    CAPTURA_PRINT_COLOR(CAPTURA_CLI_LEVEL_STATUS, "Server instance successfully started!");
+    CALF_PRINT_COLOR(CALF_CLI_LEVEL_STATUS, "Server instance successfully started!");
     server_thread.join();
     remote_listener_thread.join();
 

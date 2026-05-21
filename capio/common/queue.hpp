@@ -8,9 +8,9 @@
 
 #include "common/env.hpp"
 #ifdef __CAPIO_POSIX
-#include "captura/SyscallLogger.h"
+#include "calf/SyscallLogger.h"
 #else
-#include "captura/StlLogger.h"
+#include "calf/StlLogger.h"
 #endif
 #include "common/semaphore.hpp"
 #include "common/shm.hpp"

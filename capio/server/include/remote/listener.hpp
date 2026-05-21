@@ -1,8 +1,8 @@
 #ifndef CAPIO_SERVER_REMOTE_LISTENER_HPP
 #define CAPIO_SERVER_REMOTE_LISTENER_HPP
 
-#include "captura/StdOutLogger.h"
-#include "captura/StlLogger.h"
+#include "calf/StdOutLogger.h"
+#include "calf/StlLogger.h"
 
 #include "remote/backend.hpp"
 #include "remote/backend/include.hpp"
@@ -28,29 +28,29 @@ inline Backend *select_backend(const std::string &backend_name, int argc, char *
 
     if (backend_name.empty() || backend_name == "none") {
         LOG("backend selected: none");
-        CAPTURA_PRINT_COLOR(
-            CAPTURA_CLI_LEVEL_INFO,
+        CALF_PRINT_COLOR(
+            CALF_CLI_LEVEL_INFO,
             "Starting CAPIO with default backend (none) as no preferred backend was chosen");
         return new NoneBackend(argc, argv);
     }
 
     if (backend_name == "mpi") {
         LOG("backend selected: mpi");
-        CAPTURA_PRINT_COLOR(CAPTURA_CLI_LEVEL_INFO, "Starting CAPIO with MPI backend");
+        CALF_PRINT_COLOR(CALF_CLI_LEVEL_INFO, "Starting CAPIO with MPI backend");
         return new MPIBackend(argc, argv);
     }
 
     if (backend_name == "mpisync") {
         LOG("backend selected: mpisync");
-        CAPTURA_PRINT_COLOR(CAPTURA_CLI_LEVEL_INFO, "Starting CAPIO with MPI (SYNC) backend");
+        CALF_PRINT_COLOR(CALF_CLI_LEVEL_INFO, "Starting CAPIO with MPI (SYNC) backend");
         return new MPISYNCBackend(argc, argv);
     }
 
     LOG("Backend %s does not exist in CAPIO. Reverting back to the default backend (none)",
         backend_name.c_str());
-    CAPTURA_PRINT_COLOR(CAPTURA_CLI_LEVEL_WARNING,
-                        "Backend %s does not exist. Reverting to the default backend (none)",
-                        backend_name.c_str());
+    CALF_PRINT_COLOR(CALF_CLI_LEVEL_WARNING,
+                     "Backend %s does not exist. Reverting to the default backend (none)",
+                     backend_name.c_str());
     return new NoneBackend(argc, argv);
 }
 
@@ -62,8 +62,8 @@ inline void capio_remote_listener(Semaphore &internal_server_sem) {
 
     if (typeid(*backend) == typeid(NoneBackend)) {
 
-        CAPTURA_PRINT_COLOR(
-            CAPTURA_CLI_LEVEL_INFO,
+        CALF_PRINT_COLOR(
+            CALF_CLI_LEVEL_INFO,
             "backend is of type NoneBackend. Stopping capio_remote_listener() execution.");
         return;
     }

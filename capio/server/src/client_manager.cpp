@@ -2,8 +2,8 @@
 
 #include "client-manager/client_manager.hpp"
 
-#include "captura/StdOutLogger.h"
-#include "captura/StlLogger.h"
+#include "calf/StdOutLogger.h"
+#include "calf/StlLogger.h"
 #include "common/constants.hpp"
 #include "common/queue.hpp"
 #include "utils/capiocl_adapter.hpp"
@@ -18,12 +18,10 @@ ClientManager::ClientDataBuffers::ClientDataBuffers(const std::string &clientToS
 ClientManager::ClientManager()
     : requests{SHM_COMM_CHAN_NAME, CAPIO_REQ_BUFF_CNT, CAPIO_REQ_MAX_SIZE,
                CapioCLEngine::get().getWorkflowName()} {
-    CAPTURA_PRINT_COLOR(CAPTURA_CLI_LEVEL_STATUS, "initialization completed.");
+    CALF_PRINT_COLOR(CALF_CLI_LEVEL_STATUS, "initialization completed.");
 }
 
-ClientManager::~ClientManager() {
-    CAPTURA_PRINT_COLOR(CAPTURA_CLI_LEVEL_WARNING, "teardown completed.");
-}
+ClientManager::~ClientManager() { CALF_PRINT_COLOR(CALF_CLI_LEVEL_WARNING, "teardown completed."); }
 
 void ClientManager::registerClient(pid_t tid, const std::string &app_name, const bool wait) {
     START_LOG(gettid(), "call(tid=%ld, app_name=%s)", tid, app_name.c_str());
@@ -39,8 +37,8 @@ void ClientManager::registerClient(pid_t tid, const std::string &app_name, const
                           sizeof(off_t), CapioCLEngine::get().getWorkflowName());
 
     DBG(tid, [](const int tid_app, const std::string &app_name_) {
-        CAPTURA_PRINT_COLOR(CAPTURA_CLI_LEVEL_INFO, "Registered PID %d with app name %s", tid_app,
-                            app_name_.c_str());
+        CALF_PRINT_COLOR(CALF_CLI_LEVEL_INFO, "Registered PID %d with app name %s", tid_app,
+                         app_name_.c_str());
     }(tid, app_name));
 
     if (wait) {
@@ -81,8 +79,8 @@ void ClientManager::removeClient(const pid_t tid) {
         responses.erase(response_buffer);
     }
     DBG(tid, [&](const int tid_app, const std::string &app_name) {
-        CAPTURA_PRINT_COLOR(CAPTURA_CLI_LEVEL_WARNING, "Removed PID %d with app name %s", tid_app,
-                            app_name.c_str());
+        CALF_PRINT_COLOR(CALF_CLI_LEVEL_WARNING, "Removed PID %d with app name %s", tid_app,
+                         app_name.c_str());
     }(tid, app_name));
 }
 
@@ -186,9 +184,9 @@ int ClientManager::readNextRequest(char *str) {
         strcpy(str, ptr + 1);
     } else {
 
-        CAPTURA_PRINT_COLOR(CAPTURA_CLI_LEVEL_ERROR, "Received invalid request: %s", str);
-        CAPTURA_PRINT_COLOR(CAPTURA_CLI_LEVEL_ERROR,
-                            "Code: %d is not mapped to a valid request handler", code);
+        CALF_PRINT_COLOR(CALF_CLI_LEVEL_ERROR, "Received invalid request: %s", str);
+        CALF_PRINT_COLOR(CALF_CLI_LEVEL_ERROR, "Code: %d is not mapped to a valid request handler",
+                         code);
 
         return -1;
     }

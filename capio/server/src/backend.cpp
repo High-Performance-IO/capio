@@ -1,7 +1,7 @@
 #include "remote/backend.hpp"
 
-#include "captura/StdOutLogger.h"
-#include "captura/StlLogger.h"
+#include "calf/StdOutLogger.h"
+#include "calf/StlLogger.h"
 #include "utils/common.hpp"
 
 #include <iostream>
@@ -13,8 +13,8 @@ Backend::Backend(const unsigned int node_name_max_length)
 
     gethostname(node_name.data(), node_name_max_length);
     node_name.resize(strlen(node_name.data()));
-    CAPTURA_PRINT_COLOR(CAPTURA_CLI_LEVEL_INFO, "Node name: %s", node_name.c_str());
-    CAPTURA_PRINT_COLOR(CAPTURA_CLI_LEVEL_INFO, "Node count: %d", n_servers);
+    CALF_PRINT_COLOR(CALF_CLI_LEVEL_INFO, "Node name: %s", node_name.c_str());
+    CALF_PRINT_COLOR(CALF_CLI_LEVEL_INFO, "Node count: %d", n_servers);
 }
 
 [[nodiscard]] const std::string &Backend::get_node_name() const {

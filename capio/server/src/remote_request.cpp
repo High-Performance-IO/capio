@@ -1,7 +1,7 @@
 #include "common/constants.hpp"
 #include "remote/backend.hpp"
 
-#include "captura/StlLogger.h"
+#include "calf/StlLogger.h"
 
 RemoteRequest::RemoteRequest(char *buf_recv, const std::string &source) : _source(source) {
     START_LOG(gettid(), "call(buf_recv=%s, source=%s)", buf_recv, source.c_str());

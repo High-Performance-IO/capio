@@ -1,7 +1,7 @@
 #include "remote/backend/mpi.hpp"
 
-#include "captura/StdOutLogger.h"
-#include "captura/StlLogger.h"
+#include "calf/StdOutLogger.h"
+#include "calf/StlLogger.h"
 
 #include "common/constants.hpp"
 #include "utils/capiocl_adapter.hpp"
@@ -26,13 +26,13 @@ MPIBackend::MPIBackend(int argc, char **argv) : Backend(MPI_MAX_PROCESSOR_NAME) 
     nodes.emplace(node_name);
     rank_to_hostname[rank]      = node_name;
     hostname_to_rank[node_name] = rank;
-    CAPTURA_PRINT_COLOR(CAPTURA_CLI_LEVEL_STATUS, "initialization completed.");
+    CALF_PRINT_COLOR(CALF_CLI_LEVEL_STATUS, "initialization completed.");
 }
 
 MPIBackend::~MPIBackend() {
     START_LOG(gettid(), "Call()");
     MPI_Finalize();
-    CAPTURA_PRINT_COLOR(CAPTURA_CLI_LEVEL_INFO, "teardown completed.");
+    CALF_PRINT_COLOR(CALF_CLI_LEVEL_INFO, "teardown completed.");
 }
 
 const std::set<std::string> MPIBackend::get_nodes() { return nodes; }
@@ -125,13 +125,13 @@ void MPIBackend::recv_file(char *shm, const std::string &source, long int bytes_
 MPISYNCBackend::MPISYNCBackend(int argc, char *argv[]) : MPIBackend(argc, argv) {
     START_LOG(gettid(), "call()");
     LOG("Wrapped MPI backend with MPISYC backend");
-    CAPTURA_PRINT_COLOR(CAPTURA_CLI_LEVEL_STATUS, "initialization completed.");
+    CALF_PRINT_COLOR(CALF_CLI_LEVEL_STATUS, "initialization completed.");
 }
 
 MPISYNCBackend::~MPISYNCBackend() {
     START_LOG(gettid(), "Call()");
     MPI_Finalize();
-    CAPTURA_PRINT_COLOR(CAPTURA_CLI_LEVEL_INFO, "teardown completed.");
+    CALF_PRINT_COLOR(CALF_CLI_LEVEL_INFO, "teardown completed.");
 }
 
 RemoteRequest MPISYNCBackend::read_next_request() {

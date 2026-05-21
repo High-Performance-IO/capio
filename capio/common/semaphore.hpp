@@ -6,9 +6,9 @@
 #include <utility>
 
 #ifdef __CAPIO_POSIX
-#include "captura/SyscallLogger.h"
+#include "calf/SyscallLogger.h"
 #else
-#include "captura/StlLogger.h"
+#include "calf/StlLogger.h"
 #endif
 
 class NoLock {
