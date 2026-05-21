@@ -111,6 +111,7 @@ static constexpr std::array<CSHandler_t, CAPIO_NR_REQUESTS> build_request_handle
 }
 
 int main(int argc, char **argv) {
+    SET_CALF_COMPONENT_NAME("server");
 
     StdoutLogger::options.componentName = "SERVER";
     StdoutLogger::options.workflowName  = "";

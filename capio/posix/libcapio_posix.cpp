@@ -403,6 +403,8 @@ static int hook(long syscall_number, long arg0, long arg1, long arg2, long arg3,
 }
 
 static __attribute__((constructor)) void init() {
+    SET_CALF_COMPONENT_NAME("posix");
+    SET_CALF_SYSCALL_HANDLER(syscall_no_intercept);
 
     const long tid = syscall_no_intercept(SYS_gettid);
 
@@ -418,6 +420,5 @@ static __attribute__((constructor)) void init() {
     intercept_hook_point_clone_parent = hook_clone_parent;
     intercept_hook_point              = hook;
 
-    SET_CALF_SYSCALL_HANDLER(syscall_no_intercept);
     ENABLE_LOGGER();
 }
