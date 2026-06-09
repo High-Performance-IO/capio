@@ -78,8 +78,8 @@ ENDIF (CAPIO_LOG AND CMAKE_BUILD_TYPE STREQUAL "Debug")
 FetchContent_Declare(
         capio_cl
         GIT_REPOSITORY https://github.com/High-Performance-IO/CAPIO-CL.git
-               GIT_TAG v1.4.0
-        #GIT_TAG calf-integration
+        #       GIT_TAG v1.4.0
+        GIT_TAG calf-integration
 )
 
 FetchContent_Declare(
