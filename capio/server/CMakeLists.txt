@@ -30,6 +30,7 @@ add_executable(${TARGET_NAME} ${TARGET_SOURCES})
 # set CALF logger component name
 #####################################
 calf_set_component(${TARGET_NAME} "server")
+calf_set_default_log_dir(${TARGET_NAME} "./capio_logs")
 calf_build_stl(TRUE)
 
 #####################################
