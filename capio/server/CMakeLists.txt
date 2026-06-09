@@ -21,6 +21,18 @@ set(ARGS_BUILD_UNITTESTS OFF CACHE INTERNAL "")
 
 FetchContent_MakeAvailable(args capio_cl)
 
+
+#####################################
+# CAPIOCL JsonCons dependency patch
+#####################################
+if (TARGET libcapio_cl)
+    target_compile_options(libcapio_cl PRIVATE
+            -Wno-error=array-bounds
+            -Wno-error=stringop-overflow
+    )
+endif ()
+
+
 #####################################
 # Target definition
 #####################################
