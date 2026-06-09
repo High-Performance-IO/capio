@@ -14,7 +14,7 @@ add_executable(${TARGET_NAME} ${TARGET_SOURCES})
 #####################################
 # Link libraries
 #####################################
-target_link_libraries(${TARGET_NAME} PRIVATE GTest::gtest calf::syscall)
+target_link_libraries(${TARGET_NAME} PRIVATE GTest::gtest)
 
 #####################################
 # Configure tests

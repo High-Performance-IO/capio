@@ -26,12 +26,6 @@ FetchContent_MakeAvailable(args capio_cl)
 #####################################
 add_executable(${TARGET_NAME} ${TARGET_SOURCES})
 
-#####################################
-# set CALF logger component name
-#####################################
-calf_set_component(${TARGET_NAME} "server")
-calf_set_default_log_dir(${TARGET_NAME} "./capio_logs")
-calf_build_stl(TRUE)
 
 #####################################
 # Include files and directories
@@ -41,11 +35,20 @@ target_sources(${TARGET_NAME} PRIVATE
         "${CAPIO_COMMON_HEADERS}"
         "${CAPIO_SERVER_HEADERS}"
 )
+
 target_include_directories(${TARGET_NAME} PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}/include
         ${MPI_INCLUDE_PATH}
         ${capio_cl_SOURCE_DIR}
 )
+
+#####################################
+# set CALF logger component name
+#####################################
+calf_enable_log(${TARGET_NAME} ${CAPIO_LOG})
+calf_set_component(${TARGET_NAME} "server")
+calf_set_default_log_dir(${TARGET_NAME} "./capio_logs")
+target_include_directories(${TARGET_NAME} PRIVATE ${CALF_SOURCE_DIR})
 
 #####################################
 # Target properties
@@ -61,7 +64,7 @@ ENDIF (MPI_LINK_FLAGS)
 #####################################
 # Link libraries
 #####################################
-target_link_libraries(${TARGET_NAME} PRIVATE ${MPI_LIBRARIES} pthread rt stdc++fs libcapio_cl args calf::stl)
+target_link_libraries(${TARGET_NAME} PRIVATE ${MPI_LIBRARIES} pthread rt stdc++fs libcapio_cl args)
 
 #####################################
 # Install rules

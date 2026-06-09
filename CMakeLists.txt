@@ -28,7 +28,7 @@ option(CAPIO_BUILD_TESTS "Build CAPIO test suite" FALSE)
 option(CAPIO_LOG "Enable capio debug logging" FALSE)
 option(ENABLE_COVERAGE "Enable code coverage collection" FALSE)
 option(CAPIO_BUILD_SERVER "Build CAPIO server component" TRUE)
-option(CAPIO_BUILD_POSIX  "Build CAPIO posix component" TRUE)
+option(CAPIO_BUILD_POSIX "Build CAPIO posix component" TRUE)
 
 #####################################
 # CMake module imports
@@ -78,33 +78,31 @@ ENDIF (CAPIO_LOG AND CMAKE_BUILD_TYPE STREQUAL "Debug")
 FetchContent_Declare(
         capio_cl
         GIT_REPOSITORY https://github.com/High-Performance-IO/CAPIO-CL.git
-#        GIT_TAG v1.4.0
-        GIT_TAG calf-integration
+               GIT_TAG v1.4.0
+        #GIT_TAG calf-integration
 )
 
 FetchContent_Declare(
         calf
         GIT_REPOSITORY https://github.com/High-Performance-IO/calf.git
-        GIT_TAG        main
+        GIT_TAG main
 )
 
 FetchContent_MakeAvailable(calf)
-
-calf_log(${CAPIO_LOG})
 
 #####################################
 # Targets
 #####################################
 
-IF(CAPIO_BUILD_POSIX)
-	message(STATUS "Adding CAPIO posix component")
-	add_subdirectory(capio/posix)
-ENDIF()
+IF (CAPIO_BUILD_POSIX)
+    message(STATUS "Adding CAPIO posix component")
+    add_subdirectory(capio/posix)
+ENDIF ()
 
-IF(CAPIO_BUILD_SERVER)
-	message(STATUS "Adding CAPIO server component")
-	add_subdirectory(capio/server)
-ENDIF()
+IF (CAPIO_BUILD_SERVER)
+    message(STATUS "Adding CAPIO server component")
+    add_subdirectory(capio/server)
+ENDIF ()
 
 IF (CAPIO_BUILD_TESTS)
     message(STATUS "Building CAPIO test suite")

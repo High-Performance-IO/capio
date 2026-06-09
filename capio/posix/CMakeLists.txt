@@ -11,13 +11,6 @@ set(TARGET_SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/libcapio_posix.cpp)
 add_library(${TARGET_NAME} SHARED ${TARGET_SOURCES})
 
 #####################################
-# set CALF logger component name
-#####################################
-calf_set_component(${TARGET_NAME} "posix")
-calf_set_default_log_dir(${TARGET_NAME} "./capio_logs")
-calf_build_syscall(TRUE)
-
-#####################################
 # CMake module imports
 #####################################
 include(ProcessorCount)
@@ -77,6 +70,14 @@ target_include_directories(${TARGET_NAME} PRIVATE
 )
 
 #####################################
+# set CALF logger component name
+#####################################
+calf_enable_log(${TARGET_NAME} ${CAPIO_LOG})
+calf_set_component(${TARGET_NAME} "posix")
+calf_set_default_log_dir(${TARGET_NAME} "./capio_logs")
+target_include_directories(${TARGET_NAME} PRIVATE ${CALF_SOURCE_DIR})
+
+#####################################
 # Target properties
 #####################################
 set_target_properties(${TARGET_NAME} PROPERTIES
@@ -88,7 +89,7 @@ set_target_properties(${TARGET_NAME} PROPERTIES
 # Link libraries
 #####################################
 target_link_directories(${TARGET_NAME} PRIVATE ${SYSCALL_INTERCEPT_LIB_FOLDER})
-target_link_libraries(${TARGET_NAME} PRIVATE rt syscall_intercept calf::syscall)
+target_link_libraries(${TARGET_NAME} PRIVATE rt syscall_intercept)
 
 #####################################
 # Install rules
