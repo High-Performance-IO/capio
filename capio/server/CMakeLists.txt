@@ -19,14 +19,17 @@ FetchContent_Declare(
 set(ARGS_BUILD_EXAMPLE OFF CACHE INTERNAL "")
 set(ARGS_BUILD_UNITTESTS OFF CACHE INTERNAL "")
 
-SET(CALF_COMPONENT_NAME "server")
-
 FetchContent_MakeAvailable(args capio_cl)
 
 #####################################
 # Target definition
 #####################################
 add_executable(${TARGET_NAME} ${TARGET_SOURCES})
+
+#####################################
+# set CALF logger component name
+#####################################
+calf_set_component(${TARGET_NAME} "server")
 
 #####################################
 # Include files and directories

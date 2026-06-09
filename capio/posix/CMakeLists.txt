@@ -11,6 +11,11 @@ set(TARGET_SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/libcapio_posix.cpp)
 add_library(${TARGET_NAME} SHARED ${TARGET_SOURCES})
 
 #####################################
+# set CALF logger component name
+#####################################
+calf_set_component(${TARGET_NAME} "posix")
+
+#####################################
 # CMake module imports
 #####################################
 include(ProcessorCount)
@@ -22,8 +27,6 @@ file(MAKE_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/syscall_intercept)
 
 set(SYSCALL_INTERCEPT_INCLUDE_FOLDER "${CMAKE_CURRENT_BINARY_DIR}/syscall_intercept/${CMAKE_INSTALL_INCLUDEDIR}")
 set(SYSCALL_INTERCEPT_LIB_FOLDER "${CMAKE_CURRENT_BINARY_DIR}/syscall_intercept/${CMAKE_INSTALL_LIBDIR}")
-
-SET(CALF_COMPONENT_NAME "posix")
 
 execute_process(
         COMMAND ${CMAKE_COMMAND}
