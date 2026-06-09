@@ -14,6 +14,7 @@ add_library(${TARGET_NAME} SHARED ${TARGET_SOURCES})
 # set CALF logger component name
 #####################################
 calf_set_component(${TARGET_NAME} "posix")
+calf_build_syscall(TRUE)
 
 #####################################
 # CMake module imports

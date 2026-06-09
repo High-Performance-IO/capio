@@ -88,11 +88,9 @@ FetchContent_Declare(
         GIT_TAG        main
 )
 
-set(CALF_LOG           ${CAPIO_LOG}  CACHE BOOL "" FORCE)
-set(CALF_BUILD_STL     ON  CACHE BOOL "" FORCE)
-set(CALF_BUILD_SYSCALL ON  CACHE BOOL "" FORCE)
-
 FetchContent_MakeAvailable(calf)
+
+calf_log(${CAPIO_LOG})
 
 #####################################
 # Targets
