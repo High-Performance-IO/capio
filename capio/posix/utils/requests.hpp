@@ -3,6 +3,7 @@
 
 #include "common/requests.hpp"
 
+#include "calf/SyscallLogger.h"
 #include "env.hpp"
 #include "filesystem.hpp"
 #include "types.hpp"

@@ -3,6 +3,7 @@
 
 #include <cstdlib>
 
+#include "calf/StlLogger.h"
 #include "common/constants.hpp"
 
 off64_t get_file_initial_size() {

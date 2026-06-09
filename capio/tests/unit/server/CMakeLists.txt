@@ -35,6 +35,13 @@ target_include_directories(${TARGET_NAME} PRIVATE
 )
 
 #####################################
+# set CALF logger component name
+#####################################
+calf_enable_log(${TARGET_NAME} ${CAPIO_LOG})
+calf_set_component(${TARGET_NAME} "server")
+calf_set_default_log_dir(${TARGET_NAME} "./capio_logs")
+
+#####################################
 # Link libraries
 #####################################
 target_link_libraries(${TARGET_NAME} PRIVATE GTest::gtest_main rt libcapio_cl MPI::MPI_CXX args)

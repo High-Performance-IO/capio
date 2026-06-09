@@ -70,6 +70,13 @@ target_include_directories(${TARGET_NAME} PRIVATE
 )
 
 #####################################
+# set CALF logger component name
+#####################################
+calf_enable_log(${TARGET_NAME} ${CAPIO_LOG})
+calf_set_component(${TARGET_NAME} "posix")
+calf_set_default_log_dir(${TARGET_NAME} "./capio_logs")
+
+#####################################
 # Target properties
 #####################################
 set_target_properties(${TARGET_NAME} PROPERTIES

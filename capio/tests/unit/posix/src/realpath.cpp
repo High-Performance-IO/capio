@@ -4,6 +4,8 @@
 
 #include <fcntl.h>
 
+#include "calf/SyscallLogger.h"
+
 #include "utils/filesystem.hpp"
 
 class RealpathPosixTest : public testing::Test {

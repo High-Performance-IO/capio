@@ -21,10 +21,23 @@ set(ARGS_BUILD_UNITTESTS OFF CACHE INTERNAL "")
 
 FetchContent_MakeAvailable(args capio_cl)
 
+
+#####################################
+# CAPIOCL JsonCons dependency patch
+#####################################
+if (TARGET libcapio_cl)
+    target_compile_options(libcapio_cl PRIVATE
+            -Wno-error=array-bounds
+            -Wno-error=stringop-overflow
+    )
+endif ()
+
+
 #####################################
 # Target definition
 #####################################
 add_executable(${TARGET_NAME} ${TARGET_SOURCES})
+
 
 #####################################
 # Include files and directories
@@ -34,11 +47,19 @@ target_sources(${TARGET_NAME} PRIVATE
         "${CAPIO_COMMON_HEADERS}"
         "${CAPIO_SERVER_HEADERS}"
 )
+
 target_include_directories(${TARGET_NAME} PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}/include
         ${MPI_INCLUDE_PATH}
         ${capio_cl_SOURCE_DIR}
 )
+
+#####################################
+# set CALF logger component name
+#####################################
+calf_enable_log(${TARGET_NAME} ${CAPIO_LOG})
+calf_set_component(${TARGET_NAME} "server")
+calf_set_default_log_dir(${TARGET_NAME} "./capio_logs")
 
 #####################################
 # Target properties

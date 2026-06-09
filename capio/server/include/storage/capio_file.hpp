@@ -10,6 +10,8 @@
 #include <utility>
 #include <vector>
 
+#include "calf/StlLogger.h"
+
 #include "common/queue.hpp"
 
 /**

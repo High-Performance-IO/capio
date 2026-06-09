@@ -1,11 +1,11 @@
 #ifndef CAPIO_SERVER_UTILS_LOCATIONS_HPP
 #define CAPIO_SERVER_UTILS_LOCATIONS_HPP
-
-#include "remote/backend.hpp"
-
 #include <mutex>
 #include <thread>
 
+#include "remote/backend.hpp"
+
+#include "calf/StlLogger.h"
 #include "utils/types.hpp"
 
 extern Backend *backend;

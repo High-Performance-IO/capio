@@ -10,9 +10,9 @@
 
 #include <unistd.h>
 
+#include "calf/SyscallLogger.h"
 #include "common/env.hpp"
 #include "common/filesystem.hpp"
-#include "common/logger.hpp"
 #include "common/syscall.hpp"
 
 #include "types.hpp"

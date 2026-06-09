@@ -3,11 +3,14 @@
 #include <list>
 #include <unordered_map>
 
+#include "storage/manager.hpp"
+
+#include "calf/StdOutLogger.h"
+#include "calf/StlLogger.h"
+
 #include "common/dirent.hpp"
 #include "common/filesystem.hpp"
-#include "common/logger.hpp"
 #include "storage/capio_file.hpp"
-#include "storage/manager.hpp"
 #include "utils/capiocl_adapter.hpp"
 #include "utils/common.hpp"
 #include "utils/location.hpp"
@@ -67,8 +70,7 @@ void StorageManager::addDirectoryEntry(const pid_t tid, const std::filesystem::p
     }
 }
 StorageManager::StorageManager() {
-    server_println("initialization completed.", CapioCLEngine::get().getWorkflowName(),
-                   CAPIO_LOG_SERVER_CLI_LEVEL_STATUS, "StorageManager");
+    CALF_PRINT_COLOR(CALF_CLI_LEVEL_STATUS, "initialization completed.");
 }
 
 StorageManager::~StorageManager() {
@@ -83,8 +85,7 @@ StorageManager::~StorageManager() {
             _removeFromTid(tid, fd);
         }
     }
-    server_println("teardown completed.", CapioCLEngine::get().getWorkflowName(),
-                   CAPIO_LOG_SERVER_CLI_LEVEL_INFO, "StorageManager");
+    CALF_PRINT_COLOR(CALF_CLI_LEVEL_INFO, "teardown completed.");
 }
 
 std::optional<std::reference_wrapper<CapioFile>>

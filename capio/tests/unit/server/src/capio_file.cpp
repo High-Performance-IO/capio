@@ -323,34 +323,7 @@ TEST(ServerTest, TestFileSetCommitToFalse) {
     EXPECT_FALSE(file.isCommitted());
 }
 
-class MockBackend : public Backend {
-  public:
-    MockBackend() : Backend(HOST_NAME_MAX) {}
-
-    void recv_file(char *shm, const std::string &source, const long int bytes_expected) override {
-        for (long int i = 0; i < bytes_expected; ++i) {
-            shm[i] = 33 + (i % 93);
-        }
-    }
-
-    const std::set<std::string> get_nodes() override { return {node_name}; }
-    void handshake_servers() override {}
-    RemoteRequest read_next_request() override { return {nullptr, ""}; }
-    void send_file(char *shm, long int nbytes, const std::string &target) override {}
-    void send_request(const char *message, int message_len, const std::string &target) override {}
-};
-
-class MockBackendTestFixture : public ::testing::Test {
-  protected:
-    void SetUp() override {
-        backend = new MockBackend();
-        open_files_location();
-    }
-
-    void TearDown() override { delete backend; }
-};
-
-TEST_F(MockBackendTestFixture, TestReadFromNodeMockBackend) {
+TEST(ServerTest, TestReadFromNodeMockBackend) {
 
     CapioFile file1;
     file1.createBuffer("testDir", true);
@@ -377,7 +350,7 @@ TEST(ServerTest, TestGetSectorEnd) {
     EXPECT_EQ(file.getSectorEnd(12000), -1);
 }
 
-TEST_F(MockBackendTestFixture, TestSimulateDirectoryStreaming) {
+TEST(ServerTest, TestSimulateDirectoryStreaming) {
 
     constexpr int NUM_FILES_EXPECTED = 10;
 

@@ -28,13 +28,8 @@ constexpr int CAPIO_CACHE_LINE_SIZE_DEFAULT    = 256 * 1024;
 constexpr size_t CAPIO_SERVER_REQUEST_MAX_SIZE = sizeof(char) * (PATH_MAX + 81920);
 constexpr size_t CAPIO_REQ_MAX_SIZE            = 256 * sizeof(char);
 
-constexpr char LOG_CAPIO_START_REQUEST[]            = "\n+++++++++++ SYSCALL %s (%d) +++++++++++";
-constexpr char LOG_CAPIO_END_REQUEST[]              = "----------- END SYSCALL ----------\n";
-constexpr char CAPIO_SERVER_LOG_START_REQUEST_MSG[] = "+++++++++++++++++REQUEST+++++++++++++++++";
-constexpr char CAPIO_SERVER_LOG_END_REQUEST_MSG[]   = "~~~~~~~~~~~~~~~END REQUEST~~~~~~~~~~~~~~~";
-constexpr int CAPIO_LOG_MAX_MSG_LEN                 = 2048;
-constexpr int CAPIO_SEM_RETRIES                     = 100;
-constexpr int THEORETICAL_SIZE_DIRENT64             = sizeof(ino64_t) + sizeof(off64_t) +
+constexpr int CAPIO_SEM_RETRIES         = 100;
+constexpr int THEORETICAL_SIZE_DIRENT64 = sizeof(ino64_t) + sizeof(off64_t) +
                                           sizeof(unsigned short) + sizeof(unsigned char) +
                                           sizeof(char) * NAME_MAX;
 
@@ -43,10 +38,6 @@ constexpr int CAPIO_POSIX_SYSCALL_ERRNO        = -1;
 constexpr int CAPIO_POSIX_SYSCALL_REQUEST_SKIP = -2;
 constexpr int CAPIO_POSIX_SYSCALL_SKIP         = 1;
 constexpr int CAPIO_POSIX_SYSCALL_SUCCESS      = 0;
-
-// CAPIO logger - common
-constexpr char CAPIO_LOG_PRE_MSG[]        = "at[%.15llu][%.40s]: ";
-constexpr char CAPIO_DEFAULT_LOG_FOLDER[] = "capio_logs\0";
 
 // CAPIO common - shared memory constant names
 constexpr char SHM_FIRST_ELEM[]        = "_first_elem_";
@@ -66,15 +57,8 @@ constexpr char CAPIO_SHM_OPEN_ERROR[] =
     "Unable to open shared memory segment. Could it be that another instance of capio server is "
     "running with the same WORKFLOW_NAME?";
 
-// CAPIO logger - POSIX
-constexpr char CAPIO_LOG_POSIX_DEFAULT_LOG_FILE_PREFIX[] = "posix_thread_\0";
-constexpr char CAPIO_LOG_POSIX_SYSCALL_START[]           = "\n+++++++++ SYSCALL %s (%d) +++++++++";
-constexpr char CAPIO_LOG_POSIX_SYSCALL_END[]             = "~~~~~~~~~  END SYSCALL ~~~~~~~~~\n";
-
-// CAPIO logger - server
-constexpr char CAPIO_SERVER_DEFAULT_LOG_FILE_PREFIX[] = "server_thread_\0";
 // Note: Ensure CAPIO_VERSION is defined as a string literal, e.g., #define CAPIO_VERSION "1.0.0"
-constexpr char CAPIO_LOG_SERVER_BANNER[14][80]        = {
+constexpr char CAPIO_LOG_SERVER_BANNER[14][80] = {
     "",
     "\033[1;34m  /$$$$$$   /$$$$$$  /$$$$$$$  \033[0;96m /$$$$$$  /$$$$$$ ",
     "\033[1;34m /$$__  $$ /$$__  $$| $$__  $$ \033[0;96m|_ $$_/ /$$__  $$",
@@ -91,27 +75,24 @@ constexpr char CAPIO_LOG_SERVER_BANNER[14][80]        = {
     "",
 };
 
-constexpr char CAPIO_LOG_SERVER_CLI_LOGGING_NOT_AVAILABLE[] =
-    "CAPIO_LOG set but log support was not compiled into CAPIO!";
-constexpr char CAPIO_LOG_SERVER_REQUEST_START[] = "\n+++++++++++ REQUEST +++++++++++";
-constexpr char CAPIO_LOG_SERVER_REQUEST_END[]   = "~~~~~~~~~ END REQUEST ~~~~~~~~~\n";
-
 // Server - Warning banners
-constexpr char CAPIO_LOG_SERVER_CLI_LOGGING_ENABLED_WARNING[5][80] = {
+constexpr char CAPIO_LOG_SERVER_CLI_LOGGING_ENABLED_WARNING[6][80] = {
     "\033[1;33m|==================================================================|\033[0m",
     "\033[1;33m| you are running a build of CAPIO with logging enabled.           |\033[0m",
     "\033[1;33m| this will have impact on performance. you should recompile CAPIO |\033[0m",
     "\033[1;33m| with -DCAPIO_LOG=FALSE                                           |\033[0m",
-    "\033[1;33m|==================================================================|\033[0m"};
+    "\033[1;33m|==================================================================|\033[0m",
+    ""};
 
-constexpr char CAPIO_LOG_SERVER_CLI_CONT_ON_ERR_WARNING[7][80] = {
+constexpr char CAPIO_LOG_SERVER_CLI_CONT_ON_ERR_WARNING[8][80] = {
     "\033[1;31m|==================================================================|\033[0m",
     "\033[1;31m|           you are running CAPIO with --continue-on-error         |\033[0m",
     "\033[1;31m|       This is extremely dangerous as CAPIO server will continue  |\033[0m",
     "\033[1;31m|              its execution even if it should terminate.          |\033[0m",
     "\033[1;31m|                                                                  |\033[0m",
     "\033[1;31m|                     USE IT AT YOUR OWN RISK                      |\033[0m",
-    "\033[1;31m|==================================================================|\033[0m"};
+    "\033[1;31m|==================================================================|\033[0m",
+    ""};
 
 // CAPIO server argument parser
 constexpr char CAPIO_SERVER_ARG_PARSER_PRE[] =
@@ -145,12 +126,5 @@ constexpr char CAPIO_SERVER_ARG_PARSER_STORE_ALL_IN_MEMORY_OPT_HELP[] =
 constexpr char CAPIO_SERVER_ARG_PARSER_CONFIG_BACKEND_HELP[] =
     "Backend used in CAPIO. The value [backend] can be one of the following implemented backends: "
     "\n\t> mpi \n\t> mpisync \n\t> none (default)";
-
-// Cli pre messages
-constexpr char CAPIO_LOG_SERVER_CLI_LEVEL_RESET[]   = "\033[0m";
-constexpr char CAPIO_LOG_SERVER_CLI_LEVEL_STATUS[]  = "\033[1;34m";
-constexpr char CAPIO_LOG_SERVER_CLI_LEVEL_INFO[]    = "\033[1;32m";
-constexpr char CAPIO_LOG_SERVER_CLI_LEVEL_WARNING[] = "\033[1;33m";
-constexpr char CAPIO_LOG_SERVER_CLI_LEVEL_ERROR[]   = "\033[1;31m";
 
 #endif // CAPIO_COMMON_CONSTANTS_HPP

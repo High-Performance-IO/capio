@@ -27,6 +27,13 @@ set(SYSCALL_INTERCEPT_LIB_FOLDER
 target_compile_definitions(${TARGET_NAME} PRIVATE __CAPIO_POSIX)
 
 #####################################
+# set CALF logger component name
+#####################################
+calf_enable_log(${TARGET_NAME} ${CAPIO_LOG})
+calf_set_component(${TARGET_NAME} "posix")
+calf_set_default_log_dir(${TARGET_NAME} "./capio_logs")
+
+#####################################
 # Include files and directories
 #####################################
 file(GLOB_RECURSE CAPIO_POSIX_HEADERS "${TARGET_INCLUDE_FOLDER}/*.hpp")
