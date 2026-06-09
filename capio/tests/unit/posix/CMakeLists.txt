@@ -32,7 +32,6 @@ target_compile_definitions(${TARGET_NAME} PRIVATE __CAPIO_POSIX)
 calf_enable_log(${TARGET_NAME} ${CAPIO_LOG})
 calf_set_component(${TARGET_NAME} "posix")
 calf_set_default_log_dir(${TARGET_NAME} "./capio_logs")
-target_include_directories(${TARGET_NAME} PRIVATE ${CALF_SOURCE_DIR})
 
 #####################################
 # Include files and directories

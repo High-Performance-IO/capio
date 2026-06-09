@@ -40,7 +40,6 @@ target_include_directories(${TARGET_NAME} PRIVATE
 calf_enable_log(${TARGET_NAME} ${CAPIO_LOG})
 calf_set_component(${TARGET_NAME} "server")
 calf_set_default_log_dir(${TARGET_NAME} "./capio_logs")
-target_include_directories(${TARGET_NAME} PRIVATE ${CALF_SOURCE_DIR})
 
 #####################################
 # Link libraries
