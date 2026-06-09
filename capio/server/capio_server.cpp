@@ -111,8 +111,6 @@ static constexpr std::array<CSHandler_t, CAPIO_NR_REQUESTS> build_request_handle
 }
 
 int main(int argc, char **argv) {
-    SET_CALF_COMPONENT_NAME("server");
-    UPDATE_CALF_CLI_CONFIG("SERVER", "");
 
     Semaphore internal_server_sem(0);
 
@@ -134,7 +132,7 @@ int main(int argc, char **argv) {
         capio_cl_engine->setWorkflowName(get_capio_workflow_name());
     }
 
-    UPDATE_CALF_CLI_CONFIG("SERVER", capio_cl_engine->getWorkflowName());
+    UPDATE_CALF_WORKFLOW_NAME(capio_cl_engine->getWorkflowName());
 
     if (configuration.store_all_in_memory) {
         capio_cl_engine->setAllStoreInMemory();

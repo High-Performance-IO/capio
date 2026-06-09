@@ -19,6 +19,8 @@ FetchContent_Declare(
 set(ARGS_BUILD_EXAMPLE OFF CACHE INTERNAL "")
 set(ARGS_BUILD_UNITTESTS OFF CACHE INTERNAL "")
 
+SET(CALF_COMPONENT_NAME "server")
+
 FetchContent_MakeAvailable(args capio_cl)
 
 #####################################
