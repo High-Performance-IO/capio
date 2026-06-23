@@ -222,7 +222,7 @@ int mergeFunction(ssize_t nfiles, char *sourcedir, char *destdir) {
     }
     delete[] filepath;
 
-    auto resultpath = new char[strlen(destdir) + strlen("/result.dat")];
+    auto resultpath = new char[strlen(destdir) + strlen("/result.dat") + 1];
     sprintf(resultpath, "%s/result.dat", destdir);
     FILE *fp = fopen(resultpath, "w");
     EXPECT_TRUE(fp);
