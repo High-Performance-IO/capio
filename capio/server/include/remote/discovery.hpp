@@ -83,8 +83,7 @@ class DiscoveryService {
     void stop() const;
 };
 
-#include "discovery/fs.h"
-#include "discovery/multicast.h"
+#include "discovery/include.hpp"
 
 inline DiscoveryService *select_discovery_service(const CapioParsedConfig &config) {
     if (config.discovery_interface == CAPIO_MCAST_PROTO_FLAG) {

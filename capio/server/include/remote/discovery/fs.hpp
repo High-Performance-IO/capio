@@ -1,6 +1,6 @@
 
-#ifndef CAPIO_DISCOVERY_FS_H
-#define CAPIO_DISCOVERY_FS_H
+#ifndef CAPIO_DISCOVERY_FS_HPP
+#define CAPIO_DISCOVERY_FS_HPP
 
 /**
  * @brief Discovers CAPIO servers through token files in a shared directory.
@@ -37,4 +37,4 @@ class FSDiscoveryInterface : public DiscoveryInterface {
     void stop() override;
 };
 
-#endif // CAPIO_DISCOVERY_FS_H
+#endif // CAPIO_DISCOVERY_FS_HPP

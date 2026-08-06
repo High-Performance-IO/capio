@@ -1,5 +1,5 @@
-#ifndef CAPIO_DISCOVERY_MULTICAST_H
-#define CAPIO_DISCOVERY_MULTICAST_H
+#ifndef CAPIO_DISCOVERY_MULTICAST_HPP
+#define CAPIO_DISCOVERY_MULTICAST_HPP
 #include <string>
 
 /**
@@ -44,4 +44,4 @@ class MulticastDiscoveryInterface : public DiscoveryInterface {
     void stop() override;
 };
 
-#endif // CAPIO_DISCOVERY_MULTICAST_H
+#endif // CAPIO_DISCOVERY_MULTICAST_HPP
