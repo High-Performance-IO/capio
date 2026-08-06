@@ -49,11 +49,11 @@ CapioParsedConfig parseCLI(int argc, char **argv) {
         std::cout << parser;
         exit(EXIT_SUCCESS);
     } catch (args::ParseError &e) {
-        std::cerr << e.what() << std::endl;
+        CALF_PRINT_COLOR(CALF_CLI_LEVEL_ERROR, "%s", e.what());
         std::cerr << parser;
         exit(EXIT_FAILURE);
     } catch (args::ValidationError &e) {
-        std::cerr << e.what() << std::endl;
+        CALF_PRINT_COLOR(CALF_CLI_LEVEL_ERROR, "%s", e.what());
         std::cerr << parser;
         exit(EXIT_FAILURE);
     }
@@ -62,8 +62,9 @@ CapioParsedConfig parseCLI(int argc, char **argv) {
         discovery_flag ? args::get(discovery_flag) : CAPIO_MCAST_PROTO_FLAG;
     if (capio_config.discovery_interface != CAPIO_MCAST_PROTO_FLAG &&
         capio_config.discovery_interface != CAPIO_FS_PROTO_FLAG) {
-        std::cerr << "Invalid discovery interface: " << capio_config.discovery_interface
-                  << ". Expected mcast or fs." << std::endl;
+        CALF_PRINT_COLOR(CALF_CLI_LEVEL_ERROR,
+                         "Invalid discovery interface: %s. Expected mcast or fs.",
+                         capio_config.discovery_interface.c_str());
         exit(EXIT_FAILURE);
     }
     capio_config.mcast_addr =
