@@ -51,7 +51,7 @@ FSDiscoveryService::FSDiscoveryService(const std::string &token_directory) {
     token_directory_path = token_directory;
 }
 
-void FSDiscoveryService::start(const std::string token, unsigned int adv_delay) {
+void FSDiscoveryService::start(const std::string &token, unsigned int adv_delay) {
     std::string node_name(HOST_NAME_MAX, '\0');
     gethostname(node_name.data(), node_name.size());
     node_name.resize(strlen(node_name.data()));

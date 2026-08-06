@@ -142,10 +142,8 @@ int main(int argc, char **argv) {
 
     capio_cl_engine->print();
 
-    discovery_service =
-        new DiscoveryService(configuration.discovery_protocol, configuration.mcast_addr,
-                             configuration.mcast_port, configuration.token_directory);
-    backend = select_backend(configuration.backend_name, argc, argv);
+    discovery_service = selct_discovery_backend(configuration);
+    backend           = select_backend(configuration.backend_name, argc, argv);
 
     START_LOG(gettid(), "call()");
 

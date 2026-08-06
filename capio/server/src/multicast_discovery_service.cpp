@@ -95,7 +95,7 @@ MulticastDiscoveryService::MulticastDiscoveryService(const std::string &mcast_ad
                                                      unsigned int mcast_port)
     : capio_multicast_adv_address(mcast_addr), capio_multicast_adv_port(mcast_port) {}
 
-void MulticastDiscoveryService::start(const std::string token, unsigned int adv_delay) {
+void MulticastDiscoveryService::start(const std::string &token, unsigned int adv_delay) {
     mcast_listener_thread = new std::thread(mcast_thread_discovery_service, &terminate,
                                             capio_multicast_adv_address, capio_multicast_adv_port);
 
