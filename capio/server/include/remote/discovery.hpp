@@ -10,12 +10,12 @@
 #include "utils/shm_canary.hpp"
 
 /**
- * @brief Interface implemented by CAPIO discovery backends.
+ * @brief Interface implemented by CAPIO discovery services.
  *
- * A discovery backend advertises the local server connection token and discovers tokens published
+ * A discovery service advertises the local server connection token and discovers tokens published
  * by other server instances.
  */
-class DiscoveryServiceInterface {
+class DiscoveryInterface {
   protected:
     /// @brief Variable used to signal termination to child threads
     bool terminate = false;
@@ -23,8 +23,8 @@ class DiscoveryServiceInterface {
     std::string advertisement_token;
 
   public:
-    /// @brief Destroy a discovery backend.
-    virtual ~DiscoveryServiceInterface() = default;
+    /// @brief Destroy a discovery interface.
+    virtual ~DiscoveryInterface() = default;
 
     /**
      * @brief Start advertising and discovering server tokens.
@@ -33,7 +33,7 @@ class DiscoveryServiceInterface {
      */
     virtual void start(const std::string &token, unsigned int delay) = 0;
 
-    /// @brief Stop all work performed by the discovery backend.
+    /// @brief Stop all work performed by the discovery interface.
     virtual void stop() = 0;
 };
 
@@ -41,8 +41,8 @@ class DiscoveryServiceInterface {
  * @brief Coordinates local instance protection and remote server discovery.
  *
  * The shared-memory canary prevents two CAPIO servers with the same workflow name from running on
- * one node. The selected discovery backend finds other server instances and passes their connection
- * tokens to the active communication backend.
+ * one node. The selected discovery interface finds other server instances and passes their connection
+ * tokens to the active communication interface.
  */
 class DiscoveryService {
 
@@ -50,23 +50,23 @@ class DiscoveryService {
     /// equivalent to the one starting up
     std::unique_ptr<CapioShmCanary> shm_canary;
 
-    /// @brief Selected multicast or filesystem discovery backend.
-    std::unique_ptr<DiscoveryServiceInterface> discovery_backend;
+    /// @brief Selected multicast or filesystem discovery interface.
+    std::unique_ptr<DiscoveryInterface> discovery_interface;
 
   public:
     /**
-     * @param discovery_backend Backend that will execute the actual discovery of other running
+     * @param discovery_interface interface that will execute the actual discovery of other running
      * instances
-     * @throws std::runtime_error If @p protocol is unsupported or the selected backend cannot be
+     * @throws std::runtime_error If @p protocol is unsupported or the selected interface cannot be
      * initialized.
      */
-    explicit DiscoveryService(std::unique_ptr<DiscoveryServiceInterface> discovery_backend);
+    explicit DiscoveryService(std::unique_ptr<DiscoveryInterface> discovery_interface);
 
-    /// @brief Stop discovery and destroy the selected backend and shared-memory canary.
+    /// @brief Stop discovery and destroy the selected interface and shared-memory canary.
     ~DiscoveryService();
 
     /**
-     * @brief Start the selected discovery backend.
+     * @brief Start the selected discovery interface.
      *
      * Multicast discovery broadcasts and listens for tokens. Filesystem discovery writes the local
      * token file and scans the configured directory for tokens from other servers.
@@ -86,7 +86,7 @@ class DiscoveryService {
 #include "discovery/fs.h"
 #include "discovery/multicast.h"
 
-inline DiscoveryService *selct_discovery_backend(const CapioParsedConfig &config) {
+inline DiscoveryService *select_discovery_service(const CapioParsedConfig &config) {
     if (config.discovery_protocol == CAPIO_MCAST_PROTO_FLAG) {
         return new DiscoveryService(
             std::make_unique<MulticastDiscoveryService>(config.mcast_addr, config.mcast_port));

@@ -142,7 +142,7 @@ int main(int argc, char **argv) {
 
     capio_cl_engine->print();
 
-    discovery_service = selct_discovery_backend(configuration);
+    discovery_service = select_discovery_service(configuration);
     backend           = select_backend(configuration.backend_name, argc, argv);
 
     START_LOG(gettid(), "call()");

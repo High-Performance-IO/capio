@@ -6,13 +6,13 @@
 
 extern Backend *backend;
 
-DiscoveryService::DiscoveryService(std::unique_ptr<DiscoveryServiceInterface> discovery_backend)
+DiscoveryService::DiscoveryService(std::unique_ptr<DiscoveryInterface> discovery_backend)
     : shm_canary(std::make_unique<CapioShmCanary>(CapioCLEngine::get().getWorkflowName())),
-      discovery_backend(std::move(discovery_backend)) {}
+      discovery_interface(std::move(discovery_backend)) {}
 
 DiscoveryService::~DiscoveryService() {
     // if destructor is called before stop(), then stop the the service first.
-    discovery_backend->stop();
+    discovery_interface->stop();
 
     server_println("teardown completed.", CapioCLEngine::get().getWorkflowName(),
                    CAPIO_LOG_SERVER_CLI_LEVEL_INFO, "DiscoveryService");
@@ -24,11 +24,11 @@ void DiscoveryService::start(const std::string &token, unsigned int adv_delay) c
         throw std::runtime_error("Advertisement token is empty");
     }
 
-    discovery_backend->start(token, adv_delay);
+    discovery_interface->start(token, adv_delay);
 
     server_println(CAPIO_LOG_SERVER_CLI_LEVEL_INFO, "DiscoveryService will advertise " + token +
                                                         " every " + std::to_string(adv_delay) +
                                                         "ms.");
 }
 
-void DiscoveryService::stop() const { discovery_backend->stop(); }
+void DiscoveryService::stop() const { discovery_interface->stop(); }

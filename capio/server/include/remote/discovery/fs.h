@@ -5,7 +5,7 @@
 /**
  * @brief Discovers CAPIO servers through token files in a shared directory.
  */
-class FSDiscoveryService : public DiscoveryServiceInterface {
+class FSDiscoveryService : public DiscoveryInterface {
 
     /// @brief Directory to look into for CAPIO tokens
     std::filesystem::path token_directory_path;
@@ -17,13 +17,13 @@ class FSDiscoveryService : public DiscoveryServiceInterface {
 
   public:
     /**
-     * @brief Construct a filesystem discovery backend.
+     * @brief Construct a filesystem discovery interface.
      * @param token_directory Directory used to publish and discover token files.
      * @throws std::runtime_error If @p token_directory is empty.
      */
     explicit FSDiscoveryService(const std::string &token_directory);
 
-    /// @brief Remove this server's token file and destroy the filesystem discovery backend.
+    /// @brief Remove this server's token file and destroy the filesystem discovery interface.
     ~FSDiscoveryService() override;
 
     /**

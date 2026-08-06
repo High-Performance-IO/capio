@@ -5,7 +5,7 @@
 /**
  * @brief Discovers CAPIO servers by exchanging connection tokens over UDP multicast.
  */
-class MulticastDiscoveryService : public DiscoveryServiceInterface {
+class MulticastDiscoveryService : public DiscoveryInterface {
 
     /// @brief Variable used to signal termination to child threads
     bool terminate = false;
@@ -24,13 +24,13 @@ class MulticastDiscoveryService : public DiscoveryServiceInterface {
 
   public:
     /**
-     * @brief Construct a multicast discovery backend.
+     * @brief Construct a multicast discovery interface.
      * @param mcast_addr Multicast group address used to exchange tokens.
      * @param mcast_port UDP port used to exchange tokens.
      */
     MulticastDiscoveryService(const std::string &mcast_addr, unsigned int mcast_port);
 
-    /// @brief Destroy the multicast discovery backend.
+    /// @brief Destroy the multicast discovery interface.
     ~MulticastDiscoveryService() override;
 
     /**
