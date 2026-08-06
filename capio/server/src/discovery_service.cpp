@@ -21,7 +21,8 @@ void DiscoveryService::start(const std::string &token, unsigned int adv_delay) c
 void DiscoveryService::stop() const { discovery_backend->stop(); }
 
 DiscoveryService::DiscoveryService(const std::string protocol, const std::string &mcast_addr,
-                                   const unsigned int mcast_port, const std::string token_directory) {
+                                   const unsigned int mcast_port,
+                                   const std::string token_directory) {
     if (protocol != CAPIO_MCAST_PROTO_FLAG && protocol != CAPIO_FS_PROTO_FLAG) {
         throw std::runtime_error("Unknown discovery protocol: " + protocol);
     }

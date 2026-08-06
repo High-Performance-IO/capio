@@ -100,5 +100,5 @@ void MulticastDiscoveryService::start(const std::string token, unsigned int adv_
                                             capio_multicast_adv_address, capio_multicast_adv_port);
 
     advertisement_thread = new std::thread(advertise, &terminate, adv_delay, token,
-                                            capio_multicast_adv_address, capio_multicast_adv_port);
+                                           capio_multicast_adv_address, capio_multicast_adv_port);
 }

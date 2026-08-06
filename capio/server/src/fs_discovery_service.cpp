@@ -56,7 +56,7 @@ void FSDiscoveryService::start(const std::string token, unsigned int adv_delay) 
     gethostname(node_name.data(), node_name.size());
     node_name.resize(strlen(node_name.data()));
 
-    token_filename       = node_name + ".capio";
+    token_filename      = node_name + ".capio";
     advertisement_token = token;
     std::ofstream token_file(token_directory_path / token_filename);
     token_file << advertisement_token;
