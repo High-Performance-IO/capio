@@ -1,7 +1,11 @@
 #include "utils/shm_canary.hpp"
 
+#include "calf/StdOutLogger.h"
+#include "calf/StlLogger.h"
+
+#include "common/constants.hpp"
 #include "common/env.hpp"
-#include "common/logger.hpp"
+#include "common/shm.hpp"
 #include "utils/common.hpp"
 
 CapioShmCanary::CapioShmCanary(const std::string &capio_workflow_name)
@@ -12,21 +16,20 @@ CapioShmCanary::CapioShmCanary(const std::string &capio_workflow_name)
     }
     _shm_id = shm_open(_canary_name.data(), O_CREAT | O_EXCL, S_IRUSR | S_IWUSR);
     if (_shm_id == -1) {
-
-        server_println(CAPIO_LOG_SERVER_CLI_LEVEL_ERROR,
-                       "Error: canary variable " + _canary_name + " already exists!");
+        CALF_PRINT_COLOR(CALF_CLI_LEVEL_ERROR, "Error: canary variable %s already exists!",
+                         _canary_name.c_str());
         LOG(CAPIO_SHM_CANARY_ERROR, _canary_name.data());
         ERR_EXIT("ERR: shm canary flag already exists");
     }
-    server_println("shared memory canary created.", _canary_name, CAPIO_LOG_SERVER_CLI_LEVEL_STATUS,
-                   "CapioShmCanary");
+    CALF_PRINT_COLOR(CALF_CLI_LEVEL_STATUS, "Shared memory canary created: %s",
+                     _canary_name.c_str());
 }
 
 CapioShmCanary::~CapioShmCanary() {
     START_LOG(capio_syscall(SYS_gettid), "call()");
-    server_println(CAPIO_LOG_SERVER_CLI_LEVEL_WARNING, "Removing shared memory canary flag");
+    CALF_PRINT_COLOR(CALF_CLI_LEVEL_WARNING, "Removing shared memory canary flag");
     close(_shm_id);
     SHM_DESTROY_CHECK(_canary_name.c_str());
-    server_println("shared memory canary destroyed.", _canary_name, CAPIO_LOG_SERVER_CLI_LEVEL_INFO,
-                   "CapioShmCanary");
+    CALF_PRINT_COLOR(CALF_CLI_LEVEL_INFO, "Shared memory canary destroyed: %s",
+                     _canary_name.c_str());
 }

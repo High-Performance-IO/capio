@@ -21,6 +21,18 @@ set(ARGS_BUILD_UNITTESTS OFF CACHE INTERNAL "")
 
 FetchContent_MakeAvailable(args capio_cl)
 
+
+#####################################
+# CAPIOCL dependency compatibility
+#####################################
+if (TARGET libcapio_cl)
+    target_compile_options(libcapio_cl PRIVATE
+            -Wno-error=array-bounds
+            -Wno-error=stringop-overflow
+            $<$<NOT:$<CONFIG:Debug>>:-UCALF_LOG>
+    )
+endif ()
+
 #####################################
 # Target definition
 #####################################
@@ -39,6 +51,13 @@ target_include_directories(${TARGET_NAME} PRIVATE
         ${MPI_INCLUDE_PATH}
         ${capio_cl_SOURCE_DIR}
 )
+
+#####################################
+# set CALF logger component name
+#####################################
+calf_enable_log(${TARGET_NAME} ${CAPIO_LOG_ENABLED})
+calf_set_component(${TARGET_NAME} "server")
+calf_set_default_log_dir(${TARGET_NAME} "./capio_logs")
 
 #####################################
 # Target properties

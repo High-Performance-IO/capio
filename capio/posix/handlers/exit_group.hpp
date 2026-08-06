@@ -3,8 +3,6 @@
 
 #if defined(SYS_exit) || defined(SYS_exit_group)
 
-#include "common/logger.hpp"
-
 #include "utils/requests.hpp"
 
 /*

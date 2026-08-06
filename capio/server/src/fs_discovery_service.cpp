@@ -1,7 +1,9 @@
 #include <arpa/inet.h>
 #include <sys/socket.h>
 
-#include "common/logger.hpp"
+#include "calf/StdOutLogger.h"
+#include "calf/StlLogger.h"
+
 #include "remote/backend.hpp"
 #include "remote/discovery.hpp"
 #include "server/include/remote/discovery.hpp"
@@ -72,8 +74,7 @@ void FSDiscoveryInterface::stop() {
     if (fs_listener_thread != nullptr && fs_listener_thread->joinable()) {
         fs_listener_thread->join();
         fs_listener_thread = nullptr;
-        server_println("Discovery service stopped.", CapioCLEngine::get().getWorkflowName(),
-                       CAPIO_LOG_SERVER_CLI_LEVEL_INFO, "FSDiscoveryService");
+        CALF_PRINT_COLOR(CALF_CLI_LEVEL_INFO, "Discovery service stopped.");
     }
 }
 

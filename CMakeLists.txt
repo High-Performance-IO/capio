@@ -47,19 +47,19 @@ find_package(Threads REQUIRED)
 #####################################
 add_compile_definitions(CAPIO_VERSION="${CMAKE_PROJECT_VERSION}")
 
-IF (CAPIO_LOG)
-    IF (CMAKE_BUILD_TYPE STREQUAL "Debug")
-        message(STATUS "Enabling CAPIO logger")
-        add_compile_definitions(CAPIO_LOG)
-        execute_process(
-                COMMAND bash "${PROJECT_SOURCE_DIR}/scripts/gen_syscallnames.sh"
-                "${PROJECT_BINARY_DIR}/include/syscall/syscallnames.h"
-                ${CMAKE_CXX_COMPILER}
-        )
-    ELSE (CMAKE_BUILD_TYPE STREQUAL "Debug")
-        message(WARNING "Capio logger enabled in release mode. skipping compilation of CAPIO logger")
-    ENDIF (CMAKE_BUILD_TYPE STREQUAL "Debug")
-ENDIF (CAPIO_LOG)
+set(CAPIO_LOG_ENABLED FALSE)
+IF (CAPIO_LOG AND CMAKE_BUILD_TYPE STREQUAL "Debug")
+    set(CAPIO_LOG_ENABLED TRUE)
+    message(STATUS "Enabling CAPIO logger")
+    add_compile_definitions(CAPIO_LOG)
+    execute_process(
+            COMMAND bash "${PROJECT_SOURCE_DIR}/scripts/gen_syscallnames.sh"
+            "${PROJECT_BINARY_DIR}/include/syscall/syscallnames.h"
+            ${CMAKE_CXX_COMPILER}
+    )
+ELSEIF (CAPIO_LOG)
+    message(WARNING "CAPIO logger is only available in Debug builds; logging is disabled")
+ENDIF ()
 
 #####################################
 # Include files and directories
@@ -67,9 +67,9 @@ ENDIF (CAPIO_LOG)
 file(GLOB_RECURSE CAPIO_COMMON_HEADERS "capio/common/*.hpp")
 include_directories(capio)
 
-IF (CAPIO_LOG AND CMAKE_BUILD_TYPE STREQUAL "Debug")
+IF (CAPIO_LOG_ENABLED)
     include_directories("${PROJECT_BINARY_DIR}/include/syscall")
-ENDIF (CAPIO_LOG AND CMAKE_BUILD_TYPE STREQUAL "Debug")
+ENDIF ()
 
 
 #####################################
@@ -78,8 +78,16 @@ ENDIF (CAPIO_LOG AND CMAKE_BUILD_TYPE STREQUAL "Debug")
 FetchContent_Declare(
         capio_cl
         GIT_REPOSITORY https://github.com/High-Performance-IO/CAPIO-CL.git
-        GIT_TAG v1.4.1
+        GIT_TAG v1.5.2
 )
+
+FetchContent_Declare(
+        calf
+        GIT_REPOSITORY https://github.com/High-Performance-IO/calf.git
+        GIT_TAG v0.3.1
+)
+
+FetchContent_MakeAvailable(calf)
 
 #####################################
 # Targets

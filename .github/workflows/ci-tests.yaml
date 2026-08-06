@@ -223,12 +223,31 @@ jobs:
           capio_integration_tests \
             --gtest_break_on_failure \
             --gtest_print_time=1
-      - name: "Show client logs on failure"
-        if: ${{ always() && steps.run-tests.outcome == 'failure' && matrix.build_type == 'Debug' }}
-        run: tail -v -n +1 capio_logs/posix/$(hostname)/posix_thread_*.log
-      - name: "Show server logs on failure"
-        if: ${{ always() && steps.run-tests.outcome == 'failure' && matrix.build_type == 'Debug' }}
-        run: tail -v -n +1 capio_logs/server/$(hostname)/server_thread_*.log
+
+      # note: use always() to force log upload also on test failure
+      - name: "Compute valid artifact name"
+        if: ${{ always() && matrix.build_type == 'Debug' }}
+        id: calc-name
+        run: |
+          CLEAN_NAME=$(echo "${{ matrix.compiler }}" | tr '/:.' '-' | sed 's/--/-/g')
+          echo "artifact_name=${CLEAN_NAME}" >> $GITHUB_OUTPUT
+
+      - name: "Prepare CAPIO logs"
+        if: ${{ always() && matrix.build_type == 'Debug' }}
+        run: |
+          if [ -d capio_logs ]; then
+            mkdir capio_logs_artifact
+            cp -a capio_logs capio_logs_artifact/
+          fi
+
+      - name: "Upload CAPIO logs"
+        if: ${{ always() && matrix.build_type == 'Debug' }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: ${{ steps.calc-name.outputs.artifact_name }}-logs
+          path: ./capio_logs_artifact
+          retention-days: 1
+          if-no-files-found: warn
 
       - name: "Generate coverage report"
         if: ${{ matrix.build_type == 'Debug' }}
@@ -244,18 +263,11 @@ jobs:
             --gcov-ignore-parse-errors=negative_hits.warn \
             ../build
 
-      - name: "Compute Valid Artifact Name"
-        if: ${{ matrix.build_type == 'Debug' }}
-        id: calc-name
-        run: |
-          CLEAN_NAME=$(echo "${{ matrix.compiler }}" | tr '/:.' '-' | sed 's/--/-/g')
-          echo "artifact_name=${CLEAN_NAME}-tests" >> $GITHUB_OUTPUT
-
       - name: "Upload coverage report"
         if: ${{ matrix.build_type == 'Debug' }}
         uses: actions/upload-artifact@v7
         with:
-          name: ${{ steps.calc-name.outputs.artifact_name }}
+          name: ${{ steps.calc-name.outputs.artifact_name }}-tests
           path: ./coverage.xml
           retention-days: 1
           if-no-files-found: error
@@ -268,6 +280,8 @@ jobs:
       - uses: actions/checkout@v7
       - name: "Download artifacts"
         uses: actions/download-artifact@v8
+        with:
+          pattern: "*-tests"
       - name: "Upload coverage to Codecov"
         uses: codecov/codecov-action@v6
         with:
