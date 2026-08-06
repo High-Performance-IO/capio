@@ -15,6 +15,10 @@ constexpr off64_t CAPIO_DEFAULT_FILE_INITIAL_SIZE = 1024L * 1024 * 1024 * 4;
 constexpr char CAPIO_MCAST_ADV_DEFAULT_ADDR[]       = "224.0.0.2";
 constexpr unsigned int CAPIO_MCAST_ADV_DEFAULT_PORT = 22334;
 
+// CAPIO available discovery service
+constexpr char CAPIO_MCAST_PROTO_FLAG[] = "mcast";
+constexpr char CAPIO_FS_PROTO_FLAG[]    = "fs";
+
 // CAPIO default values for shared memory
 constexpr char CAPIO_DEFAULT_WORKFLOW_NAME[] = "CAPIO";
 constexpr char CAPIO_DEFAULT_APP_NAME[]      = "default_app";
@@ -149,6 +153,14 @@ constexpr char CAPIO_SERVER_ARG_PARSER_STORE_ALL_IN_MEMORY_OPT_HELP[] =
 constexpr char CAPIO_SERVER_ARG_PARSER_CONFIG_BACKEND_HELP[] =
     "Backend used in CAPIO. The value [backend] can be one of the following implemented backends: "
     "\n\t> mpi \n\t> mpisync \n\t> none (default)";
+constexpr char CAPIO_SERVER_ARG_PARSER_DISCOVERY_HELP[] =
+    "Discovery service used in CAPIO: mcast (default) or fs";
+constexpr char CAPIO_SERVER_ARG_PARSER_MCAST_ADDR_HELP[] =
+    "Multicast discovery address (default: 224.0.0.2)";
+constexpr char CAPIO_SERVER_ARG_PARSER_MCAST_PORT_HELP[] =
+    "Multicast discovery port (default: 22334)";
+constexpr char CAPIO_SERVER_ARG_PARSER_TOKEN_DIRECTORY_HELP[] =
+    "Filesystem discovery token directory (default: .capio_tokens/)";
 
 // Cli pre messages
 constexpr char CAPIO_LOG_SERVER_CLI_LEVEL_RESET[]   = "\033[0m";

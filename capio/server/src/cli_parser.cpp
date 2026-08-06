@@ -32,6 +32,15 @@ CapioParsedConfig parseCLI(int argc, char **argv) {
                             CAPIO_SERVER_ARG_PARSER_CONFIG_NO_CONF_FILE_HELP, {"no-config"});
     args::ValueFlag<std::string> backend_flag(
         arguments, "backend", CAPIO_SERVER_ARG_PARSER_CONFIG_BACKEND_HELP, {'b', "backend"});
+    args::ValueFlag<std::string> discovery_flag(
+        arguments, "discovery", CAPIO_SERVER_ARG_PARSER_DISCOVERY_HELP, {"discovery"});
+    args::ValueFlag<std::string> mcast_addr_flag(
+        arguments, "address", CAPIO_SERVER_ARG_PARSER_MCAST_ADDR_HELP, {"mcast-addr"});
+    args::ValueFlag<unsigned int> mcast_port_flag(
+        arguments, "port", CAPIO_SERVER_ARG_PARSER_MCAST_PORT_HELP, {"mcast-port"});
+    args::ValueFlag<std::string> token_directory_flag(
+        arguments, "directory", CAPIO_SERVER_ARG_PARSER_TOKEN_DIRECTORY_HELP,
+        {"token-directory"});
 
     args::Flag continueOnErrorFlag(arguments, "continue-on-error",
                                    CAPIO_SERVER_ARG_PARSER_CONFIG_NCONTINUE_ON_ERROR_HELP,
@@ -53,6 +62,21 @@ CapioParsedConfig parseCLI(int argc, char **argv) {
         std::cerr << parser;
         exit(EXIT_FAILURE);
     }
+
+    capio_config.discovery_protocol =
+        discovery_flag ? args::get(discovery_flag) : CAPIO_MCAST_PROTO_FLAG;
+    if (capio_config.discovery_protocol != CAPIO_MCAST_PROTO_FLAG &&
+        capio_config.discovery_protocol != CAPIO_FS_PROTO_FLAG) {
+        std::cerr << "Invalid discovery service: " << capio_config.discovery_protocol
+                  << ". Expected mcast or fs." << std::endl;
+        exit(EXIT_FAILURE);
+    }
+    capio_config.mcast_addr =
+        mcast_addr_flag ? args::get(mcast_addr_flag) : CAPIO_MCAST_ADV_DEFAULT_ADDR;
+    capio_config.mcast_port =
+        mcast_port_flag ? args::get(mcast_port_flag) : CAPIO_MCAST_ADV_DEFAULT_PORT;
+    capio_config.token_directory =
+        token_directory_flag ? args::get(token_directory_flag) : ".capio_tokens/";
 
     if (continueOnErrorFlag) {
 #ifdef CAPIO_LOG

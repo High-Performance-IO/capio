@@ -18,6 +18,8 @@ CapioShmCanary::CapioShmCanary(const std::string &capio_workflow_name)
         LOG(CAPIO_SHM_CANARY_ERROR, _canary_name.data());
         ERR_EXIT("ERR: shm canary flag already exists");
     }
+    server_println("shared memory canary created.", _canary_name,
+                   CAPIO_LOG_SERVER_CLI_LEVEL_STATUS, "CapioShmCanary");
 }
 
 CapioShmCanary::~CapioShmCanary() {
@@ -25,4 +27,6 @@ CapioShmCanary::~CapioShmCanary() {
     server_println(CAPIO_LOG_SERVER_CLI_LEVEL_WARNING, "Removing shared memory canary flag");
     close(_shm_id);
     SHM_DESTROY_CHECK(_canary_name.c_str());
+    server_println("shared memory canary destroyed.", _canary_name,
+                   CAPIO_LOG_SERVER_CLI_LEVEL_INFO, "CapioShmCanary");
 }

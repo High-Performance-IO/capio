@@ -4,6 +4,10 @@
 
 struct CapioParsedConfig {
     std::string backend_name;
+    std::string discovery_protocol;
+    std::string mcast_addr;
+    unsigned int mcast_port;
+    std::string token_directory;
     std::string capio_cl_config_path;
     std::string capio_cl_resolve_path;
     bool capio_cl_dynamic_config = false;

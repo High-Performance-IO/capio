@@ -32,8 +32,6 @@ void sig_term_handler(int signum, siginfo_t *info, void *ptr) {
                    CAPIO_LOG_SERVER_CLI_LEVEL_WARNING, __func__);
 
     delete backend;
-    delete client_manager;
-    delete storage_manager;
 
 #ifdef CAPIO_COVERAGE
     __gcov_dump();
