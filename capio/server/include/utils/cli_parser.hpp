@@ -4,7 +4,7 @@
 
 struct CapioParsedConfig {
     std::string backend_name;
-    std::string discovery_protocol;
+    std::string discovery_interface;
     std::string mcast_addr;
     unsigned int mcast_port;
     std::string token_directory;

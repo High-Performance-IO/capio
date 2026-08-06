@@ -62,11 +62,11 @@ CapioParsedConfig parseCLI(int argc, char **argv) {
         exit(EXIT_FAILURE);
     }
 
-    capio_config.discovery_protocol =
+    capio_config.discovery_interface =
         discovery_flag ? args::get(discovery_flag) : CAPIO_MCAST_PROTO_FLAG;
-    if (capio_config.discovery_protocol != CAPIO_MCAST_PROTO_FLAG &&
-        capio_config.discovery_protocol != CAPIO_FS_PROTO_FLAG) {
-        std::cerr << "Invalid discovery service: " << capio_config.discovery_protocol
+    if (capio_config.discovery_interface != CAPIO_MCAST_PROTO_FLAG &&
+        capio_config.discovery_interface != CAPIO_FS_PROTO_FLAG) {
+        std::cerr << "Invalid discovery interface: " << capio_config.discovery_interface
                   << ". Expected mcast or fs." << std::endl;
         exit(EXIT_FAILURE);
     }

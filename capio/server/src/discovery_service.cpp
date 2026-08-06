@@ -13,9 +13,6 @@ DiscoveryService::DiscoveryService(std::unique_ptr<DiscoveryInterface> discovery
 DiscoveryService::~DiscoveryService() {
     // if destructor is called before stop(), then stop the the service first.
     discovery_interface->stop();
-
-    server_println("teardown completed.", CapioCLEngine::get().getWorkflowName(),
-                   CAPIO_LOG_SERVER_CLI_LEVEL_INFO, "DiscoveryService");
 }
 
 void DiscoveryService::start(const std::string &token, unsigned int adv_delay) const {

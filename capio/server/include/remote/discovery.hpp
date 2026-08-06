@@ -41,8 +41,8 @@ class DiscoveryInterface {
  * @brief Coordinates local instance protection and remote server discovery.
  *
  * The shared-memory canary prevents two CAPIO servers with the same workflow name from running on
- * one node. The selected discovery interface finds other server instances and passes their connection
- * tokens to the active communication interface.
+ * one node. The selected discovery interface finds other server instances and passes their
+ * connection tokens to the active communication interface.
  */
 class DiscoveryService {
 
@@ -87,11 +87,11 @@ class DiscoveryService {
 #include "discovery/multicast.h"
 
 inline DiscoveryService *select_discovery_service(const CapioParsedConfig &config) {
-    if (config.discovery_protocol == CAPIO_MCAST_PROTO_FLAG) {
+    if (config.discovery_interface == CAPIO_MCAST_PROTO_FLAG) {
         return new DiscoveryService(
-            std::make_unique<MulticastDiscoveryService>(config.mcast_addr, config.mcast_port));
+            std::make_unique<MulticastDiscoveryInterface>(config.mcast_addr, config.mcast_port));
     } else {
-        return new DiscoveryService(std::make_unique<FSDiscoveryService>(config.token_directory));
+        return new DiscoveryService(std::make_unique<FSDiscoveryInterface>(config.token_directory));
     }
 }
 

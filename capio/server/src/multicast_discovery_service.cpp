@@ -75,27 +75,33 @@ void mcast_thread_discovery_service(const bool *terminate, const std::string &ad
     close(sockfd);
 }
 
-void MulticastDiscoveryService::stop() {
+void MulticastDiscoveryInterface::stop() {
     terminate = true;
 
     if (mcast_listener_thread != nullptr && mcast_listener_thread->joinable()) {
         mcast_listener_thread->join();
         mcast_listener_thread = nullptr;
+        server_println("Multicast listener service stopped.",
+                       CapioCLEngine::get().getWorkflowName(), CAPIO_LOG_SERVER_CLI_LEVEL_INFO,
+                       "MulticastDiscoveryService");
     }
 
     if (advertisement_thread != nullptr && advertisement_thread->joinable()) {
         advertisement_thread->join();
         advertisement_thread = nullptr;
+        server_println("Multicast advertisement service stopped.",
+                       CapioCLEngine::get().getWorkflowName(), CAPIO_LOG_SERVER_CLI_LEVEL_INFO,
+                       "MulticastDiscoveryService");
     }
 }
 
-MulticastDiscoveryService::~MulticastDiscoveryService() = default;
+MulticastDiscoveryInterface::~MulticastDiscoveryInterface() = default;
 
-MulticastDiscoveryService::MulticastDiscoveryService(const std::string &mcast_addr,
-                                                     unsigned int mcast_port)
+MulticastDiscoveryInterface::MulticastDiscoveryInterface(const std::string &mcast_addr,
+                                                         unsigned int mcast_port)
     : capio_multicast_adv_address(mcast_addr), capio_multicast_adv_port(mcast_port) {}
 
-void MulticastDiscoveryService::start(const std::string &token, unsigned int adv_delay) {
+void MulticastDiscoveryInterface::start(const std::string &token, unsigned int adv_delay) {
     mcast_listener_thread = new std::thread(mcast_thread_discovery_service, &terminate,
                                             capio_multicast_adv_address, capio_multicast_adv_port);
 

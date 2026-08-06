@@ -39,7 +39,7 @@ void fs_discovery_service(const bool *terminate, const std::filesystem::path &to
     }
 }
 
-FSDiscoveryService::FSDiscoveryService(const std::string &token_directory) {
+FSDiscoveryInterface::FSDiscoveryInterface(const std::string &token_directory) {
     if (token_directory.empty()) {
         throw std::runtime_error("Provided token directory is empty");
     }
@@ -51,7 +51,7 @@ FSDiscoveryService::FSDiscoveryService(const std::string &token_directory) {
     token_directory_path = token_directory;
 }
 
-void FSDiscoveryService::start(const std::string &token, unsigned int adv_delay) {
+void FSDiscoveryInterface::start(const std::string &token, unsigned int adv_delay) {
     std::string node_name(HOST_NAME_MAX, '\0');
     gethostname(node_name.data(), node_name.size());
     node_name.resize(strlen(node_name.data()));
@@ -66,16 +66,18 @@ void FSDiscoveryService::start(const std::string &token, unsigned int adv_delay)
         new std::thread(fs_discovery_service, &terminate, token_directory_path, adv_delay);
 }
 
-void FSDiscoveryService::stop() {
+void FSDiscoveryInterface::stop() {
     terminate = true;
 
     if (fs_listener_thread != nullptr && fs_listener_thread->joinable()) {
         fs_listener_thread->join();
         fs_listener_thread = nullptr;
+        server_println("Discovery service stopped.", CapioCLEngine::get().getWorkflowName(),
+                       CAPIO_LOG_SERVER_CLI_LEVEL_INFO, "FSDiscoveryService");
     }
 }
 
-FSDiscoveryService::~FSDiscoveryService() {
+FSDiscoveryInterface::~FSDiscoveryInterface() {
     // delete aliveness token
     if (!token_filename.empty()) {
         std::filesystem::remove(token_directory_path / token_filename);
