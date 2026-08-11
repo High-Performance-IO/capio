@@ -2,13 +2,14 @@
 #define CAPIO_SERVER_REMOTE_BACKEND_HPP
 #include <charconv>
 #include <set>
+#include <string>
 
 #include "common/logger.hpp"
 
 class RemoteRequest {
-    char *_buf_recv;
-    int _code;
-    const std::string _source;
+    std::string _content;
+    int _code = -1;
+    std::string _source;
 
   public:
     /**
@@ -16,11 +17,8 @@ class RemoteRequest {
      * @param buf_recv The buffer containing the raw request
      * @param source The source that generated the request
      */
+    RemoteRequest(std::string buf_recv, std::string source);
     RemoteRequest(char *buf_recv, const std::string &source);
-    RemoteRequest(const RemoteRequest &)            = delete;
-    RemoteRequest &operator=(const RemoteRequest &) = delete;
-
-    ~RemoteRequest();
 
     /// Get the source node name of the request
     [[nodiscard]] const std::string &get_source() const;

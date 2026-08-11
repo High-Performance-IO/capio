@@ -85,8 +85,14 @@ inline void capio_remote_listener(Semaphore &internal_server_sem) {
 
     while (true) {
         auto request = backend->read_next_request();
-
-        server_request_handlers[request.get_code()](request);
+        const int code = request.get_code();
+        if (code < 0 || code >= CAPIO_SERVER_NR_REQUEST || server_request_handlers[code] == nullptr) {
+            server_println("Ignoring invalid remote request code: " + std::to_string(code),
+                           CapioCLEngine::get().getWorkflowName(),
+                           CAPIO_LOG_SERVER_CLI_LEVEL_WARNING, __func__);
+            continue;
+        }
+        server_request_handlers[code](request);
     }
 }
 

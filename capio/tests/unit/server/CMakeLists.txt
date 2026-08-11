@@ -32,8 +32,8 @@ target_sources(${TARGET_NAME} PRIVATE
 target_include_directories(${TARGET_NAME} PRIVATE
         "${TARGET_INCLUDE_FOLDER}/include"
         ${capio_cl_SOURCE_DIR}
-        ${mtcl_SOURCE_DIR}/include
 )
+target_include_directories(${TARGET_NAME} SYSTEM PRIVATE ${mtcl_SOURCE_DIR}/include)
 
 #####################################
 # Link libraries

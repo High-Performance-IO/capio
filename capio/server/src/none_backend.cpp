@@ -12,7 +12,7 @@ NoneBackend::NoneBackend(int argc, char **argv) : Backend(HOST_NAME_MAX) {
 
 RemoteRequest NoneBackend::read_next_request() {
     START_LOG(gettid(), "call()");
-    return {nullptr, ""};
+    return {std::string{}, std::string{}};
 }
 
 void NoneBackend::send_file(char *shm, const long int nbytes, const std::string &target) {

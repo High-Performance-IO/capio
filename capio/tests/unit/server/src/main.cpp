@@ -14,6 +14,12 @@ ClientManager *client_manager            = nullptr;
 Backend *backend                         = nullptr;
 DiscoveryService *discovery_service      = nullptr;
 
+class TestDiscovery final : public DiscoveryInterface {
+  public:
+    void start(const std::string &, unsigned int) override {}
+    void stop() override {}
+};
+
 const capiocl::engine::Engine &CapioCLEngine::get() { return *capio_cl_engine; }
 
 class ServerUnitTestEnvironment : public testing::Environment {
@@ -24,7 +30,7 @@ class ServerUnitTestEnvironment : public testing::Environment {
         capio_cl_engine   = new capiocl::engine::Engine(false);
         client_manager    = new ClientManager();
         storage_manager   = new StorageManager();
-        discovery_service = new DiscoveryService();
+        discovery_service = new DiscoveryService(std::make_unique<TestDiscovery>());
     }
 
     void TearDown() override {
