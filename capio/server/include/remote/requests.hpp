@@ -21,7 +21,7 @@ inline void serve_remote_stat_request(const std::filesystem::path &path, int sou
 
 inline void serve_remote_read_request(int tid, int fd, int count, long int nbytes,
                                       const off64_t file_size, bool complete, bool is_getdents,
-                                      const std::string &dest) {
+                                      const std::string &dest, char *file) {
     START_LOG(gettid(), "call()");
     const char *const format = "%04d %d %d %d %ld %ld %d %d";
     const int size = snprintf(nullptr, 0, format, CAPIO_SERVER_REQUEST_READ_REPLY, tid, fd, count,
@@ -31,8 +31,7 @@ inline void serve_remote_read_request(int tid, int fd, int count, long int nbyte
             file_size, complete, is_getdents);
     LOG("Message = %s", message.get());
 
-    // send request
-    backend->send_request(message.get(), size + 1, dest);
+    backend->send_request_with_file(message.get(), size + 1, file, nbytes, dest);
 }
 
 inline void handle_remote_stat_request(int tid, const std::filesystem::path &path) {

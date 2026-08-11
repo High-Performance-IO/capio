@@ -84,7 +84,7 @@ FetchContent_Declare(
 FetchContent_Declare(
         mtcl
         GIT_REPOSITORY https://github.com/ParaGroup/MTCL
-        GIT_TAG e5f2bfeea0fc3d704554c7df02e7857f0a00bbba
+        GIT_TAG 2d534f7c1d594717e7081d88f1ac90c8b30758b1
 )
 
 #####################################

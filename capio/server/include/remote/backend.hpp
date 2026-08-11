@@ -71,6 +71,24 @@ class Backend {
     virtual void send_file(char *shm, long int nbytes, const std::string &target) = 0;
 
     /**
+     * Send a request and its associated file data as one logical operation.
+     *
+     * Backends may override this method to preserve transaction atomicity. By default, the
+     * request is sent before the file using the existing transport operations.
+     *
+     * @param message Request payload
+     * @param message_len Length of @p message in bytes
+     * @param shm File data buffer
+     * @param nbytes Length of @p shm in bytes
+     * @param target Destination server name
+     */
+    virtual void send_request_with_file(const char *message, int message_len, char *shm,
+                                        long int nbytes, const std::string &target) {
+        send_request(message, message_len, target);
+        send_file(shm, nbytes, target);
+    }
+
+    /**
      * receive a file from another process
      * @param shm Buffer that will be filled with incoming data
      * @param source The source target to receive from
