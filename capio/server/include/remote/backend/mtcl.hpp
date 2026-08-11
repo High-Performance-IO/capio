@@ -1,8 +1,10 @@
 #ifndef MTCL_BACKEND_HPP
 #define MTCL_BACKEND_HPP
 
+#include <atomic>
 #include <condition_variable>
 #include <filesystem>
+#include <memory>
 #include <mutex>
 #include <optional>
 #include <queue>
@@ -30,19 +32,24 @@ namespace MTCL {
 class HandleUser;
 }
 
-// TODO: extend backend class
+struct MTCLConnection {
+    AtomicQueue<std::vector<char>> outgoing;
+    AtomicQueue<std::vector<char>> incoming_files;
+};
+
 class MTCLBackend : public Backend {
 
     int thread_sleep_times  = 0;
-    bool continue_execution = true;
+    std::atomic_bool continue_execution{true};
 
-    const std::string selfToken, ownPort, usedProtocol;
+    const std::string listen_token, advertisement_token, ownPort, usedProtocol;
 
     std::shared_mutex open_connections_lock;
-    std::unordered_map<std::string, AtomicQueue<const char *> *> open_connections;
+    std::unordered_map<std::string, std::unique_ptr<MTCLConnection>> open_connections;
 
-    std::thread *incoming_connection_thread = nullptr;
-    std::vector<std::thread *> connection_threads;
+    std::thread incoming_connection_thread;
+    std::mutex connection_threads_lock;
+    std::vector<std::thread> connection_threads;
 
     AtomicQueue<std::string> incoming_request_queue;
 
@@ -63,10 +70,11 @@ class MTCLBackend : public Backend {
      * @param incoming_request_queue
      */
     void static incomingMTCLConnectionListener(
-        const std::string &ownPort, const std::string &usedProtocol, const bool *continue_execution,
-        int sleep_time,
-        std::unordered_map<std::string, AtomicQueue<const char *> *> *open_connections,
-        std::shared_mutex *open_connection_guard, std::vector<std::thread *> *_connection_threads,
+        const std::string &ownPort, const std::string &usedProtocol,
+        const std::atomic_bool *continue_execution, int sleep_time,
+        std::unordered_map<std::string, std::unique_ptr<MTCLConnection>> *open_connections,
+        std::shared_mutex *open_connection_guard, std::mutex *connection_threads_guard,
+        std::vector<std::thread> *_connection_threads,
         AtomicQueue<std::string> *incoming_request_queue);
 
   public:
