@@ -27,10 +27,8 @@ inline void serve_remote_read(const std::filesystem::path &path, const std::stri
     }
     const off64_t file_size = c_file.getStoredSize();
 
-    // send request
-    serve_remote_read_request(tid, fd, count, nbytes, file_size, complete, is_getdents, dest);
-    // send data
-    backend->send_file(c_file.getBuffer() + offset, nbytes, dest);
+    serve_remote_read_request(tid, fd, count, nbytes, file_size, complete, is_getdents, dest,
+                              c_file.getBuffer() + offset);
 }
 
 inline void handle_read_reply(int tid, int fd, long count, off64_t file_size, off64_t nbytes,
