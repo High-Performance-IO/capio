@@ -43,14 +43,17 @@ template <typename T> class AtomicQueue {
             if (_shutdown) {
                 return;
             }
-            _queue.emplace(message, message_size, origin);
+            _queue.emplace(std::move(message), message_size, origin);
         }
         _lock_cond.notify_all();
     }
 
-    AtomicQueueElement<T> pop() {
+    std::optional<AtomicQueueElement<T>> pop() {
         std::unique_lock lock(_mutex);
         _lock_cond.wait(lock, [this] { return !_queue.empty() || _shutdown; });
+        if (_queue.empty()) {
+            return std::nullopt;
+        }
         auto s = std::move(_queue.front());
         _queue.pop();
 
