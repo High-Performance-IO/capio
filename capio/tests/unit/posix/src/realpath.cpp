@@ -17,28 +17,28 @@ TEST_F(RealpathPosixTest, TestAbsolutePathsInCapioDirWhenPathExists) {
     const std::filesystem::path PATHNAME = get_capio_dir() / "test";
     EXPECT_NE(mkdir(PATHNAME.c_str(), S_IRWXU), -1);
     EXPECT_EQ(access(PATHNAME.c_str(), F_OK), 0);
-    EXPECT_EQ(capio_posix_realpath(PATHNAME), PATHNAME);
+    EXPECT_EQ(capio_posix_realpath(gettid(), PATHNAME), PATHNAME);
     EXPECT_NE(rmdir(PATHNAME.c_str()), -1);
     EXPECT_NE(access(PATHNAME.c_str(), F_OK), 0);
 }
 
 TEST_F(RealpathPosixTest, TestAbsolutePathsInCapioDirWhenPathDoesNotExist) {
     const std::filesystem::path PATHNAME = get_capio_dir() / "test";
-    EXPECT_EQ(capio_posix_realpath(PATHNAME), PATHNAME);
+    EXPECT_EQ(capio_posix_realpath(gettid(), PATHNAME), PATHNAME);
 }
 
 TEST_F(RealpathPosixTest, TestAbsolutePathsOutsideCapioDirWhenPathExists) {
     const std::filesystem::path PATHNAME = "/tmp/test";
     EXPECT_NE(mkdir(PATHNAME.c_str(), S_IRWXU), -1);
     EXPECT_EQ(access(PATHNAME.c_str(), F_OK), 0);
-    EXPECT_EQ(capio_posix_realpath(PATHNAME), PATHNAME);
+    EXPECT_EQ(capio_posix_realpath(gettid(), PATHNAME), PATHNAME);
     EXPECT_NE(rmdir(PATHNAME.c_str()), -1);
     EXPECT_NE(access(PATHNAME.c_str(), F_OK), 0);
 }
 
 TEST_F(RealpathPosixTest, TestAbsolutePathOutsideCapioDirWhenPathDoesNotExist) {
     const std::filesystem::path PATHNAME = "/tmp/test";
-    EXPECT_EQ(capio_posix_realpath(PATHNAME), PATHNAME);
+    EXPECT_EQ(capio_posix_realpath(gettid(), PATHNAME), PATHNAME);
 }
 
 TEST_F(RealpathPosixTest, TestRelativePathsInCapioDirWhenCwdIsCapioDir) {
@@ -47,7 +47,7 @@ TEST_F(RealpathPosixTest, TestRelativePathsInCapioDirWhenCwdIsCapioDir) {
     set_current_dir(capio_dir);
     EXPECT_NE(mkdir(PATHNAME.c_str(), S_IRWXU), -1);
     EXPECT_EQ(access(PATHNAME.c_str(), F_OK), 0);
-    EXPECT_EQ(capio_posix_realpath("test"), PATHNAME);
+    EXPECT_EQ(capio_posix_realpath(gettid(), "test"), PATHNAME);
     EXPECT_NE(rmdir(PATHNAME.c_str()), -1);
     EXPECT_NE(access(PATHNAME.c_str(), F_OK), 0);
 }
@@ -58,7 +58,7 @@ TEST_F(RealpathPosixTest, TestRelativePathsInCapioDirWhenCwdIsParentOfCapioDir) 
     set_current_dir(capio_dir.parent_path());
     EXPECT_NE(mkdir(PATHNAME.c_str(), S_IRWXU), -1);
     EXPECT_EQ(access(PATHNAME.c_str(), F_OK), 0);
-    EXPECT_EQ(capio_posix_realpath(capio_dir.filename() / "test"), PATHNAME);
+    EXPECT_EQ(capio_posix_realpath(gettid(), capio_dir.filename() / "test"), PATHNAME);
     EXPECT_NE(rmdir(PATHNAME.c_str()), -1);
     EXPECT_NE(access(PATHNAME.c_str(), F_OK), 0);
 }
