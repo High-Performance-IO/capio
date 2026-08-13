@@ -1,0 +1,45 @@
+services:
+  split:
+    image: alphaunito/capio:multinode
+    hostname: split
+    working_dir: /shared
+    environment: &environment
+      CAPIO_DIR: /shared
+      CAPIO_LOG_LEVEL: -1
+      LD_PRELOAD: libcapio_posix.so
+    volumes: &volumes
+      - shared_data:/shared
+      - discovery_tokens:/tokens
+    expose: &ports
+      - "1234"
+    networks: &networks
+      - capio
+    command: capio_multinode_split --gtest_break_on_failure --gtest_print_time=1
+
+  map:
+    image: alphaunito/capio:multinode
+    hostname: map
+    working_dir: /shared
+    environment: *environment
+    volumes: *volumes
+    expose: *ports
+    networks: *networks
+    command: capio_multinode_map --gtest_break_on_failure --gtest_print_time=1
+
+  merge:
+    image: alphaunito/capio:multinode
+    hostname: merge
+    working_dir: /shared
+    environment: *environment
+    volumes: *volumes
+    expose: *ports
+    networks: *networks
+    command: capio_multinode_merge --gtest_break_on_failure --gtest_print_time=1
+
+volumes:
+  shared_data:
+  discovery_tokens:
+
+networks:
+  capio:
+    driver: bridge
