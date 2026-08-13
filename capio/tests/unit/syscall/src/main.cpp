@@ -36,7 +36,7 @@ char **build_env(char **envp) {
 
     char **cleaned_env = (char **) malloc((vars.size() + 2) * sizeof(uintptr_t));
     for (size_t i = 0; i < vars.size(); i++) {
-        cleaned_env[i] = strdup(envp[i]);
+        cleaned_env[i] = strdup(envp[vars[i]]);
     }
     cleaned_env[vars.size()]     = strdup("LD_PRELOAD=");
     cleaned_env[vars.size() + 1] = (char *) nullptr;
