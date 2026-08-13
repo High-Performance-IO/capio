@@ -64,15 +64,13 @@ jobs:
           docker run --rm                         \
               --env CAPIO_DIR=/tmp                \
               --env CAPIO_LOG_LEVEL=-1            \
-              --env LD_PRELOAD=libcapio_posix.so  \
               --name capio-docker                 \
               alphaunito/capio:latest             \
-            jq  -n --arg pwd $(pwd)               \
-                '{name: "CAPIO", IO_Graph: [], exclude: [$pwd + "/aNonExistingFile", $pwd, $pwd + "/"]}' \
-            > test_config.json &&                 \
-            capio_syscall_unit_tests              \
-              --gtest_break_on_failure            \
-              --gtest_print_time=1
+            sh -c 'jq -n --arg pwd "$PWD" "$1" > test_config.json && \
+               LD_PRELOAD=libcapio_posix.so capio_syscall_unit_tests \
+                 --gtest_break_on_failure \
+                 --gtest_print_time=1' sh \
+              '{name: "CAPIO", IO_Graph: [], exclude: [$pwd + "/aNonExistingFile", $pwd, $pwd + "/"]}'
           
   format-check:
     name: "Check ${{ matrix.path }} clang-format conformance"
