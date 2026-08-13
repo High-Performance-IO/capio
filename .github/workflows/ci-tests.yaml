@@ -62,8 +62,9 @@ jobs:
           
           echo "Run CAPIO syscall Unit tests"
           docker run --rm                         \
-              --env CAPIO_DIR=/tmp                \
+              --env CAPIO_DIR=/tmp/capio          \
               --env CAPIO_LOG_LEVEL=-1            \
+              --workdir /tmp/capio                \
               --name capio-docker                 \
               alphaunito/capio:latest             \
             sh -c 'jq -n --arg pwd "$PWD" "$1" > test_config.json && \
