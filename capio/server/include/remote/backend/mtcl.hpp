@@ -21,8 +21,44 @@ namespace MTCL {
 class HandleUser;
 }
 
-/** Per-peer MTCL handle and asynchronous send state, defined in the implementation file. */
-struct MTCLConnection;
+/**
+ * Owns one persistent MTCL connection and its outgoing asynchronous sends.
+ *
+ * The connection retains a yielded handle for sending while MTCL manages
+ * receive readiness through MTCL::Manager::getNext().
+ */
+struct MTCLConnection {
+    /** Take ownership of a newly established MTCL handle. */
+    explicit MTCLConnection(MTCL::HandleUser handle);
+
+    /** Cancel outgoing sends and close the owned handle. */
+    ~MTCLConnection();
+
+    MTCLConnection(const MTCLConnection &)            = delete;
+    MTCLConnection &operator=(const MTCLConnection &) = delete;
+
+    /** Return receive-side ownership of the handle to MTCL. */
+    void yield() const;
+
+    /**
+     * Start sending an owned transaction frame.
+     *
+     * @param frame Complete wire frame; retained until MTCL finishes sending it
+     * @return true when send was accepted by MTCL, false if the connection failed
+     */
+    bool send_transaction(std::vector<unsigned char> frame) const;
+
+    /**
+     * Release completed transaction buffers.
+     *
+     * @return false if any asynchronous send failed
+     */
+    bool cleanup_completed_sends() const;
+
+  private:
+    struct Impl;
+    std::unique_ptr<Impl> impl;
+};
 
 /**
  * CAPIO remote backend using MTCL for dynamic point-to-point communication.
@@ -33,7 +69,7 @@ struct MTCLConnection;
 class MTCLBackend : public Backend {
 
     /// Timeout used while waiting for the next MTCL event.
-    int thread_sleep_times  = 0;
+    int thread_sleep_times = 0;
     /// Controls the receive-dispatch loop during shutdown.
     std::atomic_bool continue_execution{true};
 
@@ -91,4 +127,14 @@ class MTCLBackend : public Backend {
     void connect_to(const std::string &target_token) override;
 };
 
+/** Maximum file payload accepted by a single server-to-server transaction. */
+constexpr std::uint64_t CAPIO_SERVER_MAX_FILE_TRANSFER_SIZE = 4ULL * 1024 * 1024 * 1024;
+
+constexpr size_t wire_header_size = 17;
+
+enum class MessageType : unsigned char { request = 1, request_with_file = 2 };
+
+constexpr size_t maximum_transaction_size =
+    wire_header_size + CAPIO_SERVER_REQUEST_MAX_SIZE +
+    static_cast<size_t>(CAPIO_SERVER_MAX_FILE_TRANSFER_SIZE);
 #endif // MTCL_BACKEND_HPP
