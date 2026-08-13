@@ -73,8 +73,12 @@ class Backend {
     /**
      * Send a request and its associated file data as one logical operation.
      *
-     * Backends may override this method to preserve transaction atomicity. By default, the
-     * request is sent before the file using the existing transport operations.
+     * This operation is required by backends such that multiplex receives without a
+     * dedicated thread per connection. Keeping the request metadata and file payload in one
+     * transaction prevents concurrent senders from interleaving them and lets the receiver
+     * associate the payload with the correct READ_REPLY without an additional incoming queue.
+     * Backends that already preserve this ordering may use the default implementation, which
+     * sends the request before the file using the existing transport operations.
      *
      * @param message Request payload
      * @param message_len Length of @p message in bytes

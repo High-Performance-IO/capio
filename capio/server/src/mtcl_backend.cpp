@@ -10,16 +10,10 @@
 #include <mtcl.hpp>
 #include <stdexcept>
 
-constexpr size_t wire_header_size = 17;
+extern DiscoveryService *discovery_service;
 
-enum class MessageType : unsigned char { request = 1, request_with_file = 2 };
-
-constexpr size_t maximum_transaction_size = wire_header_size + CAPIO_SERVER_REQUEST_MAX_SIZE +
-                                            static_cast<size_t>(CAPIO_DEFAULT_FILE_INITIAL_SIZE);
-
-struct MTCLConnection {
-    explicit MTCLConnection(MTCL::HandleUser connection_handle)
-        : handle(std::move(connection_handle)) {}
+struct MTCLConnection::Impl {
+    explicit Impl(MTCL::HandleUser connection_handle) : handle(std::move(connection_handle)) {}
 
     MTCL::HandleUser handle;
     std::mutex send_lock;
@@ -29,7 +23,7 @@ struct MTCLConnection {
     };
     std::vector<std::unique_ptr<PendingSend>> pending_sends;
 
-    bool cleanup_completed_sends() {
+    bool cleanup_completed_sends_unlocked() {
         for (auto send = pending_sends.begin(); send != pending_sends.end();) {
             if (!MTCL::test((*send)->request)) {
                 ++send;
@@ -42,11 +36,36 @@ struct MTCLConnection {
         return true;
     }
 
-    ~MTCLConnection() {
+    ~Impl() {
         pending_sends.clear();
         handle.close();
     }
 };
+
+MTCLConnection::MTCLConnection(MTCL::HandleUser handle)
+    : impl(std::make_unique<Impl>(std::move(handle))) {}
+
+MTCLConnection::~MTCLConnection() = default;
+
+void MTCLConnection::yield() const { impl->handle.yield(); }
+
+bool MTCLConnection::send_transaction(std::vector<unsigned char> frame) const {
+    auto pending   = std::make_unique<Impl::PendingSend>();
+    pending->frame = std::move(frame);
+
+    const std::lock_guard lock(impl->send_lock);
+    if (!impl->cleanup_completed_sends_unlocked() ||
+        impl->handle.isend(pending->frame.data(), pending->frame.size(), pending->request) < 0) {
+        return false;
+    }
+    impl->pending_sends.emplace_back(std::move(pending));
+    return true;
+}
+
+bool MTCLConnection::cleanup_completed_sends() const {
+    const std::lock_guard lock(impl->send_lock);
+    return impl->cleanup_completed_sends_unlocked();
+}
 
 void write_u64(unsigned char *destination, uint64_t value) {
     for (int i = 7; i >= 0; --i) {
@@ -74,8 +93,6 @@ void discard_message(MTCL::HandleUser &handle) {
         request.wait();
     }
 }
-
-extern DiscoveryService *discovery_service;
 
 RemoteRequest MTCLBackend::read_next_request() {
     START_LOG(gettid(), "call()");
@@ -114,16 +131,14 @@ RemoteRequest MTCLBackend::read_next_request() {
 
         const auto type             = static_cast<MessageType>(frame[0]);
         const uint64_t request_size = read_u64(frame.data() + 1);
-        const uint64_t file_size    = read_u64(frame.data() + 9);
+        const uint64_t file_size    = read_u64(frame.data() + 9); // current op. file size
         if ((type != MessageType::request &&
-             type != MessageType::request_with_file) ||     // not a request
-            request_size == 0 ||                            // empty request
-            request_size > CAPIO_SERVER_REQUEST_MAX_SIZE || // req. too big
-            file_size >
-                static_cast<uint64_t>(CAPIO_DEFAULT_FILE_INITIAL_SIZE) || // TODO: check this
+             type != MessageType::request_with_file) ||         // not a request
+            request_size == 0 ||                                // empty request
+            request_size > CAPIO_SERVER_REQUEST_MAX_SIZE ||     // req. too big
+            file_size > CAPIO_SERVER_MAX_FILE_TRANSFER_SIZE ||  // file size too big
             (type == MessageType::request && file_size != 0) || // request on file of 0 bytes
-            request_size + file_size != available - wire_header_size) { // TODO: check this
-            // invalid connection recived
+            request_size + file_size != available - wire_header_size) { // out of bounds
             remove_connection(remote_hostname);
             continue;
         }
@@ -138,7 +153,6 @@ RemoteRequest MTCLBackend::read_next_request() {
                 continue;
             }
 
-            // TODO: check if pending file is required or can be avoided
             pending_file.emplace(PendingFile{remote_hostname, std::move(frame),
                                              wire_header_size + static_cast<size_t>(request_size)});
         }
@@ -170,7 +184,7 @@ void MTCLBackend::accept_connection(MTCL::HandleUser handle) {
         return;
     }
     auto connection = std::make_unique<MTCLConnection>(std::move(handle));
-    connection->handle.yield();
+    connection->yield();
     open_connections.emplace(remote_hostname, std::move(connection));
     server_println(CAPIO_LOG_SERVER_CLI_LEVEL_INFO, "Connected to " + usedProtocol + ":" +
                                                         remote_hostname + ":" + ownPort +
@@ -179,15 +193,14 @@ void MTCLBackend::accept_connection(MTCL::HandleUser handle) {
 
 void MTCLBackend::send_transaction(const char *message, size_t message_len, const char *file,
                                    size_t file_len, const std::string &target) {
-    auto pending = std::make_unique<MTCLConnection::PendingSend>();
-    pending->frame.resize(wire_header_size + message_len + file_len);
-    pending->frame[0] = static_cast<unsigned char>(
-        file == nullptr ? MessageType::request : MessageType::request_with_file);
-    write_u64(pending->frame.data() + 1, message_len);
-    write_u64(pending->frame.data() + 9, file_len);
-    std::memcpy(pending->frame.data() + wire_header_size, message, message_len);
+    std::vector<unsigned char> frame(wire_header_size + message_len + file_len);
+    frame[0] = static_cast<unsigned char>(file == nullptr ? MessageType::request
+                                                          : MessageType::request_with_file);
+    write_u64(frame.data() + 1, message_len);
+    write_u64(frame.data() + 9, file_len);
+    std::memcpy(frame.data() + wire_header_size, message, message_len);
     if (file_len != 0) {
-        std::memcpy(pending->frame.data() + wire_header_size + message_len, file, file_len);
+        std::memcpy(frame.data() + wire_header_size + message_len, file, file_len);
     }
 
     bool failed = false;
@@ -200,13 +213,7 @@ void MTCLBackend::send_transaction(const char *message, size_t message_len, cons
             return;
         }
         auto &connection = *found->second;
-        const std::lock_guard send_lock(connection.send_lock);
-        failed = !connection.cleanup_completed_sends() ||
-                 connection.handle.isend(pending->frame.data(), pending->frame.size(),
-                                         pending->request) < 0;
-        if (!failed) {
-            connection.pending_sends.emplace_back(std::move(pending));
-        }
+        failed           = !connection.send_transaction(std::move(frame));
     }
     if (failed) {
         server_println(CAPIO_LOG_SERVER_CLI_LEVEL_WARNING,
@@ -220,7 +227,6 @@ void MTCLBackend::cleanup_completed_sends() {
     {
         const std::shared_lock connections_lock(open_connections_lock);
         for (auto &[hostname, connection] : open_connections) {
-            const std::lock_guard send_lock(connection->send_lock);
             if (!connection->cleanup_completed_sends()) {
                 failed.emplace_back(hostname);
             }
@@ -289,7 +295,8 @@ void MTCLBackend::send_request_with_file(const char *message, const int message_
                                          const long int nbytes, const std::string &target) {
     if (message == nullptr || message_len <= 0 ||
         static_cast<size_t>(message_len) > CAPIO_SERVER_REQUEST_MAX_SIZE || nbytes < 0 ||
-        nbytes > CAPIO_DEFAULT_FILE_INITIAL_SIZE || (nbytes != 0 && shm == nullptr)) {
+        static_cast<uint64_t>(nbytes) > CAPIO_SERVER_MAX_FILE_TRANSFER_SIZE ||
+        (nbytes != 0 && shm == nullptr)) {
         throw std::invalid_argument("Invalid MTCL request or file buffer");
     }
     send_transaction(message, static_cast<size_t>(message_len), nbytes == 0 ? nullptr : shm,
@@ -347,7 +354,7 @@ void MTCLBackend::connect_to(const std::string &target_token) {
         return;
     }
     auto connection = std::make_unique<MTCLConnection>(std::move(handle));
-    connection->handle.yield();
+    connection->yield();
     open_connections.emplace(remote_hostname, std::move(connection));
     server_println(CAPIO_LOG_SERVER_CLI_LEVEL_INFO, "Connected to " + target_token);
 }
