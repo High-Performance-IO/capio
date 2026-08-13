@@ -1,44 +1,60 @@
+x-test-service: &test-service
+  image: alphaunito/capio:multinode
+  working_dir: /shared
+  volumes:
+    - shared_data:/shared
+    - discovery_tokens:/tokens
+    - test_status:/status
+  expose:
+    - "1234"
+  networks:
+    - capio
+  command:
+    - /bin/sh
+    - -c
+    - |
+      set -e
+      capio_server --no-config -b mtcl --discovery fs --token-directory /tokens &
+      server_pid=$$!
+      trap 'kill "$$server_pid"; wait "$$server_pid" || true' EXIT
+      sleep 5
+      LD_PRELOAD=libcapio_posix.so "$$TEST_BINARY" --gtest_break_on_failure --gtest_print_time=1
+      touch "/status/$$HOSTNAME"
+      while true; do
+        set -- /status/*
+        [ -e "$$1" ] && [ "$$#" -eq 3 ] && break
+        sleep 1
+      done
+
 services:
   split:
-    image: alphaunito/capio:multinode
+    <<: *test-service
     hostname: split
-    working_dir: /shared
-    environment: &environment
+    environment:
       CAPIO_DIR: /shared
       CAPIO_LOG_LEVEL: -1
-      LD_PRELOAD: libcapio_posix.so
-    volumes: &volumes
-      - shared_data:/shared
-      - discovery_tokens:/tokens
-    expose: &ports
-      - "1234"
-    networks: &networks
-      - capio
-    command: capio_multinode_split --gtest_break_on_failure --gtest_print_time=1
+      TEST_BINARY: capio_multinode_split
 
   map:
-    image: alphaunito/capio:multinode
+    <<: *test-service
     hostname: map
-    working_dir: /shared
-    environment: *environment
-    volumes: *volumes
-    expose: *ports
-    networks: *networks
-    command: capio_multinode_map --gtest_break_on_failure --gtest_print_time=1
+    environment:
+      CAPIO_DIR: /shared
+      CAPIO_LOG_LEVEL: -1
+      TEST_BINARY: capio_multinode_map
 
   merge:
-    image: alphaunito/capio:multinode
+    <<: *test-service
     hostname: merge
-    working_dir: /shared
-    environment: *environment
-    volumes: *volumes
-    expose: *ports
-    networks: *networks
-    command: capio_multinode_merge --gtest_break_on_failure --gtest_print_time=1
+    environment:
+      CAPIO_DIR: /shared
+      CAPIO_LOG_LEVEL: -1
+      TEST_BINARY: capio_multinode_merge
 
 volumes:
   shared_data:
   discovery_tokens:
+  test_status:
 
 networks:
   capio:

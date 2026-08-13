@@ -7,9 +7,6 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
-#include <signal.h>
-#include <sys/wait.h>
-#include <unistd.h>
 #include <vector>
 
 constexpr int max_phrase_length = 1024;
@@ -18,7 +15,7 @@ constexpr size_t reduce_chunk   = 10240;
 
 inline std::vector<char> read_data(FILE *file) {
     std::vector<char> data;
-    char *line = nullptr;
+    char *line      = nullptr;
     size_t capacity = 0;
     ssize_t length;
     while (errno = 0, (length = getline(&line, &capacity, file)) > 0) {
@@ -36,47 +33,28 @@ inline int write_data(const std::vector<char> &data, float percent, const char *
     for (int i = 0; i < count; ++i) {
         snprintf(path, sizeof(path), "%s/outfile_%05d.dat", directory, first + i);
         files[i] = fopen(path, "w");
-        if (!files[i]) return -1;
+        if (!files[i]) {
+            return -1;
+        }
     }
 
     size_t remaining = data.size() * percent;
-    size_t offset = 0;
+    size_t offset    = 0;
     for (size_t i = 0; remaining; ++i) {
         const size_t size = std::min(remaining, reduce_chunk);
-        if (fwrite(data.data() + offset, 1, size, files[i % files.size()]) != size) return -1;
+        if (fwrite(data.data() + offset, 1, size, files[i % files.size()]) != size) {
+            return -1;
+        }
         offset += size;
         remaining -= size;
     }
-    for (FILE *file : files) fclose(file);
+    for (FILE *file : files) {
+        fclose(file);
+    }
     return 0;
 }
 
-class CapioServerEnvironment : public testing::Environment {
-    pid_t pid = -1;
-
-  public:
-    void SetUp() override {
-        ASSERT_NE(getenv("CAPIO_DIR"), nullptr);
-        ASSERT_GE(pid = fork(), 0);
-        if (pid == 0) {
-            unsetenv("LD_PRELOAD");
-            execlp("capio_server", "capio_server", "--no-config", "-b", "mtcl", "--discovery",
-                   "fs", "--token-directory", "/tokens", nullptr);
-            _exit(127);
-        }
-        sleep(5);
-    }
-
-    void TearDown() override {
-        if (pid > 0) {
-            kill(pid, SIGTERM);
-            waitpid(pid, nullptr, 0);
-        }
-    }
-};
-
 inline int run_tests(int argc, char **argv) {
     testing::InitGoogleTest(&argc, argv);
-    testing::AddGlobalTestEnvironment(new CapioServerEnvironment);
     return RUN_ALL_TESTS();
 }

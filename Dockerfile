@@ -38,6 +38,7 @@ ENV LD_LIBRARY_PATH="/usr/local/lib"
 
 RUN apt update                                                \
  && apt install -y --no-install-recommends                    \
+        jq                                                    \
         openmpi-bin                                           \
         openssh-server                                        \
  && rm -rf /var/lib/apt/lists/*                               \

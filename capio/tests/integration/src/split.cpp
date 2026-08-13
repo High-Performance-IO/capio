@@ -1,7 +1,7 @@
 #include "common.hpp"
 
 TEST(multinodeIntegration, Split) {
-    const char *directory = getenv("CAPIO_DIR");
+    const char *directory    = getenv("CAPIO_DIR");
     constexpr int file_count = 10;
     ASSERT_LE(file_count, max_files);
 
