@@ -5,6 +5,7 @@ x-test-service: &test-service
     - shared_data:/shared
     - discovery_tokens:/tokens
     - test_status:/status
+    - ./config.json:/config.json:ro
   expose:
     - "1234"
   networks:
@@ -14,7 +15,7 @@ x-test-service: &test-service
     - -c
     - |
       set -e
-      capio_server --no-config -b mtcl --discovery fs --token-directory /tokens &
+      CAPIO_DIR=/shared capio_server -c /config.json -b mtcl --discovery fs --token-directory /tokens &
       server_pid=$$!
       trap 'kill "$$server_pid"; wait "$$server_pid" || true' EXIT
       sleep 5
@@ -33,6 +34,7 @@ services:
     environment:
       CAPIO_DIR: /shared
       CAPIO_LOG_LEVEL: -1
+      CAPIO_APP_NAME: split
       TEST_BINARY: capio_multinode_split
 
   map:
@@ -41,6 +43,7 @@ services:
     environment:
       CAPIO_DIR: /shared
       CAPIO_LOG_LEVEL: -1
+      CAPIO_APP_NAME: map
       TEST_BINARY: capio_multinode_map
 
   merge:
@@ -49,6 +52,7 @@ services:
     environment:
       CAPIO_DIR: /shared
       CAPIO_LOG_LEVEL: -1
+      CAPIO_APP_NAME: merge
       TEST_BINARY: capio_multinode_merge
 
 volumes:
