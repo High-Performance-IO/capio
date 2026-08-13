@@ -2,13 +2,14 @@
 #define CAPIO_SERVER_REMOTE_BACKEND_HPP
 #include <charconv>
 #include <set>
+#include <string>
 
 #include "common/logger.hpp"
 
 class RemoteRequest {
-    char *_buf_recv;
-    int _code;
-    const std::string _source;
+    std::string _content;
+    int _code = -1;
+    std::string _source;
 
   public:
     /**
@@ -16,11 +17,8 @@ class RemoteRequest {
      * @param buf_recv The buffer containing the raw request
      * @param source The source that generated the request
      */
+    RemoteRequest(std::string buf_recv, std::string source);
     RemoteRequest(char *buf_recv, const std::string &source);
-    RemoteRequest(const RemoteRequest &)            = delete;
-    RemoteRequest &operator=(const RemoteRequest &) = delete;
-
-    ~RemoteRequest();
 
     /// Get the source node name of the request
     [[nodiscard]] const std::string &get_source() const;
@@ -71,6 +69,28 @@ class Backend {
      * @param target target to send files to
      */
     virtual void send_file(char *shm, long int nbytes, const std::string &target) = 0;
+
+    /**
+     * Send a request and its associated file data as one logical operation.
+     *
+     * This operation is required by backends such that multiplex receives without a
+     * dedicated thread per connection. Keeping the request metadata and file payload in one
+     * transaction prevents concurrent senders from interleaving them and lets the receiver
+     * associate the payload with the correct READ_REPLY without an additional incoming queue.
+     * Backends that already preserve this ordering may use the default implementation, which
+     * sends the request before the file using the existing transport operations.
+     *
+     * @param message Request payload
+     * @param message_len Length of @p message in bytes
+     * @param shm File data buffer
+     * @param nbytes Length of @p shm in bytes
+     * @param target Destination server name
+     */
+    virtual void send_request_with_file(const char *message, int message_len, char *shm,
+                                        long int nbytes, const std::string &target) {
+        send_request(message, message_len, target);
+        send_file(shm, nbytes, target);
+    }
 
     /**
      * receive a file from another process

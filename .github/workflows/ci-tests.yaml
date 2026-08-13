@@ -62,29 +62,17 @@ jobs:
           
           echo "Run CAPIO syscall Unit tests"
           docker run --rm                         \
-              --env CAPIO_DIR=/tmp                \
+              --env CAPIO_DIR=/tmp/capio          \
               --env CAPIO_LOG_LEVEL=-1            \
-              --env LD_PRELOAD=libcapio_posix.so  \
+              --workdir /tmp/capio                \
               --name capio-docker                 \
               alphaunito/capio:latest             \
-            jq  -n --arg pwd $(pwd)               \
-                '{name: "CAPIO", IO_Graph: [], exclude: [$pwd + "/aNonExistingFile", $pwd, $pwd + "/"]}' \
-            > test_config.json &&                 \
-            capio_syscall_unit_tests              \
-              --gtest_break_on_failure            \
-              --gtest_print_time=1
+            sh -c 'jq -n --arg pwd "$PWD" "$1" > test_config.json && \
+               LD_PRELOAD=libcapio_posix.so capio_syscall_unit_tests \
+                 --gtest_break_on_failure \
+                 --gtest_print_time=1' sh \
+              '{name: "CAPIO", IO_Graph: [], exclude: [$pwd + "/aNonExistingFile", $pwd, $pwd + "/"]}'
           
-          echo "Run CAPIO integration tests"
-            docker run --rm                     \
-            --env CAPIO_DIR=/tmp                \
-            --env CAPIO_LOG_LEVEL=-1            \
-            --env LD_PRELOAD=libcapio_posix.so  \
-            --name capio-docker                 \
-            alphaunito/capio:latest             \
-            capio_integration_tests             \
-            --gtest_break_on_failure            \
-            --gtest_print_time=1
-
   format-check:
     name: "Check ${{ matrix.path }} clang-format conformance"
     runs-on: ubuntu-24.04
@@ -209,12 +197,6 @@ jobs:
             --gtest_break_on_failure \
             --gtest_print_time=1
           
-          echo "Run CAPIO integration tests"
-          rm -rf /dev/shm/CAPIO*
-          LD_PRELOAD=libcapio_posix.so \
-          capio_integration_tests \
-            --gtest_break_on_failure \
-            --gtest_print_time=1
       - name: "Show client logs on failure"
         if: ${{ always() && steps.run-tests.outcome == 'failure' && matrix.build_type == 'Debug' }}
         run: tail -v -n +1 capio_logs/posix/$(hostname)/posix_thread_*.log
@@ -251,6 +233,23 @@ jobs:
           path: ./coverage.xml
           retention-days: 1
           if-no-files-found: error
+
+  multinode-tests:
+    name: "Backend multinode test with MTCL"
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+      - name: "Build test image"
+        run: |
+          docker build \
+            --build-arg BASE_IMAGE=gcc:16 \
+            --build-arg CAPIO_BUILD_TESTS=ON \
+            --tag alphaunito/capio:multinode .
+      - name: "Run MTCL multinode test"
+        working-directory: capio/tests/integration
+        run: |
+          trap 'docker compose down -v' EXIT
+          docker compose up --abort-on-container-failure
 
   upload-to-codecov:
     name: "Codecov report upload"

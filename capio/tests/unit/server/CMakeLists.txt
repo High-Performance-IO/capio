@@ -4,7 +4,7 @@
 set(TARGET_NAME capio_server_unit_tests)
 find_package(MPI REQUIRED)
 
-FetchContent_MakeAvailable(capio_cl)
+FetchContent_MakeAvailable(capio_cl mtcl)
 
 set(TARGET_INCLUDE_FOLDER "${PROJECT_SOURCE_DIR}/capio/server")
 
@@ -33,6 +33,7 @@ target_include_directories(${TARGET_NAME} PRIVATE
         "${TARGET_INCLUDE_FOLDER}/include"
         ${capio_cl_SOURCE_DIR}
 )
+target_include_directories(${TARGET_NAME} SYSTEM PRIVATE ${mtcl_SOURCE_DIR}/include)
 
 #####################################
 # Link libraries

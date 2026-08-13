@@ -41,6 +41,15 @@ inline Backend *select_backend(const std::string &backend_name, int argc, char *
         return new MPIBackend(argc, argv);
     }
 
+    if (backend_name == "mtcl") {
+        LOG("backend selected: MTCL");
+        std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_INFO << "Starting CAPIO with MTCL backend"
+                  << std::endl;
+        char hostname[HOST_NAME_MAX]{0};
+        gethostname(hostname, HOST_NAME_MAX);
+        return new MTCLBackend("TCP", "1234", 1000000);
+    }
+
     if (backend_name == "mpisync") {
         LOG("backend selected: mpisync");
         server_println("Starting CAPIO with MPI (SYNC) backend",
@@ -75,9 +84,16 @@ inline void capio_remote_listener(Semaphore &internal_server_sem) {
     START_LOG(gettid(), "call()");
 
     while (true) {
-        auto request = backend->read_next_request();
-
-        server_request_handlers[request.get_code()](request);
+        auto request   = backend->read_next_request();
+        const int code = request.get_code();
+        if (code < 0 || code >= CAPIO_SERVER_NR_REQUEST ||
+            server_request_handlers[code] == nullptr) {
+            server_println("Ignoring invalid remote request code: " + std::to_string(code),
+                           CapioCLEngine::get().getWorkflowName(),
+                           CAPIO_LOG_SERVER_CLI_LEVEL_WARNING, __func__);
+            continue;
+        }
+        server_request_handlers[code](request);
     }
 }
 

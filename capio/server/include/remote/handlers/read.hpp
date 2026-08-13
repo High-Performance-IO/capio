@@ -1,6 +1,8 @@
 #ifndef CAPIO_SERVER_REMOTE_HANDLERS_READ_HPP
 #define CAPIO_SERVER_REMOTE_HANDLERS_READ_HPP
 
+#include <algorithm>
+
 #include "remote/backend.hpp"
 #include "remote/requests.hpp"
 #include "storage/manager.hpp"
@@ -19,7 +21,7 @@ inline void serve_remote_read(const std::filesystem::path &path, const std::stri
     // Send all the rest of the file not only the number of bytes requested
     // Useful for caching
     CapioFile &c_file          = storage_manager->get(path);
-    long int nbytes            = c_file.getStoredSize() - offset;
+    long int nbytes            = std::max<off64_t>(0, c_file.getStoredSize() - offset);
     off64_t prefetch_data_size = get_prefetch_data_size();
 
     if (prefetch_data_size != 0 && nbytes > prefetch_data_size) {
@@ -27,10 +29,8 @@ inline void serve_remote_read(const std::filesystem::path &path, const std::stri
     }
     const off64_t file_size = c_file.getStoredSize();
 
-    // send request
-    serve_remote_read_request(tid, fd, count, nbytes, file_size, complete, is_getdents, dest);
-    // send data
-    backend->send_file(c_file.getBuffer() + offset, nbytes, dest);
+    serve_remote_read_request(tid, fd, count, nbytes, file_size, complete, is_getdents, dest,
+                              nbytes == 0 ? nullptr : c_file.getBuffer() + offset);
 }
 
 inline void handle_read_reply(int tid, int fd, long count, off64_t file_size, off64_t nbytes,
@@ -61,8 +61,8 @@ inline void handle_read_reply(int tid, int fd, long count, off64_t file_size, of
     if (is_getdents) {
         send_dirent_to_client(tid, fd, c_file, offset, bytes_read);
     } else {
-        client_manager->replyToClient(tid, offset, c_file.getBuffer(), count);
-        storage_manager->setFileOffset(tid, fd, offset + count);
+        client_manager->replyToClient(tid, offset, c_file.getBuffer(), bytes_read);
+        storage_manager->setFileOffset(tid, fd, offset + bytes_read);
     }
 }
 
