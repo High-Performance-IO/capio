@@ -26,11 +26,7 @@ FetchContent_MakeAvailable(args capio_cl)
 # CAPIOCL dependency compatibility
 #####################################
 if (TARGET libcapio_cl)
-    target_compile_options(libcapio_cl PRIVATE
-            -Wno-error=array-bounds
-            -Wno-error=stringop-overflow
-            $<$<NOT:$<CONFIG:Debug>>:-UCALF_LOG>
-    )
+    target_compile_options(libcapio_cl PRIVATE $<$<NOT:$<CONFIG:Debug>>:-UCALF_LOG>)
 endif ()
 
 #####################################
