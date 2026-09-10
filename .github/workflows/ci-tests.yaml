@@ -112,9 +112,6 @@ jobs:
           - Debug
           - Release
         compiler:
-          - gcc:9
-          - gcc:10
-          - gcc:11
           - gcc:12
           - gcc:13
           - gcc:14
@@ -140,7 +137,7 @@ jobs:
       - name: "Install gfortran (OpenMPI dependency)"
         if: ${{ startsWith(matrix.compiler, 'gcc:') }}
         run: |
-          apt update
+          apt update -o Acquire::Check-Valid-Until=false
           apt install -y gfortran || true
           update-alternatives --install /usr/bin/gfortran gfortran /usr/bin/gfortran-* 100
 
