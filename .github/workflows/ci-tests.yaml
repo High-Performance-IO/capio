@@ -112,24 +112,22 @@ jobs:
           - Debug
           - Release
         compiler:
-          - gcc:9
-          - gcc:10
-          - gcc:11
           - gcc:12
           - gcc:13
           - gcc:14
           - gcc:15
           - gcc:16
-          - zhongruoyu/llvm-ports:13.0-trixie
-          - zhongruoyu/llvm-ports:14.0-trixie
-          - zhongruoyu/llvm-ports:15.0-trixie
-          - zhongruoyu/llvm-ports:16.0-trixie
-          - zhongruoyu/llvm-ports:17.0-trixie
+          - zhongruoyu/llvm-ports:13-trixie
+          - zhongruoyu/llvm-ports:14-trixie
+          - zhongruoyu/llvm-ports:15-trixie
+          - zhongruoyu/llvm-ports:16-trixie
+          - zhongruoyu/llvm-ports:17-trixie
           - zhongruoyu/llvm-ports:18-trixie
-          - zhongruoyu/llvm-ports:19.1-bullseye
-          - zhongruoyu/llvm-ports:20.1-bullseye
-          - zhongruoyu/llvm-ports:21.1-bullseye
-
+          - zhongruoyu/llvm-ports:19-trixie
+          - zhongruoyu/llvm-ports:20-trixie
+          - zhongruoyu/llvm-ports:21-trixie
+          - zhongruoyu/llvm-ports:22-trixie
+          - zhongruoyu/llvm-ports:23-trixie
     container:
       image: ${{ matrix.compiler }}
 
@@ -139,43 +137,53 @@ jobs:
       - name: "Install gfortran (OpenMPI dependency)"
         if: ${{ startsWith(matrix.compiler, 'gcc:') }}
         run: |
-          apt update
+          apt update -o Acquire::Check-Valid-Until=false
           apt install -y gfortran || true
           update-alternatives --install /usr/bin/gfortran gfortran /usr/bin/gfortran-* 100
 
       - name: "Install packages"
-        run: |
-          apt update
-          apt install -y      \
-            openmpi-bin       \
-            libopenmpi-dev    \
-            ninja-build       \
-            cmake             \
-            make              \
-            sudo              \
-            bash              \
-            git               \
-            jq                \
-            pkg-config        \
-            build-essential   \
-            wget              \
-            tar               \
-            python3           \
-            python3-pip       \
-            python3-venv
+        uses: nick-fields/retry@v3
+        with:
+          command: |
+            apt update
+            apt install -y      \
+              openmpi-bin       \
+              libopenmpi-dev    \
+              ninja-build       \
+              cmake             \
+              make              \
+              sudo              \
+              bash              \
+              git               \
+              jq                \
+              pkg-config        \
+              build-essential   \
+              wget              \
+              tar               \
+              python3           \
+              python3-pip       \
+              python3-venv
+          max_attempts: 3
+          retry_wait_seconds: 10
+          timeout_minutes: 10
 
       - name: "Run CMake"
-        shell: bash
-        run: |
-          cmake -DCMAKE_BUILD_TYPE=${{ matrix.build_type }} \
-                -DCAPIO_LOG=${{ matrix.build_type == 'Debug' && 'ON' || 'OFF' }} \
-                -DENABLE_COVERAGE=${{ matrix.build_type == 'Debug' && 'ON' || 'OFF' }} \
-                -DCAPIO_BUILD_TESTS=ON \
-                -G Ninja \
-                -B ../build \
-                -S ${GITHUB_WORKSPACE}
-          cmake --build ../build -j $(nproc)
-          sudo cmake --install ../build --prefix /usr/local
+        uses: nick-fields/retry@v3
+        with:
+          command: |
+            cmake -DCMAKE_BUILD_TYPE=${{ matrix.build_type }} \
+                  -DCAPIO_LOG=${{ matrix.build_type == 'Debug' && 'ON' || 'OFF' }} \
+                  -DENABLE_COVERAGE=${{ matrix.build_type == 'Debug' && 'ON' || 'OFF' }} \
+                  -DCAPIO_BUILD_TESTS=ON \
+                  -G Ninja \
+                  -B ../build \
+                  -S ${GITHUB_WORKSPACE}
+            cmake --build ../build -j $(nproc)
+            sudo cmake --install ../build --prefix /usr/local
+          max_attempts: 3
+          retry_wait_seconds: 10
+          timeout_minutes: 30
+
       - name: "Run tests"
         id: run-tests
         shell: bash
