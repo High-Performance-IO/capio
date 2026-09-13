@@ -5,6 +5,8 @@
 #include <unordered_map>
 #include <vector>
 
+#include "calf/StlLogger.h"
+
 #include "common/queue.hpp"
 /**
  * @brief Class to handle libcapio_posix clients applications

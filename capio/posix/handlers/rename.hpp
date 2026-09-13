@@ -5,7 +5,6 @@
 
 int renameat2_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg5,
                       long *result) {
-    const auto flags                            = arg4;
     const std::filesystem::path old_dir_fd_path = get_dir_path(static_cast<int>(arg0));
     const std::filesystem::path old_path(reinterpret_cast<const char *>(arg1));
     const std::filesystem::path new_dir_fd_path = get_dir_path(static_cast<int>(arg2));
@@ -14,10 +13,9 @@ int renameat2_handler(long arg0, long arg1, long arg2, long arg3, long arg4, lon
 
     // TODO: implement handling of FLAGS
 
-    START_LOG(tid,
-              "call(old_dir_fd_path=%s, old_path=%s, new_dir_fd_path=%s, newpath=%s, flags=%d)",
-              old_dir_fd_path.c_str(), old_path.c_str(), new_dir_fd_path.c_str(), new_path.c_str(),
-              flags);
+    START_LOG(
+        tid, "call(old_dir_fd_path=%s, old_path=%s, new_dir_fd_path=%s, newpath=%s, flags=%d)",
+        old_dir_fd_path.c_str(), old_path.c_str(), new_dir_fd_path.c_str(), new_path.c_str(), arg4);
 
     // Resolve paths relative to path of dir_fd ONLY if input path is not absolute
     const auto old_path_abs =

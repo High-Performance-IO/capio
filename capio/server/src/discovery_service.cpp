@@ -1,4 +1,6 @@
-#include "common/logger.hpp"
+#include "calf/StdOutLogger.h"
+#include "calf/StlLogger.h"
+
 #include "remote/backend.hpp"
 #include "remote/discovery.hpp"
 #include "utils/capiocl_adapter.hpp"
@@ -23,9 +25,8 @@ void DiscoveryService::start(const std::string &token, unsigned int adv_delay) c
 
     discovery_interface->start(token, adv_delay);
 
-    server_println(CAPIO_LOG_SERVER_CLI_LEVEL_INFO, "DiscoveryService will advertise " + token +
-                                                        " every " + std::to_string(adv_delay) +
-                                                        "ms.");
+    CALF_PRINT_COLOR(CALF_CLI_LEVEL_INFO, "DiscoveryService will advertise %s every %u ms.",
+                     token.c_str(), adv_delay);
 }
 
 void DiscoveryService::stop() const { discovery_interface->stop(); }

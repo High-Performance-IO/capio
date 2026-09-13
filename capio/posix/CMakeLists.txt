@@ -54,6 +54,12 @@ ENDIF (UNIX)
 #####################################
 target_compile_definitions(${TARGET_NAME} PRIVATE __CAPIO_POSIX)
 
+if (CAPIO_LOG)
+    # The syscall hook may access CALF thread-local state while resolving TLS itself.
+    # LD_PRELOAD libraries therefore require direct, loader-allocated TLS access.
+    target_compile_options(${TARGET_NAME} PRIVATE -ftls-model=initial-exec)
+endif ()
+
 #####################################
 # Include files and directories
 #####################################
@@ -68,6 +74,13 @@ target_include_directories(${TARGET_NAME} PRIVATE
         "${TARGET_INCLUDE_FOLDER}"
         "${SYSCALL_INTERCEPT_INCLUDE_FOLDER}"
 )
+
+#####################################
+# set CALF logger component name
+#####################################
+calf_enable_log(${TARGET_NAME} ${CAPIO_LOG_ENABLED})
+calf_set_component(${TARGET_NAME} "posix")
+calf_set_default_log_dir(${TARGET_NAME} "./capio_logs")
 
 #####################################
 # Target properties

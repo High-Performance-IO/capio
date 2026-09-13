@@ -5,8 +5,7 @@
 #include <string>
 #include <tuple>
 
-#include "common/logger.hpp"
-
+#include "calf/SyscallLogger.h"
 #include "types.hpp"
 
 inline int *get_fd_snapshot(long tid) {

@@ -5,6 +5,7 @@
 #include <string>
 #include <thread>
 
+#include "calf/StlLogger.h"
 #include "capiocl_adapter.hpp"
 #include "client-manager/client_manager.hpp"
 #include "common/dirent.hpp"

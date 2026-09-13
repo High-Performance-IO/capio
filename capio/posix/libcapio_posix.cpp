@@ -15,6 +15,18 @@
 
 #include "handlers.hpp"
 
+#ifdef CAPIO_LOG
+#include "syscallnames.h"
+#endif
+
+template <typename T> std::string demangled_name(const T &obj) {
+    int status;
+    const char *mangled = typeid(obj).name();
+    std::unique_ptr<char, void (*)(void *)> demangled(
+        abi::__cxa_demangle(mangled, nullptr, nullptr, &status), std::free);
+    return status == 0 ? demangled.get() : mangled;
+}
+
 /**
  * Handler for syscall not handled and interrupt syscall_intercept
  */
@@ -347,11 +359,8 @@ static int hook(long syscall_number, long arg0, long arg1, long arg2, long arg3,
         return 1;
     }
 
-#ifdef CAPIO_LOG
-    CAPIO_LOG_LEVEL = get_capio_log_level();
-#endif
-
-    START_LOG(syscall_no_intercept(SYS_gettid), "call(syscall_number=%ld)", syscall_number);
+    START_LOG(syscall_no_intercept(SYS_gettid), "call(syscall_number=%ld, syscall_name=%s)",
+              syscall_number, sys_num_to_string(syscall_number).c_str());
 
     // If the syscall_number is higher than the maximum
     // syscall captured by CAPIO, simply return
@@ -394,6 +403,7 @@ static int hook(long syscall_number, long arg0, long arg1, long arg2, long arg3,
 }
 
 static __attribute__((constructor)) void init() {
+    SET_CALF_SYSCALL_HANDLER(syscall_no_intercept);
 
     const long tid = syscall_no_intercept(SYS_gettid);
 
@@ -408,5 +418,6 @@ static __attribute__((constructor)) void init() {
     intercept_hook_point_clone_child  = hook_clone_child;
     intercept_hook_point_clone_parent = hook_clone_parent;
     intercept_hook_point              = hook;
-    START_SYSCALL_LOGGING();
+
+    ENABLE_LOGGER();
 }
