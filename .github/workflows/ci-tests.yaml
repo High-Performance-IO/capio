@@ -157,6 +157,8 @@ jobs:
               git               \
               jq                \
               pkg-config        \
+              libprotobuf-dev   \
+              protobuf-compiler \
               build-essential   \
               wget              \
               tar               \
