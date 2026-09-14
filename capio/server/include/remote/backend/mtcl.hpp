@@ -45,7 +45,7 @@ class MTCLBackend : public Backend {
     struct PendingFile {
         /// Hostname from which the frame was received.
         std::string source;
-        /// Complete transaction frame owning the file bytes.
+        /// Complete message frame owning the file bytes.
         std::vector<unsigned char> frame;
         /// Offset of the file payload within @ref frame.
         size_t offset;
@@ -55,9 +55,9 @@ class MTCLBackend : public Backend {
     /** Complete the CAPIO hostname handshake and register a newly accepted handle. */
     void accept_connection(MTCL::HandleUser handle);
 
-    /** Queue one owned request/file transaction for asynchronous transmission. */
-    void send_transaction(const char *message, size_t message_len, const char *file,
-                          size_t file_len, const std::string &target);
+    /** Queue one request/file frame for asynchronous transmission. */
+    void send_frame(const char *message, size_t message_len, const char *file, size_t file_len,
+                    const std::string &target);
 
     /** Release completed sends and remove connections whose sends failed. */
     void cleanup_completed_sends();
@@ -88,14 +88,14 @@ class MTCLBackend : public Backend {
     void connect_to(const std::string &target_token) override;
 };
 
-/** Maximum file payload accepted by a single server-to-server transaction. */
+/** Maximum file payload accepted by a single server-to-server message. */
 constexpr std::uint64_t CAPIO_SERVER_MAX_FILE_TRANSFER_SIZE = 4ULL * 1024 * 1024 * 1024;
 
 constexpr size_t wire_header_size = 17;
 
 enum class MessageType : unsigned char { request = 1, request_with_file = 2 };
 
-constexpr size_t maximum_transaction_size =
+constexpr size_t maximum_frame_size =
     wire_header_size + CAPIO_SERVER_REQUEST_MAX_SIZE +
     static_cast<size_t>(CAPIO_SERVER_MAX_FILE_TRANSFER_SIZE);
 #endif // MTCL_BACKEND_HPP

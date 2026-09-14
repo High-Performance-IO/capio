@@ -17,7 +17,31 @@ extern DiscoveryService *discovery_service;
  *
  * Sent frames remain owned by the connection until MTCL reports their completion.
  */
-struct MTCLConnection {
+class MTCLConnection {
+
+    struct PendingSend {
+        std::vector<unsigned char> frame;
+        MTCL::Request request;
+    };
+
+    MTCL::HandleUser handle;
+    std::mutex send_lock;
+    std::vector<PendingSend> pending_sends;
+
+    bool cleanup_completed_sends_unlocked() {
+        for (auto send = pending_sends.begin(); send != pending_sends.end();) {
+            if (!MTCL::test(send->request)) {
+                ++send;
+            } else if (send->request.count() != static_cast<ssize_t>(send->frame.size())) {
+                return false;
+            } else {
+                send = pending_sends.erase(send);
+            }
+        }
+        return true;
+    }
+
+  public:
     /**
      * @brief Takes ownership of an established MTCL handle.
      * @param connection_handle Handle connected to a remote CAPIO server.
@@ -38,19 +62,21 @@ struct MTCLConnection {
     void yield() { handle.yield(); }
 
     /**
-     * @brief Starts an asynchronous send of a complete transaction frame.
-     * @param frame Frame retained until the send completes.
+     * @brief Starts an asynchronous send of a complete message frame.
+     * @param message Frame retained until the send completes.
      * @return true if MTCL accepted the send, false if the connection failed.
      */
-    bool send_transaction(std::vector<unsigned char> frame) {
+    bool send(std::vector<unsigned char> message) {
         const std::lock_guard lock(send_lock);
         if (!cleanup_completed_sends_unlocked()) {
             return false;
         }
 
-        pending_sends.push_back({std::move(frame), {}});
-        auto &send = pending_sends.back();
-        if (handle.isend(send.frame.data(), send.frame.size(), send.request) < 0) {
+        // NOTE: MTCL requires the message buffer and request to remain alive until the send
+        // completes. also, the isend is async so a reference needs to keep existing
+        pending_sends.push_back({std::move(message), {}});
+        auto &[frame, request] = pending_sends.back();
+        if (handle.isend(frame.data(), frame.size(), request) < 0) {
             pending_sends.pop_back();
             return false;
         }
@@ -65,29 +91,6 @@ struct MTCLConnection {
         const std::lock_guard lock(send_lock);
         return cleanup_completed_sends_unlocked();
     }
-
-  private:
-    struct PendingSend {
-        std::vector<unsigned char> frame;
-        MTCL::Request request;
-    };
-
-    bool cleanup_completed_sends_unlocked() {
-        for (auto send = pending_sends.begin(); send != pending_sends.end();) {
-            if (!MTCL::test(send->request)) {
-                ++send;
-            } else if (send->request.count() != static_cast<ssize_t>(send->frame.size())) {
-                return false;
-            } else {
-                send = pending_sends.erase(send);
-            }
-        }
-        return true;
-    }
-
-    MTCL::HandleUser handle;
-    std::mutex send_lock;
-    std::vector<PendingSend> pending_sends;
 };
 
 static void write_u64(unsigned char *destination, uint64_t value) {
@@ -111,9 +114,8 @@ static bool receive_message(MTCL::HandleUser &handle, void *data, size_t size) {
 
 static void discard_message(MTCL::HandleUser &handle) {
     char byte = 0;
-    MTCL::Request request;
-    if (handle.ireceive(&byte, sizeof(byte), request) == 0) {
-        request.wait();
+    if (MTCL::Request request; handle.ireceive(&byte, sizeof(byte), request) == 0) {
+        [[maybe_unused]] const auto r = request.wait();
     }
 }
 
@@ -139,7 +141,7 @@ RemoteRequest MTCLBackend::read_next_request() {
             continue;
         }
 
-        if (available < wire_header_size || available > maximum_transaction_size) {
+        if (available < wire_header_size || available > maximum_frame_size) {
             // fatal error of message out of admissible size
             discard_message(handle);
             remove_connection(remote_hostname);
@@ -214,8 +216,8 @@ void MTCLBackend::accept_connection(MTCL::HandleUser handle) {
                                                         " (incoming)");
 }
 
-void MTCLBackend::send_transaction(const char *message, size_t message_len, const char *file,
-                                   size_t file_len, const std::string &target) {
+void MTCLBackend::send_frame(const char *message, size_t message_len, const char *file,
+                             size_t file_len, const std::string &target) {
     std::vector<unsigned char> frame(wire_header_size + message_len + file_len);
     frame[0] = static_cast<unsigned char>(file == nullptr ? MessageType::request
                                                           : MessageType::request_with_file);
@@ -236,7 +238,7 @@ void MTCLBackend::send_transaction(const char *message, size_t message_len, cons
             return;
         }
         auto &connection = *found->second;
-        failed           = !connection.send_transaction(std::move(frame));
+        failed           = !connection.send(std::move(frame));
     }
     if (failed) {
         server_println(CAPIO_LOG_SERVER_CLI_LEVEL_WARNING,
@@ -307,7 +309,7 @@ void MTCLBackend::send_request(const char *message, const int message_len,
         static_cast<size_t>(message_len) > CAPIO_SERVER_REQUEST_MAX_SIZE) {
         throw std::invalid_argument("Invalid MTCL request");
     }
-    send_transaction(message, static_cast<size_t>(message_len), nullptr, 0, target);
+    send_frame(message, static_cast<size_t>(message_len), nullptr, 0, target);
 }
 
 void MTCLBackend::send_file(char *, long int, const std::string &) {
@@ -322,8 +324,8 @@ void MTCLBackend::send_request_with_file(const char *message, const int message_
         (nbytes != 0 && shm == nullptr)) {
         throw std::invalid_argument("Invalid MTCL request or file buffer");
     }
-    send_transaction(message, static_cast<size_t>(message_len), nbytes == 0 ? nullptr : shm,
-                     static_cast<size_t>(nbytes), target);
+    send_frame(message, static_cast<size_t>(message_len), nbytes == 0 ? nullptr : shm,
+               static_cast<size_t>(nbytes), target);
 }
 
 void MTCLBackend::recv_file(char *shm, const std::string &source, const long int bytes_expected) {
