@@ -12,22 +12,71 @@
 
 extern DiscoveryService *discovery_service;
 
-struct MTCLConnection::Impl {
-    explicit Impl(MTCL::HandleUser connection_handle) : handle(std::move(connection_handle)) {}
+/**
+ * @brief Owns an MTCL connection and the buffers used by asynchronous sends.
+ *
+ * Sent frames remain owned by the connection until MTCL reports their completion.
+ */
+struct MTCLConnection {
+    /**
+     * @brief Takes ownership of an established MTCL handle.
+     * @param connection_handle Handle connected to a remote CAPIO server.
+     */
+    explicit MTCLConnection(MTCL::HandleUser connection_handle)
+        : handle(std::move(connection_handle)) {}
 
-    MTCL::HandleUser handle;
-    std::mutex send_lock;
+    /** @brief Cancels pending sends and closes the connection. */
+    ~MTCLConnection() {
+        pending_sends.clear();
+        handle.close();
+    }
+
+    MTCLConnection(const MTCLConnection &)            = delete;
+    MTCLConnection &operator=(const MTCLConnection &) = delete;
+
+    /** @brief Returns receive-side ownership of the handle to MTCL. */
+    void yield() { handle.yield(); }
+
+    /**
+     * @brief Starts an asynchronous send of a complete transaction frame.
+     * @param frame Frame retained until the send completes.
+     * @return true if MTCL accepted the send, false if the connection failed.
+     */
+    bool send_transaction(std::vector<unsigned char> frame) {
+        const std::lock_guard lock(send_lock);
+        if (!cleanup_completed_sends_unlocked()) {
+            return false;
+        }
+
+        pending_sends.push_back({std::move(frame), {}});
+        auto &send = pending_sends.back();
+        if (handle.isend(send.frame.data(), send.frame.size(), send.request) < 0) {
+            pending_sends.pop_back();
+            return false;
+        }
+        return true;
+    }
+
+    /**
+     * @brief Releases buffers for completed sends.
+     * @return false if a completed send transferred an unexpected number of bytes.
+     */
+    bool cleanup_completed_sends() {
+        const std::lock_guard lock(send_lock);
+        return cleanup_completed_sends_unlocked();
+    }
+
+  private:
     struct PendingSend {
         std::vector<unsigned char> frame;
         MTCL::Request request;
     };
-    std::vector<std::unique_ptr<PendingSend>> pending_sends;
 
     bool cleanup_completed_sends_unlocked() {
         for (auto send = pending_sends.begin(); send != pending_sends.end();) {
-            if (!MTCL::test((*send)->request)) {
+            if (!MTCL::test(send->request)) {
                 ++send;
-            } else if ((*send)->request.count() != static_cast<ssize_t>((*send)->frame.size())) {
+            } else if (send->request.count() != static_cast<ssize_t>(send->frame.size())) {
                 return false;
             } else {
                 send = pending_sends.erase(send);
@@ -36,45 +85,19 @@ struct MTCLConnection::Impl {
         return true;
     }
 
-    ~Impl() {
-        pending_sends.clear();
-        handle.close();
-    }
+    MTCL::HandleUser handle;
+    std::mutex send_lock;
+    std::vector<PendingSend> pending_sends;
 };
 
-MTCLConnection::MTCLConnection(MTCL::HandleUser handle)
-    : impl(std::make_unique<Impl>(std::move(handle))) {}
-
-MTCLConnection::~MTCLConnection() = default;
-
-void MTCLConnection::yield() const { impl->handle.yield(); }
-
-bool MTCLConnection::send_transaction(std::vector<unsigned char> frame) const {
-    auto pending   = std::make_unique<Impl::PendingSend>();
-    pending->frame = std::move(frame);
-
-    const std::lock_guard lock(impl->send_lock);
-    if (!impl->cleanup_completed_sends_unlocked() ||
-        impl->handle.isend(pending->frame.data(), pending->frame.size(), pending->request) < 0) {
-        return false;
-    }
-    impl->pending_sends.emplace_back(std::move(pending));
-    return true;
-}
-
-bool MTCLConnection::cleanup_completed_sends() const {
-    const std::lock_guard lock(impl->send_lock);
-    return impl->cleanup_completed_sends_unlocked();
-}
-
-void write_u64(unsigned char *destination, uint64_t value) {
+static void write_u64(unsigned char *destination, uint64_t value) {
     for (int i = 7; i >= 0; --i) {
         destination[i] = static_cast<unsigned char>(value);
         value >>= 8;
     }
 }
 
-uint64_t read_u64(const unsigned char *source) {
+static uint64_t read_u64(const unsigned char *source) {
     uint64_t value = 0;
     for (int i = 0; i < 8; ++i) {
         value = (value << 8) | source[i];
@@ -82,11 +105,11 @@ uint64_t read_u64(const unsigned char *source) {
     return value;
 }
 
-bool receive_message(MTCL::HandleUser &handle, void *data, size_t size) {
+static bool receive_message(MTCL::HandleUser &handle, void *data, size_t size) {
     return handle.receive(data, size) == static_cast<ssize_t>(size);
 }
 
-void discard_message(MTCL::HandleUser &handle) {
+static void discard_message(MTCL::HandleUser &handle) {
     char byte = 0;
     MTCL::Request request;
     if (handle.ireceive(&byte, sizeof(byte), request) == 0) {
@@ -270,7 +293,7 @@ void MTCLBackend::handshake_servers() {
 }
 
 const std::set<std::string> MTCLBackend::get_nodes() {
-    std::set<std::string> nodes{node_name};
+    std::set nodes{node_name};
     const std::shared_lock lock(open_connections_lock);
     for (const auto &[hostname, connection] : open_connections) {
         nodes.insert(hostname);

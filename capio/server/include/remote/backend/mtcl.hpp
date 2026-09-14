@@ -3,13 +3,15 @@
 
 #include <atomic>
 #include <memory>
-#include <mutex>
 #include <optional>
 #include <shared_mutex>
 #include <string>
 #include <unordered_map>
-#include <utility>
 #include <vector>
+
+namespace MTCL {
+class HandleUser;
+}
 
 #include "common/constants.hpp"
 #include "common/logger.hpp"
@@ -17,48 +19,7 @@
 
 typedef unsigned long long int capio_off64_t;
 
-namespace MTCL {
-class HandleUser;
-}
-
-/**
- * Owns one persistent MTCL connection and its outgoing asynchronous sends.
- *
- * The connection retains a yielded handle for sending while MTCL manages
- * receive readiness through MTCL::Manager::getNext().
- */
-struct MTCLConnection {
-    /** Take ownership of a newly established MTCL handle. */
-    explicit MTCLConnection(MTCL::HandleUser handle);
-
-    /** Cancel outgoing sends and close the owned handle. */
-    ~MTCLConnection();
-
-    MTCLConnection(const MTCLConnection &)            = delete;
-    MTCLConnection &operator=(const MTCLConnection &) = delete;
-
-    /** Return receive-side ownership of the handle to MTCL. */
-    void yield() const;
-
-    /**
-     * Start sending an owned transaction frame.
-     *
-     * @param frame Complete wire frame; retained until MTCL finishes sending it
-     * @return true when send was accepted by MTCL, false if the connection failed
-     */
-    bool send_transaction(std::vector<unsigned char> frame) const;
-
-    /**
-     * Release completed transaction buffers.
-     *
-     * @return false if any asynchronous send failed
-     */
-    bool cleanup_completed_sends() const;
-
-  private:
-    struct Impl;
-    std::unique_ptr<Impl> impl;
-};
+struct MTCLConnection;
 
 /**
  * CAPIO remote backend using MTCL for dynamic point-to-point communication.
