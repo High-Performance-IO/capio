@@ -14,10 +14,7 @@ class HandleUser;
 }
 
 #include "common/constants.hpp"
-#include "common/logger.hpp"
 #include "remote/backend.hpp"
-
-typedef unsigned long long int capio_off64_t;
 
 struct MTCLConnection;
 
@@ -88,14 +85,4 @@ class MTCLBackend : public Backend {
     void connect_to(const std::string &target_token) override;
 };
 
-/** Maximum file payload accepted by a single server-to-server message. */
-constexpr std::uint64_t CAPIO_SERVER_MAX_FILE_TRANSFER_SIZE = 4ULL * 1024 * 1024 * 1024;
-
-constexpr size_t wire_header_size = 17;
-
-enum class MessageType : unsigned char { request = 1, request_with_file = 2 };
-
-constexpr size_t maximum_frame_size =
-    wire_header_size + CAPIO_SERVER_REQUEST_MAX_SIZE +
-    static_cast<size_t>(CAPIO_SERVER_MAX_FILE_TRANSFER_SIZE);
 #endif // MTCL_BACKEND_HPP
