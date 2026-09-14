@@ -9,14 +9,14 @@
 inline off64_t capio_write(int fd, const void *buffer, off64_t count, long tid) {
     START_LOG(tid, "call(fd=%d, buf=0x%08x, count=%ld)", fd, buffer, count);
 
-    if (exists_capio_fd(fd)) {
+    if (exists_capio_fd(tid, fd)) {
         if (count > SSIZE_MAX) {
             ERR_EXIT("Capio does not support writes bigger than "
                      "SSIZE_MAX yet");
         }
 
-        read_cache->flush();
-        write_cache->write(fd, buffer, count);
+        read_cache->flush(tid);
+        write_cache->write(tid, fd, buffer, count);
 
         return count;
     } else {
@@ -24,11 +24,11 @@ inline off64_t capio_write(int fd, const void *buffer, off64_t count, long tid) 
     }
 }
 
-inline off64_t capio_writev(int fd, const struct iovec *iov, int iovcnt, long tid) {
+inline off64_t capio_writev(int fd, const iovec *iov, int iovcnt, long tid) {
     START_LOG(tid, "call(fd=%d, iov.iov_base=0x%08x, iov.iov_len=%ld, iovcnt=%d)", fd,
               iov->iov_base, iov->iov_len, iovcnt);
 
-    if (exists_capio_fd(fd)) {
+    if (exists_capio_fd(tid, fd)) {
         LOG("fd %d exists and is a capio fd", fd);
         off64_t tot_bytes = 0;
         off64_t res       = 0;
@@ -52,22 +52,22 @@ inline off64_t capio_writev(int fd, const struct iovec *iov, int iovcnt, long ti
     }
 }
 
-int write_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg5, long *result) {
+int write_handler(pid_t tid, long arg0, long arg1, long arg2, long arg3, long arg4, long arg5,
+                  long *result) {
     auto fd         = static_cast<int>(arg0);
     const auto *buf = reinterpret_cast<const void *>(arg1);
     auto count      = static_cast<off64_t>(arg2);
-    long tid        = syscall_no_intercept(SYS_gettid);
 
-    return posix_return_value(capio_write(fd, buf, count, tid), result);
+    return posix_return_value(tid, capio_write(fd, buf, count, tid), result);
 }
 
-int writev_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg5, long *result) {
+int writev_handler(pid_t tid, long arg0, long arg1, long arg2, long arg3, long arg4, long arg5,
+                   long *result) {
     auto fd         = static_cast<int>(arg0);
     const auto *iov = reinterpret_cast<const struct iovec *>(arg1);
     auto iovcnt     = static_cast<int>(arg2);
-    long tid        = syscall_no_intercept(SYS_gettid);
 
-    return posix_return_value(capio_writev(fd, iov, iovcnt, tid), result);
+    return posix_return_value(tid, capio_writev(fd, iov, iovcnt, tid), result);
 }
 
 #endif // SYS_write || SYS_writev

@@ -14,13 +14,13 @@
  * with CAPIO
  */
 
-int exit_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg5, long *result) {
-    long tid = syscall_no_intercept(SYS_gettid);
+int exit_handler(pid_t tid, long arg0, long arg1, long arg2, long arg3, long arg4, long arg5,
+                 long *result) {
     START_LOG(tid, "call()");
 
     LOG("Thread %d is a CAPIO thread: clean up", tid);
-    read_cache->flush();
-    write_cache->flush();
+    read_cache->flush(tid);
+    write_cache->flush(tid);
     exit_group_request(tid);
 
     return CAPIO_POSIX_SYSCALL_SKIP;
