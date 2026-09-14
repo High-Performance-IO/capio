@@ -4,13 +4,23 @@
 #include "utils/common.hpp"
 
 #include <algorithm>
-#include <array>
 #include <cstdint>
 #include <cstring>
 #include <mtcl.hpp>
 #include <stdexcept>
 
 extern DiscoveryService *discovery_service;
+
+/** Maximum file payload accepted by one MTCL message. */
+constexpr std::uint64_t CAPIO_SERVER_MAX_FILE_TRANSFER_SIZE = 4ULL * 1024 * 1024 * 1024;
+
+/** One type byte followed by request and file sizes encoded as two 64-bit integers. */
+constexpr size_t wire_header_size = 17;
+
+enum class MessageType : unsigned char { request = 1, request_with_file = 2 };
+
+constexpr size_t maximum_frame_size = wire_header_size + CAPIO_SERVER_REQUEST_MAX_SIZE +
+                                      static_cast<size_t>(CAPIO_SERVER_MAX_FILE_TRANSFER_SIZE);
 
 /**
  * @brief Owns an MTCL connection and the buffers used by asynchronous sends.
@@ -28,6 +38,13 @@ class MTCLConnection {
     std::mutex send_lock;
     std::vector<PendingSend> pending_sends;
 
+    /**
+     * @brief Removes finished sends and detects short writes while the caller holds send_lock.
+     * @return false when MTCL completed a send without transferring its entire frame.
+     *
+     * The unlocked form lets send() and cleanup_completed_sends() share the completion loop
+     * without locking the same non-recursive mutex twice.
+     */
     bool cleanup_completed_sends_unlocked() {
         for (auto send = pending_sends.begin(); send != pending_sends.end();) {
             if (!MTCL::test(send->request)) {
@@ -55,7 +72,10 @@ class MTCLConnection {
         handle.close();
     }
 
+    /** The connection is the unique owner of its MTCL handle and pending sends. */
     MTCLConnection(const MTCLConnection &)            = delete;
+    /** The connection cannot be copied because its handle, mutex, and sends have unique ownership.
+     */
     MTCLConnection &operator=(const MTCLConnection &) = delete;
 
     /** @brief Returns receive-side ownership of the handle to MTCL. */
@@ -86,6 +106,9 @@ class MTCLConnection {
     /**
      * @brief Releases buffers for completed sends.
      * @return false if a completed send transferred an unexpected number of bytes.
+     *
+     * Periodic cleanup is required because MTCL sends are asynchronous and their buffers cannot
+     * be released when send() returns.
      */
     bool cleanup_completed_sends() {
         const std::lock_guard lock(send_lock);
@@ -93,6 +116,11 @@ class MTCLConnection {
     }
 };
 
+/**
+ * @brief Encodes a 64-bit integer in big-endian order.
+ *
+ * A fixed byte order makes frame sizes independent of the sender's architecture.
+ */
 static void write_u64(unsigned char *destination, uint64_t value) {
     for (int i = 7; i >= 0; --i) {
         destination[i] = static_cast<unsigned char>(value);
@@ -100,6 +128,7 @@ static void write_u64(unsigned char *destination, uint64_t value) {
     }
 }
 
+/** @brief Decodes a big-endian 64-bit frame field written by write_u64(). */
 static uint64_t read_u64(const unsigned char *source) {
     uint64_t value = 0;
     for (int i = 0; i < 8; ++i) {
@@ -108,10 +137,19 @@ static uint64_t read_u64(const unsigned char *source) {
     return value;
 }
 
+/**
+ * @brief Receives one MTCL message and verifies that it exactly fills the expected buffer.
+ * @return true only when all expected bytes were received.
+ */
 static bool receive_message(MTCL::HandleUser &handle, void *data, size_t size) {
     return handle.receive(data, size) == static_cast<ssize_t>(size);
 }
 
+/**
+ * @brief Drains a malformed MTCL message before its connection is removed.
+ *
+ * Consuming the queued message prevents MTCL from repeatedly reporting the same invalid input.
+ */
 static void discard_message(MTCL::HandleUser &handle) {
     char byte = 0;
     if (MTCL::Request request; handle.ireceive(&byte, sizeof(byte), request) == 0) {
@@ -119,6 +157,13 @@ static void discard_message(MTCL::HandleUser &handle) {
     }
 }
 
+/**
+ * @brief Waits for, validates, and decodes the next request from any MTCL peer.
+ * @return The decoded request and its source, or empty strings during shutdown.
+ *
+ * MTCL multiplexes new connections and readable handles through getNext(), so this method also
+ * accepts peers, removes failed connections, and retains an attached file for recv_file().
+ */
 RemoteRequest MTCLBackend::read_next_request() {
     START_LOG(gettid(), "call()");
     // A valid READ_REPLY consumes this before asking for another request.
@@ -188,6 +233,12 @@ RemoteRequest MTCLBackend::read_next_request() {
     return {std::string{}, std::string{}};
 }
 
+/**
+ * @brief Reads an incoming peer's hostname and registers its connection.
+ *
+ * CAPIO needs the hostname handshake because MTCL handles do not initially carry the node name
+ * used as the open_connections key.
+ */
 void MTCLBackend::accept_connection(MTCL::HandleUser handle) {
     size_t hostname_size = 0;
     if (!receive_message(handle, &hostname_size, sizeof(hostname_size)) || hostname_size == 0 ||
@@ -216,6 +267,12 @@ void MTCLBackend::accept_connection(MTCL::HandleUser handle) {
                                                         " (incoming)");
 }
 
+/**
+ * @brief Encodes a request and optional file into one MTCL message and sends it to a peer.
+ *
+ * Keeping both payloads in one frame preserves their association; MTCLConnection retains that
+ * frame until the asynchronous send completes.
+ */
 void MTCLBackend::send_frame(const char *message, size_t message_len, const char *file,
                              size_t file_len, const std::string &target) {
     std::vector<unsigned char> frame(wire_header_size + message_len + file_len);
@@ -247,6 +304,12 @@ void MTCLBackend::send_frame(const char *message, size_t message_len, const char
     }
 }
 
+/**
+ * @brief Reclaims completed send buffers and removes peers whose sends failed.
+ *
+ * Failed hostnames are collected first because removing them while holding a shared map lock
+ * would require an unsafe lock upgrade.
+ */
 void MTCLBackend::cleanup_completed_sends() {
     std::vector<std::string> failed;
     {
@@ -262,6 +325,11 @@ void MTCLBackend::cleanup_completed_sends() {
     }
 }
 
+/**
+ * @brief Removes a failed peer from the connection map.
+ *
+ * Erasing the entry closes its MTCLConnection and allows discovery to establish a replacement.
+ */
 void MTCLBackend::remove_connection(const std::string &hostname) {
     const std::unique_lock lock(open_connections_lock);
     const auto connection = open_connections.find(hostname);
@@ -271,6 +339,11 @@ void MTCLBackend::remove_connection(const std::string &hostname) {
     open_connections.erase(connection);
 }
 
+/**
+ * @brief Initializes MTCL and starts listening on the requested protocol and port.
+ *
+ * The advertisement token is retained so discovery can announce the same reachable endpoint.
+ */
 MTCLBackend::MTCLBackend(const std::string &proto, const std::string &port, const int sleep_time)
     : Backend(HOST_NAME_MAX), thread_sleep_times(sleep_time),
       listen_token(proto + ":0.0.0.0:" + port),
@@ -281,6 +354,11 @@ MTCLBackend::MTCLBackend(const std::string &proto, const std::string &port, cons
     server_println(CAPIO_LOG_SERVER_CLI_LEVEL_INFO, "MTCL backend listening on " + listen_token);
 }
 
+/**
+ * @brief Stops request processing, closes all connections, and finalizes MTCL.
+ *
+ * Connections must be destroyed before Manager::finalize() invalidates MTCL resources.
+ */
 MTCLBackend::~MTCLBackend() {
     continue_execution = false;
     {
@@ -290,10 +368,16 @@ MTCLBackend::~MTCLBackend() {
     MTCL::Manager::finalize();
 }
 
+/**
+ * @brief Starts discovery advertising and listening for other CAPIO servers.
+ *
+ * Discovery supplies endpoint tokens to connect_to(); MTCL itself does not discover peers.
+ */
 void MTCLBackend::handshake_servers() {
     discovery_service->start(advertisement_token, std::max(1, thread_sleep_times / 1000));
 }
 
+/** @brief Returns a locked snapshot containing this node and every connected peer. */
 const std::set<std::string> MTCLBackend::get_nodes() {
     std::set nodes{node_name};
     const std::shared_lock lock(open_connections_lock);
@@ -303,6 +387,11 @@ const std::set<std::string> MTCLBackend::get_nodes() {
     return nodes;
 }
 
+/**
+ * @brief Validates and sends a request without a file payload.
+ *
+ * Validation protects frame size calculations and rejects invalid caller-owned buffers.
+ */
 void MTCLBackend::send_request(const char *message, const int message_len,
                                const std::string &target) {
     if (message == nullptr || message_len <= 0 ||
@@ -312,10 +401,21 @@ void MTCLBackend::send_request(const char *message, const int message_len,
     send_frame(message, static_cast<size_t>(message_len), nullptr, 0, target);
 }
 
+/**
+ * @brief Rejects standalone file sends because MTCL frames bind files to their requests.
+ *
+ * Callers must use send_request_with_file() so the receiver cannot associate a file with the
+ * wrong request.
+ */
 void MTCLBackend::send_file(char *, long int, const std::string &) {
     throw std::logic_error("MTCL files must be sent with their request");
 }
 
+/**
+ * @brief Validates and sends a request with its optional file payload in one frame.
+ *
+ * A single MTCL message preserves request/file ordering without a second receive operation.
+ */
 void MTCLBackend::send_request_with_file(const char *message, const int message_len, char *shm,
                                          const long int nbytes, const std::string &target) {
     if (message == nullptr || message_len <= 0 ||
@@ -328,6 +428,11 @@ void MTCLBackend::send_request_with_file(const char *message, const int message_
                static_cast<size_t>(nbytes), target);
 }
 
+/**
+ * @brief Copies the file retained by read_next_request() into the caller's destination.
+ *
+ * Matching source and size ensures the payload belongs to the request currently being handled.
+ */
 void MTCLBackend::recv_file(char *shm, const std::string &source, const long int bytes_expected) {
     if (shm == nullptr || bytes_expected < 0) {
         throw std::invalid_argument("Invalid MTCL destination buffer");
@@ -341,6 +446,12 @@ void MTCLBackend::recv_file(char *shm, const std::string &source, const long int
     pending_file.reset();
 }
 
+/**
+ * @brief Connects to a discovered MTCL endpoint and registers its hostname.
+ *
+ * Only the lexicographically smaller node initiates the connection, preventing both peers from
+ * creating duplicate links. A hostname handshake gives the receiver the same map key.
+ */
 void MTCLBackend::connect_to(const std::string &target_token) {
     const auto first_colon = target_token.find(':');
     const auto last_colon  = target_token.rfind(':');
