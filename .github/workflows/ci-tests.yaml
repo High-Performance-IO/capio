@@ -142,7 +142,7 @@ jobs:
           update-alternatives --install /usr/bin/gfortran gfortran /usr/bin/gfortran-* 100
 
       - name: "Install packages"
-        uses: nick-fields/retry@v3
+        uses: nick-fields/retry@v4
         with:
           command: |
             apt update
@@ -168,7 +168,7 @@ jobs:
           timeout_minutes: 10
 
       - name: "Run CMake"
-        uses: nick-fields/retry@v3
+        uses: nick-fields/retry@v4
         with:
           command: |
             cmake -DCMAKE_BUILD_TYPE=${{ matrix.build_type }} \
