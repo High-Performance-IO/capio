@@ -1,4 +1,5 @@
-FROM debian:bookworm AS builder
+ARG BASE_IMAGE=debian:bookworm
+FROM ${BASE_IMAGE} AS builder
 
 ARG CAPIO_BUILD_TESTS=OFF
 ARG CAPIO_LOG=OFF
@@ -31,12 +32,13 @@ RUN mkdir -p /opt/capio/build                     \
  && cmake --install /opt/capio/build --prefix /usr/local
 
 
-FROM debian:bookworm
+FROM ${BASE_IMAGE}
 
 ENV LD_LIBRARY_PATH="/usr/local/lib"
 
 RUN apt update                                                \
  && apt install -y --no-install-recommends                    \
+        jq                                                    \
         openmpi-bin                                           \
         openssh-server                                        \
  && rm -rf /var/lib/apt/lists/*                               \
@@ -89,6 +91,7 @@ COPY --from=builder                                         \
     "/usr/local/bin/capio_server_unit_test[s]"              \
     "/usr/local/bin/capio_syscall_unit_test[s]"             \
     "/usr/local/bin/capio_integration_test[s]"              \
+    "/usr/local/bin/capio_multinode_*"                       \
     /usr/local/bin/
 
 # Pkgconfig

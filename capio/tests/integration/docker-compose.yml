@@ -1,0 +1,65 @@
+x-test-service: &test-service
+  image: alphaunito/capio:multinode
+  working_dir: /shared
+  volumes:
+    - shared_data:/shared
+    - discovery_tokens:/tokens
+    - test_status:/status
+    - ./config.json:/config.json:ro
+  expose:
+    - "1234"
+  networks:
+    - capio
+  command:
+    - /bin/sh
+    - -c
+    - |
+      set -e
+      CAPIO_DIR=/shared capio_server -c /config.json -b mtcl --discovery fs --token-directory /tokens &
+      server_pid=$$!
+      trap 'kill "$$server_pid"; wait "$$server_pid" || true' EXIT
+      sleep 5
+      LD_PRELOAD=libcapio_posix.so "$$TEST_BINARY" --gtest_break_on_failure --gtest_print_time=1
+      touch "/status/$$HOSTNAME"
+      while true; do
+        set -- /status/*
+        [ -e "$$1" ] && [ "$$#" -eq 3 ] && break
+        sleep 1
+      done
+
+services:
+  split:
+    <<: *test-service
+    hostname: split
+    environment:
+      CAPIO_DIR: /shared
+      CAPIO_LOG_LEVEL: -1
+      CAPIO_APP_NAME: split
+      TEST_BINARY: capio_multinode_split
+
+  map:
+    <<: *test-service
+    hostname: map
+    environment:
+      CAPIO_DIR: /shared
+      CAPIO_LOG_LEVEL: -1
+      CAPIO_APP_NAME: map
+      TEST_BINARY: capio_multinode_map
+
+  merge:
+    <<: *test-service
+    hostname: merge
+    environment:
+      CAPIO_DIR: /shared
+      CAPIO_LOG_LEVEL: -1
+      CAPIO_APP_NAME: merge
+      TEST_BINARY: capio_multinode_merge
+
+volumes:
+  shared_data:
+  discovery_tokens:
+  test_status:
+
+networks:
+  capio:
+    driver: bridge
