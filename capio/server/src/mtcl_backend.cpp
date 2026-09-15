@@ -11,16 +11,17 @@
 
 extern DiscoveryService *discovery_service;
 
-/** Maximum file payload accepted by one MTCL message. */
-constexpr std::uint64_t CAPIO_SERVER_MAX_FILE_TRANSFER_SIZE = 4ULL * 1024 * 1024 * 1024;
-
 /** One type byte followed by request and file sizes encoded as two 64-bit integers. */
-constexpr size_t wire_header_size = 17;
+constexpr size_t MTCL_HEADER_SIZE = 17;
+
+/** Maximum file payload accepted by one MTCL message. Set to 4GB*/
+constexpr std::uint64_t MTCL_MAX_FILE_TRANSFER_SIZE = 4ULL * 1024 * 1024 * 1024;
+
+/** Maximum size a MTCL sent frame can have **/
+constexpr size_t MTCL_MAX_FRAME_SIZE = MTCL_HEADER_SIZE + CAPIO_SERVER_REQUEST_MAX_SIZE +
+                                       static_cast<size_t>(MTCL_MAX_FILE_TRANSFER_SIZE);
 
 enum class MessageType : unsigned char { request = 1, request_with_file = 2 };
-
-constexpr size_t maximum_frame_size = wire_header_size + CAPIO_SERVER_REQUEST_MAX_SIZE +
-                                      static_cast<size_t>(CAPIO_SERVER_MAX_FILE_TRANSFER_SIZE);
 
 /**
  * @brief Owns an MTCL connection and the buffers used by asynchronous sends.
@@ -45,7 +46,7 @@ class MTCLConnection {
      * The unlocked form lets send() and cleanup_completed_sends() share the completion loop
      * without locking the same non-recursive mutex twice.
      */
-    bool cleanup_completed_sends_unlocked() {
+    bool _cleanup_completed_sends() {
         for (auto send = pending_sends.begin(); send != pending_sends.end();) {
             if (!MTCL::test(send->request)) {
                 ++send;
@@ -88,7 +89,7 @@ class MTCLConnection {
      */
     bool send(std::vector<unsigned char> message) {
         const std::lock_guard lock(send_lock);
-        if (!cleanup_completed_sends_unlocked()) {
+        if (!_cleanup_completed_sends()) {
             return false;
         }
 
@@ -112,7 +113,7 @@ class MTCLConnection {
      */
     bool cleanup_completed_sends() {
         const std::lock_guard lock(send_lock);
-        return cleanup_completed_sends_unlocked();
+        return _cleanup_completed_sends();
     }
 };
 
@@ -186,7 +187,7 @@ RemoteRequest MTCLBackend::read_next_request() {
             continue;
         }
 
-        if (available < wire_header_size || available > maximum_frame_size) {
+        if (available < MTCL_HEADER_SIZE || available > MTCL_MAX_FRAME_SIZE) {
             // fatal error of message out of admissible size
             discard_message(handle);
             remove_connection(remote_hostname);
@@ -206,14 +207,14 @@ RemoteRequest MTCLBackend::read_next_request() {
              type != MessageType::request_with_file) ||         // not a request
             request_size == 0 ||                                // empty request
             request_size > CAPIO_SERVER_REQUEST_MAX_SIZE ||     // req. too big
-            file_size > CAPIO_SERVER_MAX_FILE_TRANSFER_SIZE ||  // file size too big
+            file_size > MTCL_MAX_FILE_TRANSFER_SIZE ||  // file size too big
             (type == MessageType::request && file_size != 0) || // request on file of 0 bytes
-            request_size + file_size != available - wire_header_size) { // out of bounds
+            request_size + file_size != available - MTCL_HEADER_SIZE) { // out of bounds
             remove_connection(remote_hostname);
             continue;
         }
 
-        const auto request_begin = frame.begin() + wire_header_size;
+        const auto request_begin = frame.begin() + MTCL_HEADER_SIZE;
         const auto file_begin    = request_begin + request_size;
         std::string request(request_begin, file_begin);
 
@@ -224,7 +225,7 @@ RemoteRequest MTCLBackend::read_next_request() {
             }
 
             pending_file.emplace(PendingFile{remote_hostname, std::move(frame),
-                                             wire_header_size + static_cast<size_t>(request_size)});
+                                             MTCL_HEADER_SIZE + static_cast<size_t>(request_size)});
         }
 
         handle.yield();
@@ -275,14 +276,14 @@ void MTCLBackend::accept_connection(MTCL::HandleUser handle) {
  */
 void MTCLBackend::send_frame(const char *message, size_t message_len, const char *file,
                              size_t file_len, const std::string &target) {
-    std::vector<unsigned char> frame(wire_header_size + message_len + file_len);
+    std::vector<unsigned char> frame(MTCL_HEADER_SIZE + message_len + file_len);
     frame[0] = static_cast<unsigned char>(file == nullptr ? MessageType::request
                                                           : MessageType::request_with_file);
     write_u64(frame.data() + 1, message_len);
     write_u64(frame.data() + 9, file_len);
-    std::memcpy(frame.data() + wire_header_size, message, message_len);
+    std::memcpy(frame.data() + MTCL_HEADER_SIZE, message, message_len);
     if (file_len != 0) {
-        std::memcpy(frame.data() + wire_header_size + message_len, file, file_len);
+        std::memcpy(frame.data() + MTCL_HEADER_SIZE + message_len, file, file_len);
     }
 
     bool failed = false;
@@ -420,7 +421,7 @@ void MTCLBackend::send_request_with_file(const char *message, const int message_
                                          const long int nbytes, const std::string &target) {
     if (message == nullptr || message_len <= 0 ||
         static_cast<size_t>(message_len) > CAPIO_SERVER_REQUEST_MAX_SIZE || nbytes < 0 ||
-        static_cast<uint64_t>(nbytes) > CAPIO_SERVER_MAX_FILE_TRANSFER_SIZE ||
+        static_cast<uint64_t>(nbytes) > MTCL_MAX_FILE_TRANSFER_SIZE ||
         (nbytes != 0 && shm == nullptr)) {
         throw std::invalid_argument("Invalid MTCL request or file buffer");
     }

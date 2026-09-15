@@ -16,7 +16,7 @@ class HandleUser;
 #include "common/constants.hpp"
 #include "remote/backend.hpp"
 
-struct MTCLConnection;
+class MTCLConnection;
 
 /**
  * CAPIO remote backend using MTCL for dynamic point-to-point communication.
