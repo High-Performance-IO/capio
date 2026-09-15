@@ -11,7 +11,21 @@
 
 extern DiscoveryService *discovery_service;
 
-/** One type byte followed by request and file sizes encoded as two 64-bit integers. */
+/**
+ * MTCL message layout:
+ *
+ * +----------+---------------------+------------------+-----------------+----------------+
+ * | type     | request size (BE)   | file size (BE)   | request bytes   | file bytes     |
+ * +----------+---------------------+------------------+-----------------+----------------+
+ * | 1 byte   | 8 bytes             | 8 bytes          | request size    | file size      |
+ * +----------+---------------------+------------------+-----------------+----------------+
+ * \_________________ 17-byte header _________________/   optional when file size is zero
+ *
+ * NOTE: constants are defined within this source file to avoid leakage across CAPIO
+ *
+ */
+
+/**Header size of MTCL message**/
 constexpr size_t MTCL_HEADER_SIZE = 17;
 
 /** Maximum file payload accepted by one MTCL message. Set to 4GB*/
@@ -21,7 +35,8 @@ constexpr std::uint64_t MTCL_MAX_FILE_TRANSFER_SIZE = 4ULL * 1024 * 1024 * 1024;
 constexpr size_t MTCL_MAX_FRAME_SIZE = MTCL_HEADER_SIZE + CAPIO_SERVER_REQUEST_MAX_SIZE +
                                        static_cast<size_t>(MTCL_MAX_FILE_TRANSFER_SIZE);
 
-enum class MessageType : unsigned char { request = 1, request_with_file = 2 };
+/** Identifies whether an MTCL message includes a file payload. */
+typedef enum class MessageType : unsigned char { request = 1, request_with_file = 2 } MessageType;
 
 /**
  * @brief Owns an MTCL connection and the buffers used by asynchronous sends.
