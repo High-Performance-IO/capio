@@ -10,7 +10,12 @@
 
 #include <sys/stat.h>
 
-#include "common/logger.hpp"
+#ifdef __CAPIO_POSIX
+#include "calf/SyscallLogger.h"
+#else
+#include "calf/StlLogger.h"
+#endif
+
 #include "common/syscall.hpp"
 #include "env.hpp"
 

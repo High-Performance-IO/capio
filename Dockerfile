@@ -11,9 +11,11 @@ RUN apt update                              \
         cmake                               \
         git                                 \
         libopenmpi-dev                      \
+        libprotobuf-dev                     \
         ninja-build                         \
         openmpi-bin                         \
-        pkg-config
+        pkg-config                          \
+        protobuf-compiler
 
 COPY CMakeLists.txt /opt/capio/
 COPY scripts /opt/capio/scripts

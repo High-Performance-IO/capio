@@ -1,6 +1,7 @@
 #ifndef CAPIO_SERVER_REMOTE_HANDLERS_STAT_HPP
 #define CAPIO_SERVER_REMOTE_HANDLERS_STAT_HPP
 
+#include "calf/StlLogger.h"
 #include "client-manager/client_manager.hpp"
 #include "remote/backend.hpp"
 #include "remote/requests.hpp"

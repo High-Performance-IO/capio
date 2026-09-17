@@ -1,7 +1,8 @@
-#include <cerrno>
-
 #ifndef CAPIO_FUNCTIONS_H
 #define CAPIO_FUNCTIONS_H
+#include <cerrno>
+
+#include "calf/SyscallLogger.h"
 
 int posix_return_value(long res, long *result) {
     START_LOG(capio_syscall(SYS_gettid), "cal(res=%ld)", res);

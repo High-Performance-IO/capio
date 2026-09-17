@@ -6,6 +6,7 @@
 #include <mutex>
 #include <thread>
 
+#include "calf/StlLogger.h"
 #include "utils/types.hpp"
 
 extern Backend *backend;

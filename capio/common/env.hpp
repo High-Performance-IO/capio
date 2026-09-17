@@ -6,11 +6,18 @@
 #include <cstdlib>
 #include <filesystem>
 #include <iostream>
-
 #include <sys/stat.h>
 
+#include "common/constants.hpp"
 #include "common/syscall.hpp"
-#include "logger.hpp"
+
+#include <calf/StdOutLogger.h>
+
+#ifdef __CAPIO_POSIX
+#include "calf/SyscallLogger.h"
+#else
+#include "calf/StlLogger.h"
+#endif
 
 // TODO: remove forward declaration of function by splitting into header and impl. capio/common
 inline bool is_forbidden_path(const std::string_view &path);
@@ -26,19 +33,19 @@ inline const std::filesystem::path &get_capio_dir() {
 
         if (val == nullptr) {
 
-            std::cout << "\n"
-                      << CAPIO_LOG_SERVER_CLI_LEVEL_ERROR << "Fatal: CAPIO_DIR not provided!"
-                      << std::endl;
+#ifndef __CAPIO_POSIX
+            CALF_PRINT_COLOR(CALF_CLI_LEVEL_ERROR, "CAPIO_DIR not provided");
+#endif
             ERR_EXIT("Fatal:  CAPIO_DIR not provided!");
 
         } else {
 
             const char *realpath_res = capio_realpath(val, buf.get());
             if (realpath_res == nullptr) {
-                std::cout << "\n"
-                          << CAPIO_LOG_SERVER_CLI_LEVEL_ERROR
-                          << "Fatal: CAPIO_DIR set, but folder does not exists on filesystem!"
-                          << std::endl;
+#ifndef __CAPIO_POSIX
+                CALF_PRINT_COLOR(CALF_CLI_LEVEL_ERROR,
+                                 "Fatal: CAPIO_DIR set, but folder does not exists on filesystem!");
+#endif
                 ERR_EXIT("error CAPIO_DIR: directory %s does not "
                          "exist. [buf=%s]",
                          val, buf.get());
@@ -89,24 +96,6 @@ inline long get_cache_line_size() {
     }
     LOG("data_bufs_count=%ld", data_bufs_count);
     return data_bufs_count;
-}
-
-inline int get_capio_log_level() {
-    static int level = -2;
-    if (level == -2) {
-        char *log_level = std::getenv("CAPIO_LOG_LEVEL");
-        if (log_level == nullptr) {
-            level = 0;
-        } else {
-            auto [ptr, ec] = std::from_chars(log_level, log_level + strlen(log_level), level);
-            if (ec != std::errc()) {
-                std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_WARNING << "invalid CAPIO_LOG_LEVEL value"
-                          << std::endl;
-                level = 0;
-            }
-        }
-    }
-    return level;
 }
 
 inline std::string get_capio_workflow_name() {

@@ -2,7 +2,9 @@
 #include <arpa/inet.h>
 #include <sys/socket.h>
 
-#include "common/logger.hpp"
+#include "calf/StdOutLogger.h"
+#include "calf/StlLogger.h"
+
 #include "remote/backend.hpp"
 #include "remote/discovery.hpp"
 #include "server/include/remote/discovery.hpp"
@@ -50,9 +52,9 @@ void mcast_thread_discovery_service(const bool *terminate, const std::string &ad
     local_addr.sin_port        = htons(adv_port);
     local_addr.sin_addr.s_addr = htonl(INADDR_ANY);
     if (bind(sockfd, reinterpret_cast<sockaddr *>(&local_addr), sizeof(local_addr)) == -1) {
-        server_println(CAPIO_LOG_SERVER_CLI_LEVEL_ERROR,
-                       "Error: unable to bind to multicast socket. Error is: " +
-                           std::string(std::strerror(errno)));
+        CALF_PRINT_COLOR(CALF_CLI_LEVEL_ERROR,
+                         "Error: unable to bind to multicast socket. Error is: %s",
+                         std::strerror(errno));
         // halt execution and return
         return;
     }
@@ -81,17 +83,13 @@ void MulticastDiscoveryInterface::stop() {
     if (mcast_listener_thread != nullptr && mcast_listener_thread->joinable()) {
         mcast_listener_thread->join();
         mcast_listener_thread = nullptr;
-        server_println("Multicast listener service stopped.",
-                       CapioCLEngine::get().getWorkflowName(), CAPIO_LOG_SERVER_CLI_LEVEL_INFO,
-                       "MulticastDiscoveryService");
+        CALF_PRINT_COLOR(CALF_CLI_LEVEL_INFO, "Multicast listener service stopped.");
     }
 
     if (advertisement_thread != nullptr && advertisement_thread->joinable()) {
         advertisement_thread->join();
         advertisement_thread = nullptr;
-        server_println("Multicast advertisement service stopped.",
-                       CapioCLEngine::get().getWorkflowName(), CAPIO_LOG_SERVER_CLI_LEVEL_INFO,
-                       "MulticastDiscoveryService");
+        CALF_PRINT_COLOR(CALF_CLI_LEVEL_INFO, "Multicast advertisement service stopped.");
     }
 }
 

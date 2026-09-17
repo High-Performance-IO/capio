@@ -9,7 +9,11 @@
 #include <sys/stat.h>
 #include <unistd.h>
 
-#include "common/logger.hpp"
+#ifdef __CAPIO_POSIX
+#include "calf/SyscallLogger.h"
+#else
+#include "calf/StlLogger.h"
+#endif
 
 #ifdef __CAPIO_POSIX
 
@@ -25,19 +29,20 @@
 
 #else
 
-#include "utils/server_println.hpp"
+#include "calf/StdOutLogger.h"
 
+// NOTE: cannot use CALF_PRINT_COLOR due to this already being a macro !
 #define SHM_DESTROY_CHECK(source_name)                                                             \
     if (shm_unlink(source_name) == -1) {                                                           \
-        std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_WARNING << "Unable to destroy shared mem: '"       \
-                  << source_name << "' (" << strerror(errno) << ")" << std::endl;                  \
+        std::cout << CALF_CLI_LEVEL_WARNING << "Unable to destroy shared mem: '" << source_name    \
+                  << "' (" << strerror(errno) << ")" << std::endl;                                 \
     };
 
+// NOTE: cannot use CALF_PRINT_COLOR due to this already being a macro !
 #define SHM_CREATE_CHECK(condition, source)                                                        \
     if (condition) {                                                                               \
         LOG("error while creating %s", source);                                                    \
-        std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_ERROR << "Unable to create shm: " << source        \
-                  << std::endl;                                                                    \
+        std::cout << CALF_CLI_LEVEL_ERROR << "Unable to create shm: " << source << std::endl;      \
         ERR_EXIT("Unable to open shm: %s", source);                                                \
     };
 

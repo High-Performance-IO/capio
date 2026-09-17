@@ -2,9 +2,6 @@
 #define CAPIO_POSIX_UTILS_ENV_HPP
 
 #include <cstdlib>
-#include <iostream>
-
-#include "common/logger.hpp"
 
 inline const char *get_capio_app_name() {
     static char *capio_app_name = std::getenv("CAPIO_APP_NAME");

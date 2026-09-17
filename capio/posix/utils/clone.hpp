@@ -1,6 +1,7 @@
 #ifndef CAPIO_POSIX_UTILS_CLONE_HPP
 #define CAPIO_POSIX_UTILS_CLONE_HPP
 
+#include "calf/SyscallLogger.h"
 #include "common/syscall.hpp"
 #include "data.hpp"
 #include "requests.hpp"
@@ -13,6 +14,8 @@
  * is called after a SYS_clone is issued.
  */
 inline void initialize_new_thread(const bool wait = false) {
+    SET_CALF_SYSCALL_HANDLER(syscall_no_intercept);
+
     const long tid = syscall_no_intercept(SYS_gettid);
     const long pid = syscall_no_intercept(SYS_getpid);
 
