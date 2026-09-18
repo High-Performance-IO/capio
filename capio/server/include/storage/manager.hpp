@@ -140,7 +140,7 @@ class StorageManager {
      * @return A direct reference to the associated CapioFile object.
      * @throws std::runtime_error If the file associated with the path is not present in storage.
      */
-    CapioFile &get(const std::filesystem::path &path) const;
+    CapioFile &get(const std::filesystem::path &path);
 
     /**
      * @brief Retrieves a reference to a CapioFile object from storage.
