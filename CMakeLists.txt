@@ -87,11 +87,13 @@ FetchContent_Declare(
         GIT_TAG v0.3.1
 )
 
-FetchContent_MakeAvailable(calf
+FetchContent_Declare(
         mtcl
         GIT_REPOSITORY https://github.com/ParaGroup/MTCL
         GIT_TAG 2d534f7c1d594717e7081d88f1ac90c8b30758b1
 )
+
+FetchContent_MakeAvailable(calf)
 #####################################
 # Targets
 #####################################

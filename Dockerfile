@@ -1,5 +1,4 @@
-ARG BASE_IMAGE=debian:bookworm
-FROM ${BASE_IMAGE} AS builder
+FROM debian:bookworm AS builder
 
 ARG CAPIO_BUILD_TESTS=OFF
 ARG CAPIO_LOG=OFF
@@ -34,7 +33,7 @@ RUN mkdir -p /opt/capio/build                     \
  && cmake --install /opt/capio/build --prefix /usr/local
 
 
-FROM ${BASE_IMAGE}
+FROM debian:bookworm
 
 ENV LD_LIBRARY_PATH="/usr/local/lib"
 

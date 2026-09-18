@@ -42,8 +42,7 @@ inline Backend *select_backend(const std::string &backend_name, int argc, char *
 
     if (backend_name == "mtcl") {
         LOG("backend selected: MTCL");
-        std::cout << CAPIO_LOG_SERVER_CLI_LEVEL_INFO << "Starting CAPIO with MTCL backend"
-                  << std::endl;
+        CALF_PRINT_COLOR(CALF_CLI_LEVEL_INFO, "Starting CAPIO with MTCL backend");
         char hostname[HOST_NAME_MAX]{0};
         gethostname(hostname, HOST_NAME_MAX);
         return new MTCLBackend("TCP", "1234", 1000000);
@@ -84,9 +83,8 @@ inline void capio_remote_listener(Semaphore &internal_server_sem) {
         const int code = request.get_code();
         if (code < 0 || code >= CAPIO_SERVER_NR_REQUEST ||
             server_request_handlers[code] == nullptr) {
-            server_println("Ignoring invalid remote request code: " + std::to_string(code),
-                           CapioCLEngine::get().getWorkflowName(),
-                           CAPIO_LOG_SERVER_CLI_LEVEL_WARNING, __func__);
+            std::string err_msg = "Ignoring invalid remote request code: " + std::to_string(code);
+            CALF_PRINT_COLOR(CALF_CLI_LEVEL_ERROR, err_msg.c_str());
             continue;
         }
         server_request_handlers[code](request);

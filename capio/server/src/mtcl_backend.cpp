@@ -1,4 +1,3 @@
-#include "common/logger.hpp"
 #include "remote/backend/mtcl.hpp"
 #include "remote/discovery.hpp"
 #include "utils/common.hpp"
@@ -222,7 +221,7 @@ RemoteRequest MTCLBackend::read_next_request() {
              type != MessageType::request_with_file) ||         // not a request
             request_size == 0 ||                                // empty request
             request_size > CAPIO_SERVER_REQUEST_MAX_SIZE ||     // req. too big
-            file_size > MTCL_MAX_FILE_TRANSFER_SIZE ||  // file size too big
+            file_size > MTCL_MAX_FILE_TRANSFER_SIZE ||          // file size too big
             (type == MessageType::request && file_size != 0) || // request on file of 0 bytes
             request_size + file_size != available - MTCL_HEADER_SIZE) { // out of bounds
             remove_connection(remote_hostname);
@@ -278,9 +277,8 @@ void MTCLBackend::accept_connection(MTCL::HandleUser handle) {
     auto connection = std::make_unique<MTCLConnection>(std::move(handle));
     connection->yield();
     open_connections.emplace(remote_hostname, std::move(connection));
-    server_println(CAPIO_LOG_SERVER_CLI_LEVEL_INFO, "Connected to " + usedProtocol + ":" +
-                                                        remote_hostname + ":" + ownPort +
-                                                        " (incoming)");
+    CALF_PRINT_COLOR(CALF_CLI_LEVEL_INFO, "Connected to %s:%s:%s (incoming)", usedProtocol.c_str(),
+                     remote_hostname.c_str(), ownPort.c_str());
 }
 
 /**
@@ -306,16 +304,15 @@ void MTCLBackend::send_frame(const char *message, size_t message_len, const char
         const std::shared_lock connections_lock(open_connections_lock);
         const auto found = open_connections.find(target);
         if (found == open_connections.end()) {
-            server_println(CAPIO_LOG_SERVER_CLI_LEVEL_WARNING,
-                           "MTCL connection to " + target + " is not available");
+            CALF_PRINT_COLOR(CALF_CLI_LEVEL_WARNING, "MTCL connection to %s is not available",
+                             target.c_str());
             return;
         }
         auto &connection = *found->second;
         failed           = !connection.send(std::move(frame));
     }
     if (failed) {
-        server_println(CAPIO_LOG_SERVER_CLI_LEVEL_WARNING,
-                       "MTCL connection to " + target + " failed");
+        CALF_PRINT_COLOR(CALF_CLI_LEVEL_WARNING, "MTCL connection to %s failed", target.c_str());
         remove_connection(target);
     }
 }
@@ -367,7 +364,7 @@ MTCLBackend::MTCLBackend(const std::string &proto, const std::string &port, cons
       usedProtocol(proto) {
     MTCL::Manager::init("server-" + node_name);
     MTCL::Manager::listen(listen_token);
-    server_println(CAPIO_LOG_SERVER_CLI_LEVEL_INFO, "MTCL backend listening on " + listen_token);
+    CALF_PRINT_COLOR(CALF_CLI_LEVEL_INFO, "MTCL backend listening on %s", listen_token.c_str());
 }
 
 /**
@@ -488,7 +485,7 @@ void MTCLBackend::connect_to(const std::string &target_token) {
 
     auto handle = MTCL::Manager::connect(target_token);
     if (!handle.isValid()) {
-        server_println(CAPIO_LOG_SERVER_CLI_LEVEL_WARNING, "Unable to connect to " + target_token);
+        CALF_PRINT_COLOR(CALF_CLI_LEVEL_WARNING, "Unable to connect to %s", target_token.c_str());
         return;
     }
     const size_t hostname_size = node_name.size();
@@ -508,5 +505,5 @@ void MTCLBackend::connect_to(const std::string &target_token) {
     auto connection = std::make_unique<MTCLConnection>(std::move(handle));
     connection->yield();
     open_connections.emplace(remote_hostname, std::move(connection));
-    server_println(CAPIO_LOG_SERVER_CLI_LEVEL_INFO, "Connected to " + target_token);
+    CALF_PRINT_COLOR(CALF_CLI_LEVEL_INFO, "Connected to %s", target_token.c_str());
 }

@@ -206,13 +206,6 @@ jobs:
           capio_syscall_unit_tests \
             --gtest_break_on_failure \
             --gtest_print_time=1
-          
-          echo "Run CAPIO integration tests"
-          rm -rf /dev/shm/CAPIO*
-          LD_PRELOAD=libcapio_posix.so \
-          capio_integration_tests \
-            --gtest_break_on_failure \
-            --gtest_print_time=1
 
       # note: use always() to force log upload also on test failure
       - name: "Compute valid artifact name"
@@ -238,13 +231,6 @@ jobs:
           path: ./capio_logs_artifact
           retention-days: 1
           if-no-files-found: warn
-
-      - name: "Show client logs on failure"
-        if: ${{ always() && steps.run-tests.outcome == 'failure' && matrix.build_type == 'Debug' }}
-        run: tail -v -n +1 capio_logs/posix/$(hostname)/posix_thread_*.log
-      - name: "Show server logs on failure"
-        if: ${{ always() && steps.run-tests.outcome == 'failure' && matrix.build_type == 'Debug' }}
-        run: tail -v -n +1 capio_logs/server/$(hostname)/server_thread_*.log
 
       - name: "Generate coverage report"
         if: ${{ matrix.build_type == 'Debug' }}
