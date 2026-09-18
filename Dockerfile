@@ -39,6 +39,7 @@ ENV LD_LIBRARY_PATH="/usr/local/lib"
 
 RUN apt update                                                \
  && apt install -y --no-install-recommends                    \
+        jq                                                    \
         openmpi-bin                                           \
         openssh-server                                        \
  && rm -rf /var/lib/apt/lists/*                               \
@@ -91,6 +92,7 @@ COPY --from=builder                                         \
     "/usr/local/bin/capio_server_unit_test[s]"              \
     "/usr/local/bin/capio_syscall_unit_test[s]"             \
     "/usr/local/bin/capio_integration_test[s]"              \
+    "/usr/local/bin/capio_multinode_*"                       \
     /usr/local/bin/
 
 # Pkgconfig
