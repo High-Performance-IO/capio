@@ -1,0 +1,16 @@
+#%Module1.0
+
+set root [file normalize [file join [file dirname [info script]] ../..]]
+set libdir [file join $root lib64]
+if {![file isdirectory $libdir]} {
+    set libdir [file join $root lib]
+}
+
+conflict capio
+module-whatis "CAPIO Cross-Application Programmable I/O; requires ABI-compatible Open MPI loaded first"
+
+prepend-path PATH [file join $root bin]
+prepend-path LD_LIBRARY_PATH $libdir
+setenv CAPIO_ROOT $root
+setenv CAPIO_LIBDIR $libdir
+setenv CAPIO_PRELOAD [file join $libdir libcapio_posix.so]
