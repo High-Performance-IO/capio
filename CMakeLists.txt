@@ -123,4 +123,15 @@ IF (CAPIO_BUILD_SERVER AND CAPIO_BUILD_POSIX)
             USES_TERMINAL
             COMMENT "Building CAPIO module bundle: ${CAPIO_MODULE_ARCHIVE}"
     )
+
+    set(CAPIO_OFFLINE_SOURCE_ARCHIVE "${CAPIO_MODULE_OUTPUT_DIR}/capio-${PROJECT_VERSION}-offline-source.tar.gz")
+    message(STATUS "CAPIO offline source bundle: ${CAPIO_OFFLINE_SOURCE_ARCHIVE}")
+    add_custom_target(offline_source_bundle
+            COMMAND ${CMAKE_COMMAND} -E env
+                    BUILD_DIR=${PROJECT_BINARY_DIR}
+                    "${PROJECT_SOURCE_DIR}/scripts/build_offline_source_bundle.sh"
+                    "${CAPIO_MODULE_OUTPUT_DIR}"
+            USES_TERMINAL
+            COMMENT "Building CAPIO offline source bundle: ${CAPIO_OFFLINE_SOURCE_ARCHIVE}"
+    )
 ENDIF ()
