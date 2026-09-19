@@ -43,6 +43,54 @@ sudo cmake --install .
 
 It is also possible to enable log in CAPIO, by defining `-DCAPIO_LOG=TRUE`.
 
+### Build an offline environment module
+
+First load an Open MPI installation that is ABI-compatible with the Open MPI available on the build machine. 
+Then build the bundle:
+
+```bash
+cmake -S . -B dist/module-bundle -DCMAKE_BUILD_TYPE=Release
+cmake --build dist/module-bundle --target module_bundle -j$(nproc)
+```
+
+The generated artifact path is printed by CMake and has this form:
+
+```text
+dist/capio-<version>-linux-<architecture>.tar.gz
+```
+
+#### Install the module
+
+Transfer the archive to the target machine. For a user-local installation, extract it under 
+a persistent software directory:
+
+```bash
+CAPIO_VERSION=1.0.0
+mkdir -p "$HOME/.local/apps"
+tar -xzf "capio-$CAPIO_VERSION-linux-$(uname -m).tar.gz" -C "$HOME/.local/apps"
+module use "$HOME/.local/apps/capio-$CAPIO_VERSION/modulefiles"
+module load "openmpi/SITE_VERSION" "capio/$CAPIO_VERSION"
+```
+
+For a shared installation, an administrator can instead extract it under a shared path:
+
+The `module use` command can be added to the shell startup file or the site-wide `MODULEPATH`, to make 
+CAPIO discoverable in future sessions. Verify the installation with:
+
+```bash
+module show "capio/$CAPIO_VERSION"
+command -v capio_server
+test -f "$CAPIO_PRELOAD"
+```
+
+The module defines `CAPIO_ROOT`, `CAPIO_LIBDIR`, and `CAPIO_PRELOAD`.
+
+> [!WARNING]
+> Load Open MPI before CAPIO. The remote Open MPI installation must be ABI-compatible with the Open MPI used to 
+> build the bundle; using Open MPI on both machines does not by itself guarantee binary compatibility. 
+> The machines must also use compatible Linux, CPU architecture, and glibc versions. Build tools and internet 
+> access are only required on the build machine.
+
 ## Use CAPIO in your code
 
 Good news! You don't need to modify your code to benefit from the features of CAPIO. You have only to do three steps (

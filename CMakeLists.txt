@@ -107,3 +107,20 @@ IF (CAPIO_BUILD_TESTS)
     message(STATUS "Building CAPIO test suite")
     add_subdirectory(capio/tests)
 ENDIF (CAPIO_BUILD_TESTS)
+
+IF (CAPIO_BUILD_SERVER AND CAPIO_BUILD_POSIX)
+    set(CAPIO_MODULE_OUTPUT_DIR "${PROJECT_SOURCE_DIR}/dist")
+    set(CAPIO_MODULE_ARCHIVE "${CAPIO_MODULE_OUTPUT_DIR}/capio-${PROJECT_VERSION}-linux-${CMAKE_SYSTEM_PROCESSOR}.tar.gz")
+    message(STATUS "CAPIO module bundle artifact: ${CAPIO_MODULE_ARCHIVE}")
+    add_custom_target(module_bundle
+            COMMAND ${CMAKE_COMMAND} -E env
+                    PACKAGE_ONLY=1
+                    BUILD_DIR=${PROJECT_BINARY_DIR}
+                    CMAKE_COMMAND=${CMAKE_COMMAND}
+                    "${PROJECT_SOURCE_DIR}/scripts/build_module_bundle.sh"
+                    "${CAPIO_MODULE_OUTPUT_DIR}"
+            DEPENDS capio_server capio_posix
+            USES_TERMINAL
+            COMMENT "Building CAPIO module bundle: ${CAPIO_MODULE_ARCHIVE}"
+    )
+ENDIF ()

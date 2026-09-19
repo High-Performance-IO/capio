@@ -47,6 +47,7 @@ capio_logs
 # Other
 debug
 build
+dist
 
 .capio_tokens
 
