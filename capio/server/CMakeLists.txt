@@ -44,6 +44,7 @@ target_sources(${TARGET_NAME} PRIVATE
 )
 target_include_directories(${TARGET_NAME} PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}/include
+        ${MPI_INCLUDE_PATH}
         ${capio_cl_SOURCE_DIR}
 )
 
@@ -55,15 +56,27 @@ calf_set_component(${TARGET_NAME} "server")
 calf_set_default_log_dir(${TARGET_NAME} "./capio_logs")
 
 #####################################
+# Target properties
+#####################################
+IF (MPI_COMPILE_FLAGS)
+    set_target_properties(${TARGET_NAME} PROPERTIES COMPILE_FLAGS "${MPI_COMPILE_FLAGS}")
+ENDIF (MPI_COMPILE_FLAGS)
+
+IF (MPI_LINK_FLAGS)
+    set_target_properties(${TARGET_NAME} PROPERTIES LINK_FLAGS "${MPI_LINK_FLAGS}")
+ENDIF (MPI_LINK_FLAGS)
+
+#####################################
 # Link libraries
 #####################################
-target_link_libraries(${TARGET_NAME} PRIVATE MPI::MPI_CXX pthread rt stdc++fs libcapio_cl args)
+target_link_libraries(${TARGET_NAME} PRIVATE ${MPI_LIBRARIES} pthread rt stdc++fs libcapio_cl args)
 
 #####################################
 # Install rules
 #####################################
 install(TARGETS ${TARGET_NAME}
         RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
+        COMPONENT capio_module
 )
 
 #####################################

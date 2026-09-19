@@ -26,11 +26,9 @@ CAPIO depends on the following software that needs to be manually installed:
 
 The following dependencies are automatically fetched during cmake configuration phase, and compiled when required.
 
-- [CAPIO-CL](https://github.com/High-Performance-IO/CAPIO-CL) To handle the CAPIO-CL configuration and enforce streaming
-  directives
+- [CAPIO-CL](https://github.com/High-Performance-IO/CAPIO-CL) To handle the CAPIO-CL configuration and enforce streaming directives
 - [CALF](https://github.com/High-Performance-IO/CALF) To manage logging and CLI printing
-- [alpha-unito/syscall_intercept](https://github.com/alpha-unito/syscall_intercept) to intercept syscalls (forked from
-  ```pmem/syscall_interept```)
+- [alpha-unito/syscall_intercept](https://github.com/alpha-unito/syscall_intercept) to intercept syscalls (forked from ```pmem/syscall_interept```)
 - [Taywee/args](https://github.com/Taywee/args) to parse server command line inputs
 
 ### Compile capio
@@ -47,54 +45,35 @@ It is also possible to enable log in CAPIO, by defining `-DCAPIO_LOG=TRUE`.
 
 ### Build an offline environment module
 
-#### Build a binary bundle
-
-Use this method only when the build and target machines have compatible CPU architectures, glibc, libstdc++,
-and Open MPI ABIs. First load a compatible Open MPI installation, then build:
+On the internet-connected machine, fetch CAPIO's dependencies and package their sources:
 
 ```bash
-cmake -S . -B dist/module-bundle -DCMAKE_BUILD_TYPE=Release
-cmake --build dist/module-bundle --target module_bundle -j$(nproc)
-```
-
-The generated artifact path is printed by CMake and has this form:
-
-```text
-dist/capio-<version>-linux-<architecture>.tar.gz
-```
-
-#### Build from cached sources offline
-
-If the target has an older glibc/libstdc++ or a different CPU architecture, cache CAPIO and every fetched
-dependency on the internet-connected machine:
-
-```bash
-cmake -S . -B dist/module-bundle -DCMAKE_BUILD_TYPE=Release
+cmake -S . -B dist/module-bundle -DCMAKE_BUILD_TYPE=Release \
+  -DCALF_PROTOBUF_FORCE_FETCH=ON -Dprotobuf_FORCE_FETCH_DEPENDENCIES=ON
 cmake --build dist/module-bundle --target offline_source_bundle
 ```
 
-Transfer `dist/capio-1.0.0-offline-source.tar.gz` to the offline machine. It still needs CMake, a C++17 compiler, build
-tools, and its Open MPI development module, but does not need Git or internet access. Compile the native module bundle
-there:
+Transfer `dist/capio-1.0.0-offline-source.tar.gz` to the offline machine. It needs CMake, a C++17 compiler, build tools,
+and an Open MPI development module, but does not need Git or internet access. Build against the target machine's
+glibc, libstdc++, CPU architecture, and Open MPI:
 
 ```bash
 tar -xzf capio-1.0.0-offline-source.tar.gz
 cd capio-1.0.0-offline-source
 module load "openmpi/SITE_VERSION"
-./scripts/install_offline_module.sh
+cmake -S . -B dist/module-bundle -DCMAKE_BUILD_TYPE=Release
+cmake --build dist/module-bundle --target module_bundle -j$(nproc)
 ```
 
-The native artifact is written to `dist/capio-1.0.0-linux-$(uname -m).tar.gz`. Install that artifact using the
-instructions below.
+The generated module archive is `dist/capio-1.0.0-linux-<architecture>.tar.gz`.
 
 > [!IMPORTANT]
 > The bundled `syscall_intercept` dependency currently supports x86/x86_64 and RISC-V, not AArch64. `capio_server` may
 > compile on AArch64, but the CAPIO POSIX component requires an AArch64 interception backend.
 
-#### Install the module
+#### Install
 
-Transfer the archive to the target machine. For a user-local installation, extract it under
-a persistent software directory:
+Extract the module archive into a persistent software directory:
 
 ```bash
 CAPIO_VERSION=1.0.0
@@ -104,18 +83,8 @@ module use "$HOME/.local/apps/capio-$CAPIO_VERSION/modulefiles"
 module load "openmpi/SITE_VERSION" "capio/$CAPIO_VERSION"
 ```
 
-For a shared installation, an administrator can instead extract it under a shared path:
-
-```bash
-CAPIO_VERSION=1.0.0
-sudo mkdir -p /opt/apps
-sudo tar -xzf "capio-$CAPIO_VERSION-linux-$(uname -m).tar.gz" -C /opt/apps
-module use "/opt/apps/capio-$CAPIO_VERSION/modulefiles"
-module load "openmpi/SITE_VERSION" "capio/$CAPIO_VERSION"
-```
-
-The `module use` command can be added to the shell startup file or the site-wide `MODULEPATH`, to make
-CAPIO discoverable in future sessions. Verify the installation with:
+For a shared installation, replace `$HOME/.local/apps` with the site software directory and add its `modulefiles`
+directory to the site-wide `MODULEPATH`. Verify the installation with:
 
 ```bash
 module show "capio/$CAPIO_VERSION"
@@ -126,10 +95,7 @@ test -f "$CAPIO_PRELOAD"
 The module defines `CAPIO_ROOT`, `CAPIO_LIBDIR`, and `CAPIO_PRELOAD`.
 
 > [!WARNING]
-> Load Open MPI before CAPIO. The remote Open MPI installation must be ABI-compatible with the Open MPI used to
-> build the bundle; using Open MPI on both machines does not by itself guarantee binary compatibility.
-> The machines must also use compatible Linux, CPU architecture, and glibc versions. Build tools and internet
-> access are only required on the build machine when using the prebuilt binary bundle.
+> Load the same Open MPI module used to compile CAPIO before loading CAPIO.
 
 ## Use CAPIO in your code
 
@@ -229,22 +195,16 @@ The following is an example of a simple configuration:
       ],
       "streaming": [
         {
-          "name": [
-            "file0.dat"
-          ],
+          "name": ["file0.dat"],
           "committed": "on_close"
         },
         {
-          "name": [
-            "file1.dat"
-          ],
+          "name": ["file1.dat"],
           "committed": "on_close",
           "mode": "no_update"
         },
         {
-          "name": [
-            "file2.dat"
-          ],
+          "name": ["file2.dat"],
           "committed": "on_termination"
         }
       ]
