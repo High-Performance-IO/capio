@@ -360,8 +360,8 @@ void MTCLBackend::remove_connection(const std::string &hostname) {
 MTCLBackend::MTCLBackend(const std::string &proto, const std::string &port, const int sleep_time)
     : Backend(HOST_NAME_MAX), thread_sleep_times(sleep_time),
       listen_token(proto + ":0.0.0.0:" + port),
-      advertisement_token(proto + ":" + node_name + ":" + port), ownPort(port),
-      usedProtocol(proto) {
+      advertisement_token(proto + ":" + node_name + ":" + port), own_port(port),
+      used_protocol(proto) {
     MTCL::Manager::init("server-" + node_name);
     MTCL::Manager::listen(listen_token);
     CALF_PRINT_COLOR(CALF_CLI_LEVEL_INFO, "MTCL backend listening on %s", listen_token.c_str());
