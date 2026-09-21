@@ -58,7 +58,7 @@ glibc, libstdc++, CPU architecture, and Open MPI:
 ```bash
 tar -xzf capio-1.0.0-offline-source.tar.gz
 cd capio-1.0.0-offline-source
-module load "openmpi/SITE_VERSION"
+# LOAD MPI before compiling
 ./scripts/build_offline_module.sh
 ```
 
