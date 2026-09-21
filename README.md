@@ -61,6 +61,17 @@ the first is optional).
 > if `CAPIO_DIR` is not specified when launching capio_server, it will default to the current working directory of
 > capio_server.
 
+### Server backend options
+
+Use `--backend-options` for backend-specific settings. MTCL accepts
+`PROTO:PORT@POLL_INTERVAL_US`; for example:
+
+```bash
+capio_server --no-config --backend mtcl --backend-options TCP:1234@1000000
+```
+
+If omitted, MTCL defaults to `TCP:1234@1000000`.
+
 3) Launch your programs preloading the CAPIO shared library like this:
    ```bash
    CAPIO_DIR=your_capiodir      \
