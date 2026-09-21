@@ -255,15 +255,23 @@ RemoteRequest MTCLBackend::read_next_request() {
  * used as the open_connections key.
  */
 void MTCLBackend::accept_connection(MTCL::HandleUser handle) {
+    START_LOG(gettid(), "call()");
     size_t hostname_size = 0;
     if (!receive_message(handle, &hostname_size, sizeof(hostname_size)) || hostname_size == 0 ||
         hostname_size > HOST_NAME_MAX) {
+        CALF_PRINT_COLOR(CALF_CLI_LEVEL_ERROR,
+                         "Rejecting incoming MTCL connection: invalid hostname size %zu",
+                         hostname_size);
+        LOG("Rejecting incoming MTCL connection: invalid hostname size %zu", hostname_size);
         handle.close();
         return;
     }
 
     std::string remote_hostname(hostname_size, '\0');
     if (!receive_message(handle, remote_hostname.data(), remote_hostname.size())) {
+        CALF_PRINT_COLOR(CALF_CLI_LEVEL_ERROR,
+                         "Rejecting incoming MTCL connection: failed to receive hostname");
+        LOG("Rejecting incoming MTCL connection: failed to receive hostname");
         handle.close();
         return;
     }
@@ -271,6 +279,9 @@ void MTCLBackend::accept_connection(MTCL::HandleUser handle) {
     handle.setName(remote_hostname);
     const std::unique_lock lock(open_connections_lock);
     if (open_connections.count(remote_hostname) != 0) {
+        CALF_PRINT_COLOR(CALF_CLI_LEVEL_ERROR, "Rejecting duplicate MTCL connection from %s",
+                         remote_hostname.c_str());
+        LOG("Rejecting duplicate MTCL connection from %s", remote_hostname.c_str());
         handle.close();
         return;
     }
@@ -279,6 +290,8 @@ void MTCLBackend::accept_connection(MTCL::HandleUser handle) {
     open_connections.emplace(remote_hostname, std::move(connection));
     CALF_PRINT_COLOR(CALF_CLI_LEVEL_INFO, "Connected to %s:%s:%s (incoming)", used_protocol.c_str(),
                      remote_hostname.c_str(), own_port.c_str());
+    LOG("Connected to %s:%s:%s (incoming)", used_protocol.c_str(), remote_hostname.c_str(),
+        own_port.c_str());
 }
 
 /**
