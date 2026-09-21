@@ -1,0 +1,15 @@
+diff --git a/capstone/CMakeLists.txt b/capstone/CMakeLists.txt
+index 08f662b..ce3f272 100644
+--- a/capstone/CMakeLists.txt
++++ b/capstone/CMakeLists.txt
+@@ -6,9 +6,7 @@ include(FetchContent)
+ # Import external project from git
+ #####################################
+ FetchContent_Declare(capstone
+-        GIT_REPOSITORY https://github.com/capstone-engine/capstone.git
+-        # the following git tag refers to capstone version 5.0.6
+-        GIT_TAG accf4df62f1fba6f92cae692985d27063552601c
++        SOURCE_DIR "${CMAKE_CURRENT_LIST_DIR}/../../capstone"
+ )
+ 
+ FetchContent_MakeAvailable(capstone)
