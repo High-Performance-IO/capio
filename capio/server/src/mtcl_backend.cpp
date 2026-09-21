@@ -277,7 +277,7 @@ void MTCLBackend::accept_connection(MTCL::HandleUser handle) {
     auto connection = std::make_unique<MTCLConnection>(std::move(handle));
     connection->yield();
     open_connections.emplace(remote_hostname, std::move(connection));
-    CALF_PRINT_COLOR(CALF_CLI_LEVEL_INFO, "Connected to %s:%s:%s (incoming)", usedProtocol.c_str(),
+    CALF_PRINT_COLOR(CALF_CLI_LEVEL_INFO, "Connected to %s:%s:%s (incoming)", used_protocol.c_str(),
                      remote_hostname.c_str(), ownPort.c_str());
 }
 
