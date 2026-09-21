@@ -32,7 +32,7 @@ class MTCLBackend : public Backend {
     std::atomic_bool continue_execution{true};
 
     /// MTCL listener, discovery advertisement, port, and protocol identifiers.
-    const std::string listen_token, advertisement_token, ownPort, usedProtocol;
+    const std::string listen_token, advertisement_token, own_port, used_protocol;
 
     /// Connected peers indexed by hostname and protected against discovery/send races.
     std::shared_mutex open_connections_lock;
