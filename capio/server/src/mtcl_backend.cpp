@@ -182,6 +182,9 @@ static void discard_message(MTCL::HandleUser &handle) {
 RemoteRequest MTCLBackend::read_next_request() {
     START_LOG(gettid(), "call()");
     // A valid READ_REPLY consumes this before asking for another request.
+    if (pending_file) {
+        LOG("Discarding unread MTCL file payload from %s", pending_file->source.c_str());
+    }
     pending_file.reset();
     while (continue_execution) {
         cleanup_completed_sends();
@@ -197,12 +200,14 @@ RemoteRequest MTCLBackend::read_next_request() {
         const std::string remote_hostname = handle.getName();
         size_t available                  = 0;
         if (handle.probe(available) <= 0) {
+            LOG("Failed to probe MTCL connection from %s", remote_hostname.c_str());
             remove_connection(remote_hostname);
             continue;
         }
 
         if (available < MTCL_HEADER_SIZE || available > MTCL_MAX_FRAME_SIZE) {
-            // fatal error of message out of admissible size
+            LOG("Rejecting MTCL frame from %s: size %zu is outside [%zu, %zu]",
+                remote_hostname.c_str(), available, MTCL_HEADER_SIZE, MTCL_MAX_FRAME_SIZE);
             discard_message(handle);
             remove_connection(remote_hostname);
             continue;
@@ -210,6 +215,8 @@ RemoteRequest MTCLBackend::read_next_request() {
 
         std::vector<unsigned char> frame(available);
         if (!receive_message(handle, frame.data(), frame.size())) {
+            LOG("Failed to receive %zu-byte MTCL frame from %s", available,
+                remote_hostname.c_str());
             remove_connection(remote_hostname);
             continue;
         }
@@ -217,13 +224,45 @@ RemoteRequest MTCLBackend::read_next_request() {
         const auto type             = static_cast<MessageType>(frame[0]);
         const uint64_t request_size = read_u64(frame.data() + 1);
         const uint64_t file_size    = read_u64(frame.data() + 9); // current op. file size
-        if ((type != MessageType::request &&
-             type != MessageType::request_with_file) ||         // not a request
-            request_size == 0 ||                                // empty request
-            request_size > CAPIO_SERVER_REQUEST_MAX_SIZE ||     // req. too big
-            file_size > MTCL_MAX_FILE_TRANSFER_SIZE ||          // file size too big
-            (type == MessageType::request && file_size != 0) || // request on file of 0 bytes
-            request_size + file_size != available - MTCL_HEADER_SIZE) { // out of bounds
+
+        if (type != MessageType::request && type != MessageType::request_with_file) {
+            LOG("Rejecting MTCL frame from %s: invalid message type %u", remote_hostname.c_str(),
+                static_cast<unsigned int>(frame[0]));
+            remove_connection(remote_hostname);
+            continue;
+        }
+
+        if (request_size == 0 || request_size > CAPIO_SERVER_REQUEST_MAX_SIZE) {
+            LOG("Rejecting MTCL frame from %s: request size %llu is outside [1, %zu]",
+                remote_hostname.c_str(), static_cast<unsigned long long>(request_size),
+                static_cast<size_t>(CAPIO_SERVER_REQUEST_MAX_SIZE));
+            remove_connection(remote_hostname);
+            continue;
+        }
+
+        if (file_size > MTCL_MAX_FILE_TRANSFER_SIZE) {
+            LOG("Rejecting MTCL frame from %s: file size %llu exceeds maximum %llu",
+                remote_hostname.c_str(), static_cast<unsigned long long>(file_size),
+                static_cast<unsigned long long>(MTCL_MAX_FILE_TRANSFER_SIZE));
+            remove_connection(remote_hostname);
+            continue;
+        }
+
+        const bool expects_file = type == MessageType::request_with_file;
+        const bool has_file     = file_size != 0;
+        if (expects_file != has_file) {
+            LOG("Rejecting MTCL frame from %s: message type %u does not match file size %llu",
+                remote_hostname.c_str(), static_cast<unsigned int>(frame[0]),
+                static_cast<unsigned long long>(file_size));
+            remove_connection(remote_hostname);
+            continue;
+        }
+
+        if (request_size + file_size != available - MTCL_HEADER_SIZE) {
+            LOG("Rejecting MTCL frame from %s: declared payload %llu does not match actual %zu",
+                remote_hostname.c_str(),
+                static_cast<unsigned long long>(request_size + file_size),
+                available - MTCL_HEADER_SIZE);
             remove_connection(remote_hostname);
             continue;
         }
@@ -232,12 +271,7 @@ RemoteRequest MTCLBackend::read_next_request() {
         const auto file_begin    = request_begin + request_size;
         std::string request(request_begin, file_begin);
 
-        if (type == MessageType::request_with_file) {
-            if (pending_file) {
-                remove_connection(remote_hostname);
-                continue;
-            }
-
+        if (expects_file) {
             pending_file.emplace(PendingFile{remote_hostname, std::move(frame),
                                              MTCL_HEADER_SIZE + static_cast<size_t>(request_size)});
         }
