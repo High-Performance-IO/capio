@@ -48,9 +48,7 @@ It is also possible to enable log in CAPIO, by defining `-DCAPIO_LOG=TRUE`.
 On the internet-connected machine, fetch CAPIO's dependencies and package their sources:
 
 ```bash
-cmake -S . -B dist/module-bundle -DCMAKE_BUILD_TYPE=Release \
-  -DCALF_PROTOBUF_FORCE_FETCH=ON -Dprotobuf_FORCE_FETCH_DEPENDENCIES=ON
-cmake --build dist/module-bundle --target offline_source_bundle
+./scripts/build_offline_source_bundle.sh
 ```
 
 Transfer `dist/capio-1.0.0-offline-source.tar.gz` to the offline machine. It needs CMake, a C++17 compiler, build tools,
@@ -61,8 +59,7 @@ glibc, libstdc++, CPU architecture, and Open MPI:
 tar -xzf capio-1.0.0-offline-source.tar.gz
 cd capio-1.0.0-offline-source
 module load "openmpi/SITE_VERSION"
-cmake -S . -B dist/module-bundle -DCMAKE_BUILD_TYPE=Release
-cmake --build dist/module-bundle --target module_bundle -j$(nproc)
+./scripts/build_offline_module.sh
 ```
 
 The generated module archive is `dist/capio-1.0.0-linux-<architecture>.tar.gz`.
