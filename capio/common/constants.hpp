@@ -14,9 +14,9 @@ constexpr off64_t CAPIO_DEFAULT_FILE_INITIAL_SIZE = 1024L * 1024 * 1024 * 4;
 // CAPIO backend constants
 constexpr char CAPIO_MCAST_ADV_DEFAULT_ADDR[]       = "224.0.0.2";
 constexpr unsigned int CAPIO_MCAST_ADV_DEFAULT_PORT = 22334;
-constexpr char CAPIO_MTCL_DEFAULT_PROTOCOL[]         = "TCP";
-constexpr char CAPIO_MTCL_DEFAULT_PORT[]             = "1234";
-constexpr int CAPIO_MTCL_DEFAULT_POLL_INTERVAL       = 1000000;
+constexpr char CAPIO_MTCL_DEFAULT_PROTOCOL[]        = "TCP";
+constexpr char CAPIO_MTCL_DEFAULT_PORT[]            = "7600";
+constexpr int CAPIO_MTCL_DEFAULT_POLL_INTERVAL      = 1000000;
 
 // CAPIO available discovery service
 constexpr char CAPIO_MCAST_PROTO_FLAG[] = "mcast";
@@ -147,6 +147,6 @@ constexpr char CAPIO_SERVER_ARG_PARSER_TOKEN_DIRECTORY_HELP[] =
     "Filesystem discovery token directory (default: .capio_tokens/)";
 constexpr char CAPIO_SERVER_ARG_PARSER_BACKEND_OPTIONS_HELP[] =
     "Backend-specific options. MTCL format: PROTO:PORT@POLL_INTERVAL_US "
-    "(default: TCP:1234@1000000)";
+    "(default: TCP:7600@1000000)";
 
 #endif // CAPIO_COMMON_CONSTANTS_HPP

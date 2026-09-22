@@ -67,7 +67,7 @@ Use `--backend-options` for backend-specific settings. MTCL accepts
 `PROTO:PORT@POLL_INTERVAL_US`; for example:
 
 ```bash
-capio_server --no-config --backend mtcl --backend-options TCP:1234@1000000
+capio_server --no-config --backend mtcl --backend-options TCP:7600@1000000
 ```
 
 If omitted, MTCL defaults to `TCP:1234@1000000`.

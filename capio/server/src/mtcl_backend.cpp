@@ -260,8 +260,7 @@ RemoteRequest MTCLBackend::read_next_request() {
 
         if (request_size + file_size != available - MTCL_HEADER_SIZE) {
             LOG("Rejecting MTCL frame from %s: declared payload %llu does not match actual %zu",
-                remote_hostname.c_str(),
-                static_cast<unsigned long long>(request_size + file_size),
+                remote_hostname.c_str(), static_cast<unsigned long long>(request_size + file_size),
                 available - MTCL_HEADER_SIZE);
             remove_connection(remote_hostname);
             continue;
