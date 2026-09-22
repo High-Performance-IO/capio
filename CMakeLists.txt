@@ -29,6 +29,8 @@ option(CAPIO_LOG "Enable capio debug logging" FALSE)
 option(ENABLE_COVERAGE "Enable code coverage collection" FALSE)
 option(CAPIO_BUILD_SERVER "Build CAPIO server component" TRUE)
 option(CAPIO_BUILD_POSIX  "Build CAPIO posix component" TRUE)
+# Used by the offline bundle builder to evaluate dependency declarations without requiring host MPI.
+option(CAPIO_DEPENDENCY_DISCOVERY "Configure only to discover dependency declarations" FALSE)
 
 #####################################
 # CMake module imports
@@ -37,22 +39,25 @@ include(FetchContent)
 include(GNUInstallDirs)
 
 set(CAPIO_VENDOR_DIR "${PROJECT_SOURCE_DIR}/vendor")
-if (IS_DIRECTORY "${CAPIO_VENDOR_DIR}/_deps")
+if (NOT CAPIO_DEPENDENCY_DISCOVERY AND IS_DIRECTORY "${CAPIO_VENDOR_DIR}/_deps")
+    # Offline bundles use FetchContent's standard <name>-src layout under this directory.
+    set(FETCHCONTENT_BASE_DIR "${CAPIO_VENDOR_DIR}/_deps" CACHE PATH "" FORCE)
     set(FETCHCONTENT_FULLY_DISCONNECTED ON)
     set(CALF_PROTOBUF_FORCE_FETCH ON CACHE BOOL "" FORCE)
     set(protobuf_FORCE_FETCH_DEPENDENCIES ON CACHE BOOL "" FORCE)
-    foreach (dependency absl args calf capio_cl jsoncons protobuf tomlplusplus)
-        string(TOUPPER "${dependency}" dependency_upper)
-        set(FETCHCONTENT_SOURCE_DIR_${dependency_upper} "${CAPIO_VENDOR_DIR}/_deps/${dependency}-src")
-    endforeach ()
     set(CAPIO_SYSCALL_INTERCEPT_SOURCE_DIR "${CAPIO_VENDOR_DIR}/syscall_intercept" CACHE PATH "" FORCE)
 endif ()
 
 #####################################
 # Dependencies
 #####################################
-find_package(MPI REQUIRED)
-find_package(Threads REQUIRED)
+if (CAPIO_DEPENDENCY_DISCOVERY)
+    # Configuration only needs the imported target; the actual offline build still requires MPI and Threads.
+    add_library(MPI::MPI_CXX INTERFACE IMPORTED)
+else ()
+    find_package(MPI REQUIRED)
+    find_package(Threads REQUIRED)
+endif ()
 
 #####################################
 # Definitions
@@ -131,11 +136,12 @@ IF (CAPIO_BUILD_SERVER AND CAPIO_BUILD_POSIX)
             RENAME "${PROJECT_VERSION}"
             COMPONENT capio_module
     )
+    # Preserve symbols in Debug bundles while keeping Release bundles stripped.
     add_custom_target(module_bundle
             COMMAND ${CMAKE_COMMAND} -E rm -rf "${CAPIO_MODULE_STAGE}"
             COMMAND ${CMAKE_COMMAND} -E make_directory "${CAPIO_MODULE_STAGE}" "${CAPIO_MODULE_OUTPUT_DIR}"
             COMMAND ${CMAKE_COMMAND} --install "${PROJECT_BINARY_DIR}" --prefix "${CAPIO_MODULE_STAGE}"
-                    --component capio_module --strip
+                    --component capio_module $<$<NOT:$<CONFIG:Debug>>:--strip>
             COMMAND ${CMAKE_COMMAND} -E chdir "${CAPIO_MODULE_STAGE_PARENT}"
                     ${CMAKE_COMMAND} -E tar czf "${CAPIO_MODULE_ARCHIVE}" "capio-${PROJECT_VERSION}"
             DEPENDS capio_server capio_posix

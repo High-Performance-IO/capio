@@ -18,6 +18,12 @@ include(ProcessorCount)
 #####################################
 # External projects
 #####################################
+if (CAPIO_DEPENDENCY_DISCOVERY)
+    # Keep ExternalProject_Add in the parent process so JSON tracing can see it.
+    add_subdirectory(syscall_intercept "${CMAKE_CURRENT_BINARY_DIR}/syscall_intercept")
+    return()
+endif ()
+
 file(MAKE_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/syscall_intercept)
 
 set(SYSCALL_INTERCEPT_INCLUDE_FOLDER "${CMAKE_CURRENT_BINARY_DIR}/syscall_intercept/${CMAKE_INSTALL_INCLUDEDIR}")

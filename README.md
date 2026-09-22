@@ -48,8 +48,13 @@ It is also possible to enable log in CAPIO, by defining `-DCAPIO_LOG=TRUE`.
 On the internet-connected machine, fetch CAPIO's dependencies and package their sources:
 
 ```bash
-./scripts/build_offline_source_bundle.sh
+./scripts/build_offline_bundle.py
 ```
+
+Use Up/Down and Enter to choose the build type (Release by default), tests (off by default), and CAPIO logger
+(off by default). Logging is saved in the offline settings as `CAPIO_LOG`; it only activates for Debug builds. The script
+then offers dependency Git ref overrides. CMake JSON tracing discovers direct and transitive dependencies; the archive
+includes the resolved dependency lock and selected build settings. Non-interactive runs safely use the defaults.
 
 Transfer `dist/capio-1.0.0-offline-source.tar.gz` to the offline machine. It needs CMake, a C++17 compiler, build tools,
 and an Open MPI development module, but does not need Git or internet access. Build against the target machine's
@@ -59,10 +64,11 @@ glibc, libstdc++, CPU architecture, and Open MPI:
 tar -xzf capio-1.0.0-offline-source.tar.gz
 cd capio-1.0.0-offline-source
 # LOAD MPI before compiling
-./scripts/build_offline_module.sh
+./scripts/compile_offline_module.sh
 ```
 
-The generated module archive is `dist/capio-1.0.0-linux-<architecture>.tar.gz`.
+The build tree remains in `build/` inside the extracted bundle so test binaries stay available. Set `BUILD_DIR` to use a
+different persistent directory. The generated module archive is `dist/capio-1.0.0-linux-<architecture>.tar.gz`.
 
 > [!IMPORTANT]
 > The bundled `syscall_intercept` dependency currently supports x86/x86_64 and RISC-V, not AArch64. `capio_server` may
