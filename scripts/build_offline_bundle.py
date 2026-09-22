@@ -3,14 +3,11 @@ import argparse
 import json
 import os
 import re
-import select
 import shutil
 import subprocess
 import sys
 import tarfile
 import tempfile
-import termios
-import tty
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional
@@ -26,7 +23,7 @@ class Dependency:
     cmake_args: tuple = ()
 
     @property
-    def normalized(self):
+    def key(self):
         return re.sub(r"[^a-z0-9_.-]+", "_", self.name.lower())
 
     @property
@@ -34,86 +31,44 @@ class Dependency:
         return re.sub(r"[^A-Z0-9_]+", "_", self.name.upper())
 
 
-def prompt_choice(prompt, choices, default):
-    if not sys.stdin.isatty():
-        print(f"{prompt}{default} (non-interactive default)")
-        return default
+def prompt_choice(prompt, choices, default, expected):
     while True:
-        try:
-            answer = input(prompt).strip().lower()
-        except EOFError:
-            answer = ""
+        answer = input(prompt).strip().lower()
         if not answer:
             return default
         for value, aliases in choices.items():
             if answer in aliases:
                 return value
-        print(f"Invalid answer. Enter {' or '.join('/'.join(a) for a in choices.values())}.")
-
-
-def prompt_yes_no(prompt, default=False):
-    suffix = " [Y/n]: " if default else " [y/N]: "
-    return prompt_choice(prompt + suffix, {True: ("y", "yes"), False: ("n", "no")}, default)
-
-
-def selector(label, choices, selected=0, highlight=True):
-    def render(redraw=False):
-        if redraw:
-            sys.stdout.write("\033[2A")
-        rows = [label]
-        for index, choice in enumerate(choices):
-            active = index == selected
-            text = f"> {choice}" if active else f"  {choice}"
-            if active and highlight:
-                text = f"\033[7m{text}\033[0m"
-            rows.append(text)
-        sys.stdout.write("\n".join(f"\r\033[2K{row}" for row in rows))
-        sys.stdout.flush()
-
-    render()
-    while True:
-        key = os.read(sys.stdin.fileno(), 1)
-        if key == b"\x03":
-            raise KeyboardInterrupt
-        if key in (b"\r", b"\n"):
-            print()
-            return choices[selected]
-        if key == b"\x1b":
-            sequence = b""
-            while len(sequence) < 2 and select.select([sys.stdin], [], [], 0.05)[0]:
-                sequence += os.read(sys.stdin.fileno(), 2 - len(sequence))
-            if sequence in (b"[A", b"[D"):
-                selected = (selected - 1) % len(choices)
-            elif sequence in (b"[B", b"[C"):
-                selected = (selected + 1) % len(choices)
-            else:
-                continue
-            render(redraw=True)
+        print(f"Invalid input. Enter {expected}.")
 
 
 def select_configuration():
-    defaults = ("Release", "No Tests", "No Logger")
-    if not (sys.stdin.isatty() and sys.stdout.isatty()):
-        print("Configuration selectors: non-interactive input; using safe defaults.")
-        return defaults
-
-    fd = sys.stdin.fileno()
-    settings = termios.tcgetattr(fd)
-    print("Use Up/Down (or Left/Right) and Enter. CAPIO logging activates only in Debug builds.")
+    build, tests, logger = "Release", False, False
+    if not sys.stdin.isatty():
+        print("Non-interactive input: using Release, no tests, no logger.")
+        return build, tests, logger
     try:
-        tty.setraw(fd)
-        sys.stdout.write("\033[?25l")
-        sys.stdout.flush()
-        highlight = os.environ.get("TERM", "") != "dumb"
-        return (selector("Build", ("Release", "Debug"), highlight=highlight),
-                selector("Tests", ("No Tests", "Tests"), highlight=highlight),
-                selector("Logger", ("No Logger", "Logger"), highlight=highlight))
-    finally:
-        try:
-            termios.tcsetattr(fd, termios.TCSADRAIN, settings)
-        finally:
-            sys.stdout.write("\033[?25h")
-            sys.stdout.flush()
+        build = prompt_choice("Build type [Release/Debug] (Release): ",
+                              {"Release": ("release", "r"), "Debug": ("debug", "d")},
+                              "Release", "release/r or debug/d")
+        tests = prompt_choice("Include tests? [y/N]: ",
+                              {True: ("y", "yes"), False: ("n", "no")}, False, "y or n")
+        logger = prompt_choice("Enable CAPIO logger? [y/N]: ",
+                               {True: ("y", "yes"), False: ("n", "no")}, False, "y or n")
+    except EOFError:
+        print("\nEOF: using defaults for unanswered prompts.")
+    return build, tests, logger
+
+
+def yes_no(prompt):
+    if not sys.stdin.isatty():
+        return False
+    try:
+        return prompt_choice(f"{prompt} [y/N]: ",
+                             {True: ("y", "yes"), False: ("n", "no")}, False, "y or n")
+    except EOFError:
+        print("\nEOF: defaulting to no.")
+        return False
 
 
 def run(*command, cwd=None, capture=False, check=True):
@@ -126,106 +81,98 @@ def run(*command, cwd=None, capture=False, check=True):
     return result
 
 
-def fetch(url, ref, destination, name=None):
-    name = name or destination.name
-    print(f"[fetch] {name}: fetching and checking out {ref}")
+def fetch(dependency, destination, ref):
+    print(f"[fetch] {dependency.name}: {ref}")
     try:
         destination.parent.mkdir(parents=True, exist_ok=True)
         run("git", "init", "-q", str(destination))
-        run("git", "remote", "add", "origin", url, cwd=destination)
+        run("git", "remote", "add", "origin", dependency.url, cwd=destination)
         shallow = run("git", "fetch", "-q", "--depth", "1", "origin", ref,
                       cwd=destination, capture=True, check=False)
-        if shallow.returncode == 0:
-            commit = "FETCH_HEAD"
-        else:
-            shutil.rmtree(destination)
-            run("git", "init", "-q", str(destination))
-            run("git", "remote", "add", "origin", url, cwd=destination)
-            run("git", "fetch", "-q", "origin", "+refs/heads/*:refs/remotes/origin/*",
-                "+refs/tags/*:refs/tags/*", cwd=destination)
+        commit = "FETCH_HEAD"
+        if shallow.returncode:
+            deepen = ["--unshallow"] if (destination / ".git/shallow").exists() else []
+            run("git", "fetch", "-q", *deepen, "origin",
+                "+refs/heads/*:refs/remotes/origin/*", "+refs/tags/*:refs/tags/*", cwd=destination)
             commit = next((candidate for candidate in (ref, f"origin/{ref}")
                            if run("git", "rev-parse", "--verify", f"{candidate}^{{commit}}",
                                   cwd=destination, capture=True, check=False).returncode == 0), None)
             if commit is None:
-                raise RuntimeError(f"ref {ref!r} from {url} could not be resolved")
+                raise RuntimeError(f"ref {ref!r} could not be resolved")
         run("git", "checkout", "-q", "--detach", commit, cwd=destination)
     except (RuntimeError, OSError) as error:
-        raise RuntimeError(f"fetch/check-out failed for dependency {name}: {error}") from None
+        raise RuntimeError(f"fetch/check-out failed for {dependency.name}: {error}") from None
 
 
 def declaration(record, kind):
     args = [part for argument in record.get("args", []) for part in argument.split(";")]
     if not args:
         return None
-    values = {}
-    for index, value in enumerate(args[1:], 1):
-        key = value.upper()
-        if key in {"GIT_REPOSITORY", "GIT_TAG", "URL", "SOURCE_DIR", "DOWNLOAD_COMMAND",
-                   "SVN_REPOSITORY", "HG_REPOSITORY", "CVS_REPOSITORY"}:
-            values[key] = args[index + 1] if index + 1 < len(args) else ""
-    name = args[0]
-    url = values.get("GIT_REPOSITORY")
-    if not url:
-        metadata = next((key for key in ("URL", "SOURCE_DIR", "DOWNLOAD_COMMAND", "SVN_REPOSITORY",
-                                         "HG_REPOSITORY", "CVS_REPOSITORY") if key in values), "metadata")
-        raise RuntimeError(f"{kind} dependency {name!r} uses unsupported non-Git {metadata}")
+    values = {value.upper(): args[index + 1] for index, value in enumerate(args[:-1])
+              if value.upper() in ("GIT_REPOSITORY", "GIT_TAG")}
+    if "GIT_REPOSITORY" not in values:
+        raise RuntimeError(f"{kind} dependency {args[0]!r} uses unsupported non-Git metadata")
     cmake_args = ()
     if kind == "external" and "CMAKE_ARGS" in args:
-        start = args.index("CMAKE_ARGS") + 1
-        cmake_args = tuple(value for value in args[start:] if value.startswith("-D"))
-    return Dependency(kind, name, url, values.get("GIT_TAG", "HEAD"), cmake_args=cmake_args)
+        cmake_args = tuple(value for value in args[args.index("CMAKE_ARGS") + 1:]
+                           if value.startswith("-D"))
+    return Dependency(kind, args[0], values["GIT_REPOSITORY"], values.get("GIT_TAG", "HEAD"),
+                      cmake_args=cmake_args)
 
 
-def read_trace(path):
-    if not path.is_file():
-        raise RuntimeError("CMake JSON tracing is unavailable; CMake with --trace-format=json-v1 is required")
-    dependencies = []
-    for line in path.read_text().splitlines():
+def configure_trace(source, build, definitions, cmake_args=()):
+    build.parent.mkdir(parents=True, exist_ok=True)
+    trace = build.with_name(f"{build.name}-trace.json")
+    command = ["cmake", "-Wno-dev", "-Wno-deprecated", "--trace-expand",
+               "--trace-format=json-v1", f"--trace-redirect={trace}",
+               "-S", str(source), "-B", str(build), "-DCMAKE_POLICY_VERSION_MINIMUM=3.5"]
+    command += [f"-D{key}={value}" for key, value in definitions.items()]
+    command += [arg.replace("<INSTALL_DIR>", str(build.parent / "install")) for arg in cmake_args]
+    print(f"[discovery] Configuring {source}")
+    result = run(*command, capture=True, check=False)
+    if not trace.is_file():
+        raise RuntimeError("CMake JSON tracing is unavailable; --trace-format=json-v1 is required")
+    found = []
+    for line in trace.read_text().splitlines():
         try:
             record = json.loads(line)
         except json.JSONDecodeError:
             continue
-        command = record.get("cmd", "").lower()
-        if command == "fetchcontent_declare":
-            dependencies.append(declaration(record, "fetchcontent"))
-        elif command == "externalproject_add" and "/Modules/" not in record.get("file", ""):
-            dependencies.append(declaration(record, "external"))
-    return [dependency for dependency in dependencies if dependency]
-
-
-def configure_trace(source, build, definitions, cmake_args=()):
-    print(f"[discovery] Configuring CMake discovery for {source.name}")
-    build.parent.mkdir(parents=True, exist_ok=True)
-    trace = build.parent / f"{build.name}-trace.json"
-    command = ["cmake", "-Wno-dev", "-Wno-deprecated", "--trace-expand",
-               "--trace-format=json-v1", f"--trace-redirect={trace}",
-               "-S", str(source), "-B", str(build), "-DCMAKE_POLICY_VERSION_MINIMUM=3.5"]
-    command.extend(f"-D{key}={value}" for key, value in definitions.items())
-    command.extend(arg.replace("<INSTALL_DIR>", str(build.parent / "install")) for arg in cmake_args)
-    result = run(*command, capture=True, check=False)
-    dependencies = read_trace(trace)
+        command_name = record.get("cmd", "").lower()
+        if command_name == "fetchcontent_declare":
+            found.append(declaration(record, "fetchcontent"))
+        elif command_name == "externalproject_add" and "/Modules/" not in record.get("file", ""):
+            found.append(declaration(record, "external"))
     if result.returncode:
         detail = (result.stderr or result.stdout or "").strip()
         raise RuntimeError(f"CMake dependency discovery failed for {source}: {detail}")
-    print(f"[discovery] Found {len(dependencies)} declaration(s)")
-    for dependency in dependencies:
-        print(f"  - {dependency.name}: kind={dependency.kind}, repo={dependency.url}, ref={dependency.ref}")
-    return dependencies
+    base = Path(definitions["FETCHCONTENT_BASE_DIR"])
+    for dependency in found:
+        if dependency.kind == "fetchcontent":
+            candidate = Path(definitions.get(f"FETCHCONTENT_SOURCE_DIR_{dependency.variable}",
+                                             base / f"{dependency.key}-src"))
+            if (candidate / ".git").exists():
+                dependency.source = candidate
+    print(f"[discovery] {len(found)} declaration(s) in {source}")
+    for dependency in found:
+        print(f"  - {dependency.name}: {dependency.kind}, {dependency.url}, {dependency.ref}")
+    return found
 
 
 def merge(dependencies, found):
     for dependency in found:
-        key = (dependency.kind, dependency.normalized)
-        previous = dependencies.get(key)
-        if previous and (previous.url, previous.ref) != (dependency.url, dependency.ref):
-            raise RuntimeError(f"conflicting declarations for {dependency.name}: "
-                               f"{previous.url}@{previous.ref} and {dependency.url}@{dependency.ref}")
-        dependencies.setdefault(key, dependency)
+        previous = dependencies.get(dependency.key)
+        if previous and (previous.kind, previous.url, previous.ref) != (
+                dependency.kind, dependency.url, dependency.ref):
+            raise RuntimeError(f"conflicting declarations for {dependency.name}")
+        if previous:
+            previous.source = previous.source or dependency.source
+        else:
+            dependencies[dependency.key] = dependency
 
 
-def nested_dependency_projects(source):
+def nested_projects(source):
     excluded = {".git", "_deps", "cmakefiles", "build", "_build", "generated"}
-    candidates = []
     for directory, names, files in os.walk(source):
         names[:] = [name for name in names if name.lower() not in excluded
                     and not name.lower().startswith(("build-", "cmake-build-"))]
@@ -233,140 +180,95 @@ def nested_dependency_projects(source):
         if path == source or "CMakeLists.txt" not in files:
             continue
         text = (path / "CMakeLists.txt").read_text(errors="replace")
-        if (re.search(r"\bproject\s*\(", text, re.IGNORECASE)
-                and re.search(r"\b(?:FetchContent_Declare|ExternalProject_Add)\s*\(",
-                              text, re.IGNORECASE)):
-            candidates.append(path)
-    return candidates
+        if (re.search(r"\bproject\s*\(", text, re.I)
+                and re.search(r"\b(?:FetchContent_Declare|ExternalProject_Add)\s*\(", text, re.I)):
+            yield path
 
 
-def index_populated_sources(work, dependencies, registry, override_sources):
-    for key, dependency in dependencies.items():
-        if dependency.kind != "fetchcontent":
-            continue
-        override = override_sources / f"{dependency.normalized}-src"
-        if (override / ".git").exists():
-            registry[key] = override
-            continue
-        if key in registry:
-            continue
-        registry[key] = next((path for path in work.rglob(f"{dependency.normalized}-src")
-                              if path.is_dir() and (path / ".git").exists()), None)
-        if registry[key] is None:
-            del registry[key]
-
-
-def discover(root, work, build_type, include_tests, overrides, known):
+def discover(root, work, build_type, tests, overrides, known):
     dependencies = {}
-    source_registry = {}
-    override_sources = work / "overrides"
+    override_dir = work / "overrides"
     definitions = {
-        "CAPIO_DEPENDENCY_DISCOVERY": "ON",
-        "CAPIO_BUILD_TESTS": "ON" if include_tests else "OFF",
-        "CMAKE_BUILD_TYPE": build_type,
-        "FETCHCONTENT_BASE_DIR": str(work / "root-deps"),
-        "CALF_TESTS": "OFF",
-        "CALF_PYTHON_TESTS": "OFF",
-        "CALF_BUILD_PYTHON_BINDINGS": "OFF",
-        "CALF_PROTOBUF_FORCE_FETCH": "ON",
-        "protobuf_BUILD_TESTS": "OFF",
-        "protobuf_FORCE_FETCH_DEPENDENCIES": "ON",
-        "ABSL_BUILD_TESTING": "OFF",
+        "CAPIO_DEPENDENCY_DISCOVERY": "ON", "CAPIO_BUILD_TESTS": "ON" if tests else "OFF",
+        "CMAKE_BUILD_TYPE": build_type, "FETCHCONTENT_BASE_DIR": work / "root-deps",
+        "CALF_TESTS": "OFF", "CALF_PYTHON_TESTS": "OFF", "CALF_BUILD_PYTHON_BINDINGS": "OFF",
+        "CALF_PROTOBUF_FORCE_FETCH": "ON", "protobuf_BUILD_TESTS": "OFF",
+        "protobuf_FORCE_FETCH_DEPENDENCIES": "ON", "ABSL_BUILD_TESTING": "OFF",
     }
-    print(f"[overrides] Applying {len(overrides)} dependency override(s)")
     for key, ref in overrides.items():
         dependency = known.get(key)
         if not dependency or dependency.kind != "fetchcontent":
             continue
-        source = override_sources / f"{dependency.normalized}-src"
-        fetch(dependency.url, ref, source, dependency.name)
-        source_registry[key] = source
-        definitions[f"FETCHCONTENT_SOURCE_DIR_{dependency.variable}"] = str(source)
+        source = override_dir / f"{key}-src"
+        fetch(dependency, source, ref)
+        definitions[f"FETCHCONTENT_SOURCE_DIR_{dependency.variable}"] = source
 
     found = configure_trace(root, work / "root-build", definitions)
     merge(dependencies, found)
-    index_populated_sources(work, dependencies, source_registry, override_sources)
-    external_queue = [dependency for dependency in found if dependency.kind == "external"]
-    configured = set()
-    configured_paths = set()
+    queue = [dependency.key for dependency in found if dependency.kind == "external"]
+    configured, configured_paths = set(), set()
     nested_index = 0
-    while external_queue:
-        dependency = external_queue.pop(0)
-        key = (dependency.kind, dependency.normalized)
+    while queue:
+        key = queue.pop(0)
         if key in configured:
             continue
         configured.add(key)
         dependency = dependencies[key]
-        ref = overrides.get(key, dependency.ref)
-        source = work / "external" / dependency.normalized
-        fetch(dependency.url, ref, source, dependency.name)
+        source = work / "external" / key
+        fetch(dependency, source, overrides.get(key, dependency.ref))
         dependency.source = source
-        source_registry[key] = source
         configured_paths.add(source.resolve())
-        nested_definitions = {
-            "CMAKE_BUILD_TYPE": build_type,
-            "FETCHCONTENT_BASE_DIR": str(work / "external-deps" / dependency.normalized),
-        }
-        for override_key, override_ref in overrides.items():
+        nested_definitions = {"CMAKE_BUILD_TYPE": build_type,
+                              "FETCHCONTENT_BASE_DIR": work / "external-deps" / key}
+        for override_key, ref in overrides.items():
             override = known.get(override_key)
             if not override or override.kind != "fetchcontent":
                 continue
-            override_source = override_sources / f"{override.normalized}-src"
+            override_source = override_dir / f"{override_key}-src"
             if not override_source.exists():
-                fetch(override.url, override_ref, override_source, override.name)
-            nested_definitions[f"FETCHCONTENT_SOURCE_DIR_{override.variable}"] = str(override_source)
-        nested = configure_trace(source, work / "external-build" / dependency.normalized,
+                fetch(override, override_source, ref)
+            nested_definitions[f"FETCHCONTENT_SOURCE_DIR_{override.variable}"] = override_source
+        nested = configure_trace(source, work / "external-build" / key,
                                  nested_definitions, dependency.cmake_args)
         merge(dependencies, nested)
-        index_populated_sources(work, dependencies, source_registry, override_sources)
-        external_queue.extend(item for item in nested if item.kind == "external")
-
-        for candidate in nested_dependency_projects(source):
-            resolved = candidate.resolve()
-            if resolved in configured_paths:
+        queue += [item.key for item in nested if item.kind == "external"]
+        for candidate in nested_projects(source):
+            if candidate.resolve() in configured_paths:
                 continue
-            configured_paths.add(resolved)
+            configured_paths.add(candidate.resolve())
             nested_index += 1
-            relative = candidate.relative_to(source)
-            print(f"[discovery] Nested dependency project: {dependency.name}/{relative}")
+            print(f"[discovery] Nested project {dependency.name}/{candidate.relative_to(source)}")
             candidate_definitions = dict(nested_definitions)
-            candidate_definitions["FETCHCONTENT_BASE_DIR"] = str(
-                work / "nested-deps" / f"candidate-{nested_index}")
+            candidate_definitions["FETCHCONTENT_BASE_DIR"] = work / "nested-deps" / str(nested_index)
             try:
-                candidate_dependencies = configure_trace(
-                    candidate, work / "nested-build" / f"candidate-{nested_index}",
-                    candidate_definitions)
+                nested = configure_trace(candidate, work / "nested-build" / str(nested_index),
+                                         candidate_definitions)
             except RuntimeError as error:
-                raise RuntimeError(f"nested dependency project {candidate} failed: {error}") from None
-            print(f"[discovery] Nested project {dependency.name}/{relative} found "
-                  f"{len(candidate_dependencies)} declaration(s)")
-            merge(dependencies, candidate_dependencies)
-            index_populated_sources(work, dependencies, source_registry, override_sources)
-            external_queue.extend(item for item in candidate_dependencies if item.kind == "external")
+                raise RuntimeError(f"nested project {candidate} failed: {error}") from None
+            merge(dependencies, nested)
+            queue += [item.key for item in nested if item.kind == "external"]
 
-    index_populated_sources(work, dependencies, source_registry, override_sources)
-    for key, dependency in dependencies.items():
+    for dependency in dependencies.values():
         if dependency.source:
             continue
-        ref = overrides.get(key, dependency.ref)
-        dependency.source = source_registry.get(key)
-        if dependency.source is None:
-            dependency.source = work / "declared" / f"{dependency.normalized}-src"
-            fetch(dependency.url, ref, dependency.source, dependency.name)
+        override = override_dir / f"{dependency.key}-src"
+        matches = [override] if (override / ".git").exists() else [
+            path for path in work.rglob(f"{dependency.key}-src") if (path / ".git").exists()]
+        if matches:
+            dependency.source = matches[0]
+            print(f"[fetch] {dependency.name}: populated by CMake ({overrides.get(dependency.key, dependency.ref)})")
         else:
-            print(f"[fetch] {dependency.name}: fetched and checked out by CMake discovery ({ref})")
+            dependency.source = work / "declared" / f"{dependency.key}-src"
+            fetch(dependency, dependency.source, overrides.get(dependency.key, dependency.ref))
     return dependencies
 
 
 def copy_repository(root, stage):
-    files = run("git", "ls-files", "-z", cwd=root, capture=True).stdout.split("\0")
-    replaced = {"scripts/build_offline_bundle.py", "scripts/compile_offline_module.sh",
-                "scripts/syscall_intercept-local-capstone.patch"}
+    overlays = {"scripts/build_offline_bundle.py", "scripts/compile_offline_module.sh"}
+    files = set(run("git", "ls-files", "-z", cwd=root, capture=True).stdout.split("\0")) | overlays
     for relative in files:
-        if not relative or relative in replaced:
-            continue
         source = root / relative
-        if not source.is_file() and not source.is_symlink():
+        if not relative or (not source.is_file() and not source.is_symlink()):
             continue
         target = stage / relative
         target.parent.mkdir(parents=True, exist_ok=True)
@@ -374,143 +276,102 @@ def copy_repository(root, stage):
             target.symlink_to(os.readlink(source))
         else:
             shutil.copy2(source, target)
-    for relative in replaced:
-        target = stage / relative
-        target.parent.mkdir(parents=True, exist_ok=True)
-        shutil.copy2(root / relative, target)
-
-
-def dependency_signature(dependencies, overrides):
-    return tuple(sorted((kind, name, dependency.url, overrides.get((kind, name), dependency.ref))
-                        for (kind, name), dependency in dependencies.items()))
 
 
 def main():
     root = Path(__file__).resolve().parent.parent
     parser = argparse.ArgumentParser(description="Build an offline CAPIO source archive")
-    parser.add_argument("output", nargs="?", type=Path, default=root / "dist",
-                        help="final archive directory (default: %(default)s)")
+    parser.add_argument("output", nargs="?", type=Path, default=root / "dist")
     args = parser.parse_args()
     for command in ("cmake", "git"):
         if shutil.which(command) is None:
             raise SystemExit(f"error: {command} is required")
-
-    match = re.search(r"\bVERSION\s+([0-9]+\.[0-9]+\.[0-9]+)",
-                      (root / "CMakeLists.txt").read_text())
-    if not match:
+    version = re.search(r"\bVERSION\s+([0-9]+\.[0-9]+\.[0-9]+)",
+                        (root / "CMakeLists.txt").read_text())
+    if not version:
         raise SystemExit("error: could not read CAPIO version")
-    build_type, tests_choice, logger_choice = select_configuration()
-    include_tests = tests_choice == "Tests"
-    include_logger = logger_choice == "Logger"
-    print("\nConfiguration")
-    print(f"  Build:  {build_type}")
-    print(f"  Tests:  {'enabled' if include_tests else 'disabled'}")
-    print(f"  Logger: {'enabled' if include_logger else 'disabled'}")
-    if include_logger and build_type != "Debug":
-        print("  Warning: CAPIO logging is selected but only activates in Debug builds.")
-    package = f"capio-{match.group(1)}-offline-source"
+    build_type, tests, logger = select_configuration()
+    print(f"\nConfiguration\n  Build:  {build_type}\n  Tests:  {'enabled' if tests else 'disabled'}"
+          f"\n  Logger: {'enabled' if logger else 'disabled'}")
+    if logger and build_type != "Debug":
+        print("  Warning: CAPIO logging only activates in Debug builds.")
+    package = f"capio-{version.group(1)}-offline-source"
     output = args.output.resolve()
-    output.parent.mkdir(parents=True, exist_ok=True)
-    output.mkdir(exist_ok=True)
-
-    phase = "initial dependency discovery"
+    output.mkdir(parents=True, exist_ok=True)
+    phase = "dependency discovery"
     try:
-        with tempfile.TemporaryDirectory(prefix="capio-offline-source.") as work_name, \
-                tempfile.TemporaryDirectory(prefix=".capio-archive.", dir=output.parent) as archive_name:
-            work = Path(work_name)
-            print("\n[discovery] Initial pass")
-            dependencies = discover(root, work / "discovery-0", build_type, include_tests, {}, {})
-            overrides = {}
-            if prompt_yes_no("Override dependency Git refs?", False):
-                prompted = set()
-                previous = None
-                for iteration in range(1, 6):
+        with tempfile.TemporaryDirectory(prefix="capio-offline-source.") as temporary, \
+                tempfile.TemporaryDirectory(prefix=".capio-archive.", dir=output.parent) as archive_dir:
+            work = Path(temporary)
+            dependencies = discover(root, work / "discovery-0", build_type, tests, {}, {})
+            overrides, prompted, pass_number = {}, set(), 0
+            if yes_no("Override dependency Git refs?"):
+                while True:
+                    entered = False
                     for key, dependency in sorted(dependencies.items()):
-                        if key not in prompted:
-                            answer = input(f"  {dependency.name} ref [{dependency.ref}]: ").strip()
-                            if answer:
-                                overrides[key] = answer
-                            prompted.add(key)
-                    known = dependencies
-                    phase = f"dependency rediscovery pass {iteration}"
-                    print(f"[discovery] Rediscovery pass {iteration} of 5")
-                    dependencies = discover(root, work / f"discovery-{iteration}", build_type,
-                                            include_tests, overrides, known)
-                    signature = dependency_signature(dependencies, overrides)
-                    if signature == previous and all(key in prompted for key in dependencies):
+                        if key in prompted:
+                            continue
+                        answer = input(f"  {dependency.name} ref [{dependency.ref}]: ").strip()
+                        prompted.add(key)
+                        if answer:
+                            overrides[key], entered = answer, True
+                    if not entered:
                         break
-                    previous = signature
-                else:
-                    raise RuntimeError("dependency discovery did not converge after 5 passes")
+                    pass_number += 1
+                    dependencies = discover(root, work / f"discovery-{pass_number}", build_type,
+                                            tests, overrides, dependencies)
 
-            print(f"[discovery] {len(dependencies)} unique dependency source(s) ready")
-            phase = "staging source tree"
-            print("[package] Staging CAPIO source tree")
+            print(f"[package] Staging {len(dependencies)} dependency source(s)")
+            phase = "source staging"
             stage = work / package
             stage.mkdir()
             copy_repository(root, stage)
-            vendor = stage / "vendor"
-            lock = []
-            print(f"[package] Copying {len(dependencies)} dependency source(s)")
+            vendor, lock = stage / "vendor", []
             for key, dependency in sorted(dependencies.items()):
-                phase = f"packaging dependency {dependency.name}"
-                print(f"  - {dependency.name} ({dependency.kind})")
-                destination = (vendor / "_deps" / f"{dependency.normalized}-src"
-                               if dependency.kind == "fetchcontent" else vendor / dependency.normalized)
+                destination = (vendor / "_deps" / f"{key}-src"
+                               if dependency.kind == "fetchcontent" else vendor / key)
                 destination.parent.mkdir(parents=True, exist_ok=True)
                 shutil.copytree(dependency.source, destination, symlinks=True)
-                resolved = run("git", "rev-parse", "HEAD", cwd=destination, capture=True).stdout.strip()
+                head = run("git", "rev-parse", "HEAD", cwd=destination, capture=True).stdout.strip()
                 lock.append(f"{dependency.kind}\t{dependency.name}\t{dependency.url}\t"
-                            f"{overrides.get(key, dependency.ref)}\t{resolved}\n")
+                            f"{overrides.get(key, dependency.ref)}\t{head}\n")
 
-            phase = "patching vendored dependencies"
-            print("[patch] Applying offline source patch")
-            patch = stage / "scripts" / "syscall_intercept-local-capstone.patch"
-            patched = False
+            phase = "vendored dependency patching"
+            for patch in (stage / "scripts").glob("*.patch"):
+                for dependency in dependencies.values():
+                    target = vendor / dependency.key
+                    if dependency.kind == "external" and run(
+                            "git", "apply", "--check", str(patch), cwd=target,
+                            capture=True, check=False).returncode == 0:
+                        run("git", "apply", str(patch), cwd=target)
+                        break
+                else:
+                    raise RuntimeError(f"no discovered ExternalProject source accepts {patch.name}")
             for dependency in dependencies.values():
-                if dependency.kind != "external":
-                    continue
-                target = vendor / dependency.normalized
-                if run("git", "apply", "--check", str(patch), cwd=target,
-                       capture=True, check=False).returncode == 0:
-                    run("git", "apply", str(patch), cwd=target)
-                    patched = True
-                    break
-            if not patched:
-                raise RuntimeError(f"no discovered ExternalProject source accepts {patch.name}")
-
-            for dependency in dependencies.values():
-                if dependency.kind == "fetchcontent":
-                    alias = vendor / dependency.normalized
-                    if not alias.exists():
-                        alias.symlink_to(Path("_deps") / f"{dependency.normalized}-src")
+                if dependency.kind == "fetchcontent" and not (vendor / dependency.key).exists():
+                    (vendor / dependency.key).symlink_to(Path("_deps") / f"{dependency.key}-src")
             for git_directory in stage.rglob(".git"):
                 if git_directory.is_dir():
                     shutil.rmtree(git_directory)
-            phase = "writing dependency lock and CMake cache"
-            print("[write] Writing dependency lock and offline CMake cache")
+
             (stage / "offline-dependencies.lock").write_text("".join(lock))
             cache = [f'set(CMAKE_BUILD_TYPE "{build_type}" CACHE STRING "")',
-                     f'set(CAPIO_BUILD_TESTS {"ON" if include_tests else "OFF"} CACHE BOOL "")',
+                     f'set(CAPIO_BUILD_TESTS {"ON" if tests else "OFF"} CACHE BOOL "")',
+                     f'set(CAPIO_LOG {"ON" if logger else "OFF"} CACHE BOOL "")',
                      'set(FETCHCONTENT_FULLY_DISCONNECTED ON CACHE BOOL "")']
-            for dependency in dependencies.values():
-                if dependency.kind == "fetchcontent":
-                    cache.append(f'set(FETCHCONTENT_SOURCE_DIR_{dependency.variable} '
-                                 f'"${{CMAKE_CURRENT_LIST_DIR}}/vendor/_deps/{dependency.normalized}-src" '
-                                 'CACHE PATH "")')
-            cache.append("set(CAPIO_LOG {} CACHE BOOL \"\")".format(
-                "ON" if include_logger else "OFF"))
+            cache += [f'set(FETCHCONTENT_SOURCE_DIR_{dependency.variable} '
+                      f'"${{CMAKE_CURRENT_LIST_DIR}}/vendor/_deps/{dependency.key}-src" CACHE PATH "")'
+                      for dependency in dependencies.values() if dependency.kind == "fetchcontent"]
             (stage / "offline-source.cmake").write_text("\n".join(cache) + "\n")
-            phase = "archiving offline source bundle"
-            print("[archive] Creating compressed archive")
-            temporary_archive = Path(archive_name) / f"{package}.tar.gz"
-            with tarfile.open(temporary_archive, "w:gz") as archive:
-                archive.add(stage, arcname=package)
-            final_archive = output / temporary_archive.name
-            os.replace(temporary_archive, final_archive)
-        print("\nComplete")
-        print(f"  Dependencies: {len(dependencies)}")
-        print(f"  Output: {final_archive}")
+
+            phase = "archive creation"
+            archive = Path(archive_dir) / f"{package}.tar.gz"
+            print(f"[archive] Creating {archive.name}")
+            with tarfile.open(archive, "w:gz") as output_archive:
+                output_archive.add(stage, arcname=package)
+            final_archive = output / archive.name
+            os.replace(archive, final_archive)
+        print(f"\nComplete\n  Dependencies: {len(dependencies)}\n  Output: {final_archive}")
     except (RuntimeError, OSError) as error:
         raise SystemExit(f"error: {phase} failed: {error}") from None
 
