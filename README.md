@@ -51,8 +51,8 @@ On the internet-connected machine, fetch CAPIO's dependencies and package their 
 ./scripts/build_offline_bundle.py
 ```
 
-Use Up/Down and Enter to choose the build type (Release by default), tests (off by default), and CAPIO logger
-(off by default). Logging is saved in the offline settings as `CAPIO_LOG`; it only activates for Debug builds. The script
+The script prompts for the build type (Release by default), tests (off by default), and CAPIO logger (off by default).
+Logging is saved in the offline settings as `CAPIO_LOG`; it only activates for Debug builds. The script
 then offers dependency Git ref overrides. CMake JSON tracing discovers direct and transitive dependencies; the archive
 includes the resolved dependency lock and selected build settings. Non-interactive runs safely use the defaults.
 
