@@ -24,12 +24,13 @@ CAPIO depends on the following software that needs to be manually installed:
 - `openmpi`
 - `pthreads`
 
-The following dependencies are automatically fetched during cmake configuration phase, and compiled when required.
+The following dependencies are automatically fetched during the CMake configuration phase and built as needed.
 
-- [CAPIO-CL](https://github.com/High-Performance-IO/CAPIO-CL) To handle the CAPIO-CL configuration and enforce streaming directives
-- [CALF](https://github.com/High-Performance-IO/CALF) To manage logging and CLI printing
-- [alpha-unito/syscall_intercept](https://github.com/alpha-unito/syscall_intercept) to intercept syscalls (forked from ```pmem/syscall_interept```)
-- [Taywee/args](https://github.com/Taywee/args) to parse server command line inputs
+- [CAPIO-CL](https://github.com/High-Performance-IO/CAPIO-CL) handles CAPIO-CL configuration and enforces streaming directives.
+- [CALF](https://github.com/High-Performance-IO/CALF) provides logging and CLI output.
+- [alpha-unito/syscall_intercept](https://github.com/alpha-unito/syscall_intercept) intercepts system calls (forked from `pmem/syscall_intercept`).
+- [ParaGroup/MTCL](https://github.com/ParaGroup/MTCL) provides dynamic, multi-backend communication between CAPIO server instances.
+- [Taywee/args](https://github.com/Taywee/args) parses server command-line arguments.
 
 ### Compile capio
 
@@ -57,21 +58,6 @@ the first is optional).
    [CAPIO_DIR=your_capiodir] [mpiexec -N 1 --hostfile your_hostfile] capio_server -c conf.json 
    ```
 
-> [!NOTE]
-> if `CAPIO_DIR` is not specified when launching capio_server, it will default to the current working directory of
-> capio_server.
-
-### Server backend options
-
-Use `--backend-options` for backend-specific settings. MTCL accepts
-`PROTO:PORT@POLL_INTERVAL_US`; for example:
-
-```bash
-capio_server --no-config --backend mtcl --backend-options TCP:7600@1000000
-```
-
-If omitted, MTCL defaults to `TCP:1234@1000000`.
-
 3) Launch your programs preloading the CAPIO shared library like this:
    ```bash
    CAPIO_DIR=your_capiodir      \
@@ -81,9 +67,24 @@ If omitted, MTCL defaults to `TCP:1234@1000000`.
    ./your_app <args>
     ```
 
-> [!WARNING]  
+> [!WARNING]
 > `CAPIO_DIR` must be specified when launching a program with the CAPIO library. if `CAPIO_DIR` is not specified, CAPIO
 > will not intercept syscalls.
+
+> [!NOTE]
+> If `CAPIO_DIR` is not specified when launching `capio_server`, it defaults to the server's current working directory.
+
+### Server backend options
+
+Use `--backend-options` to configure the MTCL backend. Its format is
+`PROTO:PORT@POLL_INTERVAL_US`; for example:
+
+```bash
+capio_server --no-config --backend mtcl --backend-options TCP:7600@1000000
+```
+
+If omitted, MTCL defaults to `TCP:7600@1000000`. See the
+[MTCL repository](https://github.com/ParaGroup/MTCL) for supported communication protocols and their requirements.
 
 ### Available environment variables
 
@@ -212,4 +213,4 @@ Marco Edoardo Santimaria <marcoedoardo.santimaria@unito.it> (Designer and mainta
 Iacopo Colonnelli <iacopo.colonnelli@unito.it> (Workflows expert and maintainer) \
 Massimo Torquati <massimo.torquati@unipi.it> (Designer) \
 Marco Aldinucci <marco.aldinucci@unito.it> (Designer) \
-Alberto Riccardo Martinelli <albertoriccardo.martinelli@unito.it> (designer and maintainer) 
+Alberto Riccardo Martinelli <albertoriccardo.martinelli@unito.it> (designer and maintainer)
