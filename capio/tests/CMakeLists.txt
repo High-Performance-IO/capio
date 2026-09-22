@@ -8,6 +8,11 @@ FetchContent_Declare(
 )
 FetchContent_MakeAvailable(GoogleTest)
 
+if (CAPIO_DEPENDENCY_DISCOVERY)
+    # Dependency tracing needs googletest, but not test targets or their link requirements.
+    return()
+endif ()
+
 #####################################
 # CMake module imports
 #####################################

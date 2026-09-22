@@ -76,6 +76,7 @@ target_link_libraries(${TARGET_NAME} PRIVATE ${MPI_LIBRARIES} pthread rt stdc++f
 #####################################
 install(TARGETS ${TARGET_NAME}
         RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
+        COMPONENT capio_module
 )
 
 #####################################

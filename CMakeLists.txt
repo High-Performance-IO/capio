@@ -29,6 +29,8 @@ option(CAPIO_LOG "Enable capio debug logging" FALSE)
 option(ENABLE_COVERAGE "Enable code coverage collection" FALSE)
 option(CAPIO_BUILD_SERVER "Build CAPIO server component" TRUE)
 option(CAPIO_BUILD_POSIX  "Build CAPIO posix component" TRUE)
+# Used by the offline bundle builder to evaluate dependency declarations without requiring host MPI.
+option(CAPIO_DEPENDENCY_DISCOVERY "Configure only to discover dependency declarations" FALSE)
 
 #####################################
 # CMake module imports
@@ -36,11 +38,26 @@ option(CAPIO_BUILD_POSIX  "Build CAPIO posix component" TRUE)
 include(FetchContent)
 include(GNUInstallDirs)
 
+set(CAPIO_VENDOR_DIR "${PROJECT_SOURCE_DIR}/vendor")
+if (NOT CAPIO_DEPENDENCY_DISCOVERY AND IS_DIRECTORY "${CAPIO_VENDOR_DIR}/_deps")
+    # Offline bundles use FetchContent's standard <name>-src layout under this directory.
+    set(FETCHCONTENT_BASE_DIR "${CAPIO_VENDOR_DIR}/_deps" CACHE PATH "" FORCE)
+    set(FETCHCONTENT_FULLY_DISCONNECTED ON)
+    set(CALF_PROTOBUF_FORCE_FETCH ON CACHE BOOL "" FORCE)
+    set(protobuf_FORCE_FETCH_DEPENDENCIES ON CACHE BOOL "" FORCE)
+    set(CAPIO_SYSCALL_INTERCEPT_SOURCE_DIR "${CAPIO_VENDOR_DIR}/syscall_intercept" CACHE PATH "" FORCE)
+endif ()
+
 #####################################
 # Dependencies
 #####################################
-find_package(MPI REQUIRED)
-find_package(Threads REQUIRED)
+if (CAPIO_DEPENDENCY_DISCOVERY)
+    # Configuration only needs the imported target; the actual offline build still requires MPI and Threads.
+    add_library(MPI::MPI_CXX INTERFACE IMPORTED)
+else ()
+    find_package(MPI REQUIRED)
+    find_package(Threads REQUIRED)
+endif ()
 
 #####################################
 # Definitions
@@ -107,3 +124,29 @@ IF (CAPIO_BUILD_TESTS)
     message(STATUS "Building CAPIO test suite")
     add_subdirectory(capio/tests)
 ENDIF (CAPIO_BUILD_TESTS)
+
+IF (CAPIO_BUILD_SERVER AND CAPIO_BUILD_POSIX)
+    set(CAPIO_MODULE_OUTPUT_DIR "${PROJECT_SOURCE_DIR}/dist")
+    set(CAPIO_MODULE_ARCHIVE "${CAPIO_MODULE_OUTPUT_DIR}/capio-${PROJECT_VERSION}-linux-${CMAKE_SYSTEM_PROCESSOR}.tar.gz")
+    set(CAPIO_MODULE_STAGE_PARENT "${PROJECT_BINARY_DIR}/module")
+    set(CAPIO_MODULE_STAGE "${CAPIO_MODULE_STAGE_PARENT}/capio-${PROJECT_VERSION}")
+    message(STATUS "CAPIO module bundle artifact: ${CAPIO_MODULE_ARCHIVE}")
+    install(FILES "${PROJECT_SOURCE_DIR}/scripts/capio.module"
+            DESTINATION modulefiles/capio
+            RENAME "${PROJECT_VERSION}"
+            COMPONENT capio_module
+    )
+    # Preserve symbols in Debug bundles while keeping Release bundles stripped.
+    add_custom_target(module_bundle
+            COMMAND ${CMAKE_COMMAND} -E rm -rf "${CAPIO_MODULE_STAGE}"
+            COMMAND ${CMAKE_COMMAND} -E make_directory "${CAPIO_MODULE_STAGE}" "${CAPIO_MODULE_OUTPUT_DIR}"
+            COMMAND ${CMAKE_COMMAND} --install "${PROJECT_BINARY_DIR}" --prefix "${CAPIO_MODULE_STAGE}"
+                    --component capio_module $<$<NOT:$<CONFIG:Debug>>:--strip>
+            COMMAND ${CMAKE_COMMAND} -E chdir "${CAPIO_MODULE_STAGE_PARENT}"
+                    ${CMAKE_COMMAND} -E tar czf "${CAPIO_MODULE_ARCHIVE}" "capio-${PROJECT_VERSION}"
+            DEPENDS capio_server capio_posix
+            USES_TERMINAL
+            COMMENT "Building CAPIO module bundle: ${CAPIO_MODULE_ARCHIVE}"
+    )
+
+ENDIF ()

@@ -2,7 +2,7 @@
 
 CAPIO (Cross-Application Programmable I/O), is a middleware aimed at injecting streaming capabilities to workflow steps
 without changing the application codebase. It has been proven to work with C/C++ binaries, Fortran Binaries, JAVA,
-python and bash. 
+python and bash.
 
 [![codecov](https://codecov.io/gh/High-Performance-IO/capio/graph/badge.svg?token=6ATRB5VJO3)](https://codecov.io/gh/High-Performance-IO/capio)
 ![CI-Tests](https://github.com/High-Performance-IO/capio/actions/workflows/ci-tests.yaml/badge.svg)
@@ -42,6 +42,63 @@ sudo cmake --install .
 ```
 
 It is also possible to enable log in CAPIO, by defining `-DCAPIO_LOG=TRUE`.
+
+### Build an offline environment module
+
+On the internet-connected machine, fetch CAPIO's dependencies and package their sources:
+
+```bash
+./scripts/build_offline_bundle.py
+```
+
+The script prompts for the build type (Release by default), tests (off by default), and CAPIO logger (off by default).
+Logging is saved in the offline settings as `CAPIO_LOG`; it only activates for Debug builds. The script
+then offers dependency Git ref overrides. CMake JSON tracing discovers direct and transitive dependencies; the archive
+includes the resolved dependency lock and selected build settings. Non-interactive runs safely use the defaults.
+
+Transfer `dist/capio-1.0.0-offline-source.tar.gz` to the offline machine. It needs CMake, a C++17 compiler, build tools,
+and an Open MPI development module, but does not need Git or internet access. Build against the target machine's
+glibc, libstdc++, CPU architecture, and Open MPI:
+
+```bash
+tar -xzf capio-1.0.0-offline-source.tar.gz
+cd capio-1.0.0-offline-source
+# LOAD MPI before compiling
+./scripts/compile_offline_module.sh
+```
+
+The build tree remains in `build/` inside the extracted bundle so test binaries stay available. Set `BUILD_DIR` to use a
+different persistent directory. The generated module archive is `dist/capio-1.0.0-linux-<architecture>.tar.gz`.
+
+> [!IMPORTANT]
+> The bundled `syscall_intercept` dependency currently supports x86/x86_64 and RISC-V, not AArch64. `capio_server` may
+> compile on AArch64, but the CAPIO POSIX component requires an AArch64 interception backend.
+
+#### Install
+
+Extract the module archive into a persistent software directory:
+
+```bash
+CAPIO_VERSION=1.0.0
+mkdir -p "$HOME/.local/apps"
+tar -xzf "capio-$CAPIO_VERSION-linux-$(uname -m).tar.gz" -C "$HOME/.local/apps"
+module use "$HOME/.local/apps/capio-$CAPIO_VERSION/modulefiles"
+module load "openmpi/SITE_VERSION" "capio/$CAPIO_VERSION"
+```
+
+For a shared installation, replace `$HOME/.local/apps` with the site software directory and add its `modulefiles`
+directory to the site-wide `MODULEPATH`. Verify the installation with:
+
+```bash
+module show "capio/$CAPIO_VERSION"
+command -v capio_server
+test -f "$CAPIO_PRELOAD"
+```
+
+The module defines `CAPIO_ROOT`, `CAPIO_LIBDIR`, and `CAPIO_PRELOAD`.
+
+> [!WARNING]
+> Load the same Open MPI module used to compile CAPIO before loading CAPIO.
 
 ## Use CAPIO in your code
 
@@ -201,4 +258,4 @@ Marco Edoardo Santimaria <marcoedoardo.santimaria@unito.it> (Designer and mainta
 Iacopo Colonnelli <iacopo.colonnelli@unito.it> (Workflows expert and maintainer) \
 Massimo Torquati <massimo.torquati@unipi.it> (Designer) \
 Marco Aldinucci <marco.aldinucci@unito.it> (Designer) \
-Alberto Riccardo Martinelli <albertoriccardo.martinelli@unito.it> (designer and maintainer) 
+Alberto Riccardo Martinelli <albertoriccardo.martinelli@unito.it> (designer and maintainer)
