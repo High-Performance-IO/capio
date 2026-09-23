@@ -3,6 +3,8 @@
 #include "client-manager/client_manager.hpp"
 #include "storage/manager.hpp"
 #include "utils/location.hpp"
+#include <charconv>
+#include <sstream>
 
 extern StorageManager *storage_manager;
 extern ClientManager *client_manager;
@@ -27,11 +29,22 @@ void handle_rename(int tid, const std::filesystem::path &oldpath,
 }
 
 void rename_handler(const char *const str) {
-    char oldpath[PATH_MAX];
-    char newpath[PATH_MAX];
+    std::string first, second, third;
+    std::istringstream request(str);
+    if (!(request >> first >> second >> third)) {
+        return;
+    }
+
     int tid;
-    sscanf(str, "%s %s %d", oldpath, newpath, &tid);
-    handle_rename(tid, oldpath, newpath);
+    const auto parsed = std::from_chars(first.data(), first.data() + first.size(), tid);
+    if (parsed.ec == std::errc{} && parsed.ptr == first.data() + first.size()) {
+        return; // FS format: tid old_path new_path, no reply.
+    }
+
+    const auto tid_parsed = std::from_chars(third.data(), third.data() + third.size(), tid);
+    if (tid_parsed.ec == std::errc{} && tid_parsed.ptr == third.data() + third.size()) {
+        handle_rename(tid, first, second);
+    }
 }
 
 #endif // CAPIO_SERVER_HANDLERS_RENAME_HPP

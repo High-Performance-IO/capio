@@ -1,14 +1,8 @@
 #####################################
 # Target information
 #####################################
-set(TARGET_NAME capio_posix)
 set(TARGET_INCLUDE_FOLDER ${CMAKE_CURRENT_SOURCE_DIR})
 set(TARGET_SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/libcapio_posix.cpp)
-
-#####################################
-# Target definition
-#####################################
-add_library(${TARGET_NAME} SHARED ${TARGET_SOURCES})
 
 #####################################
 # CMake module imports
@@ -16,7 +10,7 @@ add_library(${TARGET_NAME} SHARED ${TARGET_SOURCES})
 include(ProcessorCount)
 
 #####################################
-# External projects
+# External projects (built once, shared by both variants)
 #####################################
 file(MAKE_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/syscall_intercept)
 
@@ -50,70 +44,77 @@ ELSE (UNIX)
 ENDIF (UNIX)
 
 #####################################
-# Definitions
-#####################################
-target_compile_definitions(${TARGET_NAME} PRIVATE __CAPIO_POSIX)
-
-if (CAPIO_LOG)
-    # The syscall hook may access CALF thread-local state while resolving TLS itself.
-    # LD_PRELOAD libraries therefore require direct, loader-allocated TLS access.
-    target_compile_options(${TARGET_NAME} PRIVATE -ftls-model=initial-exec)
-endif ()
-
-#####################################
-# Include files and directories
+# Headers (collected once)
 #####################################
 file(GLOB_RECURSE CAPIO_POSIX_HEADERS "*.hpp")
 file(GLOB_RECURSE SYSCALL_INTERCEPT_HEADERS "${SYSCALL_INTERCEPT_INCLUDE_FOLDER}/*.h")
-target_sources(${TARGET_NAME} PRIVATE
-        "${CAPIO_COMMON_HEADERS}"
-        "${CAPIO_POSIX_HEADERS}"
-        "${SYSCALL_INTERCEPT_HEADERS}"
-)
-target_include_directories(${TARGET_NAME} PRIVATE
-        "${TARGET_INCLUDE_FOLDER}"
-        "${SYSCALL_INTERCEPT_INCLUDE_FOLDER}"
-)
 
 #####################################
-# set CALF logger component name
+# Variant definition
+#   capio_posix_add_variant(<target name> <mem stream: 1|0>)
 #####################################
-calf_enable_log(${TARGET_NAME} ${CAPIO_LOG_ENABLED})
-calf_set_component(${TARGET_NAME} "posix")
-calf_set_default_log_dir(${TARGET_NAME} "./capio_logs")
+function(capio_posix_add_variant TARGET_NAME MEM_STREAM)
+    add_library(${TARGET_NAME} SHARED ${TARGET_SOURCES})
+
+    # Definitions
+    target_compile_definitions(${TARGET_NAME} PRIVATE
+            __CAPIO_POSIX
+            CAPIO_MEM_STREAM=${MEM_STREAM}
+    )
+
+    if (CAPIO_LOG)
+        # The syscall hook may access CALF thread-local state while resolving TLS itself.
+        # LD_PRELOAD libraries therefore require direct, loader-allocated TLS access.
+        target_compile_options(${TARGET_NAME} PRIVATE -ftls-model=initial-exec)
+    endif ()
+
+    # Include files and directories
+    target_sources(${TARGET_NAME} PRIVATE
+            "${CAPIO_COMMON_HEADERS}"
+            "${CAPIO_POSIX_HEADERS}"
+            "${SYSCALL_INTERCEPT_HEADERS}"
+    )
+    target_include_directories(${TARGET_NAME} PRIVATE
+            "${TARGET_INCLUDE_FOLDER}"
+            "${SYSCALL_INTERCEPT_INCLUDE_FOLDER}"
+    )
+
+    # CALF logger component name
+    calf_enable_log(${TARGET_NAME} ${CAPIO_LOG_ENABLED})
+    calf_set_component(${TARGET_NAME} "posix")
+    calf_set_default_log_dir(${TARGET_NAME} "./capio_logs")
+
+    # Target properties
+    set_target_properties(${TARGET_NAME} PROPERTIES
+            VERSION "${CMAKE_PROJECT_VERSION}"
+            SOVERSION "${CMAKE_PROJECT_VERSION_MAJOR}"
+    )
+
+    # Link libraries
+    target_link_directories(${TARGET_NAME} PRIVATE ${SYSCALL_INTERCEPT_LIB_FOLDER})
+    target_link_libraries(${TARGET_NAME} PRIVATE rt syscall_intercept)
+
+    # Install rules
+    install(TARGETS ${TARGET_NAME}
+            LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
+    )
+
+    # Code coverage
+    IF (ENABLE_COVERAGE)
+        IF (CMAKE_BUILD_TYPE STREQUAL "Debug")
+            target_compile_options(${TARGET_NAME} PRIVATE --coverage -fprofile-arcs -ftest-coverage)
+            target_link_options(${TARGET_NAME} PRIVATE --coverage -fprofile-arcs -ftest-coverage)
+            IF (CMAKE_C_COMPILER_ID MATCHES "GNU" OR CMAKE_CXX_COMPILER_ID MATCHES "GNU")
+                target_link_libraries(${TARGET_NAME} PRIVATE gcov)
+            ENDIF (CMAKE_C_COMPILER_ID MATCHES "GNU" OR CMAKE_CXX_COMPILER_ID MATCHES "GNU")
+        ELSE (CMAKE_BUILD_TYPE STREQUAL "Debug")
+            message(WARNING "Code coverage is disabled in release mode.")
+        ENDIF (CMAKE_BUILD_TYPE STREQUAL "Debug")
+    ENDIF (ENABLE_COVERAGE)
+endfunction()
 
 #####################################
-# Target properties
+# Targets
 #####################################
-set_target_properties(${TARGET_NAME} PROPERTIES
-        VERSION "${CMAKE_PROJECT_VERSION}"
-        SOVERSION "${CMAKE_PROJECT_VERSION_MAJOR}"
-)
-
-#####################################
-# Link libraries
-#####################################
-target_link_directories(${TARGET_NAME} PRIVATE ${SYSCALL_INTERCEPT_LIB_FOLDER})
-target_link_libraries(${TARGET_NAME} PRIVATE rt syscall_intercept)
-
-#####################################
-# Install rules
-#####################################
-install(TARGETS ${TARGET_NAME}
-        LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
-)
-
-#####################################
-# Code coverage
-#####################################
-IF (ENABLE_COVERAGE)
-    IF (CMAKE_BUILD_TYPE STREQUAL "Debug")
-        target_compile_options(${TARGET_NAME} PRIVATE --coverage -fprofile-arcs -ftest-coverage)
-        target_link_options(${TARGET_NAME} PRIVATE --coverage -fprofile-arcs -ftest-coverage)
-        IF (CMAKE_C_COMPILER_ID MATCHES "GNU" OR CMAKE_CXX_COMPILER_ID MATCHES "GNU")
-            target_link_libraries(${TARGET_NAME} PRIVATE gcov)
-        ENDIF (CMAKE_C_COMPILER_ID MATCHES "GNU" OR CMAKE_CXX_COMPILER_ID MATCHES "GNU")
-    ELSE (CMAKE_BUILD_TYPE STREQUAL "Debug")
-        message(WARNING "Code coverage is disabled in release mode.")
-    ENDIF (CMAKE_BUILD_TYPE STREQUAL "Debug")
-ENDIF (ENABLE_COVERAGE)
+capio_posix_add_variant(capio_posix    1)   # libcapio_posix.so    -> memory calls
+capio_posix_add_variant(capio_posix_fs 0)   # libcapio_posix_fs.so -> file-system calls

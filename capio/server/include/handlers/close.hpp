@@ -2,6 +2,8 @@
 #define CAPIO_SERVER_HANDLERS_CLOSE_HPP
 
 #include "read.hpp"
+#include <charconv>
+#include <sstream>
 
 extern StorageManager *storage_manager;
 
@@ -32,9 +34,26 @@ inline void handle_close(int tid, int fd) {
 }
 
 void close_handler(const char *str) {
-    int tid, fd;
-    sscanf(str, "%d %d", &tid, &fd);
-    handle_close(tid, fd);
+    long tid;
+    std::string target;
+    std::istringstream request(str);
+    if (!(request >> tid >> target)) {
+        return;
+    }
+
+    int fd;
+    const auto parsed = std::from_chars(target.data(), target.data() + target.size(), fd);
+    if (parsed.ec == std::errc{} && parsed.ptr == target.data() + target.size()) {
+        handle_close(tid, fd);
+        return;
+    }
+
+    const std::filesystem::path path(target);
+    if (CapioCLEngine::get().getCommitRule(path) == capiocl::commitRules::ON_CLOSE &&
+        (CapioCLEngine::get().isProducer(path, client_manager->getAppName(tid)) ||
+         client_manager->isProducer(tid, path))) {
+        CapioCLEngine::get().increaseCloseCount(path);
+    }
 }
 
 #endif // CAPIO_SERVER_HANDLERS_CLOSE_HPP

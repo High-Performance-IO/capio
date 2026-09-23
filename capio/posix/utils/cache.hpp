@@ -182,7 +182,107 @@ class WriteCache {
     }
 };
 
+class ConsentRequestCache {
+    std::unordered_map<std::string, off64_t> received_consents;
+
+  public:
+    [[maybe_unused]]
+    void consent_request(const std::filesystem::path &path, const long tid,
+                         const std::string &source_func) {
+        START_LOG(capio_syscall(SYS_gettid), "call(path=%s, tid=%ld, source=%s)", path.c_str(), tid,
+                  source_func.c_str());
+
+        const auto resolved_path = resolve_possible_symlink(path);
+
+        if (!is_capio_path(resolved_path)) {
+            LOG("PATH is forbidden. Skipping request!");
+            return;
+        }
+
+        /**
+         * If entry is not present in cache, then proceed to perform request. othrewise if present,
+         * there is no need to perform request to server and can proceed
+         */
+        if (received_consents.find(resolved_path) == received_consents.end()) {
+            LOG("File not present in cache. performing request");
+            auto res = consent_to_proceed_request(resolved_path, tid, source_func);
+            LOG("Registering new file for consent to proceed");
+            received_consents.emplace(resolved_path, res);
+        }
+        LOG("Unlocking thread");
+    }
+};
+
+class ReadCacheFS {
+    int current_fd   = -1;
+    off64_t max_read = 0;
+    std::unordered_map<std::string, off64_t> available_read_cache;
+
+    std::filesystem::path current_path;
+
+  public:
+    void read_request(std::filesystem::path path, const long end_of_read, int tid, const int fd) {
+        START_LOG(capio_syscall(SYS_gettid), "[cache] call(path=%s, end_of_read=%ld, tid=%ld)",
+                  path.c_str(), end_of_read, tid);
+        if (fd != current_fd || path.compare(current_path) != 0) {
+            LOG("[cache] %s changed from previous state. updating",
+                fd != current_fd ? "File descriptor" : "File path");
+            current_path = std::move(path);
+            current_fd   = fd;
+
+            if (const auto item = available_read_cache.find(current_path);
+                item != available_read_cache.end()) {
+                LOG("[cache] Found file entry in cache");
+                max_read = item->second;
+            } else {
+                LOG("[cache] Entry not found, initializing new entry to offset 0");
+                max_read = 0;
+                available_read_cache.emplace(current_path, 0);
+            }
+            LOG("[cache] Max read value is %ld %s", max_read, max_read == -1 ? "(MAX)" : "");
+        }
+
+        // ULLONG_MAX on the wire is represented as -1 by off64_t.
+        if (max_read == -1) {
+            LOG("[cache] Returning as file is committed");
+            return;
+        }
+
+        if (static_cast<off64_t>(end_of_read) > max_read) {
+            LOG("[cache] end_of_read > max_read. Performing server request");
+            max_read = read_request_fs(current_path, end_of_read, tid, fd);
+            LOG("[cache] Obtained value from server is %ld", max_read);
+            if (available_read_cache.find(current_path) == available_read_cache.end()) {
+                LOG("[cache] Cound not find entry in cache. Adding new entry to cache");
+                available_read_cache.emplace(current_path, max_read);
+            } else {
+                available_read_cache.at(current_path) = max_read;
+                LOG("[cache] Updating max read value in cache. new value: %ld",
+                    available_read_cache.at(current_path));
+            }
+            LOG("[cache] completed update from server of max read for file. returning control to "
+                "application");
+        }
+    };
+};
+
 inline thread_local WriteCache *write_cache;
 inline thread_local ReadCache *read_cache;
+inline thread_local ConsentRequestCache *consent_request_cache;
+inline thread_local ReadCacheFS *read_request_cache;
+
+/**
+ * Add a new response buffer for thread @param tid
+ * @param tid
+ * @return
+ */
+inline void initialize_data_queues(const long tid) {
+    write_cache =
+        new WriteCache(tid, get_cache_lines(), get_cache_line_size(), get_capio_workflow_name());
+    read_cache =
+        new ReadCache(tid, get_cache_lines(), get_cache_line_size(), get_capio_workflow_name());
+    consent_request_cache = new ConsentRequestCache();
+    read_request_cache    = new ReadCacheFS();
+}
 
 #endif // CAPIO_SERVER_UTILS_CACHE

@@ -34,12 +34,21 @@ inline off64_t capio_faccessat(int dirfd, const std::string_view &pathname, mode
                 return CAPIO_POSIX_SYSCALL_REQUEST_SKIP;
             }
             path = (dir_path / path).lexically_normal();
-            return is_capio_path(path) ? access_request(path, tid) : -2;
+            if (is_capio_path(path)) {
+                CAPIO_STORAGE_CALL(return access_request(path, tid), {
+                    consent_request_cache->consent_request(path, tid, __FUNCTION__);
+                    return CAPIO_POSIX_SYSCALL_REQUEST_SKIP;
+                });
+            }
+            return CAPIO_POSIX_SYSCALL_REQUEST_SKIP;
         }
     }
 
     if (is_capio_path(path)) {
-        return access_request(path, tid);
+        CAPIO_STORAGE_CALL(return access_request(path, tid), {
+            consent_request_cache->consent_request(path, tid, __FUNCTION__);
+            return CAPIO_POSIX_SYSCALL_REQUEST_SKIP;
+        });
     } else {
         return CAPIO_POSIX_SYSCALL_REQUEST_SKIP;
     }

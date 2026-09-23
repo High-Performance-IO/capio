@@ -13,7 +13,8 @@
 
 int chdir_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg5, long *result) {
     const std::string_view pathname(reinterpret_cast<const char *>(arg0));
-    START_LOG(syscall_no_intercept(SYS_gettid), "call(path=%s)", pathname.data());
+    const long tid = syscall_no_intercept(SYS_gettid);
+    START_LOG(tid, "call(path=%s)", pathname.data());
 
     if (is_forbidden_path(pathname)) {
         LOG("Path %s is forbidden: skip", pathname.data());
@@ -30,10 +31,22 @@ int chdir_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long ar
     }
 
     if (is_capio_path(path)) {
-        set_current_dir(path);
-        errno   = 0;
-        *result = 0;
-        return CAPIO_POSIX_SYSCALL_SUCCESS;
+        CAPIO_STORAGE_CALL(
+            {
+                set_current_dir(path);
+                errno   = 0;
+                *result = 0;
+                return CAPIO_POSIX_SYSCALL_SUCCESS;
+            },
+            {
+                consent_request_cache->consent_request(path, tid, __FUNCTION__);
+                const auto res = syscall_no_intercept(SYS_chdir, pathname.data());
+                if (res == 0) {
+                    set_current_dir(path);
+                }
+                *result = res < 0 ? -errno : res;
+                return CAPIO_POSIX_SYSCALL_SUCCESS;
+            });
     }
 
     // if not a capio path, then control is given to kernel
