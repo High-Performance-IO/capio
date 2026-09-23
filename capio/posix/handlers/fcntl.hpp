@@ -83,17 +83,7 @@ inline long capio_fcntl_lock(int fd, int cmd, struct flock *lock) {
     return 0;
 }
 
-int fcntl_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg5, long *result) {
-    auto fd  = static_cast<int>(arg0);
-    auto cmd = static_cast<int>(arg1);
-    long tid = syscall_no_intercept(SYS_gettid);
-
-    START_LOG(tid, "call(fd=%d, cmd=%d, arg=%ld)", fd, cmd, arg2);
-
-    if (!exists_capio_fd(fd)) {
-        return CAPIO_POSIX_SYSCALL_SKIP;
-    }
-
+inline int fcntl_internal_mem_handler(int cmd, int fd, long arg2, long tid, long *result) {
     switch (cmd) {
     case F_DUPFD:
         *result = capio_fcntl_dupfd(tid, fd, static_cast<int>(arg2), false);
@@ -231,6 +221,25 @@ int fcntl_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long ar
         *result = -EINVAL;
     }
     return CAPIO_POSIX_SYSCALL_SUCCESS;
+}
+
+int fcntl_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg5, long *result) {
+    auto fd  = static_cast<int>(arg0);
+    auto cmd = static_cast<int>(arg1);
+    long tid = syscall_no_intercept(SYS_gettid);
+
+    START_LOG(tid, "call(fd=%d, cmd=%d, arg=%ld)", fd, cmd, arg2);
+
+    if (!exists_capio_fd(fd)) {
+        return CAPIO_POSIX_SYSCALL_SKIP;
+    }
+
+    CAPIO_STORAGE_CALL(
+        { return fcntl_internal_mem_handler(cmd, fd, arg2, tid, result); },
+        {
+            consent_request_cache_fs->consent_request(get_capio_fd_path(fd), tid, __FUNCTION__);
+            return CAPIO_POSIX_SYSCALL_SKIP;
+        });
 }
 
 #endif // SYS_fcntl
