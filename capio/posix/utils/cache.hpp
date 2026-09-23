@@ -239,12 +239,11 @@ class ReadCacheFS {
                 max_read = 0;
                 available_read_cache.emplace(current_path, 0);
             }
-            LOG("[cache] Max read value is %llu %s", max_read,
-                max_read == ULLONG_MAX ? "(ULLONG_MAX)" : "");
+            LOG("[cache] Max read value is %ld %s", max_read, max_read == -1 ? "(MAX)" : "");
         }
 
-        // File is committed if server reports its size to be ULLONG_MAX
-        if (max_read == ULLONG_MAX) {
+        // ULLONG_MAX on the wire is represented as -1 by off64_t.
+        if (max_read == -1) {
             LOG("[cache] Returning as file is committed");
             return;
         }
@@ -252,14 +251,14 @@ class ReadCacheFS {
         if (static_cast<off64_t>(end_of_read) > max_read) {
             LOG("[cache] end_of_read > max_read. Performing server request");
             max_read = read_request_fs(current_path, end_of_read, tid, fd);
-            LOG("[cache] Obtained value from server is %llu", max_read);
-            if (available_read_cache.find(path) == available_read_cache.end()) {
+            LOG("[cache] Obtained value from server is %ld", max_read);
+            if (available_read_cache.find(current_path) == available_read_cache.end()) {
                 LOG("[cache] Cound not find entry in cache. Adding new entry to cache");
-                available_read_cache.emplace(path, max_read);
+                available_read_cache.emplace(current_path, max_read);
             } else {
-                available_read_cache.at(path) = max_read;
-                LOG("[cache] Updating max read value in cache. new value: %llu",
-                    available_read_cache->at(path));
+                available_read_cache.at(current_path) = max_read;
+                LOG("[cache] Updating max read value in cache. new value: %ld",
+                    available_read_cache.at(current_path));
             }
             LOG("[cache] completed update from server of max read for file. returning control to "
                 "application");

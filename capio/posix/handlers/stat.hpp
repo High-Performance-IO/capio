@@ -45,14 +45,24 @@ inline int capio_fstat(int fd, struct stat *statbuf, long tid) {
     START_LOG(tid, "call(fd=%d, statbuf=0x%08x)", fd, statbuf);
 
     if (exists_capio_fd(fd)) {
-        write_cache->flush();
-        auto [file_size, is_dir] = fstat_request(fd, tid);
-        if (file_size == -1) {
-            errno = ENOENT;
-            return CAPIO_POSIX_SYSCALL_ERRNO;
-        }
-        fill_statbuf(statbuf, file_size, is_dir, std::hash<std::string>{}(get_capio_fd_path(fd)));
-        return CAPIO_POSIX_SYSCALL_SUCCESS;
+        CAPIO_STORAGE_CALL(
+            {
+                write_cache->flush();
+                const auto response = fstat_request(fd, tid);
+                const auto file_size = response.first;
+                const auto is_dir    = response.second;
+                if (file_size == -1) {
+                    errno = ENOENT;
+                    return CAPIO_POSIX_SYSCALL_ERRNO;
+                }
+                fill_statbuf(statbuf, file_size, is_dir,
+                             std::hash<std::string>{}(get_capio_fd_path(fd)));
+                return CAPIO_POSIX_SYSCALL_SUCCESS;
+            },
+            {
+                consent_request_cache->consent_request(get_capio_fd_path(fd), tid, __FUNCTION__);
+                return CAPIO_POSIX_SYSCALL_REQUEST_SKIP;
+            });
     } else {
         return CAPIO_POSIX_SYSCALL_REQUEST_SKIP;
     }
@@ -68,20 +78,27 @@ inline int capio_lstat(const std::string_view &pathname, struct stat *statbuf, l
 
     const std::filesystem::path absolute_path(pathname);
     if (is_capio_path(absolute_path)) {
-        write_cache->flush();
-        auto [file_size, is_dir] = stat_request(absolute_path, tid);
-        if (file_size == -1) {
-            errno = ENOENT;
-            return CAPIO_POSIX_SYSCALL_ERRNO;
-        }
-
-        if (file_size == CAPIO_POSIX_SYSCALL_REQUEST_SKIP) {
-            // return file to not be handled as most likely is excluded
-            return file_size;
-        }
-
-        fill_statbuf(statbuf, file_size, is_dir, std::hash<std::string>{}(absolute_path));
-        return CAPIO_POSIX_SYSCALL_SUCCESS;
+        CAPIO_STORAGE_CALL(
+            {
+                write_cache->flush();
+                const auto response = stat_request(absolute_path, tid);
+                const auto file_size = response.first;
+                const auto is_dir    = response.second;
+                if (file_size == -1) {
+                    errno = ENOENT;
+                    return CAPIO_POSIX_SYSCALL_ERRNO;
+                }
+                if (file_size == CAPIO_POSIX_SYSCALL_REQUEST_SKIP) {
+                    return file_size;
+                }
+                fill_statbuf(statbuf, file_size, is_dir,
+                             std::hash<std::string>{}(absolute_path));
+                return CAPIO_POSIX_SYSCALL_SUCCESS;
+            },
+            {
+                consent_request_cache->consent_request(absolute_path, tid, __FUNCTION__);
+                return CAPIO_POSIX_SYSCALL_REQUEST_SKIP;
+            });
     }
     return CAPIO_POSIX_SYSCALL_REQUEST_SKIP;
 }

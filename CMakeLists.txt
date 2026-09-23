@@ -78,7 +78,7 @@ ENDIF ()
 FetchContent_Declare(
         capio_cl
         GIT_REPOSITORY https://github.com/High-Performance-IO/CAPIO-CL.git
-        GIT_TAG v1.5.2
+        GIT_TAG v2.0.0
 )
 
 FetchContent_Declare(

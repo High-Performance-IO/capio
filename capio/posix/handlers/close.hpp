@@ -11,10 +11,23 @@ int close_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long ar
     START_LOG(tid, "call(fd=%ld)", fd);
 
     if (exists_capio_fd(fd)) {
-        write_cache->flush();
-        close_request(fd, tid);
-        delete_capio_fd(fd);
-        *result = 0;
+        CAPIO_STORAGE_CALL(
+            {
+                write_cache->flush();
+                close_request(fd, tid);
+                delete_capio_fd(fd);
+                *result = 0;
+                return CAPIO_POSIX_SYSCALL_SKIP;
+            },
+            {
+                close_request_fs(get_capio_fd_path(fd), tid);
+                const auto res = syscall_no_intercept(SYS_close, fd);
+                if (res == 0) {
+                    delete_capio_fd(fd);
+                }
+                *result = res < 0 ? -errno : res;
+                return CAPIO_POSIX_SYSCALL_SUCCESS;
+            });
     }
     return CAPIO_POSIX_SYSCALL_SKIP;
 }

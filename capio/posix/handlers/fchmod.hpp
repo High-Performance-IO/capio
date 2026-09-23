@@ -3,7 +3,8 @@
 
 int fchmod_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg5, long *result) {
     int fd = static_cast<int>(arg0);
-    START_LOG(syscall_no_intercept(SYS_gettid), "call(fd=%d)", fd);
+    const long tid = syscall_no_intercept(SYS_gettid);
+    START_LOG(tid, "call(fd=%d)", fd);
 
     // TODO: Handle mode provided bt arg1
 
@@ -22,7 +23,7 @@ int fchmod_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long a
             return CAPIO_POSIX_SYSCALL_SUCCESS;
         },
         {
-            consent_request_cache_fs->consent_request(get_capio_fd_path(fd), tid, __FUNCTION__);
+            consent_request_cache->consent_request(get_capio_fd_path(fd), tid, __FUNCTION__);
             return CAPIO_POSIX_SYSCALL_SKIP;
         });
 }

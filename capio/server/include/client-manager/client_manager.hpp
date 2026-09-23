@@ -1,7 +1,12 @@
 #ifndef CLIENT_MANAGER_HPP
 #define CLIENT_MANAGER_HPP
 
+#include <atomic>
 #include <condition_variable>
+#include <cstdint>
+#include <functional>
+#include <memory>
+#include <thread>
 #include <unordered_map>
 #include <vector>
 
@@ -12,12 +17,42 @@
  * @brief Class to handle libcapio_posix clients applications
  */
 class ClientManager {
+  public:
+    struct ClientState {
+        std::mutex lifecycle_mutex;
+        std::condition_variable lifecycle_cv;
+        std::atomic<bool> active{true};
+        size_t replies_in_flight = 0;
+        uint64_t generation;
+        std::shared_ptr<CircularBuffer<off64_t>> response;
+    };
+
+    struct ClientToken {
+        pid_t tid;
+        uint64_t generation;
+        std::shared_ptr<ClientState> state;
+    };
+
+  private:
 
     /**
      * Request and Response buffer variables
      */
     CircularBuffer<char> requests;
-    std::unordered_map<int, CircularBuffer<off64_t>> responses;
+    std::unordered_map<int, std::shared_ptr<ClientState>> clients;
+    mutable std::mutex clients_mutex;
+    uint64_t next_generation = 0;
+
+    std::atomic<bool> shutting_down{false};
+    struct WaiterThread {
+        std::thread thread;
+        std::shared_ptr<std::atomic<bool>> completed;
+    };
+    std::mutex waiter_threads_mutex;
+    std::vector<WaiterThread> waiter_threads;
+
+    void deactivateClient(const std::shared_ptr<ClientState> &state);
+    void reapCompletedWaiters();
 
     /// @brief default app name
     const std::string default_app_name = CAPIO_DEFAULT_APP_NAME;
@@ -36,7 +71,7 @@ class ClientManager {
     };
 
     std::unordered_map<long, ClientDataBuffers> data_buffers;
-    std::unordered_map<int, const std::string> app_names;
+    std::unordered_map<int, std::string> app_names;
 
     /**
      * Variables to handle the init process after a SYS_clone occurs
@@ -103,6 +138,9 @@ class ClientManager {
      * @param offset
      */
     void replyToClient(pid_t tid, off64_t offset);
+    bool tryReply(const ClientToken &client, off64_t offset);
+    bool isClientActive(const ClientToken &client) const;
+    bool spawnWaiter(pid_t tid, std::function<void(const ClientToken &)> waiter);
 
     /**
      * @brief Add a file that is not yet ready to be consumed by a process to a list of files
@@ -136,7 +174,7 @@ class ClientManager {
      * @param tid
      * @return std::string
      */
-    [[nodiscard]] const std::string &getAppName(pid_t tid) const;
+    [[nodiscard]] std::string getAppName(pid_t tid) const;
 
     /**
      * Get the data queues associated with a give process id

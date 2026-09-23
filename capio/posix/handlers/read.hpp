@@ -13,8 +13,23 @@ inline off64_t capio_read(int fd, void *buffer, off64_t count, long tid) {
             ERR_EXIT("CAPIO does not support read bigger than SSIZE_MAX yet");
         }
 
-        write_cache->flush();
-        return read_cache->read(fd, buffer, count, false, false);
+        CAPIO_STORAGE_CALL(
+            {
+                write_cache->flush();
+                return read_cache->read(fd, buffer, count, false, false);
+            },
+            {
+                const off64_t end_of_read = get_capio_fd_offset(fd) + count;
+                read_request_cache->read_request(get_capio_fd_path(fd), end_of_read, tid, fd);
+                const auto res = syscall_no_intercept(SYS_read, fd, buffer, count);
+                if (res >= 0) {
+                    const auto offset = syscall_no_intercept(SYS_lseek, fd, 0, SEEK_CUR);
+                    if (offset >= 0) {
+                        set_capio_fd_offset(fd, offset);
+                    }
+                }
+                return res;
+            });
     } else {
         return CAPIO_POSIX_SYSCALL_REQUEST_SKIP;
     }
@@ -25,6 +40,25 @@ inline ssize_t capio_readv(int fd, const struct iovec *iov, int iovcnt, long tid
               iov->iov_base, iov->iov_len, iovcnt);
 
     if (exists_capio_fd(fd)) {
+        CAPIO_STORAGE_CALL(
+            {},
+            {
+                off64_t count = 0;
+                for (int i = 0; i < iovcnt; ++i) {
+                    count += iov[i].iov_len;
+                }
+                const off64_t end_of_read = get_capio_fd_offset(fd) + count;
+                read_request_cache->read_request(get_capio_fd_path(fd), end_of_read, tid, fd);
+                const auto res = syscall_no_intercept(SYS_readv, fd, iov, iovcnt);
+                if (res >= 0) {
+                    const auto offset = syscall_no_intercept(SYS_lseek, fd, 0, SEEK_CUR);
+                    if (offset >= 0) {
+                        set_capio_fd_offset(fd, offset);
+                    }
+                }
+                return res;
+            });
+
         LOG("fd %d exists and is a capio fd", fd);
         ssize_t tot_bytes = 0;
         ssize_t res       = 0;

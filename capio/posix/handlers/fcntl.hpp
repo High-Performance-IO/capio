@@ -6,6 +6,7 @@
 #include "utils/requests.hpp"
 
 inline auto fcntl_internal_mem_handler(int cmd, int fd, int arg, long tid, long *result) {
+    START_LOG(tid, "call(cmd=%d, fd=%d, arg=%d)", cmd, fd, arg);
     switch (cmd) {
     case F_GETFD: {
         *result = get_capio_fd_cloexec(fd);
@@ -65,7 +66,7 @@ int fcntl_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long ar
         CAPIO_STORAGE_CALL(
             { return fcntl_internal_mem_handler(cmd, fd, arg, tid, result); },
             {
-                consent_request_cache_fs->consent_request(get_capio_fd_path(fd), tid, __FUNCTION__);
+                consent_request_cache->consent_request(get_capio_fd_path(fd), tid, __FUNCTION__);
             });
     }
     return CAPIO_POSIX_SYSCALL_SKIP;
