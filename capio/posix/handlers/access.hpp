@@ -39,7 +39,8 @@ inline off64_t capio_faccessat(int dirfd, const std::string_view &pathname, mode
     }
 
     if (is_capio_path(path)) {
-        return access_request(path, tid);
+        return CAPIO_STORAGE_CALL(access_request(path, tid),
+                                  consent_request_cache->consent_request(path, tid, __FUNCTION__));
     } else {
         return CAPIO_POSIX_SYSCALL_REQUEST_SKIP;
     }

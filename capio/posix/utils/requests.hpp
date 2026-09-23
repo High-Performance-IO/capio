@@ -280,4 +280,32 @@ inline void write_request(const int fd, const off64_t count, const long tid) {
     buf_requests->write(req, CAPIO_REQ_MAX_SIZE);
 }
 
+inline off64_t consent_to_proceed_request(const std::filesystem::path &path, const long tid,
+                                          const std::string &source_func) {
+    START_LOG(capio_syscall(SYS_gettid), "call(path=%s, tid=%ld, source_func=%s)", path.c_str(),
+              tid, source_func.c_str());
+    char req[CAPIO_REQ_MAX_SIZE];
+    sprintf(req, "%04d %ld %s %s", CAPIO_REQUEST_CONSENT, tid, path.c_str(), source_func.c_str());
+    buf_requests->write(req, CAPIO_REQ_MAX_SIZE);
+    off64_t res;
+    buff_response->read(&res);
+    LOG("Obtained from server %llu", res);
+    return res;
+}
+
+// return amount of readable bytes
+static off64_t read_request_fs(const std::filesystem::path &path, const off64_t end_of_read,
+                               const long tid, const long fd) {
+    START_LOG(capio_syscall(SYS_gettid), "call(path=%s, end_of_Read=%ld, tid=%ld, fd=%ld)",
+              path.c_str(), end_of_Read, tid, fd);
+    char req[CAPIO_REQ_MAX_SIZE];
+    sprintf(req, "%04d %ld %ld %s %ld", CAPIO_REQUEST_READ_FS, tid, fd, path.c_str(), end_of_read);
+    LOG("Sending read request %s", req);
+    buf_requests->write(req, CAPIO_REQ_MAX_SIZE);
+    off64_t res;
+    buff_response->read(&res);
+    LOG("Response to request is %llu", res);
+    return res;
+}
+
 #endif // CAPIO_POSIX_UTILS_REQUESTS_HPP

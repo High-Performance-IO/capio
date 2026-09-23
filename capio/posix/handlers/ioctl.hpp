@@ -8,9 +8,15 @@ int ioctl_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long ar
     START_LOG(syscall_no_intercept(SYS_gettid), "call(fd=%d, request=%ld)", fd, arg1);
 
     if (exists_capio_fd(fd)) {
-        errno   = ENOTTY;
-        *result = -errno;
-        return CAPIO_POSIX_SYSCALL_SUCCESS;
+        CAPIO_STORAGE_CALL(
+            {
+                errno   = ENOTTY;
+                *result = -errno;
+                return CAPIO_POSIX_SYSCALL_SUCCESS;
+            },
+            {
+                consent_request_cache_fs->consent_request(get_capio_fd_path(fd), tid, __FUNCTION__);
+            });
     }
     return CAPIO_POSIX_SYSCALL_REQUEST_SKIP;
 }

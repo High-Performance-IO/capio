@@ -3,7 +3,7 @@
 
 #include "calf/SyscallLogger.h"
 #include "common/syscall.hpp"
-#include "data.hpp"
+#include "utils/cache.hpp"
 #include "requests.hpp"
 
 /**

@@ -12,12 +12,19 @@ int fchmod_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long a
         return CAPIO_POSIX_SYSCALL_SKIP;
     }
 
-    // Upon success fchmod shall return 0
-    // Since capio does not handle permission, we will be
-    // Upon the assumption that all the operations occurs with success
-    *result = 0;
-    LOG("File is present in capio. Ignoring fchmod operation");
-    return CAPIO_POSIX_SYSCALL_SUCCESS;
+    CAPIO_STORAGE_CALL(
+        {
+            // Upon success fchmod shall return 0
+            // Since capio does not handle permission, we will be
+            // Upon the assumption that all the operations occurs with success
+            *result = 0;
+            LOG("File is present in capio. Ignoring fchmod operation");
+            return CAPIO_POSIX_SYSCALL_SUCCESS;
+        },
+        {
+            consent_request_cache_fs->consent_request(get_capio_fd_path(fd), tid, __FUNCTION__);
+            return CAPIO_POSIX_SYSCALL_SKIP;
+        });
 }
 
 #endif // CAPIO_POSIX_HANDLERS_FCHMOD_HPP

@@ -29,6 +29,8 @@ int chdir_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long ar
         }
     }
 
+    CAPIO_STORAGE_CALL(, consent_request_cache_fs->consent_request(path, tid, __FUNCTION__));
+
     if (is_capio_path(path)) {
         set_current_dir(path);
         errno   = 0;

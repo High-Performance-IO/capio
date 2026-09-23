@@ -3,7 +3,7 @@
 
 #if defined(SYS_read) || defined(SYS_readv)
 
-#include "utils/data.hpp"
+#include "utils/cache.hpp"
 
 inline off64_t capio_read(int fd, void *buffer, off64_t count, long tid) {
     START_LOG(tid, "call(fd=%d, buf=0x%08x, count=%ld)", fd, buffer, count);
