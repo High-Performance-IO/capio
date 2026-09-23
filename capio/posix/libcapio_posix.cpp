@@ -1,11 +1,3 @@
-// Macro to select at compile time either FS or MEM streaming
-// CAPIO_STORAGE_CALL(memory_call, fs_call)
-#if CAPIO_MEM_STREAM
-#  define CAPIO_STORAGE_CALL(memory_call, fs_call) memory_call
-#else
-#  define CAPIO_STORAGE_CALL(memory_call, fs_call) fs_call
-#endif
-
 #include <array>
 #include <string>
 
@@ -14,6 +6,7 @@
 #include "utils/clone.hpp"
 #include "utils/filesystem.hpp"
 #include "utils/snapshot.hpp"
+#include "utils/storage.hpp"
 
 #include "handlers.hpp"
 
@@ -209,28 +202,28 @@ static constexpr std::array<CPHandler_t, CAPIO_NR_SYSCALLS> build_syscall_table(
     _syscallTable[SYS_fchdir] = fchdir_handler;
 #endif
 #ifdef SYS_chmod
-    _syscallTable[SYS_chmod] = chmod_handler;
+    _syscallTable[SYS_chmod] = CAPIO_STORAGE_CALL(chmod_handler, not_handled_handler);
 #endif
 #ifdef SYS_fchmod
     _syscallTable[SYS_fchmod] = fchmod_handler;
 #endif
 #ifdef SYS_fchmodat
-    _syscallTable[SYS_fchmodat] = fchmodat_handler;
+    _syscallTable[SYS_fchmodat] = CAPIO_STORAGE_CALL(fchmodat_handler, not_handled_handler);
 #endif
 #ifdef SYS_chown
-    _syscallTable[SYS_chown] = chown_handler;
+    _syscallTable[SYS_chown] = CAPIO_STORAGE_CALL(chown_handler, not_handled_handler);
 #endif
 #ifdef SYS_fchown
     _syscallTable[SYS_fchown] = fchown_handler;
 #endif
 #ifdef SYS_fchownat
-    _syscallTable[SYS_fchownat] = fchownat_handler;
+    _syscallTable[SYS_fchownat] = CAPIO_STORAGE_CALL(fchownat_handler, not_handled_handler);
 #endif
 #ifdef SYS_close
     _syscallTable[SYS_close] = close_handler;
 #endif
 #ifdef SYS_copy_file_range
-    _syscallTable[SYS_copy_file_range] = copy_file_range_handler;
+    _syscallTable[SYS_copy_file_range] = CAPIO_STORAGE_CALL(copy_file_range_handler, not_handled_handler);
 #endif
 #ifdef SYS_creat
     _syscallTable[SYS_creat] = creat_handler;
@@ -335,10 +328,10 @@ static constexpr std::array<CPHandler_t, CAPIO_NR_SYSCALLS> build_syscall_table(
     _syscallTable[SYS_rmdir] = rmdir_handler;
 #endif
 #ifdef SYS_sendfile
-    _syscallTable[SYS_sendfile] = sendfile_handler;
+    _syscallTable[SYS_sendfile] = CAPIO_STORAGE_CALL(sendfile_handler, not_handled_handler);
 #endif
 #ifdef SYS_splice
-    _syscallTable[SYS_splice] = splice_handler;
+    _syscallTable[SYS_splice] = CAPIO_STORAGE_CALL(splice_handler, not_handled_handler);
 #endif
 #ifdef SYS_stat
     _syscallTable[SYS_stat] = stat_handler;

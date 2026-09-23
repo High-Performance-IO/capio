@@ -33,14 +33,17 @@ inline void initialize_new_thread(const bool wait = false) {
 }
 
 inline void hook_clone_parent(long child_tid) {
-    // syscall_intercept invokes this hook even when the clone fails (e.g. clone3 returning
-    // -ENOSYS under seccomp filters, after which glibc falls back to clone): do not register
-    // a nonexistent child with the server.
-    if (child_tid <= 0) {
-        return;
-    }
-    const auto tid = syscall_no_intercept(SYS_gettid);
-    clone_request(tid, child_tid);
+    CAPIO_STORAGE_CALL(
+        {
+            // syscall_intercept invokes this hook even when the clone fails (e.g. clone3 returning
+            // -ENOSYS under seccomp filters, after which glibc falls back to clone): do not
+            // register a nonexistent child with the server.
+            if (child_tid <= 0) {
+                return;
+            }
+            const auto tid = syscall_no_intercept(SYS_gettid);
+            clone_request(tid, child_tid);
+        }, );
 }
 
 /**

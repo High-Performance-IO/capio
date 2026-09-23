@@ -84,6 +84,7 @@ inline long capio_fcntl_lock(int fd, int cmd, struct flock *lock) {
 }
 
 inline int fcntl_internal_mem_handler(int cmd, int fd, long arg2, long tid, long *result) {
+    START_LOG(tid, "call(cmd=%d, fd=%d, arg=%ld)", cmd, fd, arg2);
     switch (cmd) {
     case F_DUPFD:
         *result = capio_fcntl_dupfd(tid, fd, static_cast<int>(arg2), false);
@@ -237,7 +238,7 @@ int fcntl_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long ar
     CAPIO_STORAGE_CALL(
         { return fcntl_internal_mem_handler(cmd, fd, arg2, tid, result); },
         {
-            consent_request_cache_fs->consent_request(get_capio_fd_path(fd), tid, __FUNCTION__);
+            consent_request_cache->consent_request(get_capio_fd_path(fd), tid, __FUNCTION__);
             return CAPIO_POSIX_SYSCALL_SKIP;
         });
 }

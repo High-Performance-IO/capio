@@ -83,6 +83,8 @@ static constexpr std::array<CSHandler_t, CAPIO_NR_REQUESTS> build_request_handle
     _request_handlers[CAPIO_REQUEST_STAT]                = stat_handler;
     _request_handlers[CAPIO_REQUEST_UNLINK]              = unlink_handler;
     _request_handlers[CAPIO_REQUEST_WRITE]               = write_handler;
+    _request_handlers[CAPIO_REQUEST_CONSENT]             = consent_handler;
+    _request_handlers[CAPIO_REQUEST_READ_FS]             = read_fs_handler;
 
     return _request_handlers;
 }
@@ -102,7 +104,7 @@ static constexpr std::array<CSHandler_t, CAPIO_NR_REQUESTS> build_request_handle
     while (true) {
         START_LOG(gettid(), "call()");
         int code = client_manager->readNextRequest(str.get());
-        if (code < 0 || code > CAPIO_NR_REQUESTS) {
+        if (code < 0 || code >= CAPIO_NR_REQUESTS) {
             CALF_PRINT_COLOR(CALF_CLI_LEVEL_ERROR, "Received invalid code: %d", code);
 
             ERR_EXIT("Error: received invalid request code");
@@ -121,6 +123,13 @@ int main(int argc, char **argv) {
 
     RuntimeConfiguration::initialize(argc, argv);
 
+    START_LOG(gettid(), "call()");
+    const char *metadata_dir = std::getenv("CAPIO_METADATA_DIR");
+    if ((metadata_dir == nullptr || metadata_dir[0] == '\0') &&
+        setenv("CAPIO_METADATA_DIR", RuntimeConfiguration::get().getCapioDir().c_str(), 1) != 0) {
+        ERR_EXIT("Failed to set CAPIO_METADATA_DIR: %s", strerror(errno));
+    }
+
     capio_cl_engine = RuntimeConfiguration::get().createCapioClEngine();
 
     UPDATE_CALF_WORKFLOW_NAME(capio_cl_engine->getWorkflowName());
@@ -129,8 +138,6 @@ int main(int argc, char **argv) {
 
     discovery_service = select_discovery_service();
     backend           = select_backend(argc, argv);
-
-    START_LOG(gettid(), "call()");
 
     home_node_service =
         new HomeNodeService(RuntimeConfiguration::get().getLocationQueryTimeout(),

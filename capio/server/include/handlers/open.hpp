@@ -1,6 +1,9 @@
 #ifndef CAPIO_SERVER_HANDLERS_OPEN_HPP
 #define CAPIO_SERVER_HANDLERS_OPEN_HPP
 
+#include <chrono>
+#include <thread>
+
 #include "remote/home_node_service.hpp"
 #include "utils/runtime_configuration.hpp"
 
@@ -83,6 +86,12 @@ void create_handler(const char *const str) {
     int tid, fd;
     char path[PATH_MAX];
     sscanf(str, "%d %d %s", &tid, &fd, path);
+    if (fd == -1) {
+        if (!CapioCLEngine::get().isExcluded(path)) {
+            client_manager->registerProducedFile(tid, path);
+        }
+        return;
+    }
     if (CapioCLEngine::get().isExcluded(path)) {
         client_manager->replyToClient(tid, CAPIO_POSIX_SYSCALL_REQUEST_SKIP);
         return;
@@ -105,6 +114,27 @@ void open_handler(const char *const str) {
     int tid, fd;
     char path[PATH_MAX];
     sscanf(str, "%d %d %s", &tid, &fd, path);
+    if (fd == -1) {
+        if (CapioCLEngine::get().isExcluded(path)) {
+            client_manager->replyToClient(tid, 0);
+        } else if (CapioCLEngine::get().isProducer(path, client_manager->getAppName(tid)) ||
+                   client_manager->isProducer(tid, path) || std::filesystem::exists(path)) {
+            client_manager->replyToClient(tid, 1);
+        } else {
+            client_manager->spawnWaiter(
+                tid, [path = std::string(path)](const ClientManager::ClientToken &client) {
+                    while (client_manager->isClientActive(client)) {
+                        std::error_code error;
+                        if (std::filesystem::exists(path, error) && !error) {
+                            client_manager->tryReply(client, 1);
+                            return;
+                        }
+                        std::this_thread::sleep_for(std::chrono::milliseconds(100));
+                    }
+                });
+        }
+        return;
+    }
     if (CapioCLEngine::get().isExcluded(path)) {
         client_manager->replyToClient(tid, CAPIO_POSIX_SYSCALL_REQUEST_SKIP);
         return;

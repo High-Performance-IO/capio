@@ -21,6 +21,7 @@
 #include "common/env.hpp"
 #include "common/syscall.hpp"
 
+#include "storage.hpp"
 #include "types.hpp"
 
 constexpr std::array CAPIO_DIR_FORBIDDEN_PATHS = {std::string_view{"/proc/"},
