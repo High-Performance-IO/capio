@@ -3,6 +3,7 @@
 #include "capiocl.hpp"
 #include "capiocl/engine.h"
 #include "client-manager/client_manager.hpp"
+#include "common/env.hpp"
 #include "remote/discovery.hpp"
 #include "storage/manager.hpp"
 #include "utils/capiocl_adapter.hpp"
@@ -27,7 +28,8 @@ class ServerUnitTestEnvironment : public testing::Environment {
     explicit ServerUnitTestEnvironment() = default;
 
     void SetUp() override {
-        capio_cl_engine   = new capiocl::engine::Engine(false);
+        capio_cl_engine = new capiocl::engine::Engine(false);
+        capio_cl_engine->setWorkflowName(get_capio_workflow_name());
         client_manager    = new ClientManager();
         storage_manager   = new StorageManager();
         discovery_service = new DiscoveryService(std::make_unique<TestDiscovery>());

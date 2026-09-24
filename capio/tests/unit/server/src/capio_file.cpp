@@ -349,7 +349,10 @@ class MockBackendTestFixture : public ::testing::Test {
         open_files_location();
     }
 
-    void TearDown() override { delete backend; }
+    void TearDown() override {
+        delete backend;
+        backend = nullptr;
+    }
 };
 
 TEST_F(MockBackendTestFixture, TestReadFromNodeMockBackend) {

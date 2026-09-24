@@ -4,14 +4,29 @@
 
 #include "capiocl.hpp"
 #include "capiocl/engine.h"
+#include "remote/backend/none.hpp"
 #include "storage/manager.hpp"
 #include "utils/capiocl_adapter.hpp"
 #include "utils/location.hpp"
 
 extern StorageManager *storage_manager;
 extern capiocl::engine::Engine *capio_cl_engine;
+extern Backend *backend;
 
-TEST(StorageManagerTestEnvironment, testGetPaths) {
+class StorageManagerTestEnvironment : public testing::Test {
+  protected:
+    void SetUp() override {
+        ASSERT_EQ(backend, nullptr);
+        backend = &test_backend;
+    }
+
+    void TearDown() override { backend = nullptr; }
+
+  private:
+    NoneBackend test_backend{0, nullptr};
+};
+
+TEST_F(StorageManagerTestEnvironment, testGetPaths) {
 
     std::vector<std::string> test_file_paths = {
         "test1.txt",
@@ -33,13 +48,13 @@ TEST(StorageManagerTestEnvironment, testGetPaths) {
     }
 }
 
-TEST(StorageManagerTestEnvironment, testExceptions) {
+TEST_F(StorageManagerTestEnvironment, testExceptions) {
 
     EXPECT_THROW(storage_manager->get("test.txt"), std::runtime_error);
     EXPECT_THROW(storage_manager->get(1234, 1234), std::runtime_error);
 }
 
-TEST(StorageManagerTestEnvironment, testInitDirectory) {
+TEST_F(StorageManagerTestEnvironment, testInitDirectory) {
 
     capio_cl_engine->setDirectory("myDirectory");
     capio_cl_engine->setDirectoryFileCount("myDirectory", 10);
@@ -56,7 +71,7 @@ TEST(StorageManagerTestEnvironment, testInitDirectory) {
     EXPECT_FALSE(dir1.isFirstWrite());
 }
 
-TEST(StorageManagerTestEnvironment, testAddDirectoryFailure) {
+TEST_F(StorageManagerTestEnvironment, testAddDirectoryFailure) {
     char *old_capio_dir = getenv("CAPIO_DIR");
     setenv("CAPIO_DIR", "/", 1);
     open_files_location();
@@ -69,7 +84,7 @@ TEST(StorageManagerTestEnvironment, testAddDirectoryFailure) {
     }
 }
 
-TEST(StorageManagerTestEnvironment, testRemameFile) {
+TEST_F(StorageManagerTestEnvironment, testRemameFile) {
 
     storage_manager->add("oldName", false, 0);
     storage_manager->add("oldNameNoChange", false, 0);
@@ -84,7 +99,7 @@ TEST(StorageManagerTestEnvironment, testRemameFile) {
     EXPECT_NO_THROW(storage_manager->get("oldNameNoChange"));
 }
 
-TEST(StorageManagerTestEnvironment, testNumberOfOpensAndCloses) {
+TEST_F(StorageManagerTestEnvironment, testNumberOfOpensAndCloses) {
 
     storage_manager->add("myFile", false, 0);
     storage_manager->addFileToTid(1234, 3, "myFile", 0);
@@ -99,7 +114,7 @@ TEST(StorageManagerTestEnvironment, testNumberOfOpensAndCloses) {
     EXPECT_TRUE(storage_manager->get("myFile").deletable());
 }
 
-TEST(StorageManagerTestEnvironment, testNumberOfOpensAfterClone) {
+TEST_F(StorageManagerTestEnvironment, testNumberOfOpensAfterClone) {
 
     storage_manager->add("myFile", false, 0);
     storage_manager->addFileToTid(1234, 3, "myFile", 0);
