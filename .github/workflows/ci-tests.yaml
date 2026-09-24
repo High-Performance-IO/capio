@@ -304,7 +304,7 @@ jobs:
         with:
           pattern: "*-tests"
       - name: "Upload coverage to Codecov"
-        uses: codecov/codecov-action@v6
+        uses: codecov/codecov-action@v7
         with:
           files: ./multinode-tests/split.xml,./multinode-tests/map.xml,./multinode-tests/merge.xml
           fail_ci_if_error: true
