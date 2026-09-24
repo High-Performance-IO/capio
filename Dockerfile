@@ -3,6 +3,7 @@ FROM debian:bookworm AS builder
 ARG CAPIO_BUILD_TESTS=OFF
 ARG CAPIO_LOG=OFF
 ARG CMAKE_BUILD_TYPE=Release
+ARG ENABLE_COVERAGE=OFF
 
 RUN apt update                              \
  && apt install -y --no-install-recommends  \
@@ -26,11 +27,22 @@ RUN mkdir -p /opt/capio/build                     \
         -DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE}    \
         -DCAPIO_BUILD_TESTS=${CAPIO_BUILD_TESTS}  \
         -DCAPIO_LOG=${CAPIO_LOG}                  \
+        -DENABLE_COVERAGE=${ENABLE_COVERAGE}      \
         -G Ninja                                  \
         -B /opt/capio/build                       \
         -S /opt/capio                             \
  && cmake --build /opt/capio/build -j$(nproc)     \
  && cmake --install /opt/capio/build --prefix /usr/local
+
+
+FROM builder AS coverage
+
+ENV LD_LIBRARY_PATH="/usr/local/lib"
+
+RUN apt update                              \
+ && apt install -y --no-install-recommends  \
+        gcovr                               \
+ && rm -rf /var/lib/apt/lists/*
 
 
 FROM debian:bookworm
@@ -92,7 +104,7 @@ COPY --from=builder                                         \
     "/usr/local/bin/capio_server_unit_test[s]"              \
     "/usr/local/bin/capio_syscall_unit_test[s]"             \
     "/usr/local/bin/capio_integration_test[s]"              \
-    "/usr/local/bin/capio_multinode_*"                       \
+    "/usr/local/bin/capio_multinode_*"                      \
     /usr/local/bin/
 
 # Pkgconfig
