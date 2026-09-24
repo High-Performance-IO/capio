@@ -1,0 +1,48 @@
+{
+  "name": "CAPIO",
+  "IO_Graph": [
+    {
+      "name": "split",
+      "input_stream" : [],
+      "output_stream": [
+        "infile_*.dat"
+      ],
+      "streaming": [
+        {
+          "name": [
+            "infile_*.dat"
+          ],
+          "committed": "on_close"
+        }
+      ]
+    },
+    {
+      "name": "map",
+      "input_stream": [
+        "infile_*.dat"
+      ],
+      "output_stream": [
+        "outfile_*.dat"
+      ],
+      "streaming": [
+        {
+          "name": ["outfile_*.dat"],
+          "committed": "on_close"
+        }
+      ]
+    },
+    {
+      "name": "merge",
+      "input_stream": [
+        "outfile_*.dat"
+      ],
+      "output_stream": ["result.dat"],
+      "streaming": [
+        {
+          "name": ["result.dat"],
+          "committed": "on_close"
+        }
+      ]
+    }
+  ]
+}

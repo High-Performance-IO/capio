@@ -5,9 +5,9 @@
 #include <string>
 
 class RemoteRequest {
-    char *_buf_recv;
-    int _code;
     const std::string _source;
+    std::string _content;
+    int _code = -1;
 
   public:
     /**
@@ -15,11 +15,8 @@ class RemoteRequest {
      * @param buf_recv The buffer containing the raw request
      * @param source The source that generated the request
      */
+    RemoteRequest(std::string buf_recv, std::string source);
     RemoteRequest(char *buf_recv, const std::string &source);
-    RemoteRequest(const RemoteRequest &)            = delete;
-    RemoteRequest &operator=(const RemoteRequest &) = delete;
-
-    ~RemoteRequest();
 
     /// Get the source node name of the request
     [[nodiscard]] const std::string &get_source() const;
@@ -64,20 +61,32 @@ class Backend {
     virtual RemoteRequest read_next_request() = 0;
 
     /**
-     * Send file
-     * @param shm buffer of data to be sent
-     * @param nbytes length of @param shm
-     * @param target target to send files to
+     * Send a request followed by its file payload as one non-interleavable transfer.
+     *
+     * The request identifies and describes the payload. Backends may encode both parts in one
+     * transport message or serialize multiple transport messages, but no other request may be
+     * inserted between them.
+     *
+     * @param message Serialized request associated with the file payload
+     * @param message_len Number of valid bytes in @p message
+     * @param shm Buffer containing the file payload
+     * @param nbytes Number of payload bytes to send from @p shm
+     * @param target Destination server identifier
      */
-    virtual void send_file(char *shm, long int nbytes, const std::string &target) = 0;
+    virtual void send_file(const char *message, int message_len, char *shm, long int nbytes,
+                           const std::string &target) = 0;
 
     /**
-     * receive a file from another process
-     * @param shm Buffer that will be filled with incoming data
-     * @param source The source target to receive from
-     * @param bytes_expected Size of expected incoming buffer
+     * Receive the file payload associated with the current request.
+     *
+     * The call blocks until the expected payload is available or the backend reports an error.
+     * The caller must provide a writable buffer of at least @p bytes_expected bytes.
+     *
+     * @param shm Destination buffer for the received payload
+     * @param bytes_expected Exact number of payload bytes expected
+     * @param source Identifier of the server that sent the current request
      */
-    virtual void recv_file(char *shm, const std::string &source, long int bytes_expected) = 0;
+    virtual void recv_file(char *shm, long int bytes_expected, const std::string &source) = 0;
 
     /**
      *

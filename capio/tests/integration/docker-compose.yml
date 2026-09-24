@@ -1,0 +1,95 @@
+x-test-service: &test-service
+  image: alphaunito/capio:multinode
+  working_dir: /shared
+  volumes:
+    - shared_data:/shared
+    - discovery_tokens:/tokens
+    - test_status:/status
+    - coverage_reports:/coverage
+    - ./config.json:/config.json:ro
+  expose:
+    - "1234"
+  networks:
+    - capio
+  command:
+    - /bin/sh
+    - -c
+    - |
+      set -e
+      CAPIO_DIR=/shared capio_server -c /config.json -b mtcl --discovery fs --token-directory /tokens &
+      server_pid=$$!
+      cleanup() {
+        status=$$?
+        set +e
+        trap - EXIT TERM INT
+        kill -TERM "$$server_pid" 2>/dev/null
+        elapsed=0
+        while kill -0 "$$server_pid" 2>/dev/null && [ "$$elapsed" -lt 10 ]; do
+          sleep 1
+          elapsed=$$((elapsed + 1))
+        done
+        forced=0
+        if kill -0 "$$server_pid" 2>/dev/null; then
+          kill -KILL "$$server_pid"
+          forced=1
+        fi
+        wait "$$server_pid" 2>/dev/null
+        gcovr --root /opt/capio --exclude-throw-branches --exclude capio/tests \
+          --gcov-executable gcov --gcov-ignore-parse-errors \
+          --xml "/coverage/$${HOSTNAME}.xml" /opt/capio/build
+        coverage_status=$$?
+        if [ "$$status" -eq 0 ] && [ "$$forced" -ne 0 ]; then
+          status=1
+        elif [ "$$status" -eq 0 ] && [ "$$coverage_status" -ne 0 ]; then
+          status=$$coverage_status
+        fi
+        exit "$$status"
+      }
+      trap cleanup EXIT
+      trap 'exit 143' TERM INT
+      sleep 5
+      LD_PRELOAD=libcapio_posix.so "$$TEST_BINARY" --gtest_break_on_failure --gtest_print_time=1
+      touch "/status/$$HOSTNAME"
+      while true; do
+        set -- /status/*
+        [ -e "$$1" ] && [ "$$#" -eq 3 ] && break
+        sleep 1
+      done
+
+services:
+  split:
+    <<: *test-service
+    hostname: split
+    environment:
+      CAPIO_DIR: /shared
+      CAPIO_LOG_LEVEL: -1
+      CAPIO_APP_NAME: split
+      TEST_BINARY: capio_multinode_split
+
+  map:
+    <<: *test-service
+    hostname: map
+    environment:
+      CAPIO_DIR: /shared
+      CAPIO_LOG_LEVEL: -1
+      CAPIO_APP_NAME: map
+      TEST_BINARY: capio_multinode_map
+
+  merge:
+    <<: *test-service
+    hostname: merge
+    environment:
+      CAPIO_DIR: /shared
+      CAPIO_LOG_LEVEL: -1
+      CAPIO_APP_NAME: merge
+      TEST_BINARY: capio_multinode_merge
+
+volumes:
+  shared_data:
+  discovery_tokens:
+  test_status:
+  coverage_reports:
+
+networks:
+  capio:
+    driver: bridge

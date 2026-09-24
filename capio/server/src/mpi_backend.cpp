@@ -6,6 +6,9 @@
 #include "common/constants.hpp"
 #include "utils/capiocl_adapter.hpp"
 
+#include <algorithm>
+#include <vector>
+
 MPIBackend::MPIBackend(int argc, char **argv) : Backend(MPI_MAX_PROCESSOR_NAME) {
     int node_name_len, provided;
     START_LOG(gettid(), "call()");
@@ -40,17 +43,19 @@ const std::set<std::string> MPIBackend::get_nodes() { return nodes; }
 void MPIBackend::handshake_servers() {
     START_LOG(gettid(), "call()");
 
-    auto buf = std::unique_ptr<char[]>(new char[MPI_MAX_PROCESSOR_NAME]);
+    std::vector local_name(MPI_MAX_PROCESSOR_NAME, '\0');
+    std::copy(node_name.begin(), node_name.end(), local_name.begin());
+    std::vector names(n_servers * MPI_MAX_PROCESSOR_NAME, '\0');
+
+    MPI_Allgather(local_name.data(), MPI_MAX_PROCESSOR_NAME, MPI_CHAR, names.data(),
+                  MPI_MAX_PROCESSOR_NAME, MPI_CHAR, MPI_COMM_WORLD);
+
     for (int i = 0; i < n_servers; i += 1) {
-        if (i != rank) {
-            // TODO: possible deadlock
-            MPI_Send(node_name.c_str(), node_name.length(), MPI_CHAR, i, 0, MPI_COMM_WORLD);
-            std::fill(buf.get(), buf.get() + MPI_MAX_PROCESSOR_NAME, 0);
-            MPI_Recv(buf.get(), MPI_MAX_PROCESSOR_NAME, MPI_CHAR, i, 0, MPI_COMM_WORLD,
-                     MPI_STATUS_IGNORE);
-            nodes.emplace(buf.get());
-            hostname_to_rank.emplace(buf.get(), i);
-        }
+        const auto begin = names.begin() + i * MPI_MAX_PROCESSOR_NAME;
+        const std::string hostname(begin, std::find(begin, begin + MPI_MAX_PROCESSOR_NAME, '\0'));
+        nodes.emplace(hostname);
+        hostname_to_rank[hostname] = i;
+        rank_to_hostname[i]        = hostname;
     }
 }
 
@@ -88,10 +93,14 @@ void MPIBackend::send_request(const char *message, int message_len, const std::s
     MPI_Send(message, message_len + 1, MPI_CHAR, mpi_target, 0, MPI_COMM_WORLD);
 }
 
-void MPIBackend::send_file(char *shm, long int nbytes, const std::string &target) {
-    START_LOG(gettid(), "call(%.50s, %ld, %s)", shm, nbytes, target.c_str());
+void MPIBackend::send_file(const char *message, const int message_len, char *shm,
+                           const long int nbytes, const std::string &target) {
+    START_LOG(gettid(), "call(%s, %d, %.50s, %ld, %s)", message, message_len, shm, nbytes,
+              target.c_str());
     int elem_to_snd = 0;
     int dest        = hostname_to_rank[target];
+
+    MPI_Send(message, message_len + 1, MPI_CHAR, dest, 0, MPI_COMM_WORLD);
     for (long int k = 0; k < nbytes; k += elem_to_snd) {
         // Compute the maximum amount to send for this chunk
         elem_to_snd = static_cast<int>(std::min(nbytes - k, MPI_MAX_ELEM_COUNT));
@@ -102,7 +111,7 @@ void MPIBackend::send_file(char *shm, long int nbytes, const std::string &target
     }
 }
 
-void MPIBackend::recv_file(char *shm, const std::string &source, long int bytes_expected) {
+void MPIBackend::recv_file(char *shm, long int bytes_expected, const std::string &source) {
     START_LOG(gettid(), "call(shm=%ld, source=%s, bytes_expected=%ld)", shm, source.c_str(),
               bytes_expected);
     MPI_Status status;

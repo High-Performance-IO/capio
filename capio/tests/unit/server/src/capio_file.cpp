@@ -327,7 +327,7 @@ class MockBackend : public Backend {
   public:
     MockBackend() : Backend(HOST_NAME_MAX) {}
 
-    void recv_file(char *shm, const std::string &source, const long int bytes_expected) override {
+    void recv_file(char *shm, const long int bytes_expected, const std::string &source) override {
         for (long int i = 0; i < bytes_expected; ++i) {
             shm[i] = 33 + (i % 93);
         }
@@ -336,7 +336,8 @@ class MockBackend : public Backend {
     const std::set<std::string> get_nodes() override { return {node_name}; }
     void handshake_servers() override {}
     RemoteRequest read_next_request() override { return {nullptr, ""}; }
-    void send_file(char *shm, long int nbytes, const std::string &target) override {}
+    void send_file(const char *message, int message_len, char *shm, long int nbytes,
+                   const std::string &target) override {}
     void send_request(const char *message, int message_len, const std::string &target) override {}
     void connect_to(const std::string &target) override {}
 };
@@ -348,7 +349,10 @@ class MockBackendTestFixture : public ::testing::Test {
         open_files_location();
     }
 
-    void TearDown() override { delete backend; }
+    void TearDown() override {
+        delete backend;
+        backend = nullptr;
+    }
 };
 
 TEST_F(MockBackendTestFixture, TestReadFromNodeMockBackend) {

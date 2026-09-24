@@ -142,7 +142,7 @@ int main(int argc, char **argv) {
     capio_cl_engine->print();
 
     discovery_service = select_discovery_service(configuration);
-    backend           = select_backend(configuration.backend_name, argc, argv);
+    backend           = select_backend(configuration, argc, argv);
 
     START_LOG(gettid(), "call()");
 
@@ -159,6 +159,5 @@ int main(int argc, char **argv) {
     server_thread.join();
     remote_listener_thread.join();
 
-    delete backend;
     return 0;
 }

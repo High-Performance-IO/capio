@@ -62,29 +62,17 @@ jobs:
           
           echo "Run CAPIO syscall Unit tests"
           docker run --rm                         \
-              --env CAPIO_DIR=/tmp                \
+              --env CAPIO_DIR=/tmp/capio          \
               --env CAPIO_LOG_LEVEL=-1            \
-              --env LD_PRELOAD=libcapio_posix.so  \
+              --workdir /tmp/capio                \
               --name capio-docker                 \
               alphaunito/capio:latest             \
-            jq  -n --arg pwd $(pwd)               \
-                '{name: "CAPIO", IO_Graph: [], exclude: [$pwd + "/aNonExistingFile", $pwd, $pwd + "/"]}' \
-            > test_config.json &&                 \
-            capio_syscall_unit_tests              \
-              --gtest_break_on_failure            \
-              --gtest_print_time=1
+            sh -c 'jq -n --arg pwd "$PWD" "$1" > test_config.json && \
+               LD_PRELOAD=libcapio_posix.so capio_syscall_unit_tests \
+                 --gtest_break_on_failure \
+                 --gtest_print_time=1' sh \
+              '{name: "CAPIO", IO_Graph: [], exclude: [$pwd + "/aNonExistingFile", $pwd, $pwd + "/"]}'
           
-          echo "Run CAPIO integration tests"
-            docker run --rm                     \
-            --env CAPIO_DIR=/tmp                \
-            --env CAPIO_LOG_LEVEL=-1            \
-            --env LD_PRELOAD=libcapio_posix.so  \
-            --name capio-docker                 \
-            alphaunito/capio:latest             \
-            capio_integration_tests             \
-            --gtest_break_on_failure            \
-            --gtest_print_time=1
-
   format-check:
     name: "Check ${{ matrix.path }} clang-format conformance"
     runs-on: ubuntu-24.04
@@ -218,13 +206,6 @@ jobs:
           capio_syscall_unit_tests \
             --gtest_break_on_failure \
             --gtest_print_time=1
-          
-          echo "Run CAPIO integration tests"
-          rm -rf /dev/shm/CAPIO*
-          LD_PRELOAD=libcapio_posix.so \
-          capio_integration_tests \
-            --gtest_break_on_failure \
-            --gtest_print_time=1
 
       # note: use always() to force log upload also on test failure
       - name: "Compute valid artifact name"
@@ -274,9 +255,47 @@ jobs:
           retention-days: 1
           if-no-files-found: error
 
+  multinode-tests:
+    name: "Backend multinode test with MTCL"
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+      - name: "Build test image"
+        run: |
+          docker build \
+            --build-arg CAPIO_BUILD_TESTS=ON \
+            --build-arg CMAKE_BUILD_TYPE=Debug \
+            --build-arg ENABLE_COVERAGE=ON \
+            --target coverage \
+            --tag alphaunito/capio:multinode .
+      - name: "Run MTCL multinode test"
+        working-directory: capio/tests/integration
+        run: |
+          trap 'docker compose down -v' EXIT
+          status=0
+          docker compose up --abort-on-container-failure || status=$?
+          mkdir -p coverage
+          copy_status=0
+          for node in split map merge; do
+            docker compose cp "${node}:/coverage/${node}.xml" "coverage/${node}.xml" || copy_status=1
+          done
+          test -s coverage/split.xml || copy_status=1
+          test -s coverage/map.xml || copy_status=1
+          test -s coverage/merge.xml || copy_status=1
+          [ "$status" -eq 0 ] || exit "$status"
+          exit "$copy_status"
+      - name: "Upload multinode coverage report"
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: multinode-tests
+          path: capio/tests/integration/coverage/*.xml
+          retention-days: 1
+          if-no-files-found: error
+
   upload-to-codecov:
     name: "Codecov report upload"
-    needs: [ "unit-tests" , "codespell-check" , "format-check" ]
+    needs: [ "unit-tests" , "multinode-tests" , "codespell-check" , "format-check" ]
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v7
@@ -287,5 +306,6 @@ jobs:
       - name: "Upload coverage to Codecov"
         uses: codecov/codecov-action@v6
         with:
+          files: ./multinode-tests/split.xml,./multinode-tests/map.xml,./multinode-tests/merge.xml
           fail_ci_if_error: true
           token: ${{ secrets.CODECOV_TOKEN }}

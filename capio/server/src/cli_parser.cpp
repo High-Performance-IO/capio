@@ -36,6 +36,8 @@ CapioParsedConfig parseCLI(int argc, char **argv) {
         arguments, "port", CAPIO_SERVER_ARG_PARSER_MCAST_PORT_HELP, {"mcast-port"});
     args::ValueFlag<std::string> token_directory_flag(
         arguments, "directory", CAPIO_SERVER_ARG_PARSER_TOKEN_DIRECTORY_HELP, {"token-directory"});
+    args::ValueFlag<std::string> backend_options_flag(
+        arguments, "options", CAPIO_SERVER_ARG_PARSER_BACKEND_OPTIONS_HELP, {"backend-options"});
 
     args::Flag continueOnErrorFlag(arguments, "continue-on-error",
                                    CAPIO_SERVER_ARG_PARSER_CONFIG_NCONTINUE_ON_ERROR_HELP,
@@ -73,6 +75,9 @@ CapioParsedConfig parseCLI(int argc, char **argv) {
         mcast_port_flag ? args::get(mcast_port_flag) : CAPIO_MCAST_ADV_DEFAULT_PORT;
     capio_config.token_directory =
         token_directory_flag ? args::get(token_directory_flag) : ".capio_tokens/";
+    if (backend_options_flag) {
+        capio_config.backend_options = args::get(backend_options_flag);
+    }
 
     if (continueOnErrorFlag) {
 #ifdef CAPIO_LOG

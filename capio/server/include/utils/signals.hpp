@@ -2,6 +2,7 @@
 #define CAPIO_SERVER_HANDLERS_SIGNALS_HPP
 
 #include <csignal>
+#include <cstdlib>
 
 #include "calf/StdOutLogger.h"
 #include "calf/StlLogger.h"
@@ -22,6 +23,12 @@ void sig_term_handler(int signum, siginfo_t *info, void *ptr) {
         CALF_PRINT_COLOR(CALF_CLI_LEVEL_ERROR, "Segfault detected!");
     }
 
+#ifdef CAPIO_COVERAGE
+    // skip unsafe global teardown in coverage runs until backend shutdown is synchronized.
+    __gcov_dump();
+    std::_Exit(EXIT_SUCCESS);
+#endif
+
     // free all the memory used
     discovery_service->stop();
     delete client_manager;
@@ -29,10 +36,6 @@ void sig_term_handler(int signum, siginfo_t *info, void *ptr) {
     CALF_PRINT_COLOR(CALF_CLI_LEVEL_WARNING, "data_buffers cleanup completed");
 
     delete backend;
-
-#ifdef CAPIO_COVERAGE
-    __gcov_dump();
-#endif
 
     delete discovery_service;
 

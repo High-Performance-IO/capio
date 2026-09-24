@@ -39,7 +39,12 @@ include(GNUInstallDirs)
 #####################################
 # Dependencies
 #####################################
-find_package(MPI REQUIRED)
+find_package(MPI QUIET COMPONENTS CXX)
+if (MPI_CXX_FOUND)
+    message(STATUS "MPI backends enabled")
+else ()
+    message(STATUS "MPI backends disabled (MPI CXX not found)")
+endif ()
 find_package(Threads REQUIRED)
 
 #####################################
@@ -87,8 +92,13 @@ FetchContent_Declare(
         GIT_TAG v0.3.1
 )
 
-FetchContent_MakeAvailable(calf)
+FetchContent_Declare(
+        mtcl
+        GIT_REPOSITORY https://github.com/ParaGroup/MTCL
+        GIT_TAG 2d534f7c1d594717e7081d88f1ac90c8b30758b1
+)
 
+FetchContent_MakeAvailable(calf)
 #####################################
 # Targets
 #####################################
