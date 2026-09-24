@@ -5,9 +5,9 @@
 #include <string>
 
 class RemoteRequest {
+    const std::string _source;
     std::string _content;
     int _code = -1;
-    std::string _source;
 
   public:
     /**
