@@ -75,12 +75,10 @@ class MTCLBackend : public Backend {
 
     void send_request(const char *message, int message_len, const std::string &target) override;
 
-    void send_file(char *shm, long int nbytes, const std::string &target) override;
+    void send_file(const char *message, int message_len, char *shm, long int nbytes,
+                   const std::string &target) override;
 
-    void send_request_with_file(const char *message, int message_len, char *shm, long int nbytes,
-                                const std::string &target) override;
-
-    void recv_file(char *shm, const std::string &source, long int bytes_expected) override;
+    void recv_file(char *shm, long int bytes_expected, const std::string &source) override;
 
     void connect_to(const std::string &target_token) override;
 };

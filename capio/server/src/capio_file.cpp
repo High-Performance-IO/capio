@@ -309,7 +309,7 @@ void CapioFile::removeFd(int tid, int fd) {
 
 void CapioFile::readFromNode(const std::string &dest, off64_t offset, off64_t buffer_size) const {
     std::lock_guard lock(_mutex);
-    backend->recv_file(_buf + offset, dest, buffer_size);
+    backend->recv_file(_buf + offset, buffer_size, dest);
     _data_avail_cv.notify_all();
 }
 

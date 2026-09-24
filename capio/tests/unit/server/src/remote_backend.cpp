@@ -13,10 +13,12 @@ class RecordingBackend : public Backend {
 
     void handshake_servers() override {}
     RemoteRequest read_next_request() override { return {{}, {}}; }
-    void send_file(char *data, long int size, const std::string &) override {
+    void send_file(const char *message, int message_size, char *data, long int size,
+                   const std::string &) override {
+        calls.emplace_back(message, static_cast<size_t>(message_size));
         calls.emplace_back(data, static_cast<size_t>(size));
     }
-    void recv_file(char *, const std::string &, long int) override {}
+    void recv_file(char *, long int, const std::string &) override {}
     void send_request(const char *message, int size, const std::string &) override {
         calls.emplace_back(message, static_cast<size_t>(size));
     }
@@ -39,11 +41,11 @@ TEST(RemoteRequestTest, RejectsMalformedRequest) {
     EXPECT_EQ(RemoteRequest(std::string("xxxx payload"), "node-a").get_code(), -1);
 }
 
-TEST(BackendTest, CompoundSendDefaultsToOrderedRequestAndFile) {
+TEST(BackendTest, CompoundSendCarriesOrderedRequestAndFile) {
     RecordingBackend backend;
     char file[] = "data";
 
-    backend.send_request_with_file("request", 7, file, 4, "node-b");
+    backend.send_file("request", 7, file, 4, "node-b");
 
     EXPECT_EQ(backend.calls, (std::vector<std::string>{"request", "data"}));
 }

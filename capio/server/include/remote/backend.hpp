@@ -61,42 +61,32 @@ class Backend {
     virtual RemoteRequest read_next_request() = 0;
 
     /**
-     * Send file
-     * @param shm buffer of data to be sent
-     * @param nbytes length of @param shm
-     * @param target target to send files to
+     * Send a request followed by its file payload as one non-interleavable transfer.
+     *
+     * The request identifies and describes the payload. Backends may encode both parts in one
+     * transport message or serialize multiple transport messages, but no other request may be
+     * inserted between them.
+     *
+     * @param message Serialized request associated with the file payload
+     * @param message_len Number of valid bytes in @p message
+     * @param shm Buffer containing the file payload
+     * @param nbytes Number of payload bytes to send from @p shm
+     * @param target Destination server identifier
      */
-    virtual void send_file(char *shm, long int nbytes, const std::string &target) = 0;
+    virtual void send_file(const char *message, int message_len, char *shm, long int nbytes,
+                           const std::string &target) = 0;
 
     /**
-     * Send a request and its associated file data as one logical operation.
+     * Receive the file payload associated with the current request.
      *
-     * This operation is required by backends such that multiplex receives without a
-     * dedicated thread per connection. Keeping the request metadata and file payload in one
-     * transaction prevents concurrent senders from interleaving them and lets the receiver
-     * associate the payload with the correct READ_REPLY without an additional incoming queue.
-     * Backends that already preserve this ordering may use the default implementation, which
-     * sends the request before the file using the existing transport operations.
+     * The call blocks until the expected payload is available or the backend reports an error.
+     * The caller must provide a writable buffer of at least @p bytes_expected bytes.
      *
-     * @param message Request payload
-     * @param message_len Length of @p message in bytes
-     * @param shm File data buffer
-     * @param nbytes Length of @p shm in bytes
-     * @param target Destination server name
+     * @param shm Destination buffer for the received payload
+     * @param bytes_expected Exact number of payload bytes expected
+     * @param source Identifier of the server that sent the current request
      */
-    virtual void send_request_with_file(const char *message, int message_len, char *shm,
-                                        long int nbytes, const std::string &target) {
-        send_request(message, message_len, target);
-        send_file(shm, nbytes, target);
-    }
-
-    /**
-     * receive a file from another process
-     * @param shm Buffer that will be filled with incoming data
-     * @param source The source target to receive from
-     * @param bytes_expected Size of expected incoming buffer
-     */
-    virtual void recv_file(char *shm, const std::string &source, long int bytes_expected) = 0;
+    virtual void recv_file(char *shm, long int bytes_expected, const std::string &source) = 0;
 
     /**
      *

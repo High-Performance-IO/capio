@@ -31,7 +31,7 @@ inline void serve_remote_read_request(int tid, int fd, int count, long int nbyte
             file_size, complete, is_getdents);
     LOG("Message = %s", message.get());
 
-    backend->send_request_with_file(message.get(), size + 1, file, nbytes, dest);
+    backend->send_file(message.get(), size + 1, file, nbytes, dest);
 }
 
 inline void handle_remote_stat_request(int tid, const std::filesystem::path &path) {

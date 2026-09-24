@@ -461,22 +461,12 @@ void MTCLBackend::send_request(const char *message, const int message_len,
 }
 
 /**
- * @brief Rejects standalone file sends because MTCL frames bind files to their requests.
- *
- * Callers must use send_request_with_file() so the receiver cannot associate a file with the
- * wrong request.
- */
-void MTCLBackend::send_file(char *, long int, const std::string &) {
-    throw std::logic_error("MTCL files must be sent with their request");
-}
-
-/**
  * @brief Validates and sends a request with its optional file payload in one frame.
  *
  * A single MTCL message preserves request/file ordering without a second receive operation.
  */
-void MTCLBackend::send_request_with_file(const char *message, const int message_len, char *shm,
-                                         const long int nbytes, const std::string &target) {
+void MTCLBackend::send_file(const char *message, const int message_len, char *shm,
+                            const long int nbytes, const std::string &target) {
     if (message == nullptr || message_len <= 0 ||
         static_cast<size_t>(message_len) > CAPIO_SERVER_REQUEST_MAX_SIZE || nbytes < 0 ||
         static_cast<uint64_t>(nbytes) > MTCL_MAX_FILE_TRANSFER_SIZE ||
@@ -492,7 +482,7 @@ void MTCLBackend::send_request_with_file(const char *message, const int message_
  *
  * Matching source and size ensures the payload belongs to the request currently being handled.
  */
-void MTCLBackend::recv_file(char *shm, const std::string &source, const long int bytes_expected) {
+void MTCLBackend::recv_file(char *shm, const long int bytes_expected, const std::string &source) {
     if (shm == nullptr || bytes_expected < 0) {
         throw std::invalid_argument("Invalid MTCL destination buffer");
     }

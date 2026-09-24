@@ -16,8 +16,10 @@ RemoteRequest NoneBackend::read_next_request() {
     return {std::string{}, std::string{}};
 }
 
-void NoneBackend::send_file(char *shm, const long int nbytes, const std::string &target) {
-    START_LOG(gettid(), "call(%.50s, %ld, %s)", shm, nbytes, target.c_str());
+void NoneBackend::send_file(const char *message, const int message_len, char *shm,
+                            const long int nbytes, const std::string &target) {
+    START_LOG(gettid(), "call(%s, %d, %.50s, %ld, %s)", message, message_len, shm, nbytes,
+              target.c_str());
 }
 
 void NoneBackend::handshake_servers() {}
@@ -28,7 +30,7 @@ void NoneBackend::send_request(const char *message, const int message_len,
               target.c_str());
 }
 
-void NoneBackend::recv_file(char *shm, const std::string &source, const long int bytes_expected) {
+void NoneBackend::recv_file(char *shm, const long int bytes_expected, const std::string &source) {
     START_LOG(gettid(), "call(shm=%ld, source=%s, bytes_expected=%ld)", shm, source.c_str(),
               bytes_expected);
 }
