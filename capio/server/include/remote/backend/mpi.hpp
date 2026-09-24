@@ -1,7 +1,6 @@
 #ifndef CAPIO_SERVER_REMOTE_BACKEND_MPI_HPP
 #define CAPIO_SERVER_REMOTE_BACKEND_MPI_HPP
 #include <mpi.h>
-#include <mutex>
 #include <unordered_map>
 
 #include "remote/backend.hpp"
@@ -9,8 +8,8 @@
 class MPIBackend : public Backend {
 
   protected:
+    MPI_Request req{};
     int rank = -1;
-    std::mutex send_lock;
 
     /// This structure holds inside the information to convert from hostname to MPI rank
     std::set<std::string> nodes;

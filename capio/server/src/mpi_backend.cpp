@@ -24,9 +24,7 @@ MPIBackend::MPIBackend(int argc, char **argv) : Backend(MPI_MAX_PROCESSOR_NAME) 
         MPI_Abort(MPI_COMM_WORLD, EXIT_FAILURE);
     }
 
-    node_name.resize(MPI_MAX_PROCESSOR_NAME);
     MPI_Get_processor_name(node_name.data(), &node_name_len);
-    node_name.resize(node_name_len);
     LOG("Node name = %s, length=%d", node_name.data(), node_name_len);
     nodes.emplace(node_name);
     rank_to_hostname[rank]      = node_name;
@@ -92,7 +90,6 @@ void MPIBackend::send_request(const char *message, int message_len, const std::s
     const auto mpi_target = hostname_to_rank[target];
     LOG("MPI_rank for target %s is %c", target.c_str(), mpi_target);
 
-    const std::lock_guard lock(send_lock);
     MPI_Send(message, message_len + 1, MPI_CHAR, mpi_target, 0, MPI_COMM_WORLD);
 }
 
@@ -102,7 +99,6 @@ void MPIBackend::send_file(const char *message, const int message_len, char *shm
               target.c_str());
     int elem_to_snd = 0;
     int dest        = hostname_to_rank[target];
-    const std::lock_guard lock(send_lock);
 
     MPI_Send(message, message_len + 1, MPI_CHAR, dest, 0, MPI_COMM_WORLD);
     for (long int k = 0; k < nbytes; k += elem_to_snd) {
@@ -110,7 +106,7 @@ void MPIBackend::send_file(const char *message, const int message_len, char *shm
         elem_to_snd = static_cast<int>(std::min(nbytes - k, MPI_MAX_ELEM_COUNT));
 
         LOG("Sending %d bytes to %d with offset from beginning odf k=%ld", elem_to_snd, dest, k);
-        MPI_Send(shm + k, elem_to_snd, MPI_BYTE, dest, 0, MPI_COMM_WORLD);
+        MPI_Isend(shm + k, elem_to_snd, MPI_BYTE, dest, 0, MPI_COMM_WORLD, &req);
         LOG("Sent chunk of %d bytes", elem_to_snd);
     }
 }
