@@ -39,7 +39,12 @@ include(GNUInstallDirs)
 #####################################
 # Dependencies
 #####################################
-find_package(MPI REQUIRED)
+find_package(MPI QUIET COMPONENTS CXX)
+if (MPI_CXX_FOUND)
+    message(STATUS "MPI backends enabled")
+else ()
+    message(STATUS "MPI backends disabled (MPI CXX not found)")
+endif ()
 find_package(Threads REQUIRED)
 
 #####################################

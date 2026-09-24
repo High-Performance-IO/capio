@@ -41,7 +41,7 @@ class MTCLBackend : public Backend {
     /** File payload retained between decoding a compound READ_REPLY and handling that request. */
     struct PendingFile {
         /// Hostname from which the frame was received.
-        std::string source;
+        const std::string source;
         /// Complete message frame owning the file bytes.
         std::vector<unsigned char> frame;
         /// Offset of the file payload within @ref frame.

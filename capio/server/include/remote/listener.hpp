@@ -41,9 +41,15 @@ inline Backend *select_backend(const CapioParsedConfig &configuration, int argc,
     }
 
     if (backend_name == "mpi") {
+#ifdef CAPIO_HAS_MPI
         LOG("backend selected: mpi");
         CALF_PRINT_COLOR(CALF_CLI_LEVEL_INFO, "Starting CAPIO with MPI backend");
         return new MPIBackend(argc, argv);
+#else
+        CALF_PRINT_COLOR(CALF_CLI_LEVEL_ERROR,
+                         "MPI backend requested, but MPI support is not compiled in");
+        exit(EXIT_FAILURE);
+#endif
     }
 
     if (backend_name == "mtcl") {
@@ -86,9 +92,15 @@ inline Backend *select_backend(const CapioParsedConfig &configuration, int argc,
     }
 
     if (backend_name == "mpisync") {
+#ifdef CAPIO_HAS_MPI
         LOG("backend selected: mpisync");
         CALF_PRINT_COLOR(CALF_CLI_LEVEL_INFO, "Starting CAPIO with MPI (SYNC) backend");
         return new MPISYNCBackend(argc, argv);
+#else
+        CALF_PRINT_COLOR(CALF_CLI_LEVEL_ERROR,
+                         "MPISYNC backend requested, but MPI support is not compiled in");
+        exit(EXIT_FAILURE);
+#endif
     }
 
     LOG("Backend %s does not exist in CAPIO. Reverting back to the default backend (none)",

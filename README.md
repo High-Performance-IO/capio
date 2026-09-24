@@ -21,9 +21,10 @@ CAPIO depends on the following software that needs to be manually installed:
 
 - `cmake >=3.15`
 - `c++17` or newer
-- `openmpi`
 - `pthreads`
 
+`openmpi` is optional. When CMake finds it, CAPIO builds and enables the `mpi` and `mpisync` server backends;
+otherwise, CAPIO builds without MPI support and the MTCL backend remains available.
 The following dependencies are automatically fetched during the CMake configuration phase and built as needed.
 
 - [CAPIO-CL](https://github.com/High-Performance-IO/CAPIO-CL) handles CAPIO-CL configuration and enforces streaming directives.

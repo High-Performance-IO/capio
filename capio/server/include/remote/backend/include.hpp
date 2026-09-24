@@ -4,7 +4,9 @@
  * Include here all backend classes
  */
 
+#ifdef CAPIO_HAS_MPI
 #include "mpi.hpp"
+#endif
 #include "mtcl.hpp"
 #include "none.hpp"
 

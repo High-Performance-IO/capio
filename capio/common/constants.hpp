@@ -136,7 +136,11 @@ constexpr char CAPIO_SERVER_ARG_PARSER_STORE_ALL_IN_MEMORY_OPT_HELP[] =
 
 constexpr char CAPIO_SERVER_ARG_PARSER_CONFIG_BACKEND_HELP[] =
     "Backend used in CAPIO. The value [backend] can be one of the following implemented backends: "
+#ifdef CAPIO_HAS_MPI
     "\n\t> mpi \n\t> mpisync \n\t> mtcl \n\t> none (default)";
+#else
+    "\n\t> mtcl \n\t> none (default)";
+#endif
 constexpr char CAPIO_SERVER_ARG_PARSER_DISCOVERY_HELP[] =
     "Discovery service used in CAPIO: mcast (default) or fs";
 constexpr char CAPIO_SERVER_ARG_PARSER_MCAST_ADDR_HELP[] =
