@@ -14,7 +14,7 @@ TEST(RuntimeConfigurationTest, ParsesCapioAndExtractsCapioClConfiguration) {
         config << R"(
 [capiocl]
 config_path = "workflow.json"
-resolve_path = "/prefix"
+resolve_path = "prefix"
 store_all_in_memory = true
 [capiocl.monitor.mcast]
 enabled = true
@@ -22,7 +22,7 @@ enabled = true
 enabled = true
 
 [capio]
-directory = "/tmp"
+directory = "."
 continue_on_error = true
 [capio.storage]
 file_initial_size = 4096
@@ -36,7 +36,7 @@ type = "fs"
 addr = "239.1.2.3"
 port = 12345
 [capio.discovery_service.fs]
-token_directory = "/tokens"
+token_directory = ".tokens"
 [capio.backend]
 type = "mtcl"
 [capio.backend.mtcl]
@@ -49,25 +49,26 @@ poll_interval_us = 50
     const auto config = parse_config(path);
     std::filesystem::remove(path);
 
-    std::string config_path, resolve_path, dynamic_enabled, store_all_in_memory,
-        multicast_enabled;
-    config.capio_cl_config.getParameter("config_path", &config_path, "");
-    config.capio_cl_config.getParameter("resolve_path", &resolve_path, "");
-    config.capio_cl_config.getParameter("dynamic_api.enabled", &dynamic_enabled, "false");
-    config.capio_cl_config.getParameter("store_all_in_memory", &store_all_in_memory, "false");
-    config.capio_cl_config.getParameter("monitor.mcast.enabled", &multicast_enabled, "false");
+    std::string config_path, resolve_path, dynamic_enabled, store_all_in_memory, multicast_enabled;
+    config.capio_cl_config.getParameter("capiocl.config_path", &config_path, "");
+    config.capio_cl_config.getParameter("capiocl.resolve_path", &resolve_path, "");
+    config.capio_cl_config.getParameter("capiocl.dynamic_api.enabled", &dynamic_enabled, "false");
+    config.capio_cl_config.getParameter("capiocl.store_all_in_memory", &store_all_in_memory,
+                                        "false");
+    config.capio_cl_config.getParameter("capiocl.monitor.mcast.enabled", &multicast_enabled,
+                                        "false");
     EXPECT_EQ(config_path, "workflow.json");
-    EXPECT_EQ(resolve_path, "/prefix");
+    EXPECT_EQ(resolve_path, "prefix");
     EXPECT_EQ(dynamic_enabled, "true");
     EXPECT_EQ(store_all_in_memory, "true");
     EXPECT_EQ(multicast_enabled, "true");
     EXPECT_EQ(config.discovery_interface, CAPIO_FS_PROTO_FLAG);
     EXPECT_EQ(config.mcast_addr, "239.1.2.3");
     EXPECT_EQ(config.mcast_port, 12345);
-    EXPECT_EQ(config.token_directory, "/tokens");
+    EXPECT_EQ(config.token_directory, ".tokens");
     EXPECT_EQ(config.backend_name, "mtcl");
     EXPECT_EQ(config.backend_options, "TCP:7601@50");
-    EXPECT_EQ(config.capio_dir, "/tmp");
+    EXPECT_EQ(config.capio_dir, std::filesystem::current_path());
     EXPECT_EQ(config.cache_lines, 20);
     EXPECT_EQ(config.cache_line_size, 8192);
     EXPECT_EQ(config.capio_file_default_init_size, 4096);

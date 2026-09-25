@@ -8,7 +8,7 @@
 #include "common/queue.hpp"
 #include "utils/capiocl_adapter.hpp"
 #include "utils/common.hpp"
-#include "utils/env.hpp"
+#include "utils/runtime_configuration.hpp"
 
 ClientManager::ClientDataBuffers::ClientDataBuffers(const std::string &clientToServerName,
                                                     const std::string &serverToClientName,

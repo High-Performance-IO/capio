@@ -3,11 +3,9 @@ x-test-service: &test-service
   working_dir: /shared
   volumes:
     - shared_data:/shared
-    - discovery_tokens:/tokens
     - test_status:/status
     - coverage_reports:/coverage
-    - ./config.json:/config.json:ro
-    - ./config.toml:/config.toml:ro
+    - ./config.json:/shared/config.json:ro
   expose:
     - "1234"
   networks:
@@ -17,7 +15,8 @@ x-test-service: &test-service
     - -c
     - |
       set -e
-      capio_server /config.toml &
+      printf '[capiocl]\nworkflow_name = "CAPIO"\nconfig_path = "config.json"\n[capio]\ndirectory = "%s"\n[capio.discovery_service]\ntype = "fs"\n[capio.discovery_service.fs]\ntoken_directory = ".capio_tokens/"\n[capio.backend]\ntype = "mtcl"\n' "$$PWD" > /tmp/capio.toml
+      capio_server /tmp/capio.toml &
       server_pid=$$!
       cleanup() {
         status=$$?
@@ -87,7 +86,6 @@ services:
 
 volumes:
   shared_data:
-  discovery_tokens:
   test_status:
   coverage_reports:
 

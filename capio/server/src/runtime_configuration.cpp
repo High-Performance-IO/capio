@@ -162,7 +162,7 @@ static CapioParsedConfig parse_table(const toml::table &table) {
     constexpr char capiocl_prefix[] = "capiocl.";
     for (const auto &[key, value] : flattened) {
         if (key.compare(0, sizeof(capiocl_prefix) - 1, capiocl_prefix) == 0) {
-            capio_cl_config.emplace(key.substr(sizeof(capiocl_prefix) - 1), value);
+            capio_cl_config.emplace(key, value);
         }
     }
     result.capio_cl_config =

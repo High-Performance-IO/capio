@@ -5,7 +5,6 @@
 
 #include "remote/backend.hpp"
 #include "remote/requests.hpp"
-#include "utils/env.hpp"
 #include "utils/location.hpp"
 #include "utils/runtime_configuration.hpp"
 
