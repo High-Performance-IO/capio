@@ -4,8 +4,8 @@
 #include "calf/StlLogger.h"
 
 #include "common/constants.hpp"
-#include "common/syscall.hpp"
 #include "common/shm.hpp"
+#include "common/syscall.hpp"
 #include "utils/common.hpp"
 
 CapioShmCanary::CapioShmCanary(const std::string &capio_workflow_name)

@@ -7,8 +7,8 @@
 #include "remote/discovery.hpp"
 #include "storage/manager.hpp"
 #include "utils/capiocl_adapter.hpp"
-#include "utils/env.hpp"
 #include "utils/location.hpp"
+#include "utils/runtime_configuration.hpp"
 
 capiocl::engine::Engine *capio_cl_engine = nullptr;
 StorageManager *storage_manager          = nullptr;

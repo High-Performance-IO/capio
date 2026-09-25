@@ -5,8 +5,8 @@
 
 #include "remote/backend.hpp"
 #include "remote/requests.hpp"
-#include "utils/env.hpp"
 #include "utils/location.hpp"
+#include "utils/runtime_configuration.hpp"
 
 extern StorageManager *storage_manager;
 extern Backend *backend;

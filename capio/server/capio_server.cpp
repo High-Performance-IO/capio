@@ -29,7 +29,6 @@
 #include "remote/discovery.hpp"
 #include "storage/capio_file.hpp"
 #include "utils/common.hpp"
-#include "utils/env.hpp"
 #include "utils/types.hpp"
 
 ClientManager *client_manager;
@@ -119,10 +118,9 @@ int main(int argc, char **argv) {
     for (const auto line : CAPIO_LOG_SERVER_BANNER) {
         CALF_PRINT("%s", line);
     }
-    configure_server_runtime(configuration.capio_dir, configuration.cache_lines,
-                             configuration.cache_line_size,
-                             configuration.capio_file_default_init_size,
-                             configuration.capio_prefetch_data_size);
+    configure_server_runtime(
+        configuration.capio_dir, configuration.cache_lines, configuration.cache_line_size,
+        configuration.capio_file_default_init_size, configuration.capio_prefetch_data_size);
 
     capio_cl_engine = capiocl::parser::Parser::parse(configuration.capio_cl_config);
 

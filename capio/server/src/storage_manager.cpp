@@ -10,10 +10,10 @@
 #include "common/filesystem.hpp"
 #include "storage/capio_file.hpp"
 #include "storage/manager.hpp"
-#include "utils/env.hpp"
 #include "utils/capiocl_adapter.hpp"
 #include "utils/common.hpp"
 #include "utils/location.hpp"
+#include "utils/runtime_configuration.hpp"
 #include "utils/shared_mutex.hpp"
 #include "utils/types.hpp"
 
