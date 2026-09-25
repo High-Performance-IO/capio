@@ -1,4 +1,4 @@
-#include "utils/cli_parser.hpp"
+#include "utils/runtime_configuration.hpp"
 
 #include "calf/StdOutLogger.h"
 #include "calf/StlLogger.h"
@@ -6,7 +6,74 @@
 #include "common/constants.hpp"
 #include "utils/common.hpp"
 
+#include "toml++/toml.hpp"
+
 #include <args.hxx>
+
+
+
+void load_config_to_memory(const toml::table &tbl,
+                           std::unordered_map<std::string, std::string> &map,
+                           const std::string &prefix = "") {
+    START_LOG(calf_current_tid(), "call()");
+    for (const auto &[key, value] : tbl) {
+        std::string full_key;
+        if (prefix.empty()) {
+            full_key = std::string{key.str()};
+        } else {
+            full_key = prefix + "." + std::string{key.str()};
+        }
+
+        if (value.is_table()) {
+            load_config_to_memory(*value.as_table(), map, full_key);
+        } else {
+            if (value.is_string()) {
+                map[full_key] = value.as_string()->get();
+            } else if (value.is_boolean()) {
+                if (value.as_boolean()->get()) {
+                    map[full_key] = "true";
+                } else {
+                    map[full_key] = "false";
+                }
+            } else {
+                map[full_key] = std::to_string(value.as_integer()->get());
+            }
+        }
+    }
+}
+
+std::unordered_map<std::string, std::string> parse_cli(int argc, char **argv) {
+    START_LOG(calf_current_tid(), "call()");
+
+    if (argc==1) {
+        // no args passed! error?
+    }
+
+    const std::string input_arg(argv[1]);
+
+    if (input_arg == "help") {
+        // print help as short as it may be
+
+        std::exit(EXIT_SUCCESS);
+    }
+
+    if (input_arg == "genconf") {
+        //generate the default config
+
+        std::exit(EXIT_SUCCESS);
+    }
+
+    std::unordered_map<std::string, std::string> loaded_config_flatten;
+    try {
+        toml::table tbl = toml::parse_file(input_arg);
+        load_config_to_memory(tbl, loaded_config_flatten); //flattened toml
+    } catch (const toml::parse_error &err) {
+        LOG("failed to parse configuration path=%s error=%s", input_arg.c_str(), err.what());
+        std::exit(EXIT_FAILURE);
+    }
+
+    return loaded_config_flatten;
+}
 
 CapioParsedConfig parseCLI(int argc, char **argv) {
     CapioParsedConfig capio_config;

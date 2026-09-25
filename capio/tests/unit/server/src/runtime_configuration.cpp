@@ -1,7 +1,7 @@
 #include <gtest/gtest.h>
 
 #include "common/constants.hpp"
-#include "utils/cli_parser.hpp"
+#include "utils/runtime_configuration.hpp"
 
 namespace {
 

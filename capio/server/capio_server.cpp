@@ -39,8 +39,8 @@ Backend *backend;
 DiscoveryService *discovery_service;
 
 #include "handlers.hpp"
-#include "utils/cli_parser.hpp"
 #include "utils/location.hpp"
+#include "utils/runtime_configuration.hpp"
 #include "utils/signals.hpp"
 
 #include "remote/listener.hpp"
@@ -119,7 +119,7 @@ int main(int argc, char **argv) {
         CALF_PRINT("%s", line);
     }
 
-    const auto configuration = parseCLI(argc, argv);
+    const auto configuration = parse_cli(argc, argv);
 
     if (configuration.capio_cl_dynamic_config) {
         capio_cl_engine = new capiocl::engine::Engine();

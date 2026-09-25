@@ -19,10 +19,16 @@ FetchContent_Declare(
         GIT_TAG 6.4.7
 )
 
+FetchContent_Declare(
+        tomlplusplus
+        GIT_REPOSITORY https://github.com/marzer/tomlplusplus.git
+        GIT_TAG v3.4.0
+)
+
 set(ARGS_BUILD_EXAMPLE OFF CACHE INTERNAL "")
 set(ARGS_BUILD_UNITTESTS OFF CACHE INTERNAL "")
 
-FetchContent_MakeAvailable(args capio_cl mtcl)
+FetchContent_MakeAvailable(args capio_cl mtcl tomlplusplus)
 
 
 #####################################
@@ -51,8 +57,12 @@ target_sources(${TARGET_NAME} PRIVATE
 target_include_directories(${TARGET_NAME} PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}/include
         ${capio_cl_SOURCE_DIR}
+        ${TOMLPLUSPLUS_SOURCE_DIR}/include
 )
 target_include_directories(${TARGET_NAME} SYSTEM PRIVATE ${mtcl_SOURCE_DIR}/include)
+
+
+target_link_libraries(${TARGET_NAME} PRIVATE tomlplusplus::tomlplusplus)
 
 #####################################
 # set CALF logger component name
