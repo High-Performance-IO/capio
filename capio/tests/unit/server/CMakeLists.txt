@@ -3,7 +3,7 @@
 #####################################
 set(TARGET_NAME capio_server_unit_tests)
 
-FetchContent_MakeAvailable(capio_cl mtcl)
+FetchContent_MakeAvailable(capio_cl mtcl tomlplusplus)
 
 set(TARGET_INCLUDE_FOLDER "${PROJECT_SOURCE_DIR}/capio/server")
 
@@ -37,6 +37,7 @@ target_sources(${TARGET_NAME} PRIVATE
 target_include_directories(${TARGET_NAME} PRIVATE
         "${TARGET_INCLUDE_FOLDER}/include"
         ${capio_cl_SOURCE_DIR}
+        ${TOMLPLUSPLUS_SOURCE_DIR}/include
 )
 target_include_directories(${TARGET_NAME} SYSTEM PRIVATE ${mtcl_SOURCE_DIR}/include)
 
@@ -50,7 +51,8 @@ calf_set_default_log_dir(${TARGET_NAME} "./capio_logs")
 #####################################
 # Link libraries
 #####################################
-target_link_libraries(${TARGET_NAME} PRIVATE GTest::gtest_main rt libcapio_cl args)
+target_link_libraries(${TARGET_NAME} PRIVATE GTest::gtest_main rt libcapio_cl
+        tomlplusplus::tomlplusplus)
 if (MPI_CXX_FOUND)
     target_compile_definitions(${TARGET_NAME} PRIVATE CAPIO_HAS_MPI)
     target_link_libraries(${TARGET_NAME} PRIVATE MPI::MPI_CXX)

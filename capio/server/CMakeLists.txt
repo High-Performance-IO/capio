@@ -14,15 +14,12 @@ endif ()
 # External projects
 #####################################
 FetchContent_Declare(
-        args
-        GIT_REPOSITORY https://github.com/Taywee/args.git
-        GIT_TAG 6.4.7
+        tomlplusplus
+        GIT_REPOSITORY https://github.com/marzer/tomlplusplus.git
+        GIT_TAG v3.4.0
 )
 
-set(ARGS_BUILD_EXAMPLE OFF CACHE INTERNAL "")
-set(ARGS_BUILD_UNITTESTS OFF CACHE INTERNAL "")
-
-FetchContent_MakeAvailable(args capio_cl mtcl)
+FetchContent_MakeAvailable(capio_cl mtcl tomlplusplus)
 
 
 #####################################
@@ -51,8 +48,12 @@ target_sources(${TARGET_NAME} PRIVATE
 target_include_directories(${TARGET_NAME} PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}/include
         ${capio_cl_SOURCE_DIR}
+        ${TOMLPLUSPLUS_SOURCE_DIR}/include
 )
 target_include_directories(${TARGET_NAME} SYSTEM PRIVATE ${mtcl_SOURCE_DIR}/include)
+
+
+target_link_libraries(${TARGET_NAME} PRIVATE tomlplusplus::tomlplusplus)
 
 #####################################
 # set CALF logger component name
@@ -64,7 +65,7 @@ calf_set_default_log_dir(${TARGET_NAME} "./capio_logs")
 #####################################
 # Link libraries
 #####################################
-target_link_libraries(${TARGET_NAME} PRIVATE pthread rt stdc++fs libcapio_cl args)
+target_link_libraries(${TARGET_NAME} PRIVATE pthread rt stdc++fs libcapio_cl)
 if (MPI_CXX_FOUND)
     target_compile_definitions(${TARGET_NAME} PRIVATE CAPIO_HAS_MPI)
     target_link_libraries(${TARGET_NAME} PRIVATE MPI::MPI_CXX)
