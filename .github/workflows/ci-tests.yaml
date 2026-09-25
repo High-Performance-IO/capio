@@ -68,6 +68,7 @@ jobs:
               --name capio-docker                 \
               alphaunito/capio:latest             \
             sh -c 'jq -n --arg pwd "$PWD" "$1" > test_config.json && \
+               printf "[capiocl]\nworkflow_name = \"CAPIO\"\nconfig_path = \"test_config.json\"\n[capio]\ndirectory = \"/tmp/capio\"\n" > test_config.toml && \
                LD_PRELOAD=libcapio_posix.so capio_syscall_unit_tests \
                  --gtest_break_on_failure \
                  --gtest_print_time=1' sh \
@@ -186,8 +187,11 @@ jobs:
               --arg pwd $(pwd) \
               '{name: "CAPIO", IO_Graph: [], exclude: [$pwd + "/aNonExistingFile", $pwd, $pwd + "/"]}' \
           > test_config.json
+
+          printf '[capiocl]\nworkflow_name = "CAPIO"\nconfig_path = "test_config.json"\n[capio]\ndirectory = "%s"\n' \
+            "$(pwd)" > test_config.toml
           
-          export CONFIG_PATH=$(realpath test_config.json)
+          export CONFIG_PATH=$(realpath test_config.toml)
           
           export LD_LIBRARY_PATH="/usr/local/lib:${LD_LIBRARY_PATH}"
           

@@ -3,10 +3,9 @@
 
 #include <thread>
 
-#include "posix/utils/env.hpp"
-
 #include "remote/backend.hpp"
 #include "remote/requests.hpp"
+#include "utils/env.hpp"
 #include "utils/location.hpp"
 
 extern StorageManager *storage_manager;
@@ -41,7 +40,7 @@ inline void handle_getdents(int tid, int fd, long int count) {
 
     const std::string &app_name                = client_manager->getAppName(tid);
     const std::filesystem::path &path_to_check = storage_manager->getPath(tid, fd);
-    const std::filesystem::path &capio_dir     = get_capio_dir();
+    const std::filesystem::path &capio_dir     = get_server_capio_dir();
     bool is_prod           = CapioCLEngine::get().isProducer(path_to_check, app_name);
     auto file_location_opt = get_file_location_opt(path_to_check);
 

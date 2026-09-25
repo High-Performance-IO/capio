@@ -8,6 +8,7 @@
 #include "remote/requests.hpp"
 
 #include "utils/location.hpp"
+#include "utils/env.hpp"
 
 extern Backend *backend;
 
@@ -135,7 +136,7 @@ inline void handle_read(int tid, int fd, off64_t count) {
     START_LOG(gettid(), "call(tid=%d, fd=%d, count=%ld)", tid, fd, count);
 
     const std::filesystem::path &path      = storage_manager->getPath(tid, fd);
-    const std::filesystem::path &capio_dir = get_capio_dir();
+    const std::filesystem::path &capio_dir = get_server_capio_dir();
     const std::string &app_name            = client_manager->getAppName(tid);
     bool is_prod =
         CapioCLEngine::get().isProducer(path, app_name) || client_manager->isProducer(tid, path);

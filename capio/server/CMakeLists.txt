@@ -14,21 +14,12 @@ endif ()
 # External projects
 #####################################
 FetchContent_Declare(
-        args
-        GIT_REPOSITORY https://github.com/Taywee/args.git
-        GIT_TAG 6.4.7
-)
-
-FetchContent_Declare(
         tomlplusplus
         GIT_REPOSITORY https://github.com/marzer/tomlplusplus.git
         GIT_TAG v3.4.0
 )
 
-set(ARGS_BUILD_EXAMPLE OFF CACHE INTERNAL "")
-set(ARGS_BUILD_UNITTESTS OFF CACHE INTERNAL "")
-
-FetchContent_MakeAvailable(args capio_cl mtcl tomlplusplus)
+FetchContent_MakeAvailable(capio_cl mtcl tomlplusplus)
 
 
 #####################################
@@ -74,7 +65,7 @@ calf_set_default_log_dir(${TARGET_NAME} "./capio_logs")
 #####################################
 # Link libraries
 #####################################
-target_link_libraries(${TARGET_NAME} PRIVATE pthread rt stdc++fs libcapio_cl args)
+target_link_libraries(${TARGET_NAME} PRIVATE pthread rt stdc++fs libcapio_cl)
 if (MPI_CXX_FOUND)
     target_compile_definitions(${TARGET_NAME} PRIVATE CAPIO_HAS_MPI)
     target_link_libraries(${TARGET_NAME} PRIVATE MPI::MPI_CXX)

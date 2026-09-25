@@ -1,0 +1,15 @@
+[capiocl]
+workflow_name = "CAPIO"
+config_path = "/config.json"
+
+[capio]
+directory = "/shared"
+
+[capio.discovery_service]
+type = "fs"
+
+[capio.discovery_service.fs]
+token_directory = "/tokens"
+
+[capio.backend]
+type = "mtcl"
