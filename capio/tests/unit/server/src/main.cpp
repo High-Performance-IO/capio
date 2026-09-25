@@ -7,6 +7,7 @@
 #include "remote/discovery.hpp"
 #include "storage/manager.hpp"
 #include "utils/capiocl_adapter.hpp"
+#include "utils/env.hpp"
 #include "utils/location.hpp"
 #include "utils/runtime_configuration.hpp"
 
@@ -29,10 +30,8 @@ class ServerUnitTestEnvironment : public testing::Environment {
     explicit ServerUnitTestEnvironment() = default;
 
     void SetUp() override {
-        setenv("CAPIO_DIR", "/tmp", 1);
-        std::array<char *, 2> argv{const_cast<char *>("capio_server"),
-                                   const_cast<char *>("--no-config")};
-        RuntimeConfiguration::set(RuntimeConfiguration(argv.size(), argv.data()));
+        configure_server_runtime("/tmp", CAPIO_CACHE_LINES_DEFAULT, CAPIO_CACHE_LINE_SIZE_DEFAULT,
+                                 CAPIO_DEFAULT_FILE_INITIAL_SIZE, 0);
         capio_cl_engine = new capiocl::engine::Engine(false);
         capio_cl_engine->setWorkflowName(CAPIO_DEFAULT_WORKFLOW_NAME);
         client_manager    = new ClientManager();

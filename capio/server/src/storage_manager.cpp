@@ -9,6 +9,7 @@
 #include "common/dirent.hpp"
 #include "storage/capio_file.hpp"
 #include "storage/manager.hpp"
+#include "utils/env.hpp"
 #include "utils/capiocl_adapter.hpp"
 #include "utils/common.hpp"
 #include "utils/filesystem.hpp"
@@ -312,7 +313,7 @@ off64_t StorageManager::addDirectory(const pid_t tid, const std::filesystem::pat
         if (c_file.isFirstWrite()) {
             c_file.registerFirstWrite();
             // TODO: it works only if there is one prod per file
-            if (is_capio_dir(path)) {
+            if (get_server_capio_dir() == path) {
                 add_file_location(path, backend->get_node_name().c_str(), -1);
             } else {
                 write_file_location(path);

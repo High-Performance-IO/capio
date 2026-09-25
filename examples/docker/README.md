@@ -50,6 +50,10 @@ The last preliminary step is to create the `CAPIO_DIR` on every node. For this e
 ```bash
 docker compose -p example exec --user capio --index 1 capio \
   mpirun -N 1 --hostfile /home/capio/hostfile mkdir -p /tmp/capio
+
+docker compose -p example exec --user capio --index 1 capio \
+  sh -c 'printf "[capiocl]\nworkflow_name = \"CAPIO\"\n[capio]\ndirectory = \"/tmp/capio\"\n" \
+  > /home/capio/server/capio.toml'
 ```
 
 Note that the command requires MPI to execute one process per node using the `-N 1` option of the `mpirun` command, and specifies the nodes' hostnames through the `hostfile` you just generated.
@@ -60,19 +64,17 @@ Finally, the CAPIO server can be started in background using the following comma
 docker compose -p example exec                \
   --detach                                    \
   --index 1                                   \
-  --env CAPIO_DIR=/tmp/capio                  \
   --user capio                                \
   --workdir /home/capio/server                \
   capio                                       \
   mpirun                                      \
   -N 1                                        \
   --hostfile /home/capio/hostfile             \
-  -x CAPIO_DIR                                \
-  sh -c ' capio_server --no-config            \
+  sh -c 'capio_server /home/capio/server/capio.toml \
   > server_${OMPI_COMM_WORLD_RANK}.out 2>&1'
 ```
 
-Let's examine some of the options introduced in the previous command. The `--detach` option allows to run a command in background. The `--env` option adds environment variables to the target container instance, in this case the one called `example-capio-1`. The `-x` option of the `mpirun` command propagates the specified list of environment variables to all nodes it targets. Finally, the `--workdir` option specifies that the CAPIO server should use the shared `/home/capio/server` directory as the working directory, to store logs and other configuration files.
+Let's examine some of the options introduced in the previous command. The `--detach` option allows running a command in background. The TOML file supplies the server runtime configuration, including its managed directory. The `--workdir` option specifies that the CAPIO server should use the shared `/home/capio/server` directory to store logs and other files.
 
 ### Start the CAPIO application
 
@@ -124,4 +126,3 @@ If the command succeeds, it should print something like this
  ✔ Container example-capio-1  Removed  0.4s 
  ✔ Network example_capionet   Removed  0.3s 
 ```
-

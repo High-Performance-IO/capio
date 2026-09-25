@@ -92,7 +92,7 @@ static constexpr std::array<CSHandler_t, CAPIO_NR_REQUESTS> build_request_handle
     setup_signal_handlers();
     backend->handshake_servers();
 
-    storage_manager->addDirectory(getpid(), RuntimeConfiguration::get().getCapioDir());
+    storage_manager->addDirectory(getpid(), get_server_capio_dir());
 
     internal_server_sem.unlock();
 
@@ -113,13 +113,17 @@ int main(int argc, char **argv) {
 
     Semaphore internal_server_sem(0);
 
+    const auto configuration = parse_cli(argc, argv);
+
     for (const auto line : CAPIO_LOG_SERVER_BANNER) {
         CALF_PRINT("%s", line);
     }
+    configure_server_runtime(configuration.capio_dir, configuration.cache_lines,
+                             configuration.cache_line_size,
+                             configuration.capio_file_default_init_size,
+                             configuration.capio_prefetch_data_size);
 
-    const auto configuration = parse_cli(argc, argv);
-
-    capio_cl_engine = RuntimeConfiguration::get().createCapioClEngine();
+    capio_cl_engine = capiocl::parser::Parser::parse(configuration.capio_cl_config);
 
     UPDATE_CALF_WORKFLOW_NAME(capio_cl_engine->getWorkflowName());
 
