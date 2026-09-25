@@ -117,7 +117,7 @@ int main(int argc, char **argv) {
         CALF_PRINT("%s", line);
     }
 
-    RuntimeConfiguration::initialize(argc, argv);
+    const auto configuration = parse_cli(argc, argv);
 
     capio_cl_engine = RuntimeConfiguration::get().createCapioClEngine();
 
