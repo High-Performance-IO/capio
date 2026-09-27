@@ -15,13 +15,27 @@ bool CapioFile::compareSectors::operator()(const std::pair<off64_t, off64_t> &lh
 }
 
 /// @brief Compute the maximum allocable memory for a CapioFile heap buffer. this ensures that
-/// requested memory for CapioFile buffers never exceeds free memory at allocation time
-/// TODO: this code is not aware of cached content or swap as there is no syscall to expose the
-///     cache usage / swap usage. the only way to achieve that is by reading /proc/meminfo but this
-///     required IO operations and is slow. the quota is hence conservative (free, not available
-///     memory). a better cooldown approach will be required in the future.
-static off64_t computeAllocableMemQuota(const off64_t requested_size) {
-    START_LOG(gettid(), "call(requested_size = %lld)", (long long) requested_size);
+/// requested memory for CapioFile buffers never exceeds available memory at allocation time
+///
+/// The check is selected at build time with CAPIO_MEMORY_CHECKS:
+///   - full: MemAvailable from /proc/meminfo (free memory + reclaimable cache)
+///   - fast: free memory only, via sysconf. no IO, but ignores cache the kernel can drop, so it
+///           caps more aggressively than needed
+///   - none: no check, the requested size is always returned
+///
+/// NOTE: reading MemAvailable from /proc/meminfo is the only way to know the memory that is
+///     actually allocable (free memory + reclaimable cache). no syscall exposes it: sysconf and
+///     sysinfo only report free memory, which ignores cache that the kernel can drop. to keep
+///     this cheap, /proc/meminfo is opened once and re-read with a single pread.
+inline off64_t computeAllocableMemQuota(const off64_t requested_size) {
+    START_LOG(gettid(), "call(requested_size = %lld)", static_cast<long long>(requested_size));
+
+#if defined(CAPIO_MEMORY_CHECKS_NONE)
+    LOG("Memory checks disabled for CapioFiles. returning requested size...");
+    return requested_size;
+#endif
+
+#if defined(CAPIO_MEMORY_CHECKS_FAST)
     const long pages     = sysconf(_SC_AVPHYS_PAGES);
     const long page_size = sysconf(_SC_PAGE_SIZE);
     if (pages < 0 || page_size < 0) {
@@ -30,21 +44,51 @@ static off64_t computeAllocableMemQuota(const off64_t requested_size) {
     }
     const off64_t mem_available = static_cast<off64_t>(pages) * page_size;
     LOG("Free memory is: %lld", static_cast<long long>(mem_available));
+#else // CAPIO_MEMORY_CHECKS_FULL (default)
+    static const int meminfo_fd = ::open("/proc/meminfo", O_RDONLY | O_CLOEXEC);
 
-    if (mem_available < requested_size) {
-        CALF_PRINT_COLOR(CALF_CLI_LEVEL_WARNING,
-                         "Requested allocation memory exceeds free memory by %lld bytes. "
-                         "Capping allocation to %lld bytes.",
-                         static_cast<long long>(requested_size - mem_available),
-                         static_cast<long long>(mem_available));
-        LOG("Requested allocation memory exceeds free memory by %lld bytes. "
-            "Capping allocation to %lld bytes.",
-            static_cast<long long>(requested_size - mem_available),
-            static_cast<long long>(mem_available));
-        return mem_available;
+    char buf[256];
+    const std::string_view meminfo(
+        buf, static_cast<size_t>(std::max<ssize_t>(pread(meminfo_fd, buf, sizeof(buf), 0), 0)));
+    if (meminfo.empty()) {
+        LOG("Unable to read /proc/meminfo, using requested size");
+        return requested_size;
     }
 
-    return requested_size;
+    constexpr std::string_view key = "MemAvailable:";
+    auto pos                       = meminfo.find(key);
+    if (pos != std::string_view::npos) {
+        pos = meminfo.find_first_not_of(' ', pos + key.size());
+    }
+    unsigned long long kb = 0;
+    if (pos == std::string_view::npos ||
+        std::from_chars(meminfo.data() + pos, meminfo.data() + meminfo.size(), kb).ec !=
+            std::errc{}) {
+        LOG("MemAvailable not found in /proc/meminfo, using requested size");
+        return requested_size;
+    }
+    const off64_t mem_available = static_cast<off64_t>(kb) * 1024;
+    LOG("Available memory is: %lld", static_cast<long long>(mem_available));
+#endif
+
+    if (mem_available >= requested_size) {
+        return requested_size;
+    }
+
+    LOG("Requested allocation memory exceeds available memory by %lld bytes. "
+        "Capping allocation to %lld bytes.",
+        static_cast<long long>(requested_size - mem_available),
+        static_cast<long long>(mem_available));
+
+    if (mem_available < requested_size / 10) {
+        CALF_PRINT_COLOR(CALF_CLI_LEVEL_WARNING,
+                         "Available memory (%lld bytes) is less than 10%% of the requested "
+                         "allocation (%lld bytes). Capping allocation to available memory.",
+                         static_cast<long long>(mem_available),
+                         static_cast<long long>(requested_size));
+    }
+
+    return mem_available;
 }
 
 CapioFile::CapioFile() = default;
