@@ -14,6 +14,39 @@ bool CapioFile::compareSectors::operator()(const std::pair<off64_t, off64_t> &lh
     return (lhs.first < rhs.first);
 }
 
+/// @brief Compute the maximum allocable memory for a CapioFile heap buffer. this ensures that
+/// requested memory for CapioFile buffers never exceeds free memory at allocation time
+/// TODO: this code is not aware of cached content or swap as there is no syscall to expose the
+///     cache usage / swap usage. the only way to achieve that is by reading /proc/meminfo but this
+///     required IO operations and is slow. the quota is hence conservative (free, not available
+///     memory). a better cooldown approach will be required in the future.
+static off64_t computeAllocableMemQuota(const off64_t requested_size) {
+    START_LOG(gettid(), "call(requested_size = %lld)", (long long) requested_size);
+    const long pages     = sysconf(_SC_AVPHYS_PAGES);
+    const long page_size = sysconf(_SC_PAGE_SIZE);
+    if (pages < 0 || page_size < 0) {
+        LOG("Unable to query free memory, using requested size");
+        return requested_size;
+    }
+    const off64_t mem_available = static_cast<off64_t>(pages) * page_size;
+    LOG("Free memory is: %lld", static_cast<long long>(mem_available));
+
+    if (mem_available < requested_size) {
+        CALF_PRINT_COLOR(CALF_CLI_LEVEL_WARNING,
+                         "Requested allocation memory exceeds free memory by %lld bytes. "
+                         "Capping allocation to %lld bytes.",
+                         static_cast<long long>(requested_size - mem_available),
+                         static_cast<long long>(mem_available));
+        LOG("Requested allocation memory exceeds free memory by %lld bytes. "
+            "Capping allocation to %lld bytes.",
+            static_cast<long long>(requested_size - mem_available),
+            static_cast<long long>(mem_available));
+        return mem_available;
+    }
+
+    return requested_size;
+}
+
 CapioFile::CapioFile() = default;
 
 CapioFile::CapioFile(const bool directory, const unsigned int n_files_expected,
@@ -114,7 +147,8 @@ void CapioFile::createBuffer(const std::filesystem::path &path, const bool home_
             if (_directory) {
                 std::filesystem::create_directory(path);
                 std::filesystem::permissions(path, std::filesystem::perms::owner_all);
-                _buf = new char[_buf_size];
+                _buf_size = computeAllocableMemQuota(_buf_size);
+                _buf      = new char[_buf_size];
             } else {
                 LOG("creating mem mapped file");
                 _fd = ::open(path.c_str(), O_RDWR | O_CREAT, S_IRWXU | S_IRGRP | S_IROTH);
@@ -131,7 +165,8 @@ void CapioFile::createBuffer(const std::filesystem::path &path, const bool home_
                 }
             }
         } else {
-            _buf = new char[_buf_size];
+            _buf_size = computeAllocableMemQuota(_buf_size);
+            _buf      = new char[_buf_size];
         }
     }
 }
@@ -146,7 +181,7 @@ void CapioFile::_memcopyCapioFile(char *new_p, const char *old_p) const {
 }
 
 char *CapioFile::expandBuffer(const off64_t data_size) {
-    const off64_t double_size = _buf_size * 2;
+    const off64_t double_size = computeAllocableMemQuota(_buf_size * 2);
     const off64_t new_size    = std::max(data_size, double_size);
     const auto new_buf        = new char[new_size];
 
