@@ -30,6 +30,10 @@ option(ENABLE_COVERAGE "Enable code coverage collection" FALSE)
 option(CAPIO_BUILD_SERVER "Build CAPIO server component" TRUE)
 option(CAPIO_BUILD_POSIX  "Build CAPIO posix component" TRUE)
 
+set(CAPIO_MEMORY_CHECKS "full" CACHE STRING
+        "Memory checks for CapioFile buffers: full (MemAvailable from /proc/meminfo), fast (free memory via sysconf), none")
+set_property(CACHE CAPIO_MEMORY_CHECKS PROPERTY STRINGS full fast none)
+
 #####################################
 # CMake module imports
 #####################################
