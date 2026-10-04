@@ -8,12 +8,15 @@
 #include "common/queue.hpp"
 #include "utils/capiocl_adapter.hpp"
 #include "utils/common.hpp"
+#include "utils/runtime_configuration.hpp"
 
 ClientManager::ClientDataBuffers::ClientDataBuffers(const std::string &clientToServerName,
                                                     const std::string &serverToClientName,
                                                     const std::string &wf_name)
-    : ClientToServer(clientToServerName, get_cache_lines(), get_cache_line_size(), wf_name),
-      ServerToClient(serverToClientName, get_cache_lines(), get_cache_line_size(), wf_name) {}
+    : ClientToServer(clientToServerName, get_server_cache_lines(), get_server_cache_line_size(),
+                     wf_name),
+      ServerToClient(serverToClientName, get_server_cache_lines(), get_server_cache_line_size(),
+                     wf_name) {}
 
 ClientManager::ClientManager()
     : requests{SHM_COMM_CHAN_NAME, CAPIO_REQ_BUFF_CNT, CAPIO_REQ_MAX_SIZE,

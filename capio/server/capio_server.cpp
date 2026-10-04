@@ -23,14 +23,12 @@
 #include "utils/capiocl_adapter.hpp"
 
 #include "client-manager/client_manager.hpp"
-#include "common/env.hpp"
 #include "common/requests.hpp"
 #include "common/semaphore.hpp"
 #include "remote/backend.hpp"
 #include "remote/discovery.hpp"
 #include "storage/capio_file.hpp"
 #include "utils/common.hpp"
-#include "utils/env.hpp"
 #include "utils/types.hpp"
 
 ClientManager *client_manager;
@@ -39,8 +37,8 @@ Backend *backend;
 DiscoveryService *discovery_service;
 
 #include "handlers.hpp"
-#include "utils/cli_parser.hpp"
 #include "utils/location.hpp"
+#include "utils/runtime_configuration.hpp"
 #include "utils/signals.hpp"
 
 #include "remote/listener.hpp"
@@ -94,7 +92,7 @@ static constexpr std::array<CSHandler_t, CAPIO_NR_REQUESTS> build_request_handle
     setup_signal_handlers();
     backend->handshake_servers();
 
-    storage_manager->addDirectory(getpid(), get_capio_dir());
+    storage_manager->addDirectory(getpid(), get_server_capio_dir());
 
     internal_server_sem.unlock();
 
@@ -115,29 +113,18 @@ int main(int argc, char **argv) {
 
     Semaphore internal_server_sem(0);
 
+    const auto configuration = parse_cli(argc, argv);
+
     for (const auto line : CAPIO_LOG_SERVER_BANNER) {
         CALF_PRINT("%s", line);
     }
+    configure_server_runtime(
+        configuration.capio_dir, configuration.cache_lines, configuration.cache_line_size,
+        configuration.capio_file_default_init_size, configuration.capio_prefetch_data_size);
 
-    const auto configuration = parseCLI(argc, argv);
-
-    if (configuration.capio_cl_dynamic_config) {
-        capio_cl_engine = new capiocl::engine::Engine();
-        capio_cl_engine->startApiServer();
-    } else if (!configuration.capio_cl_config_path.empty()) {
-        capio_cl_engine = capiocl::parser::Parser::parse(configuration.capio_cl_config_path,
-                                                         configuration.capio_cl_resolve_path,
-                                                         configuration.store_all_in_memory);
-    } else {
-        capio_cl_engine = new capiocl::engine::Engine();
-        capio_cl_engine->setWorkflowName(get_capio_workflow_name());
-    }
+    capio_cl_engine = capiocl::parser::Parser::parse(configuration.capio_cl_config);
 
     UPDATE_CALF_WORKFLOW_NAME(capio_cl_engine->getWorkflowName());
-
-    if (configuration.store_all_in_memory) {
-        capio_cl_engine->setAllStoreInMemory();
-    }
 
     capio_cl_engine->print();
 

@@ -6,7 +6,7 @@
 #include <thread>
 
 #include "common/constants.hpp"
-#include "utils/cli_parser.hpp"
+#include "utils/runtime_configuration.hpp"
 #include "utils/shm_canary.hpp"
 
 /**
