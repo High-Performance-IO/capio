@@ -18,6 +18,12 @@ include(ProcessorCount)
 #####################################
 # External projects
 #####################################
+if (CAPIO_DEPENDENCY_DISCOVERY)
+    # Keep ExternalProject_Add in the parent process so JSON tracing can see it.
+    add_subdirectory(syscall_intercept "${CMAKE_CURRENT_BINARY_DIR}/syscall_intercept")
+    return()
+endif ()
+
 file(MAKE_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/syscall_intercept)
 
 set(SYSCALL_INTERCEPT_INCLUDE_FOLDER "${CMAKE_CURRENT_BINARY_DIR}/syscall_intercept/${CMAKE_INSTALL_INCLUDEDIR}")
@@ -26,6 +32,7 @@ set(SYSCALL_INTERCEPT_LIB_FOLDER "${CMAKE_CURRENT_BINARY_DIR}/syscall_intercept/
 execute_process(
         COMMAND ${CMAKE_COMMAND}
         -DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE}
+        -DCAPIO_SYSCALL_INTERCEPT_SOURCE_DIR=${CAPIO_SYSCALL_INTERCEPT_SOURCE_DIR}
         "${CMAKE_CURRENT_SOURCE_DIR}/syscall_intercept"
         WORKING_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/syscall_intercept"
 )
@@ -40,10 +47,12 @@ IF (UNIX)
 
     file(GLOB SYSCALL_INTERCEPT_HEADERS "${SYSCALL_INTERCEPT_INCLUDE_FOLDER}/*.h")
     file(GLOB SYSCALL_INTERCEPT_LIBS "${SYSCALL_INTERCEPT_LIB_FOLDER}/*.a" "${SYSCALL_INTERCEPT_LIB_FOLDER}/*.so*")
+    file(GLOB SYSCALL_INTERCEPT_SHARED_LIBS "${SYSCALL_INTERCEPT_LIB_FOLDER}/*.so*")
     file(GLOB SYSCALL_INTERCEPT_PKGCONFIGS "${SYSCALL_INTERCEPT_LIB_FOLDER}/pkgconfig/*.pc")
 
     install(FILES ${SYSCALL_INTERCEPT_HEADERS} DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}")
     install(FILES ${SYSCALL_INTERCEPT_LIBS} DESTINATION "${CMAKE_INSTALL_LIBDIR}")
+    install(FILES ${SYSCALL_INTERCEPT_SHARED_LIBS} DESTINATION "${CMAKE_INSTALL_LIBDIR}" COMPONENT capio_module)
     install(FILES ${SYSCALL_INTERCEPT_PKGCONFIGS} DESTINATION "${CMAKE_INSTALL_LIBDIR}/pkgconfig")
 ELSE (UNIX)
     message(WARNING, "The syscall_intercept library only supports Unix OS.")
@@ -101,6 +110,7 @@ target_link_libraries(${TARGET_NAME} PRIVATE rt syscall_intercept)
 #####################################
 install(TARGETS ${TARGET_NAME}
         LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
+        COMPONENT capio_module
 )
 
 #####################################
