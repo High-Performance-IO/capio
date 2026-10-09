@@ -125,9 +125,13 @@ int main(int argc, char **argv) {
         capio_cl_engine = new capiocl::engine::Engine();
         capio_cl_engine->startApiServer();
     } else if (!configuration.capio_cl_config_path.empty()) {
-        capio_cl_engine = capiocl::parser::Parser::parse(configuration.capio_cl_config_path,
-                                                         configuration.capio_cl_resolve_path,
-                                                         configuration.store_all_in_memory);
+        const capiocl::configuration::CapioClConfiguration capio_cl_config({
+            {"capiocl.config_path", configuration.capio_cl_config_path},
+            {"capiocl.resolve_path", configuration.capio_cl_resolve_path},
+            {"capiocl.store_all_in_memory",
+             configuration.store_all_in_memory ? "true" : "false"},
+        });
+        capio_cl_engine = capiocl::parser::Parser::parse(capio_cl_config);
     } else {
         capio_cl_engine = new capiocl::engine::Engine();
         capio_cl_engine->setWorkflowName(get_capio_workflow_name());

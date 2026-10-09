@@ -193,10 +193,16 @@ def discover(root, work, build_type, tests, overrides, known):
     # (and must never be fetched or compiled). Setting FORCE_FETCH would override
     # any installed protobuf and rebuild it from source, so it is Debug-only.
     use_protobuf_fetch = (build_type == "Debug")
+    # CALF_PROTOBUF=OFF is the real lever: it removes the whole calf protobuf
+    # block (find_package/fetch/compile), so protobuf and absl are never declared
+    # or staged. Without it, calf defaults CALF_PROTOBUF=ON and fetches+compiles
+    # protobuf (and absl) whenever no system protobuf is found, even with
+    # FORCE_FETCH=OFF. Only Debug (logger active) keeps it ON.
     definitions = {
         "CAPIO_DEPENDENCY_DISCOVERY": "ON", "CAPIO_BUILD_TESTS": "ON" if tests else "OFF",
         "CMAKE_BUILD_TYPE": build_type, "FETCHCONTENT_BASE_DIR": work / "root-deps",
         "CALF_TESTS": "OFF", "CALF_PYTHON_TESTS": "OFF", "CALF_BUILD_PYTHON_BINDINGS": "OFF",
+        "CALF_PROTOBUF": "ON" if use_protobuf_fetch else "OFF",
         "CALF_PROTOBUF_FORCE_FETCH": "ON" if use_protobuf_fetch else "OFF",
         "protobuf_BUILD_TESTS": "OFF",
         "protobuf_FORCE_FETCH_DEPENDENCIES": "ON" if use_protobuf_fetch else "OFF",
