@@ -128,8 +128,7 @@ int main(int argc, char **argv) {
         const capiocl::configuration::CapioClConfiguration capio_cl_config({
             {"capiocl.config_path", configuration.capio_cl_config_path},
             {"capiocl.resolve_path", configuration.capio_cl_resolve_path},
-            {"capiocl.store_all_in_memory",
-             configuration.store_all_in_memory ? "true" : "false"},
+            {"capiocl.store_all_in_memory", configuration.store_all_in_memory ? "true" : "false"},
         });
         capio_cl_engine = capiocl::parser::Parser::parse(capio_cl_config);
     } else {
