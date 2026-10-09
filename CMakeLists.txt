@@ -43,8 +43,6 @@ if (NOT CAPIO_DEPENDENCY_DISCOVERY AND IS_DIRECTORY "${CAPIO_VENDOR_DIR}/_deps")
     # Offline bundles use FetchContent's standard <name>-src layout under this directory.
     set(FETCHCONTENT_BASE_DIR "${CAPIO_VENDOR_DIR}/_deps" CACHE PATH "" FORCE)
     set(FETCHCONTENT_FULLY_DISCONNECTED ON)
-    set(CALF_PROTOBUF_FORCE_FETCH ON CACHE BOOL "" FORCE)
-    set(protobuf_FORCE_FETCH_DEPENDENCIES ON CACHE BOOL "" FORCE)
     set(CAPIO_SYSCALL_INTERCEPT_SOURCE_DIR "${CAPIO_VENDOR_DIR}/syscall_intercept" CACHE PATH "" FORCE)
 endif ()
 
