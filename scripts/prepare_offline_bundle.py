@@ -188,12 +188,19 @@ def nested_projects(source):
 def discover(root, work, build_type, tests, overrides, known):
     dependencies = {}
     override_dir = work / "overrides"
+    # Protobuf/absl only back the CALF logger, which is active in Debug builds only.
+    # Only Debug needs them vendored; in Release they must come from the system
+    # (and must never be fetched or compiled). Setting FORCE_FETCH would override
+    # any installed protobuf and rebuild it from source, so it is Debug-only.
+    use_protobuf_fetch = (build_type == "Debug")
     definitions = {
         "CAPIO_DEPENDENCY_DISCOVERY": "ON", "CAPIO_BUILD_TESTS": "ON" if tests else "OFF",
         "CMAKE_BUILD_TYPE": build_type, "FETCHCONTENT_BASE_DIR": work / "root-deps",
         "CALF_TESTS": "OFF", "CALF_PYTHON_TESTS": "OFF", "CALF_BUILD_PYTHON_BINDINGS": "OFF",
-        "CALF_PROTOBUF_FORCE_FETCH": "ON", "protobuf_BUILD_TESTS": "OFF",
-        "protobuf_FORCE_FETCH_DEPENDENCIES": "ON", "ABSL_BUILD_TESTING": "OFF",
+        "CALF_PROTOBUF_FORCE_FETCH": "ON" if use_protobuf_fetch else "OFF",
+        "protobuf_BUILD_TESTS": "OFF",
+        "protobuf_FORCE_FETCH_DEPENDENCIES": "ON" if use_protobuf_fetch else "OFF",
+        "ABSL_BUILD_TESTING": "OFF",
     }
     for key, ref in overrides.items():
         dependency = known.get(key)
