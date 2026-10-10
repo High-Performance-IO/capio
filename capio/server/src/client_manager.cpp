@@ -107,7 +107,11 @@ void ClientManager::registerProducedFile(const pid_t tid, std::string path) {
     START_LOG(gettid(), "call(tid=%ld, path=%s)", tid, path.c_str());
     if (const auto itm = files_created_by_producer.find(tid);
         itm != files_created_by_producer.end()) {
-        itm->second.emplace_back(path);
+        // keep producer list bounded by distinct files: callers may register the same path many
+        // times
+        if (std::find(itm->second.begin(), itm->second.end(), path) == itm->second.end()) {
+            itm->second.emplace_back(path);
+        }
     } else {
         LOG("Error: tid is not present in files_created_by_producers map");
         return;
@@ -115,7 +119,9 @@ void ClientManager::registerProducedFile(const pid_t tid, std::string path) {
     const std::string &app_name = this->getAppName(tid);
     if (const auto itm = files_created_by_app_name.find(app_name);
         itm != files_created_by_app_name.end()) {
-        itm->second.emplace_back(path);
+        if (std::find(itm->second.begin(), itm->second.end(), path) == itm->second.end()) {
+            itm->second.emplace_back(path);
+        }
 
     } else {
         LOG("Error: app_name is not present in files_created_by_app_name map");
