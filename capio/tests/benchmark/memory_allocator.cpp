@@ -1,10 +1,3 @@
-// Benchmark for CapioFileMemoryAllocator. Prints a single Markdown table to stdout so CI can
-// append it to the run summary (GITHUB_STEP_SUMMARY) to eyeball regressions run over run.
-//
-// Built with CAPIO_MEMORY_CHECKS_NONE so sizes are not capped by host/cgroup memory: peak
-// pressure stays bounded and results are deterministic across CI runners. The cgroup/meminfo
-// quota-check path is deliberately not benchmarked (it is dominated by /proc I/O, not by our code).
-
 #include <chrono>
 #include <cstdint>
 #include <cstdio>
@@ -13,8 +6,6 @@
 #include <vector>
 
 #include "server/include/storage/memory_allocator.hpp"
-
-namespace {
 
 using Clock           = std::chrono::steady_clock;
 constexpr uint64_t MB = 1024 * 1024;
@@ -39,7 +30,19 @@ struct Row {
     double mb_s; ///< throughput, when meaningful
 };
 
-} // namespace
+void print_table(const std::vector<Row> &rows) {
+    std::puts("| operation | size (MB) | iters | avg time (us) | throughput (MB/s) |");
+    std::puts("|---|---:|---:|---:|---:|");
+    for (const Row &r : rows) {
+        if (r.mb_s > 0.0) {
+            std::printf("| %s | %.0f | %d | %.1f | %.1f |\n", r.op,
+                        static_cast<double>(r.size) / MB, r.iters, r.us, r.mb_s);
+        } else {
+            std::printf("| %s | %.0f | %d | %.1f | n/a |\n", r.op, static_cast<double>(r.size) / MB,
+                        r.iters, r.us);
+        }
+    }
+}
 
 int main() {
     std::vector<Row> rows;
@@ -89,21 +92,3 @@ int main() {
     print_table(rows);
     return 0;
 }
-
-namespace {
-
-void print_table(const std::vector<Row> &rows) {
-    std::puts("| operation | size (MB) | iters | avg time (us) | throughput (MB/s) |");
-    std::puts("|---|---:|---:|---:|---:|");
-    for (const Row &r : rows) {
-        if (r.mb_s > 0.0) {
-            std::printf("| %s | %.0f | %d | %.1f | %.1f |\n", r.op,
-                        static_cast<double>(r.size) / MB, r.iters, r.us, r.mb_s);
-        } else {
-            std::printf("| %s | %.0f | %d | %.1f | n/a |\n", r.op, static_cast<double>(r.size) / MB,
-                        r.iters, r.us);
-        }
-    }
-}
-
-}; // namespace
