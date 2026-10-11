@@ -12,7 +12,7 @@ set(TARGET_NAME capio_memory_allocator_benchmark)
 # server, posix or test dependencies.
 add_executable(${TARGET_NAME}
         memory_allocator.cpp
-        "${PROJECT_SOURCE_DIR}/capio/server/src/storage_memory_allocator.cpp"
+        "${PROJECT_SOURCE_DIR}/capio/server/src/storage_allocator.cpp"
 )
 
 #####################################

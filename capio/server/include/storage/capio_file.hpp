@@ -12,8 +12,8 @@
 
 #include "calf/StlLogger.h"
 
+#include "allocator.hpp"
 #include "common/queue.hpp"
-#include "memory_allocator.hpp"
 
 /**
  * @class CapioFile

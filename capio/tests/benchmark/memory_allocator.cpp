@@ -5,7 +5,7 @@
 #include <filesystem>
 #include <vector>
 
-#include "server/include/storage/memory_allocator.hpp"
+#include "server/include/storage/allocator.hpp"
 
 using Clock           = std::chrono::steady_clock;
 constexpr uint64_t MB = 1024 * 1024;

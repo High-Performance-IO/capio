@@ -3,7 +3,7 @@
 #include "calf/StdOutLogger.h"
 #include "calf/StlLogger.h"
 
-#include "../include/storage/memory_allocator.hpp"
+#include "../include/storage/allocator.hpp"
 #include "remote/backend.hpp"
 #include "server/include/utils/common.hpp"
 #include "utils/shared_mutex.hpp"
