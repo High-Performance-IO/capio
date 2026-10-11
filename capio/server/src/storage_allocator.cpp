@@ -201,6 +201,8 @@ const CgroupMem &cgroup() {
 
 #endif // !CAPIO_MEMORY_CHECKS_NONE
 
+} // namespace
+
 /// @brief Compute the maximum allocable memory for a CapioFile heap buffer. this ensures that
 /// requested memory for CapioFile buffers never exceeds available memory at allocation time
 ///
@@ -225,7 +227,7 @@ off64_t computeAllocableMemQuota(const off64_t requested_size) {
     LOG("Memory checks disabled for CapioFiles. returning requested size...");
     return requested_size;
 #else
-    const CgroupMem &cg = cgroup();
+    const CgroupMem &cg  = cgroup();
 
 #if defined(CAPIO_MEMORY_CHECKS_FAST)
     const long pages     = sysconf(_SC_AVPHYS_PAGES);
@@ -295,97 +297,5 @@ off64_t computeAllocableMemQuota(const off64_t requested_size) {
 #endif
 }
 
-} // namespace
-
-CapioFileMemoryAllocator::~CapioFileMemoryAllocator() { release(); }
-
-char *CapioFileMemoryAllocator::data() const { return _data; }
-
-off64_t CapioFileMemoryAllocator::size() const { return _size; }
-
-bool CapioFileMemoryAllocator::empty() const { return _data == nullptr; }
-
-bool CapioFileMemoryAllocator::allocateHeap(const off64_t size) {
-    if (_data != nullptr) {
-        return false;
-    }
-    _size = computeAllocableMemQuota(size);
-    _data = new char[_size];
-    return true;
-}
-
-bool CapioFileMemoryAllocator::allocateMapped(const std::filesystem::path &path,
-                                              const off64_t size) {
-    _size = computeAllocableMemQuota(size);
-    _fd   = ::open(path.c_str(), O_RDWR | O_CREAT, S_IRWXU | S_IRGRP | S_IROTH);
-    if (_fd < 0 || ftruncate(_fd, _size) == -1) {
-        if (_fd >= 0) {
-            ::close(_fd);
-            _fd = -1;
-        }
-        return false;
-    }
-    _data = static_cast<char *>(mmap(nullptr, _size, PROT_READ | PROT_WRITE, MAP_SHARED, _fd, 0));
-    if (_data == MAP_FAILED) {
-        ::close(_fd);
-        _fd   = -1;
-        _data = nullptr;
-        return false;
-    }
-    _mapped  = true;
-    _map_len = _size;
-    return true;
-}
-
-char *CapioFileMemoryAllocator::resize(const off64_t data_size,
-                                       const std::vector<std::pair<off64_t, off64_t>> &sectors) {
-    const off64_t new_size = std::max(data_size, computeAllocableMemQuota(_size * 2));
-    const auto nb          = new char[new_size];
-    for (const auto &[lbound, ubound] : sectors) {
-        memcpy(nb + lbound, _data + lbound, ubound - lbound);
-    }
-    if (_mapped) {
-        ::munmap(_data, _map_len);
-    } else {
-        delete[] _data;
-    }
-    _data    = nb;
-    _size    = new_size;
-    _mapped  = false;
-    _map_len = 0;
-    if (_fd >= 0) {
-        ::close(_fd);
-        _fd = -1;
-    }
-    return _data;
-}
-
-bool CapioFileMemoryAllocator::commit(const off64_t size) {
-    if (ftruncate(_fd, size) == -1) {
-        return false;
-    }
-    _size = size;
-    if (::close(_fd) == -1) {
-        return false;
-    }
-    _fd = -1;
-    return true;
-}
-
-void CapioFileMemoryAllocator::release() {
-    if (_data != nullptr) {
-        if (_mapped) {
-            ::munmap(_data, _map_len);
-        } else {
-            delete[] _data;
-        }
-        _data = nullptr;
-    }
-    if (_fd >= 0) {
-        ::close(_fd);
-        _fd = -1;
-    }
-    _size    = 0;
-    _mapped  = false;
-    _map_len = 0;
-}
+// MemoryAllocator methods are defined inline in the templated header
+// (capio/server/include/storage/allocator.hpp).

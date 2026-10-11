@@ -83,7 +83,7 @@ void CapioFile::dump() {
 
     if (_permanent && !_directory && _home_node) {
         const off64_t size = getFileSize();
-        if (!_buffer.commit(size)) {
+        if (auto *mapped = std::get_if<MappedBuffer>(&_buffer); mapped && !mapped->commit(size)) {
             ERR_EXIT("ftruncate/close commit capio_file");
         }
     }
@@ -92,21 +92,23 @@ void CapioFile::dump() {
 void CapioFile::createBuffer(const std::filesystem::path &path, const bool home_node) {
     START_LOG(gettid(), "call(path=%s, home_node=%s)", path.c_str(), home_node ? "true" : "false");
     std::lock_guard lock(_mutex);
-    if (this->_buffer.empty()) {
+    if (std::visit([](const auto &alloc) { return alloc.empty(); }, _buffer)) {
         _home_node = home_node;
         if (_permanent && home_node) {
             if (_directory) {
                 std::filesystem::create_directory(path);
                 std::filesystem::permissions(path, std::filesystem::perms::owner_all);
-                _buffer.allocateHeap(_requested_size);
+                _buffer.emplace<HeapBuffer>().allocate(_requested_size);
             } else {
                 LOG("creating mem mapped file");
-                if (!_buffer.allocateMapped(path, _requested_size)) {
+                // switch the active backing to the mmap-backed allocator and map the real file
+                auto &mapped = _buffer.emplace<MappedBuffer>();
+                if (!mapped.allocate(path, _requested_size)) {
                     ERR_EXIT("mmap %s CapioFile constructor", path.c_str());
                 }
             }
         } else {
-            _buffer.allocateHeap(_requested_size);
+            _buffer.emplace<HeapBuffer>().allocate(_requested_size);
         }
     }
 }
@@ -118,13 +120,17 @@ char *CapioFile::expandBuffer(const off64_t data_size) {
         const shared_lock_guard slg(_mutex_sectors);
         sectors.assign(_sectors.begin(), _sectors.end());
     }
-    return _buffer.resize(data_size, sectors);
+    return std::visit([&](auto &alloc) { return alloc.resize(data_size, sectors); }, _buffer);
 }
 
 // TODO: This is a memory leak that may lead to race conditions. remove exposure of internal buffer
-char *CapioFile::getBuffer() const { return _buffer.data(); }
+char *CapioFile::getBuffer() const {
+    return std::visit([](const auto &a) { return a.data(); }, _buffer);
+}
 
-off64_t CapioFile::getBufSize() const { return _buffer.size(); }
+off64_t CapioFile::getBufSize() const {
+    return std::visit([](const auto &a) { return a.size(); }, _buffer);
+}
 
 // TODO: This is a memory leak that may lead to race conditions. remove exposure of internal buffer
 const std::vector<std::pair<int, int>> &CapioFile::getFds() const { return _threads_fd; }
@@ -272,7 +278,7 @@ void CapioFile::removeFd(int tid, int fd) {
 
 void CapioFile::readFromNode(const std::string &dest, off64_t offset, off64_t buffer_size) const {
     std::lock_guard lock(_mutex);
-    backend->recv_file(_buffer.data() + offset, buffer_size, dest);
+    backend->recv_file(getBuffer() + offset, buffer_size, dest);
     _data_avail_cv.notify_all();
 }
 
@@ -280,7 +286,7 @@ void CapioFile::readFromQueue(SPSCQueue &queue, size_t offset, long int num_byte
     START_LOG(gettid(), "call()");
 
     std::lock_guard lock(_mutex);
-    queue.read(_buffer.data() + offset, num_bytes);
+    queue.read(getBuffer() + offset, num_bytes);
     _data_avail_cv.notify_all();
 }
 
@@ -292,7 +298,7 @@ off64_t CapioFile::_getStoredSize() const {
 
 bool CapioFile::bufferToAllocate() const {
     std::lock_guard lg(_mutex);
-    return _buffer.empty();
+    return std::visit([](const auto &alloc) { return alloc.empty(); }, _buffer);
 }
 
 off64_t CapioFile::getRealFileSize() const { return this->_real_file_size; }

@@ -8,6 +8,7 @@
 #include <shared_mutex>
 #include <string>
 #include <utility>
+#include <variant>
 #include <vector>
 
 #include "calf/StlLogger.h"
@@ -29,8 +30,12 @@ class CapioFile {
                         const std::pair<off64_t, off64_t> &rhs) const;
     };
 
-    CapioFileMemoryAllocator _buffer; ///< quota-aware storage allocator (heap or mmap-backed)
-    off64_t _requested_size = 0;      ///< Init size to allocate on createBuffer()
+    using HeapBuffer   = MemoryAllocator<HeapAllocator>;
+    using MappedBuffer = MemoryAllocator<MappedAllocator>;
+
+    /// Backing storage: plain heap for in-memory files, mmap of a file for permanent ones.
+    std::variant<HeapBuffer, MappedBuffer> _buffer;
+    off64_t _requested_size = 0; ///< Init size to allocate on createBuffer()
 
     // TODO: check if it is possible to move from int to unsigned int
     std::atomic<int> _n_close            = 0; ///< Current count of close() operations
