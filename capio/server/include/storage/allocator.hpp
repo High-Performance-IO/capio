@@ -2,8 +2,10 @@
 #define CAPIO_MEMORY_ALLOCATOR_HPP
 
 #include <cstddef>
+#include <cstdint>
 #include <filesystem>
-#include <functional>
+#include <utility>
+#include <vector>
 #include <sys/types.h> // off64_t
 
 /// RAII, quota-aware memory allocator for a CapioFile. Backs the bytes with the heap (or mmap for
@@ -39,14 +41,14 @@ class CapioFileMemoryAllocator {
     /// failure.
     bool allocateMapped(const std::filesystem::path &path, off64_t size);
 
-    /// Grow to at least data_size, copying existing bytes through `copy(dst, src)`. Returns new
-    /// base.
-    char *resize(off64_t data_size, const std::function<void(char *, const char *)> &copy);
+    /// Grow to at least data_size, copying the existing sparse data regions `sectors` to their
+    /// same offsets in the new buffer. Returns new base.
+    char *resize(off64_t data_size, const std::vector<std::pair<off64_t, off64_t>> &sectors);
 
-    /// Shrink a mapped-permanent buffer to committed `size` and close the backing fd.
+    /// Shrink a mapped-permanent buffer to committed `size` and close the associated fd.
     bool commit(off64_t size);
 
-    /// Free all owned memory and resources (idempotent).
+    /// Free all owned memory and resources
     void release();
 };
 

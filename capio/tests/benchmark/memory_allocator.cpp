@@ -59,16 +59,15 @@ int main() {
         rows.push_back({"heap alloc+release", size, iters, us, 0.0});
     }
 
-    // Heap allocation then resize (copies `target` bytes through `copy`), then release:
-    // measures reallocation + memcpy throughput.
+    // Heap allocation then resize (copies `target` bytes through the allocator's sector copy),
+    // then release: measures reallocation + memcpy throughput.
     for (const uint64_t target : {2 * MB, 32 * MB, 128 * MB}) {
         constexpr int iters = 20;
         const double us     = bench_us(iters, [target] {
             CapioFileMemoryAllocator a;
-            a.allocateHeap(static_cast<off64_t>(MB));
-            a.resize(static_cast<off64_t>(target), [target](char *d, const char *) {
-                std::memset(d, 1, static_cast<size_t>(target));
-            });
+            a.allocateHeap(static_cast<off64_t>(target));
+            // one sector over the whole buffer; resize doubles it and re-copies the data
+            a.resize(static_cast<off64_t>(target * 2), {{0, static_cast<off64_t>(target)}});
             a.release();
         });
         rows.push_back({"heap alloc+resize+release", target, iters, us,

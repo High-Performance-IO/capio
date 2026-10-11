@@ -66,13 +66,6 @@ class CapioFile {
      */
     off64_t _getStoredSize() const;
 
-    /**
-     * @brief Reallocates the buffer and copies existing sectors to their correct offsets.
-     * @param new_p The pointer to the newly allocated memory.
-     * @param old_p The pointer to the old memory buffer.
-     */
-    void _memcopyCapioFile(char *new_p, const char *old_p) const;
-
   public:
     /** @brief Default constructor. Initializes an empty file. */
     CapioFile();

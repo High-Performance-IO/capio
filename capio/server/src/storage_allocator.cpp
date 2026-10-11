@@ -337,11 +337,13 @@ bool CapioFileMemoryAllocator::allocateMapped(const std::filesystem::path &path,
     return true;
 }
 
-char *CapioFileMemoryAllocator::resize(const off64_t data_size,
-                                       const std::function<void(char *, const char *)> &copy) {
+char *CapioFileMemoryAllocator::resize(
+    const off64_t data_size, const std::vector<std::pair<off64_t, off64_t>> &sectors) {
     const off64_t new_size = std::max(data_size, computeAllocableMemQuota(_size * 2));
     char *const nb         = new char[new_size];
-    copy(nb, _data);
+    for (const auto &[lbound, ubound] : sectors) {
+        memcpy(nb + lbound, _data + lbound, ubound - lbound);
+    }
     if (_mapped) {
         ::munmap(_data, _map_len);
     } else {

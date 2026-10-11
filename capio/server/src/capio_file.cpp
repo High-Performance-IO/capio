@@ -111,19 +111,14 @@ void CapioFile::createBuffer(const std::filesystem::path &path, const bool home_
     }
 }
 
-void CapioFile::_memcopyCapioFile(char *new_p, const char *old_p) const {
-    // NOTE: do not lock here: this method is private and when reaching control in this function,
-    //       the caller has already locked the mutex
-    START_LOG(gettid(), "call()");
-    for (const auto &[lbound, ubound] : _sectors) {
-        memcpy(new_p + lbound, old_p + lbound, ubound - lbound);
-    }
-}
-
 char *CapioFile::expandBuffer(const off64_t data_size) {
     std::lock_guard lock(_mutex);
-    return _buffer.resize(
-        data_size, [this](char *new_p, const char *old_p) { _memcopyCapioFile(new_p, old_p); });
+    std::vector<std::pair<off64_t, off64_t>> sectors;
+    {
+        const shared_lock_guard slg(_mutex_sectors);
+        sectors.assign(_sectors.begin(), _sectors.end());
+    }
+    return _buffer.resize(data_size, sectors);
 }
 
 // TODO: This is a memory leak that may lead to race conditions. remove exposure of internal buffer
