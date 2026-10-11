@@ -107,7 +107,7 @@ void ClientManager::registerProducedFile(const pid_t tid, std::string path) {
     START_LOG(gettid(), "call(tid=%ld, path=%s)", tid, path.c_str());
     if (const auto itm = files_created_by_producer.find(tid);
         itm != files_created_by_producer.end()) {
-        itm->second.emplace_back(path);
+        itm->second.insert(path);
     } else {
         LOG("Error: tid is not present in files_created_by_producers map");
         return;
@@ -115,7 +115,7 @@ void ClientManager::registerProducedFile(const pid_t tid, std::string path) {
     const std::string &app_name = this->getAppName(tid);
     if (const auto itm = files_created_by_app_name.find(app_name);
         itm != files_created_by_app_name.end()) {
-        itm->second.emplace_back(path);
+        itm->second.insert(path);
 
     } else {
         LOG("Error: app_name is not present in files_created_by_app_name map");
@@ -125,15 +125,13 @@ void ClientManager::registerProducedFile(const pid_t tid, std::string path) {
 void ClientManager::removeProducedFile(const pid_t tid, const std::filesystem::path &path) {
     if (const auto itm = files_created_by_producer.find(tid);
         itm != files_created_by_producer.end()) {
-        auto &v = itm->second;
-        v.erase(std::remove(v.begin(), v.end(), path), v.end());
+        itm->second.erase(path.c_str());
     }
 
     const std::string &app_name = this->getAppName(tid);
     if (const auto itm = files_created_by_app_name.find(app_name);
         itm != files_created_by_app_name.end()) {
-        auto &v = itm->second;
-        v.erase(std::remove(v.begin(), v.end(), path), v.end());
+        itm->second.erase(path.c_str());
     }
 }
 
@@ -154,7 +152,7 @@ bool ClientManager::isProducer(const pid_t tid, const std::filesystem::path &pat
     return is_producer;
 }
 
-const std::vector<std::string> &ClientManager::getProducedFiles(const pid_t tid) const {
+const std::unordered_set<std::string> &ClientManager::getProducedFiles(const pid_t tid) const {
     START_LOG(gettid(), "call(tid=%ld)", tid);
     return files_created_by_producer[tid];
 }
