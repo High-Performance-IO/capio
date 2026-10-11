@@ -8,10 +8,12 @@
 #include <shared_mutex>
 #include <string>
 #include <utility>
+#include <variant>
 #include <vector>
 
 #include "calf/StlLogger.h"
 
+#include "allocator.hpp"
 #include "common/queue.hpp"
 
 /**
@@ -28,9 +30,12 @@ class CapioFile {
                         const std::pair<off64_t, off64_t> &rhs) const;
     };
 
-    char *_buf        = nullptr; ///< Raw pointer to memory buffer for file content
-    off64_t _buf_size = 0;       ///< Allocated size of _buf
-    int _fd           = -1;      ///< File descriptor for permanent/mmap storage
+    using HeapBuffer   = MemoryAllocator<HeapAllocator>;
+    using MappedBuffer = MemoryAllocator<MappedAllocator>;
+
+    /// Backing storage: plain heap for in-memory files, mmap of a file for permanent ones.
+    std::variant<HeapBuffer, MappedBuffer> _buffer;
+    off64_t _requested_size = 0; ///< Init size to allocate on createBuffer()
 
     // TODO: check if it is possible to move from int to unsigned int
     std::atomic<int> _n_close            = 0; ///< Current count of close() operations
@@ -65,13 +70,6 @@ class CapioFile {
      * @return Logical size based on the furthest sector end.
      */
     off64_t _getStoredSize() const;
-
-    /**
-     * @brief Reallocates the buffer and copies existing sectors to their correct offsets.
-     * @param new_p The pointer to the newly allocated memory.
-     * @param old_p The pointer to the old memory buffer.
-     */
-    void _memcopyCapioFile(char *new_p, const char *old_p) const;
 
   public:
     /** @brief Default constructor. Initializes an empty file. */
