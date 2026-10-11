@@ -63,7 +63,9 @@ TEST_F(StorageManagerTestEnvironment, testInitDirectory) {
 
     const auto &dir = storage_manager->get("myDirectory");
 
-    EXPECT_EQ(dir.getBufSize(), CAPIO_DEFAULT_DIR_INITIAL_SIZE);
+    // Directory buffers are allocated lazily by createBuffer(), so nothing is
+    // mapped yet: getBufSize() reflects the real allocation, i.e. 0.
+    EXPECT_EQ(dir.getBufSize(), 0);
 
     storage_manager->updateDirectory(1, "myDirectory");
     const auto &dir1 = storage_manager->get("myDirectory");

@@ -129,10 +129,7 @@ char *CapioFile::expandBuffer(const off64_t data_size) {
 // TODO: This is a memory leak that may lead to race conditions. remove exposure of internal buffer
 char *CapioFile::getBuffer() const { return _buffer.data(); }
 
-off64_t CapioFile::getBufSize() const {
-    // until allocation the requested init size is authoritative (old code reported _buf_size=init)
-    return _buffer.empty() ? _requested_size : _buffer.size();
-}
+off64_t CapioFile::getBufSize() const { return _buffer.size(); }
 
 // TODO: This is a memory leak that may lead to race conditions. remove exposure of internal buffer
 const std::vector<std::pair<int, int>> &CapioFile::getFds() const { return _threads_fd; }
