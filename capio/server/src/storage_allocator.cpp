@@ -28,7 +28,7 @@ struct CgroupMem {
     int stat_fd    = -1;           ///< memory.stat
     uint64_t limit = kUnlimited;   ///< smallest limit on the path to the root
     std::string_view inactive_key; ///< reclaimable page cache key in memory.stat
-    bool active() const { return usage_fd >= 0; }
+    [[nodiscard]] bool active() const { return usage_fd >= 0; }
 };
 
 /// pread the whole file into buf. Returns the number of bytes read (0 on error).
@@ -225,7 +225,7 @@ off64_t computeAllocableMemQuota(const off64_t requested_size) {
     LOG("Memory checks disabled for CapioFiles. returning requested size...");
     return requested_size;
 #else
-    const CgroupMem &cg  = cgroup();
+    const CgroupMem &cg = cgroup();
 
 #if defined(CAPIO_MEMORY_CHECKS_FAST)
     const long pages     = sysconf(_SC_AVPHYS_PAGES);
@@ -337,10 +337,10 @@ bool CapioFileMemoryAllocator::allocateMapped(const std::filesystem::path &path,
     return true;
 }
 
-char *CapioFileMemoryAllocator::resize(
-    const off64_t data_size, const std::vector<std::pair<off64_t, off64_t>> &sectors) {
+char *CapioFileMemoryAllocator::resize(const off64_t data_size,
+                                       const std::vector<std::pair<off64_t, off64_t>> &sectors) {
     const off64_t new_size = std::max(data_size, computeAllocableMemQuota(_size * 2));
-    char *const nb         = new char[new_size];
+    const auto nb          = new char[new_size];
     for (const auto &[lbound, ubound] : sectors) {
         memcpy(nb + lbound, _data + lbound, ubound - lbound);
     }

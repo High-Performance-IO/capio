@@ -8,10 +8,10 @@
 #include <vector>
 #include <sys/types.h> // off64_t
 
-/// RAII, quota-aware memory allocator for a CapioFile. Backs the bytes with the heap (or mmap for
-/// permanent files), caps every (re)allocation with the available-memory checks, and owns all
-/// frees. Errors are reported as false/empty so callers keep their own fatal-error policy
-/// (ERR_EXIT).
+/// @brief RAII, quota-aware memory allocator for a CapioFile.
+/// @details Backs the bytes with the heap (or mmap for permanent files), caps every
+/// (re)allocation with the available-memory checks, and owns all frees. Errors are reported as
+/// false/empty so callers keep their own fatal-error policy (ERR_EXIT).
 class CapioFileMemoryAllocator {
     char *_data      = nullptr; ///< buffer base, nullptr when not allocated
     off64_t _size    = 0;       ///< logical size exposed to the caller
@@ -25,30 +25,55 @@ class CapioFileMemoryAllocator {
     CapioFileMemoryAllocator(const CapioFileMemoryAllocator &)            = delete;
     CapioFileMemoryAllocator &operator=(const CapioFileMemoryAllocator &) = delete;
 
-    /// Buffer base, or nullptr when not allocated.
+    /**
+     * @brief Get the buffer base.
+     * @return Pointer to the buffer base, or nullptr when not allocated.
+     */
     [[nodiscard]] char *data() const;
 
-    /// Logical size handed to the caller.
+    /**
+     * @brief Get the logical size of the buffer.
+     * @return The logical size handed to the caller.
+     */
     [[nodiscard]] off64_t size() const;
 
-    /// True while no buffer is backing this allocator.
+    /**
+     * @brief Check whether any buffer is currently backing this allocator.
+     * @return True while no buffer is backing this allocator.
+     */
     [[nodiscard]] bool empty() const;
 
-    /// Heap-backed allocation, capped by available memory. False if already allocated.
+    /**
+     * @brief Allocate a heap-backed buffer, capped by available memory.
+     * @param size The requested buffer size.
+     * @return True on success, false if already allocated or allocation failed.
+     */
     bool allocateHeap(off64_t size);
 
-    /// mmap-backed allocation for permanent files. Rolls back to empty and returns false on
-    /// failure.
+    /**
+     * @brief Allocate an mmap-backed buffer for permanent files.
+     * @param path Backing file path for the mmap allocation.
+     * @param size The requested buffer size.
+     * @return True on success. On failure rolls back to empty and returns false.
+     */
     bool allocateMapped(const std::filesystem::path &path, off64_t size);
 
-    /// Grow to at least data_size, copying the existing sparse data regions `sectors` to their
-    /// same offsets in the new buffer. Returns new base.
+    /**
+     * @brief Grow the buffer to at least @p data_size, copying existing data to the same offsets.
+     * @param data_size Required minimum new buffer size.
+     * @param sectors Sparse data regions [start, end) to copy into the new buffer.
+     * @return Pointer to the new buffer base.
+     */
     char *resize(off64_t data_size, const std::vector<std::pair<off64_t, off64_t>> &sectors);
 
-    /// Shrink a mapped-permanent buffer to committed `size` and close the associated fd.
+    /**
+     * @brief Shrink a mapped-permanent buffer to its committed size and close its backing fd.
+     * @param size The committed size to retain.
+     * @return True on success.
+     */
     bool commit(off64_t size);
 
-    /// Free all owned memory and resources
+    /** @brief Free all owned memory and resources. */
     void release();
 };
 
