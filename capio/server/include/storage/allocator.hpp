@@ -61,7 +61,12 @@ template <class Allocator> class MemoryAllocator {
      * @param size The requested buffer size.
      * @return True on success, false if already allocated.
      */
-    bool allocate(off64_t size) { return allocator_.allocate(_data, _size, size); }
+    bool allocate(off64_t size) {
+        if (_data != nullptr) {
+            return false; // avoid leaking an already-active buffer
+        }
+        return allocator_.allocate(_data, _size, size);
+    }
 
     /**
      * @brief mmap-backed allocation of a persistent file.
@@ -70,6 +75,9 @@ template <class Allocator> class MemoryAllocator {
      * @return True on success; false on failure or on a backing that does not map files.
      */
     bool allocate(const std::filesystem::path &path, off64_t size) {
+        if (_data != nullptr) {
+            return false; // avoid leaking an already-active buffer
+        }
         return allocator_.allocate(_data, _size, path, size);
     }
 
