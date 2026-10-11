@@ -13,6 +13,7 @@
 #include "calf/StlLogger.h"
 
 #include "common/queue.hpp"
+#include "memory_allocator.hpp"
 
 /**
  * @class CapioFile
@@ -28,9 +29,8 @@ class CapioFile {
                         const std::pair<off64_t, off64_t> &rhs) const;
     };
 
-    char *_buf        = nullptr; ///< Raw pointer to memory buffer for file content
-    off64_t _buf_size = 0;       ///< Allocated size of _buf
-    int _fd           = -1;      ///< File descriptor for permanent/mmap storage
+    CapioFileMemoryAllocator _buffer; ///< quota-aware storage allocator (heap or mmap-backed)
+    off64_t _requested_size = 0;      ///< Init size to allocate on createBuffer()
 
     // TODO: check if it is possible to move from int to unsigned int
     std::atomic<int> _n_close            = 0; ///< Current count of close() operations

@@ -3,6 +3,7 @@
 #include "calf/StdOutLogger.h"
 #include "calf/StlLogger.h"
 
+#include "../include/storage/memory_allocator.hpp"
 #include "remote/backend.hpp"
 #include "server/include/utils/common.hpp"
 #include "utils/shared_mutex.hpp"
@@ -14,111 +15,21 @@ bool CapioFile::compareSectors::operator()(const std::pair<off64_t, off64_t> &lh
     return (lhs.first < rhs.first);
 }
 
-/// @brief Compute the maximum allocable memory for a CapioFile heap buffer. this ensures that
-/// requested memory for CapioFile buffers never exceeds available memory at allocation time
-///
-/// The check is selected at build time with CAPIO_MEMORY_CHECKS:
-///   - full: MemAvailable from /proc/meminfo (free memory + reclaimable cache)
-///   - fast: free memory only, via sysconf. no IO, but ignores cache the kernel can drop, so it
-///           caps more aggressively than needed
-///   - none: no check, the requested size is always returned
-///
-/// NOTE: reading MemAvailable from /proc/meminfo is the only way to know the memory that is
-///     actually allocable (free memory + reclaimable cache). no syscall exposes it: sysconf and
-///     sysinfo only report free memory, which ignores cache that the kernel can drop. to keep
-///     this cheap, /proc/meminfo is opened once and re-read with a single pread.
-inline off64_t computeAllocableMemQuota(const off64_t requested_size) {
-    START_LOG(gettid(), "call(requested_size = %lld)", static_cast<long long>(requested_size));
-
-#if defined(CAPIO_MEMORY_CHECKS_NONE)
-    LOG("Memory checks disabled for CapioFiles. returning requested size...");
-    return requested_size;
-#endif
-
-#if defined(CAPIO_MEMORY_CHECKS_FAST)
-    const long pages     = sysconf(_SC_AVPHYS_PAGES);
-    const long page_size = sysconf(_SC_PAGE_SIZE);
-    if (pages < 0 || page_size < 0) {
-        LOG("Unable to query free memory, using requested size");
-        return requested_size;
-    }
-    const off64_t mem_available = static_cast<off64_t>(pages) * page_size;
-    LOG("Free memory is: %lld", static_cast<long long>(mem_available));
-#else // CAPIO_MEMORY_CHECKS_FULL (default)
-    static const int meminfo_fd = ::open("/proc/meminfo", O_RDONLY | O_CLOEXEC);
-
-    char buf[256];
-    const std::string_view meminfo(
-        buf, static_cast<size_t>(std::max<ssize_t>(pread(meminfo_fd, buf, sizeof(buf), 0), 0)));
-    if (meminfo.empty()) {
-        LOG("Unable to read /proc/meminfo, using requested size");
-        return requested_size;
-    }
-
-    constexpr std::string_view key = "MemAvailable:";
-    auto pos                       = meminfo.find(key);
-    if (pos != std::string_view::npos) {
-        pos = meminfo.find_first_not_of(' ', pos + key.size());
-    }
-    unsigned long long kb = 0;
-    if (pos == std::string_view::npos ||
-        std::from_chars(meminfo.data() + pos, meminfo.data() + meminfo.size(), kb).ec !=
-            std::errc{}) {
-        LOG("MemAvailable not found in /proc/meminfo, using requested size");
-        return requested_size;
-    }
-    const off64_t mem_available = static_cast<off64_t>(kb) * 1024;
-    LOG("Available memory is: %lld", static_cast<long long>(mem_available));
-#endif
-
-    if (mem_available >= requested_size) {
-        return requested_size;
-    }
-
-    LOG("Requested allocation memory exceeds available memory by %lld bytes. "
-        "Capping allocation to %lld bytes.",
-        static_cast<long long>(requested_size - mem_available),
-        static_cast<long long>(mem_available));
-
-    if (mem_available < requested_size / 10) {
-        CALF_PRINT_COLOR(CALF_CLI_LEVEL_WARNING,
-                         "Available memory (%lld bytes) is less than 10%% of the requested "
-                         "allocation (%lld bytes). Capping allocation to available memory.",
-                         static_cast<long long>(mem_available),
-                         static_cast<long long>(requested_size));
-    }
-
-    return mem_available;
-}
-
 CapioFile::CapioFile() = default;
 
 CapioFile::CapioFile(const bool directory, const unsigned int n_files_expected,
                      const bool permanent, const off64_t init_size, const int n_close_expected)
-    : _buf_size(init_size), _n_files_expected(n_files_expected + 2),
+    : _requested_size(init_size), _n_files_expected(n_files_expected + 2),
       _n_close_expected(n_close_expected), _directory(directory), _permanent(permanent) {}
 
 CapioFile::CapioFile(const bool directory, const bool permanent, const off64_t init_size,
                      const unsigned int n_close_expected)
-    : _buf_size(init_size), _n_close_expected(n_close_expected), _directory(directory),
+    : _requested_size(init_size), _n_close_expected(n_close_expected), _directory(directory),
       _permanent(permanent) {}
 
 CapioFile::~CapioFile() {
     START_LOG(gettid(), "call()");
     LOG("Deleting capio_file");
-
-    if (_permanent && _home_node) {
-        if (_directory) {
-            delete[] _buf;
-        } else {
-            if (munmap(_buf, _buf_size) == -1) {
-                CALF_PRINT_COLOR(CALF_CLI_LEVEL_WARNING, "WARN: unable to unmap CapioFile: %s",
-                                 strerror(errno));
-            }
-        }
-    } else {
-        delete[] _buf;
-    }
 }
 
 bool CapioFile::isCommitted() const {
@@ -172,12 +83,8 @@ void CapioFile::dump() {
 
     if (_permanent && !_directory && _home_node) {
         const off64_t size = getFileSize();
-        if (ftruncate(_fd, size) == -1) {
-            ERR_EXIT("ftruncate commit capio_file");
-        }
-        _buf_size = size;
-        if (::close(_fd) == -1) {
-            ERR_EXIT("close commit capio_file");
+        if (!_buffer.commit(size)) {
+            ERR_EXIT("ftruncate/close commit capio_file");
         }
     }
 }
@@ -185,32 +92,21 @@ void CapioFile::dump() {
 void CapioFile::createBuffer(const std::filesystem::path &path, const bool home_node) {
     START_LOG(gettid(), "call(path=%s, home_node=%s)", path.c_str(), home_node ? "true" : "false");
     std::lock_guard lock(_mutex);
-    if (this->_buf == nullptr) {
+    if (this->_buffer.empty()) {
         _home_node = home_node;
         if (_permanent && home_node) {
             if (_directory) {
                 std::filesystem::create_directory(path);
                 std::filesystem::permissions(path, std::filesystem::perms::owner_all);
-                _buf_size = computeAllocableMemQuota(_buf_size);
-                _buf      = new char[_buf_size];
+                _buffer.allocateHeap(_requested_size);
             } else {
                 LOG("creating mem mapped file");
-                _fd = ::open(path.c_str(), O_RDWR | O_CREAT, S_IRWXU | S_IRGRP | S_IROTH);
-                if (_fd == -1) {
-                    ERR_EXIT("open %s CapioFile constructor", path.c_str());
-                }
-                if (ftruncate(_fd, _buf_size) == -1) {
-                    ERR_EXIT("ftruncate CapioFile constructor");
-                }
-                _buf = static_cast<char *>(
-                    mmap(nullptr, _buf_size, PROT_READ | PROT_WRITE, MAP_SHARED, _fd, 0));
-                if (_buf == MAP_FAILED) {
-                    ERR_EXIT("mmap CapioFile constructor");
+                if (!_buffer.allocateMapped(path, _requested_size)) {
+                    ERR_EXIT("mmap %s CapioFile constructor", path.c_str());
                 }
             }
         } else {
-            _buf_size = computeAllocableMemQuota(_buf_size);
-            _buf      = new char[_buf_size];
+            _buffer.allocateHeap(_requested_size);
         }
     }
 }
@@ -225,22 +121,15 @@ void CapioFile::_memcopyCapioFile(char *new_p, const char *old_p) const {
 }
 
 char *CapioFile::expandBuffer(const off64_t data_size) {
-    const off64_t double_size = computeAllocableMemQuota(_buf_size * 2);
-    const off64_t new_size    = std::max(data_size, double_size);
-    const auto new_buf        = new char[new_size];
-
     std::lock_guard lock(_mutex);
-    _memcopyCapioFile(new_buf, _buf);
-    delete[] _buf;
-    _buf      = new_buf;
-    _buf_size = new_size;
-    return new_buf;
+    return _buffer.resize(
+        data_size, [this](char *new_p, const char *old_p) { _memcopyCapioFile(new_p, old_p); });
 }
 
 // TODO: This is a memory leak that may lead to race conditions. remove exposure of internal buffer
-char *CapioFile::getBuffer() const { return _buf; }
+char *CapioFile::getBuffer() const { return _buffer.data(); }
 
-off64_t CapioFile::getBufSize() const { return _buf_size; }
+off64_t CapioFile::getBufSize() const { return _buffer.size(); }
 
 // TODO: This is a memory leak that may lead to race conditions. remove exposure of internal buffer
 const std::vector<std::pair<int, int>> &CapioFile::getFds() const { return _threads_fd; }
@@ -388,7 +277,7 @@ void CapioFile::removeFd(int tid, int fd) {
 
 void CapioFile::readFromNode(const std::string &dest, off64_t offset, off64_t buffer_size) const {
     std::lock_guard lock(_mutex);
-    backend->recv_file(_buf + offset, buffer_size, dest);
+    backend->recv_file(_buffer.data() + offset, buffer_size, dest);
     _data_avail_cv.notify_all();
 }
 
@@ -396,7 +285,7 @@ void CapioFile::readFromQueue(SPSCQueue &queue, size_t offset, long int num_byte
     START_LOG(gettid(), "call()");
 
     std::lock_guard lock(_mutex);
-    queue.read(_buf + offset, num_bytes);
+    queue.read(_buffer.data() + offset, num_bytes);
     _data_avail_cv.notify_all();
 }
 
@@ -408,7 +297,7 @@ off64_t CapioFile::_getStoredSize() const {
 
 bool CapioFile::bufferToAllocate() const {
     std::lock_guard lg(_mutex);
-    return _buf == nullptr;
+    return _buffer.empty();
 }
 
 off64_t CapioFile::getRealFileSize() const { return this->_real_file_size; }
