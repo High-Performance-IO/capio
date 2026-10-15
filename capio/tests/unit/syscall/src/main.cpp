@@ -4,7 +4,7 @@
 #include "common/syscall.hpp"
 
 char **build_args() {
-    char **args = (char **) malloc(4 * sizeof(uintptr_t));
+    char **args = (char **) malloc(3 * sizeof(uintptr_t));
 
     char const *command = std::getenv("CAPIO_SERVER_PATH");
     if (command == nullptr) {
@@ -13,13 +13,12 @@ char **build_args() {
 
     char const *path = std::getenv("CONFIG_PATH");
     if (path == nullptr) {
-        path = "test_config.json";
+        path = "test_config.toml";
     }
 
     args[0] = strdup(command);
-    args[1] = strdup("-c");
-    args[2] = strdup(path);
-    args[3] = (char *) nullptr;
+    args[1] = strdup(path);
+    args[2] = (char *) nullptr;
 
     return args;
 }

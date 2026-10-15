@@ -109,7 +109,6 @@ COPY --from=builder                                         \
 
 # Pkgconfig
 COPY --from=builder                                         \
-    "/usr/local/lib/pkgconfig/args.pc"                      \
     "/usr/local/lib/pkgconfig/gmock.p[c]"                   \
     "/usr/local/lib/pkgconfig/gmock_main.p[c]"              \
     "/usr/local/lib/pkgconfig/gtest.p[c]"                   \

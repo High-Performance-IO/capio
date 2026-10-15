@@ -72,16 +72,11 @@ TEST_F(StorageManagerTestEnvironment, testInitDirectory) {
 }
 
 TEST_F(StorageManagerTestEnvironment, testAddDirectoryFailure) {
-    char *old_capio_dir = getenv("CAPIO_DIR");
-    setenv("CAPIO_DIR", "/", 1);
     open_files_location();
 
     storage_manager->add("/tmp", true, 0);
     EXPECT_EQ(storage_manager->addDirectory(1, "/tmp/newDirectoryFail"), 0);
     EXPECT_EQ(storage_manager->addDirectory(1, "/tmp/newDirectoryFail"), 1);
-    if (old_capio_dir != nullptr) {
-        setenv("CAPIO_DIR", old_capio_dir, 1);
-    }
 }
 
 TEST_F(StorageManagerTestEnvironment, testRemameFile) {

@@ -9,7 +9,7 @@
 #include "remote/backend/include.hpp"
 #include "remote/handlers/read.hpp"
 #include "remote/handlers/stat.hpp"
-#include "utils/cli_parser.hpp"
+#include "utils/runtime_configuration.hpp"
 
 #include <cstdlib>
 #include <stdexcept>
