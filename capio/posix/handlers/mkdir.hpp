@@ -34,6 +34,8 @@ inline off64_t capio_mkdirat(int dirfd, const std::string_view &pathname, mode_t
     }
 
     if (is_capio_path(path)) {
+        CAPIO_STORAGE_CALL(
+            {
         if (exists_capio_path(path)) {
             errno = EEXIST;
             return CAPIO_POSIX_SYSCALL_ERRNO;
@@ -46,6 +48,11 @@ inline off64_t capio_mkdirat(int dirfd, const std::string_view &pathname, mode_t
             add_capio_path(path);
             return res;
         }
+            },
+            {
+                create_request_fs(path, tid);
+                return CAPIO_POSIX_SYSCALL_REQUEST_SKIP;
+            });
     } else {
         return CAPIO_POSIX_SYSCALL_REQUEST_SKIP;
     }
@@ -69,6 +76,8 @@ inline off64_t capio_rmdir(const std::string_view &pathname, long tid) {
     }
 
     if (is_capio_path(path)) {
+        CAPIO_STORAGE_CALL(
+            {
         if (!exists_capio_path(path)) {
             LOG("capio_files_path.find == end. errno = "
                 "ENOENT");
@@ -84,6 +93,8 @@ inline off64_t capio_rmdir(const std::string_view &pathname, long tid) {
             delete_capio_path(path);
             return res;
         }
+            },
+            { return CAPIO_POSIX_SYSCALL_REQUEST_SKIP; });
     } else {
         return CAPIO_POSIX_SYSCALL_REQUEST_SKIP;
     }

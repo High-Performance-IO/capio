@@ -3,7 +3,7 @@
 
 #include "calf/SyscallLogger.h"
 #include "common/syscall.hpp"
-#include "data.hpp"
+#include "utils/cache.hpp"
 #include "requests.hpp"
 
 /**
@@ -33,8 +33,7 @@ inline void initialize_new_thread(const bool wait = false) {
 }
 
 inline void hook_clone_parent(long child_tid) {
-    const auto tid = syscall_no_intercept(SYS_gettid);
-    clone_request(tid, child_tid);
+    CAPIO_STORAGE_CALL(clone_request(syscall_no_intercept(SYS_gettid), child_tid), );
 }
 
 inline void hook_clone_child() { initialize_new_thread(true); }

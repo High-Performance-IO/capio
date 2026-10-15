@@ -1,8 +1,10 @@
-/**
- * Capio log level.
- * if -1, and capio logging is enable everything is logged, otherwise, only
- * logs up to CAPIO_MAX_LOG_LEVEL function calls
- */
+// Macro to select at compile time either FS or MEM streaming
+// CAPIO_STORAGE_CALL(memory_call, fs_call)
+#if CAPIO_MEM_STREAM
+#  define CAPIO_STORAGE_CALL(memory_call, fs_call) memory_call
+#else
+#  define CAPIO_STORAGE_CALL(memory_call, fs_call) fs_call
+#endif
 
 #include <array>
 #include <string>

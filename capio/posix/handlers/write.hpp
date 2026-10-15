@@ -15,10 +15,22 @@ inline off64_t capio_write(int fd, const void *buffer, off64_t count, long tid) 
                      "SSIZE_MAX yet");
         }
 
-        read_cache->flush();
-        write_cache->write(fd, buffer, count);
-
-        return count;
+        CAPIO_STORAGE_CALL(
+            {
+                read_cache->flush();
+                write_cache->write(fd, buffer, count);
+                return count;
+            },
+            {
+                const auto res = syscall_no_intercept(SYS_write, fd, buffer, count);
+                if (res >= 0) {
+                    const auto offset = syscall_no_intercept(SYS_lseek, fd, 0, SEEK_CUR);
+                    if (offset >= 0) {
+                        set_capio_fd_offset(fd, offset);
+                    }
+                }
+                return res;
+            });
     } else {
         return CAPIO_POSIX_SYSCALL_REQUEST_SKIP;
     }
@@ -29,6 +41,19 @@ inline off64_t capio_writev(int fd, const struct iovec *iov, int iovcnt, long ti
               iov->iov_base, iov->iov_len, iovcnt);
 
     if (exists_capio_fd(fd)) {
+        CAPIO_STORAGE_CALL(
+            {},
+            {
+                const auto res = syscall_no_intercept(SYS_writev, fd, iov, iovcnt);
+                if (res >= 0) {
+                    const auto offset = syscall_no_intercept(SYS_lseek, fd, 0, SEEK_CUR);
+                    if (offset >= 0) {
+                        set_capio_fd_offset(fd, offset);
+                    }
+                }
+                return res;
+            });
+
         LOG("fd %d exists and is a capio fd", fd);
         off64_t tot_bytes = 0;
         off64_t res       = 0;

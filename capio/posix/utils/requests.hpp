@@ -50,6 +50,14 @@ inline void close_request(const int fd, const long tid) {
     buf_requests->write(req, CAPIO_REQ_MAX_SIZE);
 }
 
+inline void close_request_fs(const std::filesystem::path &path, const long tid) {
+    START_LOG(capio_syscall(SYS_gettid), "call(path=%s, tid=%ld)", path.c_str(), tid);
+    char req[CAPIO_REQ_MAX_SIZE];
+    sprintf(req, "%04d %ld %s", CAPIO_REQUEST_CLOSE, tid, path.c_str());
+    LOG("req=%s", req);
+    buf_requests->write(req, CAPIO_REQ_MAX_SIZE);
+}
+
 inline off64_t rename_request(const long tid, const std::filesystem::path &old_path,
                               const std::filesystem::path &newpath) {
     START_LOG(capio_syscall(SYS_gettid), "call(tid=%ld, old_path=%s, new_path=%s)", tid,
@@ -63,6 +71,16 @@ inline off64_t rename_request(const long tid, const std::filesystem::path &old_p
     return res;
 }
 
+inline void rename_request_fs(const std::filesystem::path &old_path,
+                              const std::filesystem::path &new_path, const long tid) {
+    START_LOG(capio_syscall(SYS_gettid), "call(tid=%ld, old_path=%s, new_path=%s)", tid,
+              old_path.c_str(), new_path.c_str());
+    char req[CAPIO_REQ_MAX_SIZE];
+    sprintf(req, "%04d %ld %s %s", CAPIO_REQUEST_RENAME, tid, old_path.c_str(), new_path.c_str());
+    LOG("req=%s", req);
+    buf_requests->write(req, CAPIO_REQ_MAX_SIZE);
+}
+
 inline off64_t create_request(const int fd, const std::filesystem::path &path, const long tid) {
     START_LOG(capio_syscall(SYS_gettid), "call(fd=%ld, path=%s, tid=%ld)", fd, path.c_str(), tid);
     char req[CAPIO_REQ_MAX_SIZE];
@@ -72,6 +90,14 @@ inline off64_t create_request(const int fd, const std::filesystem::path &path, c
     off64_t res;
     buff_response->read(&res);
     return res;
+}
+
+inline void create_request_fs(const std::filesystem::path &path, const long tid) {
+    START_LOG(capio_syscall(SYS_gettid), "call(path=%s, tid=%ld)", path.c_str(), tid);
+    char req[CAPIO_REQ_MAX_SIZE];
+    sprintf(req, "%04d %ld -1 %s", CAPIO_REQUEST_CREATE, tid, path.c_str());
+    LOG("req=%s", req);
+    buf_requests->write(req, CAPIO_REQ_MAX_SIZE);
 }
 
 inline off64_t create_exclusive_request(const int fd, const std::filesystem::path &path,
@@ -175,6 +201,17 @@ inline off64_t open_request(const int fd, const std::filesystem::path &path, con
     return res;
 }
 
+inline bool open_request_fs(const std::filesystem::path &path, const long tid) {
+    START_LOG(capio_syscall(SYS_gettid), "call(path=%s, tid=%ld)", path.c_str(), tid);
+    char req[CAPIO_REQ_MAX_SIZE];
+    sprintf(req, "%04d %ld -1 %s", CAPIO_REQUEST_OPEN, tid, path.c_str());
+    LOG("req=%s", req);
+    buf_requests->write(req, CAPIO_REQ_MAX_SIZE);
+    off64_t res;
+    buff_response->read(&res);
+    return res != 0;
+}
+
 inline off64_t read_request(const int fd, const off64_t count, const long tid) {
     START_LOG(capio_syscall(SYS_gettid), "call(fd=%ld, count=%ld, tid=%ld)", fd, count, tid);
     char req[CAPIO_REQ_MAX_SIZE];
@@ -190,7 +227,7 @@ inline off64_t read_request(const int fd, const off64_t count, const long tid) {
 inline off64_t seek_data_request(const int fd, const off64_t offset, const long tid) {
     START_LOG(capio_syscall(SYS_gettid), "call(fd=%ld, offset=%ld, tid=%ld)", fd, offset, tid);
     char req[CAPIO_REQ_MAX_SIZE];
-    sprintf(req, "%04d %ld %d %zu", CAPIO_REQUEST_SEEK_DATA, tid, fd, offset);
+    sprintf(req, "%04d %ld %d %ld", CAPIO_REQUEST_SEEK_DATA, tid, fd, offset);
     LOG("req=%s", req);
     buf_requests->write(req, CAPIO_REQ_MAX_SIZE);
     off64_t res;
@@ -213,7 +250,7 @@ inline off64_t seek_end_request(const int fd, const long tid) {
 inline off64_t seek_hole_request(const int fd, const off64_t offset, const long tid) {
     START_LOG(capio_syscall(SYS_gettid), "call(fd=%ld, offset=%ld, tid=%ld)", fd, offset, tid);
     char req[CAPIO_REQ_MAX_SIZE];
-    sprintf(req, "%04d %ld %d %zu", CAPIO_REQUEST_SEEK_HOLE, tid, fd, offset);
+    sprintf(req, "%04d %ld %d %ld", CAPIO_REQUEST_SEEK_HOLE, tid, fd, offset);
     LOG("req=%s", req);
     buf_requests->write(req, CAPIO_REQ_MAX_SIZE);
     off64_t res;
@@ -224,7 +261,7 @@ inline off64_t seek_hole_request(const int fd, const off64_t offset, const long 
 inline off64_t seek_request(const int fd, const off64_t offset, const long tid) {
     START_LOG(capio_syscall(SYS_gettid), "call(fd=%ld, offset=%ld, tid=%ld)", fd, offset, tid);
     char req[CAPIO_REQ_MAX_SIZE];
-    sprintf(req, "%04d %ld %d %zu", CAPIO_REQUEST_SEEK, tid, fd, offset);
+    sprintf(req, "%04d %ld %d %ld", CAPIO_REQUEST_SEEK, tid, fd, offset);
     LOG("req=%s", req);
     buf_requests->write(req, CAPIO_REQ_MAX_SIZE);
     off64_t res;
@@ -278,6 +315,34 @@ inline void write_request(const int fd, const off64_t count, const long tid) {
     sprintf(req, "%04d %ld %d %ld", CAPIO_REQUEST_WRITE, tid, fd, count);
     LOG("req=%s", req);
     buf_requests->write(req, CAPIO_REQ_MAX_SIZE);
+}
+
+inline off64_t consent_to_proceed_request(const std::filesystem::path &path, const long tid,
+                                          const std::string &source_func) {
+    START_LOG(capio_syscall(SYS_gettid), "call(path=%s, tid=%ld, source_func=%s)", path.c_str(),
+              tid, source_func.c_str());
+    char req[CAPIO_REQ_MAX_SIZE];
+    sprintf(req, "%04d %ld %s %s", CAPIO_REQUEST_CONSENT, tid, path.c_str(), source_func.c_str());
+    buf_requests->write(req, CAPIO_REQ_MAX_SIZE);
+    off64_t res;
+    buff_response->read(&res);
+    LOG("Obtained from server %ld", res);
+    return res;
+}
+
+// return amount of readable bytes
+inline off64_t read_request_fs(const std::filesystem::path &path, const off64_t end_of_read,
+                               const long tid, const long fd) {
+    START_LOG(capio_syscall(SYS_gettid), "call(path=%s, end_of_Read=%ld, tid=%ld, fd=%ld)",
+              path.c_str(), end_of_read, tid, fd);
+    char req[CAPIO_REQ_MAX_SIZE];
+    sprintf(req, "%04d %ld %ld %s %ld", CAPIO_REQUEST_READ_FS, tid, fd, path.c_str(), end_of_read);
+    LOG("Sending read request %s", req);
+    buf_requests->write(req, CAPIO_REQ_MAX_SIZE);
+    off64_t res;
+    buff_response->read(&res);
+    LOG("Response to request is %ld", res);
+    return res;
 }
 
 #endif // CAPIO_POSIX_UTILS_REQUESTS_HPP

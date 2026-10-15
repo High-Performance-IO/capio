@@ -31,15 +31,37 @@ int renameat2_handler(long arg0, long arg1, long arg2, long arg3, long arg4, lon
     }
 
     if (is_capio_path(old_path_abs)) {
-        rename_capio_path(old_path_abs, new_path_abs);
-        auto res = rename_request(tid, old_path_abs, new_path_abs);
-        *result  = (res < 0 ? -errno : res);
-        return CAPIO_POSIX_SYSCALL_SUCCESS;
+        CAPIO_STORAGE_CALL(
+            {
+                rename_capio_path(old_path_abs, new_path_abs);
+                auto res = rename_request(tid, old_path_abs, new_path_abs);
+                *result  = (res < 0 ? -errno : res);
+                return CAPIO_POSIX_SYSCALL_SUCCESS;
+            },
+            {
+                rename_request_fs(old_path_abs, new_path_abs, tid);
+                const auto res = syscall_no_intercept(SYS_renameat2, arg0, arg1, arg2, arg3, arg4);
+                if (res == 0 && exists_capio_path(old_path_abs)) {
+                    rename_capio_path(old_path_abs, new_path_abs);
+                }
+                *result = res < 0 ? -errno : res;
+                return CAPIO_POSIX_SYSCALL_SUCCESS;
+            });
     } else {
         if (is_capio_path(new_path_abs)) {
-            std::filesystem::copy(old_path_abs, new_path_abs);
-            *result = -errno;
-            return CAPIO_POSIX_SYSCALL_SUCCESS;
+            CAPIO_STORAGE_CALL(
+                {
+                    std::filesystem::copy(old_path_abs, new_path_abs);
+                    *result = -errno;
+                    return CAPIO_POSIX_SYSCALL_SUCCESS;
+                },
+                {
+                    rename_request_fs(old_path_abs, new_path_abs, tid);
+                    const auto res =
+                        syscall_no_intercept(SYS_renameat2, arg0, arg1, arg2, arg3, arg4);
+                    *result = res < 0 ? -errno : res;
+                    return CAPIO_POSIX_SYSCALL_SUCCESS;
+                });
         } else {
             return CAPIO_POSIX_SYSCALL_SKIP;
         }

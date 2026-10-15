@@ -6,7 +6,7 @@
 #include "utils/common.hpp"
 
 // TODO: EOVERFLOW is not addressed
-inline off64_t capio_lseek(int fd, off64_t offset, int whence, long tid) {
+inline off64_t capio_lseek_mem(int fd, off64_t offset, int whence, long tid) {
     START_LOG(tid, "call(fd=%d, offset=%ld, whence=%d)", fd, offset, whence);
 
     if (exists_capio_fd(fd)) {
@@ -63,6 +63,20 @@ inline off64_t capio_lseek(int fd, off64_t offset, int whence, long tid) {
     } else {
         return CAPIO_POSIX_SYSCALL_REQUEST_SKIP;
     }
+}
+
+inline off64_t capio_lseek(int fd, off64_t offset, int whence, long tid) {
+    if (!exists_capio_fd(fd)) {
+        return CAPIO_POSIX_SYSCALL_REQUEST_SKIP;
+    }
+
+    CAPIO_STORAGE_CALL(return capio_lseek_mem(fd, offset, whence, tid), {
+        const auto res = syscall_no_intercept(SYS_lseek, fd, offset, whence);
+        if (res >= 0) {
+            set_capio_fd_offset(fd, res);
+        }
+        return res;
+    });
 }
 
 int lseek_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg5, long *result) {

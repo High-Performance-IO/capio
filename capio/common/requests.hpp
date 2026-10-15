@@ -25,8 +25,10 @@ constexpr const int CAPIO_REQUEST_STAT                = 20;
 constexpr const int CAPIO_REQUEST_UNLINK              = 21;
 constexpr const int CAPIO_REQUEST_WRITE               = 22;
 constexpr const int CAPIO_REQUEST_RMDIR               = 23;
+constexpr const int CAPIO_REQUEST_CONSENT             = 24;
+constexpr const int CAPIO_REQUEST_READ_FS             = 25;
 
-constexpr const int CAPIO_NR_REQUESTS = 24;
+constexpr const int CAPIO_NR_REQUESTS = 26;
 
 /*REQUESTS FOR SERVER TO SERVER COMMUNICATION*/
 

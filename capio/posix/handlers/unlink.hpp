@@ -13,6 +13,7 @@ off64_t capio_unlink_abs(const std::filesystem::path &abs_path, long tid, bool i
             ERR_EXIT("ERROR: unlink to the capio_dir %s", abs_path.c_str());
             return -1; // note: this point should never be reached
         }
+        CAPIO_STORAGE_CALL({
         off64_t res = is_dir ? rmdir_request(abs_path, tid) : unlink_request(abs_path, tid);
         if (res == -1) {
             errno = ENOENT;
@@ -21,6 +22,14 @@ off64_t capio_unlink_abs(const std::filesystem::path &abs_path, long tid, bool i
             delete_capio_path(abs_path);
         }
         return res;
+        }, {
+            const auto res = syscall_no_intercept(SYS_unlinkat, AT_FDCWD, abs_path.c_str(),
+                                                  is_dir ? AT_REMOVEDIR : 0);
+            if (res == 0 && exists_capio_path(abs_path)) {
+                delete_capio_path(abs_path);
+            }
+            return res;
+        });
     }
     return CAPIO_POSIX_SYSCALL_REQUEST_SKIP;
 }
