@@ -13,9 +13,23 @@ include(ExternalProject)
 #####################################
 # Import external project from git
 #####################################
+set(CAPIO_SYSCALL_INTERCEPT_SOURCE_DIR "" CACHE PATH "Use a local syscall_intercept source tree")
+
+if (CAPIO_SYSCALL_INTERCEPT_SOURCE_DIR)
+    set(SYSCALL_INTERCEPT_SOURCE
+            SOURCE_DIR "${CAPIO_SYSCALL_INTERCEPT_SOURCE_DIR}"
+            DOWNLOAD_COMMAND ""
+            UPDATE_COMMAND ""
+    )
+else ()
+    set(SYSCALL_INTERCEPT_SOURCE
+            GIT_REPOSITORY https://github.com/alpha-unito/syscall_intercept.git
+            GIT_TAG 7dbdf6ab9c576f96843ef2553b7efc7d15cf66b4
+    )
+endif ()
+
 ExternalProject_Add(syscall_intercept
-        GIT_REPOSITORY https://github.com/alpha-unito/syscall_intercept.git
-        GIT_TAG 7dbdf6ab9c576f96843ef2553b7efc7d15cf66b4
+        ${SYSCALL_INTERCEPT_SOURCE}
         PREFIX ${CMAKE_CURRENT_BINARY_DIR}
         CMAKE_ARGS
         -DSTATIC_CAPSTONE=ON

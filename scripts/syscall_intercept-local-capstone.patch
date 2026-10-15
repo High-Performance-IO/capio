@@ -1,0 +1,19 @@
+diff --git a/capstone/CMakeLists.txt b/capstone/CMakeLists.txt
+index 08f662b..ce3f272 100644
+--- a/capstone/CMakeLists.txt
++++ b/capstone/CMakeLists.txt
+@@ -8,5 +8,3 @@ include(FetchContent)
+ FetchContent_Declare(capstone
+-        GIT_REPOSITORY https://github.com/capstone-engine/capstone.git
+-        # the following git tag refers to capstone version 5.0.6
+-        GIT_TAG accf4df62f1fba6f92cae692985d27063552601c
++        SOURCE_DIR "${CMAKE_CURRENT_LIST_DIR}/../../capstone"
+ )
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index 87874d0..7d60076 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -63,2 +63,2 @@ file(MAKE_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/capstone)
+-set(CAPSTONE_INCLUDE_FOLDER "${CMAKE_CURRENT_BINARY_DIR}/capstone/_deps/capstone-src/include/capstone")
++set(CAPSTONE_INCLUDE_FOLDER "${CMAKE_CURRENT_SOURCE_DIR}/../capstone/include/capstone")
+ set(CAPSTONE_LIB_FOLDER "${CMAKE_CURRENT_BINARY_DIR}/capstone/_deps/capstone-build")
