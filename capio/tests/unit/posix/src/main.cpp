@@ -1,0 +1,9 @@
+#include <gtest/gtest.h>
+
+#include "broadcast_flush.hpp"
+#include "realpath.hpp"
+
+int main(int argc, char *argv[]) {
+    ::testing::InitGoogleTest(&argc, argv);
+    return RUN_ALL_TESTS();
+}

@@ -12,6 +12,7 @@ int close_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long ar
 
     if (exists_capio_fd(fd)) {
         write_cache->flush();
+        read_cache->flush();
         close_request(fd, tid);
         delete_capio_fd(fd);
         *result = 0;

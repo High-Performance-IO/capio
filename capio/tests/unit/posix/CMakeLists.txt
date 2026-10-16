@@ -4,7 +4,7 @@
 set(TARGET_NAME capio_posix_unit_tests)
 set(TARGET_INCLUDE_FOLDER "${PROJECT_SOURCE_DIR}/capio/posix")
 set(TARGET_SOURCES
-        ${CMAKE_CURRENT_SOURCE_DIR}/src/realpath.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/src/main.cpp
 )
 
 #####################################
@@ -53,7 +53,7 @@ target_include_directories(${TARGET_NAME} PRIVATE
 # Link libraries
 #####################################
 target_link_directories(${TARGET_NAME} PRIVATE ${SYSCALL_INTERCEPT_LIB_FOLDER})
-target_link_libraries(${TARGET_NAME} PRIVATE rt syscall_intercept GTest::gtest_main)
+target_link_libraries(${TARGET_NAME} PRIVATE rt syscall_intercept GTest::gtest)
 
 #####################################
 # Configure tests
