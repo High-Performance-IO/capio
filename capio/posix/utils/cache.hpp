@@ -39,6 +39,13 @@ class ReadCache {
         }
     }
 
+    // Whether a write to fd can change the bytes this cache holds: fd is the cached descriptor or
+    // another descriptor of the same file (after dup() or a second open()).
+    [[nodiscard]] inline bool cachesFileOf(int fd) const {
+        return fd == _last_fd ||
+               (exists_capio_fd(_last_fd) && get_capio_fd_path(fd) == get_capio_fd_path(_last_fd));
+    }
+
     inline off64_t read(int fd, void *buffer, off64_t count, bool is_getdents, bool is64bit) {
         START_LOG(capio_syscall(SYS_gettid), "call(fd=%d, count=%ld, is_getdents=%s, is64bit=%s)",
                   fd, count, is_getdents ? "true" : "false", is64bit ? "true" : "false");
