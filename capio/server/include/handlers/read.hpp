@@ -28,6 +28,9 @@ inline void handle_pending_read(int tid, int fd, long int process_offset, long i
     off64_t bytes_read;
     if (end_of_sector > end_of_read) {
         bytes_read = count;
+    } else if (end_of_sector == -1) {
+        // woken by the commit of a file holding no data at this offset: end of file
+        bytes_read = 0;
     } else {
         bytes_read = end_of_sector - process_offset;
     }
@@ -66,13 +69,15 @@ inline void handle_local_read(int tid, int fd, off64_t count, bool is_prod) {
         CapioCLEngine::get().isFirable(path) ? "CapioCLEngine::get().isFirable(path)" : "");
 
     const off64_t end_of_sector = c_file.getSectorEnd(process_offset);
-    if (end_of_sector == -1) {
+    if (end_of_sector == -1 && file_complete) {
         LOG("End of sector is -1. returning process_offset without serving data");
         client_manager->replyToClient(tid, process_offset);
         return;
     }
 
-    if (process_offset + count > end_of_sector && !file_complete) {
+    // No data at this offset yet (end_of_sector == -1) is not the end of a file that is still
+    // being written: like a partially available read, it waits for the data or the commit.
+    if ((end_of_sector == -1 || process_offset + count > end_of_sector) && !file_complete) {
         LOG("Mode is NO_UPDATE, but not enough data is available. Awaiting for data on "
             "a separate thread before sending it to client");
         std::thread t([&c_file, tid, fd, count, process_offset] {

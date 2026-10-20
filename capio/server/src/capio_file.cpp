@@ -206,33 +206,42 @@ off64_t CapioFile::getStoredSize() const {
 
 void CapioFile::insertSector(off64_t new_start, off64_t new_end) {
     START_LOG(gettid(), "call(new_start=%ld, new_end=%ld)", new_start, new_end);
-    std::lock_guard lock(_mutex_sectors);
+    {
+        std::lock_guard lock(_mutex_sectors);
 
-    // First sector whose start >= new_start
-    auto it_start = _sectors.lower_bound({new_start, LLONG_MIN});
+        // First sector whose start >= new_start
+        auto it_start = _sectors.lower_bound({new_start, LLONG_MIN});
 
-    // Check if the previous sector reaches into our range
-    if (it_start != _sectors.begin()) {
-        if (const auto it_prev = std::prev(it_start); it_prev->second >= new_start) {
-            new_start = it_prev->first;
-            new_end   = std::max(new_end, it_prev->second);
-            it_start  = it_prev;
+        // Check if the previous sector reaches into our range
+        if (it_start != _sectors.begin()) {
+            if (const auto it_prev = std::prev(it_start); it_prev->second >= new_start) {
+                new_start = it_prev->first;
+                new_end   = std::max(new_end, it_prev->second);
+                it_start  = it_prev;
+            }
         }
+
+        // First sector whose start > new_end (adjacent sectors included via +1)
+        const auto it_end = _sectors.upper_bound({new_end + 1, LLONG_MIN});
+
+        // Absorb the right edge of the last overlapping sector if needed
+        if (it_end != _sectors.begin()) {
+            if (const auto it_last = std::prev(it_end); it_last->second > new_end) {
+                new_end = it_last->second;
+            }
+        }
+
+        _sectors.erase(it_start, it_end);
+        LOG("Insert sector <%ld, %ld>", new_start, new_end);
+        _sectors.emplace(new_start, new_end);
     }
 
-    // First sector whose start > new_end (adjacent sectors included via +1)
-    const auto it_end = _sectors.upper_bound({new_end + 1, LLONG_MIN});
-
-    // Absorb the right edge of the last overlapping sector if needed
-    if (it_end != _sectors.begin()) {
-        if (const auto it_last = std::prev(it_end); it_last->second > new_end) {
-            new_end = it_last->second;
-        }
-    }
-
-    _sectors.erase(it_start, it_end);
-    LOG("Insert sector <%ld, %ld>", new_start, new_end);
-    _sectors.emplace(new_start, new_end);
+    // The stored size waitForData() checks changes here, not when the bytes are copied into the
+    // buffer (readFromQueue/readFromNode notify before the sector is recorded). Notify under
+    // _mutex, which waiters hold while checking, so no wakeup is lost between their check and
+    // their wait; _mutex_sectors is released first to keep the waiters' lock order.
+    std::lock_guard lock(_mutex);
+    _data_avail_cv.notify_all();
 }
 
 bool CapioFile::closed() const {
