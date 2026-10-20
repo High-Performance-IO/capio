@@ -1,3 +1,6 @@
+#ifndef CAPIO_TEST_UNIT_POSIX_REALPATH_HPP
+#define CAPIO_TEST_UNIT_POSIX_REALPATH_HPP
+
 #include <gtest/gtest.h>
 
 #include <filesystem>
@@ -64,3 +67,5 @@ TEST_F(RealpathPosixTest, TestRelativePathsInCapioDirWhenCwdIsParentOfCapioDir) 
     EXPECT_NE(rmdir(PATHNAME.c_str()), -1);
     EXPECT_NE(access(PATHNAME.c_str(), F_OK), 0);
 }
+
+#endif // CAPIO_TEST_UNIT_POSIX_REALPATH_HPP
