@@ -114,8 +114,10 @@ TEST(ServerTest, TestCapioFileWaitForDataMultithreaded) {
         }
 
         queue.write(buffer, 1000);
-        file.insertSector(0, 1000);
+        // Same order as write_handler: the bytes are copied into the buffer before their sector
+        // is recorded, so anyone who sees the sector also sees the data.
         file.readFromQueue(queue, 0, 1000);
+        file.insertSector(0, 1000);
     });
 
     _lock.unlock();
