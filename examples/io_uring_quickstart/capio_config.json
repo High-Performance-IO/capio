@@ -1,0 +1,22 @@
+{
+    "name": "io_uring_quickstart",
+    "IO_Graph": [
+        {
+            "name": "producer",
+            "input_stream": [],
+            "output_stream": ["messages.txt"],
+            "streaming": [
+                {
+                    "name": ["messages.txt"],
+                    "committed": "on_close",
+                    "mode": "no_update"
+                }
+            ]
+        },
+        {
+            "name": "consumer",
+            "input_stream": ["messages.txt"],
+            "output_stream": []
+        }
+    ]
+}
