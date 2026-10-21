@@ -14,6 +14,7 @@
 #include "handlers/fork.hpp"
 #include "handlers/getcwd.hpp"
 #include "handlers/getdents.hpp"
+#include "handlers/io_uring.hpp"
 #include "handlers/ioctl.hpp"
 #include "handlers/lseek.hpp"
 #include "handlers/mkdir.hpp"

@@ -119,6 +119,15 @@ static constexpr long CAPIO_NR_SYSCALLS = 1 + std::max({
 #ifdef SYS_getxattr
                                                   SYS_getxattr,
 #endif
+#ifdef SYS_io_uring_enter
+                                                  SYS_io_uring_enter,
+#endif
+#ifdef SYS_io_uring_register
+                                                  SYS_io_uring_register,
+#endif
+#ifdef SYS_io_uring_setup
+                                                  SYS_io_uring_setup,
+#endif
 #ifdef SYS_ioctl
                                                   SYS_ioctl,
 #endif
@@ -268,6 +277,15 @@ static constexpr std::array<CPHandler_t, CAPIO_NR_SYSCALLS> build_syscall_table(
 #endif
 #ifdef SYS_getxattr
     _syscallTable[SYS_getxattr] = not_implemented_handler;
+#endif
+#ifdef SYS_io_uring_enter
+    _syscallTable[SYS_io_uring_enter] = io_uring_enter_handler;
+#endif
+#ifdef SYS_io_uring_register
+    _syscallTable[SYS_io_uring_register] = io_uring_register_handler;
+#endif
+#ifdef SYS_io_uring_setup
+    _syscallTable[SYS_io_uring_setup] = io_uring_setup_handler;
 #endif
 #ifdef SYS_ioctl
     _syscallTable[SYS_ioctl] = ioctl_handler;
