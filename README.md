@@ -45,6 +45,17 @@ sudo cmake --install .
 
 It is also possible to enable log in CAPIO, by defining `-DCAPIO_LOG=TRUE`.
 
+It is also possible to select how the CAPIO server checks the node memory before allocating file buffers, by defining
+`-DCAPIO_MEMORY_CHECKS=<full|fast|none>` (defaults to `full`). If the requested buffer size is larger than the memory
+the check reports, the allocation is capped to that memory, and a warning is printed when it is less than 10% of the
+requested size:
+
+- `full`: reads `MemAvailable` from `/proc/meminfo` (free memory plus reclaimable cache). This is the only way to know
+  the memory that is actually allocable;
+- `fast`: reads only the free memory with `sysconf`, without file I/O. It ignores reclaimable cache, so allocations
+  may be capped more than needed;
+- `none`: disables the check.
+
 ## Use CAPIO in your code
 
 Good news! You don't need to modify your code to benefit from the features of CAPIO. You have only to do three steps (
@@ -110,7 +121,7 @@ CAPIO can be controlled through the usage of environment variables. The availabl
 #### Server only environment variable
 
 - `CAPIO_FILE_INIT_SIZE`: This environment variable defines the default size of pre allocated memory for a new file
-  handled by capio. Defaults to 4MB. Bigger sizes will reduce the overhead of malloc but will fill faster node memory.
+  handled by capio. Defaults to 4GB. Bigger sizes will reduce the overhead of malloc but will fill faster node memory.
   Value has to be expressed in bytes;
 - `CAPIO_PREFETCH_DATA_SIZE`: If this variable is set, then data transfers between nodes will be always, at least of the
   given value in bytes;

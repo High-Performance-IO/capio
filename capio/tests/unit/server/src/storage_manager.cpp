@@ -61,10 +61,18 @@ TEST_F(StorageManagerTestEnvironment, testInitDirectory) {
 
     storage_manager->add("myDirectory", true, 0);
 
-    const auto &dir = storage_manager->get("myDirectory");
+    auto &dir = storage_manager->get("myDirectory");
 
+    // Directory buffers are allocated lazily by createBuffer(), so nothing is
+    // mapped yet: getBufSize() reflects the real allocation, i.e. 0.
+    EXPECT_EQ(dir.getBufSize(), 0);
+    dir.createBuffer("", true);
     EXPECT_EQ(dir.getBufSize(), CAPIO_DEFAULT_DIR_INITIAL_SIZE);
 
+    // updateDirectory() writes the parent to the files-location file, whose live
+    // FILE*/fd globals are process-wide and must be opened here (the test suite
+    // does not otherwise guarantee they are set for a given test).
+    open_files_location();
     storage_manager->updateDirectory(1, "myDirectory");
     const auto &dir1 = storage_manager->get("myDirectory");
 
