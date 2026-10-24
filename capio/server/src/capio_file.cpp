@@ -114,6 +114,7 @@ void CapioFile::createBuffer(const std::filesystem::path &path, const bool home_
 }
 
 char *CapioFile::expandBuffer(const off64_t data_size) {
+    START_LOG(gettid(), "call(data_size=%lld)", static_cast<long long>(data_size));
     std::lock_guard lock(_mutex);
     std::vector<std::pair<off64_t, off64_t>> sectors;
     {

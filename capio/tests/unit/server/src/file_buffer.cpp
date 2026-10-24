@@ -13,7 +13,8 @@ constexpr off64_t KB = 1024;
 constexpr off64_t MB = 1024 * KB;
 
 std::filesystem::path tempFile(const char *suffix) {
-    return std::filesystem::temp_directory_path() / ("capio_filebuf_" + std::string(suffix) + ".dat");
+    return std::filesystem::temp_directory_path() /
+           ("capio_filebuf_" + std::string(suffix) + ".dat");
 }
 } // namespace
 

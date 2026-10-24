@@ -13,8 +13,8 @@
 
 #include "calf/StlLogger.h"
 
-#include "file_buffer.hpp"
 #include "common/queue.hpp"
+#include "file_buffer.hpp"
 
 /**
  * @class CapioFile
