@@ -12,6 +12,7 @@
 
 #include "calf/StlLogger.h"
 
+#include "common/constants.hpp"
 #include "common/queue.hpp"
 
 /**
@@ -238,7 +239,7 @@ class CapioFile {
     /**
      * @brief Finds the end of the sector containing the offset.
      * @param offset Position to check.
-     * @return End offset of the sector, or -1 if in a hole.
+     * @return End offset of the sector, or CAPIO_SECTOR_NOT_FOUND if in a hole.
      */
     [[nodiscard]] off64_t getSectorEnd(off64_t offset) const;
 

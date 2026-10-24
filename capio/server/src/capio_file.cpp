@@ -181,7 +181,7 @@ off64_t CapioFile::getSectorEnd(off64_t offset) const {
     const shared_lock_guard slg(_mutex_sectors);
 
     if (_sectors.empty()) {
-        return -1;
+        return CAPIO_SECTOR_NOT_FOUND;
     }
 
     if (auto it = _sectors.upper_bound(std::make_pair(offset, 0)); it != _sectors.begin()) {
@@ -191,7 +191,7 @@ off64_t CapioFile::getSectorEnd(off64_t offset) const {
         }
     }
 
-    return -1;
+    return CAPIO_SECTOR_NOT_FOUND;
 }
 // TODO: This is a memory leak that may lead to race conditions. remove exposure of internal buffer
 const std::set<std::pair<off64_t, off64_t>, CapioFile::compareSectors> &

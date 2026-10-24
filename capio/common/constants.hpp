@@ -50,6 +50,11 @@ constexpr int CAPIO_POSIX_SYSCALL_REQUEST_SKIP = -2;
 constexpr int CAPIO_POSIX_SYSCALL_SKIP         = 1;
 constexpr int CAPIO_POSIX_SYSCALL_SUCCESS      = 0;
 
+// Bytes served to a read at end of file (as for POSIX read(), 0 bytes means EOF)
+constexpr off64_t CAPIO_EOF_BYTES        = 0;
+// Sector end returned when no sector holds data at the requested offset
+constexpr off64_t CAPIO_SECTOR_NOT_FOUND = -1;
+
 // CAPIO common - shared memory constant names
 constexpr char SHM_FIRST_ELEM[]        = "_first_elem_";
 constexpr char SHM_LAST_ELEM[]         = "_last_elem_";

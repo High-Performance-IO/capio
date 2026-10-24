@@ -376,12 +376,12 @@ TEST_F(MockBackendTestFixture, TestReadFromNodeMockBackend) {
 TEST(ServerTest, TestGetSectorEnd) {
     CapioFile file;
 
-    EXPECT_EQ(file.getSectorEnd(1234), -1);
+    EXPECT_EQ(file.getSectorEnd(1234), CAPIO_SECTOR_NOT_FOUND);
 
     file.insertSector(0, 1234);
 
     EXPECT_EQ(file.getSectorEnd(120), 1234);
-    EXPECT_EQ(file.getSectorEnd(12000), -1);
+    EXPECT_EQ(file.getSectorEnd(12000), CAPIO_SECTOR_NOT_FOUND);
 }
 
 TEST_F(MockBackendTestFixture, TestSimulateDirectoryStreaming) {

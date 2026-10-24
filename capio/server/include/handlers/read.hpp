@@ -28,9 +28,9 @@ inline void handle_pending_read(int tid, int fd, long int process_offset, long i
     off64_t bytes_read;
     if (end_of_sector > end_of_read) {
         bytes_read = count;
-    } else if (end_of_sector == -1) {
+    } else if (end_of_sector == CAPIO_SECTOR_NOT_FOUND) {
         // woken by the commit of a file holding no data at this offset: end of file
-        bytes_read = 0;
+        bytes_read = CAPIO_EOF_BYTES;
     } else {
         bytes_read = end_of_sector - process_offset;
     }
@@ -69,21 +69,22 @@ inline void handle_local_read(int tid, int fd, off64_t count, bool is_prod) {
         CapioCLEngine::get().isFirable(path) ? "CapioCLEngine::get().isFirable(path)" : "");
 
     const off64_t end_of_sector = c_file.getSectorEnd(process_offset);
-    if (end_of_sector == -1 && file_complete) {
-        LOG("End of sector is -1. returning process_offset without serving data");
+    const bool sector_not_found = end_of_sector == CAPIO_SECTOR_NOT_FOUND;
+    if (sector_not_found && file_complete) {
+        LOG("No sector found at offset. returning process_offset without serving data");
         client_manager->replyToClient(tid, process_offset);
         return;
     }
 
     // The file is still being written and the requested range is not fully available, either
-    // because no sector holds data at this offset yet (end_of_sector == -1) or because the read
-    // goes beyond the end of the sector that holds it. In both cases this is not the end of the
-    // file: wait for the data or the commit before serving the read.
-    if ((end_of_sector == -1 || process_offset + count > end_of_sector) && !file_complete) {
+    // because no sector holds data at this offset yet (CAPIO_SECTOR_NOT_FOUND) or because the
+    // read goes beyond the end of the sector that holds it. In both cases this is not the end of
+    // the file: wait for the data or the commit before serving the read.
+    if ((sector_not_found || process_offset + count > end_of_sector) && !file_complete) {
         LOG("Mode is NO_UPDATE, but %s. Awaiting for data on a separate thread before sending "
             "it to client",
-            end_of_sector == -1 ? "no sector holds data at this offset yet"
-                                : "the read goes beyond the end of the available sector");
+            sector_not_found ? "no sector holds data at this offset yet"
+                             : "the read goes beyond the end of the available sector");
         std::thread t([&c_file, tid, fd, count, process_offset] {
             c_file.waitForData(process_offset + count);
             handle_pending_read(tid, fd, process_offset, count);
@@ -110,9 +111,9 @@ inline void request_remote_read(int tid, int fd, off64_t count) {
     off64_t end_of_read               = offset + count;
     off64_t end_of_sector             = c_file.getSectorEnd(offset);
 
-    if (c_file.isCommitted() &&
-        (end_of_read <= end_of_sector ||
-         (end_of_sector == -1 ? 0 : end_of_sector) == c_file.getRealFileSize())) {
+    if (c_file.isCommitted() && (end_of_read <= end_of_sector ||
+                                 (end_of_sector == CAPIO_SECTOR_NOT_FOUND ? 0 : end_of_sector) ==
+                                     c_file.getRealFileSize())) {
         LOG("Handling local read");
         handle_local_read(tid, fd, count, true);
     } else if (end_of_read <= end_of_sector) {
