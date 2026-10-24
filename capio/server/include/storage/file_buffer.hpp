@@ -1,5 +1,5 @@
-#ifndef CAPIO_MEMORY_ALLOCATOR_HPP
-#define CAPIO_MEMORY_ALLOCATOR_HPP
+#ifndef CAPIO_FILE_BUFFER_HPP
+#define CAPIO_FILE_BUFFER_HPP
 
 #include <algorithm>
 #include <cstddef>
@@ -16,27 +16,27 @@
 #include "calf/StlLogger.h"
 
 /// Total allocable bytes for a given requested size, honoring host/cgroup memory limits.
-/// Declared before the allocator strategies so their inline methods can use it;
+/// Declared before the backing strategies so their inline methods can use it;
 /// defined in storage_allocator.cpp.
 off64_t computeAllocableMemQuota(off64_t requested_size);
 
-#include "allocators/heap.hpp"
-#include "allocators/mapped.hpp"
+#include "backings/heap.hpp"
+#include "backings/mapped.hpp"
 
-/// @brief Common buffer allocator: owns the heap-visible buffer pointer/size and the RAII
+/// @brief Data buffer behind a CapioFile: owns a single buffer pointer/size and its RAII
 /// lifecycle, and forwards every backing-specific operation to the strategy template argument.
-/// @tparam Allocator Strategy holding the per-backing allocation state and logic (HeapAllocator
-/// or MappedAllocator).
-template <class Allocator> class MemoryAllocator {
+/// @tparam Backing Strategy holding the per-backing state and logic (HeapBacking or
+/// MappedBacking).
+template <class Backing> class FileBuffer {
     char *_data   = nullptr; ///< buffer base, nullptr when not allocated
     off64_t _size = 0;       ///< logical size exposed to the caller
-    Allocator allocator_;    ///< backing-specific allocation strategy
+    Backing backing_;        ///< backing-specific storage strategy
 
   public:
-    MemoryAllocator() = default;
-    ~MemoryAllocator() { release(); }
-    MemoryAllocator(const MemoryAllocator &)            = delete;
-    MemoryAllocator &operator=(const MemoryAllocator &) = delete;
+    FileBuffer() = default;
+    ~FileBuffer() { release(); }
+    FileBuffer(const FileBuffer &)            = delete;
+    FileBuffer &operator=(const FileBuffer &) = delete;
 
     /**
      * @brief Get the buffer base.
@@ -51,8 +51,8 @@ template <class Allocator> class MemoryAllocator {
     [[nodiscard]] off64_t size() const { return _size; }
 
     /**
-     * @brief Check whether any buffer is currently backing this allocator.
-     * @return True while no buffer is backing this allocator.
+     * @brief Check whether any buffer is currently held.
+     * @return True while no buffer is held.
      */
     [[nodiscard]] bool empty() const { return _data == nullptr; }
 
@@ -65,7 +65,7 @@ template <class Allocator> class MemoryAllocator {
         if (_data != nullptr) {
             return false; // avoid leaking an already-active buffer
         }
-        return allocator_.allocate(_data, _size, size);
+        return backing_.allocate(_data, _size, size);
     }
 
     /**
@@ -78,7 +78,7 @@ template <class Allocator> class MemoryAllocator {
         if (_data != nullptr) {
             return false; // avoid leaking an already-active buffer
         }
-        return allocator_.allocate(_data, _size, path, size);
+        return backing_.allocate(_data, _size, path, size);
     }
 
     /**
@@ -86,32 +86,28 @@ template <class Allocator> class MemoryAllocator {
      * @param size The committed size to retain.
      * @return True on success; false for backings that cannot commit.
      */
-    bool commit(off64_t size) { return allocator_.commit(_size, size); }
+    bool commit(off64_t size) { return backing_.commit(_size, size); }
 
     /**
-     * @brief Grow the buffer to at least @p data_size, copying existing data to the same offsets.
+     * @brief Grow the buffer to at least @p data_size, keeping existing data at the same offsets.
      * @param data_size Required minimum new buffer size.
-     * @param sectors Sparse data regions [start, end) to copy into the new buffer.
-     * @return Pointer to the new buffer base.
+     * @param sectors Sparse data regions [start, end) to preserve in the new buffer.
+     * @return Pointer to the new buffer base, or nullptr on failure (the old buffer is kept).
      */
-    char *resize(off64_t data_size, const std::vector<std::pair<off64_t, off64_t>> &sectors) {
+    char *grow(off64_t data_size, const std::vector<std::pair<off64_t, off64_t>> &sectors) {
         const off64_t new_size = std::max(data_size, computeAllocableMemQuota(_size * 2));
-        char *const nb         = new char[new_size];
-        for (const auto &[lo, hi] : sectors) {
-            memcpy(nb + lo, _data + lo, hi - lo);
+        if (!backing_.grow(_data, _size, new_size, sectors)) {
+            return nullptr;
         }
-        allocator_.freeBuffer(_data);
-        _data = nb;
-        _size = new_size;
         return _data;
     }
 
     /** @brief Free all owned memory and resources. */
     void release() {
-        allocator_.freeBuffer(_data);
+        backing_.freeBuffer(_data);
         _data = nullptr;
         _size = 0;
     }
 };
 
-#endif // CAPIO_MEMORY_ALLOCATOR_HPP
+#endif // CAPIO_FILE_BUFFER_HPP

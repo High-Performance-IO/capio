@@ -1,4 +1,4 @@
-#include "server/include/storage/allocator.hpp"
+#include "server/include/storage/file_buffer.hpp"
 
 #include <algorithm>
 #include <charconv>
@@ -297,5 +297,5 @@ off64_t computeAllocableMemQuota(const off64_t requested_size) {
 #endif
 }
 
-// MemoryAllocator methods are defined inline in the templated header
-// (capio/server/include/storage/allocator.hpp).
+// FileBuffer methods are defined inline in the templated header
+// (capio/server/include/storage/file_buffer.hpp).

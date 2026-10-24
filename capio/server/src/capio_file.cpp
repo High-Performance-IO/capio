@@ -3,7 +3,7 @@
 #include "calf/StdOutLogger.h"
 #include "calf/StlLogger.h"
 
-#include "../include/storage/allocator.hpp"
+#include "../include/storage/file_buffer.hpp"
 #include "remote/backend.hpp"
 #include "server/include/utils/common.hpp"
 #include "utils/shared_mutex.hpp"
@@ -92,7 +92,7 @@ void CapioFile::dump() {
 void CapioFile::createBuffer(const std::filesystem::path &path, const bool home_node) {
     START_LOG(gettid(), "call(path=%s, home_node=%s)", path.c_str(), home_node ? "true" : "false");
     std::lock_guard lock(_mutex);
-    if (std::visit([](const auto &alloc) { return alloc.empty(); }, _buffer)) {
+    if (std::visit([](const auto &buf) { return buf.empty(); }, _buffer)) {
         _home_node = home_node;
         if (_permanent && home_node) {
             if (_directory) {
@@ -101,7 +101,7 @@ void CapioFile::createBuffer(const std::filesystem::path &path, const bool home_
                 _buffer.emplace<HeapBuffer>().allocate(_requested_size);
             } else {
                 LOG("creating mem mapped file");
-                // switch the active backing to the mmap-backed allocator and map the real file
+                // switch the active backing to the mmap-backed buffer and map the real file
                 auto &mapped = _buffer.emplace<MappedBuffer>();
                 if (!mapped.allocate(path, _requested_size)) {
                     ERR_EXIT("mmap %s CapioFile constructor", path.c_str());
@@ -120,7 +120,11 @@ char *CapioFile::expandBuffer(const off64_t data_size) {
         const shared_lock_guard slg(_mutex_sectors);
         sectors.assign(_sectors.begin(), _sectors.end());
     }
-    return std::visit([&](auto &alloc) { return alloc.resize(data_size, sectors); }, _buffer);
+    char *const nb = std::visit([&](auto &buf) { return buf.grow(data_size, sectors); }, _buffer);
+    if (nb == nullptr) {
+        ERR_EXIT("grow buffer of CapioFile to %lld bytes", static_cast<long long>(data_size));
+    }
+    return nb;
 }
 
 // TODO: This is a memory leak that may lead to race conditions. remove exposure of internal buffer
@@ -298,7 +302,7 @@ off64_t CapioFile::_getStoredSize() const {
 
 bool CapioFile::bufferToAllocate() const {
     std::lock_guard lg(_mutex);
-    return std::visit([](const auto &alloc) { return alloc.empty(); }, _buffer);
+    return std::visit([](const auto &buf) { return buf.empty(); }, _buffer);
 }
 
 off64_t CapioFile::getRealFileSize() const { return this->_real_file_size; }

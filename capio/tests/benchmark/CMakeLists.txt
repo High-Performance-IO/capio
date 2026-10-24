@@ -8,7 +8,7 @@ set(TARGET_NAME capio_memory_allocator_benchmark)
 #####################################
 # The benchmark is its own executable and is NOT globbed into the capio_server/unit-test targets:
 # it lives outside capio/server whose sources are gathered by file(GLOB_RECURSE **/*.cpp).
-# Only the allocator implementation is compiled in, so a benchmark build does not need the
+# Only the buffer implementation is compiled in, so a benchmark build does not need the
 # server, posix or test dependencies.
 add_executable(${TARGET_NAME}
         memory_allocator.cpp

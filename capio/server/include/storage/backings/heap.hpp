@@ -2,7 +2,7 @@
 #define CAPIO_HEAP_HPP
 
 /// @brief Heap allocation strategy: allocates a new[]/delete[] buffer in the process heap.
-struct HeapAllocator {
+struct HeapBacking {
     /**
      * @brief Allocate the buffer in the heap, capped by available memory.
      * @param data    Buffer base (updated).
@@ -13,6 +13,26 @@ struct HeapAllocator {
     bool allocate(char *&data, off64_t &size, const off64_t requested) {
         size = computeAllocableMemQuota(requested);
         data = new char[size];
+        return true;
+    }
+
+    /**
+     * @brief Move the buffer into a new heap block of @p new_size, copying only the sectors.
+     * @param data     Buffer base (updated).
+     * @param size     Buffer logical size (updated).
+     * @param new_size New buffer size.
+     * @param sectors  Sparse data regions [start, end) to copy into the new buffer.
+     * @return True on success.
+     */
+    bool grow(char *&data, off64_t &size, const off64_t new_size,
+              const std::vector<std::pair<off64_t, off64_t>> &sectors) {
+        char *const nb = new char[new_size];
+        for (const auto &[lo, hi] : sectors) {
+            memcpy(nb + lo, data + lo, hi - lo);
+        }
+        delete[] data;
+        data = nb;
+        size = new_size;
         return true;
     }
 

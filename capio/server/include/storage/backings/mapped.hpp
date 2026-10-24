@@ -3,7 +3,7 @@
 #define CAPIO_MAPPED_HPP
 
 /// @brief mmap allocation strategy: maps a persistent file as shared memory.
-struct MappedAllocator {
+struct MappedBacking {
     int _fd          = -1; ///< backing file descriptor
     off64_t _map_len = 0;  ///< original mmap length, kept so commit-shrink still unmaps fully
 
@@ -52,6 +52,29 @@ struct MappedAllocator {
             return false;
         }
         _fd = -1;
+        return true;
+    }
+
+    /**
+     * @brief Extend the backing file to @p new_size and remap it. The data already lives in the
+     * file, so nothing is copied and later writes keep landing on disk.
+     * @param data     Buffer base (updated).
+     * @param size     Buffer logical size (updated).
+     * @param new_size New buffer size.
+     * @return True on success; false once committed (fd closed) or on ftruncate/mremap failure.
+     */
+    bool grow(char *&data, off64_t &size, const off64_t new_size,
+              const std::vector<std::pair<off64_t, off64_t>> &) {
+        if (_fd < 0 || ftruncate(_fd, new_size) == -1) {
+            return false;
+        }
+        void *const nb = mremap(data, _map_len, new_size, MREMAP_MAYMOVE);
+        if (nb == MAP_FAILED) {
+            return false;
+        }
+        data     = static_cast<char *>(nb);
+        size     = new_size;
+        _map_len = new_size;
         return true;
     }
 

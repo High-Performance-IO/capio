@@ -13,7 +13,7 @@
 
 #include "calf/StlLogger.h"
 
-#include "allocator.hpp"
+#include "file_buffer.hpp"
 #include "common/queue.hpp"
 
 /**
@@ -30,8 +30,8 @@ class CapioFile {
                         const std::pair<off64_t, off64_t> &rhs) const;
     };
 
-    using HeapBuffer   = MemoryAllocator<HeapAllocator>;
-    using MappedBuffer = MemoryAllocator<MappedAllocator>;
+    using HeapBuffer   = FileBuffer<HeapBacking>;
+    using MappedBuffer = FileBuffer<MappedBacking>;
 
     /// Backing storage: plain heap for in-memory files, mmap of a file for permanent ones.
     std::variant<HeapBuffer, MappedBuffer> _buffer;
