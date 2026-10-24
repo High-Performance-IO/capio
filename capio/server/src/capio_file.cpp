@@ -236,10 +236,7 @@ void CapioFile::insertSector(off64_t new_start, off64_t new_end) {
         _sectors.emplace(new_start, new_end);
     }
 
-    // The stored size waitForData() checks changes here, not when the bytes are copied into the
-    // buffer, so this is the only place data waiters are woken. Notify under _mutex, which
-    // waiters hold while checking, so no wakeup is lost between their check and their wait;
-    // _mutex_sectors is released first to keep the waiters' lock order.
+    // wake threads waiting for new data
     std::lock_guard lock(_mutex);
     _data_avail_cv.notify_all();
 }
