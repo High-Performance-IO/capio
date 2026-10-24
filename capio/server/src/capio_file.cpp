@@ -237,9 +237,9 @@ void CapioFile::insertSector(off64_t new_start, off64_t new_end) {
     }
 
     // The stored size waitForData() checks changes here, not when the bytes are copied into the
-    // buffer (readFromQueue/readFromNode notify before the sector is recorded). Notify under
-    // _mutex, which waiters hold while checking, so no wakeup is lost between their check and
-    // their wait; _mutex_sectors is released first to keep the waiters' lock order.
+    // buffer, so this is the only place data waiters are woken. Notify under _mutex, which
+    // waiters hold while checking, so no wakeup is lost between their check and their wait;
+    // _mutex_sectors is released first to keep the waiters' lock order.
     std::lock_guard lock(_mutex);
     _data_avail_cv.notify_all();
 }
@@ -319,7 +319,6 @@ void CapioFile::removeFd(int tid, int fd) {
 void CapioFile::readFromNode(const std::string &dest, off64_t offset, off64_t buffer_size) const {
     std::lock_guard lock(_mutex);
     backend->recv_file(_buf + offset, buffer_size, dest);
-    _data_avail_cv.notify_all();
 }
 
 void CapioFile::readFromQueue(SPSCQueue &queue, size_t offset, long int num_bytes) const {
@@ -327,7 +326,6 @@ void CapioFile::readFromQueue(SPSCQueue &queue, size_t offset, long int num_byte
 
     std::lock_guard lock(_mutex);
     queue.read(_buf + offset, num_bytes);
-    _data_avail_cv.notify_all();
 }
 
 off64_t CapioFile::_getStoredSize() const {

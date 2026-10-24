@@ -75,11 +75,15 @@ inline void handle_local_read(int tid, int fd, off64_t count, bool is_prod) {
         return;
     }
 
-    // No data at this offset yet (end_of_sector == -1) is not the end of a file that is still
-    // being written: like a partially available read, it waits for the data or the commit.
+    // The file is still being written and the requested range is not fully available, either
+    // because no sector holds data at this offset yet (end_of_sector == -1) or because the read
+    // goes beyond the end of the sector that holds it. In both cases this is not the end of the
+    // file: wait for the data or the commit before serving the read.
     if ((end_of_sector == -1 || process_offset + count > end_of_sector) && !file_complete) {
-        LOG("Mode is NO_UPDATE, but not enough data is available. Awaiting for data on "
-            "a separate thread before sending it to client");
+        LOG("Mode is NO_UPDATE, but %s. Awaiting for data on a separate thread before sending "
+            "it to client",
+            end_of_sector == -1 ? "no sector holds data at this offset yet"
+                                : "the read goes beyond the end of the available sector");
         std::thread t([&c_file, tid, fd, count, process_offset] {
             c_file.waitForData(process_offset + count);
             handle_pending_read(tid, fd, process_offset, count);
