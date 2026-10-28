@@ -15,9 +15,7 @@ inline off64_t capio_write(int fd, const void *buffer, off64_t count, long tid) 
                      "SSIZE_MAX yet");
         }
 
-        // Only a write to the cached file can make prefetched bytes stale. Flushing on writes to
-        // other files would make a process that reads one file and writes another (a pipeline
-        // stage) drop and refetch a whole cache line, with two server round trips, per read.
+        // flush a write only if the FD associated changed
         if (read_cache->cachesFileOf(fd)) {
             read_cache->flush();
         }

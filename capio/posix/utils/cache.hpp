@@ -39,9 +39,9 @@ class ReadCache {
         }
     }
 
-    // Whether a write to fd can change the bytes this cache holds: fd is the cached descriptor or
-    // another descriptor of the same file (after dup() or a second open()).
-    [[nodiscard]] inline bool cachesFileOf(int fd) const {
+    // Check whether this instance caches data from the file path associated with the given
+    // FD or not
+    [[nodiscard]] bool cachesFileOf(const int fd) const {
         return fd == _last_fd ||
                (exists_capio_fd(_last_fd) && get_capio_fd_path(fd) == get_capio_fd_path(_last_fd));
     }

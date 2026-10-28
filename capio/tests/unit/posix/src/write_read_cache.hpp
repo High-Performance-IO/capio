@@ -60,7 +60,7 @@ class WriteReadCacheTest : public testing::Test {
         read_cache->_actual_size  = 256 * 1024;
         // If the cache is flushed, flush() issues a seek_request(): supply the reply it awaits
         // so the test cannot block without a server.
-        constexpr off64_t reply = 0;
+        constexpr off64_t reply   = 0;
         buff_response->write(&reply);
     }
 
