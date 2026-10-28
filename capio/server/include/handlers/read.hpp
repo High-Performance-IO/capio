@@ -29,7 +29,7 @@ inline void handle_pending_read(int tid, int fd, long int process_offset, long i
     if (end_of_sector > end_of_read) {
         bytes_read = count;
     } else if (end_of_sector == CAPIO_SECTOR_NOT_FOUND) {
-        // woken by the commit of a file holding no data at this offset: end of file (0 bytes)
+        // woken by the commit of a file holding no data at this offset: read 0 bytes
         bytes_read = 0;
     } else {
         bytes_read = end_of_sector - process_offset;
