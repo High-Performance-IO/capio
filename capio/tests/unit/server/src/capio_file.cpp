@@ -114,8 +114,10 @@ TEST(ServerTest, TestCapioFileWaitForDataMultithreaded) {
         }
 
         queue.write(buffer, 1000);
-        file.insertSector(0, 1000);
+        // Same order as write_handler: the bytes are copied into the buffer before their sector
+        // is recorded, so anyone who sees the sector also sees the data.
         file.readFromQueue(queue, 0, 1000);
+        file.insertSector(0, 1000);
     });
 
     _lock.unlock();
@@ -374,12 +376,12 @@ TEST_F(MockBackendTestFixture, TestReadFromNodeMockBackend) {
 TEST(ServerTest, TestGetSectorEnd) {
     CapioFile file;
 
-    EXPECT_EQ(file.getSectorEnd(1234), -1);
+    EXPECT_EQ(file.getSectorEnd(1234), CAPIO_SECTOR_NOT_FOUND);
 
     file.insertSector(0, 1234);
 
     EXPECT_EQ(file.getSectorEnd(120), 1234);
-    EXPECT_EQ(file.getSectorEnd(12000), -1);
+    EXPECT_EQ(file.getSectorEnd(12000), CAPIO_SECTOR_NOT_FOUND);
 }
 
 TEST_F(MockBackendTestFixture, TestSimulateDirectoryStreaming) {
