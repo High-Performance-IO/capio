@@ -92,7 +92,7 @@ static constexpr std::array<CSHandler_t, CAPIO_NR_REQUESTS> build_request_handle
     setup_signal_handlers();
     backend->handshake_servers();
 
-    storage_manager->addDirectory(getpid(), get_server_capio_dir());
+    storage_manager->addDirectory(getpid(), get_capio_dir());
 
     internal_server_sem.unlock();
 

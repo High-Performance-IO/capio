@@ -65,9 +65,7 @@ inline void configure_server_runtime(const CapioParsedConfig &configuration) {
     server_configuration = configuration;
 }
 
-inline const std::filesystem::path &get_server_capio_dir() {
-    return server_configuration.capio_dir;
-}
+inline const std::filesystem::path &get_capio_dir() { return server_configuration.capio_dir; }
 inline long get_server_cache_lines() { return server_configuration.cache_lines; }
 inline long get_server_cache_line_size() { return server_configuration.cache_line_size; }
 inline off64_t get_file_initial_size() { return server_configuration.file_initial_size; }
