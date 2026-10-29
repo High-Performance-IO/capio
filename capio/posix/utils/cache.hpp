@@ -40,7 +40,7 @@ class ReadCache {
     }
 
     // Check whether this instance caches data from the file path associated with the given
-    // FD or not
+    // fd or not
     [[nodiscard]] bool cachesFileOf(const int fd) const {
         return fd == _last_fd ||
                (exists_capio_fd(_last_fd) && get_capio_fd_path(fd) == get_capio_fd_path(_last_fd));
