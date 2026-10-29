@@ -120,7 +120,7 @@ int main(int argc, char **argv) {
         CALF_PRINT("%s", line);
     }
     try {
-        capio_cl_engine = capiocl::parser::Parser::parse(configuration.getCapioClConfiguration());
+        capio_cl_engine = configuration.createCapioClEngine();
     } catch (const std::exception &error) {
         CALF_PRINT_COLOR(CALF_CLI_LEVEL_ERROR, "Unable to load CAPIO-CL configuration: %s",
                          error.what());

@@ -3,6 +3,7 @@
 #include "calf/StdOutLogger.h"
 #include "calf/StlLogger.h"
 
+#include "capiocl/parser.h"
 #include "utils/common.hpp"
 
 #include "toml++/toml.hpp"
@@ -530,6 +531,10 @@ int RuntimeConfiguration::getMtclPollInterval() const {
 const capiocl::configuration::CapioClConfiguration &
 RuntimeConfiguration::getCapioClConfiguration() const {
     return capio_cl_configuration;
+}
+
+capiocl::engine::Engine *RuntimeConfiguration::createCapioClEngine() const {
+    return capiocl::parser::Parser::parse(capio_cl_configuration);
 }
 
 void RuntimeConfiguration::set(RuntimeConfiguration configuration) {

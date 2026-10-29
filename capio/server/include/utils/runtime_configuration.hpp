@@ -1,6 +1,8 @@
 #ifndef CAPIO_RUNTIME_CONFIGURATION_HPP
 #define CAPIO_RUNTIME_CONFIGURATION_HPP
+#include "capiocl.hpp"
 #include "capiocl/configuration.h"
+#include "capiocl/engine.h"
 
 #include <filesystem>
 #include <map>
@@ -77,6 +79,12 @@ class RuntimeConfiguration final {
     /// @brief Only the `capiocl.*` keys explicitly set by the user, forwarded verbatim to CAPIO-CL
     [[nodiscard]] const capiocl::configuration::CapioClConfiguration &
     getCapioClConfiguration() const;
+
+    /**
+     * @brief Create the CAPIO-CL engine described by the configuration
+     * @throws std::exception if the CAPIO-CL configuration cannot be loaded
+     */
+    [[nodiscard]] capiocl::engine::Engine *createCapioClEngine() const;
 
   private:
     using Value = std::variant<bool, long long, std::string>;
