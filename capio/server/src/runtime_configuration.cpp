@@ -337,10 +337,6 @@ ValueMap resolve(const std::optional<std::filesystem::path> &file,
     return values;
 }
 
-template <typename T> T get(const ValueMap &values, const std::string &key) {
-    return std::get<T>(values.at(key));
-}
-
 void write_comment(std::ostream &output, std::string_view comment, std::string_view indent = "") {
     constexpr size_t max_line_length = 100;
     const auto width                 = max_line_length - indent.size() - 2;
@@ -387,7 +383,7 @@ void write_usage(std::ostream &output) {
 
 /// @brief Warn when a value shared with applications differs from the environment of the server,
 /// as applications usually inherit the same environment.
-void check_application_environment(const CapioParsedConfig &config) {
+void check_application_environment(const RuntimeConfiguration &config) {
     const auto warn_if_different = [](const char *env, const std::string &key,
                                       const std::string &value) {
         if (const char *current = std::getenv(env); current != nullptr && value != current) {
@@ -399,43 +395,71 @@ void check_application_environment(const CapioParsedConfig &config) {
     if (const char *env_dir = std::getenv("CAPIO_DIR"); env_dir != nullptr) {
         std::error_code error;
         const auto canonical = std::filesystem::weakly_canonical(env_dir, error);
-        if (error || canonical != config.capio_dir) {
-            warn_if_different("CAPIO_DIR", "capio.directory", config.capio_dir.string());
+        if (error || canonical != config.getCapioDir()) {
+            warn_if_different("CAPIO_DIR", "capio.directory", config.getCapioDir().string());
         }
     }
-    warn_if_different("CAPIO_CACHE_LINES", "capio.cache.lines", std::to_string(config.cache_lines));
+    warn_if_different("CAPIO_CACHE_LINES", "capio.cache.lines",
+                      std::to_string(config.getCacheLines()));
     warn_if_different("CAPIO_CACHE_LINE_SIZE", "capio.cache.line_size",
-                      std::to_string(config.cache_line_size));
+                      std::to_string(config.getCacheLineSize()));
+}
+
+/// @brief Explain what the server is running with when no configuration file is given
+void warn_running_with_defaults(const RuntimeConfiguration &config,
+                                const std::vector<std::string> &overrides) {
+    CALF_PRINT_COLOR(CALF_CLI_LEVEL_WARNING,
+                     "No configuration file given: starting with the built-in defaults");
+    bool from_environment = false;
+    for (const auto &option : options()) {
+        if (const char *env = option.env ? std::getenv(option.env) : nullptr;
+            env != nullptr && *env != '\0') {
+            CALF_PRINT_COLOR(CALF_CLI_LEVEL_WARNING, "  %s taken from %s=%s", option.key.c_str(),
+                             option.env, env);
+            from_environment = true;
+        }
+    }
+    if (!from_environment) {
+        CALF_PRINT_COLOR(CALF_CLI_LEVEL_WARNING,
+                         "  no CAPIO_* environment variable set: capio.directory is the "
+                         "current directory");
+    }
+    if (!overrides.empty()) {
+        CALF_PRINT_COLOR(CALF_CLI_LEVEL_WARNING, "  %zu setting(s) overridden with -o",
+                         overrides.size());
+    }
+    std::string workflow_file, mcast_monitor, fs_monitor;
+    const auto &capio_cl = config.getCapioClConfiguration();
+    capio_cl.getParameter("capiocl.config_path", &workflow_file, "");
+    capio_cl.getParameter("capiocl.monitor.mcast.enabled", &mcast_monitor, "false");
+    capio_cl.getParameter("capiocl.monitor.filesystem.enabled", &fs_monitor, "false");
+    CALF_PRINT_COLOR(CALF_CLI_LEVEL_WARNING,
+                     "  backend=%s, CAPIO-CL workflow file=%s, CAPIO-CL monitors: mcast=%s "
+                     "filesystem=%s",
+                     config.getBackendName().c_str(),
+                     workflow_file.empty() ? "<none>" : workflow_file.c_str(),
+                     mcast_monitor == "true" ? "on" : "off", fs_monitor == "true" ? "on" : "off");
+    CALF_PRINT_COLOR(CALF_CLI_LEVEL_WARNING,
+                     "  run 'capio_server --print-config' to see every value, "
+                     "'capio_server --genconf' to create a configuration file");
+}
+
+std::optional<RuntimeConfiguration> &global_configuration() {
+    static std::optional<RuntimeConfiguration> configuration;
+    return configuration;
 }
 
 } // namespace
 
-CapioParsedConfig load_config(const std::optional<std::filesystem::path> &file,
-                              const std::vector<std::string> &overrides) {
-    const auto values = resolve(file, overrides);
-
-    CapioParsedConfig config;
-    const std::filesystem::path capio_dir = get<std::string>(values, "capio.directory");
-    if (!std::filesystem::is_directory(capio_dir)) {
-        throw std::runtime_error("capio.directory '" + capio_dir.string() +
+RuntimeConfiguration::RuntimeConfiguration(const std::optional<std::filesystem::path> &file,
+                                           const std::vector<std::string> &overrides)
+    : values(resolve(file, overrides)) {
+    const std::filesystem::path directory = value<std::string>("capio.directory");
+    if (!std::filesystem::is_directory(directory)) {
+        throw std::runtime_error("capio.directory '" + directory.string() +
                                  "' is not an existing directory");
     }
-    config.capio_dir          = std::filesystem::canonical(capio_dir);
-    config.continue_on_error  = get<bool>(values, "capio.continue_on_error");
-    config.file_initial_size  = get<long long>(values, "capio.storage.file_initial_size");
-    config.prefetch_data_size = get<long long>(values, "capio.storage.prefetch_data_size");
-    config.cache_lines        = get<long long>(values, "capio.cache.lines");
-    config.cache_line_size    = get<long long>(values, "capio.cache.line_size");
-
-    config.discovery_interface = get<std::string>(values, "capio.discovery.type");
-    config.mcast_addr          = get<std::string>(values, "capio.discovery.mcast.address");
-    config.mcast_port          = get<long long>(values, "capio.discovery.mcast.port");
-    config.token_directory     = get<std::string>(values, "capio.discovery.fs.token_directory");
-
-    config.backend_name          = get<std::string>(values, "capio.backend.type");
-    config.mtcl_protocol         = get<std::string>(values, "capio.backend.mtcl.protocol");
-    config.mtcl_port             = get<long long>(values, "capio.backend.mtcl.port");
-    config.mtcl_poll_interval_us = get<long long>(values, "capio.backend.mtcl.poll_interval_us");
+    capio_dir = std::filesystem::canonical(directory);
 
     std::unordered_map<std::string, std::string> capio_cl_values;
     for (const auto &[key, value] : values) {
@@ -443,12 +467,84 @@ CapioParsedConfig load_config(const std::optional<std::filesystem::path> &file,
             capio_cl_values.emplace(key, to_string(value));
         }
     }
-    config.capio_cl_config =
+    capio_cl_configuration =
         capiocl::configuration::CapioClConfiguration(std::move(capio_cl_values));
-    return config;
 }
 
-void write_config_template(std::ostream &output) {
+template <typename T> const T &RuntimeConfiguration::value(const std::string &key) const {
+    return std::get<T>(values.at(key));
+}
+
+const std::filesystem::path &RuntimeConfiguration::getCapioDir() const { return capio_dir; }
+
+bool RuntimeConfiguration::getContinueOnError() const {
+    return value<bool>("capio.continue_on_error");
+}
+
+long RuntimeConfiguration::getCacheLines() const { return value<long long>("capio.cache.lines"); }
+
+long RuntimeConfiguration::getCacheLineSize() const {
+    return value<long long>("capio.cache.line_size");
+}
+
+off64_t RuntimeConfiguration::getFileInitialSize() const {
+    return value<long long>("capio.storage.file_initial_size");
+}
+
+off64_t RuntimeConfiguration::getPrefetchDataSize() const {
+    return value<long long>("capio.storage.prefetch_data_size");
+}
+
+const std::string &RuntimeConfiguration::getDiscoveryType() const {
+    return value<std::string>("capio.discovery.type");
+}
+
+const std::string &RuntimeConfiguration::getMulticastDiscoveryAddress() const {
+    return value<std::string>("capio.discovery.mcast.address");
+}
+
+unsigned int RuntimeConfiguration::getMulticastDiscoveryPort() const {
+    return value<long long>("capio.discovery.mcast.port");
+}
+
+const std::string &RuntimeConfiguration::getFsDiscoveryTokenDirectory() const {
+    return value<std::string>("capio.discovery.fs.token_directory");
+}
+
+const std::string &RuntimeConfiguration::getBackendName() const {
+    return value<std::string>("capio.backend.type");
+}
+
+const std::string &RuntimeConfiguration::getMtclProtocol() const {
+    return value<std::string>("capio.backend.mtcl.protocol");
+}
+
+int RuntimeConfiguration::getMtclPort() const {
+    return value<long long>("capio.backend.mtcl.port");
+}
+
+int RuntimeConfiguration::getMtclPollInterval() const {
+    return value<long long>("capio.backend.mtcl.poll_interval_us");
+}
+
+const capiocl::configuration::CapioClConfiguration &
+RuntimeConfiguration::getCapioClConfiguration() const {
+    return capio_cl_configuration;
+}
+
+void RuntimeConfiguration::set(RuntimeConfiguration configuration) {
+    global_configuration() = std::move(configuration);
+}
+
+const RuntimeConfiguration &RuntimeConfiguration::get() {
+    const auto &configuration = global_configuration();
+    if (!configuration) {
+        throw std::logic_error("RuntimeConfiguration::get() called before initialization");
+    }
+    return *configuration;
+}
+
+void RuntimeConfiguration::writeTemplate(std::ostream &output) {
     output
         << "# CAPIO server configuration.\n"
            "# Every option is commented out and shows its default value: uncomment and edit only\n"
@@ -477,14 +573,13 @@ void write_config_template(std::ostream &output) {
     }
 }
 
-void write_effective_config(std::ostream &output, const std::optional<std::filesystem::path> &file,
-                            const std::vector<std::string> &overrides) {
-    for (const auto &[key, value] : resolve(file, overrides)) {
+void RuntimeConfiguration::write(std::ostream &output) const {
+    for (const auto &[key, value] : values) {
         output << key << " = " << to_toml(value) << '\n';
     }
 }
 
-CapioParsedConfig parse_cli(int argc, char **argv) {
+void RuntimeConfiguration::initialize(int argc, char **argv) {
     std::optional<std::filesystem::path> file;
     std::vector<std::string> overrides;
     bool print_config = false;
@@ -495,7 +590,7 @@ CapioParsedConfig parse_cli(int argc, char **argv) {
             write_usage(std::cout);
             std::exit(EXIT_SUCCESS);
         } else if (argument == "--genconf") {
-            write_config_template(std::cout);
+            writeTemplate(std::cout);
             std::exit(EXIT_SUCCESS);
         } else if (argument == "--print-config") {
             print_config = true;
@@ -515,61 +610,28 @@ CapioParsedConfig parse_cli(int argc, char **argv) {
         }
     }
 
-    CapioParsedConfig config;
     try {
-        if (print_config) {
-            write_effective_config(std::cout, file, overrides);
-            std::exit(EXIT_SUCCESS);
-        }
-        config = load_config(file, overrides);
+        set(RuntimeConfiguration(file, overrides));
     } catch (const std::exception &error) {
         CALF_PRINT_COLOR(CALF_CLI_LEVEL_ERROR, "Invalid configuration: %s", error.what());
         std::exit(EXIT_FAILURE);
+    }
+    const auto &config = get();
+
+    if (print_config) {
+        config.write(std::cout);
+        std::exit(EXIT_SUCCESS);
     }
 
     if (file) {
         CALF_PRINT_COLOR(CALF_CLI_LEVEL_INFO, "Loaded configuration from %s",
                          file->string().c_str());
     } else {
-        CALF_PRINT_COLOR(CALF_CLI_LEVEL_WARNING,
-                         "No configuration file given: starting with the built-in defaults");
-        bool from_environment = false;
-        for (const auto &option : options()) {
-            if (const char *env = option.env ? std::getenv(option.env) : nullptr;
-                env != nullptr && *env != '\0') {
-                CALF_PRINT_COLOR(CALF_CLI_LEVEL_WARNING, "  %s taken from %s=%s",
-                                 option.key.c_str(), option.env, env);
-                from_environment = true;
-            }
-        }
-        if (!from_environment) {
-            CALF_PRINT_COLOR(CALF_CLI_LEVEL_WARNING,
-                             "  no CAPIO_* environment variable set: capio.directory is the "
-                             "current directory");
-        }
-        if (!overrides.empty()) {
-            CALF_PRINT_COLOR(CALF_CLI_LEVEL_WARNING, "  %zu setting(s) overridden with -o",
-                             overrides.size());
-        }
-        std::string workflow_file, mcast_monitor, fs_monitor;
-        config.capio_cl_config.getParameter("capiocl.config_path", &workflow_file, "");
-        config.capio_cl_config.getParameter("capiocl.monitor.mcast.enabled", &mcast_monitor,
-                                            "false");
-        config.capio_cl_config.getParameter("capiocl.monitor.filesystem.enabled", &fs_monitor,
-                                            "false");
-        CALF_PRINT_COLOR(
-            CALF_CLI_LEVEL_WARNING,
-            "  backend=%s, CAPIO-CL workflow file=%s, CAPIO-CL monitors: mcast=%s "
-            "filesystem=%s",
-            config.backend_name.c_str(), workflow_file.empty() ? "<none>" : workflow_file.c_str(),
-            mcast_monitor == "true" ? "on" : "off", fs_monitor == "true" ? "on" : "off");
-        CALF_PRINT_COLOR(CALF_CLI_LEVEL_WARNING,
-                         "  run 'capio_server --print-config' to see every value, "
-                         "'capio_server --genconf' to create a configuration file");
+        warn_running_with_defaults(config, overrides);
     }
     check_application_environment(config);
 
-    if (config.continue_on_error) {
+    if (config.getContinueOnError()) {
 #ifdef CAPIO_LOG
         continue_on_error = true;
         for (const auto line : CAPIO_LOG_SERVER_CLI_CONT_ON_ERR_WARNING) {
@@ -591,6 +653,5 @@ CapioParsedConfig parse_cli(int argc, char **argv) {
                      log->getLogFileName().c_str());
 #endif
 
-    CALF_PRINT_COLOR(CALF_CLI_LEVEL_INFO, "CAPIO directory=%s", config.capio_dir.c_str());
-    return config;
+    CALF_PRINT_COLOR(CALF_CLI_LEVEL_INFO, "CAPIO directory=%s", config.getCapioDir().c_str());
 }

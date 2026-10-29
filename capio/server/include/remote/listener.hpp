@@ -56,8 +56,9 @@ inline Backend *select_backend(int argc, char *argv[]) {
     if (backend_name == "mtcl") {
         LOG("backend selected: MTCL");
         CALF_PRINT_COLOR(CALF_CLI_LEVEL_INFO, "Starting CAPIO with MTCL backend");
-        return new MTCLBackend(configuration.mtcl_protocol, std::to_string(configuration.mtcl_port),
-                               configuration.mtcl_poll_interval_us);
+        return new MTCLBackend(configuration.getMtclProtocol(),
+                               std::to_string(configuration.getMtclPort()),
+                               configuration.getMtclPollInterval());
     }
 
     if (backend_name == "mpisync") {

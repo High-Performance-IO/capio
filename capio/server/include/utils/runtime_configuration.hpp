@@ -1,74 +1,91 @@
 #ifndef CAPIO_RUNTIME_CONFIGURATION_HPP
 #define CAPIO_RUNTIME_CONFIGURATION_HPP
 #include "capiocl/configuration.h"
-#include "common/constants.hpp"
 
 #include <filesystem>
+#include <map>
 #include <optional>
 #include <ostream>
 #include <string>
+#include <sys/types.h>
+#include <variant>
 #include <vector>
 
 /**
- * @brief Effective CAPIO server configuration.
+ * @brief Runtime configuration of the CAPIO server.
  *
- * Values are resolved, from lowest to highest priority, from: built-in defaults, the legacy CAPIO_*
- * environment variables, the TOML configuration file and the `-o key=value` command line
- * overrides. Every option is described by a single table in runtime_configuration.cpp, which is
- * also used to generate the documented template printed by `capio_server --genconf`.
+ * This class is the only component that knows how the server settings are provided. Values are
+ * resolved, from lowest to highest priority, from: built-in defaults, the legacy CAPIO_*
+ * environment variables, the TOML configuration file and the `-o key=value` command line overrides.
+ * Every option is described by a single table in runtime_configuration.cpp, which is also used to
+ * validate the input and to generate the documented template printed by `capio_server --genconf`.
+ *
+ * The rest of the server only queries the global instance through RuntimeConfiguration::get(), so
+ * changes to the way the settings are provided do not affect it.
  */
-struct CapioParsedConfig {
-    std::filesystem::path capio_dir;
-    bool continue_on_error = false;
+class RuntimeConfiguration final {
+  public:
+    /**
+     * @brief Resolve a configuration.
+     * @param file Optional TOML configuration file.
+     * @param overrides `key=value` strings, applied after the file, in order.
+     * @throws std::runtime_error on unknown keys, wrongly typed values or invalid values.
+     */
+    explicit RuntimeConfiguration(const std::optional<std::filesystem::path> &file = std::nullopt,
+                                  const std::vector<std::string> &overrides        = {});
 
-    long cache_lines           = CAPIO_CACHE_LINES_DEFAULT;
-    long cache_line_size       = CAPIO_CACHE_LINE_SIZE_DEFAULT;
-    off64_t file_initial_size  = CAPIO_DEFAULT_FILE_INITIAL_SIZE;
-    off64_t prefetch_data_size = 0;
+    /**
+     * @brief Parse the command line and set the global configuration. Exits after printing the
+     * help, the template or the resolved configuration, and on invalid arguments or configuration.
+     */
+    static void initialize(int argc, char **argv);
 
-    std::string discovery_interface = CAPIO_MCAST_PROTO_FLAG;
-    std::string mcast_addr          = CAPIO_MCAST_ADV_DEFAULT_ADDR;
-    unsigned int mcast_port         = CAPIO_MCAST_ADV_DEFAULT_PORT;
-    std::string token_directory     = CAPIO_FS_DEFAULT_TOKEN_DIRECTORY;
+    /// @brief Replace the global configuration
+    static void set(RuntimeConfiguration configuration);
 
-    std::string backend_name  = "none";
-    std::string mtcl_protocol = CAPIO_MTCL_DEFAULT_PROTOCOL;
-    int mtcl_port             = CAPIO_MTCL_DEFAULT_PORT;
-    int mtcl_poll_interval_us = CAPIO_MTCL_DEFAULT_POLL_INTERVAL;
+    /**
+     * @brief Get the global configuration
+     * @throws std::logic_error if called before initialize() or set()
+     */
+    static const RuntimeConfiguration &get();
+
+    /// @brief Write a commented TOML template listing every option with its default value
+    static void writeTemplate(std::ostream &output);
+
+    /// @brief Write the resolved values as flat TOML (`section.key = value`)
+    void write(std::ostream &output) const;
+
+    /// @brief Canonical path of the directory managed by CAPIO
+    [[nodiscard]] const std::filesystem::path &getCapioDir() const;
+    [[nodiscard]] bool getContinueOnError() const;
+
+    [[nodiscard]] long getCacheLines() const;
+    [[nodiscard]] long getCacheLineSize() const;
+    [[nodiscard]] off64_t getFileInitialSize() const;
+    [[nodiscard]] off64_t getPrefetchDataSize() const;
+
+    [[nodiscard]] const std::string &getDiscoveryType() const;
+    [[nodiscard]] const std::string &getMulticastDiscoveryAddress() const;
+    [[nodiscard]] unsigned int getMulticastDiscoveryPort() const;
+    [[nodiscard]] const std::string &getFsDiscoveryTokenDirectory() const;
+
+    [[nodiscard]] const std::string &getBackendName() const;
+    [[nodiscard]] const std::string &getMtclProtocol() const;
+    [[nodiscard]] int getMtclPort() const;
+    [[nodiscard]] int getMtclPollInterval() const;
 
     /// @brief Only the `capiocl.*` keys explicitly set by the user, forwarded verbatim to CAPIO-CL
-    capiocl::configuration::CapioClConfiguration capio_cl_config;
+    [[nodiscard]] const capiocl::configuration::CapioClConfiguration &
+    getCapioClConfiguration() const;
+
+  private:
+    using Value = std::variant<bool, long long, std::string>;
+
+    std::map<std::string, Value> values;
+    std::filesystem::path capio_dir;
+    capiocl::configuration::CapioClConfiguration capio_cl_configuration;
+
+    template <typename T> [[nodiscard]] const T &value(const std::string &key) const;
 };
-
-/**
- * @brief Resolve the server configuration.
- * @param file Optional TOML configuration file.
- * @param overrides `key=value` strings, applied after the file, in order.
- * @throws std::runtime_error on unknown keys, wrongly typed values or invalid values.
- */
-CapioParsedConfig load_config(const std::optional<std::filesystem::path> &file,
-                              const std::vector<std::string> &overrides = {});
-
-/// @brief Write a commented TOML template listing every option with its default value.
-void write_config_template(std::ostream &output);
-
-/// @brief Write the resolved configuration as flat TOML (`section.key = value`).
-void write_effective_config(std::ostream &output, const std::optional<std::filesystem::path> &file,
-                            const std::vector<std::string> &overrides = {});
-
-/// @brief Parse the command line, load the configuration and exit on errors or info flags.
-CapioParsedConfig parse_cli(int argc, char **argv);
-
-inline CapioParsedConfig server_configuration;
-
-inline void configure_server_runtime(const CapioParsedConfig &configuration) {
-    server_configuration = configuration;
-}
-
-inline const std::filesystem::path &get_capio_dir() { return server_configuration.capio_dir; }
-inline long get_server_cache_lines() { return server_configuration.cache_lines; }
-inline long get_server_cache_line_size() { return server_configuration.cache_line_size; }
-inline off64_t get_file_initial_size() { return server_configuration.file_initial_size; }
-inline off64_t get_prefetch_data_size() { return server_configuration.prefetch_data_size; }
 
 #endif // CAPIO_RUNTIME_CONFIGURATION_HPP

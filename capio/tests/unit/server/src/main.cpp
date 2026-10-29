@@ -29,9 +29,7 @@ class ServerUnitTestEnvironment : public testing::Environment {
     explicit ServerUnitTestEnvironment() = default;
 
     void SetUp() override {
-        CapioParsedConfig configuration;
-        configuration.capio_dir = "/tmp";
-        configure_server_runtime(configuration);
+        RuntimeConfiguration::set(RuntimeConfiguration(std::nullopt, {"capio.directory=/tmp"}));
         capio_cl_engine = new capiocl::engine::Engine(false);
         capio_cl_engine->setWorkflowName(CAPIO_DEFAULT_WORKFLOW_NAME);
         client_manager    = new ClientManager();
