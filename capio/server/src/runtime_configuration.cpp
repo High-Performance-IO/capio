@@ -96,16 +96,14 @@ const std::vector<Option> &options() {
          65535},
         {"capio.discovery.fs.token_directory", std::string{CAPIO_FS_DEFAULT_TOKEN_DIRECTORY},
          "Directory, shared among all nodes, used by the 'fs' discovery."},
-        {"capio.backend.type",
-         std::string{"none"},
-         "Backend used to communicate with other CAPIO servers. 'none' runs a single node.",
-         nullptr,
+        {"capio.backend.type", std::string{"none"},
+         "Backend used to communicate with other CAPIO servers: "
 #ifdef CAPIO_HAS_MPI
-         {"none", "mtcl", "mpi", "mpisync"}
+         "'none' (single node), 'mtcl', 'mpi' or 'mpisync'. "
 #else
-         {"none", "mtcl"}
+         "'none' (single node) or 'mtcl'. "
 #endif
-        },
+         "Unknown backends fall back to 'none' with a warning."},
         {"capio.backend.mtcl.protocol", std::string{CAPIO_MTCL_DEFAULT_PROTOCOL},
          "MTCL protocol, see https://github.com/ParaGroup/MTCL for the supported ones."},
         {"capio.backend.mtcl.port",

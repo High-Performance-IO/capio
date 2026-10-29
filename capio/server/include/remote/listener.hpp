@@ -72,9 +72,12 @@ inline Backend *select_backend(int argc, char *argv[]) {
 #endif
     }
 
-    // Unreachable: the backend name is validated when the configuration is loaded
-    CALF_PRINT_COLOR(CALF_CLI_LEVEL_ERROR, "Backend %s does not exist", backend_name.c_str());
-    exit(EXIT_FAILURE);
+    LOG("Backend %s does not exist in CAPIO. Reverting back to the default backend (none)",
+        backend_name.c_str());
+    CALF_PRINT_COLOR(CALF_CLI_LEVEL_WARNING,
+                     "Backend %s does not exist. Reverting to the default backend (none)",
+                     backend_name.c_str());
+    return new NoneBackend(argc, argv);
 }
 
 inline void capio_remote_listener(Semaphore &internal_server_sem) {

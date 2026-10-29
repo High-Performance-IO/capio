@@ -18,6 +18,6 @@ the final return statement, comparing the new backend name with the one chosen b
 new backend if the names matches.
 
 The last thing to do, is to let the user know that your backend actually exists. To do this, add its name to the
-allowed values (`choices`) of the `capio.backend.type` option, defined in the option table inside
+help text of the `capio.backend.type` option, defined in the option table inside
 `CAPIO_ROOT_DIR/capio/server/src/runtime_configuration.cpp`. Backend specific settings should be added to the same
 table, under `capio.backend.<name>.*`, so that they are validated and documented by `capio_server --genconf`.

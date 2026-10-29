@@ -154,7 +154,6 @@ TEST_F(RuntimeConfigurationTest, RejectsInvalidConfigurations) {
     EXPECT_THROW(load_config(write("[capio]\ndirectory = [\"/tmp\"]\n")), std::runtime_error);
     // Out of range and unknown choices
     EXPECT_THROW(load_config(write("[capio.cache]\nlines = 0\n")), std::runtime_error);
-    EXPECT_THROW(load_config(write("[capio.backend]\ntype = \"tcp\"\n")), std::runtime_error);
     EXPECT_THROW(load_config(write("[capio.discovery]\ntype = \"dns\"\n")), std::runtime_error);
     EXPECT_THROW(load_config(write("[capio.backend.mtcl]\nport = 70000\n")), std::runtime_error);
     // Missing directory and broken TOML
@@ -170,6 +169,10 @@ TEST_F(RuntimeConfigurationTest, RejectsInvalidConfigurations) {
     // Invalid environment
     setenv("CAPIO_CACHE_LINES", "many", 1);
     EXPECT_THROW(load_config(std::nullopt), std::runtime_error);
+}
+
+TEST_F(RuntimeConfigurationTest, AcceptsUnknownBackendsToFallBackToNone) {
+    EXPECT_EQ(load_config(std::nullopt, {"capio.backend.type=tcp"}).backend_name, "tcp");
 }
 
 TEST_F(RuntimeConfigurationTest, ForwardsUnknownCapioClKeys) {
