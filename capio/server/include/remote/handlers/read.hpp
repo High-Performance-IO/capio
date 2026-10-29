@@ -7,6 +7,7 @@
 #include "remote/backend.hpp"
 #include "remote/requests.hpp"
 #include "storage/manager.hpp"
+#include "utils/runtime_configuration.hpp"
 
 extern StorageManager *storage_manager;
 
@@ -23,7 +24,7 @@ inline void serve_remote_read(const std::filesystem::path &path, const std::stri
     // Useful for caching
     CapioFile &c_file          = storage_manager->get(path);
     long int nbytes            = std::max<off64_t>(0, c_file.getStoredSize() - offset);
-    off64_t prefetch_data_size = get_prefetch_data_size();
+    off64_t prefetch_data_size = RuntimeConfiguration::get().getPrefetchDataSize();
 
     if (prefetch_data_size != 0 && nbytes > prefetch_data_size) {
         nbytes = prefetch_data_size;

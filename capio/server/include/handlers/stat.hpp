@@ -9,6 +9,7 @@
 #include "remote/requests.hpp"
 
 #include "utils/location.hpp"
+#include "utils/runtime_configuration.hpp"
 #include "utils/types.hpp"
 
 #include "client-manager/client_manager.hpp"
@@ -63,11 +64,13 @@ inline void reply_stat(int tid, const std::filesystem::path &path) {
             return;
         }
     }
-    auto c_file_opt   = storage_manager->tryGet(path);
-    CapioFile &c_file = (c_file_opt) ? c_file_opt->get()
-                                     : storage_manager->add(path, false, get_file_initial_size());
+    auto c_file_opt = storage_manager->tryGet(path);
+    CapioFile &c_file =
+        (c_file_opt)
+            ? c_file_opt->get()
+            : storage_manager->add(path, false, RuntimeConfiguration::get().getFileInitialSize());
     LOG("Obtained capio file. ready to reply to client");
-    const std::filesystem::path &capio_dir = get_capio_dir();
+    const std::filesystem::path &capio_dir = RuntimeConfiguration::get().getCapioDir();
     LOG("Obtained capio_dir");
     if (!file_location_opt) {
         LOG("File is now present from remote node. retrieving file again.");

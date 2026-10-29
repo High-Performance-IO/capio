@@ -9,6 +9,8 @@
 #include <sys/stat.h>
 #include <unistd.h>
 
+#include "common/syscall.hpp"
+
 #ifdef __CAPIO_POSIX
 #include "calf/SyscallLogger.h"
 #else

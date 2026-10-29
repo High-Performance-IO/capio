@@ -3,6 +3,7 @@
 #include <gtest/gtest.h>
 
 #include <client-manager/client_manager.hpp>
+#include <utils/capiocl_adapter.hpp>
 
 extern ClientManager *client_manager;
 
@@ -29,7 +30,8 @@ TEST(ClientManagerTestEnvironment, testFailedRequestCode) {
     // in the destructor
     // TODO: change behaviour of ERR_EXIT to not throw exceptions but only print error and continue
     const auto request_queue =
-        new CircularBuffer<char>(SHM_COMM_CHAN_NAME, CAPIO_REQ_BUFF_CNT, CAPIO_REQ_MAX_SIZE);
+        new CircularBuffer<char>(SHM_COMM_CHAN_NAME, CAPIO_REQ_BUFF_CNT, CAPIO_REQ_MAX_SIZE,
+                                 CapioCLEngine::get().getWorkflowName());
 
     char req[CAPIO_REQ_MAX_SIZE], new_req[CAPIO_REQ_MAX_SIZE];
     constexpr int TEST_REQ_CODE = 123;
