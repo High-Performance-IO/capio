@@ -25,7 +25,7 @@ inline std::filesystem::path get_parent_dir_path(const std::filesystem::path &fi
 inline bool is_capio_dir(const std::filesystem::path &path_to_check) {
     START_LOG(gettid(), "call(path_to_check=%s)", path_to_check.c_str());
 
-    const auto res = RuntimeConfiguration::get().getCapioDir().compare(path_to_check) == 0;
+    const auto res = get_server_capio_dir().compare(path_to_check) == 0;
     LOG("is_capio_dir:%s", res ? "yes" : "no");
     return res;
 }

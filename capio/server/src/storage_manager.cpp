@@ -7,7 +7,6 @@
 #include "calf/StlLogger.h"
 
 #include "common/dirent.hpp"
-#include "common/path.hpp"
 #include "storage/capio_file.hpp"
 #include "storage/manager.hpp"
 #include "utils/capiocl_adapter.hpp"
