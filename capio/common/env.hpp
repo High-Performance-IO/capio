@@ -22,7 +22,6 @@
 // TODO: remove forward declaration of function by splitting into header and impl. capio/common
 inline bool is_forbidden_path(const std::string_view &path);
 
-#ifdef __CAPIO_POSIX
 inline const std::filesystem::path &get_capio_dir() {
     static std::filesystem::path capio_dir{};
     START_LOG(capio_syscall(SYS_gettid), "call()");
@@ -98,14 +97,6 @@ inline long get_cache_line_size() {
     LOG("data_bufs_count=%ld", data_bufs_count);
     return data_bufs_count;
 }
-#else
-// The server takes these values from its configuration (capio.directory, capio.cache.*), which may
-// differ from the environment: use get_server_capio_dir(), get_server_cache_lines() and
-// get_server_cache_line_size() from utils/runtime_configuration.hpp instead.
-const std::filesystem::path &get_capio_dir() = delete;
-long get_cache_lines()                       = delete;
-long get_cache_line_size()                   = delete;
-#endif // __CAPIO_POSIX
 
 inline std::string get_capio_workflow_name() {
     static std::string name;

@@ -14,7 +14,9 @@ CapioShmCanary::CapioShmCanary(const std::string &capio_workflow_name)
     // The canary is named after the workflow resolved from the configuration, which must therefore
     // be loaded before the canary is created
     if (_canary_name.empty()) {
-        _canary_name = CAPIO_DEFAULT_WORKFLOW_NAME;
+        CALF_PRINT_COLOR(CALF_CLI_LEVEL_ERROR,
+                         "Error: shm canary created before the workflow name was resolved");
+        ERR_EXIT("ERR: empty workflow name for shm canary");
     }
     _shm_id = shm_open(_canary_name.data(), O_CREAT | O_EXCL, S_IRUSR | S_IWUSR);
     if (_shm_id == -1) {

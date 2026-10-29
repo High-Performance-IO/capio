@@ -1,5 +1,6 @@
 #ifndef CAPIO_RUNTIME_CONFIGURATION_HPP
 #define CAPIO_RUNTIME_CONFIGURATION_HPP
+#include "calf/StlLogger.h"
 #include "capiocl/configuration.h"
 #include "common/constants.hpp"
 
@@ -7,6 +8,7 @@
 #include <optional>
 #include <ostream>
 #include <string>
+#include <unistd.h>
 #include <vector>
 
 /**
@@ -72,5 +74,15 @@ inline long get_server_cache_lines() { return server_configuration.cache_lines; 
 inline long get_server_cache_line_size() { return server_configuration.cache_line_size; }
 inline off64_t get_file_initial_size() { return server_configuration.file_initial_size; }
 inline off64_t get_prefetch_data_size() { return server_configuration.prefetch_data_size; }
+
+/// @brief Server counterpart of is_capio_dir() in common/filesystem.hpp, which reads CAPIO_DIR from
+/// the environment: the server checks against the configured capio.directory instead.
+inline bool is_capio_dir(const std::filesystem::path &path_to_check) {
+    START_LOG(gettid(), "call(path_to_check=%s)", path_to_check.c_str());
+
+    const auto res = get_server_capio_dir().compare(path_to_check) == 0;
+    LOG("is_capio_dir:%s", res ? "yes" : "no");
+    return res;
+}
 
 #endif // CAPIO_RUNTIME_CONFIGURATION_HPP

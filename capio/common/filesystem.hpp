@@ -16,23 +16,12 @@
 #include "calf/StlLogger.h"
 #endif
 
+#include "common/path.hpp"
 #include "common/syscall.hpp"
 #include "env.hpp"
 
 constexpr std::array CAPIO_DIR_FORBIDDEN_PATHS = {std::string_view{"/proc/"},
                                                   std::string_view{"/sys/"}};
-
-inline std::filesystem::path get_parent_dir_path(const std::filesystem::path &file_path) {
-    START_LOG(capio_syscall(SYS_gettid), "call(file_path=%s)", file_path.c_str());
-    if (file_path == file_path.root_path()) {
-        return file_path;
-    }
-    const size_t pos = file_path.native().rfind('/');
-    if (pos == std::string::npos) {
-        LOG("invalid file_path in get_parent_dir_path");
-    }
-    return {file_path.native().substr(0, pos)};
-}
 
 inline bool in_dir(const std::string &path, const std::string &glob) {
     const size_t res = path.find('/', glob.length() - 1);
@@ -64,9 +53,6 @@ inline bool is_forbidden_path(const std::string_view &path) {
                        });
 }
 
-// Based on CAPIO_DIR: only available to the posix library. The server must compare paths against
-// get_server_capio_dir() from utils/runtime_configuration.hpp.
-#ifdef __CAPIO_POSIX
 inline bool is_capio_dir(const std::filesystem::path &path_to_check) {
     START_LOG(capio_syscall(SYS_gettid), "call(path_to_check=%s)", path_to_check.c_str());
 
@@ -83,6 +69,5 @@ inline bool is_capio_path(const std::filesystem::path &path_to_check) {
     LOG("is_capio_path:%s", res ? "yes" : "no");
     return res;
 }
-#endif // __CAPIO_POSIX
 
 #endif // CAPIO_COMMON_FILESYSTEM_HPP
