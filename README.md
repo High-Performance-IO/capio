@@ -31,7 +31,6 @@ The following dependencies are automatically fetched during the CMake configurat
 - [CALF](https://github.com/High-Performance-IO/CALF) provides logging and CLI output.
 - [alpha-unito/syscall_intercept](https://github.com/alpha-unito/syscall_intercept) intercepts system calls (forked from `pmem/syscall_intercept`).
 - [ParaGroup/MTCL](https://github.com/ParaGroup/MTCL) provides dynamic, multi-backend communication between CAPIO server instances.
-- [Taywee/args](https://github.com/Taywee/args) parses server command-line arguments.
 
 ### Compile capio
 
@@ -50,81 +49,125 @@ It is also possible to enable log in CAPIO, by defining `-DCAPIO_LOG=TRUE`.
 Good news! You don't need to modify your code to benefit from the features of CAPIO. You have only to do three steps (
 the first is optional).
 
-1) Write a configuration file for injecting streaming capabilities to your workflow
+1. (Optional) Write a [CAPIO-CL](https://github.com/High-Performance-IO/CAPIO-CL) JSON file describing the
+   streaming semantics of your workflow, and reference it from the server configuration
+   (`capiocl.config_path`).
 
-2) Launch the CAPIO daemons with MPI passing the (eventual) configuration file as argument on the machines in which you
-   want to execute your program (one daemon for each node). If you desire to specify a custom folder
-   for capio, set `CAPIO_DIR` as a environment variable.
+2. Launch the CAPIO daemons on the machines in which you want to execute your program (one daemon for each node),
+   optionally passing a TOML configuration file:
    ```bash
-   [CAPIO_DIR=your_capiodir] [mpiexec -N 1 --hostfile your_hostfile] capio_server -c conf.json 
+   [mpiexec -N 1 --hostfile your_hostfile] capio_server [capio.toml] [-o key=value ...]
    ```
+   On startup, the server prints the environment variables your applications must be launched with.
 
-3) Launch your programs preloading the CAPIO shared library like this:
+3. Launch your programs preloading the CAPIO shared library like this:
    ```bash
    CAPIO_DIR=your_capiodir      \
-   CAPIO_WORKFLOW_NAME=wfname   \ 
+   CAPIO_WORKFLOW_NAME=wfname   \
    CAPIO_APP_NAME=appname       \
-   LD_PRELOAD=libcapio_posix.so \ 
+   LD_PRELOAD=libcapio_posix.so \
    ./your_app <args>
     ```
 
 > [!WARNING]
 > `CAPIO_DIR` must be specified when launching a program with the CAPIO library. if `CAPIO_DIR` is not specified, CAPIO
-> will not intercept syscalls.
+> will not intercept syscalls. Its value must match `capio.directory` of the server.
 
-> [!NOTE]
-> If `CAPIO_DIR` is not specified when launching `capio_server`, it defaults to the server's current working directory.
+### Server configuration
 
-### Server backend options
+Every server setting has a default, so a configuration file is only needed for what you want to change. Each
+setting is resolved, from lowest to highest priority, from:
 
-Use `--backend-options` to configure the MTCL backend. Its format is
-`PROTO:PORT@POLL_INTERVAL_US`; for example:
+1. the built-in default;
+2. the corresponding legacy environment variable, if any (`CAPIO_DIR`, `CAPIO_CACHE_LINES`, `CAPIO_CACHE_LINE_SIZE`,
+   `CAPIO_FILE_INIT_SIZE`, `CAPIO_PREFETCH_DATA_SIZE`);
+3. the TOML configuration file given as argument;
+4. the `-o key=value` (or `--set key=value`) command line overrides, which may be repeated.
 
 ```bash
-capio_server --no-config --backend mtcl --backend-options TCP:7600@1000000
+capio_server --genconf > capio.toml   # documented template with every setting and its default
+capio_server --print-config capio.toml -o capio.backend.type=mtcl   # show the resolved configuration
+capio_server capio.toml -o capio.directory=/tmp/capio
 ```
 
-If omitted, MTCL defaults to `TCP:7600@1000000`. See the
-[MTCL repository](https://github.com/ParaGroup/MTCL) for supported communication protocols and their requirements.
+For example, a multi-node deployment that uses the MTCL backend and discovers other servers through a shared
+directory only needs:
 
-### Available environment variables
+```toml
+[capio]
+directory = "/tmp/capio"
 
-CAPIO can be controlled through the usage of environment variables. The available variables are listed below:
+[capio.backend]
+type = "mtcl"            # none (default), mtcl, mpi, mpisync
 
-#### Global environment variable
+[capio.backend.mtcl]
+protocol = "TCP"         # see https://github.com/ParaGroup/MTCL for the supported protocols
+port = 7600
 
-- `CAPIO_DIR` This environment variable tells to both server and application the mount point of capio;
-- `CAPIO_LOG_LEVEL` this environment tells both server and application the log level to use. This variable works only
+[capio.discovery]
+type = "fs"              # mcast (default) or fs
+
+[capio.discovery.fs]
+token_directory = "/shared/capio_tokens"
+
+[capiocl]
+config_path = "workflow.json"
+```
+
+Keys under `[capio]` configure the CAPIO server, while keys under `[capiocl]` are forwarded to CAPIO-CL. Unknown keys,
+values of the wrong type and invalid values are reported at startup, so typos do not go unnoticed.
+
+If no configuration file is given, the server prints a warning stating that it is running with the built-in defaults,
+which values were taken from the environment, and the resulting backend, CAPIO-CL workflow file and monitor state.
+
+#### CAPIO-CL commit monitors
+
+CAPIO-CL provides two optional commit monitors, which share the commit state (and home node) of files among CAPIO-CL
+engines, for example with other tools built on CAPIO-CL. **Both are disabled by default** and are started only when
+explicitly enabled:
+
+```toml
+[capiocl.monitor.mcast]
+enabled = true            # exchange commit/home node messages over UDP multicast
+delay_ms = 300
+commit = { ip = "224.224.224.1", port = 12345 }
+homenode = { ip = "224.224.224.2", port = 12345 }
+
+[capiocl.monitor.filesystem]
+enabled = true            # record commits/home nodes as token files
+metadata_dir = "/shared/capiocl_metadata"   # must be shared among nodes
+```
+
+The CAPIO server does not rely on them: it tracks file commits and locations by itself, so leaving them disabled does
+not change CAPIO semantics and avoids their background threads, multicast traffic and token files. Note that
+CAPIO servers built against CAPIO-CL 1.x ran with both monitors enabled: if you relied on that behaviour, enable them
+explicitly as shown above.
+
+### POSIX environment variables
+
+Preloaded applications are configured only through environment variables:
+
+#### Logging
+
+- `CAPIO_LOG_LEVEL` controls the application log level. This variable works only
   if `-DCAPIO_LOG=TRUE` was specified during cmake phase;
-- `CAPIO_LOG_PREFIX` This environment variable is defined only for capio_posix applications and specifies the prefix of
+- `CAPIO_LOG_PREFIX` specifies the prefix of
   the logfile name to which capio will log to. The default value is `posix_thread_`, which means that capio will log by
-  default to a set of files called `posix_thread_*.log`. An equivalent behaviour can be set on the capio server using
-  the `-l` option;
-- `CAPIO_LOG_DIR` This environment variable is defined only for capio_posix applications and specifies the directory
-  name to which capio will be created. If this variable is not defined, capio will log by default to `capio_logs`. An
-  equivalent behaviour can be set on the capio server using the `-d` option;
-- `CAPIO_CACHE_LINES`: This environment variable controls how many lines of cache are presents between posix and server
-  applications. defaults to 10 lines;
-- `CAPIO_CACHE_LINE_SIZE`: This environment variable controls the size of a single cache line. defaults to 256KB;
+  default to a set of files called `posix_thread_*.log`;
+- `CAPIO_LOG_DIR` specifies the log directory. It defaults to `capio_logs`.
 
-#### Server only environment variable
-
-- `CAPIO_FILE_INIT_SIZE`: This environment variable defines the default size of pre allocated memory for a new file
-  handled by capio. Defaults to 4MB. Bigger sizes will reduce the overhead of malloc but will fill faster node memory.
-  Value has to be expressed in bytes;
-- `CAPIO_PREFETCH_DATA_SIZE`: If this variable is set, then data transfers between nodes will be always, at least of the
-  given value in bytes;
-
-#### Posix only environment variable
+#### Runtime
 
 > [!WARNING]  
 > The following variables are mandatory. If not provided to a posix, application, CAPIO will not be able to correctly
-> handle the
-> application, according to the specifications given from the json configuration file!
+> handle the application according to the workflow configuration.
 
-- `CAPIO_WORKFLOW_NAME`: This environment variable is used to define the scope of a workflow for a given step. Needs to
-  be the same one as the field `"name"` inside the json configuration file;
+- `CAPIO_DIR`: must match `capio.directory` of the server;
+- `CAPIO_WORKFLOW_NAME`: must match the workflow name of the server (the `name` of the CAPIO-CL JSON file, or
+  `capiocl.workflow_name`; defaults to `CAPIO`);
 - `CAPIO_APP_NAME`: This environment variable defines the app name within a workflow for a given step;
+- `CAPIO_CACHE_LINES`: must match `capio.cache.lines`; defaults to 10;
+- `CAPIO_CACHE_LINE_SIZE`: must match `capio.cache.line_size`; defaults to 256 KiB.
 
 ## How to inject streaming capabilities into your workflow
 

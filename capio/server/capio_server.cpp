@@ -23,14 +23,12 @@
 #include "utils/capiocl_adapter.hpp"
 
 #include "client-manager/client_manager.hpp"
-#include "common/env.hpp"
 #include "common/requests.hpp"
 #include "common/semaphore.hpp"
 #include "remote/backend.hpp"
 #include "remote/discovery.hpp"
 #include "storage/capio_file.hpp"
 #include "utils/common.hpp"
-#include "utils/env.hpp"
 #include "utils/types.hpp"
 
 ClientManager *client_manager;
@@ -39,8 +37,8 @@ Backend *backend;
 DiscoveryService *discovery_service;
 
 #include "handlers.hpp"
-#include "utils/cli_parser.hpp"
 #include "utils/location.hpp"
+#include "utils/runtime_configuration.hpp"
 #include "utils/signals.hpp"
 
 #include "remote/listener.hpp"
@@ -94,7 +92,7 @@ static constexpr std::array<CSHandler_t, CAPIO_NR_REQUESTS> build_request_handle
     setup_signal_handlers();
     backend->handshake_servers();
 
-    storage_manager->addDirectory(getpid(), get_capio_dir());
+    storage_manager->addDirectory(getpid(), RuntimeConfiguration::get().getCapioDir());
 
     internal_server_sem.unlock();
 
@@ -115,34 +113,38 @@ int main(int argc, char **argv) {
 
     Semaphore internal_server_sem(0);
 
+    RuntimeConfiguration::initialize(argc, argv);
+    const auto &configuration = RuntimeConfiguration::get();
+
     for (const auto line : CAPIO_LOG_SERVER_BANNER) {
         CALF_PRINT("%s", line);
     }
-
-    const auto configuration = parseCLI(argc, argv);
-
-    if (configuration.capio_cl_dynamic_config) {
-        capio_cl_engine = new capiocl::engine::Engine();
-        capio_cl_engine->startApiServer();
-    } else if (!configuration.capio_cl_config_path.empty()) {
-        capio_cl_engine = capiocl::parser::Parser::parse(configuration.capio_cl_config_path,
-                                                         configuration.capio_cl_resolve_path,
-                                                         configuration.store_all_in_memory);
-    } else {
-        capio_cl_engine = new capiocl::engine::Engine();
-        capio_cl_engine->setWorkflowName(get_capio_workflow_name());
+    try {
+        capio_cl_engine = configuration.createCapioClEngine();
+    } catch (const std::exception &error) {
+        CALF_PRINT_COLOR(CALF_CLI_LEVEL_ERROR, "Unable to load CAPIO-CL configuration: %s",
+                         error.what());
+        return EXIT_FAILURE;
     }
 
     UPDATE_CALF_WORKFLOW_NAME(capio_cl_engine->getWorkflowName());
 
-    if (configuration.store_all_in_memory) {
-        capio_cl_engine->setAllStoreInMemory();
-    }
-
     capio_cl_engine->print();
 
-    discovery_service = select_discovery_service(configuration);
-    backend           = select_backend(configuration, argc, argv);
+    std::string application_env = "CAPIO_DIR=" + configuration.getCapioDir().string() +
+                                  " CAPIO_WORKFLOW_NAME=" + capio_cl_engine->getWorkflowName();
+    if (configuration.getCacheLines() != CAPIO_CACHE_LINES_DEFAULT) {
+        application_env += " CAPIO_CACHE_LINES=" + std::to_string(configuration.getCacheLines());
+    }
+    if (configuration.getCacheLineSize() != CAPIO_CACHE_LINE_SIZE_DEFAULT) {
+        application_env +=
+            " CAPIO_CACHE_LINE_SIZE=" + std::to_string(configuration.getCacheLineSize());
+    }
+    CALF_PRINT_COLOR(CALF_CLI_LEVEL_INFO, "Start applications with: %s CAPIO_APP_NAME=<name>",
+                     application_env.c_str());
+
+    discovery_service = select_discovery_service();
+    backend           = select_backend(argc, argv);
 
     START_LOG(gettid(), "call()");
 

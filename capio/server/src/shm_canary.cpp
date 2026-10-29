@@ -4,15 +4,19 @@
 #include "calf/StlLogger.h"
 
 #include "common/constants.hpp"
-#include "common/env.hpp"
 #include "common/shm.hpp"
+#include "common/syscall.hpp"
 #include "utils/common.hpp"
 
 CapioShmCanary::CapioShmCanary(const std::string &capio_workflow_name)
     : _canary_name(capio_workflow_name) {
     START_LOG(capio_syscall(SYS_gettid), "call(capio_workflow_name: %s)", _canary_name.data());
+    // The canary is named after the workflow resolved from the configuration, which must therefore
+    // be loaded before the canary is created
     if (_canary_name.empty()) {
-        _canary_name = get_capio_workflow_name();
+        CALF_PRINT_COLOR(CALF_CLI_LEVEL_ERROR,
+                         "Error: shm canary created before the workflow name was resolved");
+        ERR_EXIT("ERR: empty workflow name for shm canary");
     }
     _shm_id = shm_open(_canary_name.data(), O_CREAT | O_EXCL, S_IRUSR | S_IWUSR);
     if (_shm_id == -1) {

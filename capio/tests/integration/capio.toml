@@ -1,0 +1,14 @@
+# CAPIO server configuration for the multinode integration tests.
+# capio.directory is taken from the CAPIO_DIR environment variable of each service.
+
+[capio.discovery]
+type = "fs"
+
+[capio.discovery.fs]
+token_directory = "/tokens"
+
+[capio.backend]
+type = "mtcl"
+
+[capiocl]
+config_path = "/config.json"

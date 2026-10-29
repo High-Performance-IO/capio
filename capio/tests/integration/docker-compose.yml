@@ -7,6 +7,7 @@ x-test-service: &test-service
     - test_status:/status
     - coverage_reports:/coverage
     - ./config.json:/config.json:ro
+    - ./capio.toml:/capio.toml:ro
   expose:
     - "1234"
   networks:
@@ -16,7 +17,7 @@ x-test-service: &test-service
     - -c
     - |
       set -e
-      CAPIO_DIR=/shared capio_server -c /config.json -b mtcl --discovery fs --token-directory /tokens &
+      capio_server /capio.toml &
       server_pid=$$!
       cleanup() {
         status=$$?
