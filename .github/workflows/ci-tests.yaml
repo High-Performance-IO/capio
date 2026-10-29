@@ -92,10 +92,13 @@ jobs:
           extensions: 'h,cpp,c,hpp'
           clangFormatVersion: 16
   unit-tests:
-    name: "Build ${{ matrix.build_type }} with ${{ matrix.compiler }}"
-    runs-on: ubuntu-24.04
+    name: "Build ${{ matrix.build_type }} with ${{ matrix.compiler }} on ${{ matrix.os }}"
+    runs-on: ${{ matrix.os }}
     strategy:
       matrix:
+        os:
+          - ubuntu-24.04
+          - ubuntu-24.04-arm
         build_type:
           - Debug
           - Release
@@ -213,7 +216,7 @@ jobs:
         id: calc-name
         run: |
           CLEAN_NAME=$(echo "${{ matrix.compiler }}" | tr '/:.' '-' | sed 's/--/-/g')
-          echo "artifact_name=${CLEAN_NAME}" >> $GITHUB_OUTPUT
+          echo "artifact_name=${CLEAN_NAME}-${{ matrix.os }}" >> $GITHUB_OUTPUT
 
       - name: "Prepare CAPIO logs"
         if: ${{ always() && matrix.build_type == 'Debug' }}
