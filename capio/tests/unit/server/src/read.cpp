@@ -67,9 +67,10 @@ class StreamingReadTest : public testing::Test {
         storage_manager->addFileToTid(CONSUMER_TID, FD, path, 0);
 
         const std::string channel = SHM_COMM_CHAN_NAME_RESP + std::to_string(CONSUMER_TID);
-        responses = new CircularBuffer<off_t>(channel, CAPIO_REQ_BUFF_CNT, sizeof(off_t));
-        responses_available =
-            sem_open((get_capio_workflow_name() + SHM_SEM_ELEMS + channel).c_str(), 0);
+        const auto &workflow_name = CapioCLEngine::get().getWorkflowName();
+        responses =
+            new CircularBuffer<off_t>(channel, CAPIO_REQ_BUFF_CNT, sizeof(off_t), workflow_name);
+        responses_available = sem_open((workflow_name + SHM_SEM_ELEMS + channel).c_str(), 0);
         ASSERT_NE(responses_available, SEM_FAILED);
     }
 
