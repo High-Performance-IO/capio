@@ -15,7 +15,10 @@ inline off64_t capio_write(int fd, const void *buffer, off64_t count, long tid) 
                      "SSIZE_MAX yet");
         }
 
-        read_cache->flush();
+        // flush the read cache only if the associated fd changed
+        if (read_cache->cachesFileOf(fd)) {
+            read_cache->flush();
+        }
         write_cache->write(fd, buffer, count);
 
         return count;
