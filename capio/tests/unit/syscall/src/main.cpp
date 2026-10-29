@@ -3,6 +3,8 @@
 
 #include "common/syscall.hpp"
 
+#include <jsoncons/config/jsoncons_config.hpp>
+
 char **build_args() {
     char **args = (char **) malloc(4 * sizeof(uintptr_t));
 
@@ -68,7 +70,11 @@ class CapioServerEnvironment : public testing::Environment {
     void SetUp() override {
         if (server_pid < 0) {
             ASSERT_NE(std::getenv("CAPIO_DIR"), nullptr);
+#ifdef SYS_fork
             ASSERT_GE(server_pid = capio_syscall(SYS_fork), 0);
+#else
+            ASSERT_GE(server_pid = capio_syscall(SYS_clone, SIGCHLD, 0), 0);
+#endif
             if (server_pid == 0) {
                 execvpe(args[0], args, envp);
                 _exit(127);
