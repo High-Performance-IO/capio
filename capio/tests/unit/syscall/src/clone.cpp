@@ -61,6 +61,7 @@ TEST(SystemCallTest, TestThreadCloneProducerConsumer) {
     EXPECT_NE(unlink(PATHNAME), -1);
 }
 
+#ifdef SYS_fork
 TEST(SystemCallTest, TestForkParentChild) {
     auto pid = syscall(SYS_fork);
     EXPECT_GE(pid, 0);
@@ -68,6 +69,15 @@ TEST(SystemCallTest, TestForkParentChild) {
         exit(EXIT_SUCCESS);
     }
 }
+#else
+TEST(SystemCallTest, TestForkParentChild) {
+    auto pid = syscall(SYS_clone, SIGCHLD, 0);
+    EXPECT_GE(pid, 0);
+    if (pid == 0) {
+        exit(EXIT_SUCCESS);
+    }
+}
+#endif
 
 TEST(SystemCallTest, TestThreadCloneProducerConsumerWithStat) {
     constexpr const char *PATHNAME = "test_clone.txt";
