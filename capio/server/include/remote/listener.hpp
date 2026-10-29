@@ -56,9 +56,8 @@ inline Backend *select_backend(int argc, char *argv[]) {
     if (backend_name == "mtcl") {
         LOG("backend selected: MTCL");
         CALF_PRINT_COLOR(CALF_CLI_LEVEL_INFO, "Starting CAPIO with MTCL backend");
-        return new MTCLBackend(configuration.getMtclProtocol(),
-                               std::to_string(configuration.getMtclPort()),
-                               configuration.getMtclPollInterval());
+        return new MTCLBackend(configuration.mtcl_protocol, std::to_string(configuration.mtcl_port),
+                               configuration.mtcl_poll_interval_us);
     }
 
     if (backend_name == "mpisync") {
@@ -73,12 +72,9 @@ inline Backend *select_backend(int argc, char *argv[]) {
 #endif
     }
 
-    LOG("Backend %s does not exist in CAPIO. Reverting back to the default backend (none)",
-        backend_name.c_str());
-    CALF_PRINT_COLOR(CALF_CLI_LEVEL_WARNING,
-                     "Backend %s does not exist. Reverting to the default backend (none)",
-                     backend_name.c_str());
-    return new NoneBackend(argc, argv);
+    // Unreachable: the backend name is validated when the configuration is loaded
+    CALF_PRINT_COLOR(CALF_CLI_LEVEL_ERROR, "Backend %s does not exist", backend_name.c_str());
+    exit(EXIT_FAILURE);
 }
 
 inline void capio_remote_listener(Semaphore &internal_server_sem) {

@@ -118,18 +118,34 @@ int main(int argc, char **argv) {
     for (const auto line : CAPIO_LOG_SERVER_BANNER) {
         CALF_PRINT("%s", line);
     }
-    configure_server_runtime(
-        configuration.capio_dir, configuration.cache_lines, configuration.cache_line_size,
-        configuration.capio_file_default_init_size, configuration.capio_prefetch_data_size);
+    configure_server_runtime(configuration);
 
-    capio_cl_engine = capiocl::parser::Parser::parse(configuration.capio_cl_config);
+    try {
+        capio_cl_engine = capiocl::parser::Parser::parse(configuration.capio_cl_config);
+    } catch (const std::exception &error) {
+        CALF_PRINT_COLOR(CALF_CLI_LEVEL_ERROR, "Unable to load CAPIO-CL configuration: %s",
+                         error.what());
+        return EXIT_FAILURE;
+    }
 
     UPDATE_CALF_WORKFLOW_NAME(capio_cl_engine->getWorkflowName());
 
     capio_cl_engine->print();
 
-    discovery_service = select_discovery_service();
-    backend           = select_backend(argc, argv);
+    std::string application_env = "CAPIO_DIR=" + configuration.capio_dir.string() +
+                                  " CAPIO_WORKFLOW_NAME=" + capio_cl_engine->getWorkflowName();
+    if (configuration.cache_lines != CAPIO_CACHE_LINES_DEFAULT) {
+        application_env += " CAPIO_CACHE_LINES=" + std::to_string(configuration.cache_lines);
+    }
+    if (configuration.cache_line_size != CAPIO_CACHE_LINE_SIZE_DEFAULT) {
+        application_env +=
+            " CAPIO_CACHE_LINE_SIZE=" + std::to_string(configuration.cache_line_size);
+    }
+    CALF_PRINT_COLOR(CALF_CLI_LEVEL_INFO, "Start applications with: %s CAPIO_APP_NAME=<name>",
+                     application_env.c_str());
+
+    discovery_service = select_discovery_service(configuration);
+    backend           = select_backend(configuration, argc, argv);
 
     START_LOG(gettid(), "call()");
 

@@ -17,6 +17,7 @@ Finally, to be able to use the newly created backend, the function `select_backe
 the final return statement, comparing the new backend name with the one chosen by the user, returning an instance of the
 new backend if the names matches.
 
-The last thing to do, is to let the user know that your backend actually exists. To do this, you should change the
-constant `CAPIO_SERVER_ARG_PARSER_CONFIG_BACKEND_HELP`, defined in the
-file `CAPIO_ROOT_DIR/src/common/capio/constants.hpp`, to include the name of your backend.
+The last thing to do, is to let the user know that your backend actually exists. To do this, add its name to the
+allowed values (`choices`) of the `capio.backend.type` option, defined in the option table inside
+`CAPIO_ROOT_DIR/capio/server/src/runtime_configuration.cpp`. Backend specific settings should be added to the same
+table, under `capio.backend.<name>.*`, so that they are validated and documented by `capio_server --genconf`.

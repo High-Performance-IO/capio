@@ -101,60 +101,12 @@ constexpr char CAPIO_LOG_SERVER_CLI_LOGGING_ENABLED_WARNING[6][80] = {
 
 constexpr char CAPIO_LOG_SERVER_CLI_CONT_ON_ERR_WARNING[8][80] = {
     "\033[1;31m|==================================================================|\033[0m",
-    "\033[1;31m|           you are running CAPIO with --continue-on-error         |\033[0m",
+    "\033[1;31m|    you are running CAPIO with capio.continue_on_error = true     |\033[0m",
     "\033[1;31m|       This is extremely dangerous as CAPIO server will continue  |\033[0m",
     "\033[1;31m|              its execution even if it should terminate.          |\033[0m",
     "\033[1;31m|                                                                  |\033[0m",
     "\033[1;31m|                     USE IT AT YOUR OWN RISK                      |\033[0m",
     "\033[1;31m|==================================================================|\033[0m",
     ""};
-
-// CAPIO server argument parser
-constexpr char CAPIO_SERVER_ARG_PARSER_PRE[] =
-    "Cross Application Programmable IO application. developed by Alberto "
-    "Riccardo Martinelli (UniTO), Massimo Torquati(UniPI), Marco Aldinucci (UniTO), Iacopo "
-    "Colonnelli(UniTO)  and Marco Edoardo Santimaria (UniTO).";
-constexpr char CAPIO_SERVER_ARG_PARSER_EPILOGUE[] =
-    "For further help, a full list of the available ENVIRONMENT VARIABLES,"
-    " and a guide on config JSON file structure, please visit "
-    "https://github.com/High-Performance-IO/capio";
-constexpr char CAPIO_SERVER_ARG_PARSER_LOGILE_DIR_OPT_HELP[] =
-    "Name of the folder to which CAPIO server will put log files into";
-constexpr char CAPIO_SERVER_ARG_PARSER_LOGILE_OPT_HELP[] =
-    "Filename to which capio_server will log to, without extension";
-constexpr char CAPIO_SERVER_ARG_PARSER_CONFIG_OPT_HELP[] =
-    "JSON Configuration file for capio_server";
-constexpr char CAPIO_SERVER_ARG_PARSER_CONFIG_NO_CONF_FILE_HELP[] =
-    "If specified, server application will start without a config file, using default settings.";
-constexpr char CAPIO_SERVER_ARG_PARSER_CONFIG_NCONTINUE_ON_ERROR_HELP[] =
-    "If specified, Capio will try to continue its execution to continue even if it has reached a "
-    "fatal termination point. This flag should be used only to debug capio. If this flag is "
-    "specified,  and a fatal termination point is reached, the behaviour of capio is undefined and "
-    "should not  be taken as valid";
-constexpr char CAPIO_SERVER_ARG_PARSER_RESOLVE_PREFIX_OPT_HELP[] =
-    "Prefix to resolve CAPIO-CL configuration file paths when found to be relative";
-
-constexpr char CAPIO_SERVER_ARG_PARSER_STORE_ALL_IN_MEMORY_OPT_HELP[] =
-    "Flag to set CAPIO and CAPIO-CL to store all files in memory, independently of the "
-    "information provided by the CAPIO-CL configuration file";
-
-constexpr char CAPIO_SERVER_ARG_PARSER_CONFIG_BACKEND_HELP[] =
-    "Backend used in CAPIO. The value [backend] can be one of the following implemented backends: "
-#ifdef CAPIO_HAS_MPI
-    "\n\t> mpi \n\t> mpisync \n\t> mtcl \n\t> none (default)";
-#else
-    "\n\t> mtcl \n\t> none (default)";
-#endif
-constexpr char CAPIO_SERVER_ARG_PARSER_DISCOVERY_HELP[] =
-    "Discovery service used in CAPIO: mcast (default) or fs";
-constexpr char CAPIO_SERVER_ARG_PARSER_MCAST_ADDR_HELP[] =
-    "Multicast discovery address (default: 224.0.0.2)";
-constexpr char CAPIO_SERVER_ARG_PARSER_MCAST_PORT_HELP[] =
-    "Multicast discovery port (default: 22334)";
-constexpr char CAPIO_SERVER_ARG_PARSER_TOKEN_DIRECTORY_HELP[] =
-    "Filesystem discovery token directory (default: .capio_tokens/)";
-constexpr char CAPIO_SERVER_ARG_PARSER_BACKEND_OPTIONS_HELP[] =
-    "Backend-specific options. MTCL format: PROTO:PORT@POLL_INTERVAL_US "
-    "(default: TCP:7600@1000000)";
 
 #endif // CAPIO_COMMON_CONSTANTS_HPP
