@@ -1,6 +1,7 @@
 #ifndef CAPIO_SERVER_REMOTE_BACKEND_MPI_HPP
 #define CAPIO_SERVER_REMOTE_BACKEND_MPI_HPP
 #include <mpi.h>
+#include <mutex>
 #include <unordered_map>
 
 #include "remote/backend.hpp"
@@ -8,7 +9,10 @@
 class MPIBackend : public Backend {
 
   protected:
-    MPI_Request req{};
+    /// All messages share one tag, and the receiver takes the data of a file right after its
+    /// header: the messages of one send must reach the peer back to back, not interleaved with
+    /// those of another thread (e.g. a read reply sent while a read request goes out).
+    std::mutex send_mutex;
     int rank = -1;
 
     /// This structure holds inside the information to convert from hostname to MPI rank

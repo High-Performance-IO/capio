@@ -90,6 +90,7 @@ void MPIBackend::send_request(const char *message, int message_len, const std::s
     const auto mpi_target = hostname_to_rank[target];
     LOG("MPI_rank for target %s is %c", target.c_str(), mpi_target);
 
+    const std::lock_guard lg(send_mutex);
     MPI_Send(message, message_len + 1, MPI_CHAR, mpi_target, 0, MPI_COMM_WORLD);
 }
 
@@ -100,13 +101,17 @@ void MPIBackend::send_file(const char *message, const int message_len, char *shm
     int elem_to_snd = 0;
     int dest        = hostname_to_rank[target];
 
+    const std::lock_guard lg(send_mutex);
     MPI_Send(message, message_len + 1, MPI_CHAR, dest, 0, MPI_COMM_WORLD);
     for (long int k = 0; k < nbytes; k += elem_to_snd) {
         // Compute the maximum amount to send for this chunk
         elem_to_snd = static_cast<int>(std::min(nbytes - k, MPI_MAX_ELEM_COUNT));
 
         LOG("Sending %d bytes to %d with offset from beginning odf k=%ld", elem_to_snd, dest, k);
+        // non-blocking, so that a listener serving a read inline never waits on its peer
+        MPI_Request req;
         MPI_Isend(shm + k, elem_to_snd, MPI_BYTE, dest, 0, MPI_COMM_WORLD, &req);
+        MPI_Request_free(&req);
         LOG("Sent chunk of %d bytes", elem_to_snd);
     }
 }
