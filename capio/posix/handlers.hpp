@@ -20,6 +20,7 @@
 #include "handlers/open.hpp"
 #include "handlers/read.hpp"
 #include "handlers/rename.hpp"
+#include "handlers/splice.hpp"
 #include "handlers/stat.hpp"
 #include "handlers/statfs.hpp"
 #include "handlers/statx.hpp"

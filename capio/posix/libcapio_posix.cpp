@@ -62,6 +62,9 @@ static constexpr long CAPIO_NR_SYSCALLS = 1 + std::max({
 #ifdef SYS_close
                                                   SYS_close,
 #endif
+#ifdef SYS_copy_file_range
+                                                  SYS_copy_file_range,
+#endif
 #ifdef SYS_creat
                                                   SYS_creat,
 #endif
@@ -158,6 +161,12 @@ static constexpr long CAPIO_NR_SYSCALLS = 1 + std::max({
 #ifdef SYS_rmdir
                                                   SYS_rmdir,
 #endif
+#ifdef SYS_sendfile
+                                                  SYS_sendfile,
+#endif
+#ifdef SYS_splice
+                                                  SYS_splice,
+#endif
 #ifdef SYS_stat
                                                   SYS_stat,
 #endif
@@ -211,6 +220,9 @@ static constexpr std::array<CPHandler_t, CAPIO_NR_SYSCALLS> build_syscall_table(
 #endif
 #ifdef SYS_close
     _syscallTable[SYS_close] = close_handler;
+#endif
+#ifdef SYS_copy_file_range
+    _syscallTable[SYS_copy_file_range] = copy_file_range_handler;
 #endif
 #ifdef SYS_creat
     _syscallTable[SYS_creat] = creat_handler;
@@ -313,6 +325,12 @@ static constexpr std::array<CPHandler_t, CAPIO_NR_SYSCALLS> build_syscall_table(
 #endif
 #ifdef SYS_rmdir
     _syscallTable[SYS_rmdir] = rmdir_handler;
+#endif
+#ifdef SYS_sendfile
+    _syscallTable[SYS_sendfile] = sendfile_handler;
+#endif
+#ifdef SYS_splice
+    _syscallTable[SYS_splice] = splice_handler;
 #endif
 #ifdef SYS_stat
     _syscallTable[SYS_stat] = stat_handler;
