@@ -49,7 +49,7 @@ inline void reply_stat(int tid, const std::filesystem::path &path) {
             // if it is in configuration file then wait otherwise fail
 
             if (const std::string &app_name = client_manager->getAppName(tid);
-                CapioCLEngine::get().isProducer(path, app_name)) {
+                produces_path_or_contents(path, app_name)) {
                 LOG("Metadata do not contains file or globs did not contain file or app is "
                     "producer.");
                 client_manager->replyToClient(tid, -1); // return size
