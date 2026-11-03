@@ -19,6 +19,7 @@
 #include "utils/capiocl_adapter.hpp"
 #include "utils/location.hpp"
 
+#include "handlers/close.hpp"
 #include "handlers/read.hpp"
 #include "handlers/write.hpp"
 
@@ -199,6 +200,99 @@ TEST_F(StreamingReadTest, readOfFileCommittedWithoutDataReturnsEndOfFile) {
     // The producer closed the file without writing: the read ends at offset 0 (end of file).
     EXPECT_EQ(next_response(std::chrono::seconds(2)), 0);
     EXPECT_EQ(storage_manager->getFileOffset(CONSUMER_TID, FD), 0);
+}
+
+/*
+ * The on_close commit rule commits a file when its producer closes it. A consumer that closes the
+ * file, for instance the descriptor that a shell redirection or tar dup's onto a child's stdin,
+ * must not commit it while the producer is still writing: its readers would see a complete file
+ * that ends early.
+ */
+class CloseCommitTest : public testing::Test {
+  protected:
+    static constexpr pid_t PRODUCER_TID = 5252;
+    static constexpr pid_t CONSUMER_TID = 5353;
+    static constexpr pid_t CHILD_TID    = 5454;
+    static constexpr int FD             = 3;
+    static constexpr int DUP_FD         = 4;
+
+    std::string path;
+
+    void SetUp() override {
+        // A fresh file for every run: with --gtest_repeat the previous run's file is still in
+        // the storage manager, committed.
+        static int run = 0;
+        path           = std::string("close_commit_") +
+               testing::UnitTest::GetInstance()->current_test_info()->name() + "_" +
+               std::to_string(run++) + ".dat";
+        capio_cl_engine->setCommitRule(path, capiocl::commitRules::ON_CLOSE);
+
+        client_manager->registerClient(PRODUCER_TID, "close_producer");
+        client_manager->registerClient(CONSUMER_TID, "close_consumer");
+        storage_manager->add(path, false, 0);
+        storage_manager->addFileToTid(PRODUCER_TID, FD, path, 0);
+        storage_manager->addFileToTid(CONSUMER_TID, FD, path, 0);
+    }
+
+    void TearDown() override {
+        // Leave the shared storage as it was: other suites count the files it holds.
+        storage_manager->remove(path);
+        client_manager->removeClient(PRODUCER_TID);
+        client_manager->removeClient(CONSUMER_TID);
+        client_manager->removeClient(CHILD_TID);
+    }
+};
+
+TEST_F(CloseCommitTest, TestConsumerCloseDoesNotCommit) {
+    std::string producer = "close_producer";
+    capio_cl_engine->addProducer(path, producer);
+
+    handle_close(CONSUMER_TID, FD);
+    EXPECT_FALSE(storage_manager->get(path).isCommitted());
+
+    handle_close(PRODUCER_TID, FD);
+    EXPECT_TRUE(storage_manager->get(path).isCommitted());
+}
+
+TEST_F(CloseCommitTest, TestConsumerCloseOfADupDoesNotCommit) {
+    // What `gzip < file` does in a shell: open, dup2 onto stdin, close the original.
+    std::string producer = "close_producer";
+    capio_cl_engine->addProducer(path, producer);
+
+    storage_manager->dup(CONSUMER_TID, FD, DUP_FD);
+    handle_close(CONSUMER_TID, FD);
+    EXPECT_FALSE(storage_manager->get(path).isCommitted());
+    handle_close(CONSUMER_TID, DUP_FD);
+    EXPECT_FALSE(storage_manager->get(path).isCommitted());
+
+    handle_close(PRODUCER_TID, FD);
+    EXPECT_TRUE(storage_manager->get(path).isCommitted());
+}
+
+TEST_F(CloseCommitTest, TestProducerCloseWhileItsChildWritesDoesNotCommit) {
+    // What tar -czf does: it hands the archive to a gzip child, which writes it, and closes its
+    // own descriptor first.
+    std::string producer = "close_producer";
+    capio_cl_engine->addProducer(path, producer);
+    client_manager->registerClient(CHILD_TID, "close_producer");
+    storage_manager->clone(PRODUCER_TID, CHILD_TID);
+
+    handle_close(PRODUCER_TID, FD);
+    EXPECT_FALSE(storage_manager->get(path).isCommitted());
+
+    handle_close(CHILD_TID, FD);
+    EXPECT_TRUE(storage_manager->get(path).isCommitted());
+}
+
+TEST_F(CloseCommitTest, TestCloseByTheProcessThatCreatedTheFileCommits) {
+    // A file CAPIO-CL names no producer for: the process that created it is its producer.
+    client_manager->registerProducedFile(PRODUCER_TID, path);
+
+    handle_close(CONSUMER_TID, FD);
+    EXPECT_FALSE(storage_manager->get(path).isCommitted());
+
+    handle_close(PRODUCER_TID, FD);
+    EXPECT_TRUE(storage_manager->get(path).isCommitted());
 }
 
 #endif // CAPIO_SERVER_READ_TEST_HPP
