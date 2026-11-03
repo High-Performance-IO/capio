@@ -105,5 +105,84 @@ int openat_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long a
     return posix_return_value(capio_openat(dirfd, pathname, flags, tid), result);
 }
 
+#ifdef SYS_openat2
+#include <linux/openat2.h>
+
+/**
+ * Resolve @pathname lexically as openat2 does with RESOLVE_BENEATH or RESOLVE_IN_ROOT, into
+ * @resolved, relative to the directory the call starts from. CAPIO files have no symlinks or mount
+ * points, so the other RESOLVE_* flags change nothing for them.
+ * @return false when the path would leave that directory under RESOLVE_BENEATH: openat2 fails with
+ * EXDEV
+ */
+inline bool capio_openat2_resolve(const std::string_view &pathname, uint64_t resolve,
+                                  std::string &resolved) {
+    const bool beneath = (resolve & RESOLVE_BENEATH) == RESOLVE_BENEATH;
+    const bool in_root = (resolve & RESOLVE_IN_ROOT) == RESOLVE_IN_ROOT;
+    if (!beneath && !in_root) {
+        resolved = pathname;
+        return true;
+    }
+
+    std::filesystem::path path(pathname);
+    if (path.is_absolute()) {
+        if (beneath) {
+            return false;
+        }
+        // RESOLVE_IN_ROOT: "/" is the directory the call starts from.
+        path = path.relative_path();
+    }
+    std::filesystem::path normal;
+    for (const auto &part : path) {
+        if (part.empty() || part == ".") {
+            continue;
+        }
+        if (part == "..") {
+            if (normal.empty()) {
+                if (beneath) {
+                    return false;
+                }
+                // RESOLVE_IN_ROOT: ".." stops at the root.
+                continue;
+            }
+            normal = normal.parent_path();
+        } else {
+            normal /= part;
+        }
+    }
+    resolved = normal.empty() ? "." : normal.string();
+    return true;
+}
+
+int openat2_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg5,
+                    long *result) {
+    int dirfd = static_cast<int>(arg0);
+    const std::string_view pathname(reinterpret_cast<const char *>(arg1));
+    const auto *how                  = reinterpret_cast<const struct open_how *>(arg2);
+    const auto size                  = static_cast<size_t>(arg3);
+    long tid                         = syscall_no_intercept(SYS_gettid);
+    constexpr uint64_t known_resolve = RESOLVE_NO_XDEV | RESOLVE_NO_MAGICLINKS |
+                                       RESOLVE_NO_SYMLINKS | RESOLVE_BENEATH | RESOLVE_IN_ROOT |
+                                       RESOLVE_CACHED;
+
+    START_LOG(tid, "call(dirfd=%d, pathname=%s)", dirfd, pathname.data());
+
+    // Malformed arguments: the kernel answers EFAULT or EINVAL.
+    if (how == nullptr || size < sizeof(struct open_how) || (how->resolve & ~known_resolve) != 0 ||
+        ((how->resolve & RESOLVE_BENEATH) && (how->resolve & RESOLVE_IN_ROOT))) {
+        return CAPIO_POSIX_SYSCALL_SKIP;
+    }
+
+    std::string resolved;
+    if (!capio_openat2_resolve(pathname, how->resolve, resolved)) {
+        errno = EXDEV;
+        return posix_return_value(CAPIO_POSIX_SYSCALL_ERRNO, result);
+    }
+
+    return posix_return_value(capio_openat(dirfd, resolved, static_cast<int>(how->flags), tid),
+                              result);
+}
+#endif // SYS_openat2
+
 #endif // SYS_creat || SYS_open || SYS_openat
 #endif // CAPIO_POSIX_HANDLERS_OPENAT_HPP
