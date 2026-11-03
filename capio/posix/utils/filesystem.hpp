@@ -185,7 +185,7 @@ inline bool get_capio_fd_cloexec(int fd) { return std::get<3>(files->at(fd)); }
  * @param fd
  * @return the active flags
  */
-inline bool get_capio_fd_flags(int fd) { return std::get<2>(files->at(fd)); }
+inline int get_capio_fd_flags(int fd) { return std::get<2>(files->at(fd)); }
 
 /**
  * Get the path of a file descriptor
