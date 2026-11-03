@@ -23,6 +23,11 @@ inline std::mutex files_location_mutex;
 inline int files_location_fd;
 inline FILE *files_location_fp;
 inline std::unordered_map<std::string, FILE *> files_location_fps;
+/// Serializes the use of files_location_fps, of its FILE streams and of files_location_fd, which
+/// shares its offset with this node's stream. Requests and the threads that wait for a file all
+/// read the location files, and a seek and the reads after it must not interleave with another
+/// thread's seek or write. The flocks around them only exclude other processes.
+inline std::recursive_mutex files_location_fps_mutex;
 
 class Flock {
   private:
@@ -77,6 +82,7 @@ inline std::string get_file_location_name(const std::string &node) {
 
 inline FILE *get_file_location_descriptor(const std::string &name) {
     START_LOG(gettid(), "name=%s", name.c_str());
+    const std::lock_guard<std::recursive_mutex> fps_lock(files_location_fps_mutex);
 
     if (files_location_fps.find(name) == files_location_fps.end()) {
         FILE *descriptor;
@@ -146,6 +152,7 @@ inline void rename_file_location(const std::filesystem::path &oldpath,
  */
 inline bool load_file_location(const std::filesystem::path &path_to_load) {
     START_LOG(gettid(), "call(path_to_load=%s)", path_to_load.c_str());
+    const std::lock_guard<std::recursive_mutex> fps_lock(files_location_fps_mutex);
     bool found = false;
     auto line  = reinterpret_cast<char *>(malloc((PATH_MAX + HOST_NAME_MAX + 10) * sizeof(char)));
 
@@ -157,7 +164,7 @@ inline bool load_file_location(const std::filesystem::path &path_to_load) {
         const std::lock_guard<Flock> lg(file_lock);
 
         if (fseek(descriptor, 0, SEEK_SET) == -1) {
-            ERR_EXIT("fseek in load_file_location");
+            ERR_EXIT("fseek in load_file_location: %d (%s)", errno, strerror(errno));
         }
         LOG("%s offset has been moved to the beginning of the file", name.c_str());
         size_t len = 0;
@@ -199,6 +206,7 @@ inline bool load_file_location(const std::filesystem::path &path_to_load) {
  */
 inline int delete_from_files_location(const std::filesystem::path &path) {
     START_LOG(gettid(), "call(%s)", path.c_str());
+    const std::lock_guard<std::recursive_mutex> fps_lock(files_location_fps_mutex);
 
     int result           = 2;
     auto &[node, offset] = get_file_location(path);
@@ -211,7 +219,7 @@ inline int delete_from_files_location(const std::filesystem::path &path) {
 
     if (offset == -1) {
         if (fseek(descriptor, 0, SEEK_SET) == -1) {
-            ERR_EXIT("fseek in load_file_location");
+            ERR_EXIT("fseek in load_file_location: %d (%s)", errno, strerror(errno));
         }
         LOG("%s offset has been moved to the beginning of the file", name.c_str());
         auto line =
@@ -282,11 +290,15 @@ inline void open_files_location() {
         ERR_EXIT("Error obtaining file descriptor for %s file: %d (%s)", file_location_name.c_str(),
                  errno, strerror(errno));
     }
+    const std::lock_guard<std::recursive_mutex> fps_lock(files_location_fps_mutex);
     files_location_fps.emplace(file_location_name, files_location_fp);
 }
 
 inline void write_file_location(const std::filesystem::path &path_to_write) {
     START_LOG(gettid(), "call(path_to_write=%s)", path_to_write.c_str());
+    // The descriptor is this node's FILE stream too: seeking to the end here would move a lookup
+    // that is reading it.
+    const std::lock_guard<std::recursive_mutex> fps_lock(files_location_fps_mutex);
 
     Flock file_lock(files_location_fd, F_WRLCK);
     const std::lock_guard<Flock> lg(file_lock);
