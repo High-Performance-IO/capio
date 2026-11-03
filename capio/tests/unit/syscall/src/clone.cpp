@@ -6,6 +6,8 @@
 #include <semaphore.h>
 #include <syscall.h>
 #include <unistd.h>
+#include <spawn.h>
+#include <sys/wait.h>
 
 constexpr int ARRAY_SIZE = 100;
 
@@ -86,4 +88,34 @@ TEST(SystemCallTest, TestThreadCloneProducerConsumerWithStat) {
     EXPECT_NE(fclose(fp), EOF);
     EXPECT_NE(unlink(PATHNAME), -1);
     t1.join();
+}
+// glibc's system() and posix_spawn() start the child with clone(CLONE_VM | CLONE_VFORK): it shares
+// the parent's memory, and the parent waits until the child calls execve. Initializing CAPIO in
+// that child waited for the parent, so both hung.
+TEST(SystemCallTest, TestSystemRunsItsChild) {
+    EXPECT_EQ(system("exit 3"), 3 << 8);
+    EXPECT_EQ(system("true"), 0);
+}
+
+TEST(SystemCallTest, TestPosixSpawnRunsItsChild) {
+    pid_t pid;
+    char program[] = "/bin/sh";
+    char flag[]    = "-c";
+    char command[] = "exit 5";
+    char *argv[]   = {program, flag, command, nullptr};
+    ASSERT_EQ(posix_spawn(&pid, program, nullptr, nullptr, argv, environ), 0);
+    int status;
+    ASSERT_EQ(waitpid(pid, &status, 0), pid);
+    EXPECT_TRUE(WIFEXITED(status));
+    EXPECT_EQ(WEXITSTATUS(status), 5);
+}
+
+// The parent intercepts again once the child has exec'd: a CAPIO file is still handled after.
+TEST(SystemCallTest, TestCapioFilesWorkAfterSystem) {
+    EXPECT_EQ(system("true"), 0);
+    int fd = open("after_system.txt", O_CREAT | O_RDWR | O_TRUNC, S_IRUSR | S_IWUSR);
+    ASSERT_NE(fd, -1);
+    EXPECT_EQ(write(fd, "abc", 3), 3);
+    EXPECT_EQ(close(fd), 0);
+    EXPECT_EQ(unlink("after_system.txt"), 0);
 }

@@ -353,6 +353,20 @@ static int hook(long syscall_number, long arg0, long arg1, long arg2, long arg3,
     }
 #endif
 
+#ifdef SYS_clone
+    if (syscall_number == SYS_clone && (arg0 & CLONE_VFORK)) {
+        vfork_in_progress = true;
+        return 1;
+    }
+#endif
+#ifdef SYS_clone3
+    // Newer glibc issues clone3; the flags are the first field of its struct clone_args.
+    if (syscall_number == SYS_clone3 && (*reinterpret_cast<const uint64_t *>(arg0) & CLONE_VFORK)) {
+        vfork_in_progress = true;
+        return 1;
+    }
+#endif
+
     // If the flag is set to true, CAPIO will not
     // intercept the system calls
     if (syscall_no_intercept_flag) {
