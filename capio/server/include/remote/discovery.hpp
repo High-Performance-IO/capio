@@ -6,7 +6,7 @@
 #include <thread>
 
 #include "common/constants.hpp"
-#include "utils/cli_parser.hpp"
+#include "utils/runtime_configuration.hpp"
 #include "utils/shm_canary.hpp"
 
 /**
@@ -85,12 +85,14 @@ class DiscoveryService {
 
 #include "discovery/include.hpp"
 
-inline DiscoveryService *select_discovery_service(const CapioParsedConfig &config) {
-    if (config.discovery_interface == CAPIO_MCAST_PROTO_FLAG) {
-        return new DiscoveryService(
-            std::make_unique<MulticastDiscoveryInterface>(config.mcast_addr, config.mcast_port));
+inline DiscoveryService *select_discovery_service() {
+    const auto &config = RuntimeConfiguration::get();
+    if (config.getDiscoveryType() == CAPIO_MCAST_PROTO_FLAG) {
+        return new DiscoveryService(std::make_unique<MulticastDiscoveryInterface>(
+            config.getMulticastDiscoveryAddress(), config.getMulticastDiscoveryPort()));
     } else {
-        return new DiscoveryService(std::make_unique<FSDiscoveryInterface>(config.token_directory));
+        return new DiscoveryService(
+            std::make_unique<FSDiscoveryInterface>(config.getFsDiscoveryTokenDirectory()));
     }
 }
 

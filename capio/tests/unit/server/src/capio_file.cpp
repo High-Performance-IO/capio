@@ -1,6 +1,6 @@
 #include "storage/capio_file.hpp"
+#include "common/constants.hpp"
 #include "common/dirent.hpp"
-#include "common/env.hpp"
 #include "remote/backend.hpp"
 #include "storage/manager.hpp"
 #include "utils/location.hpp"
@@ -97,7 +97,8 @@ TEST(ServerTest, TestDestructionOfPermanentCapioFileDirectory) {
 TEST(ServerTest, TestCapioFileWaitForDataMultithreaded) {
     CapioFile file;
 
-    SPSCQueue queue("test_queue", get_cache_lines(), get_cache_line_size(), "test_wf");
+    SPSCQueue queue("test_queue", CAPIO_CACHE_LINES_DEFAULT, CAPIO_CACHE_LINE_SIZE_DEFAULT,
+                    "test_wf");
 
     std::mutex _lock;
     _lock.lock();
@@ -138,7 +139,8 @@ TEST(ServerTest, TestCapioFileWaitForDataMultithreaded) {
 TEST(ServerTest, TestCapioFileWaitForDataMultithreadedWithCommit) {
     CapioFile file;
 
-    SPSCQueue queue("test_queue", get_cache_lines(), get_cache_line_size(), "test_wf");
+    SPSCQueue queue("test_queue", CAPIO_CACHE_LINES_DEFAULT, CAPIO_CACHE_LINE_SIZE_DEFAULT,
+                    "test_wf");
 
     std::mutex _lock;
     _lock.lock();

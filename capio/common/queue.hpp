@@ -6,15 +6,16 @@
 
 #include <semaphore.h>
 
-#include "common/env.hpp"
 #ifdef __CAPIO_POSIX
 #include "calf/SyscallLogger.h"
 #else
 #include "calf/StlLogger.h"
 #endif
+#include "common/constants.hpp"
+#include "common/syscall.hpp"
+
 #include "common/semaphore.hpp"
 #include "common/shm.hpp"
-#include "filesystem.hpp"
 
 template <class T, class Mutex> class Queue {
   private:
@@ -50,7 +51,7 @@ template <class T, class Mutex> class Queue {
 
   public:
     Queue(const std::string &shm_name, const long int max_num_elems, const long int elem_size,
-          const std::string &workflow_name = get_capio_workflow_name())
+          const std::string &workflow_name)
         : _max_num_elems(max_num_elems), _elem_size(elem_size),
           _buff_size(_max_num_elems * _elem_size), _shm_name(workflow_name + "_" + shm_name),
           _first_elem_name(workflow_name + SHM_FIRST_ELEM + shm_name),
