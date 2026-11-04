@@ -123,7 +123,11 @@ inline void add_capio_fd(long tid, const std::string &path, int fd, off64_t offs
  */
 std::filesystem::path capio_posix_realpath(const std::filesystem::path &pathname) {
     START_LOG(syscall_no_intercept(SYS_gettid), "call(path=%s)", pathname.c_str());
-    char *posix_real_path = capio_realpath((char *) pathname.c_str(), nullptr);
+    // A relative path starts from CAPIO's working directory, not the kernel's: chdir into a CAPIO
+    // directory changes only CAPIO's, so the kernel would resolve "." to the directory before it.
+    const std::filesystem::path absolute =
+        pathname.is_absolute() ? pathname : *current_dir / pathname;
+    char *posix_real_path = capio_realpath((char *) absolute.c_str(), nullptr);
 
     // if capio_realpath fails, then it should be a capio_file
     if (posix_real_path == nullptr) {
