@@ -25,6 +25,14 @@ void StorageManager::addDirectoryEntry(const pid_t tid, const std::filesystem::p
     START_LOG(gettid(), "call(file_path=%s, dir=%s, type=%d)", file_path.c_str(), dir.c_str(),
               type);
 
+    // The entry's own type: "." and ".." are directories, and a regular entry is whatever
+    // file_path is. The directory that holds the entries is always a directory.
+    unsigned char d_type = DT_DIR;
+    if (type == REGULAR_ENTRY) {
+        const auto entry = tryGet(file_path);
+        d_type           = !entry ? DT_UNKNOWN : entry->get().isDirectory() ? DT_DIR : DT_REG;
+    }
+
     linux_dirent64 ld;
     ld.d_ino = std::hash<std::string>{}(file_path);
     std::filesystem::path file_name;
@@ -53,7 +61,7 @@ void StorageManager::addDirectoryEntry(const pid_t tid, const std::filesystem::p
         file_shm = c_file.expandBuffer(data_size);
     }
 
-    ld.d_type = (c_file.isDirectory() ? DT_DIR : DT_REG);
+    ld.d_type = d_type;
 
     memcpy((char *) file_shm + file_size, &ld, sizeof(ld));
     const off64_t base_offset = file_size;
