@@ -2,6 +2,7 @@
 #define CAPIO_SERVER_HANDLERS_RENAME_HPP
 #include "client-manager/client_manager.hpp"
 #include "storage/manager.hpp"
+#include "utils/filesystem.hpp"
 #include "utils/location.hpp"
 
 extern StorageManager *storage_manager;
@@ -15,6 +16,19 @@ void handle_rename(int tid, const std::filesystem::path &oldpath,
     // FIXME: this doesn't work if a node renames a file handled by another node
     if (storage_manager->tryGet(oldpath)) {
         storage_manager->rename(oldpath, newpath);
+        // The renaming process produced the file it renames: commit it under its new name.
+        if (const auto &produced = client_manager->getProducedFiles(tid);
+            produced.find(oldpath) != produced.end()) {
+            client_manager->removeProducedFile(tid, oldpath);
+            client_manager->registerProducedFile(tid, newpath);
+        }
+        // Drop the old name from its directory, and the entry of the file newpath replaces, if
+        // any: updateDirectory appends newpath's entry without checking for one already there.
+        storage_manager->removeFromDirectory(oldpath);
+        storage_manager->removeFromDirectory(newpath);
+        if (storage_manager->tryGet(get_parent_dir_path(newpath))) {
+            storage_manager->updateDirectory(tid, newpath);
+        }
         delete_from_files_location(oldpath);
         if (!get_file_location_opt(newpath)) {
             write_file_location(newpath);

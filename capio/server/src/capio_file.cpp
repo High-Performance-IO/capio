@@ -1,5 +1,9 @@
 #include "server/include/storage/capio_file.hpp"
 
+#include <cstring>
+
+#include "common/dirent.hpp"
+
 #include "calf/StdOutLogger.h"
 #include "calf/StlLogger.h"
 
@@ -335,6 +339,34 @@ void CapioFile::registerFirstWrite() { this->_first_write = false; }
 void CapioFile::incrementDirectoryFileCount(const int count) {
     this->_n_files += count;
     this->_data_avail_cv.notify_all();
+}
+
+bool CapioFile::removeDirectoryEntry(const std::string &name) {
+    START_LOG(gettid(), "call(name=%s)", name.c_str());
+    std::lock_guard lock(_mutex);
+    std::lock_guard sectors_lock(_mutex_sectors);
+    const auto end  = _sectors.empty() ? 0 : _sectors.rbegin()->second;
+    char *const buf = getBuffer();
+    if (buf == nullptr || end <= 0) {
+        return false;
+    }
+    // The listing is an array of fixed-size records, which getdents hands out by index.
+    constexpr off64_t record = sizeof(linux_dirent64);
+    for (off64_t offset = 0; offset + record <= end; offset += record) {
+        auto *entry = reinterpret_cast<linux_dirent64 *>(buf + offset);
+        if (name != entry->d_name) {
+            continue;
+        }
+        std::memmove(buf + offset, buf + offset + record, end - offset - record);
+        _sectors.clear();
+        if (end - record > 0) {
+            _sectors.insert({0, end - record});
+        }
+        --_n_files;
+        LOG("removed entry %s", name.c_str());
+        return true;
+    }
+    return false;
 }
 
 unsigned int CapioFile::getCurrentDirectoryFileCount() const { return this->_n_files; }
