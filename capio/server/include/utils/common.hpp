@@ -52,8 +52,12 @@ inline void send_dirent_to_client(int tid, int fd, CapioFile &c_file, off64_t of
         return;
     }
 
+    // A consumer of a directory that is not committed waits for more entries. Its producer has
+    // already added every entry it will add before reading it, so it reads the end of the
+    // directory instead, as std::filesystem::remove_all does after removing the entries.
     const auto &path_to_check = storage_manager->getPath(tid, fd);
-    if (!c_file.isCommitted() && CapioCLEngine::get().isFirable(path_to_check)) {
+    if (!c_file.isCommitted() && CapioCLEngine::get().isFirable(path_to_check) &&
+        !CapioCLEngine::get().isProducer(path_to_check, client_manager->getAppName(tid))) {
         LOG("File %s has mode no_update and not enough data is available", path_to_check.c_str());
         std::thread t(wait_for_dirent_data, (last_entry + 1) * sizeof(linux_dirent64), tid, fd,
                       count, std::ref(c_file));
