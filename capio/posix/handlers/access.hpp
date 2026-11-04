@@ -21,7 +21,7 @@ inline off64_t capio_faccessat(int dirfd, const std::string_view &pathname, mode
         if (dirfd == AT_FDCWD) {
             path = capio_posix_realpath(pathname);
             if (path.empty()) {
-                errno = ENONET;
+                errno = ENOENT;
                 return CAPIO_POSIX_SYSCALL_ERRNO;
             }
         } else {
@@ -34,15 +34,18 @@ inline off64_t capio_faccessat(int dirfd, const std::string_view &pathname, mode
                 return CAPIO_POSIX_SYSCALL_REQUEST_SKIP;
             }
             path = (dir_path / path).lexically_normal();
-            return is_capio_path(path) ? access_request(path, tid) : -2;
         }
     }
 
-    if (is_capio_path(path)) {
-        return access_request(path, tid);
-    } else {
+    if (!is_capio_path(path)) {
         return CAPIO_POSIX_SYSCALL_REQUEST_SKIP;
     }
+    // The server answers -1 for a CAPIO path it has no location for, and leaves errno to us.
+    const off64_t res = access_request(path, tid);
+    if (res == CAPIO_POSIX_SYSCALL_ERRNO) {
+        errno = ENOENT;
+    }
+    return res;
 }
 
 int access_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg5, long *result) {

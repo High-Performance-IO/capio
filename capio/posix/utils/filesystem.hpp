@@ -133,30 +133,27 @@ inline std::filesystem::path capio_normal_path(const std::filesystem::path &path
 
 std::filesystem::path capio_posix_realpath(const std::filesystem::path &pathname) {
     START_LOG(syscall_no_intercept(SYS_gettid), "call(path=%s)", pathname.c_str());
-    char *posix_real_path = capio_realpath((char *) pathname.c_str(), nullptr);
-
-    // if capio_realpath fails, then it should be a capio_file
-    if (posix_real_path == nullptr) {
-        LOG("path is null due to errno='%s'", strerror(errno));
-
-        if (pathname.is_absolute()) {
-            LOG("Path=%s is already absolute", pathname.c_str());
-            return capio_normal_path(pathname);
-        } else {
-            std::filesystem::path new_path = capio_normal_path(*current_dir / pathname);
-            if (is_capio_path(new_path)) {
-                LOG("Computed absolute path = %s", new_path.c_str());
-                return new_path;
-            } else {
-                LOG("file %s is not a posix file, nor a capio file!", pathname.c_str());
-                return {};
-            }
-        }
+    // Relative paths start from CAPIO's working directory, which differs from the kernel's after
+    // a chdir into a CAPIO directory. CAPIO paths have no symlinks, so they are resolved
+    // lexically; the kernel resolves the others.
+    // TODO: support symlinks: a path that reaches the CAPIO directory through one, or through
+    //  ".." after one, is not recognised as a CAPIO path.
+    const std::filesystem::path absolute =
+        capio_normal_path(pathname.is_absolute() ? pathname : *current_dir / pathname);
+    if (is_capio_path(absolute)) {
+        LOG("Computed CAPIO path = %s", absolute.c_str());
+        return absolute;
     }
 
-    // if not, then check for realpath through libc implementation
-    LOG("Computed realpath = %s", posix_real_path);
-    return {posix_real_path};
+    const std::unique_ptr<char, decltype(&free)> real_path(
+        capio_realpath(absolute.c_str(), nullptr), &free);
+    if (real_path == nullptr) {
+        LOG("realpath of %s failed: %s", absolute.c_str(), strerror(errno));
+        // An absolute path is returned as it is, a relative one that does not resolve is not.
+        return pathname.is_absolute() ? absolute : std::filesystem::path{};
+    }
+    LOG("Computed realpath = %s", real_path.get());
+    return {real_path.get()};
 }
 
 /**

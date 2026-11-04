@@ -53,6 +53,9 @@ static constexpr long CAPIO_NR_SYSCALLS = 1 + std::max({
 #ifdef SYS_chdir
                                                   SYS_chdir,
 #endif
+#ifdef SYS_fchdir
+                                                  SYS_fchdir,
+#endif
 #ifdef SYS_chmod
                                                   SYS_chmod,
 #endif
@@ -199,6 +202,9 @@ static constexpr std::array<CPHandler_t, CAPIO_NR_SYSCALLS> build_syscall_table(
 #endif
 #ifdef SYS_chdir
     _syscallTable[SYS_chdir] = chdir_handler;
+#endif
+#ifdef SYS_fchdir
+    _syscallTable[SYS_fchdir] = fchdir_handler;
 #endif
 #ifdef SYS_chmod
     _syscallTable[SYS_chmod] = chmod_handler;
