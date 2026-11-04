@@ -17,6 +17,7 @@ void rmdir_handler(const char *const str) {
         return;
     }
     storage_manager->remove(dir_to_remove);
+    storage_manager->removeFromDirectory(dir_to_remove);
     int res = delete_from_files_location(dir_to_remove);
     client_manager->replyToClient(tid, res);
 }

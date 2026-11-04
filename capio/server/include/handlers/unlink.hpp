@@ -19,6 +19,7 @@ void unlink_handler(const char *const str) {
         CapioFile &c_file = c_file_opt->get();
         if (c_file.deletable()) {
             storage_manager->remove(path);
+            storage_manager->removeFromDirectory(path);
             delete_from_files_location(path);
         }
         client_manager->replyToClient(tid, 0);

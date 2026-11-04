@@ -335,6 +335,13 @@ off64_t StorageManager::addDirectory(const pid_t tid, const std::filesystem::pat
     return 1;
 }
 
+void StorageManager::removeFromDirectory(const std::filesystem::path &file_path) {
+    START_LOG(gettid(), "call(file_path=%s)", file_path.c_str());
+    if (const auto dir = tryGet(get_parent_dir_path(file_path))) {
+        dir->get().removeDirectoryEntry(file_path.filename());
+    }
+}
+
 void StorageManager::updateDirectory(const pid_t tid, const std::filesystem::path &file_path) {
     START_LOG(gettid(), "call(file_path=%s)", file_path.c_str());
     const auto &dir = get_parent_dir_path(file_path);

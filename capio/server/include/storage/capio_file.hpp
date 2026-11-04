@@ -209,6 +209,12 @@ class CapioFile {
      */
     void incrementDirectoryFileCount(int count = 1);
 
+    /**
+     * @brief Removes the entry called @p name from this directory's listing.
+     * @return true if the directory listed it.
+     */
+    bool removeDirectoryEntry(const std::string &name);
+
     /** @return Pointer to the raw memory buffer. */
     char *getBuffer() const;
 
