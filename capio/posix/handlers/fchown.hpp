@@ -1,6 +1,10 @@
 #ifndef CAPIO_POSIX_HANDLERS_FCHOWN_HPP
 #define CAPIO_POSIX_HANDLERS_FCHOWN_HPP
 
+#include "utils/common.hpp"
+#include "utils/filesystem.hpp"
+#include "utils/metadata.hpp"
+
 int fchown_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg5, long *result) {
     int fd = static_cast<int>(arg0);
     START_LOG(syscall_no_intercept(SYS_gettid), "call(fd=%d)", fd);
@@ -17,4 +21,20 @@ int fchown_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long a
     LOG("File is present in capio. Ignoring fchmod operation");
     return CAPIO_POSIX_SYSCALL_SUCCESS;
 }
+
+int chown_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg5, long *result) {
+    long tid = syscall_no_intercept(SYS_gettid);
+    return posix_return_value(
+        capio_metadata_access(AT_FDCWD, reinterpret_cast<const char *>(arg0), 0, tid), result);
+}
+
+int fchownat_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg5,
+                     long *result) {
+    long tid = syscall_no_intercept(SYS_gettid);
+    return posix_return_value(capio_metadata_access(static_cast<int>(arg0),
+                                                    reinterpret_cast<const char *>(arg1),
+                                                    static_cast<int>(arg4), tid),
+                              result);
+}
+
 #endif // CAPIO_POSIX_HANDLERS_FCHOWN_HPP
