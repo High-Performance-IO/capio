@@ -1,14 +1,14 @@
 #include <gtest/gtest.h>
 
 #include <algorithm>
+#include <cstring>
 #include <dirent.h>
 #include <fcntl.h>
 #include <filesystem>
+#include <string>
 #include <sys/stat.h>
 #include <sys/syscall.h>
 #include <unistd.h>
-#include <cstring>
-#include <string>
 #include <vector>
 
 struct linux_dirent64 {
@@ -99,7 +99,7 @@ TEST(SystemCallTest, TestDirectoryIsFoundThroughDotAndTrailingSlash) {
     ASSERT_NE(fd, -1);
     EXPECT_EQ(close(fd), 0);
 
-    struct stat statbuf {};
+    struct stat statbuf{};
     EXPECT_EQ(stat("normal_dir/.", &statbuf), 0);
     EXPECT_TRUE(S_ISDIR(statbuf.st_mode));
     EXPECT_EQ(stat("normal_dir/", &statbuf), 0);
