@@ -89,7 +89,9 @@ inline long get_cache_line_size() {
         if (value != nullptr) {
             LOG("Getting value from environment variable");
             data_bufs_count = strtol(value, nullptr, 10);
-        } else {
+        }
+        // a value that is not a positive number would give cache lines that hold nothing
+        if (data_bufs_count <= 0) {
             LOG("Getting default value");
             data_bufs_count = CAPIO_CACHE_LINE_SIZE_DEFAULT;
         }

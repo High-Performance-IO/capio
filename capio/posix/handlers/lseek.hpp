@@ -4,6 +4,7 @@
 #if defined(SYS_lseek)
 
 #include "utils/common.hpp"
+#include "utils/data.hpp"
 
 // TODO: EOVERFLOW is not addressed
 inline off64_t capio_lseek(int fd, off64_t offset, int whence, long tid) {
@@ -16,8 +17,7 @@ inline off64_t capio_lseek(int fd, off64_t offset, int whence, long tid) {
         if (whence == SEEK_SET) {
             LOG("whence %d is SEEK_SET", whence);
             if (offset >= 0) {
-                set_capio_fd_offset(fd, offset);
-                seek_request(fd, offset, tid);
+                capio_set_fd_offset(fd, offset, tid);
                 LOG("the new offset of file %d is %ld", fd, offset);
                 return offset;
             } else {
@@ -28,8 +28,7 @@ inline off64_t capio_lseek(int fd, off64_t offset, int whence, long tid) {
             LOG("whence %d is SEEK_CUR", whence);
             off64_t new_offset = file_offset + offset;
             if (new_offset >= 0) {
-                set_capio_fd_offset(fd, new_offset);
-                seek_request(fd, new_offset, tid);
+                capio_set_fd_offset(fd, new_offset, tid);
                 LOG("the new offset of file %d is %ld", fd, new_offset);
                 return new_offset;
             } else {
