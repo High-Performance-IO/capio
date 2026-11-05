@@ -325,6 +325,20 @@ void CapioFile::readFromQueue(SPSCQueue &queue, size_t offset, long int num_byte
     queue.read(_buf + offset, num_bytes);
 }
 
+void CapioFile::copyFromFile(const CapioFile &src, const off64_t src_offset,
+                             const off64_t dst_offset, const off64_t num_bytes) const {
+    START_LOG(gettid(), "call(src_offset=%ld, dst_offset=%ld, num_bytes=%ld)", src_offset,
+              dst_offset, num_bytes);
+
+    if (&src == this) {
+        std::lock_guard lock(_mutex);
+        memmove(_buf + dst_offset, _buf + src_offset, num_bytes);
+        return;
+    }
+    std::scoped_lock lock(_mutex, src._mutex);
+    memcpy(_buf + dst_offset, src._buf + src_offset, num_bytes);
+}
+
 off64_t CapioFile::_getStoredSize() const {
     const shared_lock_guard slg(_mutex_sectors);
     const auto it = _sectors.rbegin();

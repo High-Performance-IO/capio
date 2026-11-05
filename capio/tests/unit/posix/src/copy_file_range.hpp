@@ -460,6 +460,41 @@ TEST_F(CopyFileRangeUtilsTest, seekOfACapioEndOnlyWhenTheFileOffsetDiffers) {
                                                static_cast<int>(CAPIO_FD_IN), 9UL));
 }
 
+TEST_F(CopyFileRangeUtilsTest, onServerAsksUntilTheEndOfTheInput) {
+    CPCopyFileRangeEnd_t in, out;
+    in.fd        = CAPIO_FD_IN;
+    in.position  = 2;
+    out.fd       = CAPIO_FD_OUT;
+    out.position = 5;
+    // the server copies 4 bytes, then 3, then reaches the end of the input
+    server_replies({4, 3, 0});
+
+    EXPECT_EQ(capio_copy_file_range_on_server(in, out, 100, tid), 7);
+    EXPECT_EQ(in.position, 9);
+    EXPECT_EQ(out.position, 12);
+
+    // each request starts where the previous one stopped
+    ASSERT_EQ(pending_requests(), 3);
+    const char *format = "%04d %ld %d %d %ld %ld %ld";
+    const int fd_in = CAPIO_FD_IN, fd_out = CAPIO_FD_OUT;
+    EXPECT_EQ(next_request(), expected_request(format, CAPIO_REQUEST_COPY_FILE_RANGE, tid, fd_in,
+                                               fd_out, 2L, 5L, 100L));
+    EXPECT_EQ(next_request(), expected_request(format, CAPIO_REQUEST_COPY_FILE_RANGE, tid, fd_in,
+                                               fd_out, 6L, 9L, 96L));
+    EXPECT_EQ(next_request(), expected_request(format, CAPIO_REQUEST_COPY_FILE_RANGE, tid, fd_in,
+                                               fd_out, 9L, 12L, 93L));
+}
+
+TEST_F(CopyFileRangeUtilsTest, onServerStopsAtTheCount) {
+    CPCopyFileRangeEnd_t in, out;
+    in.fd  = CAPIO_FD_IN;
+    out.fd = CAPIO_FD_OUT;
+    server_replies({4, 4});
+
+    EXPECT_EQ(capio_copy_file_range_on_server(in, out, 8, tid), 8);
+    EXPECT_EQ(pending_requests(), 2);
+}
+
 TEST_F(CopyFileRangeUtilsTest, finishOfACapioEnd) {
     capio_fd(CAPIO_FD_IN, "/capio/in", 3);
     capio_fd(CAPIO_FD_OUT, "/capio/out", 0);

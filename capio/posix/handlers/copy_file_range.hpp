@@ -107,7 +107,9 @@ inline off64_t capio_copy_file_range(const int fd_in, loff_t *off_in, const int 
     const auto count = static_cast<off64_t>(std::min<size_t>(len, capio_max_rw_count()));
 
     off64_t error        = 0;
-    const off64_t copied = capio_copy_file_range_through_buffer(in, out, count, error, tid);
+    const off64_t copied = in.is_capio && out.is_capio
+                               ? capio_copy_file_range_on_server(in, out, count, tid)
+                               : capio_copy_file_range_through_buffer(in, out, count, error, tid);
     LOG("copied %ld bytes", copied);
 
     // when the two ends share the descriptor offset, the end without an offset passed by the caller

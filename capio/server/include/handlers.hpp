@@ -7,6 +7,7 @@
 #include "handlers/access.hpp"
 #include "handlers/clone.hpp"
 #include "handlers/close.hpp"
+#include "handlers/copy_file_range.hpp"
 #include "handlers/dup.hpp"
 #include "handlers/exig.hpp"
 #include "handlers/getdents.hpp"
