@@ -2,6 +2,7 @@
 #define CAPIO_REMOTE_REQUESTS_HPP
 
 #include "storage/manager.hpp"
+#include "utils/runtime_configuration.hpp"
 
 extern StorageManager *storage_manager;
 extern Backend *backend;
@@ -17,6 +18,12 @@ inline void serve_remote_stat_request(const std::filesystem::path &path, int sou
             source_tid, file_size, is_dir);
 
     backend->send_request(message.get(), size + 1, dest);
+}
+
+inline off64_t remote_reply_size(const CapioFile &c_file, const off64_t offset) {
+    const off64_t nbytes             = std::max<off64_t>(0, c_file.getStoredSize() - offset);
+    const off64_t prefetch_data_size = RuntimeConfiguration::get().getPrefetchDataSize();
+    return prefetch_data_size != 0 && nbytes > prefetch_data_size ? prefetch_data_size : nbytes;
 }
 
 inline void serve_remote_read_request(int tid, int fd, int count, long int nbytes,
