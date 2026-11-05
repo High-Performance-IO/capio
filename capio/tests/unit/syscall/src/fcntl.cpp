@@ -94,7 +94,7 @@ TEST(SystemCallTest, TestFcntlSetflKeepsTheAccessMode) {
 
 TEST(SystemCallTest, TestFcntlLocksAreGranted) {
     auto fd = open("test.txt", O_CREAT | O_RDWR, 0777);
-    struct flock lock {};
+    struct flock lock{};
     lock.l_type   = F_WRLCK;
     lock.l_whence = SEEK_SET;
     EXPECT_EQ(fcntl(fd, F_SETLK, &lock), 0);
@@ -115,7 +115,7 @@ TEST(SystemCallTest, TestFcntlLocksAreGranted) {
 
 TEST(SystemCallTest, TestFcntlLockNeedsTheMatchingAccessMode) {
     auto fd = open("test.txt", O_CREAT | O_RDONLY, 0777);
-    struct flock lock {};
+    struct flock lock{};
     lock.l_type   = F_WRLCK;
     lock.l_whence = SEEK_SET;
     EXPECT_EQ(fcntl(fd, F_SETLK, &lock), -1);
@@ -128,7 +128,7 @@ TEST(SystemCallTest, TestFcntlLockNeedsTheMatchingAccessMode) {
 
 TEST(SystemCallTest, TestFcntlOpenFileDescriptionLocks) {
     auto fd = open("test.txt", O_CREAT | O_RDWR, 0777);
-    struct flock lock {};
+    struct flock lock{};
     lock.l_type   = F_WRLCK;
     lock.l_whence = SEEK_SET;
     EXPECT_EQ(fcntl(fd, F_OFD_SETLK, &lock), 0);
@@ -148,7 +148,7 @@ TEST(SystemCallTest, TestFcntlOwnerAndSignal) {
     EXPECT_EQ(fcntl(fd, F_GETOWN), getpid());
     EXPECT_EQ(fcntl(fd, F_SETSIG, SIGUSR1), 0);
     EXPECT_EQ(fcntl(fd, F_GETSIG), SIGUSR1);
-    struct f_owner_ex owner {};
+    struct f_owner_ex owner{};
     EXPECT_EQ(fcntl(fd, F_GETOWN_EX, &owner), 0);
     EXPECT_EQ(owner.pid, getpid());
     EXPECT_EQ(close(fd), 0);
