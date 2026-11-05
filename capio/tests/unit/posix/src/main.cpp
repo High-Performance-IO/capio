@@ -1,6 +1,7 @@
 #include <gtest/gtest.h>
 
 #include "broadcast_flush.hpp"
+#include "copy_file_range.hpp"
 #include "realpath.hpp"
 #include "write_read_cache.hpp"
 

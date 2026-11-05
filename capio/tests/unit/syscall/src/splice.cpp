@@ -5,8 +5,8 @@
 #include <sys/sendfile.h>
 #include <unistd.h>
 
-// splice, copy_file_range and sendfile would move the data past CAPIO, so they fail on a CAPIO file
-// and copy tools fall back to read and write.
+// splice and sendfile would move the data past CAPIO, so they fail on a CAPIO file and copy tools
+// fall back to read and write. copy_file_range is done by CAPIO: see copy_file_range.cpp.
 
 TEST(SystemCallTest, TestSpliceIntoACapioFileFailsWithEinval) {
     int pipe_fds[2];
@@ -39,20 +39,6 @@ TEST(SystemCallTest, TestSpliceFromACapioFileFailsWithEinval) {
     EXPECT_EQ(close(pipe_fds[0]), 0);
     EXPECT_EQ(close(pipe_fds[1]), 0);
     EXPECT_EQ(unlink("test.txt"), 0);
-}
-
-TEST(SystemCallTest, TestCopyFileRangeOnCapioFilesFailsWithEinval) {
-    auto in = open("in.txt", O_CREAT | O_RDWR, 0777);
-    EXPECT_EQ(write(in, "abcd", 4), 4);
-    EXPECT_EQ(lseek(in, 0, SEEK_SET), 0);
-    auto out = open("out.txt", O_CREAT | O_WRONLY, 0777);
-    EXPECT_EQ(copy_file_range(in, nullptr, out, nullptr, 4, 0), -1);
-    EXPECT_EQ(errno, EINVAL);
-    EXPECT_EQ(lseek(in, 0, SEEK_CUR), 0);
-    EXPECT_EQ(close(out), 0);
-    EXPECT_EQ(close(in), 0);
-    EXPECT_EQ(unlink("out.txt"), 0);
-    EXPECT_EQ(unlink("in.txt"), 0);
 }
 
 TEST(SystemCallTest, TestSendfileFromACapioFileFailsWithEinval) {
