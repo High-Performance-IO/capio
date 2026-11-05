@@ -77,4 +77,43 @@ inline void handle_remote_read_request(int tid, int fd, off64_t count, bool is_g
     backend->send_request(message.get(), size + 1, dest);
 }
 
+inline void handle_remote_copy_file_range_request(const int tid, const int fd_in, const int fd_out,
+                                                  const std::filesystem::path &path_in,
+                                                  const off64_t offset_in, const off64_t offset_out,
+                                                  const off64_t count) {
+    START_LOG(gettid(), "call(tid=%d, fd_in=%d, fd_out=%d, path_in=%s, offset_in=%ld, count=%ld)",
+              tid, fd_in, fd_out, path_in.c_str(), offset_in, count);
+
+    const std::string dest   = std::get<0>(get_file_location(path_in));
+    const char *const format = "%04d %s %d %d %d %ld %ld %ld";
+    const int size           = snprintf(nullptr, 0, format, CAPIO_SERVER_REQUEST_COPY_FILE_RANGE,
+                                        path_in.c_str(), tid, fd_in, fd_out, offset_in, offset_out, count);
+    const std::unique_ptr<char[]> message(new char[size + 1]);
+    sprintf(message.get(), format, CAPIO_SERVER_REQUEST_COPY_FILE_RANGE, path_in.c_str(), tid,
+            fd_in, fd_out, offset_in, offset_out, count);
+
+    LOG("destination=%s, message=%s", dest.c_str(), message.get());
+    backend->send_request(message.get(), size + 1, dest);
+}
+
+inline void serve_remote_copy_file_range_request(const int tid, const int fd_in, const int fd_out,
+                                                 const off64_t offset_in, const off64_t offset_out,
+                                                 const off64_t count, const off64_t nbytes,
+                                                 const off64_t file_size, const bool complete,
+                                                 const std::string &dest, char *data) {
+    START_LOG(gettid(), "call(tid=%d, offset_in=%ld, nbytes=%ld, dest=%s)", tid, offset_in, nbytes,
+              dest.c_str());
+
+    const char *const format = "%04d %d %d %d %ld %ld %ld %ld %ld %d";
+    const int size =
+        snprintf(nullptr, 0, format, CAPIO_SERVER_REQUEST_COPY_FILE_RANGE_REPLY, tid, fd_in, fd_out,
+                 offset_in, offset_out, count, nbytes, file_size, complete);
+    const std::unique_ptr<char[]> message(new char[size + 1]);
+    sprintf(message.get(), format, CAPIO_SERVER_REQUEST_COPY_FILE_RANGE_REPLY, tid, fd_in, fd_out,
+            offset_in, offset_out, count, nbytes, file_size, complete);
+
+    LOG("Message = %s", message.get());
+    backend->send_file(message.get(), size + 1, data, nbytes, dest);
+}
+
 #endif // CAPIO_REMOTE_REQUESTS_HPP

@@ -39,12 +39,14 @@
         "outfile_*.dat"
       ],
       "output_stream": [
-        "result.dat"
+        "result.dat",
+        "result_copy.dat"
       ],
       "streaming": [
         {
           "name": [
-            "result.dat"
+            "result.dat",
+            "result_copy.dat"
           ],
           "committed": "on_close"
         }

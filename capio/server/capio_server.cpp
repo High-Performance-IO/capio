@@ -60,6 +60,7 @@ static constexpr std::array<CSHandler_t, CAPIO_NR_REQUESTS> build_request_handle
     _request_handlers[CAPIO_REQUEST_ACCESS]              = access_handler;
     _request_handlers[CAPIO_REQUEST_CLONE]               = clone_handler;
     _request_handlers[CAPIO_REQUEST_CLOSE]               = close_handler;
+    _request_handlers[CAPIO_REQUEST_COPY_FILE_RANGE]     = copy_file_range_handler;
     _request_handlers[CAPIO_REQUEST_CREATE]              = create_handler;
     _request_handlers[CAPIO_REQUEST_CREATE_EXCLUSIVE]    = create_exclusive_handler;
     _request_handlers[CAPIO_REQUEST_DUP]                 = dup_handler;

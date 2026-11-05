@@ -7,6 +7,7 @@
 #include "common/constants.hpp"
 #include "remote/backend.hpp"
 #include "remote/backend/include.hpp"
+#include "remote/handlers/copy_file_range.hpp"
 #include "remote/handlers/read.hpp"
 #include "remote/handlers/stat.hpp"
 #include "utils/runtime_configuration.hpp"
@@ -20,10 +21,13 @@ static constexpr std::array<CComsHandler_t, CAPIO_SERVER_NR_REQUEST>
 build_server_request_handlers_table() {
     std::array<CComsHandler_t, CAPIO_SERVER_NR_REQUEST> _server_request_handlers{0};
 
-    _server_request_handlers[CAPIO_SERVER_REQUEST_READ]       = remote_read_handler;
-    _server_request_handlers[CAPIO_SERVER_REQUEST_READ_REPLY] = remote_read_reply_handler;
-    _server_request_handlers[CAPIO_SERVER_REQUEST_STAT]       = remote_stat_handler;
-    _server_request_handlers[CAPIO_SERVER_REQUEST_STAT_REPLY] = remote_stat_reply_handler;
+    _server_request_handlers[CAPIO_SERVER_REQUEST_READ]            = remote_read_handler;
+    _server_request_handlers[CAPIO_SERVER_REQUEST_READ_REPLY]      = remote_read_reply_handler;
+    _server_request_handlers[CAPIO_SERVER_REQUEST_STAT]            = remote_stat_handler;
+    _server_request_handlers[CAPIO_SERVER_REQUEST_STAT_REPLY]      = remote_stat_reply_handler;
+    _server_request_handlers[CAPIO_SERVER_REQUEST_COPY_FILE_RANGE] = remote_copy_file_range_handler;
+    _server_request_handlers[CAPIO_SERVER_REQUEST_COPY_FILE_RANGE_REPLY] =
+        remote_copy_file_range_reply_handler;
 
     return _server_request_handlers;
 }

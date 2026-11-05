@@ -25,16 +25,19 @@ constexpr const int CAPIO_REQUEST_STAT                = 20;
 constexpr const int CAPIO_REQUEST_UNLINK              = 21;
 constexpr const int CAPIO_REQUEST_WRITE               = 22;
 constexpr const int CAPIO_REQUEST_RMDIR               = 23;
+constexpr const int CAPIO_REQUEST_COPY_FILE_RANGE     = 24;
 
-constexpr const int CAPIO_NR_REQUESTS = 24;
+constexpr const int CAPIO_NR_REQUESTS = 25;
 
 /*REQUESTS FOR SERVER TO SERVER COMMUNICATION*/
 
-constexpr const int CAPIO_SERVER_REQUEST_READ       = 0;
-constexpr const int CAPIO_SERVER_REQUEST_READ_REPLY = 1;
-constexpr const int CAPIO_SERVER_REQUEST_STAT       = 2;
-constexpr const int CAPIO_SERVER_REQUEST_STAT_REPLY = 3;
+constexpr const int CAPIO_SERVER_REQUEST_READ                  = 0;
+constexpr const int CAPIO_SERVER_REQUEST_READ_REPLY            = 1;
+constexpr const int CAPIO_SERVER_REQUEST_STAT                  = 2;
+constexpr const int CAPIO_SERVER_REQUEST_STAT_REPLY            = 3;
+constexpr const int CAPIO_SERVER_REQUEST_COPY_FILE_RANGE       = 4;
+constexpr const int CAPIO_SERVER_REQUEST_COPY_FILE_RANGE_REPLY = 5;
 
-constexpr const int CAPIO_SERVER_NR_REQUEST = 4;
+constexpr const int CAPIO_SERVER_NR_REQUEST = 6;
 
 #endif // CAPIO_COMMON_REQUESTS_HPP
