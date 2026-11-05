@@ -12,6 +12,7 @@
 #include "storage/capio_file.hpp"
 #include "storage/manager.hpp"
 #include "utils/location.hpp"
+#include "utils/types.hpp"
 
 extern ClientManager *client_manager;
 extern StorageManager *storage_manager;
@@ -113,6 +114,37 @@ inline void register_written_data(const int tid, const std::filesystem::path &pa
         // TODO: it works only if there is one prod per file
         storage_manager->updateDirectory(tid, path);
     }
+}
+
+/**
+ * Copy the data the input holds at the position of @p copy, up to its count, and reply to the
+ * client with the number of bytes copied, 0 at the end of the input. The caller has already waited
+ * for the data, as a read would.
+ *
+ * @param copy
+ */
+inline void copy_file_range_data(const CSCopyFileRange_t &copy) {
+    START_LOG(gettid(), "call(tid=%d, path_in=%s, path_out=%s, offset_in=%ld, count=%ld)", copy.tid,
+              copy.path_in.c_str(), copy.path_out.c_str(), copy.offset_in, copy.count);
+
+    const CapioFile &c_file_in  = storage_manager->get(copy.path_in);
+    const off64_t end_of_sector = c_file_in.getSectorEnd(copy.offset_in);
+    const off64_t bytes_copied  = end_of_sector == CAPIO_SECTOR_NOT_FOUND
+                                      ? 0
+                                      : std::min(copy.count, end_of_sector - copy.offset_in);
+
+    if (bytes_copied > 0) {
+        CapioFile &c_file_out      = storage_manager->get(copy.path_out);
+        const off64_t end_of_write = copy.offset_out + bytes_copied;
+        c_file_out.createBuffer(copy.path_out, true);
+        if (end_of_write > c_file_out.getBufSize()) {
+            c_file_out.expandBuffer(end_of_write);
+        }
+        c_file_out.copyFromFile(c_file_in, copy.offset_in, copy.offset_out, bytes_copied);
+        register_written_data(copy.tid, copy.path_out, c_file_out, copy.offset_out, end_of_write);
+    }
+    LOG("copied %ld bytes", bytes_copied);
+    client_manager->replyToClient(copy.tid, bytes_copied);
 }
 
 #endif // CAPIO_SERVER_UTILS_COMMON_HPP

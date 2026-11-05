@@ -211,7 +211,43 @@ inline void capio_copy_file_range_finish(CPCopyFileRangeEnd_t &end, const off64_
 }
 
 /**
- * Copy @count bytes from @in to @out, at least one of them a CAPIO descriptor, through a buffer of
+ * Copy @count bytes between two CAPIO descriptors on the server: the server copies the data from
+ * one file to the other, and the data never comes to the client. The server copies up to the end
+ * of the data that follows the input position at each request, so the client asks until @count
+ * bytes are copied or the input ends.
+ *
+ * @param in
+ * @param out
+ * @param count
+ * @param tid
+ * @return the number of bytes copied
+ */
+inline off64_t capio_copy_file_range_on_server(CPCopyFileRangeEnd_t &in, CPCopyFileRangeEnd_t &out,
+                                               const off64_t count, const long tid) {
+    START_LOG(tid, "call(fd_in=%d, fd_out=%d, count=%ld)", in.fd, out.fd, count);
+
+    // the server copies the data it holds: the data this thread wrote must reach it first, and the
+    // read cache must not keep data of the output that the copy changes
+    write_cache->flush();
+    read_cache->flush();
+
+    off64_t copied = 0;
+    while (copied < count) {
+        const off64_t bytes_copied =
+            copy_file_range_request(in.fd, out.fd, in.position, out.position, count - copied, tid);
+        if (bytes_copied == 0) {
+            LOG("end of fd_in reached");
+            break;
+        }
+        copied += bytes_copied;
+        in.position += bytes_copied;
+        out.position += bytes_copied;
+    }
+    return copied;
+}
+
+/**
+ * Copy @count bytes between a CAPIO descriptor and a descriptor of the kernel, through a buffer of
  * one CAPIO cache line: each chunk is read from @in and written to @out, until @count bytes are
  * copied, the input ends, or a read or a write fails. A chunk of one line fills one line of the
  * read cache and one line of the write cache, as a read and write loop of the same size would.
@@ -369,7 +405,9 @@ inline off64_t capio_copy_file_range(const int fd_in, loff_t *off_in, const int 
     const auto count = static_cast<off64_t>(std::min<size_t>(len, capio_max_rw_count()));
 
     off64_t error        = 0;
-    const off64_t copied = capio_copy_file_range_through_buffer(in, out, count, error, tid);
+    const off64_t copied = in.is_capio && out.is_capio
+                               ? capio_copy_file_range_on_server(in, out, count, tid)
+                               : capio_copy_file_range_through_buffer(in, out, count, error, tid);
     LOG("copied %ld bytes", copied);
 
     // when the two ends share the descriptor offset, the end without an offset passed by the caller
