@@ -15,12 +15,13 @@ constexpr off64_t CAPIO_DEFAULT_FILE_INITIAL_SIZE = 1024L * 1024 * 1024 * 4;
 constexpr char CAPIO_MCAST_ADV_DEFAULT_ADDR[]       = "224.0.0.2";
 constexpr unsigned int CAPIO_MCAST_ADV_DEFAULT_PORT = 22334;
 constexpr char CAPIO_MTCL_DEFAULT_PROTOCOL[]        = "TCP";
-constexpr char CAPIO_MTCL_DEFAULT_PORT[]            = "7600";
+constexpr int CAPIO_MTCL_DEFAULT_PORT               = 7600;
 constexpr int CAPIO_MTCL_DEFAULT_POLL_INTERVAL      = 1000000;
 
 // CAPIO available discovery service
-constexpr char CAPIO_MCAST_PROTO_FLAG[] = "mcast";
-constexpr char CAPIO_FS_PROTO_FLAG[]    = "fs";
+constexpr char CAPIO_MCAST_PROTO_FLAG[]           = "mcast";
+constexpr char CAPIO_FS_PROTO_FLAG[]              = "fs";
+constexpr char CAPIO_FS_DEFAULT_TOKEN_DIRECTORY[] = ".capio_tokens/";
 
 // CAPIO default values for shared memory
 constexpr char CAPIO_DEFAULT_WORKFLOW_NAME[] = "CAPIO";

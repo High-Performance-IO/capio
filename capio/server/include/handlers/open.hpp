@@ -2,6 +2,7 @@
 #define CAPIO_SERVER_HANDLERS_OPEN_HPP
 
 #include "utils/location.hpp"
+#include "utils/runtime_configuration.hpp"
 
 extern ClientManager *client_manager;
 extern StorageManager *storage_manager;
@@ -13,9 +14,11 @@ inline void update_file_metadata(const std::filesystem::path &path, int tid, int
 
     // TODO: check the size that the user wrote in the configuration file
     //*caching_info[tid].second += 2;
-    auto c_file_opt   = storage_manager->tryGet(path);
-    CapioFile &c_file = (c_file_opt) ? c_file_opt->get()
-                                     : storage_manager->add(path, false, get_file_initial_size());
+    auto c_file_opt = storage_manager->tryGet(path);
+    CapioFile &c_file =
+        (c_file_opt)
+            ? c_file_opt->get()
+            : storage_manager->add(path, false, RuntimeConfiguration::get().getFileInitialSize());
     storage_manager->addFileToTid(tid, fd, path, offset);
 
     if (c_file.isFirstWrite() && is_creat) {
