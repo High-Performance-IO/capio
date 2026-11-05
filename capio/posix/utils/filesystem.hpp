@@ -117,13 +117,11 @@ inline void add_capio_fd(long tid, const std::string &path, int fd, off64_t offs
 }
 
 /**
- * Compute the absolute path for @pathname
- * @param pathname
+ * Compute the absolute path for @path.  The form in which CAPIO registers a path: "d/.", "d/" and
+ * "d/x/.." all name the directory that mkdir registered as "d", as realpath would return for a path
+ * on disk.
+ * @param path
  * @return
- */
-/**
- * The form in which CAPIO registers a path: "d/.", "d/" and "d/x/.." all name the directory
- * that mkdir registered as "d", as realpath would return for a path on disk.
  */
 inline std::filesystem::path capio_normal_path(const std::filesystem::path &path) {
     auto normal = path.lexically_normal().native();
