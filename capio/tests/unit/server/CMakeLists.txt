@@ -15,13 +15,13 @@ if (NOT MPI_CXX_FOUND)
 endif ()
 
 file(GLOB_RECURSE TARGET_TEST_SOURCE
-    "${CMAKE_CURRENT_SOURCE_DIR}/**/*.cpp"
+        "${CMAKE_CURRENT_SOURCE_DIR}/**/*.cpp"
 )
 
 #####################################
 # Target definition
 #####################################
-add_executable(${TARGET_NAME} ${TARGET_TEST_SOURCE} ${SERVER_SOURCES} )
+add_executable(${TARGET_NAME} ${TARGET_TEST_SOURCE} ${SERVER_SOURCES})
 
 #####################################
 # Include files and directories

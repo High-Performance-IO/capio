@@ -31,9 +31,10 @@ inline int capio_openat(int dirfd, const std::string_view &pathname, int flags, 
                 return CAPIO_POSIX_SYSCALL_REQUEST_SKIP;
             }
 
-            path = (dir_path / path).lexically_normal();
+            path = dir_path / path;
         }
     }
+    path = capio_normal_path(path);
 
     if (is_capio_path(path)) {
         int fd =

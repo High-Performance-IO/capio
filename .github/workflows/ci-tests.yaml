@@ -90,7 +90,7 @@ jobs:
         with:
           source: ${{matrix.path}}
           extensions: 'h,cpp,c,hpp'
-          clangFormatVersion: 16
+          clangFormatVersion: 19
   unit-tests:
     name: "Build ${{ matrix.build_type }} with ${{ matrix.compiler }}"
     runs-on: ubuntu-24.04

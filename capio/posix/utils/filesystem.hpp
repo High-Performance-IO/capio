@@ -33,7 +33,7 @@ inline bool in_dir(const std::string &path, const std::string &glob) {
 inline bool is_directory(int dirfd) {
     START_LOG(capio_syscall(SYS_gettid), "call(dirfd=%d)", dirfd);
 
-    struct stat path_stat {};
+    struct stat path_stat{};
     int tmp = fstat(dirfd, &path_stat);
     if (tmp != 0) {
         LOG("Error at is_directory(dirfd=%d) -> %d: %d (%s)", dirfd, tmp, errno,
@@ -117,10 +117,20 @@ inline void add_capio_fd(long tid, const std::string &path, int fd, off64_t offs
 }
 
 /**
- * Compute the absolute path for @pathname
- * @param pathname
+ * Compute the absolute path for @path.  The form in which CAPIO registers a path: "d/.", "d/" and
+ * "d/x/.." all name the directory that mkdir registered as "d", as realpath would return for a path
+ * on disk.
+ * @param path
  * @return
  */
+inline std::filesystem::path capio_normal_path(const std::filesystem::path &path) {
+    auto normal = path.lexically_normal().native();
+    while (normal.size() > 1 && normal.back() == '/') {
+        normal.pop_back();
+    }
+    return {normal};
+}
+
 std::filesystem::path capio_posix_realpath(const std::filesystem::path &pathname) {
     START_LOG(syscall_no_intercept(SYS_gettid), "call(path=%s)", pathname.c_str());
     char *posix_real_path = capio_realpath((char *) pathname.c_str(), nullptr);
@@ -131,9 +141,9 @@ std::filesystem::path capio_posix_realpath(const std::filesystem::path &pathname
 
         if (pathname.is_absolute()) {
             LOG("Path=%s is already absolute", pathname.c_str());
-            return {pathname};
+            return capio_normal_path(pathname);
         } else {
-            std::filesystem::path new_path = (*current_dir / pathname).lexically_normal();
+            std::filesystem::path new_path = capio_normal_path(*current_dir / pathname);
             if (is_capio_path(new_path)) {
                 LOG("Computed absolute path = %s", new_path.c_str());
                 return new_path;
@@ -156,7 +166,7 @@ std::filesystem::path capio_posix_realpath(const std::filesystem::path &pathname
  * @return
  */
 inline std::filesystem::path capio_absolute(const std::filesystem::path &path) {
-    return path.is_absolute() ? path : capio_posix_realpath(path);
+    return path.is_absolute() ? capio_normal_path(path) : capio_posix_realpath(path);
 }
 
 /**

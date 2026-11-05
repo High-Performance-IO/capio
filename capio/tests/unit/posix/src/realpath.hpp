@@ -18,6 +18,17 @@ class RealpathPosixTest : public testing::Test {
     static void TearDownTestSuite() { destroy_filesystem(); }
 };
 
+// CAPIO registers a directory as mkdir names it, without "." or a trailing slash, as realpath
+// would: every other spelling of the same path must reach the same entry.
+TEST_F(RealpathPosixTest, TestNormalPathDropsDotsAndTrailingSlashes) {
+    EXPECT_EQ(capio_normal_path("/capio/d/."), "/capio/d");
+    EXPECT_EQ(capio_normal_path("/capio/d/"), "/capio/d");
+    EXPECT_EQ(capio_normal_path("/capio/d//"), "/capio/d");
+    EXPECT_EQ(capio_normal_path("/capio/d/x/.."), "/capio/d");
+    EXPECT_EQ(capio_normal_path("/capio/./d"), "/capio/d");
+    EXPECT_EQ(capio_normal_path("/"), "/");
+}
+
 TEST_F(RealpathPosixTest, TestAbsolutePathsInCapioDirWhenPathExists) {
     const std::filesystem::path PATHNAME = get_capio_dir() / "test";
     EXPECT_NE(mkdir(PATHNAME.c_str(), S_IRWXU), -1);
