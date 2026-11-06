@@ -3,11 +3,13 @@
 
 #include <condition_variable>
 #include <unordered_map>
+#include <unordered_set>
 #include <vector>
 
 #include "calf/StlLogger.h"
 
 #include "common/queue.hpp"
+
 /**
  * @brief Class to handle libcapio_posix clients applications
  */
@@ -48,14 +50,15 @@ class ClientManager {
     /**
      * Files that are produced by a given pid. Used for Commit On Termination fallback rule
      */
-    mutable std::unordered_map<pid_t, std::vector<std::string>> files_created_by_producer;
+    mutable std::unordered_map<pid_t, std::unordered_set<std::string>> files_created_by_producer;
 
     /**
      * Files that are produced by a given app_name. Used to non block execution of multithreaded
      * applications with same app name when doing IO operations on files, and for
      * Commit On Termination fallback rule
      */
-    mutable std::unordered_map<std::string, std::vector<std::string>> files_created_by_app_name;
+    mutable std::unordered_map<std::string, std::unordered_set<std::string>>
+        files_created_by_app_name;
 
   public:
     ClientManager();
@@ -128,7 +131,7 @@ class ClientManager {
      * @param tid
      * @return auto
      */
-    [[nodiscard]] const std::vector<std::string> &getProducedFiles(pid_t tid) const;
+    [[nodiscard]] const std::unordered_set<std::string> &getProducedFiles(pid_t tid) const;
 
     /**
      * @brief Get the app name given a process pid

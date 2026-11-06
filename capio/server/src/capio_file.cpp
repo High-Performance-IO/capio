@@ -155,7 +155,7 @@ off64_t CapioFile::getSectorEnd(off64_t offset) const {
     const shared_lock_guard slg(_mutex_sectors);
 
     if (_sectors.empty()) {
-        return -1;
+        return CAPIO_SECTOR_NOT_FOUND;
     }
 
     if (auto it = _sectors.upper_bound(std::make_pair(offset, 0)); it != _sectors.begin()) {
@@ -165,7 +165,7 @@ off64_t CapioFile::getSectorEnd(off64_t offset) const {
         }
     }
 
-    return -1;
+    return CAPIO_SECTOR_NOT_FOUND;
 }
 // TODO: This is a memory leak that may lead to race conditions. remove exposure of internal buffer
 const std::set<std::pair<off64_t, off64_t>, CapioFile::compareSectors> &
@@ -180,33 +180,39 @@ off64_t CapioFile::getStoredSize() const {
 
 void CapioFile::insertSector(off64_t new_start, off64_t new_end) {
     START_LOG(gettid(), "call(new_start=%ld, new_end=%ld)", new_start, new_end);
-    std::lock_guard lock(_mutex_sectors);
+    {
+        std::lock_guard lock(_mutex_sectors);
 
-    // First sector whose start >= new_start
-    auto it_start = _sectors.lower_bound({new_start, LLONG_MIN});
+        // First sector whose start >= new_start
+        auto it_start = _sectors.lower_bound({new_start, LLONG_MIN});
 
-    // Check if the previous sector reaches into our range
-    if (it_start != _sectors.begin()) {
-        if (const auto it_prev = std::prev(it_start); it_prev->second >= new_start) {
-            new_start = it_prev->first;
-            new_end   = std::max(new_end, it_prev->second);
-            it_start  = it_prev;
+        // Check if the previous sector reaches into our range
+        if (it_start != _sectors.begin()) {
+            if (const auto it_prev = std::prev(it_start); it_prev->second >= new_start) {
+                new_start = it_prev->first;
+                new_end   = std::max(new_end, it_prev->second);
+                it_start  = it_prev;
+            }
         }
+
+        // First sector whose start > new_end (adjacent sectors included via +1)
+        const auto it_end = _sectors.upper_bound({new_end + 1, LLONG_MIN});
+
+        // Absorb the right edge of the last overlapping sector if needed
+        if (it_end != _sectors.begin()) {
+            if (const auto it_last = std::prev(it_end); it_last->second > new_end) {
+                new_end = it_last->second;
+            }
+        }
+
+        _sectors.erase(it_start, it_end);
+        LOG("Insert sector <%ld, %ld>", new_start, new_end);
+        _sectors.emplace(new_start, new_end);
     }
 
-    // First sector whose start > new_end (adjacent sectors included via +1)
-    const auto it_end = _sectors.upper_bound({new_end + 1, LLONG_MIN});
-
-    // Absorb the right edge of the last overlapping sector if needed
-    if (it_end != _sectors.begin()) {
-        if (const auto it_last = std::prev(it_end); it_last->second > new_end) {
-            new_end = it_last->second;
-        }
-    }
-
-    _sectors.erase(it_start, it_end);
-    LOG("Insert sector <%ld, %ld>", new_start, new_end);
-    _sectors.emplace(new_start, new_end);
+    // wake threads waiting for new data
+    std::lock_guard lock(_mutex);
+    _data_avail_cv.notify_all();
 }
 
 bool CapioFile::closed() const {
@@ -284,7 +290,6 @@ void CapioFile::removeFd(int tid, int fd) {
 void CapioFile::readFromNode(const std::string &dest, off64_t offset, off64_t buffer_size) const {
     std::lock_guard lock(_mutex);
     backend->recv_file(getBuffer() + offset, buffer_size, dest);
-    _data_avail_cv.notify_all();
 }
 
 void CapioFile::readFromQueue(SPSCQueue &queue, size_t offset, long int num_bytes) const {
@@ -292,7 +297,20 @@ void CapioFile::readFromQueue(SPSCQueue &queue, size_t offset, long int num_byte
 
     std::lock_guard lock(_mutex);
     queue.read(getBuffer() + offset, num_bytes);
-    _data_avail_cv.notify_all();
+}
+
+void CapioFile::copyFromFile(const CapioFile &src, const off64_t src_offset,
+                             const off64_t dst_offset, const off64_t num_bytes) const {
+    START_LOG(gettid(), "call(src_offset=%ld, dst_offset=%ld, num_bytes=%ld)", src_offset,
+              dst_offset, num_bytes);
+
+    if (&src == this) {
+        std::lock_guard lock(_mutex);
+        memmove(getBuffer() + dst_offset, getBuffer() + src_offset, num_bytes);
+        return;
+    }
+    std::scoped_lock lock(_mutex, src._mutex);
+    memcpy(getBuffer() + dst_offset, src.getBuffer() + src_offset, num_bytes);
 }
 
 off64_t CapioFile::_getStoredSize() const {

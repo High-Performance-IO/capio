@@ -16,10 +16,11 @@ inline thread_local CircularBuffer<off_t> *buff_response;
  * @return
  */
 inline void init_client(const long tid) {
-    buff_response = new CircularBuffer<off_t>(SHM_COMM_CHAN_NAME_RESP + std::to_string(tid),
-                                              CAPIO_REQ_BUFF_CNT, sizeof(off_t));
-    buf_requests =
-        new CircularBuffer<char>(SHM_COMM_CHAN_NAME, CAPIO_REQ_BUFF_CNT, CAPIO_REQ_MAX_SIZE);
+    buff_response =
+        new CircularBuffer<off_t>(SHM_COMM_CHAN_NAME_RESP + std::to_string(tid), CAPIO_REQ_BUFF_CNT,
+                                  sizeof(off_t), get_capio_workflow_name());
+    buf_requests = new CircularBuffer<char>(SHM_COMM_CHAN_NAME, CAPIO_REQ_BUFF_CNT,
+                                            CAPIO_REQ_MAX_SIZE, get_capio_workflow_name());
 }
 
 inline off64_t access_request(const std::filesystem::path &path, const long tid) {
@@ -172,6 +173,37 @@ inline off64_t open_request(const int fd, const std::filesystem::path &path, con
     buf_requests->write(req, CAPIO_REQ_MAX_SIZE);
     off64_t res;
     buff_response->read(&res);
+    return res;
+}
+
+/**
+ * Ask the server to copy up to @count bytes from @fd_in at @offset_in to @fd_out at @offset_out,
+ * two CAPIO descriptors. The server copies at most up to the end of the data that follows
+ * @offset_in, and does not move the file offsets of the descriptors.
+ *
+ * @param fd_in
+ * @param fd_out
+ * @param offset_in
+ * @param offset_out
+ * @param count
+ * @param tid
+ * @return the number of bytes copied, 0 at the end of the input, or
+ * CAPIO_POSIX_SYSCALL_REQUEST_SKIP if the server cannot do the copy and the client must do it
+ */
+inline off64_t copy_file_range_request(const int fd_in, const int fd_out, const off64_t offset_in,
+                                       const off64_t offset_out, const off64_t count,
+                                       const long tid) {
+    START_LOG(capio_syscall(SYS_gettid),
+              "call(fd_in=%d, fd_out=%d, offset_in=%ld, offset_out=%ld, count=%ld, tid=%ld)", fd_in,
+              fd_out, offset_in, offset_out, count, tid);
+    char req[CAPIO_REQ_MAX_SIZE];
+    sprintf(req, "%04d %ld %d %d %ld %ld %ld", CAPIO_REQUEST_COPY_FILE_RANGE, tid, fd_in, fd_out,
+            offset_in, offset_out, count);
+    LOG("req=%s", req);
+    buf_requests->write(req, CAPIO_REQ_MAX_SIZE);
+    off64_t res;
+    buff_response->read(&res);
+    LOG("Response to request is %ld", res);
     return res;
 }
 

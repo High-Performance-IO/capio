@@ -3,7 +3,7 @@
   "IO_Graph": [
     {
       "name": "split",
-      "input_stream" : [],
+      "input_stream": [],
       "output_stream": [
         "infile_*.dat"
       ],
@@ -26,7 +26,9 @@
       ],
       "streaming": [
         {
-          "name": ["outfile_*.dat"],
+          "name": [
+            "outfile_*.dat"
+          ],
           "committed": "on_close"
         }
       ]
@@ -36,10 +38,16 @@
       "input_stream": [
         "outfile_*.dat"
       ],
-      "output_stream": ["result.dat"],
+      "output_stream": [
+        "result.dat",
+        "result_copy.dat"
+      ],
       "streaming": [
         {
-          "name": ["result.dat"],
+          "name": [
+            "result.dat",
+            "result_copy.dat"
+          ],
           "committed": "on_close"
         }
       ]

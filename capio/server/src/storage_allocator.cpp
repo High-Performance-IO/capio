@@ -227,7 +227,7 @@ off64_t computeAllocableMemQuota(const off64_t requested_size) {
     LOG("Memory checks disabled for CapioFiles. returning requested size...");
     return requested_size;
 #else
-    const CgroupMem &cg  = cgroup();
+    const CgroupMem &cg = cgroup();
 
 #if defined(CAPIO_MEMORY_CHECKS_FAST)
     const long pages     = sysconf(_SC_AVPHYS_PAGES);

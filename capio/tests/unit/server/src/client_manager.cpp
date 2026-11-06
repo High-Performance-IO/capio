@@ -3,6 +3,7 @@
 #include <gtest/gtest.h>
 
 #include <client-manager/client_manager.hpp>
+#include <utils/capiocl_adapter.hpp>
 
 extern ClientManager *client_manager;
 
@@ -29,7 +30,8 @@ TEST(ClientManagerTestEnvironment, testFailedRequestCode) {
     // in the destructor
     // TODO: change behaviour of ERR_EXIT to not throw exceptions but only print error and continue
     const auto request_queue =
-        new CircularBuffer<char>(SHM_COMM_CHAN_NAME, CAPIO_REQ_BUFF_CNT, CAPIO_REQ_MAX_SIZE);
+        new CircularBuffer<char>(SHM_COMM_CHAN_NAME, CAPIO_REQ_BUFF_CNT, CAPIO_REQ_MAX_SIZE,
+                                 CapioCLEngine::get().getWorkflowName());
 
     char req[CAPIO_REQ_MAX_SIZE], new_req[CAPIO_REQ_MAX_SIZE];
     constexpr int TEST_REQ_CODE = 123;
@@ -57,6 +59,27 @@ TEST(ClientManagerTestEnvironment, testAddAndRemoveProducedFiles) {
 
     client_manager->registerProducedFile(1111, "test1.txt");
     EXPECT_FALSE(client_manager->isProducer(1111, "test1.txt"));
+}
+
+TEST(ClientManagerTestEnvironment, registerProducedFileIsIdempotentPerPath) {
+    const pid_t tid = 2222;
+    client_manager->registerClient(tid, "test_app");
+
+    constexpr int NTIMES = 10000;
+    for (int i = 0; i < NTIMES; ++i) {
+        client_manager->registerProducedFile(tid, "p1_0.dat");
+    }
+
+    // a file written 10000 times must be registered exactly once
+    EXPECT_EQ(client_manager->getProducedFiles(tid).size(), 1u);
+
+    // distinct files are all still registered
+    client_manager->registerProducedFile(tid, "mid_0_0.dat");
+    EXPECT_EQ(client_manager->getProducedFiles(tid).size(), 2u);
+    EXPECT_TRUE(client_manager->isProducer(tid, "p1_0.dat"));
+    EXPECT_TRUE(client_manager->isProducer(tid, "mid_0_0.dat"));
+
+    client_manager->removeClient(tid);
 }
 
 #endif // CAPIO_CLIENT_MANAGER_HPP

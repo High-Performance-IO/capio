@@ -1,9 +1,10 @@
 #ifndef CAPIO_SERVER_HANDLERS_WRITE_HPP
 #define CAPIO_SERVER_HANDLERS_WRITE_HPP
 
+#include "utils/common.hpp"
 #include "utils/location.hpp"
 
-void write_handler(const char *const str) {
+inline void write_handler(const char *const str) {
     std::string request;
     int tid, fd;
     off64_t count;
@@ -24,14 +25,7 @@ void write_handler(const char *const str) {
     }
     c_file.readFromQueue(data_buf, offset, count);
 
-    client_manager->registerProducedFile(tid, path);
-    c_file.insertSector(offset, end_of_write);
-    if (c_file.isFirstWrite()) {
-        c_file.registerFirstWrite();
-        write_file_location(path);
-        // TODO: it works only if there is one prod per file
-        storage_manager->updateDirectory(tid, path);
-    }
+    register_written_data(tid, path, c_file, offset, end_of_write);
     storage_manager->setFileOffset(tid, fd, end_of_write);
 }
 

@@ -4,6 +4,7 @@
 #if defined(SYS_write) || defined(SYS_writev)
 
 #include "utils/common.hpp"
+#include "utils/data.hpp"
 #include "utils/requests.hpp"
 
 inline off64_t capio_write(int fd, const void *buffer, off64_t count, long tid) {
@@ -15,8 +16,7 @@ inline off64_t capio_write(int fd, const void *buffer, off64_t count, long tid) 
                      "SSIZE_MAX yet");
         }
 
-        read_cache->flush();
-        write_cache->write(fd, buffer, count);
+        capio_cached_write(fd, buffer, count);
 
         return count;
     } else {

@@ -11,6 +11,8 @@
 #include "common/dirent.hpp"
 #include "storage/capio_file.hpp"
 #include "storage/manager.hpp"
+#include "utils/location.hpp"
+#include "utils/types.hpp"
 
 extern ClientManager *client_manager;
 extern StorageManager *storage_manager;
@@ -83,6 +85,66 @@ inline bool is_int(const std::string &s) {
         res = *p == 0;
     }
     return res;
+}
+
+/**
+ * Record that @p tid wrote the bytes [@p offset, @p end_of_write) of @p path, once they are in the
+ * buffer of @p c_file: the bytes become readable and wake the readers waiting for them, @p tid
+ * becomes a producer of the file, and the first write publishes the location of the file and adds
+ * it to its directory. Every handler that puts data into a file calls it, as write_handler and
+ * copy_file_range_handler do. It does not move the file offset of the writer.
+ *
+ * @param tid thread that wrote the data
+ * @param path path of the file written
+ * @param c_file the file written, whose buffer already holds the data
+ * @param offset start of the data written
+ * @param end_of_write end of the data written, excluded
+ */
+inline void register_written_data(const int tid, const std::filesystem::path &path,
+                                  CapioFile &c_file, const off64_t offset,
+                                  const off64_t end_of_write) {
+    START_LOG(gettid(), "call(tid=%d, path=%s, offset=%ld, end_of_write=%ld)", tid, path.c_str(),
+              offset, end_of_write);
+
+    client_manager->registerProducedFile(tid, path);
+    c_file.insertSector(offset, end_of_write);
+    if (c_file.isFirstWrite()) {
+        c_file.registerFirstWrite();
+        write_file_location(path);
+        // TODO: it works only if there is one prod per file
+        storage_manager->updateDirectory(tid, path);
+    }
+}
+
+/**
+ * Copy the data the input holds at the position of @p copy, up to its count, and reply to the
+ * client with the number of bytes copied, 0 at the end of the input. The caller has already waited
+ * for the data, as a read would.
+ *
+ * @param copy
+ */
+inline void copy_file_range_data(const CSCopyFileRange_t &copy) {
+    START_LOG(gettid(), "call(tid=%d, path_in=%s, path_out=%s, offset_in=%ld, count=%ld)", copy.tid,
+              copy.path_in.c_str(), copy.path_out.c_str(), copy.offset_in, copy.count);
+
+    const CapioFile &c_file_in  = storage_manager->get(copy.path_in);
+    const off64_t end_of_sector = c_file_in.getSectorEnd(copy.offset_in);
+    const off64_t bytes_copied  = end_of_sector == CAPIO_SECTOR_NOT_FOUND
+                                      ? 0
+                                      : std::min(copy.count, end_of_sector - copy.offset_in);
+
+    if (bytes_copied > 0) {
+        CapioFile &c_file_out      = storage_manager->get(copy.path_out);
+        const off64_t end_of_write = copy.offset_out + bytes_copied;
+        c_file_out.createBuffer(copy.path_out, true);
+        if (end_of_write > c_file_out.getBufSize()) {
+            c_file_out.expandBuffer(end_of_write);
+        }
+        c_file_out.copyFromFile(c_file_in, copy.offset_in, copy.offset_out, bytes_copied);
+        register_written_data(copy.tid, copy.path_out, c_file_out, copy.offset_out, end_of_write);
+    }
+    LOG("copied %ld bytes", bytes_copied);
+    client_manager->replyToClient(copy.tid, bytes_copied);
 }
 
 #endif // CAPIO_SERVER_UTILS_COMMON_HPP

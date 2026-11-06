@@ -13,6 +13,7 @@
 
 #include "calf/StlLogger.h"
 
+#include "common/constants.hpp"
 #include "common/queue.hpp"
 #include "file_buffer.hpp"
 
@@ -194,6 +195,18 @@ class CapioFile {
      */
     void readFromQueue(SPSCQueue &queue, size_t offset, long int num_bytes) const;
 
+    /**
+     * @brief Copies data from the buffer of another file, or of this file, into this file buffer.
+     * The buffer must already hold @p dst_offset + @p num_bytes bytes, and the caller records the
+     * new data with insertSector(), as for readFromQueue().
+     * @param src Source file, which may be this file.
+     * @param src_offset Source offset in @p src.
+     * @param dst_offset Destination offset in this file.
+     * @param num_bytes Number of bytes to copy.
+     */
+    void copyFromFile(const CapioFile &src, off64_t src_offset, off64_t dst_offset,
+                      off64_t num_bytes) const;
+
     /** @brief Explicitly sets the total file size. */
     void setRealFileSize(off64_t size);
 
@@ -236,7 +249,7 @@ class CapioFile {
     /**
      * @brief Finds the end of the sector containing the offset.
      * @param offset Position to check.
-     * @return End offset of the sector, or -1 if in a hole.
+     * @return End offset of the sector, or CAPIO_SECTOR_NOT_FOUND if in a hole.
      */
     [[nodiscard]] off64_t getSectorEnd(off64_t offset) const;
 

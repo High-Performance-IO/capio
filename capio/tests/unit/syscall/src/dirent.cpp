@@ -1,9 +1,11 @@
 #include <gtest/gtest.h>
 
 #include <algorithm>
+#include <cstring>
 #include <dirent.h>
 #include <fcntl.h>
 #include <filesystem>
+#include <string>
 #include <sys/stat.h>
 #include <sys/syscall.h>
 #include <unistd.h>
@@ -87,4 +89,31 @@ TEST(SystemCallTest, TestDirentsOnCapioDir) {
 
     EXPECT_NE(mkdir(PATHNAME1.c_str(), S_IRWXU), -1);
     EXPECT_NE(rmdir(PATHNAME1.c_str()), -1);
+}
+
+// CAPIO registers a directory as mkdir names it. "d/.", as ls stats it, and "d/", as tar opens it,
+// were looked up as they were written and not found.
+TEST(SystemCallTest, TestDirectoryIsFoundThroughDotAndTrailingSlash) {
+    ASSERT_EQ(mkdir("normal_dir", S_IRWXU), 0);
+    int fd = open("normal_dir/a", O_CREAT | O_WRONLY | O_TRUNC, S_IRUSR | S_IWUSR);
+    ASSERT_NE(fd, -1);
+    EXPECT_EQ(close(fd), 0);
+
+    struct stat statbuf{};
+    EXPECT_EQ(stat("normal_dir/.", &statbuf), 0);
+    EXPECT_TRUE(S_ISDIR(statbuf.st_mode));
+    EXPECT_EQ(stat("normal_dir/", &statbuf), 0);
+    EXPECT_TRUE(S_ISDIR(statbuf.st_mode));
+
+    DIR *dir = opendir("normal_dir/.");
+    ASSERT_NE(dir, nullptr);
+    std::vector<std::string> names;
+    while (const dirent *entry = readdir(dir)) {
+        names.emplace_back(entry->d_name);
+    }
+    EXPECT_EQ(closedir(dir), 0);
+    EXPECT_NE(std::find(names.begin(), names.end(), "a"), names.end());
+
+    EXPECT_EQ(unlink("normal_dir/a"), 0);
+    EXPECT_NE(rmdir("normal_dir"), -1);
 }
