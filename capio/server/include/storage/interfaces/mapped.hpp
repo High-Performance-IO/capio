@@ -3,7 +3,7 @@
 #define CAPIO_MAPPED_HPP
 
 /// @brief mmap allocation strategy: maps a persistent file as shared memory.
-struct MappedBacking {
+struct MappedStorageInterface {
     int _fd          = -1; ///< backing file descriptor
     off64_t _map_len = 0;  ///< original mmap length, kept so commit-shrink still unmaps fully
 

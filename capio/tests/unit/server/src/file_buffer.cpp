@@ -18,19 +18,19 @@ std::filesystem::path tempFile(const char *suffix) {
 }
 } // namespace
 
-using HeapBuf   = FileBuffer<HeapBacking>;
-using MappedBuf = FileBuffer<MappedBacking>;
+using HeapBuf   = FileBuffer<HeapStorageInterface>;
+using MappedBuf = FileBuffer<MappedStorageInterface>;
 
-// ---- HeapBacking ---------------------------------------------------------
+// ---- HeapStorageInterface ------------------------------------------------
 
-TEST(HeapBackingTest, StartsEmpty) {
+TEST(HeapStorageInterfaceTest, StartsEmpty) {
     HeapBuf buf;
     EXPECT_TRUE(buf.empty());
     EXPECT_EQ(buf.data(), nullptr);
     EXPECT_EQ(buf.size(), 0);
 }
 
-TEST(HeapBackingTest, AllocateAndRelease) {
+TEST(HeapStorageInterfaceTest, AllocateAndRelease) {
     HeapBuf buf;
     EXPECT_TRUE(buf.allocate(1 * MB));
     EXPECT_FALSE(buf.empty());
@@ -46,14 +46,14 @@ TEST(HeapBackingTest, AllocateAndRelease) {
     EXPECT_EQ(buf.size(), 0);
 }
 
-TEST(HeapBackingTest, AllocateTwiceReturnsFalse) {
+TEST(HeapStorageInterfaceTest, AllocateTwiceReturnsFalse) {
     HeapBuf buf;
     ASSERT_TRUE(buf.allocate(1 * KB));
     EXPECT_FALSE(buf.allocate(1 * MB));
     EXPECT_EQ(buf.size(), 1 * KB);
 }
 
-TEST(HeapBackingTest, GrowKeepsData) {
+TEST(HeapStorageInterfaceTest, GrowKeepsData) {
     HeapBuf buf;
     ASSERT_TRUE(buf.allocate(1 * KB));
     for (off64_t i = 0; i < buf.size(); ++i) {
@@ -70,7 +70,7 @@ TEST(HeapBackingTest, GrowKeepsData) {
     }
 }
 
-TEST(HeapBackingTest, ReleaseIsSafeTwice) {
+TEST(HeapStorageInterfaceTest, ReleaseIsSafeTwice) {
     HeapBuf buf;
     ASSERT_TRUE(buf.allocate(1 * KB));
     buf.release();
@@ -78,9 +78,9 @@ TEST(HeapBackingTest, ReleaseIsSafeTwice) {
     buf.release();
 }
 
-// ---- MappedBacking -------------------------------------------------------
+// ---- MappedStorageInterface ----------------------------------------------
 
-TEST(MappedBackingTest, AllocateCreatesBackingFile) {
+TEST(MappedStorageInterfaceTest, AllocateCreatesBackingFile) {
     const auto path = tempFile("mapped_creates");
     std::filesystem::remove(path);
     {
@@ -96,7 +96,7 @@ TEST(MappedBackingTest, AllocateCreatesBackingFile) {
     std::filesystem::remove(path);
 }
 
-TEST(MappedBackingTest, CommitTruncatesAndPersists) {
+TEST(MappedStorageInterfaceTest, CommitTruncatesAndPersists) {
     const auto path        = tempFile("mapped_commit");
     constexpr off64_t keep = 16;
     std::filesystem::remove(path);
@@ -118,7 +118,7 @@ TEST(MappedBackingTest, CommitTruncatesAndPersists) {
     std::filesystem::remove(path);
 }
 
-TEST(MappedBackingTest, CommitTwiceFailsAfterFdClosed) {
+TEST(MappedStorageInterfaceTest, CommitTwiceFailsAfterFdClosed) {
     const auto path = tempFile("mapped_commit2");
     std::filesystem::remove(path);
     {
@@ -131,7 +131,7 @@ TEST(MappedBackingTest, CommitTwiceFailsAfterFdClosed) {
     std::filesystem::remove(path);
 }
 
-TEST(MappedBackingTest, AllocateMissingDirectoryFails) {
+TEST(MappedStorageInterfaceTest, AllocateMissingDirectoryFails) {
     const auto path =
         tempFile("no_such_dir").parent_path() / "capio_filebuf_missing_dir" / "file.dat";
     MappedBuf buf;
@@ -139,7 +139,7 @@ TEST(MappedBackingTest, AllocateMissingDirectoryFails) {
     EXPECT_TRUE(buf.empty());
     EXPECT_EQ(buf.data(), nullptr);
 }
-TEST(MappedBackingTest, GrowKeepsDataInBackingFile) {
+TEST(MappedStorageInterfaceTest, GrowKeepsDataInBackingFile) {
     const auto path = tempFile("mapped_grow");
     std::filesystem::remove(path);
     {
@@ -165,7 +165,7 @@ TEST(MappedBackingTest, GrowKeepsDataInBackingFile) {
     std::filesystem::remove(path);
 }
 
-TEST(MappedBackingTest, GrowAfterCommitFails) {
+TEST(MappedStorageInterfaceTest, GrowAfterCommitFails) {
     const auto path = tempFile("mapped_grow_committed");
     std::filesystem::remove(path);
     {

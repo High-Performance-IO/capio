@@ -52,7 +52,7 @@ int main() {
     for (const uint64_t size : {1 * MB, 16 * MB, 64 * MB, 256 * MB}) {
         const int iters = size < 32 * MB ? 300 : 50; // cheap allocs: average out timer noise
         const double us = bench_us(iters, [size] {
-            FileBuffer<HeapBacking> a;
+            FileBuffer<HeapStorageInterface> a;
             a.allocate(static_cast<off64_t>(size));
             a.release();
         });
@@ -64,7 +64,7 @@ int main() {
     for (const uint64_t target : {2 * MB, 32 * MB, 128 * MB}) {
         constexpr int iters = 20;
         const double us     = bench_us(iters, [target] {
-            FileBuffer<HeapBacking> a;
+            FileBuffer<HeapStorageInterface> a;
             a.allocate(static_cast<off64_t>(target));
             // one sector over the whole buffer; grow doubles it and re-copies the data
             a.grow(static_cast<off64_t>(target * 2), {{0, static_cast<off64_t>(target)}});
@@ -78,7 +78,7 @@ int main() {
     for (const uint64_t size : {1 * MB, 16 * MB}) {
         constexpr int iters = 50;
         const double us     = bench_us(iters, [&, size] {
-            FileBuffer<MappedBacking> a;
+            FileBuffer<MappedStorageInterface> a;
             a.allocate(tmp, static_cast<off64_t>(size));
             a.commit(static_cast<off64_t>(size));
             a.release();

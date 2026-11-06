@@ -30,8 +30,8 @@ class CapioFile {
                         const std::pair<off64_t, off64_t> &rhs) const;
     };
 
-    using HeapBuffer   = FileBuffer<HeapBacking>;
-    using MappedBuffer = FileBuffer<MappedBacking>;
+    using HeapBuffer   = FileBuffer<HeapStorageInterface>;
+    using MappedBuffer = FileBuffer<MappedStorageInterface>;
 
     /// Backing storage: plain heap for in-memory files, mmap of a file for permanent ones.
     std::variant<HeapBuffer, MappedBuffer> _buffer;

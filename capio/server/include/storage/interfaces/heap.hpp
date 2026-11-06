@@ -2,7 +2,7 @@
 #define CAPIO_HEAP_HPP
 
 /// @brief Heap allocation strategy: allocates a new[]/delete[] buffer in the process heap.
-struct HeapBacking {
+struct HeapStorageInterface {
     /**
      * @brief Allocate the buffer in the heap, capped by available memory.
      * @param data    Buffer base (updated).

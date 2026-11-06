@@ -16,21 +16,21 @@
 #include "calf/StlLogger.h"
 
 /// Total allocable bytes for a given requested size, honoring host/cgroup memory limits.
-/// Declared before the backing strategies so their inline methods can use it;
+/// Declared before the storage interfaces so their inline methods can use it;
 /// defined in storage_allocator.cpp.
 off64_t computeAllocableMemQuota(off64_t requested_size);
 
-#include "backings/heap.hpp"
-#include "backings/mapped.hpp"
+#include "interfaces/heap.hpp"
+#include "interfaces/mapped.hpp"
 
 /// @brief Data buffer behind a CapioFile: owns a single buffer pointer/size and its RAII
-/// lifecycle, and forwards every backing-specific operation to the strategy template argument.
-/// @tparam Backing Strategy holding the per-backing state and logic (HeapBacking or
-/// MappedBacking).
-template <class Backing> class FileBuffer {
-    char *_data   = nullptr; ///< buffer base, nullptr when not allocated
-    off64_t _size = 0;       ///< logical size exposed to the caller
-    Backing backing_;        ///< backing-specific storage strategy
+/// lifecycle, and forwards every storage-specific operation to the strategy template argument.
+/// @tparam StorageInterface Strategy holding the per-storage state and logic
+/// (HeapStorageInterface or MappedStorageInterface).
+template <class StorageInterface> class FileBuffer {
+    char *_data   = nullptr;   ///< buffer base, nullptr when not allocated
+    off64_t _size = 0;         ///< logical size exposed to the caller
+    StorageInterface storage_; ///< storage-specific allocation strategy
 
   public:
     FileBuffer() = default;
@@ -65,7 +65,7 @@ template <class Backing> class FileBuffer {
         if (_data != nullptr) {
             return false; // avoid leaking an already-active buffer
         }
-        return backing_.allocate(_data, _size, size);
+        return storage_.allocate(_data, _size, size);
     }
 
     /**
@@ -78,15 +78,15 @@ template <class Backing> class FileBuffer {
         if (_data != nullptr) {
             return false; // avoid leaking an already-active buffer
         }
-        return backing_.allocate(_data, _size, path, size);
+        return storage_.allocate(_data, _size, path, size);
     }
 
     /**
      * @brief Shrink a mapped-permanent buffer to its committed size and close its backing fd.
      * @param size The committed size to retain.
-     * @return True on success; false for backings that cannot commit.
+     * @return True on success; false for storage interfaces that cannot commit.
      */
-    bool commit(off64_t size) { return backing_.commit(_size, size); }
+    bool commit(off64_t size) { return storage_.commit(_size, size); }
 
     /**
      * @brief Grow the buffer to at least @p data_size, keeping existing data at the same offsets.
@@ -96,7 +96,7 @@ template <class Backing> class FileBuffer {
      */
     char *grow(off64_t data_size, const std::vector<std::pair<off64_t, off64_t>> &sectors) {
         const off64_t new_size = std::max(data_size, computeAllocableMemQuota(_size * 2));
-        if (!backing_.grow(_data, _size, new_size, sectors)) {
+        if (!storage_.grow(_data, _size, new_size, sectors)) {
             return nullptr;
         }
         return _data;
@@ -104,7 +104,7 @@ template <class Backing> class FileBuffer {
 
     /** @brief Free all owned memory and resources. */
     void release() {
-        backing_.freeBuffer(_data);
+        storage_.freeBuffer(_data);
         _data = nullptr;
         _size = 0;
     }
