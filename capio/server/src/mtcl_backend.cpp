@@ -409,7 +409,14 @@ MTCLBackend::MTCLBackend(const std::string &proto, const std::string &port, cons
       advertisement_token(proto + ":" + node_name + ":" + port), own_port(port),
       used_protocol(proto) {
     MTCL::Manager::init("server-" + node_name);
-    MTCL::Manager::listen(listen_token);
+    // A server that cannot listen (e.g. the port is taken by another server on this node) must
+    // not run: peers would connect to whichever process owns the port.
+    if (MTCL::Manager::listen(listen_token) < 0) {
+        const int error = errno;
+        MTCL::Manager::finalize();
+        throw std::runtime_error("MTCL backend cannot listen on " + listen_token + ": " +
+                                 std::strerror(error));
+    }
     CALF_PRINT_COLOR(CALF_CLI_LEVEL_INFO, "MTCL backend listening on %s", listen_token.c_str());
 }
 
