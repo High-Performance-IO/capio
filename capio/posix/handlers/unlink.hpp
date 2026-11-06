@@ -13,7 +13,18 @@ off64_t capio_unlink_abs(const std::filesystem::path &abs_path, long tid, bool i
             ERR_EXIT("ERROR: unlink to the capio_dir %s", abs_path.c_str());
             return -1; // note: this point should never be reached
         }
-        off64_t res = is_dir ? rmdir_request(abs_path, tid) : unlink_request(abs_path, tid);
+        off64_t res;
+        if (is_dir) {
+            // rmdir's reply, as in capio_rmdir: 1 removed, 2 no such directory
+            res = rmdir_request(abs_path, tid);
+            if (res == 2) {
+                res = -1;
+            } else if (res != CAPIO_POSIX_SYSCALL_REQUEST_SKIP) {
+                res = CAPIO_POSIX_SYSCALL_SUCCESS;
+            }
+        } else {
+            res = unlink_request(abs_path, tid);
+        }
         if (res == -1) {
             errno = ENOENT;
         } else {
