@@ -75,15 +75,19 @@ inline off64_t capio_rmdir(const std::string_view &pathname, long tid) {
             errno = ENOENT;
             return CAPIO_POSIX_SYSCALL_ERRNO;
         }
+        // The server replies 1 when it removed the directory and 2 when it had no such directory,
+        // or asks to skip an excluded path. 1 is not rmdir's result: success is 0.
         off64_t res = rmdir_request(path, tid);
+        if (res == CAPIO_POSIX_SYSCALL_REQUEST_SKIP) {
+            return res;
+        }
         if (res == 2) {
             LOG("res == 2. errno = ENOENT");
             errno = ENOENT;
             return CAPIO_POSIX_SYSCALL_ERRNO;
-        } else {
-            delete_capio_path(path);
-            return res;
         }
+        delete_capio_path(path);
+        return CAPIO_POSIX_SYSCALL_SUCCESS;
     } else {
         return CAPIO_POSIX_SYSCALL_REQUEST_SKIP;
     }

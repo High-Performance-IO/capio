@@ -38,6 +38,28 @@ TEST(SystemCallTest, TestDirectoryCreateReopenCloseWithMkdiratAtFdcwd) {
     EXPECT_NE(faccessat(AT_FDCWD, PATHNAME, F_OK, 0), 0);
 }
 
+TEST(SystemCallTest, TestRmdirReturnsZero) {
+    EXPECT_EQ(mkdir("rmdir_parent", S_IRWXU), 0);
+    EXPECT_EQ(mkdir("rmdir_parent/sub", S_IRWXU), 0);
+    EXPECT_EQ(rmdir("rmdir_parent/sub"), 0);
+    EXPECT_EQ(rmdir("rmdir_parent"), 0);
+    EXPECT_NE(access("rmdir_parent", F_OK), 0);
+}
+
+TEST(SystemCallTest, TestUnlinkatRemovedirReturnsZero) {
+    EXPECT_EQ(mkdir("unlinkat_parent", S_IRWXU), 0);
+    EXPECT_EQ(mkdir("unlinkat_parent/sub", S_IRWXU), 0);
+    EXPECT_EQ(unlinkat(AT_FDCWD, "unlinkat_parent/sub", AT_REMOVEDIR), 0);
+    EXPECT_EQ(unlinkat(AT_FDCWD, "unlinkat_parent", AT_REMOVEDIR), 0);
+    EXPECT_NE(access("unlinkat_parent", F_OK), 0);
+}
+
+TEST(SystemCallTest, TestRmdirOfAMissingDirectoryFailsWithEnoent) {
+    errno = 0;
+    EXPECT_EQ(rmdir("rmdir_missing"), -1);
+    EXPECT_EQ(errno, ENOENT);
+}
+
 TEST(SystemCallTest, TestMkdirFailsIfDirectoryAlreadyExists) {
     constexpr const char *PATHNAME = "test";
     EXPECT_NE(mkdir(PATHNAME, S_IRWXU), -1);
