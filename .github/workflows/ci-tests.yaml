@@ -255,6 +255,58 @@ jobs:
           retention-days: 1
           if-no-files-found: error
 
+  memory-allocator-benchmark:
+    name: "Benchmark memory allocator"
+    runs-on: ubuntu-24.04
+    container:
+      image: gcc:14
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: "Install packages"
+        uses: nick-fields/retry@v4
+        with:
+          command: |
+            apt update
+            apt install -y      \
+              cmake             \
+              ninja-build       \
+              make              \
+              bash              \
+              git               \
+              build-essential   \
+              git               \
+              jq                \
+              pkg-config        \
+              libprotobuf-dev   \
+              protobuf-compiler \
+              wget              \
+              tar               \
+              libcapstone-dev
+          max_attempts: 3
+          retry_wait_seconds: 10
+          timeout_minutes: 10
+
+      - name: "Configure and build the benchmark"
+        run: |
+          # The benchmark is gated on CAPIO_BUILD_TESTS, so configure the project with tests on
+          # (POSIX needed so unit/posix can build syscall_intercept), then build only the small
+          # benchmark target instead of compiling the whole server/test stack.
+          cmake -DCMAKE_BUILD_TYPE=Release \
+                -DCAPIO_BUILD_TESTS=ON    \
+                -G Ninja                  \
+                -B ../bench-build         \
+                -S ${GITHUB_WORKSPACE}
+          cmake --build ../bench-build --target capio_memory_allocator_benchmark -j $(nproc)
+
+      - name: "Run benchmark and post summary table"
+        shell: bash
+        run: |
+          BENCH="$(pwd)/../bench-build/capio/tests/benchmark/capio_memory_allocator_benchmark"
+          echo "## CapioFileMemoryAllocator benchmark" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          "$BENCH" >> "$GITHUB_STEP_SUMMARY"
+
   multinode-tests:
     name: "Backend multinode test with MTCL"
     runs-on: ubuntu-24.04

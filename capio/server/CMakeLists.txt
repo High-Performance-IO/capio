@@ -38,6 +38,18 @@ endif ()
 add_executable(${TARGET_NAME} ${TARGET_SOURCES})
 
 #####################################
+# Memory checks Options
+#####################################
+
+string(TOLOWER "${CAPIO_MEMORY_CHECKS}" _capio_memory_checks)
+set(_capio_memory_checks_values full fast none)
+if (NOT _capio_memory_checks IN_LIST _capio_memory_checks_values)
+    message(FATAL_ERROR "CAPIO_MEMORY_CHECKS must be one of: full, fast, none (got '${CAPIO_MEMORY_CHECKS}')")
+endif ()
+string(TOUPPER "${_capio_memory_checks}" _capio_memory_checks)
+target_compile_definitions(${TARGET_NAME} PRIVATE CAPIO_MEMORY_CHECKS_${_capio_memory_checks})
+
+#####################################
 # Include files and directories
 #####################################
 file(GLOB_RECURSE CAPIO_SERVER_HEADERS "${CMAKE_CURRENT_SOURCE_DIR}/include/**/*.hpp")
