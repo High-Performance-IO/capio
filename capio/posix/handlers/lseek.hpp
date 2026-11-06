@@ -43,7 +43,8 @@ inline off64_t capio_lseek(int fd, off64_t offset, int whence, long tid) {
                 errno = EINVAL;
                 return CAPIO_POSIX_SYSCALL_ERRNO;
             }
-            capio_set_fd_offset(fd, new_offset, tid);
+            set_capio_fd_offset(fd, new_offset);
+            seek_request(fd, new_offset, tid);
             LOG("the new offset of file %d is %ld", fd, new_offset);
             return new_offset;
         } else if (whence == SEEK_DATA) {
