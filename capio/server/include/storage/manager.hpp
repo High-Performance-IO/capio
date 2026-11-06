@@ -303,6 +303,12 @@ class StorageManager {
      * @param file_path The path of the file/directory whose entry is being added to the parent.
      */
     void updateDirectory(pid_t tid, const std::filesystem::path &file_path);
+
+    /**
+     * @brief Removes the entry of @p file_path from its parent directory's listing, once the file
+     * or directory has been removed.
+     */
+    void removeFromDirectory(const std::filesystem::path &file_path);
 };
 
 #endif // CAPIO_STORAGE_MANAGER_HPP

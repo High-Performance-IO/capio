@@ -53,6 +53,43 @@ TEST(SystemCallTest, TestFileCreateWriteLseekClose) {
     EXPECT_NE(access(PATHNAME, F_OK), 0);
 }
 
+TEST(SystemCallTest, TestLseekSeekEndReturnsFileSize) {
+    constexpr const char *PATHNAME      = "test_file.txt";
+    constexpr std::array<int, 6> BUFFER = {1, 2, 3, 4, 5, 6};
+    int fd = open(PATHNAME, O_CREAT | O_RDWR | O_TRUNC, S_IRUSR | S_IWUSR);
+    EXPECT_NE(fd, -1);
+    EXPECT_EQ(write(fd, BUFFER.data(), sizeof(BUFFER)), sizeof(BUFFER));
+    EXPECT_EQ(lseek(fd, 0, SEEK_SET), 0);
+    EXPECT_EQ(lseek(fd, 0, SEEK_END), sizeof(BUFFER));
+    EXPECT_EQ(lseek(fd, -static_cast<off_t>(sizeof(int)), SEEK_END), sizeof(BUFFER) - sizeof(int));
+    EXPECT_EQ(lseek(fd, -static_cast<off_t>(sizeof(BUFFER)) - 1, SEEK_END), -1);
+    EXPECT_EQ(errno, EINVAL);
+    EXPECT_NE(close(fd), -1);
+    EXPECT_NE(unlink(PATHNAME), -1);
+}
+
+TEST(SystemCallTest, TestOpenAppendWritesAtEnd) {
+    constexpr const char *PATHNAME       = "test_file.txt";
+    constexpr std::array<int, 3> FIRST   = {1, 2, 3};
+    constexpr std::array<int, 3> SECOND  = {4, 5, 6};
+    constexpr std::array<int, 6> CONTENT = {1, 2, 3, 4, 5, 6};
+    int fd = open(PATHNAME, O_CREAT | O_WRONLY | O_TRUNC, S_IRUSR | S_IWUSR);
+    EXPECT_NE(fd, -1);
+    EXPECT_EQ(write(fd, FIRST.data(), sizeof(FIRST)), sizeof(FIRST));
+    EXPECT_NE(close(fd), -1);
+    fd = open(PATHNAME, O_CREAT | O_WRONLY | O_APPEND, S_IRUSR | S_IWUSR);
+    EXPECT_NE(fd, -1);
+    EXPECT_EQ(write(fd, SECOND.data(), sizeof(SECOND)), sizeof(SECOND));
+    EXPECT_NE(close(fd), -1);
+    fd = open(PATHNAME, O_RDONLY);
+    EXPECT_NE(fd, -1);
+    std::array<int, 6> buf{};
+    EXPECT_EQ(read(fd, buf.data(), sizeof(buf)), sizeof(buf));
+    EXPECT_EQ(CONTENT, buf);
+    EXPECT_NE(close(fd), -1);
+    EXPECT_NE(unlink(PATHNAME), -1);
+}
+
 TEST(SystemCallTest, TestFileCreateBufferedWriteClose) {
     constexpr const char *PATHNAME              = "test_file.txt";
     constexpr const std::array<int, 10> BUFFER1 = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9};

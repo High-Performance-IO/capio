@@ -13,7 +13,13 @@ inline void handle_exit_group(int tid) {
 
         LOG("Handling file %s", path.c_str());
         if (CapioCLEngine::get().getCommitRule(path) == capiocl::commitRules::ON_TERMINATION) {
-            CapioFile &c_file = storage_manager->get(path);
+            // A file the process removed before exiting has nothing left to commit.
+            auto c_file_opt = storage_manager->tryGet(path);
+            if (!c_file_opt) {
+                LOG("File %s was removed", path.c_str());
+                continue;
+            }
+            CapioFile &c_file = c_file_opt->get();
             if (c_file.isDirectory()) {
                 LOG("file %s is dir", path.c_str());
                 long int n_committed = c_file.getDirectoryExpectedFileCount();
