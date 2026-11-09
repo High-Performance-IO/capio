@@ -217,17 +217,20 @@ TEST_F(FileLocationServiceTest, anotherServerAnnouncingAPathDoesNotTakeItFromThi
 }
 
 TEST_F(FileLocationServiceTest, remoteRequestsReachTheService) {
-    remote_location_announce_handler(RemoteRequest("0006 /capio/with space", "peer-a"));
+    remote_location_announce_handler(
+        RemoteRequest(std::string("0006 /capio/with space"), std::string("peer-a")));
     EXPECT_EQ(service.getHome("/capio/with space"), "peer-a");
 
     service.setHome("/capio/mine too");
     peers.clear();
-    remote_location_query_handler(RemoteRequest("0008 42 /capio/mine too", "peer-b"));
+    remote_location_query_handler(
+        RemoteRequest(std::string("0008 42 /capio/mine too"), std::string("peer-b")));
     const auto sent = peers.sent();
     ASSERT_EQ(sent.size(), 1);
     EXPECT_EQ(sent[0].first, "0009 42 1 /capio/mine too");
     EXPECT_EQ(sent[0].second, "peer-b");
 
-    remote_location_forget_handler(RemoteRequest("0007 /capio/with space", "peer-a"));
+    remote_location_forget_handler(
+        RemoteRequest(std::string("0007 /capio/with space"), std::string("peer-a")));
     EXPECT_FALSE(service.getHome("/capio/with space"));
 }
