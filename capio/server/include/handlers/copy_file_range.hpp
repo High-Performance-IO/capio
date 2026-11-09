@@ -5,11 +5,11 @@
 
 #include "client-manager/client_manager.hpp"
 #include "remote/backend.hpp"
+#include "remote/file_location_service.hpp"
 #include "remote/handlers/copy_file_range.hpp"
 #include "storage/manager.hpp"
 #include "utils/capiocl_adapter.hpp"
 #include "utils/common.hpp"
-#include "utils/location.hpp"
 #include "utils/types.hpp"
 
 extern Backend *backend;
@@ -61,7 +61,7 @@ inline void handle_local_copy_file_range(const CSCopyFileRange_t &copy, const bo
  * @param is_prod whether the client is a producer of the input
  */
 inline void handle_copy_file_range(const CSCopyFileRange_t &copy, const bool is_prod) {
-    if (is_prod || std::get<0>(get_file_location(copy.path_in)) == backend->get_node_name()) {
+    if (is_prod || file_location_service->getKnownHome(copy.path_in) == backend->get_node_name()) {
         handle_local_copy_file_range(copy, is_prod);
     } else {
         handle_remote_copy_file_range(copy);
@@ -82,10 +82,10 @@ inline void copy_file_range_handler(const char *const str) {
     const bool is_prod          = CapioCLEngine::get().isProducer(copy.path_in, app_name) ||
                                   client_manager->isProducer(copy.tid, copy.path_in);
 
-    if (!is_prod && !get_file_location_opt(copy.path_in)) {
+    if (!is_prod && !file_location_service->getHome(copy.path_in)) {
         LOG("Waiting on a separate thread for the input to be created");
         std::thread t([copy] {
-            loop_load_file_location(copy.path_in);
+            file_location_service->waitForHome(copy.path_in);
             handle_copy_file_range(copy, false);
         });
         t.detach();

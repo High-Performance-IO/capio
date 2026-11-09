@@ -37,7 +37,11 @@ constexpr const int CAPIO_SERVER_REQUEST_STAT                  = 2;
 constexpr const int CAPIO_SERVER_REQUEST_STAT_REPLY            = 3;
 constexpr const int CAPIO_SERVER_REQUEST_COPY_FILE_RANGE       = 4;
 constexpr const int CAPIO_SERVER_REQUEST_COPY_FILE_RANGE_REPLY = 5;
+constexpr const int CAPIO_SERVER_REQUEST_LOCATION_ANNOUNCE     = 6;
+constexpr const int CAPIO_SERVER_REQUEST_LOCATION_FORGET       = 7;
+constexpr const int CAPIO_SERVER_REQUEST_LOCATION_QUERY        = 8;
+constexpr const int CAPIO_SERVER_REQUEST_LOCATION_ANSWER       = 9;
 
-constexpr const int CAPIO_SERVER_NR_REQUEST = 6;
+constexpr const int CAPIO_SERVER_NR_REQUEST = 10;
 
 #endif // CAPIO_COMMON_REQUESTS_HPP

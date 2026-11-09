@@ -7,7 +7,7 @@
 #include "remote/backend.hpp"
 #include "remote/requests.hpp"
 
-#include "utils/location.hpp"
+#include "remote/file_location_service.hpp"
 #include "utils/runtime_configuration.hpp"
 
 extern Backend *backend;
@@ -132,10 +132,10 @@ inline void request_remote_read(int tid, int fd, off64_t count) {
 void wait_for_file(const std::filesystem::path &path, int tid, int fd, off64_t count) {
     START_LOG(gettid(), "call(path=%s, tid=%d, fd=%d, count=%ld)", path.c_str(), tid, fd, count);
 
-    loop_load_file_location(path);
+    file_location_service->waitForHome(path);
 
     // check if the file is local or remote
-    if (std::get<0>(get_file_location(path)) == backend->get_node_name().c_str()) {
+    if (file_location_service->getKnownHome(path) == backend->get_node_name()) {
         handle_local_read(tid, fd, count, false);
     } else {
         request_remote_read(tid, fd, count);
@@ -150,7 +150,7 @@ inline void handle_read(int tid, int fd, off64_t count) {
     const std::string &app_name            = client_manager->getAppName(tid);
     bool is_prod =
         CapioCLEngine::get().isProducer(path, app_name) || client_manager->isProducer(tid, path);
-    auto file_location_opt = get_file_location_opt(path);
+    auto file_location_opt = file_location_service->getHome(path);
 
     LOG("Is producer= %s", is_prod ? "TRUE" : "FALSE");
 
@@ -159,8 +159,7 @@ inline void handle_read(int tid, int fd, off64_t count) {
         // launch a thread that checks when the file is created
         std::thread t(wait_for_file, path, tid, fd, count);
         t.detach();
-    } else if (is_prod || std::get<0>(file_location_opt->get()) == backend->get_node_name() ||
-               capio_dir == path) {
+    } else if (is_prod || *file_location_opt == backend->get_node_name() || capio_dir == path) {
         LOG("File is local. handling local read");
         handle_local_read(tid, fd, count, is_prod);
     } else {

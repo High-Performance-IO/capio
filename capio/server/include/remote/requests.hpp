@@ -1,6 +1,7 @@
 #ifndef CAPIO_REMOTE_REQUESTS_HPP
 #define CAPIO_REMOTE_REQUESTS_HPP
 
+#include "remote/file_location_service.hpp"
 #include "storage/manager.hpp"
 #include "utils/runtime_configuration.hpp"
 
@@ -44,7 +45,7 @@ inline void serve_remote_read_request(int tid, int fd, int count, long int nbyte
 inline void handle_remote_stat_request(int tid, const std::filesystem::path &path) {
     START_LOG(gettid(), "call(tid=%d, path=%s)", tid, path.c_str());
 
-    std::string dest         = std::get<0>(get_file_location(path));
+    std::string dest         = file_location_service->getKnownHome(path);
     const char *const format = "%04d %d %s %s";
     const int size           = snprintf(nullptr, 0, format, CAPIO_SERVER_REQUEST_STAT, tid,
                                         backend->get_node_name().c_str(), path.c_str());
@@ -64,7 +65,7 @@ inline void handle_remote_read_request(int tid, int fd, off64_t count, bool is_g
     // If it is not in cache then send the request to the remote node
     const std::filesystem::path &path = storage_manager->getPath(tid, fd);
     off64_t offset                    = storage_manager->getFileOffset(tid, fd);
-    std::string dest                  = std::get<0>(get_file_location(path));
+    std::string dest                  = file_location_service->getKnownHome(path);
 
     const char *const format = "%04d %s %d %d %ld %ld %d";
     const int size = snprintf(nullptr, 0, format, CAPIO_SERVER_REQUEST_READ, path.c_str(), tid, fd,
@@ -84,7 +85,7 @@ inline void handle_remote_copy_file_range_request(const int tid, const int fd_in
     START_LOG(gettid(), "call(tid=%d, fd_in=%d, fd_out=%d, path_in=%s, offset_in=%ld, count=%ld)",
               tid, fd_in, fd_out, path_in.c_str(), offset_in, count);
 
-    const std::string dest   = std::get<0>(get_file_location(path_in));
+    const std::string dest   = file_location_service->getKnownHome(path_in);
     const char *const format = "%04d %s %d %d %d %ld %ld %ld";
     const int size = snprintf(nullptr, 0, format, CAPIO_SERVER_REQUEST_COPY_FILE_RANGE,
                               path_in.c_str(), tid, fd_in, fd_out, offset_in, offset_out, count);

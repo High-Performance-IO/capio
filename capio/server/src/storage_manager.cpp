@@ -7,12 +7,12 @@
 #include "calf/StlLogger.h"
 
 #include "common/dirent.hpp"
+#include "remote/file_location_service.hpp"
 #include "storage/capio_file.hpp"
 #include "storage/manager.hpp"
 #include "utils/capiocl_adapter.hpp"
 #include "utils/common.hpp"
 #include "utils/filesystem.hpp"
-#include "utils/location.hpp"
 #include "utils/runtime_configuration.hpp"
 #include "utils/shared_mutex.hpp"
 #include "utils/types.hpp"
@@ -315,15 +315,17 @@ void StorageManager::addFileToTid(const pid_t tid, const int fd, const std::file
 off64_t StorageManager::addDirectory(const pid_t tid, const std::filesystem::path &path) {
     START_LOG(tid, "call(path=%s)", path.c_str());
 
-    if (!get_file_location_opt(path)) {
+    // Whether this server has the directory, not whether some server has it: the other servers
+    // announce theirs, and a directory created there is created here too when a client asks.
+    if (!tryGet(path)) {
         CapioFile &c_file = add(path, true, CAPIO_DEFAULT_DIR_INITIAL_SIZE);
         if (c_file.isFirstWrite()) {
             c_file.registerFirstWrite();
             // TODO: it works only if there is one prod per file
             if (is_capio_dir(path)) {
-                add_file_location(path, backend->get_node_name().c_str(), -1);
+                file_location_service->learn(path, backend->get_node_name());
             } else {
-                write_file_location(path);
+                file_location_service->setHome(path);
                 updateDirectory(tid, path);
             }
             addDirectoryEntry(tid, path, path, DOT_ENTRY);
@@ -347,7 +349,7 @@ void StorageManager::updateDirectory(const pid_t tid, const std::filesystem::pat
     const auto &dir = get_parent_dir_path(file_path);
     if (CapioFile &c_file = get(dir.c_str()); c_file.isFirstWrite()) {
         c_file.registerFirstWrite();
-        write_file_location(dir);
+        file_location_service->setHome(dir);
     }
     addDirectoryEntry(tid, file_path, dir, REGULAR_ENTRY);
 }

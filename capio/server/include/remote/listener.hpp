@@ -8,6 +8,7 @@
 #include "remote/backend.hpp"
 #include "remote/backend/include.hpp"
 #include "remote/handlers/copy_file_range.hpp"
+#include "remote/handlers/location.hpp"
 #include "remote/handlers/read.hpp"
 #include "remote/handlers/stat.hpp"
 #include "utils/runtime_configuration.hpp"
@@ -28,6 +29,11 @@ build_server_request_handlers_table() {
     _server_request_handlers[CAPIO_SERVER_REQUEST_COPY_FILE_RANGE] = remote_copy_file_range_handler;
     _server_request_handlers[CAPIO_SERVER_REQUEST_COPY_FILE_RANGE_REPLY] =
         remote_copy_file_range_reply_handler;
+    _server_request_handlers[CAPIO_SERVER_REQUEST_LOCATION_ANNOUNCE] =
+        remote_location_announce_handler;
+    _server_request_handlers[CAPIO_SERVER_REQUEST_LOCATION_FORGET] = remote_location_forget_handler;
+    _server_request_handlers[CAPIO_SERVER_REQUEST_LOCATION_QUERY]  = remote_location_query_handler;
+    _server_request_handlers[CAPIO_SERVER_REQUEST_LOCATION_ANSWER] = remote_location_answer_handler;
 
     return _server_request_handlers;
 }

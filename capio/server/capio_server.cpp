@@ -35,9 +35,10 @@ ClientManager *client_manager;
 StorageManager *storage_manager;
 Backend *backend;
 DiscoveryService *discovery_service;
+FileLocationService *file_location_service;
 
 #include "handlers.hpp"
-#include "utils/location.hpp"
+#include "remote/file_location_service.hpp"
 #include "utils/runtime_configuration.hpp"
 #include "utils/signals.hpp"
 
@@ -131,7 +132,7 @@ int main(int argc, char **argv) {
 
     START_LOG(gettid(), "call()");
 
-    open_files_location();
+    file_location_service = new FileLocationService();
 
     storage_manager = new StorageManager();
     client_manager  = new ClientManager();

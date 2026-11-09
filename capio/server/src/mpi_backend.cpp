@@ -87,6 +87,7 @@ RemoteRequest MPIBackend::read_next_request() {
 void MPIBackend::send_request(const char *message, int message_len, const std::string &target) {
     START_LOG(gettid(), "call(message=%s, message_len=%d, target=%s)", message, message_len,
               target.c_str());
+    const std::lock_guard lg(send_mutex);
     const auto mpi_target = hostname_to_rank[target];
     LOG("MPI_rank for target %s is %c", target.c_str(), mpi_target);
 
@@ -98,7 +99,8 @@ void MPIBackend::send_file(const char *message, const int message_len, char *shm
     START_LOG(gettid(), "call(%s, %d, %.50s, %ld, %s)", message, message_len, shm, nbytes,
               target.c_str());
     int elem_to_snd = 0;
-    int dest        = hostname_to_rank[target];
+    const std::lock_guard lg(send_mutex);
+    int dest = hostname_to_rank[target];
 
     MPI_Send(message, message_len + 1, MPI_CHAR, dest, 0, MPI_COMM_WORLD);
     for (long int k = 0; k < nbytes; k += elem_to_snd) {

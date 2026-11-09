@@ -2,8 +2,8 @@
 #include "common/constants.hpp"
 #include "common/dirent.hpp"
 #include "remote/backend.hpp"
+#include "remote/file_location_service.hpp"
 #include "storage/manager.hpp"
-#include "utils/location.hpp"
 
 extern StorageManager *storage_manager;
 extern Backend *backend;
@@ -348,10 +348,7 @@ class MockBackend : public Backend {
 
 class MockBackendTestFixture : public ::testing::Test {
   protected:
-    void SetUp() override {
-        backend = new MockBackend();
-        open_files_location();
-    }
+    void SetUp() override { backend = new MockBackend(); }
 
     void TearDown() override {
         delete backend;

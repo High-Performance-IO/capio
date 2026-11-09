@@ -13,10 +13,10 @@
 #include "client-manager/client_manager.hpp"
 #include "common/requests.hpp"
 #include "remote/backend.hpp"
+#include "remote/file_location_service.hpp"
 #include "storage/manager.hpp"
 #include "utils/capiocl_adapter.hpp"
 #include "utils/common.hpp"
-#include "utils/location.hpp"
 
 #include "handlers/copy_file_range.hpp"
 #include "handlers/write.hpp"
@@ -118,7 +118,7 @@ class CopyFileRangeTest : public testing::Test {
 
         client_manager->registerClient(PRODUCER_TID, "producer");
         client_manager->registerClient(COPIER_TID, "copier");
-        // Skip the first-write bookkeeping (file location files) that a write would do.
+        // Skip the first-write bookkeeping (announcing the file location) that a write would do.
         storage_manager->add(path_in, false, 0).registerFirstWrite();
         storage_manager->add(path_out, false, 0).registerFirstWrite();
         storage_manager->addFileToTid(PRODUCER_TID, FD_IN, path_in, 0);
@@ -143,7 +143,7 @@ class CopyFileRangeTest : public testing::Test {
         // Give a copy released by the commit above time to finish before its files are removed.
         std::this_thread::sleep_for(std::chrono::milliseconds(50));
         sem_close(responses_available);
-        erase_from_files_location(path_in);
+        file_location_service->remove(path_in);
         storage_manager->remove(path_in);
         storage_manager->remove(path_out);
         client_manager->removeClient(PRODUCER_TID);
@@ -152,10 +152,10 @@ class CopyFileRangeTest : public testing::Test {
     }
 
     // The input is stored on this node.
-    void input_is_local() { add_file_location(path_in, backend->get_node_name().c_str(), 0); }
+    void input_is_local() { file_location_service->learn(path_in, backend->get_node_name()); }
 
     // The input is stored on another node.
-    void input_is_remote() { add_file_location(path_in, REMOTE_NODE, 0); }
+    void input_is_remote() { file_location_service->learn(path_in, REMOTE_NODE); }
 
     int pending_responses() const {
         int value = 0;

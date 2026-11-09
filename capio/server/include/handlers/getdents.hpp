@@ -4,8 +4,8 @@
 #include <thread>
 
 #include "remote/backend.hpp"
+#include "remote/file_location_service.hpp"
 #include "remote/requests.hpp"
-#include "utils/location.hpp"
 #include "utils/runtime_configuration.hpp"
 
 extern StorageManager *storage_manager;
@@ -42,15 +42,15 @@ inline void handle_getdents(int tid, int fd, long int count) {
     const std::filesystem::path &path_to_check = storage_manager->getPath(tid, fd);
     const std::filesystem::path &capio_dir     = RuntimeConfiguration::get().getCapioDir();
     bool is_prod           = CapioCLEngine::get().isProducer(path_to_check, app_name);
-    auto file_location_opt = get_file_location_opt(path_to_check);
+    auto file_location_opt = file_location_service->getHome(path_to_check);
 
     if (!file_location_opt && !is_prod) {
         std::thread t([tid, fd, count, path_to_check] {
             START_LOG(gettid(), "call(tid=%d, fd=%d, count=%ld)", tid, fd, count);
 
-            loop_load_file_location(path_to_check);
+            file_location_service->waitForHome(path_to_check);
 
-            if (std::get<0>(get_file_location(path_to_check)) == backend->get_node_name()) {
+            if (file_location_service->getKnownHome(path_to_check) == backend->get_node_name()) {
                 handle_getdents(tid, fd, count);
             } else {
 
@@ -58,7 +58,7 @@ inline void handle_getdents(int tid, int fd, long int count) {
             }
         });
         t.detach();
-    } else if (is_prod || std::get<0>(file_location_opt->get()) == backend->get_node_name() ||
+    } else if (is_prod || *file_location_opt == backend->get_node_name() ||
                capio_dir == path_to_check) {
         CapioFile &c_file = storage_manager->get(path_to_check);
         off64_t offset    = storage_manager->getFileOffset(tid, fd);

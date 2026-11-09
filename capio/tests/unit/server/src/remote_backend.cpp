@@ -2,7 +2,7 @@
 
 #include <cstring>
 
-#include "utils/location.hpp"
+#include "remote/file_location_service.hpp"
 
 #include "common/requests.hpp"
 #include "remote/backend.hpp"
