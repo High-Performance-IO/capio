@@ -35,7 +35,7 @@ inline void handle_local_copy_file_range(const CSCopyFileRange_t &copy, const bo
     // the file is still being written and the requested range is not all there: this is not the
     // end of the file
     const bool wait_for_data    = !file_complete && (end_of_sector == CAPIO_SECTOR_NOT_FOUND ||
-                                                  copy.offset_in + copy.count > end_of_sector);
+                                                     copy.offset_in + copy.count > end_of_sector);
 
     if (!wait_for_commit && !wait_for_data) {
         copy_file_range_data(copy);
@@ -80,7 +80,7 @@ inline void copy_file_range_handler(const char *const str) {
     copy.path_out               = storage_manager->getPath(copy.tid, copy.fd_out);
     const std::string &app_name = client_manager->getAppName(copy.tid);
     const bool is_prod          = CapioCLEngine::get().isProducer(copy.path_in, app_name) ||
-                         client_manager->isProducer(copy.tid, copy.path_in);
+                                  client_manager->isProducer(copy.tid, copy.path_in);
 
     if (!is_prod && !get_file_location_opt(copy.path_in)) {
         LOG("Waiting on a separate thread for the input to be created");

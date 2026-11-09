@@ -38,7 +38,7 @@ inline void handle_remote_copy_file_range(const CSCopyFileRange_t &copy) {
     const bool sector_found     = end_of_sector != CAPIO_SECTOR_NOT_FOUND;
     const bool range_here       = sector_found && copy.offset_in + copy.count <= end_of_sector;
     const bool all_data_here    = c_file_in.isCommitted() &&
-                               (sector_found ? end_of_sector : 0) == c_file_in.getRealFileSize();
+                                  (sector_found ? end_of_sector : 0) == c_file_in.getRealFileSize();
 
     if (range_here || all_data_here) {
         LOG("The data of the input is already on this node");
