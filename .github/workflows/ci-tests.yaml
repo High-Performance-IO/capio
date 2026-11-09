@@ -85,12 +85,13 @@ jobs:
           - "capio/tests"
     steps:
       - uses: actions/checkout@v7
+      # The same release CLion's bundled clang-format agrees with, so code formatted in the IDE passes.
+      - name: "Install clang-format"
+        run: pipx install clang-format==23.1.5
       - name: "Run clang-format style check"
-        uses: DoozyX/clang-format-lint-action@v0.20
-        with:
-          source: ${{matrix.path}}
-          extensions: 'h,cpp,c,hpp'
-          clangFormatVersion: 19
+        run: |
+          find "${{ matrix.path }}" -type f \( -name '*.h' -o -name '*.c' -o -name '*.hpp' -o -name '*.cpp' \) -print0 |
+            xargs -0 clang-format --dry-run --Werror
   unit-tests:
     name: "Build ${{ matrix.build_type }} with ${{ matrix.compiler }}"
     runs-on: ubuntu-24.04

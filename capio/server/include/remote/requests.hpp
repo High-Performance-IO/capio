@@ -86,8 +86,8 @@ inline void handle_remote_copy_file_range_request(const int tid, const int fd_in
 
     const std::string dest   = std::get<0>(get_file_location(path_in));
     const char *const format = "%04d %s %d %d %d %ld %ld %ld";
-    const int size           = snprintf(nullptr, 0, format, CAPIO_SERVER_REQUEST_COPY_FILE_RANGE,
-                                        path_in.c_str(), tid, fd_in, fd_out, offset_in, offset_out, count);
+    const int size = snprintf(nullptr, 0, format, CAPIO_SERVER_REQUEST_COPY_FILE_RANGE,
+                              path_in.c_str(), tid, fd_in, fd_out, offset_in, offset_out, count);
     const std::unique_ptr<char[]> message(new char[size + 1]);
     sprintf(message.get(), format, CAPIO_SERVER_REQUEST_COPY_FILE_RANGE, path_in.c_str(), tid,
             fd_in, fd_out, offset_in, offset_out, count);

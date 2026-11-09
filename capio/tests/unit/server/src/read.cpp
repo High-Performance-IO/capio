@@ -52,8 +52,8 @@ class StreamingReadTest : public testing::Test {
         // the storage manager, committed.
         static int run = 0;
         path           = std::string("streaming_read_") +
-               testing::UnitTest::GetInstance()->current_test_info()->name() + "_" +
-               std::to_string(run++) + ".dat";
+                         testing::UnitTest::GetInstance()->current_test_info()->name() + "_" +
+                         std::to_string(run++) + ".dat";
         capio_cl_engine->setCommitRule(path, capiocl::commitRules::ON_CLOSE);
         capio_cl_engine->setFireRule(path, capiocl::fireRules::NO_UPDATE);
 
