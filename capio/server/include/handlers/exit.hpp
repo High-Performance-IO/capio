@@ -1,5 +1,5 @@
-#ifndef CAPIO_SERVER_HANDLERS_EXITG_HPP
-#define CAPIO_SERVER_HANDLERS_EXITG_HPP
+#ifndef CAPIO_SERVER_HANDLERS_EXIT_HPP
+#define CAPIO_SERVER_HANDLERS_EXIT_HPP
 
 #include "storage/manager.hpp"
 extern StorageManager *storage_manager;
@@ -48,4 +48,4 @@ void exit_group_handler(const char *const str) {
     handle_exit_group(tid);
 }
 
-#endif // CAPIO_SERVER_HANDLERS_EXITG_HPP
+#endif // CAPIO_SERVER_HANDLERS_EXIT_HPP
