@@ -477,6 +477,11 @@ void MTCLBackend::send_file(const char *message, const int message_len, char *sh
                static_cast<size_t>(nbytes), target);
 }
 
+/** @brief One MTCL message carries at most MTCL_MAX_FILE_TRANSFER_SIZE bytes of file data. */
+long int MTCLBackend::max_file_transfer_size() const {
+    return static_cast<long int>(MTCL_MAX_FILE_TRANSFER_SIZE);
+}
+
 /**
  * @brief Copies the file retained by read_next_request() into the caller's destination.
  *
