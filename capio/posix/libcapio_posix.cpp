@@ -53,6 +53,9 @@ static constexpr long CAPIO_NR_SYSCALLS = 1 + std::max({
 #ifdef SYS_chdir
                                                   SYS_chdir,
 #endif
+#ifdef SYS_fchdir
+                                                  SYS_fchdir,
+#endif
 #ifdef SYS_chmod
                                                   SYS_chmod,
 #endif
@@ -200,23 +203,26 @@ static constexpr std::array<CPHandler_t, CAPIO_NR_SYSCALLS> build_syscall_table(
 #ifdef SYS_chdir
     _syscallTable[SYS_chdir] = chdir_handler;
 #endif
+#ifdef SYS_fchdir
+    _syscallTable[SYS_fchdir] = fchdir_handler;
+#endif
 #ifdef SYS_chmod
-    _syscallTable[SYS_chmod] = fchmod_handler;
+    _syscallTable[SYS_chmod] = chmod_handler;
 #endif
 #ifdef SYS_fchmod
     _syscallTable[SYS_fchmod] = fchmod_handler;
 #endif
 #ifdef SYS_fchmodat
-    _syscallTable[SYS_fchmodat] = fchmod_handler;
+    _syscallTable[SYS_fchmodat] = fchmodat_handler;
 #endif
 #ifdef SYS_chown
-    _syscallTable[SYS_chown] = fchown_handler;
+    _syscallTable[SYS_chown] = chown_handler;
 #endif
 #ifdef SYS_fchown
     _syscallTable[SYS_fchown] = fchown_handler;
 #endif
 #ifdef SYS_fchownat
-    _syscallTable[SYS_fchownat] = fchown_handler;
+    _syscallTable[SYS_fchownat] = fchownat_handler;
 #endif
 #ifdef SYS_close
     _syscallTable[SYS_close] = close_handler;

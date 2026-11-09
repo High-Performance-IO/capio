@@ -1,5 +1,5 @@
-#ifndef CAPIO_SERVER_HANDLERS_EXITG_HPP
-#define CAPIO_SERVER_HANDLERS_EXITG_HPP
+#ifndef CAPIO_SERVER_HANDLERS_EXIT_HPP
+#define CAPIO_SERVER_HANDLERS_EXIT_HPP
 
 #include "storage/manager.hpp"
 extern StorageManager *storage_manager;
@@ -13,7 +13,13 @@ inline void handle_exit_group(int tid) {
 
         LOG("Handling file %s", path.c_str());
         if (CapioCLEngine::get().getCommitRule(path) == capiocl::commitRules::ON_TERMINATION) {
-            CapioFile &c_file = storage_manager->get(path);
+            // A file the process removed before exiting has nothing left to commit.
+            auto c_file_opt = storage_manager->tryGet(path);
+            if (!c_file_opt) {
+                LOG("File %s was removed", path.c_str());
+                continue;
+            }
+            CapioFile &c_file = c_file_opt->get();
             if (c_file.isDirectory()) {
                 LOG("file %s is dir", path.c_str());
                 long int n_committed = c_file.getDirectoryExpectedFileCount();
@@ -42,4 +48,4 @@ void exit_group_handler(const char *const str) {
     handle_exit_group(tid);
 }
 
-#endif // CAPIO_SERVER_HANDLERS_EXITG_HPP
+#endif // CAPIO_SERVER_HANDLERS_EXIT_HPP
