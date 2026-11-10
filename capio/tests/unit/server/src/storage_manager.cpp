@@ -5,7 +5,7 @@
 #include "capiocl.hpp"
 #include "capiocl/engine.h"
 #include "remote/backend/none.hpp"
-#include "remote/file_location_service.hpp"
+#include "remote/home_node_service.hpp"
 #include "storage/manager.hpp"
 #include "utils/capiocl_adapter.hpp"
 

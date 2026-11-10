@@ -7,7 +7,7 @@
 #include "calf/StlLogger.h"
 
 #include "common/dirent.hpp"
-#include "remote/file_location_service.hpp"
+#include "remote/home_node_service.hpp"
 #include "storage/capio_file.hpp"
 #include "storage/manager.hpp"
 #include "utils/capiocl_adapter.hpp"
@@ -323,9 +323,9 @@ off64_t StorageManager::addDirectory(const pid_t tid, const std::filesystem::pat
             c_file.registerFirstWrite();
             // TODO: it works only if there is one prod per file
             if (is_capio_dir(path)) {
-                file_location_service->learn(path, backend->get_node_name());
+                home_node_service->learn(path, backend->get_node_name());
             } else {
-                file_location_service->setHome(path);
+                home_node_service->setHome(path);
                 updateDirectory(tid, path);
             }
             addDirectoryEntry(tid, path, path, DOT_ENTRY);
@@ -349,7 +349,7 @@ void StorageManager::updateDirectory(const pid_t tid, const std::filesystem::pat
     const auto &dir = get_parent_dir_path(file_path);
     if (CapioFile &c_file = get(dir.c_str()); c_file.isFirstWrite()) {
         c_file.registerFirstWrite();
-        file_location_service->setHome(dir);
+        home_node_service->setHome(dir);
     }
     addDirectoryEntry(tid, file_path, dir, REGULAR_ENTRY);
 }

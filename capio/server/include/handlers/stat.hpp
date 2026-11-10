@@ -8,7 +8,7 @@
 
 #include "remote/requests.hpp"
 
-#include "remote/file_location_service.hpp"
+#include "remote/home_node_service.hpp"
 #include "utils/runtime_configuration.hpp"
 #include "utils/types.hpp"
 
@@ -22,7 +22,7 @@ extern Backend *backend;
 void wait_for_file_completion(int tid, const std::filesystem::path &path) {
     START_LOG(gettid(), "call(tid=%d, path=%s)", tid, path.c_str());
 
-    const auto home   = file_location_service->waitForHome(path);
+    const auto home   = home_node_service->waitForHome(path);
     // check if the file is local or remote
     CapioFile &c_file = storage_manager->get(path);
 
@@ -41,11 +41,11 @@ void wait_for_file_completion(int tid, const std::filesystem::path &path) {
 inline void reply_stat(int tid, const std::filesystem::path &path) {
     START_LOG(gettid(), "call(tid=%d, path=%s)", tid, path.c_str());
 
-    auto file_location_opt = file_location_service->getHome(path);
+    auto file_location_opt = home_node_service->getHome(path);
     LOG("File %s is local? %s", path.c_str(), file_location_opt ? "True" : "False");
 
     if (!file_location_opt) {
-        file_location_opt = file_location_service->lookup(path);
+        file_location_opt = home_node_service->lookup(path);
         if (!file_location_opt) {
             LOG("path %s is not present in any node", path.c_str());
             // if it is in configuration file then wait otherwise fail

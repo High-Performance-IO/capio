@@ -8,11 +8,11 @@
 #include <vector>
 
 #include "remote/backend.hpp"
-#include "remote/file_location_service.hpp"
 #include "remote/handlers/location.hpp"
+#include "remote/home_node_service.hpp"
 
 extern Backend *backend;
-extern FileLocationService *file_location_service;
+extern HomeNodeService *home_node_service;
 
 namespace {
 
@@ -63,29 +63,29 @@ long queryId(const std::string &message) { return std::stol(message.substr(5)); 
 
 } // namespace
 
-class FileLocationServiceTest : public testing::Test {
+class HomeNodeServiceTest : public testing::Test {
   protected:
     PeersBackend peers;
     // A long timeout: lookups must end on the answers, not on the timeout
-    FileLocationService service{std::chrono::seconds(30), std::chrono::seconds(30)};
-    FileLocationService *global_service = nullptr;
+    HomeNodeService service{std::chrono::seconds(30), std::chrono::seconds(30)};
+    HomeNodeService *global_service = nullptr;
 
     void SetUp() override {
         ASSERT_EQ(backend, nullptr);
-        backend               = &peers;
-        global_service        = file_location_service;
-        file_location_service = &service;
+        backend           = &peers;
+        global_service    = home_node_service;
+        home_node_service = &service;
     }
 
     void TearDown() override {
-        file_location_service = global_service;
-        backend               = nullptr;
+        home_node_service = global_service;
+        backend           = nullptr;
     }
 
     std::string self() const { return peers.get_node_name(); }
 };
 
-TEST_F(FileLocationServiceTest, creatingAFileAnnouncesItToEveryOtherServer) {
+TEST_F(HomeNodeServiceTest, creatingAFileAnnouncesItToEveryOtherServer) {
     service.setHome("/capio/file");
 
     EXPECT_EQ(service.getHome("/capio/file"), self());
@@ -98,14 +98,14 @@ TEST_F(FileLocationServiceTest, creatingAFileAnnouncesItToEveryOtherServer) {
     EXPECT_NE(sent[1].second, self());
 }
 
-TEST_F(FileLocationServiceTest, lookupOfAKnownFileAsksNoOne) {
+TEST_F(HomeNodeServiceTest, lookupOfAKnownFileAsksNoOne) {
     service.learn("/capio/file", "peer-a");
 
     EXPECT_EQ(service.lookup("/capio/file"), "peer-a");
     EXPECT_TRUE(peers.sent().empty());
 }
 
-TEST_F(FileLocationServiceTest, lookupOfAFileNoServerHoldsEndsWhenEveryServerAnswered) {
+TEST_F(HomeNodeServiceTest, lookupOfAFileNoServerHoldsEndsWhenEveryServerAnswered) {
     auto result = std::async(std::launch::async, [this] { return service.lookup("/capio/new"); });
 
     ASSERT_TRUE(peers.waitForSent(2));
@@ -123,7 +123,7 @@ TEST_F(FileLocationServiceTest, lookupOfAFileNoServerHoldsEndsWhenEveryServerAns
     EXPECT_FALSE(service.getHome("/capio/new"));
 }
 
-TEST_F(FileLocationServiceTest, lookupReturnsTheServerThatHoldsTheFile) {
+TEST_F(HomeNodeServiceTest, lookupReturnsTheServerThatHoldsTheFile) {
     auto result = std::async(std::launch::async, [this] { return service.lookup("/capio/file"); });
 
     ASSERT_TRUE(peers.waitForSent(2));
@@ -134,7 +134,7 @@ TEST_F(FileLocationServiceTest, lookupReturnsTheServerThatHoldsTheFile) {
     EXPECT_EQ(service.getHome("/capio/file"), "peer-b");
 }
 
-TEST_F(FileLocationServiceTest, waitForAFileEndsWhenItsCreationIsAnnounced) {
+TEST_F(HomeNodeServiceTest, waitForAFileEndsWhenItsCreationIsAnnounced) {
     auto result =
         std::async(std::launch::async, [this] { return service.waitForHome("/capio/later"); });
 
@@ -150,7 +150,7 @@ TEST_F(FileLocationServiceTest, waitForAFileEndsWhenItsCreationIsAnnounced) {
     EXPECT_EQ(result.get(), "peer-a");
 }
 
-TEST_F(FileLocationServiceTest, onlyTheHomeOfAFileSaysItHoldsIt) {
+TEST_F(HomeNodeServiceTest, onlyTheHomeOfAFileSaysItHoldsIt) {
     service.setHome("/capio/mine");
     service.learn("/capio/theirs", "peer-a");
     peers.clear();
@@ -168,7 +168,7 @@ TEST_F(FileLocationServiceTest, onlyTheHomeOfAFileSaysItHoldsIt) {
               std::make_pair(std::string("0009 9 0 /capio/unknown"), std::string("peer-b")));
 }
 
-TEST_F(FileLocationServiceTest, removingAFileThisServerHoldsTellsTheOthers) {
+TEST_F(HomeNodeServiceTest, removingAFileThisServerHoldsTellsTheOthers) {
     service.setHome("/capio/mine");
     service.learn("/capio/theirs", "peer-a");
     peers.clear();
@@ -185,7 +185,7 @@ TEST_F(FileLocationServiceTest, removingAFileThisServerHoldsTellsTheOthers) {
     EXPECT_FALSE(service.getHome("/capio/theirs"));
 }
 
-TEST_F(FileLocationServiceTest, renamingAFileMovesItsAnnouncement) {
+TEST_F(HomeNodeServiceTest, renamingAFileMovesItsAnnouncement) {
     service.setHome("/capio/old");
     peers.clear();
 
@@ -199,7 +199,7 @@ TEST_F(FileLocationServiceTest, renamingAFileMovesItsAnnouncement) {
     EXPECT_EQ(sent[2].first, "0006 /capio/new");
 }
 
-TEST_F(FileLocationServiceTest, forgettingAFileThatMovedKeepsItsNewHome) {
+TEST_F(HomeNodeServiceTest, forgettingAFileThatMovedKeepsItsNewHome) {
     // peer-a removes the file and peer-b creates it again, but peer-b's announcement arrives first
     service.learn("/capio/moved", "peer-a");
     service.learn("/capio/moved", "peer-b");
@@ -210,13 +210,13 @@ TEST_F(FileLocationServiceTest, forgettingAFileThatMovedKeepsItsNewHome) {
     EXPECT_FALSE(service.getHome("/capio/moved"));
 }
 
-TEST_F(FileLocationServiceTest, anotherServerAnnouncingAPathDoesNotTakeItFromThisOne) {
+TEST_F(HomeNodeServiceTest, anotherServerAnnouncingAPathDoesNotTakeItFromThisOne) {
     service.setHome("/capio/dir");
     service.learn("/capio/dir", "peer-a");
     EXPECT_EQ(service.getHome("/capio/dir"), self());
 }
 
-TEST_F(FileLocationServiceTest, remoteRequestsReachTheService) {
+TEST_F(HomeNodeServiceTest, remoteRequestsReachTheService) {
     remote_location_announce_handler(
         RemoteRequest(std::string("0006 /capio/with space"), std::string("peer-a")));
     EXPECT_EQ(service.getHome("/capio/with space"), "peer-a");

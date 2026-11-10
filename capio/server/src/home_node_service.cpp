@@ -4,7 +4,7 @@
 
 #include "calf/StlLogger.h"
 #include "common/requests.hpp"
-#include "remote/file_location_service.hpp"
+#include "remote/home_node_service.hpp"
 
 namespace {
 
@@ -34,20 +34,20 @@ std::string location_request(const int code, const std::string &fields,
 
 } // namespace
 
-FileLocationService::FileLocationService(const std::chrono::milliseconds query_timeout,
-                                         const std::chrono::milliseconds requery_interval)
+HomeNodeService::HomeNodeService(const std::chrono::milliseconds query_timeout,
+                                 const std::chrono::milliseconds requery_interval)
     : _query_timeout(query_timeout), _requery_interval(requery_interval) {}
 
-void FileLocationService::_send(const int code, const std::string &fields,
-                                const std::filesystem::path &path, const std::string &target) {
+void HomeNodeService::_send(const int code, const std::string &fields,
+                            const std::filesystem::path &path, const std::string &target) {
     START_LOG(gettid(), "call(code=%d, fields=%s, path=%s, target=%s)", code, fields.c_str(),
               path.c_str(), target.c_str());
     const std::string message = location_request(code, fields, path);
     backend->send_request(message.c_str(), static_cast<int>(message.size()), target);
 }
 
-std::size_t FileLocationService::_broadcast(const int code, const std::string &fields,
-                                            const std::filesystem::path &path) {
+std::size_t HomeNodeService::_broadcast(const int code, const std::string &fields,
+                                        const std::filesystem::path &path) {
     START_LOG(gettid(), "call(code=%d, fields=%s, path=%s)", code, fields.c_str(), path.c_str());
     const auto servers = other_servers();
     for (const auto &server : servers) {
@@ -56,7 +56,7 @@ std::size_t FileLocationService::_broadcast(const int code, const std::string &f
     return servers.size();
 }
 
-std::optional<std::string> FileLocationService::getHome(const std::filesystem::path &path) const {
+std::optional<std::string> HomeNodeService::getHome(const std::filesystem::path &path) const {
     START_LOG(gettid(), "call(path=%s)", path.c_str());
     const std::lock_guard lg(_mutex);
     if (const auto it = _homes.find(path); it != _homes.end()) {
@@ -67,7 +67,7 @@ std::optional<std::string> FileLocationService::getHome(const std::filesystem::p
     return {};
 }
 
-std::optional<std::string> FileLocationService::lookup(const std::filesystem::path &path) {
+std::optional<std::string> HomeNodeService::lookup(const std::filesystem::path &path) {
     START_LOG(gettid(), "call(path=%s)", path.c_str());
 
     const auto servers = other_servers();
@@ -112,7 +112,7 @@ std::optional<std::string> FileLocationService::lookup(const std::filesystem::pa
     return {};
 }
 
-std::string FileLocationService::waitForHome(const std::filesystem::path &path) {
+std::string HomeNodeService::waitForHome(const std::filesystem::path &path) {
     START_LOG(gettid(), "call(path=%s)", path.c_str());
     while (true) {
         if (auto home = lookup(path)) {
@@ -128,7 +128,7 @@ std::string FileLocationService::waitForHome(const std::filesystem::path &path) 
     }
 }
 
-void FileLocationService::setHome(const std::filesystem::path &path) {
+void HomeNodeService::setHome(const std::filesystem::path &path) {
     START_LOG(gettid(), "call(path=%s)", path.c_str());
     {
         const std::lock_guard lg(_mutex);
@@ -138,7 +138,7 @@ void FileLocationService::setHome(const std::filesystem::path &path) {
     _broadcast(CAPIO_SERVER_REQUEST_LOCATION_ANNOUNCE, "", path);
 }
 
-int FileLocationService::remove(const std::filesystem::path &path) {
+int HomeNodeService::remove(const std::filesystem::path &path) {
     START_LOG(gettid(), "call(path=%s)", path.c_str());
     bool was_home;
     {
@@ -157,8 +157,8 @@ int FileLocationService::remove(const std::filesystem::path &path) {
     return 1;
 }
 
-void FileLocationService::rename(const std::filesystem::path &oldpath,
-                                 const std::filesystem::path &newpath) {
+void HomeNodeService::rename(const std::filesystem::path &oldpath,
+                             const std::filesystem::path &newpath) {
     START_LOG(gettid(), "call(oldpath=%s, newpath=%s)", oldpath.c_str(), newpath.c_str());
     remove(oldpath);
     if (!getHome(newpath)) {
@@ -166,7 +166,7 @@ void FileLocationService::rename(const std::filesystem::path &oldpath,
     }
 }
 
-void FileLocationService::learn(const std::filesystem::path &path, const std::string &home) {
+void HomeNodeService::learn(const std::filesystem::path &path, const std::string &home) {
     START_LOG(gettid(), "call(path=%s, home=%s)", path.c_str(), home.c_str());
     {
         const std::lock_guard lg(_mutex);
@@ -178,7 +178,7 @@ void FileLocationService::learn(const std::filesystem::path &path, const std::st
     _changed.notify_all();
 }
 
-void FileLocationService::forget(const std::filesystem::path &path, const std::string &home) {
+void HomeNodeService::forget(const std::filesystem::path &path, const std::string &home) {
     START_LOG(gettid(), "call(path=%s, home=%s)", path.c_str(), home.c_str());
     const std::lock_guard lg(_mutex);
     if (const auto it = _homes.find(path); it != _homes.end() && it->second == home) {
@@ -186,8 +186,8 @@ void FileLocationService::forget(const std::filesystem::path &path, const std::s
     }
 }
 
-void FileLocationService::answerQuery(const long query_id, const std::filesystem::path &path,
-                                      const std::string &source) const {
+void HomeNodeService::answerQuery(const long query_id, const std::filesystem::path &path,
+                                  const std::string &source) const {
     START_LOG(gettid(), "call(query_id=%ld, path=%s, source=%s)", query_id, path.c_str(),
               source.c_str());
     bool holds;
@@ -200,8 +200,8 @@ void FileLocationService::answerQuery(const long query_id, const std::filesystem
           std::to_string(query_id) + " " + (holds ? "1" : "0") + " ", path, source);
 }
 
-void FileLocationService::receiveAnswer(const long query_id, const bool holds,
-                                        const std::string &source) {
+void HomeNodeService::receiveAnswer(const long query_id, const bool holds,
+                                    const std::string &source) {
     START_LOG(gettid(), "call(query_id=%ld, holds=%s, source=%s)", query_id,
               holds ? "true" : "false", source.c_str());
     {

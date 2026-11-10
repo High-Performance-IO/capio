@@ -5,8 +5,8 @@
 
 #include "client-manager/client_manager.hpp"
 #include "remote/backend.hpp"
-#include "remote/file_location_service.hpp"
 #include "remote/handlers/copy_file_range.hpp"
+#include "remote/home_node_service.hpp"
 #include "storage/manager.hpp"
 #include "utils/capiocl_adapter.hpp"
 #include "utils/common.hpp"
@@ -84,15 +84,15 @@ inline void copy_file_range_handler(const char *const str) {
     const bool is_prod          = CapioCLEngine::get().isProducer(copy.path_in, app_name) ||
                                   client_manager->isProducer(copy.tid, copy.path_in);
 
-    if (!is_prod && !file_location_service->getHome(copy.path_in)) {
+    if (!is_prod && !home_node_service->getHome(copy.path_in)) {
         LOG("Waiting on a separate thread for the input to be created");
         std::thread t([copy] {
-            handle_copy_file_range(copy, false, file_location_service->waitForHome(copy.path_in));
+            handle_copy_file_range(copy, false, home_node_service->waitForHome(copy.path_in));
         });
         t.detach();
         return;
     }
-    handle_copy_file_range(copy, is_prod, file_location_service->getHome(copy.path_in));
+    handle_copy_file_range(copy, is_prod, home_node_service->getHome(copy.path_in));
 }
 
 #endif // CAPIO_SERVER_HANDLERS_COPY_FILE_RANGE_HPP

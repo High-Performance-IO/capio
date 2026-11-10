@@ -35,10 +35,10 @@ ClientManager *client_manager;
 StorageManager *storage_manager;
 Backend *backend;
 DiscoveryService *discovery_service;
-FileLocationService *file_location_service;
+HomeNodeService *home_node_service;
 
 #include "handlers.hpp"
-#include "remote/file_location_service.hpp"
+#include "remote/home_node_service.hpp"
 #include "utils/runtime_configuration.hpp"
 #include "utils/signals.hpp"
 
@@ -132,9 +132,9 @@ int main(int argc, char **argv) {
 
     START_LOG(gettid(), "call()");
 
-    file_location_service =
-        new FileLocationService(RuntimeConfiguration::get().getLocationQueryTimeout(),
-                                RuntimeConfiguration::get().getLocationRequeryInterval());
+    home_node_service =
+        new HomeNodeService(RuntimeConfiguration::get().getLocationQueryTimeout(),
+                            RuntimeConfiguration::get().getLocationRequeryInterval());
 
     storage_manager = new StorageManager();
     client_manager  = new ClientManager();

@@ -1,7 +1,7 @@
 #ifndef CAPIO_SERVER_HANDLERS_OPEN_HPP
 #define CAPIO_SERVER_HANDLERS_OPEN_HPP
 
-#include "remote/file_location_service.hpp"
+#include "remote/home_node_service.hpp"
 #include "utils/runtime_configuration.hpp"
 
 extern ClientManager *client_manager;
@@ -24,14 +24,14 @@ inline void update_file_metadata(const std::filesystem::path &path, int tid, int
     if (c_file.isFirstWrite() && is_creat) {
         client_manager->registerProducedFile(tid, path);
         c_file.registerFirstWrite();
-        file_location_service->setHome(path);
+        home_node_service->setHome(path);
         storage_manager->updateDirectory(tid, path);
     }
 }
 
 inline void wait_for_file_creation(const std::filesystem::path &path, pid_t tid, int fd) {
     START_LOG(gettid(), "wait_for_file_creation(%s, %ld, %d)", path.c_str(), tid, fd);
-    file_location_service->waitForHome(path);
+    home_node_service->waitForHome(path);
     LOG("File %s exists. Allowing execution of posix client", path.c_str());
     update_file_metadata(path, tid, fd, false, 0);
     client_manager->replyToClient(tid, 0);
@@ -40,7 +40,7 @@ inline void wait_for_file_creation(const std::filesystem::path &path, pid_t tid,
 inline void handle_create(int tid, int fd, const std::filesystem::path &path) {
     START_LOG(gettid(), "call(tid=%d, fd=%d, path_cstr=%s)", tid, fd, path.c_str());
 
-    bool is_creat = !(file_location_service->getHome(path) || file_location_service->lookup(path));
+    bool is_creat = !(home_node_service->getHome(path) || home_node_service->lookup(path));
     update_file_metadata(path, tid, fd, is_creat, 0);
     client_manager->replyToClient(tid, 0);
 }
@@ -60,7 +60,7 @@ inline void handle_open(int tid, int fd, const std::filesystem::path &path) {
     START_LOG(gettid(), "call(tid=%d, fd=%d, path_cstr=%s)", tid, fd, path.c_str());
 
     // lookup() is last because it may ask the other servers (short circuit evaluation)
-    if (file_location_service->getHome(path) || file_location_service->lookup(path)) {
+    if (home_node_service->getHome(path) || home_node_service->lookup(path)) {
         update_file_metadata(path, tid, fd, false, 0);
         client_manager->replyToClient(tid, 0);
     } else {

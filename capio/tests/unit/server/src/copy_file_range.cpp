@@ -13,7 +13,7 @@
 #include "client-manager/client_manager.hpp"
 #include "common/requests.hpp"
 #include "remote/backend.hpp"
-#include "remote/file_location_service.hpp"
+#include "remote/home_node_service.hpp"
 #include "storage/manager.hpp"
 #include "utils/capiocl_adapter.hpp"
 #include "utils/common.hpp"
@@ -143,7 +143,7 @@ class CopyFileRangeTest : public testing::Test {
         // Give a copy released by the commit above time to finish before its files are removed.
         std::this_thread::sleep_for(std::chrono::milliseconds(50));
         sem_close(responses_available);
-        file_location_service->remove(path_in);
+        home_node_service->remove(path_in);
         storage_manager->remove(path_in);
         storage_manager->remove(path_out);
         client_manager->removeClient(PRODUCER_TID);
@@ -152,10 +152,10 @@ class CopyFileRangeTest : public testing::Test {
     }
 
     // The input is stored on this node.
-    void input_is_local() { file_location_service->learn(path_in, backend->get_node_name()); }
+    void input_is_local() { home_node_service->learn(path_in, backend->get_node_name()); }
 
     // The input is stored on another node.
-    void input_is_remote() { file_location_service->learn(path_in, REMOTE_NODE); }
+    void input_is_remote() { home_node_service->learn(path_in, REMOTE_NODE); }
 
     int pending_responses() const {
         int value = 0;

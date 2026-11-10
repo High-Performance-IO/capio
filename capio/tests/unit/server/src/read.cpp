@@ -15,7 +15,7 @@
 #include "client-manager/client_manager.hpp"
 #include "common/requests.hpp"
 #include "remote/backend/none.hpp"
-#include "remote/file_location_service.hpp"
+#include "remote/home_node_service.hpp"
 #include "storage/manager.hpp"
 #include "utils/capiocl_adapter.hpp"
 

@@ -9,7 +9,7 @@
 #include "capiocl_adapter.hpp"
 #include "client-manager/client_manager.hpp"
 #include "common/dirent.hpp"
-#include "remote/file_location_service.hpp"
+#include "remote/home_node_service.hpp"
 #include "storage/capio_file.hpp"
 #include "storage/manager.hpp"
 #include "utils/types.hpp"
@@ -114,7 +114,7 @@ inline void register_written_data(const int tid, const std::filesystem::path &pa
     c_file.insertSector(offset, end_of_write);
     if (c_file.isFirstWrite()) {
         c_file.registerFirstWrite();
-        file_location_service->setHome(path);
+        home_node_service->setHome(path);
         // TODO: it works only if there is one prod per file
         storage_manager->updateDirectory(tid, path);
     }

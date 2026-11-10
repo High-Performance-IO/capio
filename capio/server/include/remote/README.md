@@ -23,8 +23,8 @@ file `CAPIO_ROOT_DIR/src/common/capio/constants.hpp`, to include the name of you
 
 # File locations
 
-Every CAPIO file has a home: the server that holds it. `FileLocationService`
-(`file_location_service.hpp`) keeps, on each server, a table of the files it has heard of and their
+Every CAPIO file has a home: the server that holds it. `HomeNodeService`
+(`home_node_service.hpp`) keeps, on each server, a table of the files it has heard of and their
 homes, through the communication backend, as ARP keeps a table of addresses:
 
 | request | sent | meaning |

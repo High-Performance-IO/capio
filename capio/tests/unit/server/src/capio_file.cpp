@@ -2,7 +2,7 @@
 #include "common/constants.hpp"
 #include "common/dirent.hpp"
 #include "remote/backend.hpp"
-#include "remote/file_location_service.hpp"
+#include "remote/home_node_service.hpp"
 #include "storage/manager.hpp"
 
 extern StorageManager *storage_manager;

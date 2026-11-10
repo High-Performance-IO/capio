@@ -1,7 +1,7 @@
 #ifndef CAPIO_SERVER_HANDLERS_RENAME_HPP
 #define CAPIO_SERVER_HANDLERS_RENAME_HPP
 #include "client-manager/client_manager.hpp"
-#include "remote/file_location_service.hpp"
+#include "remote/home_node_service.hpp"
 #include "storage/manager.hpp"
 #include "utils/filesystem.hpp"
 
@@ -29,7 +29,7 @@ void handle_rename(int tid, const std::filesystem::path &oldpath,
         if (storage_manager->tryGet(get_parent_dir_path(newpath))) {
             storage_manager->updateDirectory(tid, newpath);
         }
-        file_location_service->rename(oldpath, newpath);
+        home_node_service->rename(oldpath, newpath);
         client_manager->replyToClient(tid, 0);
     } else {
         client_manager->replyToClient(tid, 1);

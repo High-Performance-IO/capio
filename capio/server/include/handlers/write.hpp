@@ -1,7 +1,7 @@
 #ifndef CAPIO_SERVER_HANDLERS_WRITE_HPP
 #define CAPIO_SERVER_HANDLERS_WRITE_HPP
 
-#include "remote/file_location_service.hpp"
+#include "remote/home_node_service.hpp"
 #include "utils/common.hpp"
 
 inline void write_handler(const char *const str) {

@@ -1,7 +1,7 @@
 #ifndef CAPIO_REMOTE_REQUESTS_HPP
 #define CAPIO_REMOTE_REQUESTS_HPP
 
-#include "remote/file_location_service.hpp"
+#include "remote/home_node_service.hpp"
 #include "storage/manager.hpp"
 #include "utils/runtime_configuration.hpp"
 

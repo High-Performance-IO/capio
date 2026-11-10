@@ -5,17 +5,17 @@
 #include "client-manager/client_manager.hpp"
 #include "common/constants.hpp"
 #include "remote/discovery.hpp"
-#include "remote/file_location_service.hpp"
+#include "remote/home_node_service.hpp"
 #include "storage/manager.hpp"
 #include "utils/capiocl_adapter.hpp"
 #include "utils/runtime_configuration.hpp"
 
-capiocl::engine::Engine *capio_cl_engine   = nullptr;
-StorageManager *storage_manager            = nullptr;
-ClientManager *client_manager              = nullptr;
-Backend *backend                           = nullptr;
-DiscoveryService *discovery_service        = nullptr;
-FileLocationService *file_location_service = nullptr;
+capiocl::engine::Engine *capio_cl_engine = nullptr;
+StorageManager *storage_manager          = nullptr;
+ClientManager *client_manager            = nullptr;
+Backend *backend                         = nullptr;
+DiscoveryService *discovery_service      = nullptr;
+HomeNodeService *home_node_service       = nullptr;
 
 class TestDiscovery final : public DiscoveryInterface {
   public:
@@ -36,10 +36,12 @@ class ServerUnitTestEnvironment : public testing::Environment {
         RuntimeConfiguration::set(RuntimeConfiguration(argv.size(), argv.data()));
         capio_cl_engine = new capiocl::engine::Engine(false);
         capio_cl_engine->setWorkflowName(CAPIO_DEFAULT_WORKFLOW_NAME);
-        client_manager        = new ClientManager();
-        storage_manager       = new StorageManager();
-        discovery_service     = new DiscoveryService(std::make_unique<TestDiscovery>());
-        file_location_service = new FileLocationService();
+        client_manager    = new ClientManager();
+        storage_manager   = new StorageManager();
+        discovery_service = new DiscoveryService(std::make_unique<TestDiscovery>());
+        home_node_service =
+            new HomeNodeService(RuntimeConfiguration::get().getLocationQueryTimeout(),
+                                RuntimeConfiguration::get().getLocationRequeryInterval());
     }
 
     void TearDown() override {
@@ -47,7 +49,7 @@ class ServerUnitTestEnvironment : public testing::Environment {
         delete client_manager;
         delete capio_cl_engine;
         delete discovery_service;
-        delete file_location_service;
+        delete home_node_service;
     }
 };
 

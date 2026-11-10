@@ -1,7 +1,7 @@
 #ifndef CAPIO_SERVER_HANDLERS_ACCESS_HPP
 #define CAPIO_SERVER_HANDLERS_ACCESS_HPP
 
-#include "remote/file_location_service.hpp"
+#include "remote/home_node_service.hpp"
 
 extern ClientManager *client_manager;
 
@@ -16,7 +16,7 @@ void access_handler(const char *const str) {
         return;
     }
 
-    client_manager->replyToClient(tid, file_location_service->getHome(path) ? 0 : -1);
+    client_manager->replyToClient(tid, home_node_service->getHome(path) ? 0 : -1);
 }
 
 #endif // CAPIO_SERVER_HANDLERS_ACCESS_HPP

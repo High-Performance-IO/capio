@@ -1,5 +1,5 @@
-#ifndef CAPIO_SERVER_REMOTE_FILE_LOCATION_SERVICE_HPP
-#define CAPIO_SERVER_REMOTE_FILE_LOCATION_SERVICE_HPP
+#ifndef CAPIO_SERVER_REMOTE_HOME_NODE_SERVICE_HPP
+#define CAPIO_SERVER_REMOTE_HOME_NODE_SERVICE_HPP
 
 #include <chrono>
 #include <condition_variable>
@@ -37,7 +37,7 @@ extern Backend *backend;
  * Lookups and waits block until the other servers answer, which the remote listener thread
  * handles: never call them from that thread.
  */
-class FileLocationService {
+class HomeNodeService {
     /// @brief Protects every member below
     mutable std::mutex _mutex;
     /// @brief Signalled when a home is learnt or a query is answered
@@ -90,11 +90,11 @@ class FileLocationService {
      * @param query_timeout how long lookup() waits for the other servers to answer
      * @param requery_interval how often waitForHome() asks the other servers again
      */
-    FileLocationService(std::chrono::milliseconds query_timeout,
-                        std::chrono::milliseconds requery_interval);
+    HomeNodeService(std::chrono::milliseconds query_timeout,
+                    std::chrono::milliseconds requery_interval);
 
-    FileLocationService(const FileLocationService &)            = delete;
-    FileLocationService &operator=(const FileLocationService &) = delete;
+    HomeNodeService(const HomeNodeService &)            = delete;
+    HomeNodeService &operator=(const HomeNodeService &) = delete;
 
     /**
      * @brief Home node of a file, if this server knows it. Asks no other server.
@@ -179,6 +179,6 @@ class FileLocationService {
     void receiveAnswer(long query_id, bool holds, const std::string &source);
 };
 
-extern FileLocationService *file_location_service;
+extern HomeNodeService *home_node_service;
 
-#endif // CAPIO_SERVER_REMOTE_FILE_LOCATION_SERVICE_HPP
+#endif // CAPIO_SERVER_REMOTE_HOME_NODE_SERVICE_HPP

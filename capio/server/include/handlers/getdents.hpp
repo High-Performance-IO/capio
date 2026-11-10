@@ -4,7 +4,7 @@
 #include <thread>
 
 #include "remote/backend.hpp"
-#include "remote/file_location_service.hpp"
+#include "remote/home_node_service.hpp"
 #include "remote/requests.hpp"
 #include "utils/runtime_configuration.hpp"
 
@@ -44,13 +44,13 @@ inline void handle_getdents(int tid, int fd, long int count) {
     const std::filesystem::path &path_to_check = storage_manager->getPath(tid, fd);
     const std::filesystem::path &capio_dir     = RuntimeConfiguration::get().getCapioDir();
     bool is_prod           = CapioCLEngine::get().isProducer(path_to_check, app_name);
-    auto file_location_opt = file_location_service->getHome(path_to_check);
+    auto file_location_opt = home_node_service->getHome(path_to_check);
 
     if (!file_location_opt && !is_prod) {
         std::thread t([tid, fd, count, path_to_check] {
             START_LOG(gettid(), "call(tid=%d, fd=%d, count=%ld)", tid, fd, count);
 
-            if (const auto home = file_location_service->waitForHome(path_to_check);
+            if (const auto home = home_node_service->waitForHome(path_to_check);
                 home == backend->get_node_name()) {
                 handle_getdents(tid, fd, count);
             } else {
