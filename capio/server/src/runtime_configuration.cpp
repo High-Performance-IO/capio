@@ -3,6 +3,7 @@
 #include "calf/StdOutLogger.h"
 #include "calf/StlLogger.h"
 
+#include "capiocl/configuration.h"
 #include "capiocl/parser.h"
 #include "common/constants.hpp"
 #include "utils/common.hpp"
@@ -233,8 +234,14 @@ capiocl::engine::Engine *RuntimeConfiguration::createCapioClEngine() const {
         engine = new capiocl::engine::Engine();
         engine->startApiServer();
     } else if (!capio_cl_config_path.empty()) {
-        engine = capiocl::parser::Parser::parse(capio_cl_config_path, capio_cl_resolve_path,
-                                                store_all_in_memory);
+        // The defaults enable the multicast and file system monitors, as Parser::parse did
+        // before CAPIO-CL 2.0. They don't touch the three options set here.
+        capiocl::configuration::CapioClConfiguration capio_cl_config(
+            {{"capiocl.config_path", capio_cl_config_path},
+             {"capiocl.resolve_path", capio_cl_resolve_path},
+             {"capiocl.store_all_in_memory", store_all_in_memory ? "true" : "false"}});
+        capio_cl_config.loadDefaults();
+        engine = capiocl::parser::Parser::parse(capio_cl_config);
     } else {
         const char *workflow_name = std::getenv("CAPIO_WORKFLOW_NAME");
         engine                    = new capiocl::engine::Engine();
