@@ -28,8 +28,9 @@ extern StorageManager *storage_manager;
  * copies it when it arrives.
  *
  * @param copy
+ * @param home the input's home node, which the data is asked from
  */
-inline void handle_remote_copy_file_range(const CSCopyFileRange_t &copy) {
+inline void handle_remote_copy_file_range(const CSCopyFileRange_t &copy, const std::string &home) {
     START_LOG(gettid(), "call(tid=%d, path_in=%s, offset_in=%ld, count=%ld)", copy.tid,
               copy.path_in.c_str(), copy.offset_in, copy.count);
 
@@ -46,7 +47,7 @@ inline void handle_remote_copy_file_range(const CSCopyFileRange_t &copy) {
         return;
     }
     handle_remote_copy_file_range_request(copy.tid, copy.fd_in, copy.fd_out, copy.path_in,
-                                          copy.offset_in, copy.offset_out, copy.count);
+                                          copy.offset_in, copy.offset_out, copy.count, home);
 }
 
 /**

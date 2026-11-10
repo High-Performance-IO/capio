@@ -1,8 +1,8 @@
 #ifndef CAPIO_SERVER_HANDLERS_WRITE_HPP
 #define CAPIO_SERVER_HANDLERS_WRITE_HPP
 
+#include "remote/home_node_service.hpp"
 #include "utils/common.hpp"
-#include "utils/location.hpp"
 
 inline void write_handler(const char *const str) {
     std::string request;

@@ -6,10 +6,10 @@
 #include "client-manager/client_manager.hpp"
 #include "remote/backend.hpp"
 #include "remote/handlers/copy_file_range.hpp"
+#include "remote/home_node_service.hpp"
 #include "storage/manager.hpp"
 #include "utils/capiocl_adapter.hpp"
 #include "utils/common.hpp"
-#include "utils/location.hpp"
 #include "utils/types.hpp"
 
 extern Backend *backend;
@@ -59,12 +59,14 @@ inline void handle_local_copy_file_range(const CSCopyFileRange_t &copy, const bo
  *
  * @param copy
  * @param is_prod whether the client is a producer of the input
+ * @param home the input's home node; a producer copies locally and may not have one yet
  */
-inline void handle_copy_file_range(const CSCopyFileRange_t &copy, const bool is_prod) {
-    if (is_prod || std::get<0>(get_file_location(copy.path_in)) == backend->get_node_name()) {
+inline void handle_copy_file_range(const CSCopyFileRange_t &copy, const bool is_prod,
+                                   const std::optional<std::string> &home) {
+    if (is_prod || home == backend->get_node_name()) {
         handle_local_copy_file_range(copy, is_prod);
     } else {
-        handle_remote_copy_file_range(copy);
+        handle_remote_copy_file_range(copy, *home);
     }
 }
 
@@ -82,16 +84,15 @@ inline void copy_file_range_handler(const char *const str) {
     const bool is_prod          = CapioCLEngine::get().isProducer(copy.path_in, app_name) ||
                                   client_manager->isProducer(copy.tid, copy.path_in);
 
-    if (!is_prod && !get_file_location_opt(copy.path_in)) {
+    if (!is_prod && !home_node_service->getHome(copy.path_in)) {
         LOG("Waiting on a separate thread for the input to be created");
         std::thread t([copy] {
-            loop_load_file_location(copy.path_in);
-            handle_copy_file_range(copy, false);
+            handle_copy_file_range(copy, false, home_node_service->waitForHome(copy.path_in));
         });
         t.detach();
         return;
     }
-    handle_copy_file_range(copy, is_prod);
+    handle_copy_file_range(copy, is_prod, home_node_service->getHome(copy.path_in));
 }
 
 #endif // CAPIO_SERVER_HANDLERS_COPY_FILE_RANGE_HPP

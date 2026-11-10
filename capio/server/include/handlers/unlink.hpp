@@ -20,7 +20,7 @@ void unlink_handler(const char *const str) {
         if (c_file.deletable()) {
             storage_manager->remove(path);
             storage_manager->removeFromDirectory(path);
-            delete_from_files_location(path);
+            home_node_service->remove(path);
         }
         client_manager->replyToClient(tid, 0);
     } else {

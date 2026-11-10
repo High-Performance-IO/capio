@@ -5,9 +5,9 @@
 #include "capiocl.hpp"
 #include "capiocl/engine.h"
 #include "remote/backend/none.hpp"
+#include "remote/home_node_service.hpp"
 #include "storage/manager.hpp"
 #include "utils/capiocl_adapter.hpp"
-#include "utils/location.hpp"
 
 extern StorageManager *storage_manager;
 extern capiocl::engine::Engine *capio_cl_engine;
@@ -69,10 +69,6 @@ TEST_F(StorageManagerTestEnvironment, testInitDirectory) {
     dir.createBuffer("", true);
     EXPECT_EQ(dir.getBufSize(), CAPIO_DEFAULT_DIR_INITIAL_SIZE);
 
-    // updateDirectory() writes the parent to the files-location file, whose live
-    // FILE*/fd globals are process-wide and must be opened here (the test suite
-    // does not otherwise guarantee they are set for a given test).
-    open_files_location();
     storage_manager->updateDirectory(1, "myDirectory");
     const auto &dir1 = storage_manager->get("myDirectory");
 
@@ -80,8 +76,6 @@ TEST_F(StorageManagerTestEnvironment, testInitDirectory) {
 }
 
 TEST_F(StorageManagerTestEnvironment, testAddDirectoryFailure) {
-    open_files_location();
-
     storage_manager->add("/tmp", true, 0);
     EXPECT_EQ(storage_manager->addDirectory(1, "/tmp/newDirectoryFail"), 0);
     EXPECT_EQ(storage_manager->addDirectory(1, "/tmp/newDirectoryFail"), 1);

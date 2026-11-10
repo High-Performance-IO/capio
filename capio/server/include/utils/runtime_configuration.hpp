@@ -3,6 +3,7 @@
 #include "capiocl.hpp"
 #include "capiocl/engine.h"
 
+#include <chrono>
 #include <filesystem>
 #include <string>
 #include <sys/types.h>
@@ -57,6 +58,11 @@ class RuntimeConfiguration final {
     [[nodiscard]] int getMtclPort() const;
     [[nodiscard]] int getMtclPollInterval() const;
 
+    /// @brief How long a lookup of a file's home waits for the other servers to answer
+    [[nodiscard]] std::chrono::milliseconds getLocationQueryTimeout() const;
+    /// @brief How often a server waiting for a file to be created asks the other servers again
+    [[nodiscard]] std::chrono::milliseconds getLocationRequeryInterval() const;
+
     /// @brief Create the CAPIO-CL engine described by the configuration
     [[nodiscard]] capiocl::engine::Engine *createCapioClEngine() const;
 
@@ -78,6 +84,9 @@ class RuntimeConfiguration final {
     std::string mtcl_protocol;
     int mtcl_port          = 0;
     int mtcl_poll_interval = 0;
+
+    long location_query_timeout_ms    = 0;
+    long location_requery_interval_ms = 0;
 
     std::string capio_cl_config_path;
     std::string capio_cl_resolve_path;

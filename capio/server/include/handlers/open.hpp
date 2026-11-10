@@ -1,7 +1,7 @@
 #ifndef CAPIO_SERVER_HANDLERS_OPEN_HPP
 #define CAPIO_SERVER_HANDLERS_OPEN_HPP
 
-#include "utils/location.hpp"
+#include "remote/home_node_service.hpp"
 #include "utils/runtime_configuration.hpp"
 
 extern ClientManager *client_manager;
@@ -24,14 +24,14 @@ inline void update_file_metadata(const std::filesystem::path &path, int tid, int
     if (c_file.isFirstWrite() && is_creat) {
         client_manager->registerProducedFile(tid, path);
         c_file.registerFirstWrite();
-        write_file_location(path);
+        home_node_service->setHome(path);
         storage_manager->updateDirectory(tid, path);
     }
 }
 
 inline void wait_for_file_creation(const std::filesystem::path &path, pid_t tid, int fd) {
     START_LOG(gettid(), "wait_for_file_creation(%s, %ld, %d)", path.c_str(), tid, fd);
-    loop_load_file_location(path);
+    home_node_service->waitForHome(path);
     LOG("File %s exists. Allowing execution of posix client", path.c_str());
     update_file_metadata(path, tid, fd, false, 0);
     client_manager->replyToClient(tid, 0);
@@ -40,7 +40,7 @@ inline void wait_for_file_creation(const std::filesystem::path &path, pid_t tid,
 inline void handle_create(int tid, int fd, const std::filesystem::path &path) {
     START_LOG(gettid(), "call(tid=%d, fd=%d, path_cstr=%s)", tid, fd, path.c_str());
 
-    bool is_creat = !(get_file_location_opt(path) || load_file_location(path));
+    bool is_creat = !(home_node_service->getHome(path) || home_node_service->lookup(path));
     update_file_metadata(path, tid, fd, is_creat, 0);
     client_manager->replyToClient(tid, 0);
 }
@@ -59,9 +59,8 @@ inline void handle_create_exclusive(int tid, int fd, const std::filesystem::path
 inline void handle_open(int tid, int fd, const std::filesystem::path &path) {
     START_LOG(gettid(), "call(tid=%d, fd=%d, path_cstr=%s)", tid, fd, path.c_str());
 
-    // it is important that check_files_location is the last because is the
-    // slowest (short circuit evaluation)
-    if (get_file_location_opt(path) || load_file_location(path)) {
+    // lookup() is last because it may ask the other servers (short circuit evaluation)
+    if (home_node_service->getHome(path) || home_node_service->lookup(path)) {
         update_file_metadata(path, tid, fd, false, 0);
         client_manager->replyToClient(tid, 0);
     } else {

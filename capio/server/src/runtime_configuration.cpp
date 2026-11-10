@@ -82,6 +82,12 @@ RuntimeConfiguration::RuntimeConfiguration(int argc, char **argv) {
         arguments, "directory", CAPIO_SERVER_ARG_PARSER_TOKEN_DIRECTORY_HELP, {"token-directory"});
     args::ValueFlag<std::string> backend_options_flag(
         arguments, "options", CAPIO_SERVER_ARG_PARSER_BACKEND_OPTIONS_HELP, {"backend-options"});
+    args::ValueFlag<long> location_query_timeout_flag(
+        arguments, "ms", CAPIO_SERVER_ARG_PARSER_LOCATION_QUERY_TIMEOUT_HELP,
+        {"location-query-timeout"});
+    args::ValueFlag<long> location_requery_interval_flag(
+        arguments, "ms", CAPIO_SERVER_ARG_PARSER_LOCATION_REQUERY_INTERVAL_HELP,
+        {"location-requery-interval"});
 
     args::Flag continueOnErrorFlag(arguments, "continue-on-error",
                                    CAPIO_SERVER_ARG_PARSER_CONFIG_NCONTINUE_ON_ERROR_HELP,
@@ -115,6 +121,17 @@ RuntimeConfiguration::RuntimeConfiguration(int argc, char **argv) {
     mcast_port    = mcast_port_flag ? args::get(mcast_port_flag) : CAPIO_MCAST_ADV_DEFAULT_PORT;
     token_directory =
         token_directory_flag ? args::get(token_directory_flag) : CAPIO_FS_DEFAULT_TOKEN_DIRECTORY;
+
+    location_query_timeout_ms    = location_query_timeout_flag
+                                       ? args::get(location_query_timeout_flag)
+                                       : CAPIO_LOCATION_QUERY_TIMEOUT_DEFAULT_MS;
+    location_requery_interval_ms = location_requery_interval_flag
+                                       ? args::get(location_requery_interval_flag)
+                                       : CAPIO_LOCATION_REQUERY_INTERVAL_DEFAULT_MS;
+    if (location_query_timeout_ms <= 0 || location_requery_interval_ms <= 0) {
+        throw std::runtime_error("The location query timeout and requery interval must be "
+                                 "positive numbers of milliseconds.");
+    }
 
     continue_on_error   = continueOnErrorFlag;
     store_all_in_memory = mem_only_flag;
@@ -201,6 +218,14 @@ const std::string &RuntimeConfiguration::getMtclProtocol() const { return mtcl_p
 int RuntimeConfiguration::getMtclPort() const { return mtcl_port; }
 
 int RuntimeConfiguration::getMtclPollInterval() const { return mtcl_poll_interval; }
+
+std::chrono::milliseconds RuntimeConfiguration::getLocationQueryTimeout() const {
+    return std::chrono::milliseconds(location_query_timeout_ms);
+}
+
+std::chrono::milliseconds RuntimeConfiguration::getLocationRequeryInterval() const {
+    return std::chrono::milliseconds(location_requery_interval_ms);
+}
 
 capiocl::engine::Engine *RuntimeConfiguration::createCapioClEngine() const {
     capiocl::engine::Engine *engine;

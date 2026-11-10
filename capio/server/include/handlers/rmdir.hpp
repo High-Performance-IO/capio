@@ -1,8 +1,8 @@
 #ifndef CAPIO_SERVER_HANDLERS_RMDIR_HPP
 #define CAPIO_SERVER_HANDLERS_RMDIR_HPP
 #include "client-manager/client_manager.hpp"
+#include "remote/home_node_service.hpp"
 #include "storage/manager.hpp"
-#include "utils/location.hpp"
 
 extern ClientManager *client_manager;
 extern StorageManager *storage_manager;
@@ -18,7 +18,7 @@ void rmdir_handler(const char *const str) {
     }
     storage_manager->remove(dir_to_remove);
     storage_manager->removeFromDirectory(dir_to_remove);
-    int res = delete_from_files_location(dir_to_remove);
+    int res = home_node_service->remove(dir_to_remove);
     client_manager->replyToClient(tid, res);
 }
 

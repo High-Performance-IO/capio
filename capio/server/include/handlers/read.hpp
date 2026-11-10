@@ -7,7 +7,7 @@
 #include "remote/backend.hpp"
 #include "remote/requests.hpp"
 
-#include "utils/location.hpp"
+#include "remote/home_node_service.hpp"
 #include "utils/runtime_configuration.hpp"
 
 extern Backend *backend;
@@ -103,8 +103,10 @@ inline void handle_local_read(int tid, int fd, off64_t count, bool is_prod) {
     storage_manager->setFileOffset(tid, fd, process_offset + read_size);
 }
 
-inline void request_remote_read(int tid, int fd, off64_t count) {
-    START_LOG(gettid(), "call(tid=%d, fd=%d, count=%ld)", tid, fd, count);
+/// @brief Serve a read of a file whose home is @p home, another server, from what this server has
+/// of it, or ask @p home for the data
+inline void request_remote_read(int tid, int fd, off64_t count, const std::string &home) {
+    START_LOG(gettid(), "call(tid=%d, fd=%d, count=%ld, home=%s)", tid, fd, count, home.c_str());
 
     const std::filesystem::path &path = storage_manager->getPath(tid, fd);
     CapioFile &c_file                 = storage_manager->get(path);
@@ -125,20 +127,18 @@ inline void request_remote_read(int tid, int fd, off64_t count) {
         storage_manager->setFileOffset(tid, fd, offset + count);
     } else {
         LOG("Delegating to backend remote read");
-        handle_remote_read_request(tid, fd, count, false);
+        handle_remote_read_request(tid, fd, count, false, home);
     }
 }
 
 void wait_for_file(const std::filesystem::path &path, int tid, int fd, off64_t count) {
     START_LOG(gettid(), "call(path=%s, tid=%d, fd=%d, count=%ld)", path.c_str(), tid, fd, count);
 
-    loop_load_file_location(path);
-
     // check if the file is local or remote
-    if (std::get<0>(get_file_location(path)) == backend->get_node_name().c_str()) {
+    if (const auto home = home_node_service->waitForHome(path); home == backend->get_node_name()) {
         handle_local_read(tid, fd, count, false);
     } else {
-        request_remote_read(tid, fd, count);
+        request_remote_read(tid, fd, count, home);
     }
 }
 
@@ -150,7 +150,7 @@ inline void handle_read(int tid, int fd, off64_t count) {
     const std::string &app_name            = client_manager->getAppName(tid);
     bool is_prod =
         CapioCLEngine::get().isProducer(path, app_name) || client_manager->isProducer(tid, path);
-    auto file_location_opt = get_file_location_opt(path);
+    auto file_location_opt = home_node_service->getHome(path);
 
     LOG("Is producer= %s", is_prod ? "TRUE" : "FALSE");
 
@@ -159,13 +159,12 @@ inline void handle_read(int tid, int fd, off64_t count) {
         // launch a thread that checks when the file is created
         std::thread t(wait_for_file, path, tid, fd, count);
         t.detach();
-    } else if (is_prod || std::get<0>(file_location_opt->get()) == backend->get_node_name() ||
-               capio_dir == path) {
+    } else if (is_prod || *file_location_opt == backend->get_node_name() || capio_dir == path) {
         LOG("File is local. handling local read");
         handle_local_read(tid, fd, count, is_prod);
     } else {
         LOG("File is remote. Delegating to backend remote read");
-        request_remote_read(tid, fd, count);
+        request_remote_read(tid, fd, count, *file_location_opt);
     }
 }
 

@@ -1,6 +1,7 @@
 #ifndef CAPIO_SERVER_REMOTE_BACKEND_MPI_HPP
 #define CAPIO_SERVER_REMOTE_BACKEND_MPI_HPP
 #include <mpi.h>
+#include <mutex>
 #include <unordered_map>
 
 #include "remote/backend.hpp"
@@ -10,6 +11,12 @@ class MPIBackend : public Backend {
   protected:
     MPI_Request req{};
     int rank = -1;
+
+    /// Serializes the sends of all threads. MPI orders the messages of one sender to one
+    /// destination only when the program orders them: without this, a request sent by one thread
+    /// could arrive between the header and the data of a file sent by another, where recv_file
+    /// would take it for data.
+    std::mutex send_mutex;
 
     /// This structure holds inside the information to convert from hostname to MPI rank
     std::set<std::string> nodes;

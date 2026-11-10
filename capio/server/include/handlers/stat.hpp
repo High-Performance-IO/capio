@@ -8,7 +8,7 @@
 
 #include "remote/requests.hpp"
 
-#include "utils/location.hpp"
+#include "remote/home_node_service.hpp"
 #include "utils/runtime_configuration.hpp"
 #include "utils/types.hpp"
 
@@ -22,30 +22,31 @@ extern Backend *backend;
 void wait_for_file_completion(int tid, const std::filesystem::path &path) {
     START_LOG(gettid(), "call(tid=%d, path=%s)", tid, path.c_str());
 
-    loop_load_file_location(path);
+    const auto home   = home_node_service->waitForHome(path);
     // check if the file is local or remote
     CapioFile &c_file = storage_manager->get(path);
 
     // if file is streamable
     if (c_file.isCommitted() || CapioCLEngine::get().isFirable(path) ||
-        std::get<0>(get_file_location(path)) == backend->get_node_name().c_str()) {
+        home == backend->get_node_name()) {
 
         client_manager->replyToClient(tid, c_file.getFileSize());
         client_manager->replyToClient(tid, static_cast<int>(c_file.isDirectory() ? 1 : 0));
 
     } else {
-        handle_remote_stat_request(tid, path);
+        handle_remote_stat_request(tid, path, home);
     }
 }
 
 inline void reply_stat(int tid, const std::filesystem::path &path) {
     START_LOG(gettid(), "call(tid=%d, path=%s)", tid, path.c_str());
 
-    auto file_location_opt = get_file_location_opt(path);
+    auto file_location_opt = home_node_service->getHome(path);
     LOG("File %s is local? %s", path.c_str(), file_location_opt ? "True" : "False");
 
     if (!file_location_opt) {
-        if (!load_file_location(path)) {
+        file_location_opt = home_node_service->lookup(path);
+        if (!file_location_opt) {
             LOG("path %s is not present in any node", path.c_str());
             // if it is in configuration file then wait otherwise fail
 
@@ -72,11 +73,7 @@ inline void reply_stat(int tid, const std::filesystem::path &path) {
     LOG("Obtained capio file. ready to reply to client");
     const std::filesystem::path &capio_dir = RuntimeConfiguration::get().getCapioDir();
     LOG("Obtained capio_dir");
-    if (!file_location_opt) {
-        LOG("File is now present from remote node. retrieving file again.");
-        file_location_opt = get_file_location_opt(path);
-    }
-    if (c_file.isCommitted() || std::get<0>(file_location_opt->get()) == backend->get_node_name() ||
+    if (c_file.isCommitted() || *file_location_opt == backend->get_node_name() ||
         CapioCLEngine::get().isFirable(path) || capio_dir == path) {
         LOG("Sending response to client");
         client_manager->replyToClient(tid, c_file.getFileSize());
@@ -85,7 +82,7 @@ inline void reply_stat(int tid, const std::filesystem::path &path) {
         LOG("Delegating backend to reply to remote stats");
         // send a request for file. then start a thread to wait for the request completion
         c_file.createBuffer(path, false);
-        handle_remote_stat_request(tid, path);
+        handle_remote_stat_request(tid, path, *file_location_opt);
     }
 }
 
