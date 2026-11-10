@@ -187,7 +187,7 @@ void FileLocationService::learn(const std::filesystem::path &path, const std::st
     _changed.notify_all();
 }
 
-void FileLocationService::unlearn(const std::filesystem::path &path, const std::string &home) {
+void FileLocationService::forget(const std::filesystem::path &path, const std::string &home) {
     START_LOG(gettid(), "call(path=%s, home=%s)", path.c_str(), home.c_str());
     const std::lock_guard lg(_mutex);
     if (const auto it = _homes.find(path); it != _homes.end() && it->second == home) {

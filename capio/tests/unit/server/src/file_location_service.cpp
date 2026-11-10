@@ -203,10 +203,10 @@ TEST_F(FileLocationServiceTest, forgettingAFileThatMovedKeepsItsNewHome) {
     // peer-a removes the file and peer-b creates it again, but peer-b's announcement arrives first
     service.learn("/capio/moved", "peer-a");
     service.learn("/capio/moved", "peer-b");
-    service.unlearn("/capio/moved", "peer-a");
+    service.forget("/capio/moved", "peer-a");
     EXPECT_EQ(service.getHome("/capio/moved"), "peer-b");
 
-    service.unlearn("/capio/moved", "peer-b");
+    service.forget("/capio/moved", "peer-b");
     EXPECT_FALSE(service.getHome("/capio/moved"));
 }
 

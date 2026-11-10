@@ -21,7 +21,7 @@ inline void remote_location_announce_handler(const RemoteRequest &request) {
 inline void remote_location_forget_handler(const RemoteRequest &request) {
     START_LOG(gettid(), "call(source=%s, path=%s)", request.get_source().c_str(),
               request.get_content());
-    file_location_service->unlearn(request.get_content(), request.get_source());
+    file_location_service->forget(request.get_content(), request.get_source());
 }
 
 /// Another server asks whether this one holds a file: "<query id> <path>"

@@ -166,7 +166,7 @@ class FileLocationService {
      * @param path the file
      * @param home the server that removed it
      */
-    void unlearn(const std::filesystem::path &path, const std::string &home);
+    void forget(const std::filesystem::path &path, const std::string &home);
 
     /**
      * @brief Answer another server's lookup: whether this server is the home of a file.
