@@ -132,7 +132,9 @@ int main(int argc, char **argv) {
 
     START_LOG(gettid(), "call()");
 
-    file_location_service = new FileLocationService();
+    file_location_service =
+        new FileLocationService(RuntimeConfiguration::get().getLocationQueryTimeout(),
+                                RuntimeConfiguration::get().getLocationRequeryInterval());
 
     storage_manager = new StorageManager();
     client_manager  = new ClientManager();

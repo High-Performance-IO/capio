@@ -85,13 +85,13 @@ class FileLocationService {
 
   public:
     /**
-     * @brief Create a service that knows no file yet.
+     * @brief Create a service that knows no file yet. The server passes the values of
+     * RuntimeConfiguration, set with --location-query-timeout and --location-requery-interval.
      * @param query_timeout how long lookup() waits for the other servers to answer
      * @param requery_interval how often waitForHome() asks the other servers again
      */
-    explicit FileLocationService(
-        std::chrono::milliseconds query_timeout    = std::chrono::milliseconds(5000),
-        std::chrono::milliseconds requery_interval = std::chrono::milliseconds(500));
+    FileLocationService(std::chrono::milliseconds query_timeout,
+                        std::chrono::milliseconds requery_interval);
 
     FileLocationService(const FileLocationService &)            = delete;
     FileLocationService &operator=(const FileLocationService &) = delete;

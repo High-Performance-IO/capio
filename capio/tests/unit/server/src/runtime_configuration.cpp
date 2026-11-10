@@ -61,13 +61,17 @@ TEST_F(RuntimeConfigurationTest, UsesDefaultsWithNoConfig) {
     EXPECT_EQ(config.getCacheLineSize(), CAPIO_CACHE_LINE_SIZE_DEFAULT);
     EXPECT_EQ(config.getFileInitialSize(), CAPIO_DEFAULT_FILE_INITIAL_SIZE);
     EXPECT_EQ(config.getPrefetchDataSize(), 0);
+    EXPECT_EQ(config.getLocationQueryTimeout().count(), CAPIO_LOCATION_QUERY_TIMEOUT_DEFAULT_MS);
+    EXPECT_EQ(config.getLocationRequeryInterval().count(),
+              CAPIO_LOCATION_REQUERY_INTERVAL_DEFAULT_MS);
 }
 
 TEST_F(RuntimeConfigurationTest, ParsesExplicitOptions) {
     const auto config =
         parse({"capio_server", "--no-config", "--backend", "mtcl", "--backend-options",
                "TCP:7601@50", "--discovery", "fs", "--mcast-addr", "239.1.2.3", "--mcast-port",
-               "12345", "--token-directory", "/tokens", "--continue-on-error"});
+               "12345", "--token-directory", "/tokens", "--continue-on-error",
+               "--location-query-timeout", "750", "--location-requery-interval", "25"});
 
     EXPECT_EQ(config.getBackendName(), "mtcl");
     EXPECT_EQ(config.getMtclProtocol(), "TCP");
@@ -78,6 +82,8 @@ TEST_F(RuntimeConfigurationTest, ParsesExplicitOptions) {
     EXPECT_EQ(config.getMulticastDiscoveryPort(), 12345);
     EXPECT_EQ(config.getFsDiscoveryTokenDirectory(), "/tokens");
     EXPECT_TRUE(config.getContinueOnError());
+    EXPECT_EQ(config.getLocationQueryTimeout(), std::chrono::milliseconds(750));
+    EXPECT_EQ(config.getLocationRequeryInterval(), std::chrono::milliseconds(25));
 }
 
 TEST_F(RuntimeConfigurationTest, ReadsEnvironment) {
@@ -110,6 +116,12 @@ TEST_F(RuntimeConfigurationTest, RejectsInvalidConfigurations) {
                  std::runtime_error);
     EXPECT_THROW(parse({"capio_server", "--no-config", "--backend", "mtcl", "--backend-options",
                         "TCP:port@50"}),
+                 std::runtime_error);
+    EXPECT_THROW(parse({"capio_server", "--no-config", "--location-query-timeout", "0"}),
+                 std::runtime_error);
+    EXPECT_THROW(parse({"capio_server", "--no-config", "--location-requery-interval", "-5"}),
+                 std::runtime_error);
+    EXPECT_THROW(parse({"capio_server", "--no-config", "--location-query-timeout", "soon"}),
                  std::runtime_error);
 
     unsetenv("CAPIO_DIR");

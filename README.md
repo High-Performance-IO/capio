@@ -98,6 +98,16 @@ capio_server --no-config --backend mtcl --backend-options TCP:7600@1000000
 If omitted, MTCL defaults to `TCP:7600@1000000`. See the
 [MTCL repository](https://github.com/ParaGroup/MTCL) for supported communication protocols and their requirements.
 
+### File location options
+
+Each server learns which server holds each file by asking the others over the backend. Two options tune it, both in
+milliseconds:
+
+- `--location-query-timeout MS` (default 5000): how long a lookup waits for the other servers to answer before it ends
+  without them.
+- `--location-requery-interval MS` (default 500): how often a server waiting for a file to be created asks the others
+  again, in case it missed the announcement.
+
 ### Available environment variables
 
 CAPIO can be controlled through the usage of environment variables. The available variables are listed below:
