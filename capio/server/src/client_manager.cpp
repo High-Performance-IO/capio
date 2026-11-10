@@ -143,13 +143,13 @@ bool ClientManager::isProducer(const pid_t tid, const std::filesystem::path &pat
 
     if (const auto itm = files_created_by_producer.find(tid);
         itm != files_created_by_producer.end()) {
-        is_producer |= std::find(itm->second.begin(), itm->second.end(), path) != itm->second.end();
+        is_producer |= itm->second.count(path.native()) != 0;
     }
 
     const std::string &app_name = this->getAppName(tid);
     if (const auto itm = files_created_by_app_name.find(app_name);
         itm != files_created_by_app_name.end()) {
-        is_producer |= std::find(itm->second.begin(), itm->second.end(), path) != itm->second.end();
+        is_producer |= itm->second.count(path.native()) != 0;
     }
 
     return is_producer;
