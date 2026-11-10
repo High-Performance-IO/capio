@@ -22,19 +22,19 @@ extern Backend *backend;
 void wait_for_file_completion(int tid, const std::filesystem::path &path) {
     START_LOG(gettid(), "call(tid=%d, path=%s)", tid, path.c_str());
 
-    file_location_service->waitForHome(path);
+    const auto home   = file_location_service->waitForHome(path);
     // check if the file is local or remote
     CapioFile &c_file = storage_manager->get(path);
 
     // if file is streamable
     if (c_file.isCommitted() || CapioCLEngine::get().isFirable(path) ||
-        file_location_service->getKnownHome(path) == backend->get_node_name()) {
+        home == backend->get_node_name()) {
 
         client_manager->replyToClient(tid, c_file.getFileSize());
         client_manager->replyToClient(tid, static_cast<int>(c_file.isDirectory() ? 1 : 0));
 
     } else {
-        handle_remote_stat_request(tid, path);
+        handle_remote_stat_request(tid, path, home);
     }
 }
 
@@ -45,7 +45,8 @@ inline void reply_stat(int tid, const std::filesystem::path &path) {
     LOG("File %s is local? %s", path.c_str(), file_location_opt ? "True" : "False");
 
     if (!file_location_opt) {
-        if (!file_location_service->lookup(path)) {
+        file_location_opt = file_location_service->lookup(path);
+        if (!file_location_opt) {
             LOG("path %s is not present in any node", path.c_str());
             // if it is in configuration file then wait otherwise fail
 
@@ -72,10 +73,6 @@ inline void reply_stat(int tid, const std::filesystem::path &path) {
     LOG("Obtained capio file. ready to reply to client");
     const std::filesystem::path &capio_dir = RuntimeConfiguration::get().getCapioDir();
     LOG("Obtained capio_dir");
-    if (!file_location_opt) {
-        LOG("File is now present from remote node. retrieving file again.");
-        file_location_opt = file_location_service->getHome(path);
-    }
     if (c_file.isCommitted() || *file_location_opt == backend->get_node_name() ||
         CapioCLEngine::get().isFirable(path) || capio_dir == path) {
         LOG("Sending response to client");
@@ -85,7 +82,7 @@ inline void reply_stat(int tid, const std::filesystem::path &path) {
         LOG("Delegating backend to reply to remote stats");
         // send a request for file. then start a thread to wait for the request completion
         c_file.createBuffer(path, false);
-        handle_remote_stat_request(tid, path);
+        handle_remote_stat_request(tid, path, *file_location_opt);
     }
 }
 

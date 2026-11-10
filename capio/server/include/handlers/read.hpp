@@ -103,8 +103,10 @@ inline void handle_local_read(int tid, int fd, off64_t count, bool is_prod) {
     storage_manager->setFileOffset(tid, fd, process_offset + read_size);
 }
 
-inline void request_remote_read(int tid, int fd, off64_t count) {
-    START_LOG(gettid(), "call(tid=%d, fd=%d, count=%ld)", tid, fd, count);
+/// @brief Serve a read of a file whose home is @p home, another server, from what this server has
+/// of it, or ask @p home for the data
+inline void request_remote_read(int tid, int fd, off64_t count, const std::string &home) {
+    START_LOG(gettid(), "call(tid=%d, fd=%d, count=%ld, home=%s)", tid, fd, count, home.c_str());
 
     const std::filesystem::path &path = storage_manager->getPath(tid, fd);
     CapioFile &c_file                 = storage_manager->get(path);
@@ -125,20 +127,19 @@ inline void request_remote_read(int tid, int fd, off64_t count) {
         storage_manager->setFileOffset(tid, fd, offset + count);
     } else {
         LOG("Delegating to backend remote read");
-        handle_remote_read_request(tid, fd, count, false);
+        handle_remote_read_request(tid, fd, count, false, home);
     }
 }
 
 void wait_for_file(const std::filesystem::path &path, int tid, int fd, off64_t count) {
     START_LOG(gettid(), "call(path=%s, tid=%d, fd=%d, count=%ld)", path.c_str(), tid, fd, count);
 
-    file_location_service->waitForHome(path);
-
     // check if the file is local or remote
-    if (file_location_service->getKnownHome(path) == backend->get_node_name()) {
+    if (const auto home = file_location_service->waitForHome(path);
+        home == backend->get_node_name()) {
         handle_local_read(tid, fd, count, false);
     } else {
-        request_remote_read(tid, fd, count);
+        request_remote_read(tid, fd, count, home);
     }
 }
 
@@ -164,7 +165,7 @@ inline void handle_read(int tid, int fd, off64_t count) {
         handle_local_read(tid, fd, count, is_prod);
     } else {
         LOG("File is remote. Delegating to backend remote read");
-        request_remote_read(tid, fd, count);
+        request_remote_read(tid, fd, count, *file_location_opt);
     }
 }
 

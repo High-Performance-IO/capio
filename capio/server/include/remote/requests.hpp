@@ -42,10 +42,11 @@ inline void serve_remote_read_request(int tid, int fd, int count, long int nbyte
     backend->send_file(message.get(), size + 1, file, nbytes, dest);
 }
 
-inline void handle_remote_stat_request(int tid, const std::filesystem::path &path) {
-    START_LOG(gettid(), "call(tid=%d, path=%s)", tid, path.c_str());
+/// @brief Ask @p dest, the home of @p path, for its size and kind on behalf of client @p tid
+inline void handle_remote_stat_request(int tid, const std::filesystem::path &path,
+                                       const std::string &dest) {
+    START_LOG(gettid(), "call(tid=%d, path=%s, dest=%s)", tid, path.c_str(), dest.c_str());
 
-    std::string dest         = file_location_service->getKnownHome(path);
     const char *const format = "%04d %d %s %s";
     const int size           = snprintf(nullptr, 0, format, CAPIO_SERVER_REQUEST_STAT, tid,
                                         backend->get_node_name().c_str(), path.c_str());
@@ -58,14 +59,15 @@ inline void handle_remote_stat_request(int tid, const std::filesystem::path &pat
     LOG("message sent");
 }
 
-inline void handle_remote_read_request(int tid, int fd, off64_t count, bool is_getdents) {
-    START_LOG(gettid(), "call(tid=%d, fd=%d, count=%ld, is_getdents=%s)", tid, fd, count,
-              is_getdents ? "true" : "false");
+/// @brief Ask @p dest, the home of the file open as @p fd, for the data a read or getdents needs
+inline void handle_remote_read_request(int tid, int fd, off64_t count, bool is_getdents,
+                                       const std::string &dest) {
+    START_LOG(gettid(), "call(tid=%d, fd=%d, count=%ld, is_getdents=%s, dest=%s)", tid, fd, count,
+              is_getdents ? "true" : "false", dest.c_str());
 
     // If it is not in cache then send the request to the remote node
     const std::filesystem::path &path = storage_manager->getPath(tid, fd);
     off64_t offset                    = storage_manager->getFileOffset(tid, fd);
-    std::string dest                  = file_location_service->getKnownHome(path);
 
     const char *const format = "%04d %s %d %d %ld %ld %d";
     const int size = snprintf(nullptr, 0, format, CAPIO_SERVER_REQUEST_READ, path.c_str(), tid, fd,
@@ -81,11 +83,11 @@ inline void handle_remote_read_request(int tid, int fd, off64_t count, bool is_g
 inline void handle_remote_copy_file_range_request(const int tid, const int fd_in, const int fd_out,
                                                   const std::filesystem::path &path_in,
                                                   const off64_t offset_in, const off64_t offset_out,
-                                                  const off64_t count) {
-    START_LOG(gettid(), "call(tid=%d, fd_in=%d, fd_out=%d, path_in=%s, offset_in=%ld, count=%ld)",
-              tid, fd_in, fd_out, path_in.c_str(), offset_in, count);
+                                                  const off64_t count, const std::string &dest) {
+    START_LOG(gettid(),
+              "call(tid=%d, fd_in=%d, fd_out=%d, path_in=%s, offset_in=%ld, count=%ld, dest=%s)",
+              tid, fd_in, fd_out, path_in.c_str(), offset_in, count, dest.c_str());
 
-    const std::string dest   = file_location_service->getKnownHome(path_in);
     const char *const format = "%04d %s %d %d %d %ld %ld %ld";
     const int size = snprintf(nullptr, 0, format, CAPIO_SERVER_REQUEST_COPY_FILE_RANGE,
                               path_in.c_str(), tid, fd_in, fd_out, offset_in, offset_out, count);

@@ -104,14 +104,6 @@ class FileLocationService {
     [[nodiscard]] std::optional<std::string> getHome(const std::filesystem::path &path) const;
 
     /**
-     * @brief Home node of a file that this server must know. Ends the server with an error if it
-     * does not.
-     * @param path the file
-     * @return the home node
-     */
-    [[nodiscard]] std::string getKnownHome(const std::filesystem::path &path) const;
-
-    /**
      * @brief Home node of a file, asking every other server if this one does not know it, and
      * recording the answer. Blocks until all of them have answered, one of them holds the file,
      * or the query timeout passes.

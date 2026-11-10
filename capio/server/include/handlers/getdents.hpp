@@ -11,8 +11,10 @@
 extern StorageManager *storage_manager;
 extern Backend *backend;
 
-inline void request_remote_getdents(int tid, int fd, off64_t count) {
-    START_LOG(gettid(), "call(tid=%d, fd=%d, count=%ld)", tid, fd, count);
+/// @brief Serve a getdents of a directory whose home is @p home, another server, from what this
+/// server has of it, or ask @p home for the entries
+inline void request_remote_getdents(int tid, int fd, off64_t count, const std::string &home) {
+    START_LOG(gettid(), "call(tid=%d, fd=%d, count=%ld, home=%s)", tid, fd, count, home.c_str());
 
     CapioFile &c_file     = storage_manager->get(tid, fd);
     off64_t offset        = storage_manager->getFileOffset(tid, fd);
@@ -31,7 +33,7 @@ inline void request_remote_getdents(int tid, int fd, off64_t count) {
         storage_manager->setFileOffset(tid, fd, offset + count);
     } else {
         LOG("Delegating to backend remote read");
-        handle_remote_read_request(tid, fd, count, true);
+        handle_remote_read_request(tid, fd, count, true, home);
     }
 }
 
@@ -48,13 +50,11 @@ inline void handle_getdents(int tid, int fd, long int count) {
         std::thread t([tid, fd, count, path_to_check] {
             START_LOG(gettid(), "call(tid=%d, fd=%d, count=%ld)", tid, fd, count);
 
-            file_location_service->waitForHome(path_to_check);
-
-            if (file_location_service->getKnownHome(path_to_check) == backend->get_node_name()) {
+            if (const auto home = file_location_service->waitForHome(path_to_check);
+                home == backend->get_node_name()) {
                 handle_getdents(tid, fd, count);
             } else {
-
-                request_remote_getdents(tid, fd, count);
+                request_remote_getdents(tid, fd, count, home);
             }
         });
         t.detach();
@@ -65,7 +65,7 @@ inline void handle_getdents(int tid, int fd, long int count) {
         send_dirent_to_client(tid, fd, c_file, offset, count);
     } else {
         LOG("File is remote. Delegating to backend remote read");
-        request_remote_getdents(tid, fd, count);
+        request_remote_getdents(tid, fd, count, *file_location_opt);
     }
 }
 

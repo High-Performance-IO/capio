@@ -59,12 +59,14 @@ inline void handle_local_copy_file_range(const CSCopyFileRange_t &copy, const bo
  *
  * @param copy
  * @param is_prod whether the client is a producer of the input
+ * @param home the input's home node; a producer copies locally and may not have one yet
  */
-inline void handle_copy_file_range(const CSCopyFileRange_t &copy, const bool is_prod) {
-    if (is_prod || file_location_service->getKnownHome(copy.path_in) == backend->get_node_name()) {
+inline void handle_copy_file_range(const CSCopyFileRange_t &copy, const bool is_prod,
+                                   const std::optional<std::string> &home) {
+    if (is_prod || home == backend->get_node_name()) {
         handle_local_copy_file_range(copy, is_prod);
     } else {
-        handle_remote_copy_file_range(copy);
+        handle_remote_copy_file_range(copy, *home);
     }
 }
 
@@ -85,13 +87,12 @@ inline void copy_file_range_handler(const char *const str) {
     if (!is_prod && !file_location_service->getHome(copy.path_in)) {
         LOG("Waiting on a separate thread for the input to be created");
         std::thread t([copy] {
-            file_location_service->waitForHome(copy.path_in);
-            handle_copy_file_range(copy, false);
+            handle_copy_file_range(copy, false, file_location_service->waitForHome(copy.path_in));
         });
         t.detach();
         return;
     }
-    handle_copy_file_range(copy, is_prod);
+    handle_copy_file_range(copy, is_prod, file_location_service->getHome(copy.path_in));
 }
 
 #endif // CAPIO_SERVER_HANDLERS_COPY_FILE_RANGE_HPP

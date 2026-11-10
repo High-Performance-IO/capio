@@ -67,15 +67,6 @@ std::optional<std::string> FileLocationService::getHome(const std::filesystem::p
     return {};
 }
 
-std::string FileLocationService::getKnownHome(const std::filesystem::path &path) const {
-    START_LOG(gettid(), "call(path=%s)", path.c_str());
-    auto home = getHome(path);
-    if (!home) {
-        ERR_EXIT("error file location %s not present in CAPIO", path.c_str());
-    }
-    return home.value_or("");
-}
-
 std::optional<std::string> FileLocationService::lookup(const std::filesystem::path &path) {
     START_LOG(gettid(), "call(path=%s)", path.c_str());
 
