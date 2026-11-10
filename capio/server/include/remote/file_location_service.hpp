@@ -63,18 +63,31 @@ class FileLocationService {
     /// was sent before this server could receive it
     std::chrono::milliseconds _requery_interval;
 
-    /// @brief Send a request about @p path to every other server; return how many were sent
+    /**
+     * @brief Send the same request to every other server the backend knows.
+     * @param code request code, one of the CAPIO_SERVER_REQUEST_LOCATION_* codes
+     * @param fields the request's fields before the path, each followed by a space; may be empty
+     * @param path the file the request is about, sent last so that it may hold spaces
+     * @return how many servers the request was sent to
+     */
     static std::size_t _broadcast(int code, const std::string &fields,
                                   const std::filesystem::path &path);
 
-    /// @brief Send a request about @p path to the server @p target
+    /**
+     * @brief Send a request to one server.
+     * @param code request code, one of the CAPIO_SERVER_REQUEST_LOCATION_* codes
+     * @param fields the request's fields before the path, each followed by a space; may be empty
+     * @param path the file the request is about, sent last so that it may hold spaces
+     * @param target the server to send it to, as the backend names it
+     */
     static void _send(int code, const std::string &fields, const std::filesystem::path &path,
                       const std::string &target);
 
   public:
     /**
-     * @param query_timeout how long a lookup waits for the other servers to answer
-     * @param requery_interval how often a wait for a file asks the other servers again
+     * @brief Create a service that knows no file yet.
+     * @param query_timeout how long lookup() waits for the other servers to answer
+     * @param requery_interval how often waitForHome() asks the other servers again
      */
     explicit FileLocationService(
         std::chrono::milliseconds query_timeout    = std::chrono::milliseconds(5000),
@@ -84,86 +97,92 @@ class FileLocationService {
     FileLocationService &operator=(const FileLocationService &) = delete;
 
     /**
-     * @brief Home node of @p path, if this server knows it. Asks no other server.
-     * @param path
+     * @brief Home node of a file, if this server knows it. Asks no other server.
+     * @param path the file
      * @return the home node, or nothing if this server does not know @p path
      */
     [[nodiscard]] std::optional<std::string> getHome(const std::filesystem::path &path) const;
 
     /**
-     * @brief Home node of @p path, which this server must know. Ends the server otherwise.
-     * @param path
+     * @brief Home node of a file that this server must know. Ends the server with an error if it
+     * does not.
+     * @param path the file
      * @return the home node
      */
     [[nodiscard]] std::string getKnownHome(const std::filesystem::path &path) const;
 
     /**
-     * @brief Home node of @p path, asking the other servers if this one does not know it.
-     * @param path
-     * @return the home node, or nothing if no running server holds @p path
+     * @brief Home node of a file, asking every other server if this one does not know it, and
+     * recording the answer. Blocks until all of them have answered, one of them holds the file,
+     * or the query timeout passes.
+     * @param path the file
+     * @return the home node, or nothing if no server that answered in time holds @p path
      */
     std::optional<std::string> lookup(const std::filesystem::path &path);
 
     /**
-     * @brief Wait until some server holds @p path.
-     * @param path
+     * @brief Wait until some server holds a file, however long that takes. Asks the other servers
+     * with lookup(), then again every requery interval, and wakes early when the file's creation
+     * is announced.
+     * @param path the file
      * @return the home node
      */
     std::string waitForHome(const std::filesystem::path &path);
 
     /**
-     * @brief Make this server the home of @p path, and announce it to the other servers.
-     * @param path
+     * @brief Make this server the home of a file, and announce it to every other server.
+     * @param path the file, just created on this server
      */
     void setHome(const std::filesystem::path &path);
 
     /**
-     * @brief Forget @p path. If this server was its home, tell the other servers to forget it.
-     * @param path
+     * @brief Forget a file. If this server was its home, tell every other server to forget it.
+     * @param path the file, just removed
      * @return 1 if this server knew @p path, 2 otherwise, as rmdir replies to its clients
      */
     int remove(const std::filesystem::path &path);
 
     /**
-     * @brief Move this server's knowledge of @p oldpath to @p newpath, after a rename done here.
-     * The other servers forget @p oldpath and learn @p newpath if this server is its home.
-     * @param oldpath
-     * @param newpath
+     * @brief Update the table after a rename done on this server: remove() the old path, then
+     * setHome() the new one unless this server already knows a home for it.
+     * @param oldpath the file's path before the rename
+     * @param newpath the file's path after it
      */
     void rename(const std::filesystem::path &oldpath, const std::filesystem::path &newpath);
 
     /**
-     * @brief Record that @p home holds @p path, without telling anyone. A home this server has
-     * for itself is kept: another server announcing the same path, such as a directory both
-     * write into, does not take it away.
-     * @param path
-     * @param home
+     * @brief Record that a server holds a file, without telling anyone: what another server's
+     * announcement does. A home this server has for itself is kept: another server announcing the
+     * same path, such as a directory both write into, does not take it away.
+     * @param path the file
+     * @param home the server that holds it
      */
     void learn(const std::filesystem::path &path, const std::string &home);
 
     /**
-     * @brief Forget that @p home holds @p path, without telling anyone. A path whose recorded
-     * home is another server is kept: it moved there after @p home removed it.
-     * @param path
-     * @param home
+     * @brief Forget that a server holds a file, without telling anyone: what another server's
+     * removal does. A path whose recorded home is another server is kept: it moved there after
+     * @p home removed it.
+     * @param path the file
+     * @param home the server that removed it
      */
     void unlearn(const std::filesystem::path &path, const std::string &home);
 
     /**
-     * @brief Answer the lookup @p query_id of server @p source: whether this server holds
-     * @p path.
-     * @param query_id
-     * @param path
-     * @param source
+     * @brief Answer another server's lookup: whether this server is the home of a file.
+     * @param query_id the asking server's identifier of its lookup, sent back with the answer
+     * @param path the file
+     * @param source the server that asked, which the answer goes to
      */
     void answerQuery(long query_id, const std::filesystem::path &path,
                      const std::string &source) const;
 
     /**
-     * @brief Record the answer of server @p source to this server's lookup @p query_id.
-     * @param query_id
-     * @param holds whether @p source holds the file
-     * @param source
+     * @brief Record another server's answer to one of this server's lookups. An answer to a lookup
+     * that already ended, by an earlier home or the timeout, is ignored.
+     * @param query_id this server's identifier of the lookup
+     * @param holds whether @p source is the file's home
+     * @param source the server that answered
      */
     void receiveAnswer(long query_id, bool holds, const std::string &source);
 };
