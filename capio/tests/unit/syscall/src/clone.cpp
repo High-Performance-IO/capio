@@ -71,7 +71,7 @@ TEST(SystemCallTest, TestForkParentChild) {
 }
 #endif
 
-TEST(SystemCallTest, TestForkParentChild) {
+TEST(SystemCallTest, TestCloneParentChild) {
     auto pid = syscall(SYS_clone, SIGCHLD, 0);
     EXPECT_GE(pid, 0);
     if (pid == 0) {
