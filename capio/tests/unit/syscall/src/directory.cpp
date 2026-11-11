@@ -60,6 +60,12 @@ TEST(SystemCallTest, TestRmdirOfAMissingDirectoryFailsWithEnoent) {
     EXPECT_EQ(errno, ENOENT);
 }
 
+TEST(SystemCallTest, TestUnlinkatRemovedirOfAMissingDirectoryFailsWithEnoent) {
+    errno = 0;
+    EXPECT_EQ(unlinkat(AT_FDCWD, "unlinkat_missing", AT_REMOVEDIR), -1);
+    EXPECT_EQ(errno, ENOENT);
+}
+
 TEST(SystemCallTest, TestMkdirFailsIfDirectoryAlreadyExists) {
     constexpr const char *PATHNAME = "test";
     EXPECT_NE(mkdir(PATHNAME, S_IRWXU), -1);

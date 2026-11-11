@@ -33,10 +33,27 @@ inline void initialize_new_thread(const bool wait = false) {
 }
 
 inline void hook_clone_parent(long child_tid) {
+    // syscall_intercept invokes this hook even when the clone fails (e.g. clone3 returning
+    // -ENOSYS under seccomp filters, after which glibc falls back to clone): do not register
+    // a nonexistent child with the server.
+    if (child_tid <= 0) {
+        return;
+    }
     const auto tid = syscall_no_intercept(SYS_gettid);
     clone_request(tid, child_tid);
 }
 
-inline void hook_clone_child() { initialize_new_thread(true); }
+/**
+ * Called in the child after a successful clone/clone3. When the child is a new thread, wait for
+ * the server to acknowledge the handshake. When it is a new process (fork semantics, i.e. no
+ * CLONE_THREAD, as issued by fork() on architectures without SYS_fork such as aarch64), behave
+ * like fork_handler and do not wait: the child may be the one that is about to exec the CAPIO
+ * server, so waiting for a reply would deadlock.
+ */
+inline void hook_clone_child() {
+    const long pid = syscall_no_intercept(SYS_getpid);
+    const long tid = syscall_no_intercept(SYS_gettid);
+    initialize_new_thread(pid != tid);
+}
 
 #endif // CAPIO_POSIX_UTILS_CLONE_HPP

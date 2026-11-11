@@ -3,37 +3,34 @@
 
 #if defined(SYS_unlink) || defined(SYS_unlinkat)
 
+#include "handlers/mkdir.hpp"
 #include "utils/common.hpp"
+#include "utils/filesystem.hpp"
 
 off64_t capio_unlink_abs(const std::filesystem::path &abs_path, long tid, bool is_dir) {
     START_LOG(tid, "call(abs_path=%s, is_dir=%s)", abs_path.c_str(), is_dir ? "true" : "false");
 
-    if (is_capio_path(abs_path)) {
-        if (is_capio_dir(abs_path)) {
-            ERR_EXIT("ERROR: unlink to the capio_dir %s", abs_path.c_str());
-            return -1; // note: this point should never be reached
-        }
-        off64_t res;
-        if (is_dir) {
-            // rmdir's reply, as in capio_rmdir: 1 removed, 2 no such directory
-            res = rmdir_request(abs_path, tid);
-            if (res == 2) {
-                res = -1;
-            } else if (res != CAPIO_POSIX_SYSCALL_REQUEST_SKIP) {
-                res = CAPIO_POSIX_SYSCALL_SUCCESS;
-            }
-        } else {
-            res = unlink_request(abs_path, tid);
-        }
-        if (res == -1) {
-            errno = ENOENT;
-        } else {
-            LOG("Removing %s from capio_files_path", abs_path.c_str());
-            delete_capio_path(abs_path);
-        }
-        return res;
+    if (!is_capio_path(abs_path)) {
+        return CAPIO_POSIX_SYSCALL_REQUEST_SKIP;
     }
-    return CAPIO_POSIX_SYSCALL_REQUEST_SKIP;
+    if (is_capio_dir(abs_path)) {
+        ERR_EXIT("ERROR: unlink to the capio_dir %s", abs_path.c_str());
+    }
+
+    // unlinkat(AT_REMOVEDIR) is rmdir: this is how glibc issues rmdir() on architectures
+    // without SYS_rmdir (e.g. aarch64), so handle it exactly as SYS_rmdir is handled.
+    if (is_dir) {
+        return capio_rmdir(abs_path.native(), tid);
+    }
+
+    const off64_t res = unlink_request(abs_path, tid);
+    if (res == CAPIO_POSIX_SYSCALL_ERRNO) {
+        errno = ENOENT;
+    } else if (exists_capio_path(abs_path)) {
+        LOG("Removing %s from capio_files_path", abs_path.c_str());
+        delete_capio_path(abs_path);
+    }
+    return res;
 }
 
 inline off64_t capio_unlinkat(int dirfd, const std::string_view &pathname, int flags, long tid) {
