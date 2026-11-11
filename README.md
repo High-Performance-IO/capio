@@ -215,7 +215,9 @@ supported protocols and their requirements.
 
 ## Examples
 
-The [examples](examples) folder contains MPI-IO example applications and a Docker Compose setup.
+[High-Performance-IO/IO-pattern-benchmarks](https://github.com/High-Performance-IO/IO-pattern-benchmarks) contains
+producer, consumer and producer-consumer applications that exercise different file access patterns and workflow
+topologies, with a CAPIO-CL configuration and a script to run them on CAPIO.
 More documentation is available at [https://capio.hpc4ai.it/docs](https://capio.hpc4ai.it/docs).
 
 ## Report bugs and get help
