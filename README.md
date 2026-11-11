@@ -26,26 +26,16 @@ CAPIO is available through the High Performance IO Spack repository. See
 
 ### Dependencies
 
-Required:
+Required: `cmake >= 3.15`, a `C++17` (or newer) compiler (CI tests GCC 12–16 and Clang 13–23), `pthreads`.
 
-- `cmake >= 3.15`
-- A `C++17` (or newer) compiler. CI tests GCC 12–16 and Clang 13–23.
-- `pthreads`
-
-Optional:
-
-- MPI: when CMake finds it, CAPIO builds the `mpi` and `mpisync` server backends. Otherwise CAPIO builds without MPI
-  support, and the `mtcl` backend remains available.
+Optional: MPI. When CMake finds it, CAPIO builds the `mpi` and `mpisync` server backends. Otherwise CAPIO builds
+without MPI support, and the `mtcl` backend remains available.
 
 Fetched and built during the CMake configuration:
-
-- [CAPIO-CL](https://github.com/High-Performance-IO/CAPIO-CL) parses CAPIO-CL configuration files and enforces
-  streaming directives.
-- [CALF](https://github.com/High-Performance-IO/calf) provides logging and CLI output.
-- [alpha-unito/syscall_intercept](https://github.com/alpha-unito/syscall_intercept) intercepts system calls (a fork of
-  `pmem/syscall_intercept` with aarch64 support).
-- [ParaGroup/MTCL](https://github.com/ParaGroup/MTCL) provides multi-protocol communication between CAPIO servers.
-- [Taywee/args](https://github.com/Taywee/args) parses the server command-line arguments.
+[CAPIO-CL](https://github.com/High-Performance-IO/CAPIO-CL),
+[CALF](https://github.com/High-Performance-IO/calf),
+[alpha-unito/syscall_intercept](https://github.com/alpha-unito/syscall_intercept) (a fork of `pmem/syscall_intercept`
+with aarch64 support), [ParaGroup/MTCL](https://github.com/ParaGroup/MTCL), [Taywee/args](https://github.com/Taywee/args).
 
 ### Compile CAPIO
 
