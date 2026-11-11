@@ -1,5 +1,11 @@
+#include <cstdlib>
 #include <gtest/gtest.h>
+
 #include <linux/limits.h>
+#include <string_view>
+#include <sys/types.h>
+#include <unistd.h>
+#include <vector>
 
 #include "common/syscall.hpp"
 
@@ -68,7 +74,7 @@ class CapioServerEnvironment : public testing::Environment {
     void SetUp() override {
         if (server_pid < 0) {
             ASSERT_NE(std::getenv("CAPIO_DIR"), nullptr);
-            ASSERT_GE(server_pid = capio_syscall(SYS_fork), 0);
+            ASSERT_GE(server_pid = capio_syscall(SYS_clone, SIGCHLD, 0), 0);
             if (server_pid == 0) {
                 execvpe(args[0], args, envp);
                 _exit(127);
