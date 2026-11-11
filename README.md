@@ -32,10 +32,14 @@ Optional: MPI. When CMake finds it, CAPIO builds the `mpi` and `mpisync` server 
 without MPI support, and the `mtcl` backend remains available.
 
 Fetched and built during the CMake configuration:
-[CAPIO-CL](https://github.com/High-Performance-IO/CAPIO-CL),
-[CALF](https://github.com/High-Performance-IO/calf),
-[alpha-unito/syscall_intercept](https://github.com/alpha-unito/syscall_intercept) (a fork of `pmem/syscall_intercept`
-with aarch64 support), [ParaGroup/MTCL](https://github.com/ParaGroup/MTCL), [Taywee/args](https://github.com/Taywee/args).
+
+- [CAPIO-CL](https://github.com/High-Performance-IO/CAPIO-CL) parses CAPIO-CL configuration files and enforces
+  streaming directives.
+- [CALF](https://github.com/High-Performance-IO/calf) provides logging and CLI output.
+- [alpha-unito/syscall_intercept](https://github.com/alpha-unito/syscall_intercept) intercepts system calls (a fork of
+  `pmem/syscall_intercept` with aarch64 support).
+- [ParaGroup/MTCL](https://github.com/ParaGroup/MTCL) provides multi-protocol communication between CAPIO servers.
+- [Taywee/args](https://github.com/Taywee/args) parses the server command-line arguments.
 
 ### Compile CAPIO
 
