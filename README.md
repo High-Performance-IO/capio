@@ -1,39 +1,53 @@
-# CAPIO
+# CAPIO: Cross-Application Programmable I/O
 
-CAPIO (Cross-Application Programmable I/O), is a middleware aimed at injecting streaming capabilities to workflow steps
-without changing the application codebase. It has been proven to work with C/C++ binaries, Fortran Binaries, JAVA,
-python and bash. 
+CAPIO is a middleware aimed at injecting streaming capabilities into workflow steps without changing the application
+codebase. It has been proven to work with C/C++ binaries, Fortran, Java, Python, and Bash.
 
 [![codecov](https://codecov.io/gh/High-Performance-IO/capio/graph/badge.svg?token=6ATRB5VJO3)](https://codecov.io/gh/High-Performance-IO/capio)
 ![CI-Tests](https://github.com/High-Performance-IO/capio/actions/workflows/ci-tests.yaml/badge.svg)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://raw.githubusercontent.com/High-Performance-IO/capio/master/LICENSE)
 
-## Capio Bibliography
+> [!TIP]
+> MPI is optional. CAPIO servers can communicate through MTCL, or run with no backend at all to only coordinate I/O
+> operations between workflow steps on a single node.
 
-- [![CAPIO methodology](https://img.shields.io/badge/CAPIO%20Methodology%20(Use%20this%20to%20cite%20CAPIO)-10.1016/j.future.2025.108159-%23cc5500?logo=doi&logoColor=white&labelColor=2b2b2b)](http://dx.doi.org/10.1016/j.future.2025.108159)
-- [![CAPIO middleware](https://img.shields.io/badge/HiPC%202023%20Paper-10.1109/HiPC58850.2023.00031-%23cc5500?logo=doi&logoColor=white&labelColor=2b2b2b)](http://dx.doi.org/10.1109/HiPC58850.2023.00031)
+Supported architectures:
 
-## Build and run tests
+- ![x86_64](https://img.shields.io/badge/x86__64_/_amd64-supported-50C878.svg)
+- ![ARM64](https://img.shields.io/badge/ARM64_/_aarch64-supported-50C878.svg)
+- ![RISC-V](https://img.shields.io/badge/RISC--V_(riscv64)-in_progress-orange.svg)
+
+## Install with Spack
+
+CAPIO is available through the High Performance IO Spack repository. See
+[High-Performance-IO/hpio-spack](https://github.com/High-Performance-IO/hpio-spack) for instructions.
+
+## Manual build and install
 
 ### Dependencies
 
-CAPIO depends on the following software that needs to be manually installed:
+Required:
 
-- `cmake >=3.15`
-- `c++17` or newer
+- `cmake >= 3.15`
+- A `C++17` (or newer) compiler. CI tests GCC 12–16 and Clang 13–23.
 - `pthreads`
 
-`openmpi` is optional. When CMake finds it, CAPIO builds and enables the `mpi` and `mpisync` server backends;
-otherwise, CAPIO builds without MPI support and the MTCL backend remains available.
-The following dependencies are automatically fetched during the CMake configuration phase and built as needed.
+Optional:
 
-- [CAPIO-CL](https://github.com/High-Performance-IO/CAPIO-CL) handles CAPIO-CL configuration and enforces streaming directives.
-- [CALF](https://github.com/High-Performance-IO/CALF) provides logging and CLI output.
-- [alpha-unito/syscall_intercept](https://github.com/alpha-unito/syscall_intercept) intercepts system calls (forked from `pmem/syscall_intercept`).
-- [ParaGroup/MTCL](https://github.com/ParaGroup/MTCL) provides dynamic, multi-backend communication between CAPIO server instances.
-- [Taywee/args](https://github.com/Taywee/args) parses server command-line arguments.
+- MPI: when CMake finds it, CAPIO builds the `mpi` and `mpisync` server backends. Otherwise CAPIO builds without MPI
+  support, and the `mtcl` backend remains available.
 
-### Compile capio
+Fetched and built during the CMake configuration:
+
+- [CAPIO-CL](https://github.com/High-Performance-IO/CAPIO-CL) parses CAPIO-CL configuration files and enforces
+  streaming directives.
+- [CALF](https://github.com/High-Performance-IO/calf) provides logging and CLI output.
+- [alpha-unito/syscall_intercept](https://github.com/alpha-unito/syscall_intercept) intercepts system calls (a fork of
+  `pmem/syscall_intercept` with aarch64 support).
+- [ParaGroup/MTCL](https://github.com/ParaGroup/MTCL) provides multi-protocol communication between CAPIO servers.
+- [Taywee/args](https://github.com/Taywee/args) parses the server command-line arguments.
+
+### Compile CAPIO
 
 ```bash
 git clone https://github.com/High-Performance-IO/capio.git capio && cd capio
@@ -43,124 +57,47 @@ cmake --build . -j$(nproc)
 sudo cmake --install .
 ```
 
-It is also possible to enable log in CAPIO, by defining `-DCAPIO_LOG=TRUE`.
+### CMake options
 
-It is also possible to select how the CAPIO server checks the node memory before allocating file buffers, by defining
-`-DCAPIO_MEMORY_CHECKS=<full|fast|none>` (defaults to `full`). If the requested buffer size is larger than the memory
-the check reports, the allocation is capped to that memory, and a warning is printed when it is less than 10% of the
-requested size:
+| Option                                     | Default | Description                                                  |
+|--------------------------------------------|---------|--------------------------------------------------------------|
+| `-DCAPIO_LOG=TRUE`                         | `FALSE` | Enable logging. Only takes effect in `Debug` builds          |
+| `-DCAPIO_BUILD_TESTS=TRUE`                 | `FALSE` | Build the test suite                                         |
+| `-DCAPIO_BUILD_SERVER=FALSE`               | `TRUE`  | Skip building `capio_server`                                 |
+| `-DCAPIO_BUILD_POSIX=FALSE`                | `TRUE`  | Skip building `libcapio_posix.so`                            |
+| `-DCAPIO_MEMORY_CHECKS=<full\|fast\|none>` | `full`  | How the server checks node memory before allocating buffers |
+
+If a requested file buffer is larger than the memory reported by `CAPIO_MEMORY_CHECKS`, the allocation is capped to
+that memory, and a warning is printed when it is less than 10% of the requested size:
 
 - `full`: reads `MemAvailable` from `/proc/meminfo` (free memory plus reclaimable cache). This is the only way to know
-  the memory that is actually allocable;
+  the memory that is actually allocatable.
 - `fast`: reads only the free memory with `sysconf`, without file I/O. It ignores reclaimable cache, so allocations
-  may be capped more than needed;
+  may be capped more than needed.
 - `none`: disables the check.
 
-## Use CAPIO in your code
+### Documentation
 
-Good news! You don't need to modify your code to benefit from the features of CAPIO. You have only to do three steps (
-the first is optional).
-
-1) Write a configuration file for injecting streaming capabilities to your workflow
-
-2) Launch the CAPIO daemons with MPI passing the (eventual) configuration file as argument on the machines in which you
-   want to execute your program (one daemon for each node). If you desire to specify a custom folder
-   for capio, set `CAPIO_DIR` as a environment variable.
-   ```bash
-   [CAPIO_DIR=your_capiodir] [mpiexec -N 1 --hostfile your_hostfile] capio_server -c conf.json 
-   ```
-
-3) Launch your programs preloading the CAPIO shared library like this:
-   ```bash
-   CAPIO_DIR=your_capiodir      \
-   CAPIO_WORKFLOW_NAME=wfname   \ 
-   CAPIO_APP_NAME=appname       \
-   LD_PRELOAD=libcapio_posix.so \ 
-   ./your_app <args>
-    ```
-
-> [!WARNING]
-> `CAPIO_DIR` must be specified when launching a program with the CAPIO library. if `CAPIO_DIR` is not specified, CAPIO
-> will not intercept syscalls.
-
-> [!NOTE]
-> If `CAPIO_DIR` is not specified when launching `capio_server`, it defaults to the server's current working directory.
-
-### Server backend options
-
-Use `--backend-options` to configure the MTCL backend. Its format is
-`PROTO:PORT@POLL_INTERVAL_US`; for example:
+The source code documentation can be generated with Doxygen, using the
+[doxygen-awesome-css](https://github.com/jothepro/doxygen-awesome-css) theme:
 
 ```bash
-capio_server --no-config --backend mtcl --backend-options TCP:7600@1000000
+cd doxy
+git clone --depth 1 https://github.com/jothepro/doxygen-awesome-css.git theme
+doxygen Doxyfile
 ```
 
-If omitted, MTCL defaults to `TCP:7600@1000000`. See the
-[MTCL repository](https://github.com/ParaGroup/MTCL) for supported communication protocols and their requirements.
+The HTML output is written to `doxy/html`.
 
-### File location options
+## Using CAPIO
 
-Each server learns which server holds each file by asking the others over the backend. Two options tune it, both in
-milliseconds:
+You don't need to modify your application code. Just follow these steps.
 
-- `--location-query-timeout MS` (default 5000): how long a lookup waits for the other servers to answer before it ends
-  without them.
-- `--location-requery-interval MS` (default 500): how often a server waiting for a file to be created asks the others
-  again, in case it missed the announcement.
+### 1. Write a configuration file
 
-### Available environment variables
-
-CAPIO can be controlled through the usage of environment variables. The available variables are listed below:
-
-#### Global environment variable
-
-- `CAPIO_DIR` This environment variable tells to both server and application the mount point of capio;
-- `CAPIO_LOG_LEVEL` this environment tells both server and application the log level to use. This variable works only
-  if `-DCAPIO_LOG=TRUE` was specified during cmake phase;
-- `CAPIO_LOG_PREFIX` This environment variable is defined only for capio_posix applications and specifies the prefix of
-  the logfile name to which capio will log to. The default value is `posix_thread_`, which means that capio will log by
-  default to a set of files called `posix_thread_*.log`. An equivalent behaviour can be set on the capio server using
-  the `-l` option;
-- `CAPIO_LOG_DIR` This environment variable is defined only for capio_posix applications and specifies the directory
-  name to which capio will be created. If this variable is not defined, capio will log by default to `capio_logs`. An
-  equivalent behaviour can be set on the capio server using the `-d` option;
-- `CAPIO_CACHE_LINES`: This environment variable controls how many lines of cache are presents between posix and server
-  applications. defaults to 10 lines;
-- `CAPIO_CACHE_LINE_SIZE`: This environment variable controls the size of a single cache line. defaults to 256KB;
-
-#### Server only environment variable
-
-- `CAPIO_FILE_INIT_SIZE`: This environment variable defines the default size of pre allocated memory for a new file
-  handled by capio. Defaults to 4GB. Bigger sizes will reduce the overhead of malloc but will fill faster node memory.
-  Value has to be expressed in bytes;
-- `CAPIO_PREFETCH_DATA_SIZE`: If this variable is set, then data transfers between nodes will be always, at least of the
-  given value in bytes;
-
-#### Posix only environment variable
-
-> [!WARNING]  
-> The following variables are mandatory. If not provided to a posix, application, CAPIO will not be able to correctly
-> handle the
-> application, according to the specifications given from the json configuration file!
-
-- `CAPIO_WORKFLOW_NAME`: This environment variable is used to define the scope of a workflow for a given step. Needs to
-  be the same one as the field `"name"` inside the json configuration file;
-- `CAPIO_APP_NAME`: This environment variable defines the app name within a workflow for a given step;
-
-## How to inject streaming capabilities into your workflow
-
-With CAPIO is possible to run the applications of your workflow that communicates through files concurrently. CAPIO will
-synchronize transparently the concurrent reads and writes on those files. If a file is never modified after it is closed
-you can set the streaming semantics equals to "on_close" on the configuration file. In this way, all the reads done on
-this file will hung until the writer closes the file, allowing the consumer application to read the file even if the
-producer is still running.
-Another supported file streaming semantics is "append" in which a read is satisfied when the producer writes the
-requested data. This is the most aggressive (and efficient) form of streaming semantics (because the consumer can start
-reading while the producer is writing the file). This semantic must be used only if the producer does not modify a piece
-of data after it is written.
-The streaming semantic on_termination tells CAPIO to not allowing streaming on that file. This is the default streaming
-semantics if a semantics for a file is not specified.
-The following is an example of a simple configuration:
+Write a CAPIO-CL configuration file to inject streaming into your workflow. Refer to the
+[CAPIO-CL repository](https://github.com/High-Performance-IO/CAPIO-CL) and the
+[CAPIO-CL docs](https://capio.hpc4ai.it/docs/coord-language/) for details. A minimal example:
 
 ```json
 {
@@ -168,71 +105,137 @@ The following is an example of a simple configuration:
   "IO_Graph": [
     {
       "name": "writer",
-      "output_stream": [
-        "file0.dat",
-        "file1.dat",
-        "file2.dat"
-      ],
+      "input_stream": [],
+      "output_stream": ["file0.dat", "file1.dat"],
       "streaming": [
-        {
-          "name": ["file0.dat"],
-          "committed": "on_close"
-        },
-        {
-          "name": ["file1.dat"],
-          "committed": "on_close",
-          "mode": "no_update"
-        },
-        {
-          "name": ["file2.dat"],
-          "committed": "on_termination"
-        }
+        { "name": ["file0.dat"], "committed": "on_close" },
+        { "name": ["file1.dat"], "committed": "on_termination" }
       ]
     },
     {
       "name": "reader",
-      "input_stream": [
-        "file0.dat",
-        "file1.dat",
-        "file2.dat"
-      ]
+      "input_stream": ["file0.dat", "file1.dat"],
+      "output_stream": []
     }
   ]
 }
 ```
 
-> [!NOTE]
-> We are working on an extension of the possible streaming semantics and in a detailed
-> documentation about the configuration file!
+### 2. Launch the CAPIO servers
+
+Start one server per node. `CAPIO_DIR` is required and must be an existing directory: it is the CAPIO mount point.
+
+```bash
+CAPIO_DIR=your_capiodir capio_server -c conf.json
+```
+
+To start a server without a configuration file, pass `--no-config` instead of `-c`.
+
+### 3. Launch your application
+
+Set the environment variables and preload the `libcapio_posix.so` intercepting library:
+
+```bash
+CAPIO_DIR=your_capiodir      \
+CAPIO_WORKFLOW_NAME=wfname   \
+CAPIO_APP_NAME=appname       \
+LD_PRELOAD=libcapio_posix.so \
+./your_app <args>
+```
+
+> [!WARNING]
+> If `CAPIO_DIR` is not set, the application runs without CAPIO intercepting its system calls. If
+> `CAPIO_WORKFLOW_NAME` and `CAPIO_APP_NAME` are not set, they default to `CAPIO` and `default_app`, which will not
+> match the steps described in your CAPIO-CL configuration file.
+
+To shut down a server, send it `SIGTERM` or `SIGINT` (e.g. `killall capio_server`). The server releases its resources
+and exits.
+
+## Server options
+
+| Option                            | Description                                                                         |
+|-----------------------------------|-------------------------------------------------------------------------------------|
+| `-c, --config FILE`               | CAPIO-CL configuration file                                                         |
+| `--no-config`                     | Start without a configuration file, using default settings                          |
+| `-r, --resolve-prefix PREFIX`     | Prefix used to resolve relative paths in the configuration file                     |
+| `--mem-only`                      | Store all files in memory, regardless of the configuration file                     |
+| `-b, --backend NAME`              | Communication backend (see below)                                                   |
+| `--backend-options OPTS`          | Backend-specific options (see below)                                                |
+| `--discovery mcast\|fs`           | How servers find each other: multicast (default) or token files on a shared filesystem |
+| `--mcast-addr ADDR`               | Multicast discovery address (default `224.0.0.2`)                                   |
+| `--mcast-port PORT`               | Multicast discovery port (default `22334`)                                          |
+| `--token-directory DIR`           | Token directory for `fs` discovery (default `.capio_tokens/`)                       |
+| `--location-query-timeout MS`     | How long a file lookup waits for the other servers to answer (default 5000)         |
+| `--location-requery-interval MS`  | How often a server waiting for a file to be created asks again (default 500)        |
+| `--continue-on-error`             | Try to keep running after a fatal error. Only for debugging: behaviour is undefined |
+
+### Backends
+
+| Backend   | Description                                                      |
+|-----------|------------------------------------------------------------------|
+| `none`    | Default. No communication between servers                        |
+| `mtcl`    | Communication through MTCL                                       |
+| `mpi`     | Communication through MPI (only if built with MPI)               |
+| `mpisync` | Like `mpi`, but with blocking receives (only if built with MPI)  |
+
+Use `--backend-options` to configure the MTCL backend. Its format is `PROTO:PORT@POLL_INTERVAL_US`, for example:
+
+```bash
+capio_server --no-config --backend mtcl --backend-options TCP:7600@1000000
+```
+
+If omitted, MTCL defaults to `TCP:7600@1000000`. See the [MTCL repository](https://github.com/ParaGroup/MTCL) for
+supported protocols and their requirements.
+
+## Environment variables
+
+### Server and application
+
+| Variable                | Description                                                                |
+|-------------------------|----------------------------------------------------------------------------|
+| `CAPIO_DIR`             | CAPIO mount point, shared by servers and applications                      |
+| `CAPIO_CACHE_LINES`     | Number of cache lines between application and server (default: 10)         |
+| `CAPIO_CACHE_LINE_SIZE` | Size of a cache line, in bytes (default: 256KB)                            |
+| `CALF_LOG_DIR`          | Directory for log files (default: `./capio_logs`). Needs `CAPIO_LOG`        |
+| `CALF_LOG_PREFIX`       | Log file name prefix. Needs `CAPIO_LOG`                                     |
+
+### Server only
+
+| Variable                   | Description                                                              |
+|----------------------------|--------------------------------------------------------------------------|
+| `CAPIO_FILE_INIT_SIZE`     | Bytes preallocated for each new file (default: 4GB)                      |
+| `CAPIO_PREFETCH_DATA_SIZE` | If set, data transfers between servers are at least this many bytes      |
+
+### Application only
+
+| Variable              | Description                                                          |
+|-----------------------|----------------------------------------------------------------------|
+| `CAPIO_WORKFLOW_NAME` | Must match the `"name"` field of the configuration file             |
+| `CAPIO_APP_NAME`      | Must match the `"name"` of the step in the configuration `IO_Graph` |
 
 ## Examples
 
-The [examples](examples) folder contains some examples that shows how to use mpi_io with CAPIO.
-There are also examples on how to write JSON configuration files for the semantics implemented by CAPIO:
+The [examples](examples) folder contains MPI-IO example applications and a Docker Compose setup.
+More documentation is available at [https://capio.hpc4ai.it/docs](https://capio.hpc4ai.it/docs).
 
-- [on_close](https://github.com/High-Performance-IO/capio/wiki/Examples#on_close-semantic): A pipeline composed by a
-  producer and a consumer with "on_close" semantics
-- [no_update](https://github.com/High-Performance-IO/capio/wiki/Examples#noupdate-semantics): A pipeline composed by a
-  producer and a consumer with "no_update" semantics
-- [mix_semantics](https://github.com/High-Performance-IO/capio/wiki/Examples#mixed-semantics): A pipeline composed by a
-  producer and a consumer with mix semantics
+## Report bugs and get help
 
-## Report bugs + get help
+- [Create an issue](https://github.com/High-Performance-IO/capio/issues/new)
+- [Official documentation](https://capio.hpc4ai.it/docs)
 
-[Create a new issue](https://github.com/High-Performance-IO/capio/issues/new)
+## CAPIO team
 
-[Get help](https://github.com/High-Performance-IO/capio/wiki)
+- Marco Edoardo Santimaria – <marcoedoardo.santimaria@unito.it> (Designer & Maintainer)
+- Iacopo Colonnelli – <iacopo.colonnelli@unito.it> (Workflow Support & Maintainer)
+- Massimo Torquati – <massimo.torquati@unipi.it> (Designer)
+- Marco Aldinucci – <marco.aldinucci@unito.it> (Designer)
 
-> [!TIP]
-> A [wiki](https://github.com/High-Performance-IO/capio/wiki) is in development! You might want to check the wiki to get
-> more in depth information about CAPIO!
+Former members:
 
-## CAPIO Team
+- Alberto Riccardo Martinelli – <albertoriccardo.martinelli@unito.it> (Designer & Maintainer)
 
-Made with :heart: by:
+## Publications
 
-Marco Edoardo Santimaria <marcoedoardo.santimaria@unito.it> (Designer and maintainer) \
-Iacopo Colonnelli <iacopo.colonnelli@unito.it> (Workflows expert and maintainer) \
-Massimo Torquati <massimo.torquati@unipi.it> (Designer) \
-Marco Aldinucci <marco.aldinucci@unito.it> (Designer) \
-Alberto Riccardo Martinelli <albertoriccardo.martinelli@unito.it> (designer and maintainer)
+- [![CAPIO methodology](https://img.shields.io/badge/CAPIO%20Methodology%20(Use%20this%20to%20cite%20CAPIO)-10.1016/j.future.2025.108159-%23cc5500?logo=doi&logoColor=white&labelColor=2b2b2b)](http://dx.doi.org/10.1016/j.future.2025.108159)
+- [![CAPIO middleware](https://img.shields.io/badge/HiPC%202023%20Paper-10.1109/HiPC58850.2023.00031-%23cc5500?logo=doi&logoColor=white&labelColor=2b2b2b)](http://dx.doi.org/10.1109/HiPC58850.2023.00031)
+- [![CAPIO-CL](https://img.shields.io/badge/CAPIO--CL-10.1007/s10766--025--00789--0-%23cc5500?logo=doi&logoColor=white&labelColor=2b2b2b)](https://doi.org/10.1007/s10766-025-00789-0)
