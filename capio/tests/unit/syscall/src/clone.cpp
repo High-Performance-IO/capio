@@ -69,7 +69,8 @@ TEST(SystemCallTest, TestForkParentChild) {
         exit(EXIT_SUCCESS);
     }
 }
-#else
+#endif
+
 TEST(SystemCallTest, TestForkParentChild) {
     auto pid = syscall(SYS_clone, SIGCHLD, 0);
     EXPECT_GE(pid, 0);
@@ -77,7 +78,6 @@ TEST(SystemCallTest, TestForkParentChild) {
         exit(EXIT_SUCCESS);
     }
 }
-#endif
 
 TEST(SystemCallTest, TestThreadCloneProducerConsumerWithStat) {
     constexpr const char *PATHNAME = "test_clone.txt";
