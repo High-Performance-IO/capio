@@ -62,6 +62,7 @@ inline int capio_openat(int dirfd, const std::string_view &pathname, int flags, 
             LOG("!excl && !create");
             off64_t return_code = open_request(fd, path, tid);
             if (return_code == 1) {
+                syscall_no_intercept(SYS_close, fd);
                 errno = ENOENT;
                 return CAPIO_POSIX_SYSCALL_ERRNO;
             }
