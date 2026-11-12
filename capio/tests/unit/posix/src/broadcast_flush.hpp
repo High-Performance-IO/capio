@@ -37,17 +37,22 @@ class ReadCacheCloseTest : public testing::Test {
         init_client(tid);
         initialize_data_queues(tid);
         add_capio_fd(tid, "/capio/file_0.dat", fd, 0, 0, O_RDONLY, false);
-        read_cache->_last_fd      = fd;
-        read_cache->_cache_offset = 100;
-        read_cache->_actual_size  = 0;
+        auto &line              = read_cache->_lines[fd];
+        line.offset             = 100;
+        line.size               = 0;
         // The pending flush() issues a seek_request(); supply the reply it awaits.
-        constexpr off64_t reply   = 0;
+        constexpr off64_t reply = 0;
         buff_response->write(&reply);
         return fd;
     }
 
     static bool ReadCacheHasPendingData(ReadCache &cache) {
-        return cache._actual_size != cache._cache_offset;
+        for (const auto &[fd, line] : cache._lines) {
+            if (line.size != line.offset) {
+                return true;
+            }
+        }
+        return false;
     }
 };
 
