@@ -41,7 +41,9 @@ constexpr const int CAPIO_SERVER_REQUEST_LOCATION_ANNOUNCE     = 6;
 constexpr const int CAPIO_SERVER_REQUEST_LOCATION_FORGET       = 7;
 constexpr const int CAPIO_SERVER_REQUEST_LOCATION_QUERY        = 8;
 constexpr const int CAPIO_SERVER_REQUEST_LOCATION_ANSWER       = 9;
+constexpr const int CAPIO_SERVER_REQUEST_DIRECTORY_ENTRY_ADD    = 10;
+constexpr const int CAPIO_SERVER_REQUEST_DIRECTORY_ENTRY_REMOVE = 11;
 
-constexpr const int CAPIO_SERVER_NR_REQUEST = 10;
+constexpr const int CAPIO_SERVER_NR_REQUEST = 12;
 
 #endif // CAPIO_COMMON_REQUESTS_HPP
