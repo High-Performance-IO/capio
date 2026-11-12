@@ -2,6 +2,7 @@
 #define CAPIO_SERVER_REMOTE_HANDLERS_HPP
 
 #include "handlers/copy_file_range.hpp"
+#include "handlers/directory.hpp"
 #include "handlers/read.hpp"
 #include "handlers/stat.hpp"
 

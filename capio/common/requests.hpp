@@ -31,17 +31,19 @@ constexpr const int CAPIO_NR_REQUESTS = 25;
 
 /*REQUESTS FOR SERVER TO SERVER COMMUNICATION*/
 
-constexpr const int CAPIO_SERVER_REQUEST_READ                  = 0;
-constexpr const int CAPIO_SERVER_REQUEST_READ_REPLY            = 1;
-constexpr const int CAPIO_SERVER_REQUEST_STAT                  = 2;
-constexpr const int CAPIO_SERVER_REQUEST_STAT_REPLY            = 3;
-constexpr const int CAPIO_SERVER_REQUEST_COPY_FILE_RANGE       = 4;
-constexpr const int CAPIO_SERVER_REQUEST_COPY_FILE_RANGE_REPLY = 5;
-constexpr const int CAPIO_SERVER_REQUEST_LOCATION_ANNOUNCE     = 6;
-constexpr const int CAPIO_SERVER_REQUEST_LOCATION_FORGET       = 7;
-constexpr const int CAPIO_SERVER_REQUEST_LOCATION_QUERY        = 8;
-constexpr const int CAPIO_SERVER_REQUEST_LOCATION_ANSWER       = 9;
+constexpr const int CAPIO_SERVER_REQUEST_READ                   = 0;
+constexpr const int CAPIO_SERVER_REQUEST_READ_REPLY             = 1;
+constexpr const int CAPIO_SERVER_REQUEST_STAT                   = 2;
+constexpr const int CAPIO_SERVER_REQUEST_STAT_REPLY             = 3;
+constexpr const int CAPIO_SERVER_REQUEST_COPY_FILE_RANGE        = 4;
+constexpr const int CAPIO_SERVER_REQUEST_COPY_FILE_RANGE_REPLY  = 5;
+constexpr const int CAPIO_SERVER_REQUEST_LOCATION_ANNOUNCE      = 6;
+constexpr const int CAPIO_SERVER_REQUEST_LOCATION_FORGET        = 7;
+constexpr const int CAPIO_SERVER_REQUEST_LOCATION_QUERY         = 8;
+constexpr const int CAPIO_SERVER_REQUEST_LOCATION_ANSWER        = 9;
+constexpr const int CAPIO_SERVER_REQUEST_DIRECTORY_ENTRY_ADD    = 10;
+constexpr const int CAPIO_SERVER_REQUEST_DIRECTORY_ENTRY_REMOVE = 11;
 
-constexpr const int CAPIO_SERVER_NR_REQUEST = 10;
+constexpr const int CAPIO_SERVER_NR_REQUEST = 12;
 
 #endif // CAPIO_COMMON_REQUESTS_HPP

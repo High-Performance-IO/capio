@@ -297,7 +297,9 @@ class StorageManager {
      * @brief Updates the parent directory to include an entry for a new file/directory.
      *
      * This is called when a new file or directory is created to ensure the parent
-     * directory's content reflects the new entry.
+     * directory's content reflects the new entry. When another server is the home of the parent
+     * directory, this server keeps a stand-in for it, which never becomes its home and holds no
+     * entries, and asks the home to add the entry: listings, served by the home, stay one.
      *
      * @param tid The thread ID.
      * @param file_path The path of the file/directory whose entry is being added to the parent.
@@ -306,9 +308,19 @@ class StorageManager {
 
     /**
      * @brief Removes the entry of @p file_path from its parent directory's listing, once the file
-     * or directory has been removed.
+     * or directory has been removed: here, or at the home of the parent directory if it is another
+     * server.
      */
     void removeFromDirectory(const std::filesystem::path &file_path);
+
+    /**
+     * @brief Adds to its parent directory, of which this server is the home, the entry of a file
+     * another server created (a CAPIO_SERVER_REQUEST_DIRECTORY_ENTRY_ADD). Ignored if this server
+     * does not hold the directory.
+     *
+     * @param file_path The path of the file/directory whose entry is being added to the parent.
+     */
+    void addRemoteDirectoryEntry(const std::filesystem::path &file_path);
 };
 
 #endif // CAPIO_STORAGE_MANAGER_HPP
