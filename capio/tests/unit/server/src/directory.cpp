@@ -43,7 +43,9 @@ class RemoteDirectoryTest : public testing::Test {
     }
 
     void TearDown() override {
-        storage_manager->remove(dir);
+        if (storage_manager->tryGet(dir)) { // the stat test makes no entry for the directory
+            storage_manager->remove(dir);
+        }
         client_manager->removeClient(TID);
         backend = nullptr;
     }
