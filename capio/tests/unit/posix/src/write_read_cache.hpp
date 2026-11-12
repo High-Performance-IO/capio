@@ -55,17 +55,18 @@ class WriteReadCacheTest : public testing::Test {
         init_client(tid);
         initialize_data_queues(tid);
         add_capio_fd(tid, input_path, INPUT_FD, 0, 0, O_RDONLY, false);
-        read_cache->_last_fd      = INPUT_FD;
-        read_cache->_cache_offset = 8192;
-        read_cache->_actual_size  = 256 * 1024;
+        auto &line              = read_cache->_lines[INPUT_FD];
+        line.offset             = 8192;
+        line.size               = 256 * 1024;
         // If the cache is flushed, flush() issues a seek_request(): supply the reply it awaits
         // so the test cannot block without a server.
-        constexpr off64_t reply   = 0;
+        constexpr off64_t reply = 0;
         buff_response->write(&reply);
     }
 
     static bool ReadCacheHasPrefetchedData() {
-        return read_cache->_actual_size != read_cache->_cache_offset;
+        const auto it = read_cache->_lines.find(INPUT_FD);
+        return it != read_cache->_lines.end() && it->second.size != it->second.offset;
     }
 };
 
@@ -78,7 +79,7 @@ TEST_F(WriteReadCacheTest, WriteToAnotherFileKeepsPrefetchedReadData) {
 
     EXPECT_TRUE(ReadCacheHasPrefetchedData())
         << "a write to p1_0.dat dropped the prefetched bytes of p0_0.dat";
-    EXPECT_EQ(read_cache->_cache_offset, 8192);
+    EXPECT_EQ(read_cache->_lines.at(INPUT_FD).offset, 8192);
 }
 
 TEST_F(WriteReadCacheTest, WriteToTheCachedFileDropsPrefetchedReadData) {

@@ -45,6 +45,7 @@ class ReadCache {
     }
 
     inline Line &_line(const int fd) {
+        START_LOG(capio_syscall(SYS_gettid), "call(fd=%d)", fd);
         auto it = _lines.find(fd);
         if (it == _lines.end()) {
             if (_lines.size() >= MAX_LINES) {
@@ -96,17 +97,6 @@ class ReadCache {
             _flush(fd, it->second);
             _lines.erase(it);
         }
-    }
-
-    // Check whether this instance caches data from the file path associated with the given
-    // fd or not
-    [[nodiscard]] bool cachesFileOf(const int fd) const {
-        for (const auto &[cached, line] : _lines) {
-            if (line.offset != line.size && same_file(fd, cached)) {
-                return true;
-            }
-        }
-        return false;
     }
 
     /// Drop the lines of every descriptor of the file of @p fd, which a write makes stale
