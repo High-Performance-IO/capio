@@ -14,6 +14,8 @@
 #include "storage/manager.hpp"
 #include "utils/capiocl_adapter.hpp"
 
+#include "handlers/stat.hpp"
+
 extern StorageManager *storage_manager;
 extern ClientManager *client_manager;
 extern Backend *backend;
@@ -81,6 +83,19 @@ TEST_F(RemoteDirectoryTest, homeAddsAndRemovesTheEntriesOfAnotherServer) {
             file,
         other_node));
     EXPECT_EQ(storage_manager->get(dir).getCurrentDirectoryFileCount(), 0u);
+}
+
+/*
+ * A stat of a file that does not exist yet waits for it to be created. Created through another
+ * server, it has no entry on this one: the stat must go to its home, not abort this server.
+ */
+TEST_F(RemoteDirectoryTest, statWaitingForAFileCreatedThroughAnotherServerAsksItsHome) {
+    const auto file = dir / "created_elsewhere.fits";
+    home_node_service->learn(file, other_node);
+
+    wait_for_file_completion(TID, file); // used to abort: "not found in local storage"
+
+    EXPECT_FALSE(storage_manager->tryGet(file)) << "the stat created a local entry for the file";
 }
 
 #endif // CAPIO_SERVER_DIRECTORY_TEST_HPP
