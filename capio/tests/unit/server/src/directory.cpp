@@ -28,17 +28,17 @@ extern HomeNodeService *home_node_service;
  */
 class RemoteDirectoryTest : public testing::Test {
   protected:
-    static constexpr pid_t TID = 6161;
+    static constexpr pid_t TID   = 6161;
     const std::string other_node = "another-node";
     std::filesystem::path dir;
 
     void SetUp() override {
         ASSERT_EQ(backend, nullptr);
-        backend = &test_backend;
+        backend        = &test_backend;
         static int run = 0;
-        dir = std::string("remote_directory_") +
-              testing::UnitTest::GetInstance()->current_test_info()->name() + "_" +
-              std::to_string(run++);
+        dir            = std::string("remote_directory_") +
+                         testing::UnitTest::GetInstance()->current_test_info()->name() + "_" +
+                         std::to_string(run++);
         client_manager->registerClient(TID, "writer");
     }
 
@@ -81,8 +81,7 @@ TEST_F(RemoteDirectoryTest, homeAddsAndRemovesTheEntriesOfAnotherServer) {
     EXPECT_EQ(storage_manager->get(dir).getCurrentDirectoryFileCount(), 1u);
 
     remote_directory_entry_remove_handler(RemoteRequest(
-        std::to_string(CAPIO_SERVER_REQUEST_DIRECTORY_ENTRY_REMOVE).insert(0, 2, '0') + " " +
-            file,
+        std::to_string(CAPIO_SERVER_REQUEST_DIRECTORY_ENTRY_REMOVE).insert(0, 2, '0') + " " + file,
         other_node));
     EXPECT_EQ(storage_manager->get(dir).getCurrentDirectoryFileCount(), 0u);
 }
