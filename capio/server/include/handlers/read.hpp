@@ -37,8 +37,10 @@ inline void handle_pending_read(int tid, int fd, long int process_offset, long i
     }
 
     c_file.createBuffer(path, false);
-    client_manager->replyToClient(tid, process_offset, c_file.getBuffer(), bytes_read);
+    // The offset is set before the reply: this runs outside the thread that serves the client
+    // requests, so once the client has its answer it may close fd before the offset is stored.
     storage_manager->setFileOffset(tid, fd, process_offset + bytes_read);
+    client_manager->replyToClient(tid, process_offset, c_file.getBuffer(), bytes_read);
 
     // TODO: check if the file was moved to the disk
 }
