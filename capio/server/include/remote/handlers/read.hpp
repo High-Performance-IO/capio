@@ -20,8 +20,11 @@ inline void serve_remote_read(const std::filesystem::path &path, const std::stri
               path.c_str(), dest.c_str(), tid, fd, count, offset, complete ? "true" : "false",
               is_getdents ? "true" : "false");
 
-    CapioFile &c_file       = storage_manager->get(path);
-    const long int nbytes   = remote_reply_size(c_file, offset);
+    CapioFile &c_file = storage_manager->get(path);
+    // The backend cannot send more in one message (MTCL: 4 GiB); without this cap a
+    // larger reply threw in send_file and the server died, leaving the reader waiting.
+    const long int nbytes = std::min<long int>(remote_reply_size(c_file, offset),
+                                               backend->max_file_transfer_size());
     const off64_t file_size = c_file.getStoredSize();
 
     serve_remote_read_request(tid, fd, count, nbytes, file_size, complete, is_getdents, dest,
