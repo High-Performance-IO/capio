@@ -461,11 +461,8 @@ static int hook(long syscall_number, long arg0, long arg1, long arg2, long arg3,
     }
 }
 
-static __attribute__((constructor)) void init() {
-    SET_CALF_SYSCALL_HANDLER(syscall_no_intercept);
-
-    const long tid = syscall_no_intercept(SYS_gettid);
-
+// The setup that both interception backends do before installing the hooks
+static void init_capio(const long tid) {
     FileDescriptorTable::protectAcrossFork();
     // After the handlers of the table, so that the child has a free lock
     FS_MODE({ pthread_atfork(nullptr, nullptr, announce_inherited_descriptors_fs); })
@@ -489,6 +486,40 @@ static __attribute__((constructor)) void init() {
             close_request(fd, tid);
         }
     })
+}
+
+#if defined(__riscv)
+
+// vpoline calls it, once libvpoline.so has loaded this library through LIBVPHOOK
+extern "C" {
+int __hook_init(long placeholder __attribute__((unused)), void *no_intercept_ptr,
+                void **out_hook_ptr, void **out_post_clone_child_ptr,
+                void **out_post_clone_parent_ptr) {
+    syscall_no_intercept = (syscall_no_intercept_t) no_intercept_ptr;
+
+    SET_CALF_SYSCALL_HANDLER(syscall_no_intercept);
+
+    init_capio(syscall_no_intercept(SYS_gettid));
+
+    *out_hook_ptr = (void *) hook;
+    if (out_post_clone_child_ptr != nullptr) {
+        *out_post_clone_child_ptr = (void *) hook_clone_child;
+    }
+    if (out_post_clone_parent_ptr != nullptr) {
+        *out_post_clone_parent_ptr = (void *) hook_clone_parent;
+    }
+
+    ENABLE_LOGGER();
+    return 0;
+}
+}
+
+#else
+
+static __attribute__((constructor)) void init() {
+    SET_CALF_SYSCALL_HANDLER(syscall_no_intercept);
+
+    init_capio(syscall_no_intercept(SYS_gettid));
 
     intercept_hook_point_clone_child  = hook_clone_child;
     intercept_hook_point_clone_parent = hook_clone_parent;
@@ -496,3 +527,5 @@ static __attribute__((constructor)) void init() {
 
     ENABLE_LOGGER();
 }
+
+#endif

@@ -12,44 +12,75 @@ set(TARGET_SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/libcapio_posix.cpp ${CAPIO_POSIX_
 include(ProcessorCount)
 
 #####################################
+# Interception backend selection.
+# Mirrors the #if defined(__riscv) branch in common/syscall.hpp and
+# libcapio_posix.cpp:
+#   riscv          -> vpoline, preloaded at runtime as LD_PRELOAD=libvpoline.so and
+#                     loading the hook via LIBVPHOOK (no link time dependency)
+#   x86_64/aarch64 -> syscall_intercept, built and linked upstream
+#####################################
+if (CMAKE_SYSTEM_PROCESSOR MATCHES "riscv")
+    set(CAPIO_USE_VPOLINE TRUE)
+    set(BACKEND_PROJECT_FOLDER "${CMAKE_CURRENT_SOURCE_DIR}/vpoline")
+else ()
+    set(CAPIO_USE_SYSCALL_INTERCEPT TRUE)
+    set(BACKEND_PROJECT_FOLDER "${CMAKE_CURRENT_SOURCE_DIR}/syscall_intercept")
+endif ()
+
+get_filename_component(BACKEND_NAME "${BACKEND_PROJECT_FOLDER}" NAME)
+set(BACKEND_BUILD_FOLDER "${CMAKE_CURRENT_BINARY_DIR}/${BACKEND_NAME}")
+
+if (CAPIO_USE_SYSCALL_INTERCEPT)
+    set(BACKEND_INCLUDE_FOLDER "${BACKEND_BUILD_FOLDER}/${CMAKE_INSTALL_INCLUDEDIR}")
+    set(BACKEND_LIB_FOLDER "${BACKEND_BUILD_FOLDER}/${CMAKE_INSTALL_LIBDIR}")
+else ()
+    # vpoline has no install() rule: header from the cloned source tree, .so from the
+    # ExternalProject build dir (paths fixed in vpoline/CMakeLists.txt)
+    set(BACKEND_INCLUDE_FOLDER "${BACKEND_BUILD_FOLDER}/vpoline-src/include")
+    set(BACKEND_LIB_FOLDER "${BACKEND_BUILD_FOLDER}/vpoline-build")
+endif ()
+
+#####################################
 # External projects (built once, shared by both variants)
 #####################################
-file(MAKE_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/syscall_intercept)
-
-set(SYSCALL_INTERCEPT_INCLUDE_FOLDER "${CMAKE_CURRENT_BINARY_DIR}/syscall_intercept/${CMAKE_INSTALL_INCLUDEDIR}")
-set(SYSCALL_INTERCEPT_LIB_FOLDER "${CMAKE_CURRENT_BINARY_DIR}/syscall_intercept/${CMAKE_INSTALL_LIBDIR}")
+file(MAKE_DIRECTORY ${BACKEND_BUILD_FOLDER})
 
 execute_process(
         COMMAND ${CMAKE_COMMAND}
         -DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE}
-        "${CMAKE_CURRENT_SOURCE_DIR}/syscall_intercept"
-        WORKING_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/syscall_intercept"
+        "${BACKEND_PROJECT_FOLDER}"
+        WORKING_DIRECTORY "${BACKEND_BUILD_FOLDER}"
 )
 
 IF (UNIX)
     ProcessorCount(NPROC)
     execute_process(
             COMMAND ${CMAKE_COMMAND} --build
-            "${CMAKE_CURRENT_BINARY_DIR}/syscall_intercept"
+            "${BACKEND_BUILD_FOLDER}"
             --parallel "${NPROC}"
     )
 
-    file(GLOB SYSCALL_INTERCEPT_HEADERS "${SYSCALL_INTERCEPT_INCLUDE_FOLDER}/*.h")
-    file(GLOB SYSCALL_INTERCEPT_LIBS "${SYSCALL_INTERCEPT_LIB_FOLDER}/*.a" "${SYSCALL_INTERCEPT_LIB_FOLDER}/*.so*")
-    file(GLOB SYSCALL_INTERCEPT_PKGCONFIGS "${SYSCALL_INTERCEPT_LIB_FOLDER}/pkgconfig/*.pc")
+    if (CAPIO_USE_SYSCALL_INTERCEPT)
+        file(GLOB BACKEND_HEADERS "${BACKEND_INCLUDE_FOLDER}/*.h")
+        file(GLOB BACKEND_LIBS "${BACKEND_LIB_FOLDER}/*.a" "${BACKEND_LIB_FOLDER}/*.so*")
+        file(GLOB BACKEND_PKGCONFIGS "${BACKEND_LIB_FOLDER}/pkgconfig/*.pc")
 
-    install(FILES ${SYSCALL_INTERCEPT_HEADERS} DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}")
-    install(FILES ${SYSCALL_INTERCEPT_LIBS} DESTINATION "${CMAKE_INSTALL_LIBDIR}")
-    install(FILES ${SYSCALL_INTERCEPT_PKGCONFIGS} DESTINATION "${CMAKE_INSTALL_LIBDIR}/pkgconfig")
+        install(FILES ${BACKEND_HEADERS} DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}")
+        install(FILES ${BACKEND_LIBS} DESTINATION "${CMAKE_INSTALL_LIBDIR}")
+        install(FILES ${BACKEND_PKGCONFIGS} DESTINATION "${CMAKE_INSTALL_LIBDIR}/pkgconfig")
+    else ()
+        # Ship libvpoline.so so the riscv launch can use an installed copy.
+        file(GLOB BACKEND_LIBS "${BACKEND_LIB_FOLDER}/libvpoline.so*")
+        install(FILES ${BACKEND_LIBS} DESTINATION "${CMAKE_INSTALL_LIBDIR}")
+    endif ()
 ELSE (UNIX)
-    message(WARNING, "The syscall_intercept library only supports Unix OS.")
+    message(WARNING, "The syscall interception backend only supports Unix OS.")
 ENDIF (UNIX)
 
 #####################################
 # Headers (collected once)
 #####################################
 file(GLOB_RECURSE CAPIO_POSIX_HEADERS "*.hpp")
-file(GLOB_RECURSE SYSCALL_INTERCEPT_HEADERS "${SYSCALL_INTERCEPT_INCLUDE_FOLDER}/*.h")
 
 #####################################
 # Variant definition
@@ -74,11 +105,11 @@ function(capio_posix_add_variant TARGET_NAME MEM_STREAM)
     target_sources(${TARGET_NAME} PRIVATE
             "${CAPIO_COMMON_HEADERS}"
             "${CAPIO_POSIX_HEADERS}"
-            "${SYSCALL_INTERCEPT_HEADERS}"
+            "${BACKEND_HEADERS}"
     )
     target_include_directories(${TARGET_NAME} PRIVATE
             "${TARGET_INCLUDE_FOLDER}"
-            "${SYSCALL_INTERCEPT_INCLUDE_FOLDER}"
+            "${BACKEND_INCLUDE_FOLDER}"
     )
 
     # CALF logger component name
@@ -93,8 +124,11 @@ function(capio_posix_add_variant TARGET_NAME MEM_STREAM)
     )
 
     # Link libraries
-    target_link_directories(${TARGET_NAME} PRIVATE ${SYSCALL_INTERCEPT_LIB_FOLDER})
-    target_link_libraries(${TARGET_NAME} PRIVATE rt syscall_intercept)
+    target_link_directories(${TARGET_NAME} PRIVATE ${BACKEND_LIB_FOLDER})
+    target_link_libraries(${TARGET_NAME} PRIVATE rt)
+    if (CAPIO_USE_SYSCALL_INTERCEPT)
+        target_link_libraries(${TARGET_NAME} PRIVATE syscall_intercept)
+    endif ()
 
     # Install rules
     install(TARGETS ${TARGET_NAME}

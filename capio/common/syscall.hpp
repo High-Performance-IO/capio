@@ -5,7 +5,16 @@
 
 #ifdef __CAPIO_POSIX
 
+#if defined(__riscv)
+
+#include <libvpoline.h>
+static syscall_no_intercept_t syscall_no_intercept = nullptr;
+
+#else
+
 #include <libsyscall_intercept_hook_point.h>
+
+#endif
 
 #define capio_syscall syscall_no_intercept
 
