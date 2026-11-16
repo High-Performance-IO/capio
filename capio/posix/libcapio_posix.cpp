@@ -426,6 +426,41 @@ static int hook(long syscall_number, long arg0, long arg1, long arg2, long arg3,
     }
 }
 
+#if defined(__riscv)
+
+extern "C" {
+    int __hook_init(long placeholder __attribute__((unused)), void *no_intercept_ptr,
+        void **out_hook_ptr,
+        void **out_post_clone_child_ptr,
+        void **out_post_clone_parent_ptr) {
+
+        syscall_no_intercept = (syscall_no_intercept_t) no_intercept_ptr;
+
+        SET_CALF_SYSCALL_HANDLER(syscall_no_intercept);
+
+        const long tid = syscall_no_intercept(SYS_gettid);
+
+        init_client(tid);
+        init_filesystem();
+        initialize_new_thread();
+
+        if (const int *fd_shm = get_fd_snapshot(tid); fd_shm != nullptr) {
+            initialize_from_snapshot(fd_shm, tid);
+        }
+
+        *out_hook_ptr = (void *) hook;
+        if (out_post_clone_child_ptr != NULL)
+            *out_post_clone_child_ptr = (void *) hook_clone_child;
+        if (out_post_clone_parent_ptr != NULL)
+            *out_post_clone_parent_ptr = (void *) hook_clone_parent;
+
+        ENABLE_LOGGER();
+        return 0;
+    }
+}
+
+#else
+
 static __attribute__((constructor)) void init() {
     SET_CALF_SYSCALL_HANDLER(syscall_no_intercept);
 
@@ -445,3 +480,5 @@ static __attribute__((constructor)) void init() {
 
     ENABLE_LOGGER();
 }
+
+#endif
