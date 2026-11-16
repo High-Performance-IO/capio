@@ -10,6 +10,19 @@
 #include <libvpoline.h>
 static syscall_no_intercept_t syscall_no_intercept = nullptr;
 
+/*
+ * Mirror of syscall_intercept's helper (to be added on vpoline)
+ *
+ * syscall_error_code - examines a return value from
+ * syscall_no_intercept, and returns an error code if said
+ * return value indicates an error.
+ */
+static inline int syscall_error_code(long result) {
+    if (result < 0 && result >= -0x1000)
+        return (int)-result;
+    return 0;
+}
+
 #else
 
 #include <libsyscall_intercept_hook_point.h>
