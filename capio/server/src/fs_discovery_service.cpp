@@ -23,13 +23,22 @@ void fs_discovery_service(const bool *terminate, const std::filesystem::path &to
     while (!*terminate) {
         const auto iterator = std::filesystem::directory_iterator(token_directory_path);
         for (auto &entry : iterator) {
+            // Only published tokens: "<host>.capio" (a hidden file is still being written).
+            const std::string name = entry.path().filename().string();
+            if (name.empty() || name.front() == '.' || entry.path().extension() != ".capio") {
+                continue;
+            }
             if (std::find(cache.begin(), cache.end(), entry.path()) == cache.end()) {
-                cache.push_back(entry.path());
-
                 // Read connection token from FS
                 std::ifstream input(entry.path());
                 std::string token;
                 input >> token;
+                if (token.empty()) {
+                    // Not readable yet (e.g. a token written in place by an older server):
+                    // look again at the next scan instead of ignoring this peer forever.
+                    continue;
+                }
+                cache.push_back(entry.path());
 
                 // Send token to backend to issue a direct connection.
                 // NOTE: backend will refuse to connect silently if connection is already
@@ -60,9 +69,19 @@ void FSDiscoveryInterface::start(const std::string &token, unsigned int adv_dela
 
     token_filename      = node_name + ".capio";
     advertisement_token = token;
-    std::ofstream token_file(token_directory_path / token_filename);
-    token_file << advertisement_token;
-    token_file.close();
+    // Publish the token atomically: on a shared file system the other servers may list the
+    // directory between the creation of the file and the write of its content.
+    const auto token_path = token_directory_path / token_filename;
+    const auto tmp_path   = token_directory_path / ("." + token_filename.string() + ".tmp");
+    {
+        std::ofstream token_file(tmp_path);
+        token_file << advertisement_token;
+        token_file.close();
+        if (!token_file) {
+            throw std::runtime_error("Unable to write the discovery token " + tmp_path.string());
+        }
+    }
+    std::filesystem::rename(tmp_path, token_path);
 
     fs_listener_thread =
         new std::thread(fs_discovery_service, &terminate, token_directory_path, adv_delay);
