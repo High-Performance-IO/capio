@@ -59,6 +59,12 @@ class MTCLBackend : public Backend {
     /** Release completed sends and remove connections whose sends failed. */
     void cleanup_completed_sends();
 
+    /** Advance pending sends to every peer; failures are left to cleanup_completed_sends(). */
+    void progress_sends();
+
+    /** Receive one whole frame while the pending sends of every peer keep progressing. */
+    bool receive_frame(MTCL::HandleUser &handle, void *data, size_t size);
+
     /** Remove a peer so discovery can establish a replacement connection. */
     void remove_connection(const std::string &hostname);
 
