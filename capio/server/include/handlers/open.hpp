@@ -40,7 +40,12 @@ inline void wait_for_file_creation(const std::filesystem::path &path, pid_t tid,
 inline void handle_create(int tid, int fd, const std::filesystem::path &path) {
     START_LOG(gettid(), "call(tid=%d, fd=%d, path_cstr=%s)", tid, fd, path.c_str());
 
-    bool is_creat = !(home_node_service->getHome(path) || home_node_service->lookup(path));
+    // The other servers are asked only when the configuration does not name this client as a
+    // producer of the file: lookup() blocks this thread, and with it every client of this
+    // server, until all of them have answered.
+    const bool is_producer = CapioCLEngine::get().isProducer(path, client_manager->getAppName(tid));
+    bool is_creat          = !(home_node_service->getHome(path) ||
+                               (!is_producer && home_node_service->lookup(path)));
     update_file_metadata(path, tid, fd, is_creat, 0);
     client_manager->replyToClient(tid, 0);
 }
