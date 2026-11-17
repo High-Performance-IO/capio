@@ -7,7 +7,7 @@
 
 #if defined(__riscv)
 
-#include <libvpoline.h>
+typedef long (*syscall_no_intercept_t)(long syscall_number, ...);
 static syscall_no_intercept_t syscall_no_intercept = nullptr;
 
 /*
