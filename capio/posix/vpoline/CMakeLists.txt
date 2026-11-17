@@ -20,7 +20,7 @@ include(ExternalProject)
 # and libvpoline.so from vpoline-build (fixed SOURCE_DIR/BINARY_DIR below).
 ExternalProject_Add(vpoline
         GIT_REPOSITORY https://github.com/alpha-unito/vpoline.git
-        GIT_TAG f29a4613a45207672caba133a1a8752ed591bddb
+        GIT_TAG 27efc2970dd879a8cd04dceaae1f1beb07d3ab99
         PREFIX ${CMAKE_CURRENT_BINARY_DIR}
         SOURCE_DIR ${CMAKE_CURRENT_BINARY_DIR}/vpoline-src
         BINARY_DIR ${CMAKE_CURRENT_BINARY_DIR}/vpoline-build

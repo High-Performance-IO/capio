@@ -13,15 +13,6 @@ set(TARGET_SOURCES
 add_executable(${TARGET_NAME} ${TARGET_SOURCES})
 
 #####################################
-# External projects
-#####################################
-set(SYSCALL_INTERCEPT_BINARY_DIR "${PROJECT_BINARY_DIR}/capio/posix/syscall_intercept")
-set(SYSCALL_INTERCEPT_INCLUDE_FOLDER
-        "${SYSCALL_INTERCEPT_BINARY_DIR}/${CMAKE_INSTALL_INCLUDEDIR}")
-set(SYSCALL_INTERCEPT_LIB_FOLDER
-        "${SYSCALL_INTERCEPT_BINARY_DIR}/${CMAKE_INSTALL_LIBDIR}")
-
-#####################################
 # Definitions
 #####################################
 target_compile_definitions(${TARGET_NAME} PRIVATE __CAPIO_POSIX)
@@ -37,23 +28,36 @@ calf_set_default_log_dir(${TARGET_NAME} "./capio_logs")
 # Include files and directories
 #####################################
 file(GLOB_RECURSE CAPIO_POSIX_HEADERS "${TARGET_INCLUDE_FOLDER}/*.hpp")
-file(GLOB_RECURSE SYSCALL_INTERCEPT_HEADERS "${SYSCALL_INTERCEPT_INCLUDE_FOLDER}/*.h")
 target_sources(${TARGET_NAME} PRIVATE
         "${CAPIO_COMMON_HEADERS}"
         "${CAPIO_POSIX_HEADERS}"
         "${GTEST_CONFIG_HEADERS}"
-        "${SYSCALL_INTERCEPT_HEADERS}"
 )
 target_include_directories(${TARGET_NAME} PRIVATE
         "${TARGET_INCLUDE_FOLDER}"
-        "${SYSCALL_INTERCEPT_INCLUDE_FOLDER}"
 )
 
 #####################################
 # Link libraries
 #####################################
-target_link_directories(${TARGET_NAME} PRIVATE ${SYSCALL_INTERCEPT_LIB_FOLDER})
-target_link_libraries(${TARGET_NAME} PRIVATE rt syscall_intercept GTest::gtest)
+# Base linking senza syscall_intercept
+target_link_libraries(${TARGET_NAME} PRIVATE rt GTest::gtest)
+
+#####################################
+# Conditional Backend (only for x86_64/aarch64)
+#####################################
+if (NOT CMAKE_SYSTEM_PROCESSOR MATCHES "riscv")
+    set(SYSCALL_INTERCEPT_BINARY_DIR "${PROJECT_BINARY_DIR}/capio/posix/syscall_intercept")
+    set(SYSCALL_INTERCEPT_INCLUDE_FOLDER "${SYSCALL_INTERCEPT_BINARY_DIR}/${CMAKE_INSTALL_INCLUDEDIR}")
+    set(SYSCALL_INTERCEPT_LIB_FOLDER "${SYSCALL_INTERCEPT_BINARY_DIR}/${CMAKE_INSTALL_LIBDIR}")
+
+    file(GLOB_RECURSE SYSCALL_INTERCEPT_HEADERS "${SYSCALL_INTERCEPT_INCLUDE_FOLDER}/*.h")
+
+    target_sources(${TARGET_NAME} PRIVATE "${SYSCALL_INTERCEPT_HEADERS}")
+    target_include_directories(${TARGET_NAME} PRIVATE "${SYSCALL_INTERCEPT_INCLUDE_FOLDER}")
+    target_link_directories(${TARGET_NAME} PRIVATE ${SYSCALL_INTERCEPT_LIB_FOLDER})
+    target_link_libraries(${TARGET_NAME} PRIVATE syscall_intercept)
+endif ()
 
 #####################################
 # Configure tests
