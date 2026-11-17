@@ -86,11 +86,7 @@ ENDIF (UNIX)
 #####################################
 target_compile_definitions(${TARGET_NAME} PRIVATE __CAPIO_POSIX)
 
-if (CAPIO_LOG)
-    # The syscall hook may access CALF thread-local state while resolving TLS itself.
-    # LD_PRELOAD libraries therefore require direct, loader-allocated TLS access.
-    target_compile_options(${TARGET_NAME} PRIVATE -ftls-model=initial-exec)
-endif ()
+target_compile_options(${TARGET_NAME} PRIVATE -ftls-model=initial-exec)
 
 #####################################
 # Include files and directories
