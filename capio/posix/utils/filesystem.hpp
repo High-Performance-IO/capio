@@ -30,11 +30,19 @@ inline bool in_dir(const std::string &path, const std::string &glob) {
     return res != std::string::npos;
 }
 
+int fstat_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg5, long *result);
+
 inline bool is_directory(int dirfd) {
     START_LOG(capio_syscall(SYS_gettid), "call(dirfd=%d)", dirfd);
 
     struct stat path_stat{};
-    int tmp = fstat(dirfd, &path_stat);
+    long res = 0;
+    int tmp  = 0;
+    if (fstat_handler(dirfd, reinterpret_cast<long>(&path_stat), 0, 0, 0, 0, &res) == 1) {
+        tmp = fstat(dirfd, &path_stat);
+    } else {
+        tmp = static_cast<int>(res);
+    }
     if (tmp != 0) {
         LOG("Error at is_directory(dirfd=%d) -> %d: %d (%s)", dirfd, tmp, errno,
             std::strerror(errno));

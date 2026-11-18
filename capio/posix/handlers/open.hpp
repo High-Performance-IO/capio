@@ -6,6 +6,8 @@
 #include "utils/common.hpp"
 #include "utils/filesystem.hpp"
 
+int lseek_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg5, long *result);
+
 inline int capio_openat(int dirfd, const std::string_view &pathname, int flags, long tid) {
     START_LOG(tid, "call(dirfd=%d, pathname=%s, flags=%X)", dirfd, pathname.data(), flags);
 
@@ -74,7 +76,8 @@ inline int capio_openat(int dirfd, const std::string_view &pathname, int flags, 
         add_capio_fd(tid, path, fd, 0, CAPIO_DEFAULT_FILE_INITIAL_SIZE, actual_flags,
                      (flags & O_CLOEXEC) == O_CLOEXEC);
         if ((flags & O_APPEND) == O_APPEND) {
-            lseek(fd, 0, SEEK_END);
+            long res = 0;
+            lseek_handler(fd, 0, SEEK_END, 0, 0, 0, &res);
         }
         return fd;
     } else {
