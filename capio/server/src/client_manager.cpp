@@ -113,9 +113,13 @@ void ClientManager::registerClient(pid_t tid, const std::string &app_name, const
     files_created_by_app_name.emplace(app_name, std::initializer_list<std::string>{});
 
     auto state      = std::make_shared<ClientState>();
-    state->response = std::make_shared<CircularBuffer<off64_t>>(
-        SHM_COMM_CHAN_NAME_RESP + std::to_string(tid), CAPIO_REQ_BUFF_CNT, sizeof(off_t),
-        CapioCLEngine::get().getWorkflowName());
+    // execve registers the same tid again. Destroying the old buffer would unlink the shared
+    // memory that the new one, and the client, use under the same name.
+    state->response = previous != nullptr
+                          ? previous->response
+                          : std::make_shared<CircularBuffer<off64_t>>(
+                                SHM_COMM_CHAN_NAME_RESP + std::to_string(tid), CAPIO_REQ_BUFF_CNT,
+                                sizeof(off_t), CapioCLEngine::get().getWorkflowName());
     {
         const std::lock_guard lock(clients_mutex);
         state->generation = ++next_generation;
