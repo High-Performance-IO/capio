@@ -1,5 +1,6 @@
 #include "fs-streaming/fs_streaming.hpp"
 
+#include <algorithm>
 #include <cstring>
 #include <thread>
 
@@ -67,6 +68,7 @@ void FsStreaming::addProducer(const pid_t tid, const std::filesystem::path &path
     START_LOG(gettid(), "call(tid=%d, path=%s)", tid, path.c_str());
     producers[path].insert(producerName(tid));
     producer_threads[path].insert(tid);
+    noteNewEntry(path);
 }
 
 bool FsStreaming::isProducer(const pid_t tid, const std::filesystem::path &path) const {
@@ -239,6 +241,7 @@ void FsStreaming::renameTo(const pid_t tid, const std::string &to, const bool to
     for (const auto &path : renamed) {
         producers[path].insert(producerName(tid));
         producer_threads[path].insert(tid);
+        noteNewEntry(path);
     }
     if (to_capio) {
         // The rule of each new name, with the history of its file
@@ -264,6 +267,67 @@ bool FsStreaming::waitsForCreation(const pid_t tid, const std::filesystem::path 
 bool FsStreaming::isDeclared(const std::filesystem::path &path) {
     return !CapioCLEngine::get().getConsumers(path).empty() ||
            !CapioCLEngine::get().getProducers(path).empty();
+}
+
+void FsStreaming::loadExpectedEntries() {
+    const auto &engine = CapioCLEngine::get();
+    for (const auto &path : engine.getPaths()) {
+        if (engine.getCommitRule(path) == capiocl::commitRules::ON_N_FILES) {
+            expected_entries[std::filesystem::path(path).lexically_normal()] =
+                std::max(1L, engine.getDirectoryFileCount(path));
+        }
+    }
+}
+
+long FsStreaming::expectedEntries(const std::filesystem::path &directory) {
+    if (const auto known = expected_entries.find(directory); known != expected_entries.end()) {
+        return known->second;
+    }
+    // From a glob or the dynamic API: as it is at first sight
+    const long expected = std::max(1L, CapioCLEngine::get().getDirectoryFileCount(directory));
+    expected_entries[directory] = expected;
+    return expected;
+}
+
+long FsStreaming::countEntries(const std::filesystem::path &directory) {
+    std::error_code error;
+    std::filesystem::directory_iterator entry(directory, error);
+    long count = 0;
+    while (!error && entry != std::filesystem::directory_iterator()) {
+        ++count;
+        entry.increment(error);
+    }
+    return error ? -1 : count;
+}
+
+bool FsStreaming::isDirectoryCommitted(const std::filesystem::path &directory,
+                                       const long n_expected) {
+    const auto &engine = CapioCLEngine::get();
+    if (countEntries(directory) >= n_expected) {
+        engine.setCommitted(directory);
+        return true;
+    }
+    return engine.isCommitted(directory);
+}
+
+/*
+ * Waiters count entries on their own. This commits the directory also when nobody waits for it,
+ * as on_file rules that depend on it need, and only lists it once it can have N entries.
+ */
+void FsStreaming::noteNewEntry(const std::filesystem::path &path) {
+    const auto directory = path.parent_path();
+    if (committed_directories.count(directory) != 0 ||
+        CapioCLEngine::get().getCommitRule(directory) != capiocl::commitRules::ON_N_FILES) {
+        return;
+    }
+    auto &created = new_entries[directory];
+    created.insert(path.filename());
+    const long expected = expectedEntries(directory);
+    if (static_cast<long>(created.size()) >= expected && countEntries(directory) >= expected) {
+        commit(directory);
+        committed_directories.insert(directory);
+        new_entries.erase(directory);
+    }
 }
 
 void FsStreaming::addPathPart(const pid_t tid, const char *part) { path_parts[tid] += part; }

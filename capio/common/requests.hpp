@@ -29,8 +29,14 @@ constexpr const int CAPIO_REQUEST_COPY_FILE_RANGE     = 24;
 constexpr const int CAPIO_REQUEST_CONSENT             = 25;
 constexpr const int CAPIO_REQUEST_READ_FS             = 26;
 constexpr const int CAPIO_REQUEST_PATH_PART           = 27;
+constexpr const int CAPIO_REQUEST_LIST_FS             = 28;
 
-constexpr const int CAPIO_NR_REQUESTS = 28;
+constexpr const int CAPIO_NR_REQUESTS = 29;
+
+/* REPLIES TO CAPIO_REQUEST_LIST_FS */
+constexpr const int CAPIO_FS_LIST_AS_IS     = 0; // the kernel lists it
+constexpr const int CAPIO_FS_LIST_STREAMING = 1; // more entries may come
+constexpr const int CAPIO_FS_LIST_COMMITTED = 2; // what is there now is all
 
 /* KINDS OF CAPIO_REQUEST_CLOSE IN THE FS VARIANT */
 constexpr const char CAPIO_FS_CLOSE_EXPLICIT = 'X'; // close()

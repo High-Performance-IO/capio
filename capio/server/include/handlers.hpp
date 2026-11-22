@@ -14,6 +14,7 @@
 #include "handlers/fs_request.hpp"
 #include "handlers/getdents.hpp"
 #include "handlers/handshake.hpp"
+#include "handlers/list_fs.hpp"
 #include "handlers/mkdir.hpp"
 #include "handlers/open.hpp"
 #include "handlers/read.hpp"

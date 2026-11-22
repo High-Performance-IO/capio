@@ -49,6 +49,15 @@ class FsStreaming final {
     /// @brief tid -> first half of a rename, and whether it is inside CAPIO_DIR
     std::unordered_map<pid_t, std::pair<std::string, bool>> renaming;
 
+    /// @brief on_n_files directory -> N, as it was before lookups could change it
+    std::unordered_map<std::string, long> expected_entries;
+
+    /// @brief on_n_files directory -> entries created here, until it is committed
+    std::unordered_map<std::string, std::unordered_set<std::string>> new_entries;
+    std::unordered_set<std::string> committed_directories;
+
+    void noteNewEntry(const std::filesystem::path &path);
+
     void applyOnClose(const std::filesystem::path &path, long n_closes);
 
     /// @brief path -> errno of the close that failed: never committed by this server
@@ -119,6 +128,25 @@ class FsStreaming final {
      * turns true after any lookup. Such entries have no apps unless they match a glob.
      */
     static bool isDeclared(const std::filesystem::path &path);
+
+    /**
+     * @brief Take N of the on_n_files directories from the config, before serving requests.
+     *
+     * CAPIO-CL counts the children it knows of when n_files is omitted, lookups included, and
+     * cannot say that it was omitted. So N is what it reports at startup, and at least 1.
+     */
+    void loadExpectedEntries();
+
+    [[nodiscard]] long expectedEntries(const std::filesystem::path &directory);
+
+    /// @brief The entries of @p directory without "." and "..", or -1 if it cannot be listed
+    static long countEntries(const std::filesystem::path &directory);
+
+    /**
+     * @brief Whether an on_n_files directory is committed, committing it if it has N entries.
+     * CAPIO-CL does not evaluate that rule. Blocks: for waiter threads only.
+     */
+    static bool isDirectoryCommitted(const std::filesystem::path &directory, long n_expected);
 
     /// @brief Whether a reader may have to wait for the commit of @p path, which exists
     static bool canWaitForCommit(const std::filesystem::path &path);

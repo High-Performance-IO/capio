@@ -86,6 +86,7 @@ static constexpr std::array<CSHandler_t, CAPIO_NR_REQUESTS> build_request_handle
     _request_handlers[CAPIO_REQUEST_CONSENT]             = consent_handler;
     _request_handlers[CAPIO_REQUEST_READ_FS]             = read_fs_handler;
     _request_handlers[CAPIO_REQUEST_PATH_PART]           = path_part_handler;
+    _request_handlers[CAPIO_REQUEST_LIST_FS]             = list_fs_handler;
 
     return _request_handlers;
 }
@@ -130,6 +131,7 @@ int main(int argc, char **argv) {
     UPDATE_CALF_WORKFLOW_NAME(capio_cl_engine->getWorkflowName());
 
     capio_cl_engine->print();
+    FsStreaming::get().loadExpectedEntries();
 
     discovery_service = select_discovery_service();
     backend           = select_backend(argc, argv);

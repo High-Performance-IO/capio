@@ -8,6 +8,7 @@
 #include <sys/stat.h>
 
 #include "filesystem.hpp"
+#include "fs_listing.hpp"
 #include "requests.hpp"
 
 /*
@@ -51,6 +52,7 @@ inline void fs_track(const long tid, const std::string &path, const int fd, cons
     if (exists_capio_fd(fd)) {
         delete_capio_fd(fd);
     }
+    fs_forget_listing(fd);
     const long offset = syscall_no_intercept(SYS_lseek, fd, 0, SEEK_CUR);
     add_capio_fd(tid, path, fd, offset < 0 ? 0 : offset, CAPIO_DEFAULT_FILE_INITIAL_SIZE, flags,
                  is_cloexec);

@@ -35,7 +35,10 @@ void consent_handler(const char *const str) {
             return;
         }
     }
-    fs_reply_when(tid, [path](off64_t &reply) {
+    const bool by_entries =
+        CapioCLEngine::get().getCommitRule(path) == capiocl::commitRules::ON_N_FILES;
+    const long expected = by_entries ? FsStreaming::get().expectedEntries(path) : 0;
+    fs_reply_when(tid, [path, by_entries, expected](off64_t &reply) {
         std::error_code not_there;
         if (!std::filesystem::exists(path, not_there)) {
             return false;
@@ -44,7 +47,9 @@ void consent_handler(const char *const str) {
             return true;
         }
         reply = 1;
-        return CapioCLEngine::get().isFirable(path) || CapioCLEngine::get().isCommitted(path);
+        return CapioCLEngine::get().isFirable(path) ||
+               (by_entries ? FsStreaming::isDirectoryCommitted(path, expected)
+                           : CapioCLEngine::get().isCommitted(path));
     });
 }
 

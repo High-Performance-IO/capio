@@ -5,6 +5,7 @@
 
 #include "utils/common.hpp"
 #include "utils/data.hpp"
+#include "utils/fs_listing.hpp"
 #include "utils/fs_waiting.hpp"
 
 // TODO: EOVERFLOW is not addressed
@@ -74,6 +75,9 @@ inline off64_t capio_lseek(int fd, off64_t offset, int whence, long tid) {
     }
 
     CAPIO_STORAGE_CALL(return capio_lseek_mem(fd, offset, whence, tid), {
+        if (long position; fs_seek_listing(fd, offset, whence, position)) {
+            return capio_kernel_result(position);
+        }
         const bool looks_for_data = whence == SEEK_DATA || whence == SEEK_HOLE;
         if (whence == SEEK_END) {
             fs_wait_for_data(fd, FS_UNTIL_COMMIT, tid);

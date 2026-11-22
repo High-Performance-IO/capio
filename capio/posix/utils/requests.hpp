@@ -373,6 +373,21 @@ inline void write_request(const int fd, const off64_t count, const long tid) {
     buf_requests->write(req, CAPIO_REQ_MAX_SIZE);
 }
 
+/**
+ * Ask how to list the directory @path.
+ *
+ * @param n_seen -1 at the start of a listing, or the entries in the directory when nothing new
+ * was found: the server then replies when that changes or the directory is committed
+ * @return one of CAPIO_FS_LIST_*
+ */
+inline off64_t list_request_fs(const std::filesystem::path &path, const off64_t n_seen,
+                               const long tid) {
+    fs_request(CAPIO_REQUEST_LIST_FS, tid, std::to_string(n_seen) + " ", path.native());
+    off64_t res;
+    buff_response->read(&res);
+    return res;
+}
+
 inline off64_t consent_to_proceed_request(const std::filesystem::path &path, const long tid,
                                           const std::string &source_func) {
     START_LOG(capio_syscall(SYS_gettid), "call(path=%s, tid=%ld, source_func=%s)", path.c_str(),
