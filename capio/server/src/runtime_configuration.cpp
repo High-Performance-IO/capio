@@ -228,6 +228,10 @@ std::chrono::milliseconds RuntimeConfiguration::getLocationRequeryInterval() con
     return std::chrono::milliseconds(location_requery_interval_ms);
 }
 
+bool RuntimeConfiguration::hasNoConfig() const {
+    return !capio_cl_dynamic_config && capio_cl_config_path.empty();
+}
+
 capiocl::engine::Engine *RuntimeConfiguration::createCapioClEngine() const {
     // Commit state travels by multicast only, so the file system monitor, which leaves tokens next
     // to the files and needs a metadata directory for on_close:N, is off. This assumes that some

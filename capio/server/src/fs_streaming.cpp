@@ -250,6 +250,22 @@ void FsStreaming::renameTo(const pid_t tid, const std::string &to, const bool to
     }
 }
 
+bool FsStreaming::waitsForCreation(const pid_t tid, const std::filesystem::path &path) const {
+    if (isProducer(tid, path) || CapioCLEngine::get().isExcluded(path)) {
+        return false;
+    }
+    if (RuntimeConfiguration::get().hasNoConfig()) {
+        return true;
+    }
+    const auto thread = threads.find(tid);
+    return thread != threads.end() && CapioCLEngine::get().isConsumer(path, thread->second.app);
+}
+
+bool FsStreaming::isDeclared(const std::filesystem::path &path) {
+    return !CapioCLEngine::get().getConsumers(path).empty() ||
+           !CapioCLEngine::get().getProducers(path).empty();
+}
+
 void FsStreaming::addPathPart(const pid_t tid, const char *part) { path_parts[tid] += part; }
 
 std::string FsStreaming::takePath(const pid_t tid, const char *tail) {

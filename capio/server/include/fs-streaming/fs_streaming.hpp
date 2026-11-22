@@ -104,6 +104,22 @@ class FsStreaming final {
     /// @brief Apply on_close to one more close of @p path. Never blocks.
     void countClose(const std::filesystem::path &path);
 
+    /**
+     * @brief Whether @p tid waits for the missing @p path to be created.
+     *
+     * With a config, only its declared consumers do, so that probing for optional files gets
+     * ENOENT. Without one nothing tells an input from an output: all but the producer wait.
+     */
+    [[nodiscard]] bool waitsForCreation(pid_t tid, const std::filesystem::path &path) const;
+
+    /**
+     * @brief Whether the config mentions @p path, itself or through a glob.
+     *
+     * Not Engine::contains(): CAPIO-CL makes an entry for every path it is asked about, so that
+     * turns true after any lookup. Such entries have no apps unless they match a glob.
+     */
+    static bool isDeclared(const std::filesystem::path &path);
+
     /// @brief Whether a reader may have to wait for the commit of @p path, which exists
     static bool canWaitForCommit(const std::filesystem::path &path);
 };

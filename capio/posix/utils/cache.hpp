@@ -213,8 +213,11 @@ class ConsentRequestCache {
         if (received_consents.find(resolved_path) == received_consents.end()) {
             LOG("File not present in cache. performing request");
             auto res = consent_to_proceed_request(resolved_path, tid, source_func);
-            LOG("Registering new file for consent to proceed");
-            received_consents.emplace(resolved_path, res);
+            // 0 holds only now: the path may be created or committed later
+            if (res != 0) {
+                LOG("Registering new file for consent to proceed");
+                received_consents.emplace(resolved_path, res);
+            }
         }
         LOG("Unlocking thread");
     }

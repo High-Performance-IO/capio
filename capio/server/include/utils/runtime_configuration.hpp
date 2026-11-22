@@ -63,6 +63,9 @@ class RuntimeConfiguration final {
     /// @brief How often a server waiting for a file to be created asks the other servers again
     [[nodiscard]] std::chrono::milliseconds getLocationRequeryInterval() const;
 
+    /// @brief Whether there are no CAPIO-CL rules at all: no config file and no dynamic API
+    [[nodiscard]] bool hasNoConfig() const;
+
     /// @brief Create the CAPIO-CL engine described by the configuration
     [[nodiscard]] capiocl::engine::Engine *createCapioClEngine() const;
 

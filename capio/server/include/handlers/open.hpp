@@ -1,9 +1,6 @@
 #ifndef CAPIO_SERVER_HANDLERS_OPEN_HPP
 #define CAPIO_SERVER_HANDLERS_OPEN_HPP
 
-#include <chrono>
-#include <thread>
-
 #include "handlers/fs_request.hpp"
 #include "remote/home_node_service.hpp"
 #include "utils/runtime_configuration.hpp"
@@ -97,20 +94,16 @@ inline void handle_open_fs(const int tid, const std::filesystem::path &path) {
         return;
     }
     FsStreaming::get().addOpener(tid, path);
-    if (FsStreaming::get().isProducer(tid, path) || std::filesystem::exists(path)) {
-        client_manager->replyToClient(tid, 1);
-    } else {
-        client_manager->spawnWaiter(tid, [path](const ClientManager::ClientToken &client) {
-            while (client_manager->isClientActive(client)) {
-                std::error_code error;
-                if (std::filesystem::exists(path, error) && !error) {
-                    client_manager->tryReply(client, 1);
-                    return;
-                }
-                std::this_thread::sleep_for(std::chrono::milliseconds(100));
-            }
-        });
+    std::error_code error;
+    if (std::filesystem::exists(path, error) || !FsStreaming::get().waitsForCreation(tid, path)) {
+        client_manager->replyToClient(tid, 1); // if it is missing, the kernel answers ENOENT
+        return;
     }
+    fs_reply_when(tid, [path](off64_t &reply) {
+        std::error_code not_there;
+        reply = 1;
+        return std::filesystem::exists(path, not_there);
+    });
 }
 
 void create_handler(const char *const str) {
