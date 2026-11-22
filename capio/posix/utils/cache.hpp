@@ -6,6 +6,9 @@
 
 #include "requests.hpp"
 
+#include <fcntl.h>
+#include <sys/stat.h>
+
 class ReadCache {
   private:
     char *_cache;
@@ -213,6 +216,12 @@ class ConsentRequestCache {
         if (received_consents.find(resolved_path) == received_consents.end()) {
             LOG("File not present in cache. performing request");
             auto res = consent_to_proceed_request(resolved_path, tid, source_func);
+#ifdef SYS_statx
+            // NFS may still have the size from before the wait cached
+            struct statx fresh{};
+            capio_syscall(SYS_statx, AT_FDCWD, resolved_path.c_str(), AT_STATX_FORCE_SYNC,
+                          STATX_SIZE, &fresh);
+#endif
             // 0 holds only now: the path may be created or committed later
             if (res != 0) {
                 LOG("Registering new file for consent to proceed");
@@ -224,56 +233,23 @@ class ConsentRequestCache {
 };
 
 class ReadCacheFS {
-    int current_fd   = -1;
-    off64_t max_read = 0;
+    // path -> bytes known to be readable, -1 for all of them: committed, or nothing to wait for
     std::unordered_map<std::string, off64_t> available_read_cache;
 
-    std::filesystem::path current_path;
-
   public:
-    void read_request(std::filesystem::path path, const long end_of_read, int tid, const int fd) {
+    /// @brief Whether the first @p end_of_read bytes of @p path are known to be readable
+    [[nodiscard]] bool covers(const std::string &path, const off64_t end_of_read) const {
+        const auto known = available_read_cache.find(path);
+        return known != available_read_cache.end() &&
+               (known->second == -1 || end_of_read <= known->second);
+    }
+
+    void read_request(const std::string &path, const off64_t end_of_read, const long tid,
+                      const int fd) {
         START_LOG(capio_syscall(SYS_gettid), "[cache] call(path=%s, end_of_read=%ld, tid=%ld)",
                   path.c_str(), end_of_read, tid);
-        if (fd != current_fd || path.compare(current_path) != 0) {
-            LOG("[cache] %s changed from previous state. updating",
-                fd != current_fd ? "File descriptor" : "File path");
-            current_path = std::move(path);
-            current_fd   = fd;
-
-            if (const auto item = available_read_cache.find(current_path);
-                item != available_read_cache.end()) {
-                LOG("[cache] Found file entry in cache");
-                max_read = item->second;
-            } else {
-                LOG("[cache] Entry not found, initializing new entry to offset 0");
-                max_read = 0;
-                available_read_cache.emplace(current_path, 0);
-            }
-            LOG("[cache] Max read value is %ld %s", max_read, max_read == -1 ? "(MAX)" : "");
-        }
-
-        // ULLONG_MAX on the wire is represented as -1 by off64_t.
-        if (max_read == -1) {
-            LOG("[cache] Returning as file is committed");
-            return;
-        }
-
-        if (static_cast<off64_t>(end_of_read) > max_read) {
-            LOG("[cache] end_of_read > max_read. Performing server request");
-            max_read = read_request_fs(current_path, end_of_read, tid, fd);
-            LOG("[cache] Obtained value from server is %ld", max_read);
-            if (available_read_cache.find(current_path) == available_read_cache.end()) {
-                LOG("[cache] Cound not find entry in cache. Adding new entry to cache");
-                available_read_cache.emplace(current_path, max_read);
-            } else {
-                available_read_cache.at(current_path) = max_read;
-                LOG("[cache] Updating max read value in cache. new value: %ld",
-                    available_read_cache.at(current_path));
-            }
-            LOG("[cache] completed update from server of max read for file. returning control to "
-                "application");
-        }
-    };
+        available_read_cache[path] = read_request_fs(path, end_of_read, tid, fd);
+    }
 };
 
 inline thread_local WriteCache *write_cache;

@@ -5,6 +5,7 @@
 
 #include "utils/common.hpp"
 #include "utils/data.hpp"
+#include "utils/fs_waiting.hpp"
 
 // TODO: EOVERFLOW is not addressed
 inline off64_t capio_lseek_mem(int fd, off64_t offset, int whence, long tid) {
@@ -73,11 +74,19 @@ inline off64_t capio_lseek(int fd, off64_t offset, int whence, long tid) {
     }
 
     CAPIO_STORAGE_CALL(return capio_lseek_mem(fd, offset, whence, tid), {
-        const auto res = capio_kernel_result(syscall_no_intercept(SYS_lseek, fd, offset, whence));
-        if (res >= 0) {
-            set_capio_fd_offset(fd, res);
+        const bool looks_for_data = whence == SEEK_DATA || whence == SEEK_HOLE;
+        if (whence == SEEK_END) {
+            fs_wait_for_data(fd, FS_UNTIL_COMMIT, tid);
+        } else if (looks_for_data && offset >= 0) {
+            fs_wait_for_data(fd, fs_end_of(offset, 1), tid);
         }
-        return res;
+        auto res = syscall_no_intercept(SYS_lseek, fd, offset, whence);
+        if (res == -ENXIO && looks_for_data) {
+            // Only a hole so far. Whether data follows is known at the commit.
+            fs_wait_for_data(fd, FS_UNTIL_COMMIT, tid);
+            res = syscall_no_intercept(SYS_lseek, fd, offset, whence);
+        }
+        return capio_kernel_result(res);
     });
 }
 

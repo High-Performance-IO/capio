@@ -1,9 +1,6 @@
 #ifndef CAPIO_SERVER_HANDLERS_READ_FS_HPP
 #define CAPIO_SERVER_HANDLERS_READ_FS_HPP
 
-#include <chrono>
-#include <thread>
-
 #include "handlers/fs_request.hpp"
 
 void read_fs_handler(const char *const str) {
@@ -12,59 +9,40 @@ void read_fs_handler(const char *const str) {
     if (sscanf(str, "%d %d %ld%n", &tid, &fd, &end_of_read, &consumed) != 3) {
         return;
     }
-    const std::string path = fs_request_path(tid, str, consumed);
-    if (std::error_code error;
-        std::filesystem::is_directory(path, error) || CapioCLEngine::get().isExcluded(path)) {
-        client_manager->replyToClient(tid, -1); // nothing to wait for: the kernel answers EISDIR
+    const std::filesystem::path path = fs_request_path(tid, str, consumed);
+
+    // -1: there will never be anything to wait for, so the client does not ask again
+    if (std::error_code error; std::filesystem::is_directory(path, error) ||
+                               CapioCLEngine::get().isExcluded(path) ||
+                               FsStreaming::get().isProducer(tid, path)) {
+        client_manager->replyToClient(tid, -1);
         return;
     }
 
-    const bool is_producer = FsStreaming::get().isProducer(tid, path);
-    const auto reply_if_ready = [tid, end_of_read, is_producer, path](
-                                    const ClientManager::ClientToken *client) {
+    const auto enough_data = [path, end_of_read](off64_t &readable) {
+        if (!CapioCLEngine::get().isFirable(path)) {
+            return false;
+        }
         std::error_code error;
-        const bool exists = std::filesystem::exists(path, error);
-        if (error || !exists || std::filesystem::is_directory(path, error) || error) {
-            return false;
-        }
         const auto size = std::filesystem::file_size(path, error);
-        if (error) {
+        if (error || size < static_cast<uintmax_t>(end_of_read)) {
             return false;
         }
-        const bool ready = is_producer || (CapioCLEngine::get().isFirable(path) &&
-                                           size >= static_cast<uintmax_t>(end_of_read));
-        if (ready) {
-            return client == nullptr
-                       ? (client_manager->replyToClient(tid, static_cast<off64_t>(size)), true)
-                       : client_manager->tryReply(*client, static_cast<off64_t>(size));
-        }
-        if (client == nullptr) {
-            return false; // the request thread must not ask: see FsStreaming::commit
-        }
-        try {
-            if (CapioCLEngine::get().isCommitted(path)) {
-                return client_manager->tryReply(*client, -1);
-            }
-        } catch (const std::filesystem::filesystem_error &) {
-        }
-        return false;
+        readable = static_cast<off64_t>(size);
+        return true;
     };
 
-    if (reply_if_ready(nullptr)) {
+    if (off64_t readable; enough_data(readable)) {
+        client_manager->replyToClient(tid, readable);
         return;
     }
-    client_manager->spawnWaiter(
-        tid, [reply_if_ready](const ClientManager::ClientToken &client) {
-            while (client_manager->isClientActive(client)) {
-                try {
-                    if (reply_if_ready(&client)) {
-                        return;
-                    }
-                } catch (const std::system_error &) {
-                }
-                std::this_thread::sleep_for(std::chrono::milliseconds(100));
-            }
-        });
+    fs_reply_when(tid, [path, enough_data](off64_t &reply) {
+        if (enough_data(reply)) {
+            return true;
+        }
+        reply = -1;
+        return CapioCLEngine::get().isCommitted(path);
+    });
 }
 
 #endif // CAPIO_SERVER_HANDLERS_READ_FS_HPP

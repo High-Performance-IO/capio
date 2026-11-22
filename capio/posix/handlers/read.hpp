@@ -4,6 +4,7 @@
 #if defined(SYS_read) || defined(SYS_readv)
 
 #include "utils/data.hpp"
+#include "utils/fs_waiting.hpp"
 
 inline off64_t capio_read(int fd, void *buffer, off64_t count, long tid) {
     START_LOG(tid, "call(fd=%d, buf=0x%08x, count=%ld)", fd, buffer, count);
@@ -16,16 +17,8 @@ inline off64_t capio_read(int fd, void *buffer, off64_t count, long tid) {
         CAPIO_STORAGE_CALL(
             { return capio_cached_read(fd, buffer, count); },
             {
-                const off64_t end_of_read = get_capio_fd_offset(fd) + count;
-                read_request_cache->read_request(get_capio_fd_path(fd), end_of_read, tid, fd);
-                const auto res = capio_kernel_result(syscall_no_intercept(SYS_read, fd, buffer, count));
-                if (res >= 0) {
-                    const auto offset = syscall_no_intercept(SYS_lseek, fd, 0, SEEK_CUR);
-                    if (offset >= 0) {
-                        set_capio_fd_offset(fd, offset);
-                    }
-                }
-                return res;
+                fs_wait_for_data(fd, fs_end_of(fs_read_position(fd, nullptr), count), tid);
+                return CAPIO_POSIX_SYSCALL_REQUEST_SKIP;
             });
     } else {
         return CAPIO_POSIX_SYSCALL_REQUEST_SKIP;
@@ -40,20 +33,10 @@ inline ssize_t capio_readv(int fd, const struct iovec *iov, int iovcnt, long tid
         CAPIO_STORAGE_CALL(
             {},
             {
-                off64_t count = 0;
-                for (int i = 0; i < iovcnt; ++i) {
-                    count += iov[i].iov_len;
-                }
-                const off64_t end_of_read = get_capio_fd_offset(fd) + count;
-                read_request_cache->read_request(get_capio_fd_path(fd), end_of_read, tid, fd);
-                const auto res = capio_kernel_result(syscall_no_intercept(SYS_readv, fd, iov, iovcnt));
-                if (res >= 0) {
-                    const auto offset = syscall_no_intercept(SYS_lseek, fd, 0, SEEK_CUR);
-                    if (offset >= 0) {
-                        set_capio_fd_offset(fd, offset);
-                    }
-                }
-                return res;
+                fs_wait_for_data(
+                    fd, fs_end_of(fs_read_position(fd, nullptr), fs_total_length(iov, iovcnt)),
+                    tid);
+                return CAPIO_POSIX_SYSCALL_REQUEST_SKIP;
             });
 
         LOG("fd %d exists and is a capio fd", fd);

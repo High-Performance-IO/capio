@@ -150,6 +150,18 @@ static constexpr long CAPIO_NR_SYSCALLS = 1 + std::max({
 #ifdef SYS_openat
                                                   SYS_openat,
 #endif
+#if defined(SYS_mmap) && !CAPIO_MEM_STREAM
+                                                  SYS_mmap,
+#endif
+#if defined(SYS_pread64) && !CAPIO_MEM_STREAM
+                                                  SYS_pread64,
+#endif
+#if defined(SYS_preadv) && !CAPIO_MEM_STREAM
+                                                  SYS_preadv,
+#endif
+#if defined(SYS_preadv2) && !CAPIO_MEM_STREAM
+                                                  SYS_preadv2,
+#endif
 #ifdef SYS_read
                                                   SYS_read,
 #endif
@@ -226,7 +238,7 @@ static constexpr std::array<CPHandler_t, CAPIO_NR_SYSCALLS> build_syscall_table(
     _syscallTable[SYS_close] = close_handler;
 #endif
 #ifdef SYS_copy_file_range
-    _syscallTable[SYS_copy_file_range] = CAPIO_STORAGE_CALL(copy_file_range_handler, not_handled_handler);
+    _syscallTable[SYS_copy_file_range] = CAPIO_STORAGE_CALL(copy_file_range_handler, copy_file_range_fs_handler);
 #endif
 #if defined(SYS_close_range) && !CAPIO_MEM_STREAM
     _syscallTable[SYS_close_range] = close_range_handler;
@@ -315,6 +327,18 @@ static constexpr std::array<CPHandler_t, CAPIO_NR_SYSCALLS> build_syscall_table(
 #ifdef SYS_openat
     _syscallTable[SYS_openat] = openat_handler;
 #endif
+#if defined(SYS_mmap) && !CAPIO_MEM_STREAM
+    _syscallTable[SYS_mmap] = mmap_handler;
+#endif
+#if defined(SYS_pread64) && !CAPIO_MEM_STREAM
+    _syscallTable[SYS_pread64] = pread_handler;
+#endif
+#if defined(SYS_preadv) && !CAPIO_MEM_STREAM
+    _syscallTable[SYS_preadv] = preadv_handler;
+#endif
+#if defined(SYS_preadv2) && !CAPIO_MEM_STREAM
+    _syscallTable[SYS_preadv2] = preadv_handler;
+#endif
 #ifdef SYS_read
     _syscallTable[SYS_read] = read_handler;
 #endif
@@ -334,10 +358,10 @@ static constexpr std::array<CPHandler_t, CAPIO_NR_SYSCALLS> build_syscall_table(
     _syscallTable[SYS_rmdir] = rmdir_handler;
 #endif
 #ifdef SYS_sendfile
-    _syscallTable[SYS_sendfile] = CAPIO_STORAGE_CALL(sendfile_handler, not_handled_handler);
+    _syscallTable[SYS_sendfile] = CAPIO_STORAGE_CALL(sendfile_handler, sendfile_fs_handler);
 #endif
 #ifdef SYS_splice
-    _syscallTable[SYS_splice] = CAPIO_STORAGE_CALL(splice_handler, not_handled_handler);
+    _syscallTable[SYS_splice] = CAPIO_STORAGE_CALL(splice_handler, splice_fs_handler);
 #endif
 #ifdef SYS_stat
     _syscallTable[SYS_stat] = stat_handler;
@@ -386,6 +410,11 @@ static int hook(long syscall_number, long arg0, long arg1, long arg2, long arg3,
 
 #if !CAPIO_MEM_STREAM
     // Before anything that allocates, logging included: see utils/process.hpp
+#ifdef SYS_mmap
+    if (syscall_number == SYS_mmap && (arg3 & MAP_ANONYMOUS) != 0) {
+        return 1; // malloc calls it holding its lock: nothing here may allocate
+    }
+#endif
     if (in_vfork_child()) {
         return 1;
     }
