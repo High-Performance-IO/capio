@@ -40,6 +40,17 @@ class FsStreaming final {
     /// @brief path -> processes that opened it: only their implicit closes count
     std::unordered_map<std::string, std::unordered_set<uint64_t>> openers;
 
+    /// @brief path -> successful closes that counted, whatever its rule: a rename carries them
+    std::unordered_map<std::string, long> closes;
+
+    /// @brief path -> threads that produced it, which commit it on_termination when they end
+    std::unordered_map<std::string, std::unordered_set<pid_t>> producer_threads;
+
+    /// @brief tid -> first half of a rename, and whether it is inside CAPIO_DIR
+    std::unordered_map<pid_t, std::pair<std::string, bool>> renaming;
+
+    void applyOnClose(const std::filesystem::path &path, long n_closes);
+
     /// @brief path -> errno of the close that failed: never committed by this server
     std::unordered_map<std::string, int> failed;
 
@@ -72,6 +83,14 @@ class FsStreaming final {
 
     /// @brief The threads of the process of @p tid, other than @p tid
     [[nodiscard]] std::vector<pid_t> otherThreads(pid_t tid) const;
+
+    void renameFrom(pid_t tid, std::string path, bool in_capio_dir);
+
+    /**
+     * @brief A rename worked: what is known of the file, or of the files in the directory, moves
+     * to the new name, whose rule is then evaluated.
+     */
+    void renameTo(pid_t tid, const std::string &path, bool in_capio_dir);
 
     /// @brief Keep a piece of a path that did not fit in a request
     void addPathPart(pid_t tid, const char *part);

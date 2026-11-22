@@ -42,7 +42,12 @@ void rename_handler(const char *const str) {
         int tid, consumed = 0;
         char side;
         if (sscanf(str, "%d %c%n", &tid, &side, &consumed) == 2) {
-            fs_request_path(tid, str, consumed);
+            auto path = fs_request_path(tid, str, consumed);
+            if (side == 'F' || side == 'O') {
+                FsStreaming::get().renameFrom(tid, std::move(path), side == 'F');
+            } else {
+                FsStreaming::get().renameTo(tid, path, side == 'T');
+            }
         }
         return;
     }

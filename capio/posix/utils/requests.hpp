@@ -102,12 +102,14 @@ inline off64_t rename_request(const long tid, const std::filesystem::path &old_p
     return res;
 }
 
-inline void rename_request_fs(const std::filesystem::path &old_path,
-                              const std::filesystem::path &new_path, const long tid) {
+inline void rename_request_fs(const std::filesystem::path &old_path, const bool old_is_capio,
+                              const std::filesystem::path &new_path, const bool new_is_capio,
+                              const long tid) {
     START_LOG(capio_syscall(SYS_gettid), "call(tid=%ld, old_path=%s, new_path=%s)", tid,
               old_path.c_str(), new_path.c_str());
-    fs_request(CAPIO_REQUEST_RENAME, tid, "F ", old_path.native());
-    fs_request(CAPIO_REQUEST_RENAME, tid, "T ", new_path.native());
+    // Two requests, as both paths may not fit in one. F, T: inside CAPIO_DIR. O, D: outside.
+    fs_request(CAPIO_REQUEST_RENAME, tid, old_is_capio ? "F " : "O ", old_path.native());
+    fs_request(CAPIO_REQUEST_RENAME, tid, new_is_capio ? "T " : "D ", new_path.native());
 }
 
 inline off64_t create_request(const int fd, const std::filesystem::path &path, const long tid) {

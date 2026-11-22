@@ -7,9 +7,12 @@
 #include "calf/StlLogger.h"
 #include "capiocl.hpp"
 #include "capiocl/engine.h"
+#include "client-manager/client_manager.hpp"
 #include "common/constants.hpp"
 #include "utils/capiocl_adapter.hpp"
 #include "utils/runtime_configuration.hpp"
+
+extern ClientManager *client_manager;
 
 FsStreaming &FsStreaming::get() {
     static FsStreaming instance;
@@ -42,6 +45,7 @@ void FsStreaming::removeThread(const pid_t tid) {
     START_LOG(gettid(), "call(tid=%d)", tid);
     threads.erase(tid);
     path_parts.erase(tid);
+    renaming.erase(tid);
 }
 
 /*
@@ -62,6 +66,7 @@ std::string FsStreaming::producerName(const pid_t tid) const {
 void FsStreaming::addProducer(const pid_t tid, const std::filesystem::path &path) {
     START_LOG(gettid(), "call(tid=%d, path=%s)", tid, path.c_str());
     producers[path].insert(producerName(tid));
+    producer_threads[path].insert(tid);
 }
 
 bool FsStreaming::isProducer(const pid_t tid, const std::filesystem::path &path) const {
@@ -138,6 +143,113 @@ std::vector<pid_t> FsStreaming::otherThreads(const pid_t tid) const {
     return others;
 }
 
+namespace {
+
+/// @brief Whether @p path is @p name or inside the directory @p name
+bool is_at_or_below(const std::string &path, const std::string &name) {
+    return path.compare(0, name.size(), name) == 0 &&
+           (path.size() == name.size() || path[name.size()] == '/');
+}
+
+/// @brief Move the entries at or below @p from to @p to, replacing those that were there
+template <typename Map>
+void move_entries(Map &map, const std::string &from, const std::string &to, const bool keep) {
+    Map moved;
+    for (auto entry = map.begin(); entry != map.end();) {
+        if (is_at_or_below(entry->first, from)) {
+            if (keep) {
+                moved.emplace(to + entry->first.substr(from.size()), std::move(entry->second));
+            }
+            entry = map.erase(entry);
+        } else if (keep && is_at_or_below(entry->first, to)) {
+            entry = map.erase(entry); // the file that the rename replaced
+        } else {
+            ++entry;
+        }
+    }
+    for (auto &[path, value] : moved) {
+        map[path] = std::move(value);
+    }
+}
+
+} // namespace
+
+void FsStreaming::renameFrom(const pid_t tid, std::string path, const bool in_capio_dir) {
+    renaming[tid] = {std::move(path), in_capio_dir};
+}
+
+void FsStreaming::renameTo(const pid_t tid, const std::string &to, const bool to_capio) {
+    const auto half = renaming.find(tid);
+    if (half == renaming.end()) {
+        return;
+    }
+    const auto [from, from_capio] = half->second;
+    renaming.erase(half);
+    START_LOG(gettid(), "call(tid=%d, from=%s, to=%s)", tid, from.c_str(), to.c_str());
+
+    if (!from_capio) {
+        if (!to_capio) {
+            return;
+        }
+        // CAPIO never saw it being written: moving it in is its one close
+        failed.erase(to);
+        closes[to]           = 0;
+        producer_threads[to] = {};
+        producers[to]        = {};
+        if (!CapioCLEngine::get().isExcluded(to)) {
+            addProducer(tid, to);
+            client_manager->registerProducedFile(tid, to);
+            countClose(to);
+        }
+        return;
+    }
+
+    // Who commits it on_termination: the threads that produced it, under the new name
+    std::vector<std::string> renamed;
+    for (const auto &[path, producing] : producer_threads) {
+        if (!is_at_or_below(path, from)) {
+            continue;
+        }
+        const auto new_path = to + path.substr(from.size());
+        bool one_is_alive   = false;
+        for (const auto thread : producing) {
+            if (threads.count(thread) == 0) {
+                continue;
+            }
+            client_manager->removeProducedFile(thread, path);
+            if (to_capio) {
+                client_manager->registerProducedFile(thread, new_path);
+                one_is_alive = true;
+            }
+        }
+        if (to_capio) {
+            renamed.push_back(new_path);
+            if (!one_is_alive) { // mv, after the producer ended: it commits when mv ends
+                client_manager->registerProducedFile(tid, new_path);
+            }
+        }
+    }
+
+    move_entries(producers, from, to, to_capio);
+    move_entries(producer_threads, from, to, to_capio);
+    move_entries(openers, from, to, to_capio);
+    move_entries(closes, from, to, to_capio);
+    move_entries(failed, from, to, to_capio);
+
+    for (const auto &path : renamed) {
+        producers[path].insert(producerName(tid));
+        producer_threads[path].insert(tid);
+    }
+    if (to_capio) {
+        // The rule of each new name, with the history of its file
+        for (const auto &[path, n_closes] : closes) {
+            if (n_closes > 0 && is_at_or_below(path, to)) {
+                applyOnClose(path, n_closes);
+            }
+        }
+    }
+}
+
 void FsStreaming::addPathPart(const pid_t tid, const char *part) { path_parts[tid] += part; }
 
 std::string FsStreaming::takePath(const pid_t tid, const char *tail) {
@@ -164,6 +276,11 @@ void FsStreaming::commit(const std::filesystem::path &path) {
 
 void FsStreaming::countClose(const std::filesystem::path &path) {
     START_LOG(gettid(), "call(path=%s)", path.c_str());
+    ++closes[path];
+    applyOnClose(path, 1);
+}
+
+void FsStreaming::applyOnClose(const std::filesystem::path &path, const long n_closes) {
     const auto &engine = CapioCLEngine::get();
     if (failed.count(path) != 0 || engine.getCommitRule(path) != capiocl::commitRules::ON_CLOSE) {
         return;
@@ -174,9 +291,13 @@ void FsStreaming::countClose(const std::filesystem::path &path) {
     }
     // Counting asks the other nodes. The order of the counts does not matter, and the client that
     // closed does not need to be alive.
-    std::thread([path] {
+    std::thread([path, n_closes] {
         try {
-            CapioCLEngine::get().increaseCloseCount(path);
+            for (long i = 0; i < n_closes; ++i) {
+                if (CapioCLEngine::get().increaseCloseCount(path)) {
+                    break;
+                }
+            }
         } catch (const std::exception &exception) {
             CALF_PRINT_COLOR(CALF_CLI_LEVEL_ERROR, "Could not count a close of %s: %s",
                              path.c_str(), exception.what());

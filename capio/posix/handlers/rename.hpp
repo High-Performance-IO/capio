@@ -2,6 +2,7 @@
 #define CAPIO_POSIX_HANDLERS_RENAME_HPP
 
 #include "utils/filesystem.hpp"
+#include "utils/fs_descriptors.hpp"
 
 int renameat2_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg5,
                       long *result) {
@@ -24,6 +25,10 @@ int renameat2_handler(long arg0, long arg1, long arg2, long arg3, long arg4, lon
     const auto new_path_abs =
         new_path.is_absolute() ? new_path : capio_absolute(new_dir_fd_path / new_path);
 
+    // Before the check below, which refuses renaming a file to itself. Here the kernel checks.
+    CAPIO_STORAGE_CALL(
+        , return fs_rename(old_path_abs, new_path_abs, arg0, arg1, arg2, arg3, arg4, tid, result));
+
     if (is_prefix(old_path_abs, new_path_abs)) { // TODO: The check is more complex
         errno   = EINVAL;
         *result = -errno;
@@ -31,37 +36,15 @@ int renameat2_handler(long arg0, long arg1, long arg2, long arg3, long arg4, lon
     }
 
     if (is_capio_path(old_path_abs)) {
-        CAPIO_STORAGE_CALL(
-            {
-                rename_capio_path(old_path_abs, new_path_abs);
-                auto res = rename_request(tid, old_path_abs, new_path_abs);
-                *result  = (res < 0 ? -errno : res);
-                return CAPIO_POSIX_SYSCALL_SUCCESS;
-            },
-            {
-                rename_request_fs(old_path_abs, new_path_abs, tid);
-                const auto res = syscall_no_intercept(SYS_renameat2, arg0, arg1, arg2, arg3, arg4);
-                if (res == 0 && exists_capio_path(old_path_abs)) {
-                    rename_capio_path(old_path_abs, new_path_abs);
-                }
-                *result = res;
-                return CAPIO_POSIX_SYSCALL_SUCCESS;
-            });
+        rename_capio_path(old_path_abs, new_path_abs);
+        auto res = rename_request(tid, old_path_abs, new_path_abs);
+        *result  = (res < 0 ? -errno : res);
+        return CAPIO_POSIX_SYSCALL_SUCCESS;
     } else {
         if (is_capio_path(new_path_abs)) {
-            CAPIO_STORAGE_CALL(
-                {
-                    std::filesystem::copy(old_path_abs, new_path_abs);
-                    *result = -errno;
-                    return CAPIO_POSIX_SYSCALL_SUCCESS;
-                },
-                {
-                    rename_request_fs(old_path_abs, new_path_abs, tid);
-                    const auto res =
-                        syscall_no_intercept(SYS_renameat2, arg0, arg1, arg2, arg3, arg4);
-                    *result = res;
-                    return CAPIO_POSIX_SYSCALL_SUCCESS;
-                });
+            std::filesystem::copy(old_path_abs, new_path_abs);
+            *result = -errno;
+            return CAPIO_POSIX_SYSCALL_SUCCESS;
         } else {
             return CAPIO_POSIX_SYSCALL_SKIP;
         }

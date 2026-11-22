@@ -249,6 +249,43 @@ inline bool fs_is_last_thread() {
            tasks.st_nlink <= 3;
 }
 
+/**
+ * Rename, and on success tell the server, which moves what it knows of the file to the new name.
+ * renameat2 can exchange two paths: that moves no file to a new life, so it is not announced.
+ */
+inline int fs_rename(const std::filesystem::path &from, const std::filesystem::path &to,
+                     const long from_dir, const long from_arg, const long to_dir, const long to_arg,
+                     const long flags, const long tid, long *result) {
+    const bool from_capio = is_capio_path(from);
+    const bool to_capio   = is_capio_path(to);
+    if (!from_capio && !to_capio) {
+        return CAPIO_POSIX_SYSCALL_SKIP;
+    }
+    *result = syscall_no_intercept(SYS_renameat2, from_dir, from_arg, to_dir, to_arg, flags);
+
+    constexpr long exchange = 1 << 1; // RENAME_EXCHANGE
+    if (*result < 0 || from == to || (flags & exchange) != 0) {
+        return CAPIO_POSIX_SYSCALL_SUCCESS;
+    }
+    if (from_capio) {
+        // The descriptors of the file, or of what is inside the directory, follow it
+        const auto &old_name = from.native();
+        for (const int fd : get_capio_fds()) {
+            const std::string path = get_capio_fd_path(fd);
+            if (path.compare(0, old_name.size(), old_name) != 0 ||
+                (path.size() > old_name.size() && path[old_name.size()] != '/')) {
+                continue;
+            }
+            delete_capio_fd(fd);
+            if (to_capio) {
+                fs_track(tid, to.native() + path.substr(old_name.size()), fd, 0, false);
+            }
+        }
+    }
+    rename_request_fs(from, from_capio, to, to_capio, tid);
+    return CAPIO_POSIX_SYSCALL_SUCCESS;
+}
+
 /// @brief Find the descriptors of CAPIO files that a program inherits when it starts
 inline void fs_track_inherited(const long tid) {
     if (std::getenv("CAPIO_DIR") == nullptr) {

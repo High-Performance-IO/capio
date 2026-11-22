@@ -129,6 +129,11 @@ const std::map<std::string, Operation> &operations() {
              }).detach();
              return true;
          }},
+        {"rename",
+         [](const std::string &a) {
+             const auto to = a.find('>');
+             return ::rename(a.substr(0, to).c_str(), a.substr(to + 1).c_str()) == 0;
+         }},
         {"thread",
          [](const std::string &a) {
              std::thread thread([&a] { run(a); });
