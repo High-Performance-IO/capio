@@ -274,10 +274,10 @@ static constexpr std::array<CPHandler_t, CAPIO_NR_SYSCALLS> build_syscall_table(
     _syscallTable[SYS_fcntl] = fcntl_handler;
 #endif
 #ifdef SYS_fgetxattr
-    _syscallTable[SYS_fgetxattr] = fgetxattr_handler;
+    _syscallTable[SYS_fgetxattr] = CAPIO_STORAGE_CALL(fgetxattr_handler, not_handled_handler);
 #endif
 #ifdef SYS_flistxattr
-    _syscallTable[SYS_flistxattr] = not_implemented_handler;
+    _syscallTable[SYS_flistxattr] = CAPIO_STORAGE_CALL(not_implemented_handler, not_handled_handler);
 #endif
 #ifdef SYS_fork
     _syscallTable[SYS_fork] = fork_handler;
@@ -298,13 +298,13 @@ static constexpr std::array<CPHandler_t, CAPIO_NR_SYSCALLS> build_syscall_table(
     _syscallTable[SYS_getdents64] = getdents64_handler;
 #endif
 #ifdef SYS_getxattr
-    _syscallTable[SYS_getxattr] = not_implemented_handler;
+    _syscallTable[SYS_getxattr] = CAPIO_STORAGE_CALL(not_implemented_handler, not_handled_handler);
 #endif
 #ifdef SYS_ioctl
     _syscallTable[SYS_ioctl] = ioctl_handler;
 #endif
 #ifdef SYS_lgetxattr
-    _syscallTable[SYS_lgetxattr] = not_implemented_handler;
+    _syscallTable[SYS_lgetxattr] = CAPIO_STORAGE_CALL(not_implemented_handler, not_handled_handler);
 #endif
 #ifdef SYS_lseek
     _syscallTable[SYS_lseek] = lseek_handler;

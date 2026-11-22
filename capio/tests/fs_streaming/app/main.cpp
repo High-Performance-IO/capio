@@ -21,6 +21,7 @@
 #include <sys/syscall.h>
 #include <sys/uio.h>
 #include <sys/wait.h>
+#include <sys/xattr.h>
 #include <unistd.h>
 
 namespace {
@@ -56,6 +57,14 @@ bool read_all() {
         print(std::string(buffer, count));
     }
     return count == 0;
+}
+
+bool print_bytes(const char *bytes, const ssize_t size) {
+    if (size < 0) {
+        return false;
+    }
+    print(std::string(bytes, size));
+    return true;
 }
 
 bool open_as(const std::string &path, const int flags) {
@@ -301,6 +310,34 @@ const std::map<std::string, Operation> &operations() {
              }
              free(entries);
              return true;
+         }},
+        {"getxattr",
+         [](const std::string &a) {
+             char value[64];
+             const ssize_t size = getxattr(a.c_str(), "user.note", value, sizeof(value));
+             return print_bytes(value, size);
+         }},
+        {"lgetxattr",
+         [](const std::string &a) {
+             char value[64];
+             const ssize_t size = lgetxattr(a.c_str(), "user.note", value, sizeof(value));
+             return print_bytes(value, size);
+         }},
+        {"fgetxattr",
+         [](const std::string &) {
+             char value[64];
+             return print_bytes(value, fgetxattr(fd, "user.note", value, sizeof(value)));
+         }},
+        {"flistxattr",
+         [](const std::string &) {
+             char names[512];
+             const ssize_t size = flistxattr(fd, names, sizeof(names));
+             for (ssize_t at = 0; at < size; at += static_cast<ssize_t>(strlen(names + at)) + 1) {
+                 if (strncmp(names + at, "user.", 5) == 0) {
+                     print(names + at);
+                 }
+             }
+             return size >= 0;
          }},
         {"thread",
          [](const std::string &a) {
