@@ -86,6 +86,7 @@ inline void handle_create_fs(const int tid, const std::filesystem::path &path) {
         FsStreaming::get().addProducer(tid, path);
         FsStreaming::get().addOpener(tid, path);
     }
+    client_manager->replyToClient(tid, 1);
 }
 
 inline void handle_open_fs(const int tid, const std::filesystem::path &path) {

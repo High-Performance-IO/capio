@@ -8,8 +8,34 @@
 #include "filesystem.hpp"
 #include "types.hpp"
 
+/**
+ * The responses of the server. It refuses clients of the other variant, as the two keep files and
+ * commits in different places and would wait for each other forever. The handshake cannot wait
+ * for an answer, so a refused client learns it at the first request that has one.
+ */
+class ResponseBuffer : public CircularBuffer<off_t> {
+  public:
+    using CircularBuffer<off_t>::CircularBuffer;
+
+    void read(off_t *response) {
+        CircularBuffer<off_t>::read(response);
+        if (*response == CAPIO_REPLY_VARIANT_REFUSED) {
+            CAPIO_STORAGE_CALL(
+                constexpr char message[] =
+                    "CAPIO: this process uses libcapio_posix.so (memory), but its workflow uses "
+                    "libcapio_posix_fs.so: the two cannot be mixed in a workflow. Fix LD_PRELOAD.\n",
+                constexpr char message[] =
+                    "CAPIO: this process uses libcapio_posix_fs.so (file system), but its workflow "
+                    "uses libcapio_posix.so: the two cannot be mixed in a workflow. Fix "
+                    "LD_PRELOAD.\n");
+            syscall_no_intercept(SYS_write, STDERR_FILENO, message, sizeof(message) - 1);
+            syscall_no_intercept(SYS_exit_group, EXIT_FAILURE);
+        }
+    }
+};
+
 inline thread_local CircularBuffer<char> *buf_requests;
-inline thread_local CircularBuffer<off_t> *buff_response;
+inline thread_local ResponseBuffer *buff_response;
 
 /**
  * Initialize request and response buffers
@@ -17,8 +43,8 @@ inline thread_local CircularBuffer<off_t> *buff_response;
  */
 inline void init_client(const long tid) {
     buff_response =
-        new CircularBuffer<off_t>(SHM_COMM_CHAN_NAME_RESP + std::to_string(tid), CAPIO_REQ_BUFF_CNT,
-                                  sizeof(off_t), get_capio_workflow_name());
+        new ResponseBuffer(SHM_COMM_CHAN_NAME_RESP + std::to_string(tid), CAPIO_REQ_BUFF_CNT,
+                           sizeof(off_t), get_capio_workflow_name());
     buf_requests = new CircularBuffer<char>(SHM_COMM_CHAN_NAME, CAPIO_REQ_BUFF_CNT,
                                             CAPIO_REQ_MAX_SIZE, get_capio_workflow_name());
 }
@@ -126,6 +152,8 @@ inline off64_t create_request(const int fd, const std::filesystem::path &path, c
 inline void create_request_fs(const std::filesystem::path &path, const long tid) {
     START_LOG(capio_syscall(SYS_gettid), "call(path=%s, tid=%ld)", path.c_str(), tid);
     fs_request(CAPIO_REQUEST_CREATE, tid, "-1 ", path.native());
+    off64_t res; // nothing to learn, but a client of the wrong variant stops before it writes
+    buff_response->read(&res);
 }
 
 inline off64_t create_exclusive_request(const int fd, const std::filesystem::path &path,
@@ -182,8 +210,8 @@ inline void handshake_named_request(const long tid, const long pid, const std::s
     START_LOG(capio_syscall(SYS_gettid), "call(tid=%ld, pid=%ld, app_name=%s)", tid, pid,
               app_name.c_str());
     char req[CAPIO_REQ_MAX_SIZE];
-    sprintf(req, "%04d %ld %ld %s %d", CAPIO_REQUEST_HANDSHAKE_NAMED, tid, pid, app_name.c_str(),
-            wait ? 1 : 0);
+    sprintf(req, "%04d %ld %ld %s %d %c", CAPIO_REQUEST_HANDSHAKE_NAMED, tid, pid,
+            app_name.c_str(), wait ? 1 : 0, CAPIO_STORAGE_CALL(CAPIO_VARIANT_MEMORY, CAPIO_VARIANT_FS));
     LOG("req=%s", req);
     buf_requests->write(req, CAPIO_REQ_MAX_SIZE);
 

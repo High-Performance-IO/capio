@@ -38,6 +38,13 @@ constexpr const int CAPIO_FS_LIST_AS_IS     = 0; // the kernel lists it
 constexpr const int CAPIO_FS_LIST_STREAMING = 1; // more entries may come
 constexpr const int CAPIO_FS_LIST_COMMITTED = 2; // what is there now is all
 
+/* VARIANT OF THE CLIENT, IN THE HANDSHAKE */
+constexpr const char CAPIO_VARIANT_MEMORY = 'M';
+constexpr const char CAPIO_VARIANT_FS     = 'F';
+
+/* REPLY TO A CLIENT OF ANOTHER VARIANT THAN ITS WORKFLOW'S */
+constexpr const long long CAPIO_REPLY_VARIANT_REFUSED = -0x7ff000000000CA10LL;
+
 /* KINDS OF CAPIO_REQUEST_CLOSE IN THE FS VARIANT */
 constexpr const char CAPIO_FS_CLOSE_EXPLICIT = 'X'; // close()
 constexpr const char CAPIO_FS_CLOSE_IMPLICIT = 'I'; // exit, dup2 over it, close_range
