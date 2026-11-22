@@ -1,5 +1,8 @@
 #include "fs-streaming/fs_streaming.hpp"
 
+#include <thread>
+
+#include "calf/StdOutLogger.h"
 #include "calf/StlLogger.h"
 #include "capiocl.hpp"
 #include "capiocl/engine.h"
@@ -68,6 +71,38 @@ std::string FsStreaming::takePath(const pid_t tid, const char *tail) {
         path_parts.erase(parts);
     }
     return path + tail;
+}
+
+/*
+ * Nothing here may ask whether a file is committed: CAPIO-CL's multicast monitor sleeps 300 ms
+ * before it answers no, and the request thread serves every client of the node. Committing only
+ * sends a message. Questions are asked by waiter and background threads.
+ */
+void FsStreaming::commit(const std::filesystem::path &path) {
+    START_LOG(gettid(), "call(path=%s)", path.c_str());
+    CapioCLEngine::get().setCommitted(path);
+}
+
+void FsStreaming::countClose(const std::filesystem::path &path) {
+    START_LOG(gettid(), "call(path=%s)", path.c_str());
+    const auto &engine = CapioCLEngine::get();
+    if (engine.getCommitRule(path) != capiocl::commitRules::ON_CLOSE) {
+        return;
+    }
+    if (engine.getCommitCloseCount(path) <= 1) {
+        commit(path); // what increaseCloseCount does, without asking first
+        return;
+    }
+    // Counting asks the other nodes. The order of the counts does not matter, and the client that
+    // closed does not need to be alive.
+    std::thread([path] {
+        try {
+            CapioCLEngine::get().increaseCloseCount(path);
+        } catch (const std::exception &exception) {
+            CALF_PRINT_COLOR(CALF_CLI_LEVEL_ERROR, "Could not count a close of %s: %s",
+                             path.c_str(), exception.what());
+        }
+    }).detach();
 }
 
 bool FsStreaming::canWaitForCommit(const std::filesystem::path &path) {

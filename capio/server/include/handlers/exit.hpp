@@ -20,7 +20,7 @@ inline void handle_exit_group(int tid) {
                 // missing from storage was removed before exiting and has nothing left to commit.
                 if (std::error_code error; std::filesystem::exists(path, error)) {
                     LOG("File %s is on the file system. Setting it to complete", path.c_str());
-                    CapioCLEngine::get().setCommitted(path);
+                    FsStreaming::get().commit(path);
                 } else {
                     LOG("File %s was removed", path.c_str());
                 }

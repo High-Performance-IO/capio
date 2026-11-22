@@ -5,7 +5,9 @@
 
 #include <cstdlib>
 #include <filesystem>
+#include <fstream>
 #include <map>
+#include <memory>
 #include <optional>
 #include <string>
 #include <vector>
@@ -105,6 +107,30 @@ TEST_F(RuntimeConfigurationTest, CreatesCapioClEngineWithoutConfigFile) {
     const auto engine = config.createCapioClEngine();
     EXPECT_EQ(engine->getWorkflowName(), CAPIO_DEFAULT_WORKFLOW_NAME);
     delete engine;
+}
+
+TEST_F(RuntimeConfigurationTest, CreatedEnginesCountClosesWithoutMetadata) {
+    char dir[] = "/tmp/capio_close_count_XXXXXX";
+    ASSERT_NE(mkdtemp(dir), nullptr);
+    setenv("CAPIO_DIR", dir, 1);
+    const std::filesystem::path root(dir);
+    std::ofstream(root / "config.json") << R"({"name": "CAPIO", "IO_Graph": []})";
+
+    const std::vector<std::vector<std::string>> servers = {
+        {"capio_server", "--no-config"},
+        {"capio_server", "-c", (root / "config.json").string()}};
+    for (size_t i = 0; i < servers.size(); ++i) {
+        const std::unique_ptr<capiocl::engine::Engine> engine(
+            parse(servers[i]).createCapioClEngine());
+        const auto file = root / ("file" + std::to_string(i));
+        engine->setCommitRule(file, capiocl::commitRules::ON_CLOSE);
+        engine->setCommitedCloseNumber(file, 2);
+
+        EXPECT_FALSE(engine->increaseCloseCount(file));
+        EXPECT_TRUE(engine->increaseCloseCount(file));
+        EXPECT_FALSE(std::filesystem::exists(root / (".file" + std::to_string(i) + ".commit")));
+    }
+    std::filesystem::remove_all(root);
 }
 
 TEST_F(RuntimeConfigurationTest, RejectsInvalidConfigurations) {

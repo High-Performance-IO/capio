@@ -229,22 +229,29 @@ std::chrono::milliseconds RuntimeConfiguration::getLocationRequeryInterval() con
 }
 
 capiocl::engine::Engine *RuntimeConfiguration::createCapioClEngine() const {
+    // Commit state travels by multicast only, so the file system monitor, which leaves tokens next
+    // to the files and needs a metadata directory for on_close:N, is off. This assumes that some
+    // server that heard of a commit is online for as long as someone may ask for it.
+    // The map replaces loadDefaults(), which would turn that monitor on again. Options that are
+    // not in it take their default where they are read.
+    std::unordered_map<std::string, std::string> options{
+        {"capiocl.monitor.mcast.enabled", "true"}, {"capiocl.monitor.filesystem.enabled", "false"}};
+
     capiocl::engine::Engine *engine;
     if (capio_cl_dynamic_config) {
-        engine = new capiocl::engine::Engine();
+        engine = new capiocl::engine::Engine(
+            capiocl::configuration::CapioClConfiguration(std::move(options)));
         engine->startApiServer();
     } else if (!capio_cl_config_path.empty()) {
-        // The defaults enable the multicast and file system monitors, as Parser::parse did
-        // before CAPIO-CL 2.0. They don't touch the three options set here.
-        capiocl::configuration::CapioClConfiguration capio_cl_config(
-            {{"capiocl.config_path", capio_cl_config_path},
-             {"capiocl.resolve_path", capio_cl_resolve_path},
-             {"capiocl.store_all_in_memory", store_all_in_memory ? "true" : "false"}});
-        capio_cl_config.loadDefaults();
-        engine = capiocl::parser::Parser::parse(capio_cl_config);
+        options["capiocl.config_path"]         = capio_cl_config_path;
+        options["capiocl.resolve_path"]        = capio_cl_resolve_path;
+        options["capiocl.store_all_in_memory"] = store_all_in_memory ? "true" : "false";
+        engine                                 = capiocl::parser::Parser::parse(
+            capiocl::configuration::CapioClConfiguration(std::move(options)));
     } else {
         const char *workflow_name = std::getenv("CAPIO_WORKFLOW_NAME");
-        engine                    = new capiocl::engine::Engine();
+        engine                    = new capiocl::engine::Engine(
+            capiocl::configuration::CapioClConfiguration(std::move(options)));
         engine->setWorkflowName(workflow_name != nullptr ? workflow_name
                                                          : CAPIO_DEFAULT_WORKFLOW_NAME);
     }

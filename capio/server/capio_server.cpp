@@ -125,12 +125,6 @@ int main(int argc, char **argv) {
     RuntimeConfiguration::initialize(argc, argv);
 
     START_LOG(gettid(), "call()");
-    const char *metadata_dir = std::getenv("CAPIO_METADATA_DIR");
-    if ((metadata_dir == nullptr || metadata_dir[0] == '\0') &&
-        setenv("CAPIO_METADATA_DIR", RuntimeConfiguration::get().getCapioDir().c_str(), 1) != 0) {
-        ERR_EXIT("Failed to set CAPIO_METADATA_DIR: %s", strerror(errno));
-    }
-
     capio_cl_engine = RuntimeConfiguration::get().createCapioClEngine();
 
     UPDATE_CALF_WORKFLOW_NAME(capio_cl_engine->getWorkflowName());

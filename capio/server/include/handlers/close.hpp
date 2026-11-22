@@ -33,9 +33,8 @@ inline void handle_close(int tid, int fd) {
 }
 
 inline void handle_close_fs(const int tid, const std::filesystem::path &path) {
-    if (CapioCLEngine::get().getCommitRule(path) == capiocl::commitRules::ON_CLOSE &&
-        FsStreaming::get().isProducer(tid, path)) {
-        CapioCLEngine::get().increaseCloseCount(path);
+    if (FsStreaming::get().isProducer(tid, path)) {
+        FsStreaming::get().countClose(path);
     }
 }
 

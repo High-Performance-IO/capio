@@ -49,6 +49,12 @@ class FsStreaming final {
     /// @brief The path of a request, whose last piece is @p tail
     std::string takePath(pid_t tid, const char *tail);
 
+    /// @brief Commit @p path. Never blocks.
+    void commit(const std::filesystem::path &path);
+
+    /// @brief Apply on_close to one more close of @p path. Never blocks.
+    void countClose(const std::filesystem::path &path);
+
     /// @brief Whether a reader may have to wait for the commit of @p path, which exists
     static bool canWaitForCommit(const std::filesystem::path &path);
 };

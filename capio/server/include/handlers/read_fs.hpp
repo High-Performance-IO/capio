@@ -37,10 +37,12 @@ void read_fs_handler(const char *const str) {
                        ? (client_manager->replyToClient(tid, static_cast<off64_t>(size)), true)
                        : client_manager->tryReply(*client, static_cast<off64_t>(size));
         }
+        if (client == nullptr) {
+            return false; // the request thread must not ask: see FsStreaming::commit
+        }
         try {
             if (CapioCLEngine::get().isCommitted(path)) {
-                return client == nullptr ? (client_manager->replyToClient(tid, -1), true)
-                                         : client_manager->tryReply(*client, -1);
+                return client_manager->tryReply(*client, -1);
             }
         } catch (const std::filesystem::filesystem_error &) {
         }
