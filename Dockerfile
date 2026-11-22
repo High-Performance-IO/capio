@@ -87,6 +87,9 @@ COPY --from=builder                                         \
     "/usr/local/lib/libcapio_posix.so"                      \
     "/usr/local/lib/libcapio_posix.so.1"                    \
     "/usr/local/lib/libcapio_posix.so.1.0.0"                \
+    "/usr/local/lib/libcapio_posix_fs.so"                   \
+    "/usr/local/lib/libcapio_posix_fs.so.1"                 \
+    "/usr/local/lib/libcapio_posix_fs.so.1.0.0"             \
     "/usr/local/lib/libgmock.[a]"                           \
     "/usr/local/lib/libgmock_main.[a]"                      \
     "/usr/local/lib/libgtest.[a]"                           \
@@ -99,6 +102,8 @@ COPY --from=builder                                         \
 
 # Binaries
 COPY --from=builder                                         \
+    "/usr/local/bin/capio_fs_streaming_ap[p]"               \
+    "/usr/local/bin/capio_fs_streaming_test[s]"             \
     "/usr/local/bin/capio_posix_unit_test[s]"               \
     "/usr/local/bin/capio_server"                           \
     "/usr/local/bin/capio_server_unit_test[s]"              \

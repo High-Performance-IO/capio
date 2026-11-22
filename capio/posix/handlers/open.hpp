@@ -41,46 +41,46 @@ inline int capio_openat(int dirfd, const std::string_view &pathname, int flags, 
     if (is_capio_path(path)) {
         CAPIO_STORAGE_CALL(
             {
-        int fd =
-            static_cast<int>(syscall_no_intercept(SYS_openat, AT_FDCWD, "/dev/null", O_RDONLY));
-        if (fd == -1) {
-            ERR_EXIT("capio_open, /dev/null opening");
-        }
-        bool create = (flags & O_CREAT) == O_CREAT;
-        bool excl   = (flags & O_EXCL) == O_EXCL;
-        if (excl) {
-            LOG("excl");
-            off64_t return_code = create_exclusive_request(fd, path, tid);
-            if (return_code == 1) {
-                errno = EEXIST;
-                return CAPIO_POSIX_SYSCALL_ERRNO;
-            }
-        } else if (create) {
-            LOG("create");
-            off64_t return_code = create_request(fd, path, tid);
-            if (return_code == 1) {
-                errno = ENOENT;
-                return CAPIO_POSIX_SYSCALL_ERRNO;
-            }
-        } else {
-            LOG("!excl && !create");
-            off64_t return_code = open_request(fd, path, tid);
-            if (return_code == 1) {
-                syscall_no_intercept(SYS_close, fd);
-                errno = ENOENT;
-                return CAPIO_POSIX_SYSCALL_ERRNO;
-            }
-        }
-        int actual_flags = flags & ~O_CLOEXEC;
-        if ((flags & O_DIRECTORY) == O_DIRECTORY) {
-            actual_flags = actual_flags | O_LARGEFILE;
-        }
-        add_capio_fd(tid, path, fd, 0, CAPIO_DEFAULT_FILE_INITIAL_SIZE, actual_flags,
-                     (flags & O_CLOEXEC) == O_CLOEXEC);
-        if ((flags & O_APPEND) == O_APPEND) {
-            lseek(fd, 0, SEEK_END);
-        }
-        return fd;
+                int fd = static_cast<int>(
+                    syscall_no_intercept(SYS_openat, AT_FDCWD, "/dev/null", O_RDONLY));
+                if (fd == -1) {
+                    ERR_EXIT("capio_open, /dev/null opening");
+                }
+                bool create = (flags & O_CREAT) == O_CREAT;
+                bool excl   = (flags & O_EXCL) == O_EXCL;
+                if (excl) {
+                    LOG("excl");
+                    off64_t return_code = create_exclusive_request(fd, path, tid);
+                    if (return_code == 1) {
+                        errno = EEXIST;
+                        return CAPIO_POSIX_SYSCALL_ERRNO;
+                    }
+                } else if (create) {
+                    LOG("create");
+                    off64_t return_code = create_request(fd, path, tid);
+                    if (return_code == 1) {
+                        errno = ENOENT;
+                        return CAPIO_POSIX_SYSCALL_ERRNO;
+                    }
+                } else {
+                    LOG("!excl && !create");
+                    off64_t return_code = open_request(fd, path, tid);
+                    if (return_code == 1) {
+                        syscall_no_intercept(SYS_close, fd);
+                        errno = ENOENT;
+                        return CAPIO_POSIX_SYSCALL_ERRNO;
+                    }
+                }
+                int actual_flags = flags & ~O_CLOEXEC;
+                if ((flags & O_DIRECTORY) == O_DIRECTORY) {
+                    actual_flags = actual_flags | O_LARGEFILE;
+                }
+                add_capio_fd(tid, path, fd, 0, CAPIO_DEFAULT_FILE_INITIAL_SIZE, actual_flags,
+                             (flags & O_CLOEXEC) == O_CLOEXEC);
+                if ((flags & O_APPEND) == O_APPEND) {
+                    lseek(fd, 0, SEEK_END);
+                }
+                return fd;
             },
             {
                 const bool create = (flags & O_CREAT) == O_CREAT;
@@ -109,10 +109,9 @@ int creat_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long ar
     const std::string_view pathname(reinterpret_cast<const char *>(arg0));
     long tid = syscall_no_intercept(SYS_gettid);
 
-    return posix_return_value(
-        capio_openat(AT_FDCWD, pathname, O_CREAT | O_WRONLY | O_TRUNC,
-                     static_cast<mode_t>(arg1), tid),
-        result);
+    return posix_return_value(capio_openat(AT_FDCWD, pathname, O_CREAT | O_WRONLY | O_TRUNC,
+                                           static_cast<mode_t>(arg1), tid),
+                              result);
 }
 
 int open_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg5, long *result) {

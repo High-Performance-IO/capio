@@ -12,7 +12,10 @@ TEST_F(FsStreamingTest, CommitsLeaveNoTokens) {
     EXPECT_OUTPUT(run("prod", {"create:f", "write:AAAA", "close"}), "");
     EXPECT_OUTPUT(run("cons", {"open:f", "read"}), "AAAA");
     for (const auto &entry : std::filesystem::directory_iterator(work)) {
-        EXPECT_EQ(entry.path().filename(), "f");
+        // Not just "f": builds with logging put capio_logs there
+        const auto name = entry.path().filename().string();
+        EXPECT_EQ(name.find(".commit"), std::string::npos) << name;
+        EXPECT_NE(name, "capiocl");
     }
 }
 

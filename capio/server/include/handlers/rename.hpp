@@ -1,9 +1,9 @@
 #ifndef CAPIO_SERVER_HANDLERS_RENAME_HPP
 #define CAPIO_SERVER_HANDLERS_RENAME_HPP
 #include "client-manager/client_manager.hpp"
+#include "handlers/fs_request.hpp"
 #include "remote/home_node_service.hpp"
 #include "storage/manager.hpp"
-#include "handlers/fs_request.hpp"
 #include "utils/filesystem.hpp"
 
 extern StorageManager *storage_manager;

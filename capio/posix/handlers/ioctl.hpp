@@ -22,7 +22,7 @@ inline void fs_wait_before_clone(const unsigned long request, const long argumen
 }
 
 int ioctl_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg5, long *result) {
-    const auto fd = static_cast<int>(arg0);
+    const auto fd  = static_cast<int>(arg0);
     const long tid = syscall_no_intercept(SYS_gettid);
     START_LOG(tid, "call(fd=%d, request=%ld)", fd, arg1);
 

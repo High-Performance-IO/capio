@@ -36,18 +36,18 @@ inline off64_t capio_mkdirat(int dirfd, const std::string_view &pathname, mode_t
     if (is_capio_path(path)) {
         CAPIO_STORAGE_CALL(
             {
-        if (exists_capio_path(path)) {
-            errno = EEXIST;
-            return CAPIO_POSIX_SYSCALL_ERRNO;
-        }
-        off64_t res = mkdir_request(path, tid);
-        if (res == 1) {
-            return CAPIO_POSIX_SYSCALL_ERRNO;
-        } else {
-            LOG("Adding %s to capio_files_path", path.c_str());
-            add_capio_path(path);
-            return res;
-        }
+                if (exists_capio_path(path)) {
+                    errno = EEXIST;
+                    return CAPIO_POSIX_SYSCALL_ERRNO;
+                }
+                off64_t res = mkdir_request(path, tid);
+                if (res == 1) {
+                    return CAPIO_POSIX_SYSCALL_ERRNO;
+                } else {
+                    LOG("Adding %s to capio_files_path", path.c_str());
+                    add_capio_path(path);
+                    return res;
+                }
             },
             {
                 const auto res = capio_kernel_result(
@@ -82,25 +82,26 @@ inline off64_t capio_rmdir(const std::string_view &pathname, long tid) {
     if (is_capio_path(path)) {
         CAPIO_STORAGE_CALL(
             {
-        if (!exists_capio_path(path)) {
-            LOG("capio_files_path.find == end. errno = "
-                "ENOENT");
-            errno = ENOENT;
-            return CAPIO_POSIX_SYSCALL_ERRNO;
-        }
-        // The server replies 1 when it removed the directory and 2 when it had no such directory,
-        // or asks to skip an excluded path. 1 is not rmdir's result: success is 0.
-        off64_t res = rmdir_request(path, tid);
-        if (res == CAPIO_POSIX_SYSCALL_REQUEST_SKIP) {
-            return res;
-        }
-        if (res == 2) {
-            LOG("res == 2. errno = ENOENT");
-            errno = ENOENT;
-            return CAPIO_POSIX_SYSCALL_ERRNO;
-        }
-        delete_capio_path(path);
-        return CAPIO_POSIX_SYSCALL_SUCCESS;
+                if (!exists_capio_path(path)) {
+                    LOG("capio_files_path.find == end. errno = "
+                        "ENOENT");
+                    errno = ENOENT;
+                    return CAPIO_POSIX_SYSCALL_ERRNO;
+                }
+                // The server replies 1 when it removed the directory and 2 when it had no such
+                // directory, or asks to skip an excluded path. 1 is not rmdir's result: success is
+                // 0.
+                off64_t res = rmdir_request(path, tid);
+                if (res == CAPIO_POSIX_SYSCALL_REQUEST_SKIP) {
+                    return res;
+                }
+                if (res == 2) {
+                    LOG("res == 2. errno = ENOENT");
+                    errno = ENOENT;
+                    return CAPIO_POSIX_SYSCALL_ERRNO;
+                }
+                delete_capio_path(path);
+                return CAPIO_POSIX_SYSCALL_SUCCESS;
             },
             { return CAPIO_POSIX_SYSCALL_REQUEST_SKIP; });
     } else {

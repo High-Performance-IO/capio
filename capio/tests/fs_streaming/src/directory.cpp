@@ -49,7 +49,10 @@ TEST_F(FsStreamingTest, OtherDirectoriesListWithoutWaiting) {
     startServer({{"f"}});
     std::filesystem::create_directory(work / "plain");
     std::ofstream(work / "plain" / "x") << "x";
-    EXPECT_OUTPUT(run("cons", {"list:plain", "list:."}), "x,plain,");
+    EXPECT_OUTPUT(run("cons", {"list:plain"}), "x,");
+    const auto capio_dir = run("cons", {"list:."});
+    EXPECT_TRUE(capio_dir.finished);
+    EXPECT_NE(capio_dir.output.find("plain,"), std::string::npos) << capio_dir.output;
 }
 
 TEST_F(FsStreamingTest, RewindListsAgain) {

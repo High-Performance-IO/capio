@@ -26,6 +26,13 @@ inline void initialize_new_thread(const bool wait = false) {
 
     START_LOG(tid, "call(tid=%d, pid=%d, app_name=%s)", tid, pid, capio_app_name);
 
+    CAPIO_STORAGE_CALL(
+        , if (pid == tid) {
+            // a new process has no other threads, whatever its parent was doing
+            requests_being_written = 0;
+            reset_descriptor_table_lock();
+            resume_requests();
+        });
     initialize_data_queues(tid);
     init_client(tid);
 

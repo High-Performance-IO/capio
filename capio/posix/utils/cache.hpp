@@ -202,6 +202,9 @@ class ConsentRequestCache {
         START_LOG(capio_syscall(SYS_gettid), "call(path=%s, tid=%ld, source=%s)", path.c_str(), tid,
                   source_func.c_str());
 
+        if (path.empty()) {
+            return; // a descriptor that another thread has closed
+        }
         const auto resolved_path = resolve_possible_symlink(path);
 
         if (!is_capio_path(resolved_path)) {
@@ -217,10 +220,12 @@ class ConsentRequestCache {
             LOG("File not present in cache. performing request");
             auto res = consent_to_proceed_request(resolved_path, tid, source_func);
 #ifdef SYS_statx
-            // NFS may still have the size from before the wait cached
-            struct statx fresh{};
-            capio_syscall(SYS_statx, AT_FDCWD, resolved_path.c_str(), AT_STATX_FORCE_SYNC,
-                          STATX_SIZE, &fresh);
+            if (res != 0) {
+                // NFS may still have the size from before the wait cached
+                struct statx fresh{};
+                capio_syscall(SYS_statx, AT_FDCWD, resolved_path.c_str(), AT_STATX_FORCE_SYNC,
+                              STATX_SIZE, &fresh);
+            }
 #endif
             // 0 holds only now: the path may be created or committed later
             if (res != 0) {

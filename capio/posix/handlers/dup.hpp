@@ -64,9 +64,7 @@ int dup3_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg
     //  int res = capio_dup3(fd, fd2, flags, tid);
 
     START_LOG(tid, "call(fd=%d, fd2=%d)", fd, fd2);
-    CAPIO_STORAGE_CALL(
-        ,
-        if (fd != fd2) { return fs_dup_onto(fd, fd2, flags, true, tid, result); });
+    CAPIO_STORAGE_CALL(, if (fd != fd2) { return fs_dup_onto(fd, fd2, flags, true, tid, result); });
 
     if (exists_capio_fd(fd)) {
         if (fd == fd2) {

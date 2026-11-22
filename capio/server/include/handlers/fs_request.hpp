@@ -18,11 +18,11 @@ extern ClientManager *client_manager;
 /// @brief The path of a request of the FS variant, whose arguments end at @p consumed
 inline std::string fs_request_path(const pid_t tid, const char *str, const int consumed) {
     // %n follows the last number: one space separates it from the path
-    auto path = std::filesystem::path(FsStreaming::get().takePath(
-                                          tid, str[consumed] == ' ' ? str + consumed + 1
-                                                                    : str + consumed))
-                    .lexically_normal()
-                    .string();
+    auto path =
+        std::filesystem::path(FsStreaming::get().takePath(
+                                  tid, str[consumed] == ' ' ? str + consumed + 1 : str + consumed))
+            .lexically_normal()
+            .string();
     while (path.size() > 1 && path.back() == '/') {
         path.pop_back();
     }

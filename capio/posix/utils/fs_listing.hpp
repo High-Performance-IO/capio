@@ -50,7 +50,16 @@ inline std::unordered_map<int, FsListing> &fs_listings() {
 }
 
 /// @brief Forget the listing of a descriptor number
-inline void fs_forget_listing(const int fd) { fs_listings().erase(fd); }
+inline void fs_forget_listing(const int fd) {
+    CAPIO_DESCRIPTOR_TABLE_LOCK();
+    fs_listings().erase(fd);
+}
+
+/// @brief The listing of a descriptor. It stays valid until that descriptor is closed.
+inline FsListing &fs_listing_of(const int fd) {
+    CAPIO_DESCRIPTOR_TABLE_LOCK();
+    return fs_listings()[fd];
+}
 
 /**
  * List the directory of @p fd again, adding the entries that are new to @p listing.
@@ -119,7 +128,7 @@ inline int fs_getdents(const int fd, char *buffer, const size_t count, const boo
     if (!exists_capio_fd(fd)) {
         return CAPIO_POSIX_SYSCALL_SKIP;
     }
-    auto &listing = fs_listings()[fd];
+    auto &listing = fs_listing_of(fd);
     if (listing.as_is) {
         return CAPIO_POSIX_SYSCALL_SKIP;
     }
@@ -172,6 +181,7 @@ inline int fs_getdents(const int fd, char *buffer, const size_t count, const boo
  * @return whether it was one
  */
 inline bool fs_seek_listing(const int fd, const off64_t offset, const int whence, long &result) {
+    CAPIO_DESCRIPTOR_TABLE_LOCK();
     auto &listings   = fs_listings();
     const auto found = listings.find(fd);
     if (found == listings.end() || found->second.as_is || !found->second.is_started) {

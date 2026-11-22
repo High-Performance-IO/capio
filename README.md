@@ -142,6 +142,34 @@ LD_PRELOAD=libcapio_posix.so \
 > `CAPIO_WORKFLOW_NAME` and `CAPIO_APP_NAME` are not set, they default to `CAPIO` and `default_app`, which will not
 > match the steps described in your CAPIO-CL configuration file.
 
+#### Streaming through the file system
+
+`libcapio_posix.so` keeps the files of `CAPIO_DIR` in memory. `libcapio_posix_fs.so` leaves them on the file system and
+only coordinates who waits for what. Preload one or the other for the whole workflow: they cannot be mixed, and the
+server refuses a process that uses the other one.
+
+`CAPIO_DIR` is a working directory: keep the inputs of the workflow outside it.
+
+In the file system variant:
+
+- **Commits** travel between servers by multicast only, and are not stored. The servers must stay up for the whole
+  workflow, on a network with multicast.
+- **`on_close`** counts every successful `close()`, also of a duplicated or inherited descriptor. `cmd > file` is
+  committed when the shell closes its copy: use `on_close:N` or `on_termination` for such producers. Closes made by the
+  kernel (exit, close-on-exec, `dup2`, `close_range`) count only in the process that opened the file. A file whose
+  close fails is never committed, and its consumers wait: see the log of the server.
+- **`on_termination`** commits what a thread or process created when that thread or process ends, even if another one
+  still writes to it. A process killed by a signal commits nothing.
+- **Renames** carry the closes and producers of the file to its new name. Closes are those seen by the local server.
+- **Missing paths** make `open`, `stat` and `access` wait only in the declared consumers of the path, and fail with
+  `ENOENT` otherwise. With `--no-config` every process but the producer waits. The children of a directory are
+  declared with a glob, as `dir/*`.
+- **`on_n_files`** directories are the only ones whose listing waits.
+- **`no_update`** streams to `read`, `pread` and copies. `mmap`, `SEEK_END` and reflinks wait for the commit. `stat`
+  returns the current size, so tools that trust it, as `wc -c` does, see a partial size. Between NFS nodes data only
+  appears when the writer flushes.
+- **`io_uring`** and programs that make system calls without glibc, as Go does, are not intercepted.
+
 To shut down a server, send it `SIGTERM` or `SIGINT` (e.g. `killall capio_server`). The server releases its resources
 and exits.
 

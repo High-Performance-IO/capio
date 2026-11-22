@@ -21,9 +21,7 @@ inline off64_t capio_write(int fd, const void *buffer, off64_t count, long tid) 
                 capio_cached_write(fd, buffer, count);
                 return count;
             },
-            {
-                return CAPIO_POSIX_SYSCALL_REQUEST_SKIP;
-            });
+            { return CAPIO_POSIX_SYSCALL_REQUEST_SKIP; });
     } else {
         return CAPIO_POSIX_SYSCALL_REQUEST_SKIP;
     }
@@ -34,11 +32,7 @@ inline off64_t capio_writev(int fd, const struct iovec *iov, int iovcnt, long ti
               iov->iov_base, iov->iov_len, iovcnt);
 
     if (exists_capio_fd(fd)) {
-        CAPIO_STORAGE_CALL(
-            {},
-            {
-                return CAPIO_POSIX_SYSCALL_REQUEST_SKIP;
-            });
+        CAPIO_STORAGE_CALL({}, { return CAPIO_POSIX_SYSCALL_REQUEST_SKIP; });
 
         LOG("fd %d exists and is a capio fd", fd);
         off64_t tot_bytes = 0;

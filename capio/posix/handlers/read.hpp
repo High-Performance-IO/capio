@@ -30,14 +30,11 @@ inline ssize_t capio_readv(int fd, const struct iovec *iov, int iovcnt, long tid
               iov->iov_base, iov->iov_len, iovcnt);
 
     if (exists_capio_fd(fd)) {
-        CAPIO_STORAGE_CALL(
-            {},
-            {
-                fs_wait_for_data(
-                    fd, fs_end_of(fs_read_position(fd, nullptr), fs_total_length(iov, iovcnt)),
-                    tid);
-                return CAPIO_POSIX_SYSCALL_REQUEST_SKIP;
-            });
+        CAPIO_STORAGE_CALL({}, {
+            fs_wait_for_data(
+                fd, fs_end_of(fs_read_position(fd, nullptr), fs_total_length(iov, iovcnt)), tid);
+            return CAPIO_POSIX_SYSCALL_REQUEST_SKIP;
+        });
 
         LOG("fd %d exists and is a capio fd", fd);
         ssize_t tot_bytes = 0;

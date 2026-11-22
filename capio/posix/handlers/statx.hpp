@@ -91,7 +91,7 @@ inline int capio_statx(int dirfd, const std::string_view &pathname, int flags, i
     CAPIO_STORAGE_CALL(
         {
             write_cache->flush();
-            const auto response = stat_request(path, tid);
+            const auto response  = stat_request(path, tid);
             const auto file_size = response.first;
             const auto is_dir    = response.second;
             if (file_size == -1) {

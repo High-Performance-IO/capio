@@ -153,9 +153,39 @@ bool is_at_or_below(const std::string &path, const std::string &name) {
            (path.size() == name.size() || path[name.size()] == '/');
 }
 
+/**
+ * @brief Call @p visit on the entry of @p name or, if it is a directory, on those at or below it.
+ * Only a directory needs looking at every entry: renaming files one by one must not be quadratic.
+ */
+template <typename Map, typename Visit>
+void for_each_renamed(const Map &map, const std::string &name, const bool is_directory,
+                      Visit &&visit) {
+    if (is_directory) {
+        for (const auto &[path, value] : map) {
+            if (is_at_or_below(path, name)) {
+                visit(path, value);
+            }
+        }
+    } else if (const auto found = map.find(name); found != map.end()) {
+        visit(found->first, found->second);
+    }
+}
+
 /// @brief Move the entries at or below @p from to @p to, replacing those that were there
 template <typename Map>
-void move_entries(Map &map, const std::string &from, const std::string &to, const bool keep) {
+void move_entries(Map &map, const std::string &from, const std::string &to, const bool keep,
+                  const bool is_directory) {
+    if (!is_directory) {
+        auto entry = map.extract(from);
+        if (keep) {
+            map.erase(to); // the file that the rename replaced
+            if (!entry.empty()) {
+                entry.key() = to;
+                map.insert(std::move(entry));
+            }
+        }
+        return;
+    }
     Map moved;
     for (auto entry = map.begin(); entry != map.end();) {
         if (is_at_or_below(entry->first, from)) {
@@ -164,7 +194,7 @@ void move_entries(Map &map, const std::string &from, const std::string &to, cons
             }
             entry = map.erase(entry);
         } else if (keep && is_at_or_below(entry->first, to)) {
-            entry = map.erase(entry); // the file that the rename replaced
+            entry = map.erase(entry); // what the rename replaced
         } else {
             ++entry;
         }
@@ -206,37 +236,40 @@ void FsStreaming::renameTo(const pid_t tid, const std::string &to, const bool to
         return;
     }
 
+    // The rename happened, so it is at the new name. A file that left CAPIO_DIR is also found
+    // there.
+    std::error_code error;
+    const bool is_directory = std::filesystem::is_directory(to, error);
+
     // Who commits it on_termination: the threads that produced it, under the new name
     std::vector<std::string> renamed;
-    for (const auto &[path, producing] : producer_threads) {
-        if (!is_at_or_below(path, from)) {
-            continue;
-        }
-        const auto new_path = to + path.substr(from.size());
-        bool one_is_alive   = false;
-        for (const auto thread : producing) {
-            if (threads.count(thread) == 0) {
-                continue;
+    for_each_renamed(
+        producer_threads, from, is_directory, [&](const std::string &path, const auto &producing) {
+            const auto new_path = to + path.substr(from.size());
+            bool one_is_alive   = false;
+            for (const auto thread : producing) {
+                if (threads.count(thread) == 0) {
+                    continue;
+                }
+                client_manager->removeProducedFile(thread, path);
+                if (to_capio) {
+                    client_manager->registerProducedFile(thread, new_path);
+                    one_is_alive = true;
+                }
             }
-            client_manager->removeProducedFile(thread, path);
             if (to_capio) {
-                client_manager->registerProducedFile(thread, new_path);
-                one_is_alive = true;
+                renamed.push_back(new_path);
+                if (!one_is_alive) { // mv, after the producer ended: it commits when mv ends
+                    client_manager->registerProducedFile(tid, new_path);
+                }
             }
-        }
-        if (to_capio) {
-            renamed.push_back(new_path);
-            if (!one_is_alive) { // mv, after the producer ended: it commits when mv ends
-                client_manager->registerProducedFile(tid, new_path);
-            }
-        }
-    }
+        });
 
-    move_entries(producers, from, to, to_capio);
-    move_entries(producer_threads, from, to, to_capio);
-    move_entries(openers, from, to, to_capio);
-    move_entries(closes, from, to, to_capio);
-    move_entries(failed, from, to, to_capio);
+    move_entries(producers, from, to, to_capio, is_directory);
+    move_entries(producer_threads, from, to, to_capio, is_directory);
+    move_entries(openers, from, to, to_capio, is_directory);
+    move_entries(closes, from, to, to_capio, is_directory);
+    move_entries(failed, from, to, to_capio, is_directory);
 
     for (const auto &path : renamed) {
         producers[path].insert(producerName(tid));
@@ -245,11 +278,11 @@ void FsStreaming::renameTo(const pid_t tid, const std::string &to, const bool to
     }
     if (to_capio) {
         // The rule of each new name, with the history of its file
-        for (const auto &[path, n_closes] : closes) {
-            if (n_closes > 0 && is_at_or_below(path, to)) {
-                applyOnClose(path, n_closes);
+        for_each_renamed(closes, to, is_directory, [&](const std::string &path, const long count) {
+            if (count > 0) {
+                applyOnClose(path, count);
             }
-        }
+        });
     }
 }
 

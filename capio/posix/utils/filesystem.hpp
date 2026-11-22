@@ -14,6 +14,7 @@
 #include <unordered_map>
 #include <vector>
 
+#include <pthread.h>
 #include <sys/stat.h>
 #include <unistd.h>
 
@@ -83,7 +84,9 @@ inline bool is_capio_path(const std::filesystem::path &path_to_check) {
 resolve_possible_symlink(const std::filesystem::path &input_path) {
 
     // Cache for resolved symbolic links: link -> realpath
-    static std::unordered_map<std::string, std::string> resolved_symlinks_cache;
+    // One per thread, and never destroyed: handlers run in any thread, also during exit()
+    static thread_local auto *cache_of_thread = new std::unordered_map<std::string, std::string>();
+    auto &resolved_symlinks_cache             = *cache_of_thread;
 
     if (resolved_symlinks_cache.find(input_path) == resolved_symlinks_cache.end()) {
         START_LOG(capio_syscall(SYS_gettid), "call(path=%s)", input_path.c_str());
@@ -134,8 +137,55 @@ resolve_possible_symlink(const std::filesystem::path &input_path) {
 
 CPFileDescriptors_t *capio_files_descriptors;
 CPFilesPaths_t *capio_files_paths;
+#if CAPIO_MEM_STREAM
 std::unique_ptr<std::filesystem::path> current_dir;
+#else
+/*
+ * exit() destroys globals while other threads still make system calls, and the handlers of those
+ * need the current directory: this one is never destroyed.
+ */
+struct CurrentDirectory {
+    std::filesystem::path *path = nullptr;
+
+    CurrentDirectory &operator=(std::unique_ptr<std::filesystem::path> new_path) {
+        path = new_path.release(); // the old one may be in use by another thread
+        return *this;
+    }
+    std::filesystem::path &operator*() const { return *path; }
+    void reset() { path = nullptr; }
+};
+CurrentDirectory current_dir;
+#endif
 CPFiles_t *files;
+
+#if CAPIO_MEM_STREAM
+#define CAPIO_DESCRIPTOR_TABLE_LOCK() static_cast<void>(0)
+#else
+/*
+ * The threads of a process share the descriptor table, so the FS variant locks it. The lock is
+ * recursive, as allocating can make system calls, whose handlers read the table. fork takes it, so
+ * that the child gets a whole table and a free lock.
+ */
+inline pthread_mutex_t descriptor_table_mutex = PTHREAD_RECURSIVE_MUTEX_INITIALIZER_NP;
+
+inline void reset_descriptor_table_lock() {
+    descriptor_table_mutex = PTHREAD_RECURSIVE_MUTEX_INITIALIZER_NP;
+}
+
+inline void protect_descriptor_table_across_fork() {
+    pthread_atfork([] { pthread_mutex_lock(&descriptor_table_mutex); },
+                   [] { pthread_mutex_unlock(&descriptor_table_mutex); },
+                   reset_descriptor_table_lock);
+}
+
+struct DescriptorTableLock {
+    DescriptorTableLock() { pthread_mutex_lock(&descriptor_table_mutex); }
+    ~DescriptorTableLock() { pthread_mutex_unlock(&descriptor_table_mutex); }
+    DescriptorTableLock(const DescriptorTableLock &)            = delete;
+    DescriptorTableLock &operator=(const DescriptorTableLock &) = delete;
+};
+#define CAPIO_DESCRIPTOR_TABLE_LOCK() const DescriptorTableLock descriptor_table_lock
+#endif
 
 /**
  * Set the CLOEXEC property of a file descriptor in metadata structures
@@ -144,6 +194,9 @@ CPFiles_t *files;
  * @return
  */
 inline void set_capio_fd_cloexec(int fd, bool is_cloexec) {
+    CAPIO_DESCRIPTOR_TABLE_LOCK();
+    // in the FS variant another thread may have closed it
+    CAPIO_STORAGE_CALL(, if (files->find(fd) == files->end()) { return; });
     std::get<3>(files->at(fd)) = is_cloexec;
 }
 
@@ -159,6 +212,7 @@ inline const std::filesystem::path &get_current_dir() { return *current_dir; }
  * @return
  */
 inline void add_capio_path(const std::string &path) {
+    CAPIO_DESCRIPTOR_TABLE_LOCK();
     capio_files_paths->emplace(path, std::unordered_set<int>{});
 }
 
@@ -170,6 +224,7 @@ inline void add_capio_path(const std::string &path) {
  */
 inline void add_capio_fd(long tid, const std::string &path, int fd, off64_t offset,
                          off64_t init_size, int flags, bool is_cloexec) {
+    CAPIO_DESCRIPTOR_TABLE_LOCK();
     add_capio_path(path);
     capio_files_paths->at(path).insert(fd);
     capio_files_descriptors->insert({fd, path});
@@ -232,6 +287,8 @@ inline std::filesystem::path capio_absolute(const std::filesystem::path &path) {
  * @return
  */
 inline void delete_capio_fd(int fd) {
+    CAPIO_DESCRIPTOR_TABLE_LOCK();
+    CAPIO_STORAGE_CALL(, if (files->find(fd) == files->end()) { return; });
     auto &path = capio_files_descriptors->at(fd);
     capio_files_paths->at(path).erase(fd);
     capio_files_descriptors->erase(fd);
@@ -244,6 +301,7 @@ inline void delete_capio_fd(int fd) {
  * @return
  */
 inline void delete_capio_path(const std::string &path) {
+    CAPIO_DESCRIPTOR_TABLE_LOCK();
     auto it = capio_files_paths->at(path).begin();
     while (it != capio_files_paths->at(path).end()) {
         delete_capio_fd(*it++);
@@ -283,6 +341,7 @@ inline void dup_capio_fd(long tid, int oldfd, int newfd, bool is_cloexec) {
  */
 inline bool exists_capio_fd(int fd) {
     START_LOG(capio_syscall(SYS_gettid), "call(fd=%d)", fd);
+    CAPIO_DESCRIPTOR_TABLE_LOCK();
     return files->find(fd) != files->end();
 }
 
@@ -292,6 +351,7 @@ inline bool exists_capio_fd(int fd) {
  * @return if the path exists
  */
 inline bool exists_capio_path(const std::string &path) {
+    CAPIO_DESCRIPTOR_TABLE_LOCK();
     return capio_files_paths->find(path) != capio_files_paths->end();
 }
 
@@ -314,7 +374,16 @@ inline int get_capio_fd_flags(int fd) { return std::get<2>(files->at(fd)); }
  * @param fd
  * @return the file descriptor path
  */
+#if CAPIO_MEM_STREAM
 inline const std::string &get_capio_fd_path(int fd) { return capio_files_descriptors->at(fd); }
+#else
+// A copy, and empty if another thread has closed the descriptor since the caller looked
+inline std::string get_capio_fd_path(int fd) {
+    CAPIO_DESCRIPTOR_TABLE_LOCK();
+    const auto found = capio_files_descriptors->find(fd);
+    return found == capio_files_descriptors->end() ? std::string{} : found->second;
+}
+#endif
 
 /**
  * Get the current offset of a file descriptor
@@ -335,6 +404,7 @@ inline off64_t get_capio_fd_size(int fd) { return std::get<1>(files->at(fd)); }
  * @return a vector of file descriptors
  */
 inline std::vector<int> get_capio_fds() {
+    CAPIO_DESCRIPTOR_TABLE_LOCK();
     std::vector<int> fds;
     fds.reserve(files->size());
     for (auto &file : *files) {
@@ -356,13 +426,18 @@ std::filesystem::path get_dir_path(int dirfd) {
         return get_current_dir();
     }
 
+    CAPIO_DESCRIPTOR_TABLE_LOCK();
     auto it = capio_files_descriptors->find(dirfd);
     if (it != capio_files_descriptors->end()) {
         LOG("dirfd %d points to path %s", dirfd, it->second.c_str());
         return it->second;
     } else {
         char proclnk[128];
+#if CAPIO_MEM_STREAM
         char dir_pathname[PATH_MAX];
+#else
+        char dir_pathname[PATH_MAX + 1]{}; // readlink does not terminate it
+#endif
         sprintf(proclnk, "/proc/self/fd/%d", dirfd);
         if (syscall_no_intercept(SYS_readlinkat, AT_FDCWD, proclnk, dir_pathname, PATH_MAX) < 0) {
             LOG("failed to readlink\n");
@@ -392,6 +467,7 @@ inline void init_filesystem() {
  * @return
  */
 inline void rename_capio_path(const std::string &oldpath, const std::string &newpath) {
+    CAPIO_DESCRIPTOR_TABLE_LOCK();
     auto entry  = capio_files_paths->extract(oldpath);
     entry.key() = newpath;
     capio_files_paths->insert(std::move(entry));

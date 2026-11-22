@@ -28,7 +28,10 @@ constexpr off64_t FS_UNTIL_COMMIT = LLONG_MAX;
 
 /// @brief Wait until the first @p end bytes of @p fd can be read
 inline void fs_wait_for_data(const int fd, const off64_t end, const long tid) {
-    const std::string &path = get_capio_fd_path(fd);
+    const std::string path = get_capio_fd_path(fd);
+    if (path.empty()) {
+        return;
+    }
     if (read_request_cache->covers(path, end)) {
         return;
     }

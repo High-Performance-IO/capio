@@ -48,7 +48,7 @@ inline int capio_fstat(int fd, struct stat *statbuf, long tid) {
         CAPIO_STORAGE_CALL(
             {
                 write_cache->flush();
-                const auto response = fstat_request(fd, tid);
+                const auto response  = fstat_request(fd, tid);
                 const auto file_size = response.first;
                 const auto is_dir    = response.second;
                 if (file_size == -1) {
@@ -81,7 +81,7 @@ inline int capio_lstat(const std::string_view &pathname, struct stat *statbuf, l
         CAPIO_STORAGE_CALL(
             {
                 write_cache->flush();
-                const auto response = stat_request(absolute_path, tid);
+                const auto response  = stat_request(absolute_path, tid);
                 const auto file_size = response.first;
                 const auto is_dir    = response.second;
                 if (file_size == -1) {
@@ -91,8 +91,7 @@ inline int capio_lstat(const std::string_view &pathname, struct stat *statbuf, l
                 if (file_size == CAPIO_POSIX_SYSCALL_REQUEST_SKIP) {
                     return file_size;
                 }
-                fill_statbuf(statbuf, file_size, is_dir,
-                             std::hash<std::string>{}(absolute_path));
+                fill_statbuf(statbuf, file_size, is_dir, std::hash<std::string>{}(absolute_path));
                 return CAPIO_POSIX_SYSCALL_SUCCESS;
             },
             {

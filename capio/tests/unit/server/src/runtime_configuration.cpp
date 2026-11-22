@@ -117,8 +117,7 @@ TEST_F(RuntimeConfigurationTest, CreatedEnginesCountClosesWithoutMetadata) {
     std::ofstream(root / "config.json") << R"({"name": "CAPIO", "IO_Graph": []})";
 
     const std::vector<std::vector<std::string>> servers = {
-        {"capio_server", "--no-config"},
-        {"capio_server", "-c", (root / "config.json").string()}};
+        {"capio_server", "--no-config"}, {"capio_server", "-c", (root / "config.json").string()}};
     for (size_t i = 0; i < servers.size(); ++i) {
         const std::unique_ptr<capiocl::engine::Engine> engine(
             parse(servers[i]).createCapioClEngine());

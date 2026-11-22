@@ -123,8 +123,8 @@ void ClientManager::registerClient(pid_t tid, const std::string &app_name, const
     {
         const std::lock_guard lock(clients_mutex);
         state->generation = ++next_generation;
-        app_names[tid] = app_name;
-        clients[tid] = std::move(state);
+        app_names[tid]    = app_name;
+        clients[tid]      = std::move(state);
     }
 
     DBG(tid, [](const int tid_app, const std::string &app_name_) {
@@ -136,8 +136,7 @@ void ClientManager::registerClient(pid_t tid, const std::string &app_name, const
         spawnWaiter(tid, [&, target_tid = tid](const ClientToken &client) {
             std::unique_lock<std::mutex> lock(mutex_thread_allowed_to_continue);
             cv_thread_allowed_to_continue.wait(lock, [&, target_tid]() {
-                return shutting_down ||
-                       !isClientActive(client) ||
+                return shutting_down || !isClientActive(client) ||
                        std::find(thread_allowed_to_continue.begin(),
                                  thread_allowed_to_continue.end(),
                                  target_tid) != thread_allowed_to_continue.end();
@@ -237,12 +236,10 @@ bool ClientManager::tryReply(const ClientToken &client, const off64_t offset) {
 }
 
 bool ClientManager::isClientActive(const ClientToken &client) const {
-    return !shutting_down && client.state->active &&
-           client.state->generation == client.generation;
+    return !shutting_down && client.state->active && client.state->generation == client.generation;
 }
 
-bool ClientManager::spawnWaiter(const pid_t tid,
-                                std::function<void(const ClientToken &)> waiter) {
+bool ClientManager::spawnWaiter(const pid_t tid, std::function<void(const ClientToken &)> waiter) {
     reapCompletedWaiters();
     ClientToken client;
     {

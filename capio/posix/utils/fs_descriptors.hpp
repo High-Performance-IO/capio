@@ -11,6 +11,8 @@
 #include "fs_listing.hpp"
 #include "requests.hpp"
 
+#if !CAPIO_MEM_STREAM
+
 /*
  * Descriptors of the FS variant: real descriptors of real files.
  *
@@ -49,11 +51,15 @@ inline std::string fs_descriptor_link(const int fd) {
 /// @brief Register @p fd as a descriptor of @p path, forgetting what had that number before
 inline void fs_track(const long tid, const std::string &path, const int fd, const int flags,
                      const bool is_cloexec) {
+    if (path.empty()) {
+        return; // dup of a descriptor that another thread has closed
+    }
+    const long offset = syscall_no_intercept(SYS_lseek, fd, 0, SEEK_CUR);
+    CAPIO_DESCRIPTOR_TABLE_LOCK();
     if (exists_capio_fd(fd)) {
         delete_capio_fd(fd);
     }
     fs_forget_listing(fd);
-    const long offset = syscall_no_intercept(SYS_lseek, fd, 0, SEEK_CUR);
     add_capio_fd(tid, path, fd, offset < 0 ? 0 : offset, CAPIO_DEFAULT_FILE_INITIAL_SIZE, flags,
                  is_cloexec);
 }
@@ -70,8 +76,9 @@ inline FsClose fs_prepare_close(const int fd) {
     closing.writable = flags >= 0 && (flags & O_ACCMODE) != O_RDONLY;
 
     // The path it was opened with, unless another process renamed the file since
-    const std::string &opened_as = get_capio_fd_path(fd);
-    if (syscall_no_intercept(SYS_newfstatat, AT_FDCWD, opened_as.c_str(), &named_file, 0) == 0 &&
+    const std::string opened_as = get_capio_fd_path(fd);
+    if (!opened_as.empty() &&
+        syscall_no_intercept(SYS_newfstatat, AT_FDCWD, opened_as.c_str(), &named_file, 0) == 0 &&
         named_file.st_ino == open_file.st_ino && named_file.st_dev == open_file.st_dev) {
         closing.path = opened_as;
     } else if (auto path = fs_descriptor_link(fd); !path.empty() && is_capio_path(path)) {
@@ -104,6 +111,7 @@ inline void fs_announce_close(const FsClose &closing, const char kind, const lon
 
 inline int fs_close(const int fd, const long tid, long *result) {
     FsClose closing = fs_prepare_close(fd);
+    fs_forget_listing(fd);
     // Forget it before closing: another thread may get the same number as soon as it is free
     delete_capio_fd(fd);
     *result = syscall_no_intercept(SYS_close, fd);
@@ -218,6 +226,7 @@ inline int fs_close_range(const unsigned first, const unsigned last, const unsig
  */
 inline int fs_execve(const long path, const long argv, const long envp, const long tid,
                      long *result) {
+    stop_requests_of_other_threads(tid);
     bool has_pending = false;
     for (const int fd : get_capio_fds()) {
         const long fd_flags = syscall_no_intercept(SYS_fcntl, fd, F_GETFD);
@@ -231,11 +240,13 @@ inline int fs_execve(const long path, const long argv, const long envp, const lo
     if (has_pending) {
         close_request_fs("-", CAPIO_FS_EXEC_FAILED, false, 0, tid);
     }
+    resume_requests();
     return CAPIO_POSIX_SYSCALL_SUCCESS;
 }
 
 /// @brief The exit of the process: the kernel closes everything, when nothing can announce it
 inline void fs_process_exit(const long tid) {
+    stop_requests_of_other_threads(tid);
     for (const int fd : get_capio_fds()) {
         FsClose closing = fs_prepare_close(fd);
         fs_flush(closing);
@@ -290,9 +301,11 @@ inline int fs_rename(const std::filesystem::path &from, const std::filesystem::p
 
 /// @brief Find the descriptors of CAPIO files that a program inherits when it starts
 inline void fs_track_inherited(const long tid) {
+    protect_descriptor_table_across_fork();
     if (std::getenv("CAPIO_DIR") == nullptr) {
         return;
     }
+    get_capio_dir(); // set it now, before there are threads to race for it
     syscall_no_intercept_flag = true;
     std::vector<int> open_fds;
     std::error_code error;
@@ -312,4 +325,5 @@ inline void fs_track_inherited(const long tid) {
     syscall_no_intercept_flag = false;
 }
 
+#endif // !CAPIO_MEM_STREAM
 #endif // CAPIO_POSIX_UTILS_FS_DESCRIPTORS_HPP

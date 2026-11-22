@@ -1,6 +1,8 @@
 #ifndef CAPIO_POSIX_UTILS_REQUESTS_HPP
 #define CAPIO_POSIX_UTILS_REQUESTS_HPP
 
+#include <atomic>
+
 #include "common/requests.hpp"
 
 #include "calf/SyscallLogger.h"
@@ -23,7 +25,8 @@ class ResponseBuffer : public CircularBuffer<off_t> {
             CAPIO_STORAGE_CALL(
                 constexpr char message[] =
                     "CAPIO: this process uses libcapio_posix.so (memory), but its workflow uses "
-                    "libcapio_posix_fs.so: the two cannot be mixed in a workflow. Fix LD_PRELOAD.\n",
+                    "libcapio_posix_fs.so: the two cannot be mixed in a workflow. Fix "
+                    "LD_PRELOAD.\n",
                 constexpr char message[] =
                     "CAPIO: this process uses libcapio_posix_fs.so (file system), but its workflow "
                     "uses libcapio_posix.so: the two cannot be mixed in a workflow. Fix "
@@ -34,7 +37,57 @@ class ResponseBuffer : public CircularBuffer<off_t> {
     }
 };
 
-inline thread_local CircularBuffer<char> *buf_requests;
+#if CAPIO_MEM_STREAM
+using RequestBuffer = CircularBuffer<char>;
+#else
+/*
+ * All the clients of a node write to one queue, under a named semaphore. A thread killed in the
+ * middle of a write leaves it taken, and then every client of the workflow waits forever. So
+ * before exit_group and execve, which kill the other threads, no new write starts and the ones
+ * that started are waited for. A process killed by a signal is not covered.
+ */
+inline std::atomic<int> requests_being_written{0};
+inline std::atomic<long> thread_ending_process{0};
+
+class RequestBuffer : public CircularBuffer<char> {
+  public:
+    using CircularBuffer<char>::CircularBuffer;
+
+    void write(const char *request, const long num_bytes) {
+        for (;;) {
+            ++requests_being_written;
+            const long ending = thread_ending_process;
+            if (ending == 0 || ending == syscall_no_intercept(SYS_gettid)) {
+                break;
+            }
+            --requests_being_written;
+            while (thread_ending_process != 0) { // until killed, or until execve fails
+                syscall_no_intercept(SYS_sched_yield);
+            }
+        }
+        CircularBuffer<char>::write(request, num_bytes);
+        --requests_being_written;
+    }
+};
+
+/// @brief Called before what kills the other threads
+inline void stop_requests_of_other_threads(const long tid) {
+    long nobody = 0;
+    if (!thread_ending_process.compare_exchange_strong(nobody, tid)) {
+        return;
+    }
+    // Bounded, as the caller may be a signal handler that interrupted a write of its own thread
+    constexpr int MAX_YIELDS = 200000;
+    for (int i = 0; i < MAX_YIELDS && requests_being_written != 0; ++i) {
+        syscall_no_intercept(SYS_sched_yield);
+    }
+}
+
+/// @brief Called if execve failed, and in a new process
+inline void resume_requests() { thread_ending_process = 0; }
+#endif
+
+inline thread_local RequestBuffer *buf_requests;
 inline thread_local ResponseBuffer *buff_response;
 
 /**
@@ -45,8 +98,8 @@ inline void init_client(const long tid) {
     buff_response =
         new ResponseBuffer(SHM_COMM_CHAN_NAME_RESP + std::to_string(tid), CAPIO_REQ_BUFF_CNT,
                            sizeof(off_t), get_capio_workflow_name());
-    buf_requests = new CircularBuffer<char>(SHM_COMM_CHAN_NAME, CAPIO_REQ_BUFF_CNT,
-                                            CAPIO_REQ_MAX_SIZE, get_capio_workflow_name());
+    buf_requests = new RequestBuffer(SHM_COMM_CHAN_NAME, CAPIO_REQ_BUFF_CNT, CAPIO_REQ_MAX_SIZE,
+                                     get_capio_workflow_name());
 }
 
 /**
@@ -62,8 +115,9 @@ inline void init_client(const long tid) {
 inline void fs_request(const int code, const long tid, const std::string &arguments,
                        const std::string_view path) {
     char req[CAPIO_REQ_MAX_SIZE];
-    const size_t part_header = snprintf(req, sizeof(req), "%04d %ld ", CAPIO_REQUEST_PATH_PART, tid);
-    const size_t header      = part_header + arguments.size();
+    const size_t part_header =
+        snprintf(req, sizeof(req), "%04d %ld ", CAPIO_REQUEST_PATH_PART, tid);
+    const size_t header = part_header + arguments.size();
 
     std::string_view rest = path;
     while (header + rest.size() >= sizeof(req)) {
@@ -210,8 +264,8 @@ inline void handshake_named_request(const long tid, const long pid, const std::s
     START_LOG(capio_syscall(SYS_gettid), "call(tid=%ld, pid=%ld, app_name=%s)", tid, pid,
               app_name.c_str());
     char req[CAPIO_REQ_MAX_SIZE];
-    sprintf(req, "%04d %ld %ld %s %d %c", CAPIO_REQUEST_HANDSHAKE_NAMED, tid, pid,
-            app_name.c_str(), wait ? 1 : 0, CAPIO_STORAGE_CALL(CAPIO_VARIANT_MEMORY, CAPIO_VARIANT_FS));
+    sprintf(req, "%04d %ld %ld %s %d %c", CAPIO_REQUEST_HANDSHAKE_NAMED, tid, pid, app_name.c_str(),
+            wait ? 1 : 0, CAPIO_STORAGE_CALL(CAPIO_VARIANT_MEMORY, CAPIO_VARIANT_FS));
     LOG("req=%s", req);
     buf_requests->write(req, CAPIO_REQ_MAX_SIZE);
 

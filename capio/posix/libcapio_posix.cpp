@@ -34,8 +34,8 @@ static int not_handled_handler(long arg0, long arg1, long arg2, long arg3, long 
  * Handler for syscall handled, but not yet implemented and interrupt
  * syscall_intercept
  */
-static int not_implemented_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg5,
-                                   long *result) {
+[[maybe_unused]] static int not_implemented_handler(long arg0, long arg1, long arg2, long arg3,
+                                                    long arg4, long arg5, long *result) {
     errno   = ENOTSUP;
     *result = -errno;
     return 0;
@@ -238,7 +238,8 @@ static constexpr std::array<CPHandler_t, CAPIO_NR_SYSCALLS> build_syscall_table(
     _syscallTable[SYS_close] = close_handler;
 #endif
 #ifdef SYS_copy_file_range
-    _syscallTable[SYS_copy_file_range] = CAPIO_STORAGE_CALL(copy_file_range_handler, copy_file_range_fs_handler);
+    _syscallTable[SYS_copy_file_range] =
+        CAPIO_STORAGE_CALL(copy_file_range_handler, copy_file_range_fs_handler);
 #endif
 #if defined(SYS_close_range) && !CAPIO_MEM_STREAM
     _syscallTable[SYS_close_range] = close_range_handler;
@@ -277,7 +278,8 @@ static constexpr std::array<CPHandler_t, CAPIO_NR_SYSCALLS> build_syscall_table(
     _syscallTable[SYS_fgetxattr] = CAPIO_STORAGE_CALL(fgetxattr_handler, not_handled_handler);
 #endif
 #ifdef SYS_flistxattr
-    _syscallTable[SYS_flistxattr] = CAPIO_STORAGE_CALL(not_implemented_handler, not_handled_handler);
+    _syscallTable[SYS_flistxattr] =
+        CAPIO_STORAGE_CALL(not_implemented_handler, not_handled_handler);
 #endif
 #ifdef SYS_fork
     _syscallTable[SYS_fork] = fork_handler;

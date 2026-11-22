@@ -3,6 +3,7 @@
  * current descriptor, e.g. "create:out" "write:AAAA" "sleep:500" "close". A failed operation
  * prints "<operation>=<errno name>" and the next one runs.
  */
+#include <atomic>
 #include <cerrno>
 #include <cstdio>
 #include <cstring>
@@ -11,6 +12,7 @@
 #include <set>
 #include <string>
 #include <thread>
+#include <vector>
 
 #include <dirent.h>
 #include <fcntl.h>
@@ -338,6 +340,40 @@ const std::map<std::string, Operation> &operations() {
                  }
              }
              return size >= 0;
+         }},
+        {"hammer",
+         [](const std::string &a) {
+             struct stat info{};
+             for (;;) {
+                 ::stat(a.c_str(), &info);
+             }
+             return true;
+         }},
+        {"pool",
+         [](const std::string &a) {
+             const int n_files = std::stoi(a);
+             std::atomic<int> next{0}, good{0};
+             std::vector<std::thread> threads;
+             for (int i = 0; i < 8; ++i) {
+                 threads.emplace_back([&] {
+                     for (int file; (file = next++) < n_files;) {
+                         const auto name  = "pool" + std::to_string(file);
+                         const int out    = ::open(name.c_str(), O_CREAT | O_WRONLY, 0644);
+                         const bool wrote = ::write(out, "x", 1) == 1;
+                         if (::close(out) != 0 || !wrote) {
+                             continue;
+                         }
+                         const int in = ::open(name.c_str(), O_RDONLY);
+                         char byte    = 0;
+                         good += ::read(in, &byte, 1) == 1 && byte == 'x';
+                         ::close(in);
+                     }
+                 });
+             }
+             for (auto &thread : threads) {
+                 thread.join();
+             }
+             return good == n_files;
          }},
         {"thread",
          [](const std::string &a) {

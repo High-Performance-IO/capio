@@ -36,7 +36,6 @@ class ClientManager {
     };
 
   private:
-
     /**
      * Request and Response buffer variables
      */
