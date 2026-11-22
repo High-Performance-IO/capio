@@ -1,0 +1,67 @@
+#include "harness.hpp"
+
+TEST_F(FsStreamingTest, FailedWriteReportsItsError) {
+    startServer({{"unused"}});
+    std::ofstream(work / "f") << "data";
+    EXPECT_OUTPUT(run("prod", {"create:unused", "close", "open:unused", "write:x"}), "write=EBADF");
+}
+
+TEST_F(FsStreamingTest, FailedSeekReportsItsError) {
+    startServer({{"f"}});
+    EXPECT_OUTPUT(run("prod", {"create:f", "seek:-5", "close"}), "seek=EINVAL");
+}
+
+TEST_F(FsStreamingTest, FailedExclusiveCreateReportsItsError) {
+    startServer({{"f"}});
+    EXPECT_OUTPUT(run("prod", {"create:f", "close", "excl:f"}), "excl=EEXIST");
+}
+
+TEST_F(FsStreamingTest, ThreadDoesNotHang) {
+    startServer({{"f"}});
+    EXPECT_OUTPUT(run("prod", {"create:f", "thread:write:AAAA", "close", "print:done"}), "done");
+}
+
+TEST_F(FsStreamingTest, ForkAfterAThreadDoesNotHang) {
+    startServer({{"f"}});
+    EXPECT_OUTPUT(
+        run("prod", {"create:f", "thread:write:A", "fork:write:B", "close", "print:done"}), "done");
+    EXPECT_EQ(slurp(work / "f"), "AB");
+}
+
+TEST_F(FsStreamingTest, SpawnDoesNotBreakTheParent) {
+    startServer({{"f"}});
+    EXPECT_OUTPUT(run("prod", {"spawn", "create:f", "write:A", "close", "open:f", "read"}), "A");
+}
+
+TEST_F(FsStreamingTest, PathWithSpaces) {
+    startServer({{"a b"}, {"a"}});
+    EXPECT_OUTPUT(run("prod", {"create:a b", "write:AAAA", "close"}), "");
+    EXPECT_OUTPUT(run("cons", {"open:a b", "read"}), "AAAA");
+}
+
+TEST_F(FsStreamingTest, PathLongerThanARequest) {
+    const std::string name(240, 'x');
+    startServer({{name}});
+    EXPECT_OUTPUT(run("prod", {"create:" + name, "write:AAAA", "close"}), "");
+    EXPECT_OUTPUT(run("cons", {"open:" + name, "read"}), "AAAA");
+}
+
+TEST_F(FsStreamingTest, CapioDirNeverWaits) {
+    startServer({{"f"}});
+    EXPECT_OUTPUT(run("cons", {"stat:" + work.string()}), "dir");
+}
+
+TEST_F(FsStreamingTest, PlainDirectoryNeverWaits) {
+    startServer({{"f"}});
+    std::filesystem::create_directory(work / "plain");
+    // Twice: the first lookup is enough to make contains() true
+    EXPECT_OUTPUT(run("cons", {"stat:plain", "open:plain", "stat:plain"}), "dirdir");
+}
+
+TEST_F(FsStreamingTest, ExitOfAnotherClientKeepsTheAppAProducer) {
+    // "writer" is not in the config: it produces f only because it created it
+    startServer({{"f", "on_close", "update", -1, false}});
+    const auto app = start(
+        "writer", {"create:f", "write:AAAA", "thread:sleep:10", "thread:open:f", "thread:read"});
+    EXPECT_OUTPUT(finish(app), "AAAA");
+}

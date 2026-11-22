@@ -35,8 +35,8 @@ off64_t capio_unlink_abs(const std::filesystem::path &abs_path, long tid, bool i
             return res;
         },
         {
-            const auto res = syscall_no_intercept(SYS_unlinkat, AT_FDCWD, abs_path.c_str(),
-                                                  is_dir ? AT_REMOVEDIR : 0);
+            const auto res = capio_kernel_result(syscall_no_intercept(
+                SYS_unlinkat, AT_FDCWD, abs_path.c_str(), is_dir ? AT_REMOVEDIR : 0));
             if (res == 0 && exists_capio_path(abs_path)) {
                 delete_capio_path(abs_path);
             }

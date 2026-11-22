@@ -73,7 +73,7 @@ inline off64_t capio_lseek(int fd, off64_t offset, int whence, long tid) {
     }
 
     CAPIO_STORAGE_CALL(return capio_lseek_mem(fd, offset, whence, tid), {
-        const auto res = syscall_no_intercept(SYS_lseek, fd, offset, whence);
+        const auto res = capio_kernel_result(syscall_no_intercept(SYS_lseek, fd, offset, whence));
         if (res >= 0) {
             set_capio_fd_offset(fd, res);
         }

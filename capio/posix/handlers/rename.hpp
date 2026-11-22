@@ -44,7 +44,7 @@ int renameat2_handler(long arg0, long arg1, long arg2, long arg3, long arg4, lon
                 if (res == 0 && exists_capio_path(old_path_abs)) {
                     rename_capio_path(old_path_abs, new_path_abs);
                 }
-                *result = res < 0 ? -errno : res;
+                *result = res;
                 return CAPIO_POSIX_SYSCALL_SUCCESS;
             });
     } else {
@@ -59,7 +59,7 @@ int renameat2_handler(long arg0, long arg1, long arg2, long arg3, long arg4, lon
                     rename_request_fs(old_path_abs, new_path_abs, tid);
                     const auto res =
                         syscall_no_intercept(SYS_renameat2, arg0, arg1, arg2, arg3, arg4);
-                    *result = res < 0 ? -errno : res;
+                    *result = res;
                     return CAPIO_POSIX_SYSCALL_SUCCESS;
                 });
         } else {

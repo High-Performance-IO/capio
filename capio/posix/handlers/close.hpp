@@ -26,7 +26,7 @@ int close_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long ar
                 if (res == 0) {
                     delete_capio_fd(fd);
                 }
-                *result = res < 0 ? -errno : res;
+                *result = res;
                 return CAPIO_POSIX_SYSCALL_SUCCESS;
             });
     }

@@ -88,8 +88,8 @@ inline int capio_openat(int dirfd, const std::string_view &pathname, int flags, 
                     return CAPIO_POSIX_SYSCALL_REQUEST_SKIP;
                 }
 
-                const int fd = static_cast<int>(
-                    syscall_no_intercept(SYS_openat, dirfd, pathname.data(), flags, mode));
+                const int fd = static_cast<int>(capio_kernel_result(
+                    syscall_no_intercept(SYS_openat, dirfd, pathname.data(), flags, mode)));
                 if (fd < 0) {
                     return CAPIO_POSIX_SYSCALL_ERRNO;
                 }

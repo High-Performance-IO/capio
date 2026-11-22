@@ -18,7 +18,7 @@ inline off64_t capio_read(int fd, void *buffer, off64_t count, long tid) {
             {
                 const off64_t end_of_read = get_capio_fd_offset(fd) + count;
                 read_request_cache->read_request(get_capio_fd_path(fd), end_of_read, tid, fd);
-                const auto res = syscall_no_intercept(SYS_read, fd, buffer, count);
+                const auto res = capio_kernel_result(syscall_no_intercept(SYS_read, fd, buffer, count));
                 if (res >= 0) {
                     const auto offset = syscall_no_intercept(SYS_lseek, fd, 0, SEEK_CUR);
                     if (offset >= 0) {
@@ -46,7 +46,7 @@ inline ssize_t capio_readv(int fd, const struct iovec *iov, int iovcnt, long tid
                 }
                 const off64_t end_of_read = get_capio_fd_offset(fd) + count;
                 read_request_cache->read_request(get_capio_fd_path(fd), end_of_read, tid, fd);
-                const auto res = syscall_no_intercept(SYS_readv, fd, iov, iovcnt);
+                const auto res = capio_kernel_result(syscall_no_intercept(SYS_readv, fd, iov, iovcnt));
                 if (res >= 0) {
                     const auto offset = syscall_no_intercept(SYS_lseek, fd, 0, SEEK_CUR);
                     if (offset >= 0) {

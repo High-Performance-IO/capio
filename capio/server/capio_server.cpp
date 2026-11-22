@@ -85,6 +85,7 @@ static constexpr std::array<CSHandler_t, CAPIO_NR_REQUESTS> build_request_handle
     _request_handlers[CAPIO_REQUEST_WRITE]               = write_handler;
     _request_handlers[CAPIO_REQUEST_CONSENT]             = consent_handler;
     _request_handlers[CAPIO_REQUEST_READ_FS]             = read_fs_handler;
+    _request_handlers[CAPIO_REQUEST_PATH_PART]           = path_part_handler;
 
     return _request_handlers;
 }

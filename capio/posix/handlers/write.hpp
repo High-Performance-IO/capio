@@ -22,7 +22,7 @@ inline off64_t capio_write(int fd, const void *buffer, off64_t count, long tid) 
                 return count;
             },
             {
-                const auto res = syscall_no_intercept(SYS_write, fd, buffer, count);
+                const auto res = capio_kernel_result(syscall_no_intercept(SYS_write, fd, buffer, count));
                 if (res >= 0) {
                     const auto offset = syscall_no_intercept(SYS_lseek, fd, 0, SEEK_CUR);
                     if (offset >= 0) {
@@ -44,7 +44,7 @@ inline off64_t capio_writev(int fd, const struct iovec *iov, int iovcnt, long ti
         CAPIO_STORAGE_CALL(
             {},
             {
-                const auto res = syscall_no_intercept(SYS_writev, fd, iov, iovcnt);
+                const auto res = capio_kernel_result(syscall_no_intercept(SYS_writev, fd, iov, iovcnt));
                 if (res >= 0) {
                     const auto offset = syscall_no_intercept(SYS_lseek, fd, 0, SEEK_CUR);
                     if (offset >= 0) {

@@ -4,19 +4,22 @@
 #include <chrono>
 #include <thread>
 
+#include "handlers/fs_request.hpp"
+
 void read_fs_handler(const char *const str) {
-    long tid;
-    int fd;
+    int tid, fd, consumed = 0;
     off64_t end_of_read;
-    char path[PATH_MAX];
-    if (sscanf(str, "%ld %d %s %ld", &tid, &fd, path, &end_of_read) != 4) {
+    if (sscanf(str, "%d %d %ld%n", &tid, &fd, &end_of_read, &consumed) != 3) {
+        return;
+    }
+    const std::string path = fs_request_path(tid, str, consumed);
+    if (std::error_code error; std::filesystem::is_directory(path, error)) {
+        client_manager->replyToClient(tid, -1); // nothing to wait for: the kernel answers EISDIR
         return;
     }
 
-    const bool is_producer = CapioCLEngine::get().isProducer(
-                                 path, client_manager->getAppName(tid)) ||
-                             client_manager->isProducer(tid, path);
-    const auto reply_if_ready = [tid, end_of_read, is_producer, path = std::string(path)](
+    const bool is_producer = FsStreaming::get().isProducer(tid, path);
+    const auto reply_if_ready = [tid, end_of_read, is_producer, path](
                                     const ClientManager::ClientToken *client) {
         std::error_code error;
         const bool exists = std::filesystem::exists(path, error);

@@ -1,6 +1,7 @@
 #ifndef CAPIO_SERVER_HANDLERS_HANDSHAKE_HPP
 #define CAPIO_SERVER_HANDLERS_HANDSHAKE_HPP
 #include "clone.hpp"
+#include "fs-streaming/fs_streaming.hpp"
 
 void handshake_anonymous_handler(const char *const str) {
     int tid, pid;
@@ -13,6 +14,7 @@ void handshake_named_handler(const char *const str) {
     char app_name[1024];
     sscanf(str, "%d %d %s %d", &tid, &pid, app_name, &wait);
     client_manager->registerClient(tid, app_name, static_cast<bool>(wait));
+    FsStreaming::get().addThread(tid, pid, app_name);
 }
 
 #endif // CAPIO_SERVER_HANDLERS_HANDSHAKE_HPP

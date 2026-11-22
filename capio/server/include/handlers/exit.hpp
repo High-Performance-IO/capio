@@ -1,6 +1,7 @@
 #ifndef CAPIO_SERVER_HANDLERS_EXIT_HPP
 #define CAPIO_SERVER_HANDLERS_EXIT_HPP
 
+#include "fs-streaming/fs_streaming.hpp"
 #include "storage/manager.hpp"
 extern StorageManager *storage_manager;
 
@@ -46,6 +47,7 @@ inline void handle_exit_group(int tid) {
         handle_close(tid, fd);
     }
     client_manager->removeClient(tid);
+    FsStreaming::get().removeThread(tid);
 }
 
 void exit_group_handler(const char *const str) {

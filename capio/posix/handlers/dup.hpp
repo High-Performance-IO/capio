@@ -15,7 +15,7 @@ int dup_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg5
     if (exists_capio_fd(fd)) {
         int res;
         CAPIO_STORAGE_CALL(res = open("/dev/null", O_WRONLY),
-                           res = static_cast<int>(syscall_no_intercept(SYS_dup, fd)));
+                           res = static_cast<int>(capio_kernel_result(syscall_no_intercept(SYS_dup, fd))));
         if (res == -1) {
             *result = -errno;
             return CAPIO_POSIX_SYSCALL_SUCCESS;
@@ -38,7 +38,10 @@ int dup2_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg
     START_LOG(tid, "call(fd=%d, fd2=%d)", fd, fd2);
 
     if (exists_capio_fd(fd)) {
-        int res = static_cast<int>(syscall_no_intercept(SYS_dup2, fd, fd2));
+        int res;
+        CAPIO_STORAGE_CALL(
+            res = static_cast<int>(syscall_no_intercept(SYS_dup2, fd, fd2)),
+            res = static_cast<int>(capio_kernel_result(syscall_no_intercept(SYS_dup2, fd, fd2))));
         if (res == -1) {
             *result = -errno;
             return CAPIO_POSIX_SYSCALL_SUCCESS;
@@ -70,7 +73,10 @@ int dup3_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg
             *result = -errno;
             return 0;
         }
-        int res = static_cast<int>(syscall_no_intercept(SYS_dup3, fd, fd2, flags));
+        int res;
+        CAPIO_STORAGE_CALL(res = static_cast<int>(syscall_no_intercept(SYS_dup3, fd, fd2, flags)),
+                           res = static_cast<int>(capio_kernel_result(
+                               syscall_no_intercept(SYS_dup3, fd, fd2, flags))));
         if (res == -1) {
             *result = -errno;
             return CAPIO_POSIX_SYSCALL_SUCCESS;

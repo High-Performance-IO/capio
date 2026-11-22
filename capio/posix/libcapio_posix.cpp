@@ -378,6 +378,22 @@ static int hook(long syscall_number, long arg0, long arg1, long arg2, long arg3,
         return 1;
     }
 
+#if !CAPIO_MEM_STREAM
+    // Before anything that allocates, logging included: see utils/process.hpp
+    if (in_vfork_child()) {
+        return 1;
+    }
+    note_process_creation(syscall_number, arg0);
+    if (process_needs_setup) {
+        if (syscall_number >= CAPIO_NR_SYSCALLS ||
+            syscallTable[syscall_number] == not_handled_handler) {
+            return 1;
+        }
+        process_needs_setup = false;
+        initialize_new_thread();
+    }
+#endif
+
     START_LOG(syscall_no_intercept(SYS_gettid), "call(syscall_number=%ld, syscall_name=%s)",
               syscall_number, sys_num_to_string(syscall_number).c_str());
 

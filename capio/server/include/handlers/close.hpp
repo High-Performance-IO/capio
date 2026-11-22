@@ -1,9 +1,8 @@
 #ifndef CAPIO_SERVER_HANDLERS_CLOSE_HPP
 #define CAPIO_SERVER_HANDLERS_CLOSE_HPP
 
+#include "handlers/fs_request.hpp"
 #include "read.hpp"
-#include <charconv>
-#include <sstream>
 
 extern StorageManager *storage_manager;
 
@@ -33,27 +32,21 @@ inline void handle_close(int tid, int fd) {
     storage_manager->removeFromTid(tid, fd);
 }
 
-void close_handler(const char *str) {
-    long tid;
-    std::string target;
-    std::istringstream request(str);
-    if (!(request >> tid >> target)) {
-        return;
-    }
-
-    int fd;
-    const auto parsed = std::from_chars(target.data(), target.data() + target.size(), fd);
-    if (parsed.ec == std::errc{} && parsed.ptr == target.data() + target.size()) {
-        handle_close(tid, fd);
-        return;
-    }
-
-    const std::filesystem::path path(target);
+inline void handle_close_fs(const int tid, const std::filesystem::path &path) {
     if (CapioCLEngine::get().getCommitRule(path) == capiocl::commitRules::ON_CLOSE &&
-        (CapioCLEngine::get().isProducer(path, client_manager->getAppName(tid)) ||
-         client_manager->isProducer(tid, path))) {
+        FsStreaming::get().isProducer(tid, path)) {
         CapioCLEngine::get().increaseCloseCount(path);
     }
+}
+
+void close_handler(const char *str) {
+    int tid, fd, consumed = 0;
+    sscanf(str, "%d %d%n", &tid, &fd, &consumed);
+    if (fd == -1) {
+        handle_close_fs(tid, fs_request_path(tid, str, consumed));
+        return;
+    }
+    handle_close(tid, fd);
 }
 
 #endif // CAPIO_SERVER_HANDLERS_CLOSE_HPP

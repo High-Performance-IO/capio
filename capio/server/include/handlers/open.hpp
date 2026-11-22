@@ -4,6 +4,7 @@
 #include <chrono>
 #include <thread>
 
+#include "handlers/fs_request.hpp"
 #include "remote/home_node_service.hpp"
 #include "utils/runtime_configuration.hpp"
 
@@ -82,16 +83,41 @@ inline void handle_open(int tid, int fd, const std::filesystem::path &path) {
     }
 }
 
+inline void handle_create_fs(const int tid, const std::filesystem::path &path) {
+    if (!CapioCLEngine::get().isExcluded(path)) {
+        client_manager->registerProducedFile(tid, path);
+        FsStreaming::get().addProducer(tid, path);
+    }
+}
+
+inline void handle_open_fs(const int tid, const std::filesystem::path &path) {
+    if (CapioCLEngine::get().isExcluded(path)) {
+        client_manager->replyToClient(tid, 0);
+    } else if (FsStreaming::get().isProducer(tid, path) || std::filesystem::exists(path)) {
+        client_manager->replyToClient(tid, 1);
+    } else {
+        client_manager->spawnWaiter(tid, [path](const ClientManager::ClientToken &client) {
+            while (client_manager->isClientActive(client)) {
+                std::error_code error;
+                if (std::filesystem::exists(path, error) && !error) {
+                    client_manager->tryReply(client, 1);
+                    return;
+                }
+                std::this_thread::sleep_for(std::chrono::milliseconds(100));
+            }
+        });
+    }
+}
+
 void create_handler(const char *const str) {
-    int tid, fd;
-    char path[PATH_MAX];
-    sscanf(str, "%d %d %s", &tid, &fd, path);
+    int tid, fd, consumed = 0;
+    sscanf(str, "%d %d%n", &tid, &fd, &consumed);
     if (fd == -1) {
-        if (!CapioCLEngine::get().isExcluded(path)) {
-            client_manager->registerProducedFile(tid, path);
-        }
+        handle_create_fs(tid, fs_request_path(tid, str, consumed));
         return;
     }
+    char path[PATH_MAX];
+    sscanf(str, "%d %d %s", &tid, &fd, path);
     if (CapioCLEngine::get().isExcluded(path)) {
         client_manager->replyToClient(tid, CAPIO_POSIX_SYSCALL_REQUEST_SKIP);
         return;
@@ -111,30 +137,14 @@ void create_exclusive_handler(const char *const str) {
 }
 
 void open_handler(const char *const str) {
-    int tid, fd;
-    char path[PATH_MAX];
-    sscanf(str, "%d %d %s", &tid, &fd, path);
+    int tid, fd, consumed = 0;
+    sscanf(str, "%d %d%n", &tid, &fd, &consumed);
     if (fd == -1) {
-        if (CapioCLEngine::get().isExcluded(path)) {
-            client_manager->replyToClient(tid, 0);
-        } else if (CapioCLEngine::get().isProducer(path, client_manager->getAppName(tid)) ||
-                   client_manager->isProducer(tid, path) || std::filesystem::exists(path)) {
-            client_manager->replyToClient(tid, 1);
-        } else {
-            client_manager->spawnWaiter(
-                tid, [path = std::string(path)](const ClientManager::ClientToken &client) {
-                    while (client_manager->isClientActive(client)) {
-                        std::error_code error;
-                        if (std::filesystem::exists(path, error) && !error) {
-                            client_manager->tryReply(client, 1);
-                            return;
-                        }
-                        std::this_thread::sleep_for(std::chrono::milliseconds(100));
-                    }
-                });
-        }
+        handle_open_fs(tid, fs_request_path(tid, str, consumed));
         return;
     }
+    char path[PATH_MAX];
+    sscanf(str, "%d %d %s", &tid, &fd, path);
     if (CapioCLEngine::get().isExcluded(path)) {
         client_manager->replyToClient(tid, CAPIO_POSIX_SYSCALL_REQUEST_SKIP);
         return;

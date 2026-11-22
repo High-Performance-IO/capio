@@ -11,6 +11,7 @@
 #include "handlers/copy_file_range.hpp"
 #include "handlers/dup.hpp"
 #include "handlers/exit.hpp"
+#include "handlers/fs_request.hpp"
 #include "handlers/getdents.hpp"
 #include "handlers/handshake.hpp"
 #include "handlers/mkdir.hpp"
