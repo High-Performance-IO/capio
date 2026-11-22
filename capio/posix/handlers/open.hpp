@@ -5,6 +5,7 @@
 
 #include "utils/common.hpp"
 #include "utils/filesystem.hpp"
+#include "utils/fs_descriptors.hpp"
 
 inline int capio_openat(int dirfd, const std::string_view &pathname, int flags, mode_t mode,
                         long tid) {
@@ -82,9 +83,8 @@ inline int capio_openat(int dirfd, const std::string_view &pathname, int flags, 
         return fd;
             },
             {
-                if ((flags & O_CREAT) == O_CREAT) {
-                    create_request_fs(path, tid);
-                } else if (!open_request_fs(path, tid)) {
+                const bool create = (flags & O_CREAT) == O_CREAT;
+                if (!create && !open_request_fs(path, tid)) {
                     return CAPIO_POSIX_SYSCALL_REQUEST_SKIP;
                 }
 
@@ -93,8 +93,11 @@ inline int capio_openat(int dirfd, const std::string_view &pathname, int flags, 
                 if (fd < 0) {
                     return CAPIO_POSIX_SYSCALL_ERRNO;
                 }
-                add_capio_fd(tid, path, fd, 0, CAPIO_DEFAULT_FILE_INITIAL_SIZE, flags,
-                             (flags & O_CLOEXEC) == O_CLOEXEC);
+                // Announced once it worked: a failed O_EXCL must not make a producer
+                if (create) {
+                    create_request_fs(path, tid);
+                }
+                fs_track(tid, path.native(), fd, flags, (flags & O_CLOEXEC) == O_CLOEXEC);
                 return fd;
             });
     } else {

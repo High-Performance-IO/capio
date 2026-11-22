@@ -87,13 +87,17 @@ inline void handle_create_fs(const int tid, const std::filesystem::path &path) {
     if (!CapioCLEngine::get().isExcluded(path)) {
         client_manager->registerProducedFile(tid, path);
         FsStreaming::get().addProducer(tid, path);
+        FsStreaming::get().addOpener(tid, path);
     }
 }
 
 inline void handle_open_fs(const int tid, const std::filesystem::path &path) {
     if (CapioCLEngine::get().isExcluded(path)) {
         client_manager->replyToClient(tid, 0);
-    } else if (FsStreaming::get().isProducer(tid, path) || std::filesystem::exists(path)) {
+        return;
+    }
+    FsStreaming::get().addOpener(tid, path);
+    if (FsStreaming::get().isProducer(tid, path) || std::filesystem::exists(path)) {
         client_manager->replyToClient(tid, 1);
     } else {
         client_manager->spawnWaiter(tid, [path](const ClientManager::ClientToken &client) {

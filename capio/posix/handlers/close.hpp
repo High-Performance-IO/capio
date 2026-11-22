@@ -3,6 +3,7 @@
 
 #if defined(SYS_close)
 
+#include "utils/fs_descriptors.hpp"
 #include "utils/requests.hpp"
 
 int close_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg5, long *result) {
@@ -20,15 +21,7 @@ int close_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long ar
                 *result = 0;
                 return CAPIO_POSIX_SYSCALL_SKIP;
             },
-            {
-                close_request_fs(get_capio_fd_path(fd), tid);
-                const auto res = syscall_no_intercept(SYS_close, fd);
-                if (res == 0) {
-                    delete_capio_fd(fd);
-                }
-                *result = res;
-                return CAPIO_POSIX_SYSCALL_SUCCESS;
-            });
+            { return fs_close(fd, tid, result); });
     }
     return CAPIO_POSIX_SYSCALL_SKIP;
 }

@@ -13,7 +13,8 @@ void read_fs_handler(const char *const str) {
         return;
     }
     const std::string path = fs_request_path(tid, str, consumed);
-    if (std::error_code error; std::filesystem::is_directory(path, error)) {
+    if (std::error_code error;
+        std::filesystem::is_directory(path, error) || CapioCLEngine::get().isExcluded(path)) {
         client_manager->replyToClient(tid, -1); // nothing to wait for: the kernel answers EISDIR
         return;
     }

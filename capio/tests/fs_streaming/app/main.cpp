@@ -14,6 +14,7 @@
 #include <fcntl.h>
 #include <spawn.h>
 #include <sys/stat.h>
+#include <sys/syscall.h>
 #include <sys/wait.h>
 #include <unistd.h>
 
@@ -100,6 +101,32 @@ const std::map<std::string, Operation> &operations() {
                  return false;
              }
              print(S_ISDIR(info.st_mode) ? "dir" : std::to_string(info.st_size));
+             return true;
+         }},
+        {"cloexec", [](const std::string &) { return fcntl(fd, F_SETFD, FD_CLOEXEC) == 0; }},
+        {"replace",
+         [](const std::string &) {
+             const int null_fd = ::open("/dev/null", O_RDONLY);
+             return dup2(null_fd, fd) == fd && ::close(null_fd) == 0;
+         }},
+        {"close_range",
+         [](const std::string &) { return syscall(SYS_close_range, fd, fd, 0) == 0; }},
+        {"exec",
+         [](const std::string &a) {
+             execlp("sleep", "sleep", a.c_str(), nullptr);
+             return false;
+         }},
+        {"exec_missing",
+         [](const std::string &) {
+             execl("/no/such/program", "program", nullptr);
+             return errno == ENOENT;
+         }},
+        {"background",
+         [](const std::string &a) {
+             std::thread([a] {
+                 run(a);
+                 sleep(60);
+             }).detach();
              return true;
          }},
         {"thread",

@@ -6,8 +6,15 @@
 #include <string>
 #include <unordered_map>
 #include <unordered_set>
+#include <vector>
 
 #include <sys/types.h>
+
+/// @brief How a descriptor was closed
+enum class CloseKind {
+    EXPLICIT, ///< close(), by whoever has the descriptor
+    IMPLICIT  ///< By the kernel: exit, close-on-exec, dup2 over it, close_range
+};
 
 /**
  * @brief What the server knows about the clients of the FS variant and their files.
@@ -30,6 +37,15 @@ class FsStreaming final {
     /// @brief path -> who produces it: an app or, for apps without a name, a process
     std::unordered_map<std::string, std::unordered_set<std::string>> producers;
 
+    /// @brief path -> processes that opened it: only their implicit closes count
+    std::unordered_map<std::string, std::unordered_set<uint64_t>> openers;
+
+    /// @brief path -> errno of the close that failed: never committed by this server
+    std::unordered_map<std::string, int> failed;
+
+    /// @brief process -> what its execve closes, if it works
+    std::unordered_map<uint64_t, std::vector<std::pair<std::string, bool>>> closes_at_exec;
+
     std::unordered_map<pid_t, std::string> path_parts;
 
     [[nodiscard]] std::string producerName(pid_t tid) const;
@@ -42,6 +58,20 @@ class FsStreaming final {
 
     void addProducer(pid_t tid, const std::filesystem::path &path);
     [[nodiscard]] bool isProducer(pid_t tid, const std::filesystem::path &path) const;
+
+    void addOpener(pid_t tid, const std::filesystem::path &path);
+
+    /// @brief A descriptor of @p path was closed successfully
+    void closed(pid_t tid, const std::filesystem::path &path, CloseKind kind, bool writable);
+
+    /// @brief A close of @p path failed, so data was lost
+    void closeFailed(pid_t tid, const std::filesystem::path &path, int error);
+
+    void closeAtExec(pid_t tid, const std::filesystem::path &path, bool writable);
+    void execFailed(pid_t tid);
+
+    /// @brief The threads of the process of @p tid, other than @p tid
+    [[nodiscard]] std::vector<pid_t> otherThreads(pid_t tid) const;
 
     /// @brief Keep a piece of a path that did not fit in a request
     void addPathPart(pid_t tid, const char *part);

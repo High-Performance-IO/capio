@@ -3,6 +3,7 @@
 
 #if defined(SYS_exit) || defined(SYS_exit_group)
 
+#include "utils/fs_descriptors.hpp"
 #include "utils/requests.hpp"
 
 /*
@@ -22,11 +23,27 @@ int exit_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg
             read_cache->flush();
             write_cache->flush();
         },
-        {});
+        {
+            // The end of a thread closes nothing: only the last one is the exit of the process
+            if (fs_is_last_thread()) {
+                fs_process_exit(tid);
+            }
+        });
     exit_group_request(tid);
 
     return CAPIO_POSIX_SYSCALL_SKIP;
 }
+
+#if defined(SYS_exit_group) && !CAPIO_MEM_STREAM
+int exit_process_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg5,
+                         long *result) {
+    const long tid = syscall_no_intercept(SYS_gettid);
+    START_LOG(tid, "call()");
+    fs_process_exit(tid);
+    exit_group_request(tid);
+    return CAPIO_POSIX_SYSCALL_SKIP;
+}
+#endif
 
 #endif // SYS_exit || SYS_exit_group
 #endif // CAPIO_POSIX_HANDLERS_EXIT_GROUP_HPP

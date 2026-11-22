@@ -32,6 +32,13 @@ constexpr const int CAPIO_REQUEST_PATH_PART           = 27;
 
 constexpr const int CAPIO_NR_REQUESTS = 28;
 
+/* KINDS OF CAPIO_REQUEST_CLOSE IN THE FS VARIANT */
+constexpr const char CAPIO_FS_CLOSE_EXPLICIT = 'X'; // close()
+constexpr const char CAPIO_FS_CLOSE_IMPLICIT = 'I'; // exit, dup2 over it, close_range
+constexpr const char CAPIO_FS_CLOSE_AT_EXEC  = 'P'; // close-on-exec, if the exec works
+constexpr const char CAPIO_FS_EXEC_FAILED    = 'A';
+constexpr const char CAPIO_FS_PROCESS_EXIT   = 'E';
+
 /*REQUESTS FOR SERVER TO SERVER COMMUNICATION*/
 
 constexpr const int CAPIO_SERVER_REQUEST_READ                  = 0;

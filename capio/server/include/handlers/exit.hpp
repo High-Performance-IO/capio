@@ -5,7 +5,7 @@
 #include "storage/manager.hpp"
 extern StorageManager *storage_manager;
 
-inline void handle_exit_group(int tid) {
+void handle_exit_group(int tid) {
     START_LOG(gettid(), "call(tid=%d)", tid);
 
     LOG("retrieving files from writers for process with pid = %d", tid);

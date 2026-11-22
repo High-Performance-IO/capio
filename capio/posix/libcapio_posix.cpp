@@ -63,6 +63,9 @@ static constexpr long CAPIO_NR_SYSCALLS = 1 + std::max({
 #ifdef SYS_copy_file_range
                                                   SYS_copy_file_range,
 #endif
+#if defined(SYS_close_range) && !CAPIO_MEM_STREAM
+                                                  SYS_close_range,
+#endif
 #ifdef SYS_creat
                                                   SYS_creat,
 #endif
@@ -225,6 +228,9 @@ static constexpr std::array<CPHandler_t, CAPIO_NR_SYSCALLS> build_syscall_table(
 #ifdef SYS_copy_file_range
     _syscallTable[SYS_copy_file_range] = CAPIO_STORAGE_CALL(copy_file_range_handler, not_handled_handler);
 #endif
+#if defined(SYS_close_range) && !CAPIO_MEM_STREAM
+    _syscallTable[SYS_close_range] = close_range_handler;
+#endif
 #ifdef SYS_creat
     _syscallTable[SYS_creat] = creat_handler;
 #endif
@@ -244,7 +250,7 @@ static constexpr std::array<CPHandler_t, CAPIO_NR_SYSCALLS> build_syscall_table(
     _syscallTable[SYS_exit] = exit_handler;
 #endif
 #ifdef SYS_exit_group
-    _syscallTable[SYS_exit_group] = exit_handler;
+    _syscallTable[SYS_exit_group] = CAPIO_STORAGE_CALL(exit_handler, exit_process_handler);
 #endif
 #ifdef SYS_faccessat
     _syscallTable[SYS_faccessat] = faccessat_handler;
@@ -446,9 +452,13 @@ static __attribute__((constructor)) void init() {
     init_filesystem();
     initialize_new_thread();
 
+#if CAPIO_MEM_STREAM
     if (const int *fd_shm = get_fd_snapshot(tid); fd_shm != nullptr) {
         initialize_from_snapshot(fd_shm, tid);
     }
+#else
+    fs_track_inherited(tid);
+#endif
 
     intercept_hook_point_clone_child  = hook_clone_child;
     intercept_hook_point_clone_parent = hook_clone_parent;

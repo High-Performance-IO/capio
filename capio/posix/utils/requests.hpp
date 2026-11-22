@@ -80,9 +80,13 @@ inline void close_request(const int fd, const long tid) {
     buf_requests->write(req, CAPIO_REQ_MAX_SIZE);
 }
 
-inline void close_request_fs(const std::filesystem::path &path, const long tid) {
-    START_LOG(capio_syscall(SYS_gettid), "call(path=%s, tid=%ld)", path.c_str(), tid);
-    fs_request(CAPIO_REQUEST_CLOSE, tid, "-1 ", path.native());
+inline void close_request_fs(const std::filesystem::path &path, const char kind,
+                             const bool writable, const long error, const long tid) {
+    START_LOG(capio_syscall(SYS_gettid), "call(path=%s, kind=%c, error=%ld, tid=%ld)", path.c_str(),
+              kind, error, tid);
+    fs_request(CAPIO_REQUEST_CLOSE, tid,
+               std::string("-1 ") + kind + (writable ? " 1 " : " 0 ") + std::to_string(error) + " ",
+               path.native());
 }
 
 inline off64_t rename_request(const long tid, const std::filesystem::path &old_path,

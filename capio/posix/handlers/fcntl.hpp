@@ -7,6 +7,7 @@
 #include <string>
 #include <unordered_map>
 
+#include "utils/fs_descriptors.hpp"
 #include "utils/requests.hpp"
 
 /**
@@ -237,10 +238,7 @@ int fcntl_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long ar
 
     CAPIO_STORAGE_CALL(
         { return fcntl_internal_mem_handler(cmd, fd, arg2, tid, result); },
-        {
-            consent_request_cache->consent_request(get_capio_fd_path(fd), tid, __FUNCTION__);
-            return CAPIO_POSIX_SYSCALL_SKIP;
-        });
+        { return fs_fcntl(fd, cmd, arg2, tid, result); });
 }
 
 #endif // SYS_fcntl

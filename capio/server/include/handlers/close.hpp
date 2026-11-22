@@ -1,6 +1,7 @@
 #ifndef CAPIO_SERVER_HANDLERS_CLOSE_HPP
 #define CAPIO_SERVER_HANDLERS_CLOSE_HPP
 
+#include "common/requests.hpp"
 #include "handlers/fs_request.hpp"
 #include "read.hpp"
 
@@ -32,17 +33,41 @@ inline void handle_close(int tid, int fd) {
     storage_manager->removeFromTid(tid, fd);
 }
 
-inline void handle_close_fs(const int tid, const std::filesystem::path &path) {
-    if (FsStreaming::get().isProducer(tid, path)) {
-        FsStreaming::get().countClose(path);
+void handle_exit_group(int tid);
+
+inline void handle_close_fs(const int tid, const char *const str) {
+    int fd, writable, error, consumed = 0;
+    int ignored;
+    char kind;
+    if (sscanf(str, "%d %d %c %d %d%n", &ignored, &fd, &kind, &writable, &error, &consumed) != 5) {
+        return;
+    }
+    const std::filesystem::path path = fs_request_path(tid, str, consumed);
+    auto &state                      = FsStreaming::get();
+
+    if (kind == CAPIO_FS_PROCESS_EXIT) {
+        // exit_group ends the other threads, and none of them can say so
+        for (const auto other : state.otherThreads(tid)) {
+            handle_exit_group(other);
+        }
+    } else if (kind == CAPIO_FS_EXEC_FAILED) {
+        state.execFailed(tid);
+    } else if (error != 0) {
+        state.closeFailed(tid, path, error);
+    } else if (kind == CAPIO_FS_CLOSE_AT_EXEC) {
+        state.closeAtExec(tid, path, writable != 0);
+    } else {
+        state.closed(tid, path,
+                     kind == CAPIO_FS_CLOSE_EXPLICIT ? CloseKind::EXPLICIT : CloseKind::IMPLICIT,
+                     writable != 0);
     }
 }
 
 void close_handler(const char *str) {
-    int tid, fd, consumed = 0;
-    sscanf(str, "%d %d%n", &tid, &fd, &consumed);
+    int tid, fd;
+    sscanf(str, "%d %d", &tid, &fd);
     if (fd == -1) {
-        handle_close_fs(tid, fs_request_path(tid, str, consumed));
+        handle_close_fs(tid, str);
         return;
     }
     handle_close(tid, fd);

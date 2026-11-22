@@ -50,8 +50,12 @@ inline off64_t capio_mkdirat(int dirfd, const std::string_view &pathname, mode_t
         }
             },
             {
-                create_request_fs(path, tid);
-                return CAPIO_POSIX_SYSCALL_REQUEST_SKIP;
+                const auto res = capio_kernel_result(
+                    syscall_no_intercept(SYS_mkdirat, dirfd, pathname.data(), mode));
+                if (res == 0) {
+                    create_request_fs(path, tid);
+                }
+                return res;
             });
     } else {
         return CAPIO_POSIX_SYSCALL_REQUEST_SKIP;
