@@ -522,10 +522,10 @@ void MTCLBackend::recv_file(char *shm, const long int bytes_expected, const std:
  */
 void MTCLBackend::connect_to(const std::string &advertised_token) {
     // "PROTO:host:port", or "PROTO:address:port|hostname" (see make_advertisement_token)
-    const auto bar                  = advertised_token.find('|');
-    const std::string target_token  = advertised_token.substr(0, bar);
-    const auto first_colon = target_token.find(':');
-    const auto last_colon  = target_token.rfind(':');
+    const auto bar                 = advertised_token.find('|');
+    const std::string target_token = advertised_token.substr(0, bar);
+    const auto first_colon         = target_token.find(':');
+    const auto last_colon          = target_token.rfind(':');
     if (first_colon == std::string::npos || first_colon == last_colon) {
         return;
     }
