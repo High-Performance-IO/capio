@@ -34,17 +34,20 @@ TEST_F(FsStreamingTest, ClosesDoNotStallTheServer) {
 }
 
 TEST_F(FsStreamingTest, WaitingReadersDoNotStallTheServer) {
+    // A check on the request thread costs 300 ms per waiter, 6 s for 20: the bound leaves room
+    // for slow runners (aarch64, Debug with coverage)
+    constexpr int n_waiters = 20;
     std::vector<Stream> streams{{"other"}};
-    for (int i = 0; i < 12; ++i) {
+    for (int i = 0; i < n_waiters; ++i) {
         streams.push_back({"in" + std::to_string(i)});
         std::ofstream(work / ("in" + std::to_string(i))) << "partial";
     }
     startServer(streams);
-    for (int i = 0; i < 12; ++i) {
+    for (int i = 0; i < n_waiters; ++i) {
         start("cons", {"open:in" + std::to_string(i), "read"});
     }
     pause(100);
     EXPECT_OUTPUT(finish(start("prod", {"create:other", "close", "open:other", "read"}),
-                         std::chrono::milliseconds(700)),
+                         std::chrono::milliseconds(3000)),
                   "");
 }
