@@ -181,7 +181,13 @@ RuntimeConfiguration::RuntimeConfiguration(int argc, char **argv) {
         }
     }
 
-    capio_dir            = resolve_capio_dir();
+    capio_dir = resolve_capio_dir();
+    // Relative names in the configuration are inside CAPIO_DIR, unless -r says otherwise:
+    // unresolved, they would never match the absolute paths that clients use
+    if (!capio_cl_config_path.empty() && !capio_cl_dynamic_config &&
+        capio_cl_resolve_path.empty()) {
+        capio_cl_resolve_path = capio_dir;
+    }
     cache_lines          = env_number("CAPIO_CACHE_LINES", CAPIO_CACHE_LINES_DEFAULT);
     cache_line_size      = env_number("CAPIO_CACHE_LINE_SIZE", CAPIO_CACHE_LINE_SIZE_DEFAULT);
     file_initial_size    = env_number("CAPIO_FILE_INIT_SIZE", CAPIO_DEFAULT_FILE_INITIAL_SIZE);
