@@ -67,8 +67,8 @@ void FSDiscoveryInterface::start(const std::string &token, unsigned int adv_dela
     gethostname(node_name.data(), node_name.size());
     node_name.resize(strlen(node_name.data()));
 
-    token_filename      = node_name + ".capio";
-    advertisement_token = token;
+    token_filename        = node_name + ".capio";
+    advertisement_token   = token;
     // Publish the token atomically: on a shared file system the other servers may list the
     // directory between the creation of the file and the write of its content.
     const auto token_path = token_directory_path / token_filename;
