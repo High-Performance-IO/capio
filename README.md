@@ -182,7 +182,7 @@ and exits.
 |-----------------------------------|-------------------------------------------------------------------------------------|
 | `-c, --config FILE`               | CAPIO-CL configuration file                                                         |
 | `--no-config`                     | Start without a configuration file, using default settings                          |
-| `-r, --resolve-prefix PREFIX`     | Prefix used to resolve relative paths in the configuration file                     |
+| `-r, --resolve-prefix PREFIX`     | Prefix used to resolve relative paths in the configuration file (default: `CAPIO_DIR`) |
 | `--mem-only`                      | Store all files in memory, regardless of the configuration file                     |
 | `-b, --backend NAME`              | Communication backend (see below)                                                   |
 | `--backend-options OPTS`          | Backend-specific options (see below)                                                |

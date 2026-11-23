@@ -132,6 +132,30 @@ TEST_F(RuntimeConfigurationTest, CreatedEnginesCountClosesWithoutMetadata) {
     std::filesystem::remove_all(root);
 }
 
+TEST_F(RuntimeConfigurationTest, RelativeNamesAreInsideCapioDirUnlessPrefixed) {
+    char dir[] = "/tmp/capio_relative_XXXXXX";
+    ASSERT_NE(mkdtemp(dir), nullptr);
+    setenv("CAPIO_DIR", dir, 1);
+    const auto root = std::filesystem::canonical(dir);
+    std::ofstream(root / "config.json")
+        << R"({"name": "CAPIO", "IO_Graph": [)"
+        << R"({"name": "writer", "input_stream": [], "output_stream": ["out.dat"],)"
+        << R"( "streaming": [{"name": ["out.dat"], "committed": "on_close"}]},)"
+        << R"({"name": "reader", "input_stream": ["out.dat"], "output_stream": []}]})";
+    const auto config_path = (root / "config.json").string();
+
+    const std::unique_ptr<capiocl::engine::Engine> in_capio_dir(
+        parse({"capio_server", "-c", config_path}).createCapioClEngine());
+    EXPECT_EQ(in_capio_dir->getCommitRule(root / "out.dat"), capiocl::commitRules::ON_CLOSE);
+    EXPECT_TRUE(in_capio_dir->isConsumer(root / "out.dat", "reader"));
+
+    const std::unique_ptr<capiocl::engine::Engine> prefixed(
+        parse({"capio_server", "-c", config_path, "-r", "/elsewhere"}).createCapioClEngine());
+    EXPECT_EQ(prefixed->getCommitRule("/elsewhere/out.dat"), capiocl::commitRules::ON_CLOSE);
+    EXPECT_FALSE(prefixed->isConsumer(root / "out.dat", "reader"));
+    std::filesystem::remove_all(root);
+}
+
 TEST_F(RuntimeConfigurationTest, RejectsInvalidConfigurations) {
     EXPECT_THROW(parse({"capio_server"}), std::runtime_error);
     EXPECT_THROW(parse({"capio_server", "--no-config", "--unknown"}), std::runtime_error);

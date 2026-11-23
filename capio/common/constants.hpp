@@ -136,7 +136,8 @@ constexpr char CAPIO_SERVER_ARG_PARSER_CONFIG_NCONTINUE_ON_ERROR_HELP[] =
     "specified,  and a fatal termination point is reached, the behaviour of capio is undefined and "
     "should not  be taken as valid";
 constexpr char CAPIO_SERVER_ARG_PARSER_RESOLVE_PREFIX_OPT_HELP[] =
-    "Prefix to resolve CAPIO-CL configuration file paths when found to be relative";
+    "Prefix to resolve CAPIO-CL configuration file paths when found to be relative (default: "
+    "CAPIO_DIR)";
 
 constexpr char CAPIO_SERVER_ARG_PARSER_STORE_ALL_IN_MEMORY_OPT_HELP[] =
     "Flag to set CAPIO and CAPIO-CL to store all files in memory, independently of the "
