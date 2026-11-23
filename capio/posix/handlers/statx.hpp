@@ -88,6 +88,10 @@ inline int capio_statx(int dirfd, const std::string_view &pathname, int flags, i
         }
     }
 
+#if !CAPIO_MEM_STREAM
+    consent_request_cache->consent_request(path, tid, __FUNCTION__);
+    return CAPIO_POSIX_SYSCALL_REQUEST_SKIP;
+#endif
     write_cache->flush();
     auto [file_size, is_dir] = stat_request(path, tid);
     if (file_size == -1) {

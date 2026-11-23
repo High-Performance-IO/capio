@@ -34,6 +34,17 @@ inline off64_t capio_mkdirat(int dirfd, const std::string_view &pathname, mode_t
     }
 
     if (is_capio_path(path)) {
+#if !CAPIO_MEM_STREAM
+        {
+            // Announced once it worked: a failed mkdir must not make a producer
+            const auto res = capio_kernel_result(
+                syscall_no_intercept(SYS_mkdirat, dirfd, pathname.data(), mode));
+            if (res == 0) {
+                create_request_fs(path, tid);
+            }
+            return res;
+        }
+#endif
         if (exists_capio_path(path)) {
             errno = EEXIST;
             return CAPIO_POSIX_SYSCALL_ERRNO;

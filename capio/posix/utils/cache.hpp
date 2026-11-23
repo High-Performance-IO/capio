@@ -6,6 +6,9 @@
 
 #include "requests.hpp"
 
+#include <fcntl.h>
+#include <sys/stat.h>
+
 class ReadCache {
   private:
     char *_cache;
@@ -189,7 +192,73 @@ class WriteCache {
     }
 };
 
+class ConsentRequestCache {
+    std::unordered_map<std::string, off64_t> received_consents;
+
+  public:
+    void consent_request(const std::filesystem::path &path, const long tid,
+                         const std::string &source_func) {
+        START_LOG(capio_syscall(SYS_gettid), "call(path=%s, tid=%ld, source=%s)", path.c_str(), tid,
+                  source_func.c_str());
+
+        if (path.empty()) {
+            return; // a descriptor that another thread has closed
+        }
+        const auto resolved_path = resolve_possible_symlink(path);
+
+        if (!is_capio_path(resolved_path)) {
+            LOG("PATH is forbidden. Skipping request!");
+            return;
+        }
+
+        /**
+         * If entry is not present in cache, then proceed to perform request. othrewise if present,
+         * there is no need to perform request to server and can proceed
+         */
+        if (received_consents.find(resolved_path) == received_consents.end()) {
+            LOG("File not present in cache. performing request");
+            auto res = consent_to_proceed_request(resolved_path, tid, source_func);
+#ifdef SYS_statx
+            if (res != 0) {
+                // NFS may still have the size from before the wait cached
+                struct statx fresh{};
+                capio_syscall(SYS_statx, AT_FDCWD, resolved_path.c_str(), AT_STATX_FORCE_SYNC,
+                              STATX_SIZE, &fresh);
+            }
+#endif
+            // 0 holds only now: the path may be created or committed later
+            if (res != 0) {
+                LOG("Registering new file for consent to proceed");
+                received_consents.emplace(resolved_path, res);
+            }
+        }
+        LOG("Unlocking thread");
+    }
+};
+
+class ReadCacheFS {
+    // path -> bytes known to be readable, -1 for all of them: committed, or nothing to wait for
+    std::unordered_map<std::string, off64_t> available_read_cache;
+
+  public:
+    /// @brief Whether the first @p end_of_read bytes of @p path are known to be readable
+    [[nodiscard]] bool covers(const std::string &path, const off64_t end_of_read) const {
+        const auto known = available_read_cache.find(path);
+        return known != available_read_cache.end() &&
+               (known->second == -1 || end_of_read <= known->second);
+    }
+
+    void read_request(const std::string &path, const off64_t end_of_read, const long tid,
+                      const int fd) {
+        START_LOG(capio_syscall(SYS_gettid), "[cache] call(path=%s, end_of_read=%ld, tid=%ld)",
+                  path.c_str(), end_of_read, tid);
+        available_read_cache[path] = read_request_fs(path, end_of_read, tid, fd);
+    }
+};
+
 inline thread_local WriteCache *write_cache;
 inline thread_local ReadCache *read_cache;
+inline thread_local ConsentRequestCache *consent_request_cache;
+inline thread_local ReadCacheFS *read_request_cache;
 
 #endif // CAPIO_SERVER_UTILS_CACHE

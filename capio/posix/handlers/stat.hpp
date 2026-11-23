@@ -45,6 +45,10 @@ inline int capio_fstat(int fd, struct stat *statbuf, long tid) {
     START_LOG(tid, "call(fd=%d, statbuf=0x%08x)", fd, statbuf);
 
     if (exists_capio_fd(fd)) {
+#if !CAPIO_MEM_STREAM
+        consent_request_cache->consent_request(get_capio_fd_path(fd), tid, __FUNCTION__);
+        return CAPIO_POSIX_SYSCALL_REQUEST_SKIP;
+#endif
         write_cache->flush();
         auto [file_size, is_dir] = fstat_request(fd, tid);
         if (file_size == -1) {
@@ -68,6 +72,10 @@ inline int capio_lstat(const std::string_view &pathname, struct stat *statbuf, l
 
     const std::filesystem::path absolute_path(pathname);
     if (is_capio_path(absolute_path)) {
+#if !CAPIO_MEM_STREAM
+        consent_request_cache->consent_request(absolute_path, tid, __FUNCTION__);
+        return CAPIO_POSIX_SYSCALL_REQUEST_SKIP;
+#endif
         write_cache->flush();
         auto [file_size, is_dir] = stat_request(absolute_path, tid);
         if (file_size == -1) {

@@ -147,6 +147,35 @@ LD_PRELOAD=libcapio_posix.so \
 > the file's producer (the file is in its `output_stream`), the open fails with `ENOENT` instead, since no other step
 > would create the file.
 
+#### Streaming through the file system
+
+`libcapio_posix.so` keeps the files of `CAPIO_DIR` in memory. `libcapio_posix_fs.so` leaves them on the file system and
+only coordinates who waits for what. Preload one or the other for the whole workflow: they cannot be mixed.
+
+`CAPIO_DIR` is a working directory: keep the inputs of the workflow outside it.
+
+In the file system variant:
+
+- **Commits** travel between servers by multicast, and are kept as a token next to each file (`.<name>.commit`), so
+  a server that starts later still finds them. Tokens are not removed: clear them before running a workflow again in
+  the same directory. `on_close:N` keeps its counters in `CAPIO_METADATA_DIR`.
+- **`on_close`** counts every successful `close()` by a producer, also of an inherited descriptor, and its exit.
+  `cmd > file` is committed when the shell closes its copy: use `on_close:N` or `on_termination` for such
+  producers. A close that fails does not count.
+- **`on_termination`** commits what a thread or process writes when that thread or process ends, even if another one
+  still writes to it. It writes what it creates or opens for writing, and what it gets open for writing when it starts
+  (from `posix_spawn` file actions, or a shell outside CAPIO) if no other process writes it. A process killed by a
+  signal commits nothing.
+- **Missing paths** make `open`, `stat` and `access` wait only in the declared consumers of the path, and fail with
+  `ENOENT` otherwise. With `--no-config`, meant for simple tests, every process but the producer waits, and `stat` and
+  `access` wait for the commit too: a tool that probes a name it is about to create, as `cp src new` does, waits
+  forever. The children of a directory are declared with a glob, as `dir/*`.
+- **Directories** never make anyone wait: listings come from the kernel.
+- **`no_update`** streams to `read` and `readv`; other calls (`pread`, copies, `mmap`) do not wait. `stat` returns
+  the current size, so tools that trust it, as `wc -c` does, see a partial size. Between NFS nodes data only appears
+  when the writer flushes.
+- **`io_uring`** and programs that make system calls without glibc, as Go does, are not intercepted.
+
 To shut down a server, send it `SIGTERM` or `SIGINT` (e.g. `killall capio_server`). The server releases its resources
 and exits.
 

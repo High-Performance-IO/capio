@@ -23,6 +23,23 @@ inline void init_client(const long tid) {
                                             CAPIO_REQ_MAX_SIZE, get_capio_workflow_name());
 }
 
+/**
+ * Send a request of the FS variant: "<code> <tid> <arguments><path>". The path is last, so it may
+ * contain spaces.
+ *
+ * @param code
+ * @param tid
+ * @param arguments the arguments before the path, ending with a space
+ * @param path
+ */
+inline void fs_request(const int code, const long tid, const std::string &arguments,
+                       const std::string_view path) {
+    char req[CAPIO_REQ_MAX_SIZE];
+    snprintf(req, sizeof(req), "%04d %ld %s%.*s", code, tid, arguments.c_str(),
+             static_cast<int>(path.size()), path.data());
+    buf_requests->write(req, CAPIO_REQ_MAX_SIZE);
+}
+
 inline off64_t access_request(const std::filesystem::path &path, const long tid) {
     START_LOG(capio_syscall(SYS_gettid), "call(path=%s, tid=%ld)", path.c_str(), tid);
     char req[CAPIO_REQ_MAX_SIZE];
@@ -51,6 +68,13 @@ inline void close_request(const int fd, const long tid) {
     buf_requests->write(req, CAPIO_REQ_MAX_SIZE);
 }
 
+/// @brief Tell the server that @p tid closed @p path: @p error is what the close failed with, or 0
+inline void close_request_fs(const std::filesystem::path &path, const long error, const long tid) {
+    START_LOG(capio_syscall(SYS_gettid), "call(path=%s, error=%ld, tid=%ld)", path.c_str(), error,
+              tid);
+    fs_request(CAPIO_REQUEST_CLOSE_FS, tid, std::to_string(error) + " ", path.native());
+}
+
 inline off64_t rename_request(const long tid, const std::filesystem::path &old_path,
                               const std::filesystem::path &newpath) {
     START_LOG(capio_syscall(SYS_gettid), "call(tid=%ld, old_path=%s, new_path=%s)", tid,
@@ -73,6 +97,19 @@ inline off64_t create_request(const int fd, const std::filesystem::path &path, c
     off64_t res;
     buff_response->read(&res);
     return res;
+}
+
+/// @brief Tell the server that @p tid writes @p path: it created it, or opened it for writing
+inline void create_request_fs(const std::filesystem::path &path, const long tid) {
+    START_LOG(capio_syscall(SYS_gettid), "call(path=%s, tid=%ld)", path.c_str(), tid);
+    fs_request(CAPIO_REQUEST_CREATE_FS, tid, "", path.native());
+}
+
+/// @brief Tell the server that @p tid got a writable descriptor of @p path at exec
+inline void inherit_request_fs(const std::filesystem::path &path, const long tid) {
+    START_LOG(capio_syscall(SYS_gettid), "call(path=%s, tid=%ld)", path.c_str(), tid);
+    // sent while the program starts, maybe before its server does: no reply
+    fs_request(CAPIO_REQUEST_INHERIT_FS, tid, "", path.native());
 }
 
 inline off64_t create_exclusive_request(const int fd, const std::filesystem::path &path,
@@ -207,6 +244,14 @@ inline off64_t copy_file_range_request(const int fd_in, const int fd_out, const 
     return res;
 }
 
+inline bool open_request_fs(const std::filesystem::path &path, const long tid) {
+    START_LOG(capio_syscall(SYS_gettid), "call(path=%s, tid=%ld)", path.c_str(), tid);
+    fs_request(CAPIO_REQUEST_OPEN_FS, tid, "", path.native());
+    off64_t res;
+    buff_response->read(&res);
+    return res != 0;
+}
+
 inline off64_t read_request(const int fd, const off64_t count, const long tid) {
     START_LOG(capio_syscall(SYS_gettid), "call(fd=%ld, count=%ld, tid=%ld)", fd, count, tid);
     char req[CAPIO_REQ_MAX_SIZE];
@@ -310,6 +355,30 @@ inline void write_request(const int fd, const off64_t count, const long tid) {
     sprintf(req, "%04d %ld %d %ld", CAPIO_REQUEST_WRITE, tid, fd, count);
     LOG("req=%s", req);
     buf_requests->write(req, CAPIO_REQ_MAX_SIZE);
+}
+
+inline off64_t consent_to_proceed_request(const std::filesystem::path &path, const long tid,
+                                          const std::string &source_func) {
+    START_LOG(capio_syscall(SYS_gettid), "call(path=%s, tid=%ld, source_func=%s)", path.c_str(),
+              tid, source_func.c_str());
+    fs_request(CAPIO_REQUEST_CONSENT, tid, "", path.native());
+    off64_t res;
+    buff_response->read(&res);
+    LOG("Obtained from server %ld", res);
+    return res;
+}
+
+// return amount of readable bytes
+inline off64_t read_request_fs(const std::filesystem::path &path, const off64_t end_of_read,
+                               const long tid, const long fd) {
+    START_LOG(capio_syscall(SYS_gettid), "call(path=%s, end_of_Read=%ld, tid=%ld, fd=%ld)",
+              path.c_str(), end_of_read, tid, fd);
+    fs_request(CAPIO_REQUEST_READ_FS, tid,
+               std::to_string(fd) + " " + std::to_string(end_of_read) + " ", path.native());
+    off64_t res;
+    buff_response->read(&res);
+    LOG("Response to request is %ld", res);
+    return res;
 }
 
 #endif // CAPIO_POSIX_UTILS_REQUESTS_HPP

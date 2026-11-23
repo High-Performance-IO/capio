@@ -5,8 +5,10 @@
 
 #include "utils/common.hpp"
 #include "utils/filesystem.hpp"
+#include "utils/fs_descriptors.hpp"
 
-inline int capio_openat(int dirfd, const std::string_view &pathname, int flags, long tid) {
+inline int capio_openat(int dirfd, const std::string_view &pathname, int flags, mode_t mode,
+                        long tid) {
     START_LOG(tid, "call(dirfd=%d, pathname=%s, flags=%X)", dirfd, pathname.data(), flags);
 
     if (is_forbidden_path(pathname)) {
@@ -37,6 +39,26 @@ inline int capio_openat(int dirfd, const std::string_view &pathname, int flags, 
     path = capio_normal_path(path);
 
     if (is_capio_path(path)) {
+#if !CAPIO_MEM_STREAM
+        {
+            const bool create = (flags & O_CREAT) == O_CREAT;
+            if (!create && !open_request_fs(path, tid)) {
+                return CAPIO_POSIX_SYSCALL_REQUEST_SKIP;
+            }
+            const int new_fd = static_cast<int>(capio_kernel_result(
+                syscall_no_intercept(SYS_openat, dirfd, pathname.data(), flags, mode)));
+            if (new_fd < 0) {
+                return CAPIO_POSIX_SYSCALL_ERRNO;
+            }
+            // Who writes it produces it, also without O_CREAT. Announced once it worked: a failed
+            // O_EXCL must not make a producer.
+            if (create || (flags & O_ACCMODE) != O_RDONLY) {
+                create_request_fs(path, tid);
+            }
+            fs_track(tid, path.native(), new_fd, flags, (flags & O_CLOEXEC) == O_CLOEXEC);
+            return new_fd;
+        }
+#endif
         int fd =
             static_cast<int>(syscall_no_intercept(SYS_openat, AT_FDCWD, "/dev/null", O_RDONLY));
         if (fd == -1) {
@@ -101,25 +123,28 @@ int creat_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long ar
     const std::string_view pathname(reinterpret_cast<const char *>(arg0));
     long tid = syscall_no_intercept(SYS_gettid);
 
-    return posix_return_value(capio_openat(AT_FDCWD, pathname, O_CREAT | O_WRONLY | O_TRUNC, tid),
+    return posix_return_value(capio_openat(AT_FDCWD, pathname, O_CREAT | O_WRONLY | O_TRUNC,
+                                           static_cast<mode_t>(arg1), tid),
                               result);
 }
 
 int open_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg5, long *result) {
     const std::string_view pathname(reinterpret_cast<const char *>(arg0));
     int flags = static_cast<int>(arg1);
+    auto mode = static_cast<mode_t>(arg2);
     long tid  = syscall_no_intercept(SYS_gettid);
 
-    return posix_return_value(capio_openat(AT_FDCWD, pathname, flags, tid), result);
+    return posix_return_value(capio_openat(AT_FDCWD, pathname, flags, mode, tid), result);
 }
 
 int openat_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg5, long *result) {
     int dirfd = static_cast<int>(arg0);
     const std::string_view pathname(reinterpret_cast<const char *>(arg1));
     int flags = static_cast<int>(arg2);
+    auto mode = static_cast<mode_t>(arg3);
     long tid  = syscall_no_intercept(SYS_gettid);
 
-    return posix_return_value(capio_openat(dirfd, pathname, flags, tid), result);
+    return posix_return_value(capio_openat(dirfd, pathname, flags, mode, tid), result);
 }
 
 #endif // SYS_creat || SYS_open || SYS_openat
