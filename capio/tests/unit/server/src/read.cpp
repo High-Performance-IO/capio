@@ -21,6 +21,7 @@
 
 #include "handlers/read.hpp"
 #include "handlers/write.hpp"
+#include "remote/handlers/read.hpp"
 
 extern StorageManager *storage_manager;
 extern ClientManager *client_manager;
@@ -200,6 +201,57 @@ TEST_F(StreamingReadTest, readOfFileCommittedWithoutDataReturnsEndOfFile) {
     // The producer closed the file without writing: the read ends at offset 0 (end of file).
     EXPECT_EQ(next_response(std::chrono::seconds(2)), 0);
     EXPECT_EQ(storage_manager->getFileOffset(CONSUMER_TID, FD), 0);
+}
+
+/*
+ * The reply to a remote read is handled on the remote listener thread, not on the one that serves
+ * the client requests. Once the client has its answer it may close the file descriptor, so the
+ * new offset must be stored before the answer is sent: stored after it, it can find no descriptor
+ * and the server crashes.
+ */
+TEST(RemoteReadReplyTest, offsetIsStoredBeforeTheClientIsAnswered) {
+    constexpr pid_t CONSUMER_TID = 4545;
+    constexpr int FD             = 3;
+
+    NoneBackend test_backend{0, nullptr};
+    ASSERT_EQ(backend, nullptr);
+    backend = &test_backend;
+
+    // More data than the queue to the client holds: the reply cannot finish before the client
+    // reads the data, so the client looks at the offset while the server is still replying.
+    const auto &config     = RuntimeConfiguration::get();
+    const off64_t size     = (config.getCacheLines() + 1) * config.getCacheLineSize();
+    const std::string path = "remote_read_reply.dat";
+
+    client_manager->registerClient(CONSUMER_TID, "consumer");
+    storage_manager->add(path, false, size);
+    storage_manager->addFileToTid(CONSUMER_TID, FD, path, 0);
+
+    // Attach to the consumer's channels, as the POSIX client does. Not deleted: the destructors
+    // would unlink the shared memory still owned by client_manager.
+    const auto &workflow_name = CapioCLEngine::get().getWorkflowName();
+    const std::string channel = SHM_COMM_CHAN_NAME_RESP + std::to_string(CONSUMER_TID);
+    auto *responses =
+        new CircularBuffer<off_t>(channel, CAPIO_REQ_BUFF_CNT, sizeof(off_t), workflow_name);
+    auto *data = new SPSCQueue(SHM_SPSC_PREFIX_READ + std::to_string(CONSUMER_TID),
+                               config.getCacheLines(), config.getCacheLineSize(), workflow_name);
+
+    std::thread listener(
+        [&] { handle_read_reply(CONSUMER_TID, FD, size, size, size, true, false); });
+
+    off_t reply;
+    responses->read(&reply);
+    EXPECT_EQ(reply, size);
+    EXPECT_EQ(storage_manager->getFileOffset(CONSUMER_TID, FD), size)
+        << "the client was answered before the offset of its file descriptor was stored";
+
+    std::vector<char> received(size);
+    data->read(received.data(), size);
+    listener.join();
+
+    storage_manager->remove(path);
+    client_manager->removeClient(CONSUMER_TID);
+    backend = nullptr;
 }
 
 #endif // CAPIO_SERVER_READ_TEST_HPP

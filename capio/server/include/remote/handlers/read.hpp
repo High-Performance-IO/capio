@@ -56,8 +56,10 @@ inline void handle_read_reply(int tid, int fd, long count, off64_t file_size, of
     if (is_getdents) {
         send_dirent_to_client(tid, fd, c_file, offset, bytes_read);
     } else {
-        client_manager->replyToClient(tid, offset, c_file.getBuffer(), bytes_read);
+        // The offset is set before the reply: this runs on the remote listener thread, so once
+        // the client has its answer it may close fd before the offset is stored.
         storage_manager->setFileOffset(tid, fd, offset + bytes_read);
+        client_manager->replyToClient(tid, offset, c_file.getBuffer(), bytes_read);
     }
 }
 
