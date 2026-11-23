@@ -181,11 +181,13 @@ RuntimeConfiguration::RuntimeConfiguration(int argc, char **argv) {
         }
     }
 
-    capio_dir          = resolve_capio_dir();
-    cache_lines        = env_number("CAPIO_CACHE_LINES", CAPIO_CACHE_LINES_DEFAULT);
-    cache_line_size    = env_number("CAPIO_CACHE_LINE_SIZE", CAPIO_CACHE_LINE_SIZE_DEFAULT);
-    file_initial_size  = env_number("CAPIO_FILE_INIT_SIZE", CAPIO_DEFAULT_FILE_INITIAL_SIZE);
-    prefetch_data_size = env_number("CAPIO_PREFETCH_DATA_SIZE", 0);
+    capio_dir            = resolve_capio_dir();
+    cache_lines          = env_number("CAPIO_CACHE_LINES", CAPIO_CACHE_LINES_DEFAULT);
+    cache_line_size      = env_number("CAPIO_CACHE_LINE_SIZE", CAPIO_CACHE_LINE_SIZE_DEFAULT);
+    file_initial_size    = env_number("CAPIO_FILE_INIT_SIZE", CAPIO_DEFAULT_FILE_INITIAL_SIZE);
+    prefetch_data_size   = env_number("CAPIO_PREFETCH_DATA_SIZE", 0);
+    const char *metadata = std::getenv("CAPIO_METADATA_DIR");
+    metadata_dir         = metadata != nullptr ? std::filesystem::path(metadata) : capio_dir;
 }
 
 const std::filesystem::path &RuntimeConfiguration::getCapioDir() const { return capio_dir; }
@@ -229,22 +231,31 @@ std::chrono::milliseconds RuntimeConfiguration::getLocationRequeryInterval() con
 }
 
 capiocl::engine::Engine *RuntimeConfiguration::createCapioClEngine() const {
+    // Commits travel by multicast, and as tokens next to the files (the file system monitor), which
+    // a server that starts later still finds. Counted on_close keeps its counters in the metadata
+    // directory, which the servers of a workflow share as they share CAPIO_DIR.
+    // Not loadDefaults(): it would reset the metadata directory to none. Options that are not in
+    // the map take their default where they are read.
+    std::unordered_map<std::string, std::string> options{
+        {"capiocl.monitor.mcast.enabled", "true"},
+        {"capiocl.monitor.filesystem.enabled", "true"},
+        {"capiocl.monitor.filesystem.metadata_dir", metadata_dir.string()}};
+
     capiocl::engine::Engine *engine;
     if (capio_cl_dynamic_config) {
-        engine = new capiocl::engine::Engine();
+        engine = new capiocl::engine::Engine(
+            capiocl::configuration::CapioClConfiguration(std::move(options)));
         engine->startApiServer();
     } else if (!capio_cl_config_path.empty()) {
-        // The defaults enable the multicast and file system monitors, as Parser::parse did
-        // before CAPIO-CL 2.0. They don't touch the three options set here.
-        capiocl::configuration::CapioClConfiguration capio_cl_config(
-            {{"capiocl.config_path", capio_cl_config_path},
-             {"capiocl.resolve_path", capio_cl_resolve_path},
-             {"capiocl.store_all_in_memory", store_all_in_memory ? "true" : "false"}});
-        capio_cl_config.loadDefaults();
-        engine = capiocl::parser::Parser::parse(capio_cl_config);
+        options["capiocl.config_path"]         = capio_cl_config_path;
+        options["capiocl.resolve_path"]        = capio_cl_resolve_path;
+        options["capiocl.store_all_in_memory"] = store_all_in_memory ? "true" : "false";
+        engine                                 = capiocl::parser::Parser::parse(
+            capiocl::configuration::CapioClConfiguration(std::move(options)));
     } else {
         const char *workflow_name = std::getenv("CAPIO_WORKFLOW_NAME");
-        engine                    = new capiocl::engine::Engine();
+        engine                    = new capiocl::engine::Engine(
+            capiocl::configuration::CapioClConfiguration(std::move(options)));
         engine->setWorkflowName(workflow_name != nullptr ? workflow_name
                                                          : CAPIO_DEFAULT_WORKFLOW_NAME);
     }

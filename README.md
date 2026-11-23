@@ -188,6 +188,7 @@ supported protocols and their requirements.
 | Variable                | Description                                                                |
 |-------------------------|----------------------------------------------------------------------------|
 | `CAPIO_DIR`             | CAPIO mount point, shared by servers and applications                      |
+| `CAPIO_METADATA_DIR`    | Counters of `on_close:N`, shared by the servers (default: `CAPIO_DIR`)       |
 | `CAPIO_CACHE_LINES`     | Number of cache lines between application and server (default: 10)         |
 | `CAPIO_CACHE_LINE_SIZE` | Size of a cache line, in bytes (default: 256KB)                            |
 | `CALF_LOG_DIR`          | Directory for log files (default: `./capio_logs`). Needs `CAPIO_LOG`        |
