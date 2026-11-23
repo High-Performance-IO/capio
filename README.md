@@ -142,6 +142,11 @@ LD_PRELOAD=libcapio_posix.so \
 > `CAPIO_WORKFLOW_NAME` and `CAPIO_APP_NAME` are not set, they default to `CAPIO` and `default_app`, which will not
 > match the steps described in your CAPIO-CL configuration file.
 
+> [!NOTE]
+> Opening a file that does not exist yet without `O_CREAT` blocks until another step creates it. If the opening step is
+> the file's producer (the file is in its `output_stream`), the open fails with `ENOENT` instead, since no other step
+> would create the file.
+
 To shut down a server, send it `SIGTERM` or `SIGINT` (e.g. `killall capio_server`). The server releases its resources
 and exits.
 
@@ -181,6 +186,25 @@ capio_server --no-config --backend mtcl --backend-options TCP:7600@1000000
 If omitted, MTCL defaults to `TCP:7600@1000000`. See the [MTCL repository](https://github.com/ParaGroup/MTCL) for
 supported protocols and their requirements.
 
+If the server cannot listen on the MTCL port (for example because another process already uses it), it prints an error
+and exits instead of starting.
+
+By default, each server advertises its hostname, and the other servers connect to it through that name. On clusters
+where the hostname resolves to a slow interface (e.g. a management Ethernet network), set `CAPIO_MTCL_ADVERTISE_HOST`
+on each server to the address of the interface to use on that node (e.g. its InfiniBand IP):
+
+```bash
+CAPIO_DIR=your_capiodir CAPIO_MTCL_ADVERTISE_HOST=10.10.0.12 \
+  capio_server -c conf.json --backend mtcl
+```
+
+The value is specific to each node, so it has to be set separately for every server. Nodes are still identified by
+their hostname. All servers must run a CAPIO version that supports this variable, because it changes the format of the
+advertised token.
+
+With `--discovery fs`, the token directory must be on a file system shared by all nodes. Each server publishes its
+token as `<hostname>.capio`; hidden files in the directory are tokens still being written and are ignored.
+
 ## Environment variables
 
 ### Server and application
@@ -195,11 +219,11 @@ supported protocols and their requirements.
 
 ### Server only
 
-| Variable                   | Description                                                              |
-|----------------------------|--------------------------------------------------------------------------|
-| `CAPIO_FILE_INIT_SIZE`     | Bytes preallocated for each new file (default: 4GB)                      |
-| `CAPIO_PREFETCH_DATA_SIZE` | If set, data transfers between servers are at least this many bytes      |
-| `CAPIO_MTCL_ADVERTISE_HOST`| If set, allows the MTCL backend to advertise a different IP address than the hostname resolved one (useful when hostname resolves to slow network interfaces). Each server must have it set to the local node interface address. |
+| Variable                    | Description                                                                         |
+|-----------------------------|-------------------------------------------------------------------------------------|
+| `CAPIO_FILE_INIT_SIZE`      | Bytes preallocated for each new file (default: 4GB)                                 |
+| `CAPIO_PREFETCH_DATA_SIZE`  | If set, data transfers between servers are at least this many bytes                 |
+| `CAPIO_MTCL_ADVERTISE_HOST` | Address the other servers use to reach this one with the `mtcl` backend (default: the hostname). See [Backends](#backends) |
 
 ### Application only
 
