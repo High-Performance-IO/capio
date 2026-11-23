@@ -303,7 +303,10 @@ bool FsStreaming::waitsForCreation(const pid_t tid, const std::filesystem::path 
 }
 
 bool FsStreaming::isDeclared(const std::filesystem::path &path) {
-    return !CapioCLEngine::get().getConsumers(path).empty() ||
+    // Without a config every file follows the default rule: it is committed when its producer
+    // ends, whoever that is
+    return RuntimeConfiguration::get().hasNoConfig() ||
+           !CapioCLEngine::get().getConsumers(path).empty() ||
            !CapioCLEngine::get().getProducers(path).empty();
 }
 

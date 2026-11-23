@@ -164,8 +164,9 @@ In the file system variant:
   signal commits nothing.
 - **Renames** carry the closes and producers of the file to its new name. Closes are those seen by the local server.
 - **Missing paths** make `open`, `stat` and `access` wait only in the declared consumers of the path, and fail with
-  `ENOENT` otherwise. With `--no-config` every process but the producer waits. The children of a directory are
-  declared with a glob, as `dir/*`.
+  `ENOENT` otherwise. With `--no-config`, meant for simple tests, every process but the producer waits, and `stat` and
+  `access` wait for the commit too: a tool that probes a name it is about to create, as `cp src new` does, waits
+  forever. The children of a directory are declared with a glob, as `dir/*`.
 - **`on_n_files`** directories are the only ones whose listing waits.
 - **`no_update`** streams to `read`, `pread` and copies. `mmap`, `SEEK_END` and reflinks wait for the commit. `stat`
   returns the current size, so tools that trust it, as `wc -c` does, see a partial size. Between NFS nodes data only

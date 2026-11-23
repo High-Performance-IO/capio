@@ -57,6 +57,17 @@ TEST_F(FsStreamingTest, WithoutAConfigEveryMissingPathWaits) {
     EXPECT_OUTPUT(finish(reader), "AAAA");
 }
 
+TEST_F(FsStreamingTest, WithoutAConfigStatWaitsForTheCommit) {
+    // Committed when the undeclared producer ends, not when it creates the file
+    startServer({});
+    const auto stat   = start("reader", {"stat:f"});
+    const auto access = start("prober", {"access:f", "stat:f"});
+    pause(400);
+    EXPECT_OUTPUT(run("writer", {"create:f", "sleep:600", "write:AAAA"}), "");
+    EXPECT_OUTPUT(finish(stat), "4");
+    EXPECT_OUTPUT(finish(access), "4");
+}
+
 TEST_F(FsStreamingTest, PathsAreNormalized) {
     startServer({{"f"}});
     EXPECT_OUTPUT(run("prod", {"create:f", "write:A", "close"}), "");

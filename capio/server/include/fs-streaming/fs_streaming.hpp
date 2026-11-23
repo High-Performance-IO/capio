@@ -125,7 +125,8 @@ class FsStreaming final {
     [[nodiscard]] bool waitsForCreation(pid_t tid, const std::filesystem::path &path) const;
 
     /**
-     * @brief Whether the config mentions @p path, itself or through a glob.
+     * @brief Whether the config mentions @p path, itself or through a glob. Without a config,
+     * every path is.
      *
      * Not Engine::contains(): CAPIO-CL makes an entry for every path it is asked about, so that
      * turns true after any lookup. Such entries have no apps unless they match a glob.
