@@ -199,6 +199,7 @@ supported protocols and their requirements.
 |----------------------------|--------------------------------------------------------------------------|
 | `CAPIO_FILE_INIT_SIZE`     | Bytes preallocated for each new file (default: 4GB)                      |
 | `CAPIO_PREFETCH_DATA_SIZE` | If set, data transfers between servers are at least this many bytes      |
+| `CAPIO_MTCL_ADVERTISE_HOST`| If set, allows the MTCL backend to advertise a different IP address than the hostname resolved one (useful when hostname resolves to slow network interfaces). Each server must have it set to the local node interface address. |
 
 ### Application only
 
