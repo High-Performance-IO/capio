@@ -1,7 +1,10 @@
 #ifndef CAPIO_SERVER_HANDLERS_STAT_HPP
 #define CAPIO_SERVER_HANDLERS_STAT_HPP
 
+#include <chrono>
+#include <csignal>
 #include <mutex>
+#include <pthread.h>
 #include <thread>
 
 #include "remote/backend.hpp"
@@ -14,6 +17,7 @@
 
 #include "client-manager/client_manager.hpp"
 #include "storage/manager.hpp"
+#include "utils/common.hpp"
 
 extern StorageManager *storage_manager;
 extern ClientManager *client_manager;
@@ -102,6 +106,55 @@ void stat_handler(const char *const str) {
         return;
     }
     reply_stat(tid, path);
+}
+
+/*
+ * stat, access, chdir: wait for the path to exist, as open does, and then, for a declared path in
+ * update mode, for its commit. The reply is 1 if it holds from now on, so that the client can cache
+ * it, and 0 if it only holds now (the path is missing, or is not declared).
+ */
+void consent_handler(const char *const str) {
+    int tid, consumed = 0;
+    if (sscanf(str, "%d%n", &tid, &consumed) != 1) {
+        return;
+    }
+    const std::filesystem::path path = fs_request_path(tid, str, consumed);
+
+    std::error_code error;
+    const bool exists = std::filesystem::exists(path, error);
+    if (!exists && !FsStorageManager::waitsForCreation(tid, path)) {
+        client_manager->replyToClient(tid, 0);
+        return;
+    }
+    if (exists) {
+        if (CapioCLEngine::get().isExcluded(path) || FsStorageManager::isProducer(tid, path)) {
+            client_manager->replyToClient(tid, 1);
+            return;
+        }
+        // Directories are never committed
+        if (std::filesystem::is_directory(path, error) || !FsStorageManager::isDeclared(path)) {
+            client_manager->replyToClient(tid, 0);
+            return;
+        }
+        if (CapioCLEngine::get().isFirable(path)) {
+            client_manager->replyToClient(tid, 1);
+            return;
+        }
+    }
+    // The waiter does not get the termination signals: their handler frees memory and exits, and
+    // run on a thread that holds a lock (malloc's, CAPIO-CL's) it would wait for it forever.
+    // TODO: a thread manager for the threads of the server
+    sigset_t signals, previous;
+    sigemptyset(&signals);
+    for (const int signal : {SIGTERM, SIGINT, SIGQUIT, SIGPIPE}) {
+        sigaddset(&signals, signal);
+    }
+    pthread_sigmask(SIG_BLOCK, &signals, &previous);
+    std::thread t([path, tid] {
+        client_manager->replyToClient(tid, fs_storage_manager->waitForConsent(path));
+    });
+    t.detach();
+    pthread_sigmask(SIG_SETMASK, &previous, nullptr);
 }
 
 #endif // CAPIO_SERVER_HANDLERS_STAT_HPP

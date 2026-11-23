@@ -12,6 +12,7 @@
 
 #include "remote/backend.hpp"
 #include "remote/discovery.hpp"
+#include "utils/common.hpp"
 
 #ifdef CAPIO_COVERAGE
 extern "C" void __gcov_dump(void);
@@ -45,6 +46,10 @@ void sig_term_handler(int signum, siginfo_t *info, void *ptr) {
 
     if (signum == SIGSEGV) {
         CALF_PRINT_COLOR(CALF_CLI_LEVEL_ERROR, "Segfault detected!");
+    }
+
+    if (fs_storage_manager != nullptr) {
+        fs_storage_manager->waitForPendingCounts(std::chrono::seconds(10));
     }
 
 #ifdef CAPIO_COVERAGE

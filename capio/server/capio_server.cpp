@@ -33,6 +33,7 @@
 
 ClientManager *client_manager;
 StorageManager *storage_manager;
+FsStorageManager *fs_storage_manager;
 Backend *backend;
 DiscoveryService *discovery_service;
 HomeNodeService *home_node_service;
@@ -83,6 +84,12 @@ static constexpr std::array<CSHandler_t, CAPIO_NR_REQUESTS> build_request_handle
     _request_handlers[CAPIO_REQUEST_STAT]                = stat_handler;
     _request_handlers[CAPIO_REQUEST_UNLINK]              = unlink_handler;
     _request_handlers[CAPIO_REQUEST_WRITE]               = write_handler;
+    _request_handlers[CAPIO_REQUEST_CONSENT]             = consent_handler;
+    _request_handlers[CAPIO_REQUEST_READ_FS]             = read_fs_handler;
+    _request_handlers[CAPIO_REQUEST_CREATE_FS]           = create_fs_handler;
+    _request_handlers[CAPIO_REQUEST_OPEN_FS]             = open_fs_handler;
+    _request_handlers[CAPIO_REQUEST_CLOSE_FS]            = close_fs_handler;
+    _request_handlers[CAPIO_REQUEST_INHERIT_FS]          = inherit_fs_handler;
 
     return _request_handlers;
 }
@@ -121,6 +128,7 @@ int main(int argc, char **argv) {
 
     RuntimeConfiguration::initialize(argc, argv);
 
+    START_LOG(gettid(), "call()");
     capio_cl_engine = RuntimeConfiguration::get().createCapioClEngine();
 
     UPDATE_CALF_WORKFLOW_NAME(capio_cl_engine->getWorkflowName());
@@ -130,14 +138,13 @@ int main(int argc, char **argv) {
     discovery_service = select_discovery_service();
     backend           = select_backend(argc, argv);
 
-    START_LOG(gettid(), "call()");
-
     home_node_service =
         new HomeNodeService(RuntimeConfiguration::get().getLocationQueryTimeout(),
                             RuntimeConfiguration::get().getLocationRequeryInterval());
 
-    storage_manager = new StorageManager();
-    client_manager  = new ClientManager();
+    storage_manager    = new StorageManager();
+    fs_storage_manager = new FsStorageManager();
+    client_manager     = new ClientManager();
 
     std::thread server_thread(capio_server, std::ref(internal_server_sem));
     LOG("capio_server thread started");

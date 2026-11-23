@@ -1,6 +1,7 @@
 #ifndef CAPIO_SERVER_HANDLERS_HANDSHAKE_HPP
 #define CAPIO_SERVER_HANDLERS_HANDSHAKE_HPP
 #include "clone.hpp"
+#include "utils/common.hpp"
 
 void handshake_anonymous_handler(const char *const str) {
     int tid, pid;

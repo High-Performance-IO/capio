@@ -4,6 +4,7 @@
 #include <iomanip>
 #include <string>
 #include <thread>
+#include <unordered_map>
 
 #include "calf/StlLogger.h"
 #include "capiocl_adapter.hpp"
@@ -11,10 +12,12 @@
 #include "common/dirent.hpp"
 #include "remote/home_node_service.hpp"
 #include "storage/capio_file.hpp"
+#include "storage/fs_storage_manager.hpp"
 #include "storage/manager.hpp"
 #include "utils/types.hpp"
 
 extern ClientManager *client_manager;
+extern FsStorageManager *fs_storage_manager;
 extern StorageManager *storage_manager;
 
 void wait_for_dirent_data(off64_t wait_size, int wait_tid, int wait_fd, int wait_count,
@@ -149,6 +152,24 @@ inline void copy_file_range_data(const CSCopyFileRange_t &copy) {
     }
     LOG("copied %ld bytes", bytes_copied);
     client_manager->replyToClient(copy.tid, bytes_copied);
+}
+
+/*
+ * Requests of the file system variant (libcapio_posix_fs.so) end with the path, which may contain
+ * spaces, so the handlers read the arguments before it with sscanf and a final %n, and the path
+ * from there to the end.
+ */
+
+/// @brief The path of a request of the FS variant, whose arguments end at @p consumed
+inline std::string fs_request_path(const pid_t tid, const char *str, const int consumed) {
+    // %n follows the last number: one space separates it from the path
+    auto path = std::filesystem::path(str[consumed] == ' ' ? str + consumed + 1 : str + consumed)
+                    .lexically_normal()
+                    .string();
+    while (path.size() > 1 && path.back() == '/') {
+        path.pop_back();
+    }
+    return path;
 }
 
 #endif // CAPIO_SERVER_UTILS_COMMON_HPP

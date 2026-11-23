@@ -1,7 +1,9 @@
 #ifndef CAPIO_SERVER_HANDLERS_CLOSE_HPP
 #define CAPIO_SERVER_HANDLERS_CLOSE_HPP
 
+#include "common/requests.hpp"
 #include "read.hpp"
+#include "utils/common.hpp"
 
 extern StorageManager *storage_manager;
 
@@ -29,6 +31,18 @@ inline void handle_close(int tid, int fd) {
 
     LOG("Deleting capio file %s from tid=%d", path.c_str(), tid);
     storage_manager->removeFromTid(tid, fd);
+}
+
+/// @brief close of the FS variant: "tid error path", error 0 if the close worked
+void close_fs_handler(const char *const str) {
+    int tid, error, consumed = 0;
+    if (sscanf(str, "%d %d%n", &tid, &error, &consumed) != 2) {
+        return;
+    }
+    const std::filesystem::path path = fs_request_path(tid, str, consumed);
+    if (error == 0) { // a close that failed lost data: it does not count
+        fs_storage_manager->closed(tid, path);
+    }
 }
 
 void close_handler(const char *str) {

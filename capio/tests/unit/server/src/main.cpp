@@ -6,12 +6,14 @@
 #include "common/constants.hpp"
 #include "remote/discovery.hpp"
 #include "remote/home_node_service.hpp"
+#include "storage/fs_storage_manager.hpp"
 #include "storage/manager.hpp"
 #include "utils/capiocl_adapter.hpp"
 #include "utils/runtime_configuration.hpp"
 
 capiocl::engine::Engine *capio_cl_engine = nullptr;
 StorageManager *storage_manager          = nullptr;
+FsStorageManager *fs_storage_manager     = nullptr;
 ClientManager *client_manager            = nullptr;
 Backend *backend                         = nullptr;
 DiscoveryService *discovery_service      = nullptr;

@@ -236,6 +236,10 @@ std::chrono::milliseconds RuntimeConfiguration::getLocationRequeryInterval() con
     return std::chrono::milliseconds(location_requery_interval_ms);
 }
 
+bool RuntimeConfiguration::hasConfig() const {
+    return capio_cl_dynamic_config || !capio_cl_config_path.empty();
+}
+
 capiocl::engine::Engine *RuntimeConfiguration::createCapioClEngine() const {
     // Commits travel by multicast, and as tokens next to the files (the file system monitor), which
     // a server that starts later still finds. Counted on_close keeps its counters in the metadata

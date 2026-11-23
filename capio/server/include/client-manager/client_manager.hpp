@@ -130,6 +130,9 @@ class ClientManager {
 
     [[nodiscard]] bool isProducer(pid_t tid, const std::filesystem::path &path) const;
 
+    /// @brief Whether any client registered as producer of @p path
+    [[nodiscard]] bool hasProducer(const std::filesystem::path &path) const;
+
     /**
      * @brief Get the files that a given pid is waiting to be produced
      *
