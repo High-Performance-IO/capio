@@ -1,3 +1,4 @@
+#include <cstdio>
 #include <dirent.h>
 #include <filesystem>
 #include <list>
@@ -7,6 +8,7 @@
 #include "calf/StlLogger.h"
 
 #include "common/dirent.hpp"
+#include "common/requests.hpp"
 #include "remote/home_node_service.hpp"
 #include "storage/capio_file.hpp"
 #include "storage/manager.hpp"
@@ -337,16 +339,67 @@ off64_t StorageManager::addDirectory(const pid_t tid, const std::filesystem::pat
     return 1;
 }
 
+namespace {
+/// Ask @p home, the home of the directory that holds @p file_path, to add or remove its entry
+/// (@p code is CAPIO_SERVER_REQUEST_DIRECTORY_ENTRY_ADD or _REMOVE): "<path of the file>"
+void send_directory_entry(const int code, const std::filesystem::path &file_path,
+                          const std::string &home) {
+    START_LOG(gettid(), "call(code=%d, file_path=%s, home=%s)", code, file_path.c_str(),
+              home.c_str());
+    char header[8];
+    snprintf(header, sizeof(header), "%04d ", code);
+    const std::string message = header + file_path.native();
+    backend->send_request(message.c_str(), static_cast<int>(message.size() + 1), home);
+}
+} // namespace
+
 void StorageManager::removeFromDirectory(const std::filesystem::path &file_path) {
     START_LOG(gettid(), "call(file_path=%s)", file_path.c_str());
-    if (const auto dir = tryGet(get_parent_dir_path(file_path))) {
-        dir->get().removeDirectoryEntry(file_path.filename());
+    const auto dir = get_parent_dir_path(file_path);
+    if (const auto home = home_node_service->getHome(dir);
+        home && *home != backend->get_node_name()) {
+        send_directory_entry(CAPIO_SERVER_REQUEST_DIRECTORY_ENTRY_REMOVE, file_path, *home);
+        return;
     }
+    if (const auto c_dir = tryGet(dir)) {
+        c_dir->get().removeDirectoryEntry(file_path.filename());
+    }
+}
+
+void StorageManager::addRemoteDirectoryEntry(const std::filesystem::path &file_path) {
+    START_LOG(gettid(), "call(file_path=%s)", file_path.c_str());
+    const auto dir = get_parent_dir_path(file_path);
+    if (!tryGet(dir)) {
+        LOG("Directory %s is not held by this server: entry ignored", dir.c_str());
+        return;
+    }
+    // No client of this server created the file: -1 registers it as nobody's product.
+    addDirectoryEntry(-1, file_path, dir, REGULAR_ENTRY);
 }
 
 void StorageManager::updateDirectory(const pid_t tid, const std::filesystem::path &file_path) {
     START_LOG(gettid(), "call(file_path=%s)", file_path.c_str());
     const auto &dir = get_parent_dir_path(file_path);
+
+    // A directory made through another server, its home: this server keeps a stand-in for it, an
+    // entry that never becomes its home and holds no entries, and the new entry goes to the home.
+    // getdents of the stand-in reads the home's listing, so every server lists the one directory.
+    const auto local = tryGet(dir);
+    const auto known = home_node_service->getHome(dir);
+    if (known ? *known != backend->get_node_name() : !local) {
+        // lookup() may ask the other servers, for a directory this server has never heard of
+        if (const auto home = known ? known : home_node_service->lookup(dir);
+            home && *home != backend->get_node_name()) {
+            if (!local) {
+                LOG("Directory %s is at %s: stand-in created", dir.c_str(), home->c_str());
+                add(dir, true, CAPIO_DEFAULT_DIR_INITIAL_SIZE);
+            }
+            home_node_service->learn(dir, *home);
+            send_directory_entry(CAPIO_SERVER_REQUEST_DIRECTORY_ENTRY_ADD, file_path, *home);
+            return;
+        }
+    }
+
     if (CapioFile &c_file = get(dir.c_str()); c_file.isFirstWrite()) {
         c_file.registerFirstWrite();
         home_node_service->setHome(dir);

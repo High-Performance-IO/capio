@@ -22,7 +22,13 @@ extern Backend *backend;
 void wait_for_file_completion(int tid, const std::filesystem::path &path) {
     START_LOG(gettid(), "call(tid=%d, path=%s)", tid, path.c_str());
 
-    const auto home   = home_node_service->waitForHome(path);
+    const auto home = home_node_service->waitForHome(path);
+    // Created through another server, and never opened through this one: this server holds no
+    // entry for it, so ask its home, as reply_stat does for a remote file it already knows of.
+    if (home != backend->get_node_name() && !storage_manager->tryGet(path)) {
+        handle_remote_stat_request(tid, path, home);
+        return;
+    }
     // check if the file is local or remote
     CapioFile &c_file = storage_manager->get(path);
 
