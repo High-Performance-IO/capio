@@ -24,8 +24,7 @@ inline void follow_kernel_current_dir() {
 
 int chdir_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg5, long *result) {
     const std::string_view pathname(reinterpret_cast<const char *>(arg0));
-    const long tid = syscall_no_intercept(SYS_gettid);
-    START_LOG(tid, "call(path=%s)", pathname.data());
+    START_LOG(syscall_no_intercept(SYS_gettid), "call(path=%s)", pathname.data());
 
     if (is_forbidden_path(pathname)) {
         LOG("Path %s is forbidden: skip", pathname.data());
@@ -42,22 +41,20 @@ int chdir_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long ar
     }
 
     if (is_capio_path(path)) {
-        CAPIO_STORAGE_CALL(
-            {
-                set_current_dir(path);
-                errno   = 0;
-                *result = 0;
-                return CAPIO_POSIX_SYSCALL_SUCCESS;
-            },
-            {
-                consent_request_cache->consent_request(path, tid, __FUNCTION__);
-                const auto res = syscall_no_intercept(SYS_chdir, pathname.data());
-                if (res == 0) {
-                    set_current_dir(path);
-                }
-                *result = res;
-                return CAPIO_POSIX_SYSCALL_SUCCESS;
-            });
+#if !CAPIO_MEM_STREAM
+        // Real directories: wait for it, then the kernel changes directory as for any other path
+        consent_request_cache->consent_request(path, syscall_no_intercept(SYS_gettid),
+                                               __FUNCTION__);
+        *result = syscall_no_intercept(SYS_chdir, arg0);
+        if (*result == 0) {
+            set_current_dir(path);
+        }
+        return CAPIO_POSIX_SYSCALL_SUCCESS;
+#endif
+        set_current_dir(path);
+        errno   = 0;
+        *result = 0;
+        return CAPIO_POSIX_SYSCALL_SUCCESS;
     }
 
     // Not a CAPIO path: the kernel changes directory, and CAPIO follows it, since it resolves
@@ -77,14 +74,10 @@ int fchdir_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long a
     const int fd = static_cast<int>(arg0);
     START_LOG(syscall_no_intercept(SYS_gettid), "call(fd=%d)", fd);
 
-    if (exists_capio_fd(fd)) {
-        CAPIO_STORAGE_CALL(
-            {
-                set_current_dir(get_capio_fd_path(fd));
-                *result = 0;
-                return CAPIO_POSIX_SYSCALL_SUCCESS;
-            },
-            {}); // A real directory: the kernel changes directory, and CAPIO follows it.
+    if (CAPIO_MEM_STREAM && exists_capio_fd(fd)) { // FS: a real directory, as below
+        set_current_dir(get_capio_fd_path(fd));
+        *result = 0;
+        return CAPIO_POSIX_SYSCALL_SUCCESS;
     }
     *result = syscall_no_intercept(SYS_fchdir, fd);
     if (*result == 0) {

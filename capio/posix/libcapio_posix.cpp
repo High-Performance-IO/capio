@@ -220,7 +220,7 @@ static constexpr std::array<CPHandler_t, CAPIO_NR_SYSCALLS> build_syscall_table(
     _syscallTable[SYS_chmod] = CAPIO_STORAGE_CALL(chmod_handler, not_handled_handler);
 #endif
 #ifdef SYS_fchmod
-    _syscallTable[SYS_fchmod] = fchmod_handler;
+    _syscallTable[SYS_fchmod] = CAPIO_STORAGE_CALL(fchmod_handler, fd_consent_fs_handler);
 #endif
 #ifdef SYS_fchmodat
     _syscallTable[SYS_fchmodat] = CAPIO_STORAGE_CALL(fchmodat_handler, not_handled_handler);
@@ -229,13 +229,13 @@ static constexpr std::array<CPHandler_t, CAPIO_NR_SYSCALLS> build_syscall_table(
     _syscallTable[SYS_chown] = CAPIO_STORAGE_CALL(chown_handler, not_handled_handler);
 #endif
 #ifdef SYS_fchown
-    _syscallTable[SYS_fchown] = fchown_handler;
+    _syscallTable[SYS_fchown] = CAPIO_STORAGE_CALL(fchown_handler, fd_consent_fs_handler);
 #endif
 #ifdef SYS_fchownat
     _syscallTable[SYS_fchownat] = CAPIO_STORAGE_CALL(fchownat_handler, not_handled_handler);
 #endif
 #ifdef SYS_close
-    _syscallTable[SYS_close] = close_handler;
+    _syscallTable[SYS_close] = CAPIO_STORAGE_CALL(close_handler, close_fs_handler);
 #endif
 #ifdef SYS_copy_file_range
     _syscallTable[SYS_copy_file_range] =
@@ -248,22 +248,22 @@ static constexpr std::array<CPHandler_t, CAPIO_NR_SYSCALLS> build_syscall_table(
     _syscallTable[SYS_creat] = creat_handler;
 #endif
 #ifdef SYS_dup
-    _syscallTable[SYS_dup] = dup_handler;
+    _syscallTable[SYS_dup] = CAPIO_STORAGE_CALL(dup_handler, dup_fs_handler);
 #endif
 #ifdef SYS_dup2
-    _syscallTable[SYS_dup2] = dup2_handler;
+    _syscallTable[SYS_dup2] = CAPIO_STORAGE_CALL(dup2_handler, dup2_fs_handler);
 #endif
 #ifdef SYS_dup3
-    _syscallTable[SYS_dup3] = dup3_handler;
+    _syscallTable[SYS_dup3] = CAPIO_STORAGE_CALL(dup3_handler, dup3_fs_handler);
 #endif
 #ifdef SYS_execve
-    _syscallTable[SYS_execve] = execve_handler;
+    _syscallTable[SYS_execve] = CAPIO_STORAGE_CALL(execve_handler, execve_fs_handler);
 #endif
 #ifdef SYS_exit
-    _syscallTable[SYS_exit] = exit_handler;
+    _syscallTable[SYS_exit] = CAPIO_STORAGE_CALL(exit_handler, exit_fs_handler);
 #endif
 #ifdef SYS_exit_group
-    _syscallTable[SYS_exit_group] = CAPIO_STORAGE_CALL(exit_handler, exit_process_handler);
+    _syscallTable[SYS_exit_group] = CAPIO_STORAGE_CALL(exit_handler, exit_group_fs_handler);
 #endif
 #ifdef SYS_faccessat
     _syscallTable[SYS_faccessat] = faccessat_handler;
@@ -272,7 +272,7 @@ static constexpr std::array<CPHandler_t, CAPIO_NR_SYSCALLS> build_syscall_table(
     _syscallTable[SYS_faccessat2] = faccessat_handler;
 #endif
 #ifdef SYS_fcntl
-    _syscallTable[SYS_fcntl] = fcntl_handler;
+    _syscallTable[SYS_fcntl] = CAPIO_STORAGE_CALL(fcntl_handler, fcntl_fs_handler);
 #endif
 #ifdef SYS_fgetxattr
     _syscallTable[SYS_fgetxattr] = CAPIO_STORAGE_CALL(fgetxattr_handler, not_handled_handler);
@@ -288,28 +288,28 @@ static constexpr std::array<CPHandler_t, CAPIO_NR_SYSCALLS> build_syscall_table(
     _syscallTable[SYS_fstat] = fstat_handler;
 #endif
 #ifdef SYS_fstatfs
-    _syscallTable[SYS_fstatfs] = fstatfs_handler;
+    _syscallTable[SYS_fstatfs] = CAPIO_STORAGE_CALL(fstatfs_handler, fd_consent_fs_handler);
 #endif
 #ifdef SYS_getcwd
-    _syscallTable[SYS_getcwd] = getcwd_handler;
+    _syscallTable[SYS_getcwd] = CAPIO_STORAGE_CALL(getcwd_handler, not_handled_handler);
 #endif
 #ifdef SYS_getdents
-    _syscallTable[SYS_getdents] = getdents_handler;
+    _syscallTable[SYS_getdents] = CAPIO_STORAGE_CALL(getdents_handler, getdents_fs_handler);
 #endif
 #ifdef SYS_getdents64
-    _syscallTable[SYS_getdents64] = getdents64_handler;
+    _syscallTable[SYS_getdents64] = CAPIO_STORAGE_CALL(getdents64_handler, getdents64_fs_handler);
 #endif
 #ifdef SYS_getxattr
     _syscallTable[SYS_getxattr] = CAPIO_STORAGE_CALL(not_implemented_handler, not_handled_handler);
 #endif
 #ifdef SYS_ioctl
-    _syscallTable[SYS_ioctl] = ioctl_handler;
+    _syscallTable[SYS_ioctl] = CAPIO_STORAGE_CALL(ioctl_handler, ioctl_fs_handler);
 #endif
 #ifdef SYS_lgetxattr
     _syscallTable[SYS_lgetxattr] = CAPIO_STORAGE_CALL(not_implemented_handler, not_handled_handler);
 #endif
 #ifdef SYS_lseek
-    _syscallTable[SYS_lseek] = lseek_handler;
+    _syscallTable[SYS_lseek] = CAPIO_STORAGE_CALL(lseek_handler, lseek_fs_handler);
 #endif
 #ifdef SYS_lstat
     _syscallTable[SYS_lstat] = lstat_handler;
@@ -342,10 +342,10 @@ static constexpr std::array<CPHandler_t, CAPIO_NR_SYSCALLS> build_syscall_table(
     _syscallTable[SYS_preadv2] = preadv_handler;
 #endif
 #ifdef SYS_read
-    _syscallTable[SYS_read] = read_handler;
+    _syscallTable[SYS_read] = CAPIO_STORAGE_CALL(read_handler, read_fs_handler);
 #endif
 #ifdef SYS_readv
-    _syscallTable[SYS_readv] = readv_handler;
+    _syscallTable[SYS_readv] = CAPIO_STORAGE_CALL(readv_handler, readv_fs_handler);
 #endif
 #ifdef SYS_rename
     _syscallTable[SYS_rename] = rename_handler;
@@ -357,7 +357,7 @@ static constexpr std::array<CPHandler_t, CAPIO_NR_SYSCALLS> build_syscall_table(
     _syscallTable[SYS_renameat2] = renameat2_handler;
 #endif
 #ifdef SYS_rmdir
-    _syscallTable[SYS_rmdir] = rmdir_handler;
+    _syscallTable[SYS_rmdir] = CAPIO_STORAGE_CALL(rmdir_handler, not_handled_handler);
 #endif
 #ifdef SYS_sendfile
     _syscallTable[SYS_sendfile] = CAPIO_STORAGE_CALL(sendfile_handler, sendfile_fs_handler);
@@ -378,10 +378,10 @@ static constexpr std::array<CPHandler_t, CAPIO_NR_SYSCALLS> build_syscall_table(
     _syscallTable[SYS_unlinkat] = unlinkat_handler;
 #endif
 #ifdef SYS_write
-    _syscallTable[SYS_write] = write_handler;
+    _syscallTable[SYS_write] = CAPIO_STORAGE_CALL(write_handler, not_handled_handler);
 #endif
 #ifdef SYS_writev
-    _syscallTable[SYS_writev] = writev_handler;
+    _syscallTable[SYS_writev] = CAPIO_STORAGE_CALL(writev_handler, not_handled_handler);
 #endif
 
     return _syscallTable;

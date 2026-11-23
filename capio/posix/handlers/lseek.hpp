@@ -5,11 +5,9 @@
 
 #include "utils/common.hpp"
 #include "utils/data.hpp"
-#include "utils/fs_listing.hpp"
-#include "utils/fs_waiting.hpp"
 
 // TODO: EOVERFLOW is not addressed
-inline off64_t capio_lseek_mem(int fd, off64_t offset, int whence, long tid) {
+inline off64_t capio_lseek(int fd, off64_t offset, int whence, long tid) {
     START_LOG(tid, "call(fd=%d, offset=%ld, whence=%d)", fd, offset, whence);
 
     if (exists_capio_fd(fd)) {
@@ -67,31 +65,6 @@ inline off64_t capio_lseek_mem(int fd, off64_t offset, int whence, long tid) {
     } else {
         return CAPIO_POSIX_SYSCALL_REQUEST_SKIP;
     }
-}
-
-inline off64_t capio_lseek(int fd, off64_t offset, int whence, long tid) {
-    if (!exists_capio_fd(fd)) {
-        return CAPIO_POSIX_SYSCALL_REQUEST_SKIP;
-    }
-
-    CAPIO_STORAGE_CALL(return capio_lseek_mem(fd, offset, whence, tid), {
-        if (long position; fs_seek_listing(fd, offset, whence, position)) {
-            return capio_kernel_result(position);
-        }
-        const bool looks_for_data = whence == SEEK_DATA || whence == SEEK_HOLE;
-        if (whence == SEEK_END) {
-            fs_wait_for_data(fd, FS_UNTIL_COMMIT, tid);
-        } else if (looks_for_data && offset >= 0) {
-            fs_wait_for_data(fd, fs_end_of(offset, 1), tid);
-        }
-        auto res = syscall_no_intercept(SYS_lseek, fd, offset, whence);
-        if (res == -ENXIO && looks_for_data) {
-            // Only a hole so far. Whether data follows is known at the commit.
-            fs_wait_for_data(fd, FS_UNTIL_COMMIT, tid);
-            res = syscall_no_intercept(SYS_lseek, fd, offset, whence);
-        }
-        return capio_kernel_result(res);
-    });
 }
 
 int lseek_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg5, long *result) {

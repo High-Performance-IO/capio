@@ -15,7 +15,7 @@ inline long capio_kernel_result(const long result) {
     return result;
 }
 
-// Macro to select at compile time either FS or MEM streaming
+// Pick an expression of the memory or the FS variant at compile time; statements use #if
 // CAPIO_STORAGE_CALL(memory_call, fs_call)
 #if CAPIO_MEM_STREAM
 #define CAPIO_STORAGE_CALL(memory_call, fs_call) memory_call

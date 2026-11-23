@@ -4,7 +4,6 @@
 #if defined(SYS_dup) || defined(SYS_dup2) || defined(SYS_dup3)
 
 #include "common/syscall.hpp"
-#include "utils/fs_descriptors.hpp"
 #include "utils/requests.hpp"
 
 int dup_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg5, long *result) {
@@ -12,7 +11,6 @@ int dup_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg5
     int fd   = static_cast<int>(arg0);
 
     START_LOG(tid, "call(fd=%d)", fd);
-    CAPIO_STORAGE_CALL(, return fs_dup(fd, tid, result));
 
     if (exists_capio_fd(fd)) {
         int res = open("/dev/null", O_WRONLY);
@@ -36,7 +34,6 @@ int dup2_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg
     int fd2  = static_cast<int>(arg1);
 
     START_LOG(tid, "call(fd=%d, fd2=%d)", fd, fd2);
-    CAPIO_STORAGE_CALL(, return fs_dup_onto(fd, fd2, 0, false, tid, result));
 
     if (exists_capio_fd(fd)) {
         int res = static_cast<int>(syscall_no_intercept(SYS_dup2, fd, fd2));
@@ -64,7 +61,6 @@ int dup3_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg
     //  int res = capio_dup3(fd, fd2, flags, tid);
 
     START_LOG(tid, "call(fd=%d, fd2=%d)", fd, fd2);
-    CAPIO_STORAGE_CALL(, if (fd != fd2) { return fs_dup_onto(fd, fd2, flags, true, tid, result); });
 
     if (exists_capio_fd(fd)) {
         if (fd == fd2) {

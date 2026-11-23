@@ -26,13 +26,14 @@ inline void initialize_new_thread(const bool wait = false) {
 
     START_LOG(tid, "call(tid=%d, pid=%d, app_name=%s)", tid, pid, capio_app_name);
 
-    CAPIO_STORAGE_CALL(
-        , if (pid == tid) {
-            // a new process has no other threads, whatever its parent was doing
-            requests_being_written = 0;
-            reset_descriptor_table_lock();
-            resume_requests();
-        });
+#if !CAPIO_MEM_STREAM
+    if (pid == tid) {
+        // a new process has no other threads, whatever its parent was doing
+        requests_being_written = 0;
+        reset_descriptor_table_lock();
+        resume_requests();
+    }
+#endif
     initialize_data_queues(tid);
     init_client(tid);
 
@@ -61,13 +62,13 @@ inline void hook_clone_parent(long child_tid) {
 inline void hook_clone_child() {
     const long pid = syscall_no_intercept(SYS_getpid);
     const long tid = syscall_no_intercept(SYS_gettid);
-    CAPIO_STORAGE_CALL(initialize_new_thread(pid != tid), {
-        if (pid != tid) {
-            initialize_new_thread(true);
-        } else {
-            defer_new_process(tid);
-        }
-    });
+#if !CAPIO_MEM_STREAM
+    if (pid == tid) {
+        defer_new_process(tid); // see utils/process.hpp
+        return;
+    }
+#endif
+    initialize_new_thread(pid != tid);
 }
 
 #endif // CAPIO_POSIX_UTILS_CLONE_HPP

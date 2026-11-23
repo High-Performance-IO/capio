@@ -88,26 +88,21 @@ inline int capio_statx(int dirfd, const std::string_view &pathname, int flags, i
         }
     }
 
-    CAPIO_STORAGE_CALL(
-        {
-            write_cache->flush();
-            const auto response  = stat_request(path, tid);
-            const auto file_size = response.first;
-            const auto is_dir    = response.second;
-            if (file_size == -1) {
-                errno = ENOENT;
-                return CAPIO_POSIX_SYSCALL_ERRNO;
-            }
-            if (file_size == CAPIO_POSIX_SYSCALL_REQUEST_SKIP) {
-                return CAPIO_POSIX_SYSCALL_REQUEST_SKIP;
-            }
-            fill_statxbuf(statxbuf, file_size, is_dir, std::hash<std::string>{}(path), mask);
-            return CAPIO_POSIX_SYSCALL_SUCCESS;
-        },
-        {
-            consent_request_cache->consent_request(path, tid, __FUNCTION__);
-            return CAPIO_POSIX_SYSCALL_REQUEST_SKIP;
-        });
+#if !CAPIO_MEM_STREAM
+    consent_request_cache->consent_request(path, tid, __FUNCTION__);
+    return CAPIO_POSIX_SYSCALL_REQUEST_SKIP;
+#endif
+    write_cache->flush();
+    auto [file_size, is_dir] = stat_request(path, tid);
+    if (file_size == -1) {
+        errno = ENOENT;
+        return CAPIO_POSIX_SYSCALL_ERRNO;
+    }
+    if (file_size == CAPIO_POSIX_SYSCALL_REQUEST_SKIP) {
+        return CAPIO_POSIX_SYSCALL_REQUEST_SKIP;
+    }
+    fill_statxbuf(statxbuf, file_size, is_dir, std::hash<std::string>{}(path), mask);
+    return CAPIO_POSIX_SYSCALL_SUCCESS;
 }
 
 int statx_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg5, long *result) {

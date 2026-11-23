@@ -3,7 +3,6 @@
 
 #if defined(SYS_close)
 
-#include "utils/fs_descriptors.hpp"
 #include "utils/requests.hpp"
 
 int close_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg5, long *result) {
@@ -12,16 +11,11 @@ int close_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long ar
     START_LOG(tid, "call(fd=%ld)", fd);
 
     if (exists_capio_fd(fd)) {
-        CAPIO_STORAGE_CALL(
-            {
-                write_cache->flush();
-                read_cache->flush();
-                close_request(fd, tid);
-                delete_capio_fd(fd);
-                *result = 0;
-                return CAPIO_POSIX_SYSCALL_SKIP;
-            },
-            { return fs_close(fd, tid, result); });
+        write_cache->flush();
+        read_cache->flush();
+        close_request(fd, tid);
+        delete_capio_fd(fd);
+        *result = 0;
     }
     return CAPIO_POSIX_SYSCALL_SKIP;
 }

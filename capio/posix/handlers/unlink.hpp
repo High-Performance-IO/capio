@@ -17,31 +17,30 @@ off64_t capio_unlink_abs(const std::filesystem::path &abs_path, long tid, bool i
         ERR_EXIT("ERROR: unlink to the capio_dir %s", abs_path.c_str());
     }
 
-    CAPIO_STORAGE_CALL(
-        {
-            // unlinkat(AT_REMOVEDIR) is rmdir: this is how glibc issues rmdir() on architectures
-            // without SYS_rmdir (e.g. aarch64), so handle it exactly as SYS_rmdir is handled.
-            if (is_dir) {
-                return capio_rmdir(abs_path.native(), tid);
-            }
+#if !CAPIO_MEM_STREAM
+    {
+        const auto res = capio_kernel_result(syscall_no_intercept(
+            SYS_unlinkat, AT_FDCWD, abs_path.c_str(), is_dir ? AT_REMOVEDIR : 0));
+        if (res == 0 && exists_capio_path(abs_path)) {
+            delete_capio_path(abs_path);
+        }
+        return res;
+    }
+#endif
+    // unlinkat(AT_REMOVEDIR) is rmdir: this is how glibc issues rmdir() on architectures
+    // without SYS_rmdir (e.g. aarch64), so handle it exactly as SYS_rmdir is handled.
+    if (is_dir) {
+        return capio_rmdir(abs_path.native(), tid);
+    }
 
-            const off64_t res = unlink_request(abs_path, tid);
-            if (res == CAPIO_POSIX_SYSCALL_ERRNO) {
-                errno = ENOENT;
-            } else if (exists_capio_path(abs_path)) {
-                LOG("Removing %s from capio_files_path", abs_path.c_str());
-                delete_capio_path(abs_path);
-            }
-            return res;
-        },
-        {
-            const auto res = capio_kernel_result(syscall_no_intercept(
-                SYS_unlinkat, AT_FDCWD, abs_path.c_str(), is_dir ? AT_REMOVEDIR : 0));
-            if (res == 0 && exists_capio_path(abs_path)) {
-                delete_capio_path(abs_path);
-            }
-            return res;
-        });
+    const off64_t res = unlink_request(abs_path, tid);
+    if (res == CAPIO_POSIX_SYSCALL_ERRNO) {
+        errno = ENOENT;
+    } else if (exists_capio_path(abs_path)) {
+        LOG("Removing %s from capio_files_path", abs_path.c_str());
+        delete_capio_path(abs_path);
+    }
+    return res;
 }
 
 inline off64_t capio_unlinkat(int dirfd, const std::string_view &pathname, int flags, long tid) {

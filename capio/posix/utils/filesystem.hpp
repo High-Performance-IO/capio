@@ -195,8 +195,11 @@ struct DescriptorTableLock {
  */
 inline void set_capio_fd_cloexec(int fd, bool is_cloexec) {
     CAPIO_DESCRIPTOR_TABLE_LOCK();
-    // in the FS variant another thread may have closed it
-    CAPIO_STORAGE_CALL(, if (files->find(fd) == files->end()) { return; });
+#if !CAPIO_MEM_STREAM
+    if (files->find(fd) == files->end()) {
+        return; // another thread has closed it
+    }
+#endif
     std::get<3>(files->at(fd)) = is_cloexec;
 }
 
@@ -288,7 +291,11 @@ inline std::filesystem::path capio_absolute(const std::filesystem::path &path) {
  */
 inline void delete_capio_fd(int fd) {
     CAPIO_DESCRIPTOR_TABLE_LOCK();
-    CAPIO_STORAGE_CALL(, if (files->find(fd) == files->end()) { return; });
+#if !CAPIO_MEM_STREAM
+    if (files->find(fd) == files->end()) {
+        return; // another thread has closed it
+    }
+#endif
     auto &path = capio_files_descriptors->at(fd);
     capio_files_paths->at(path).erase(fd);
     capio_files_descriptors->erase(fd);
@@ -369,21 +376,28 @@ inline bool get_capio_fd_cloexec(int fd) { return std::get<3>(files->at(fd)); }
  */
 inline int get_capio_fd_flags(int fd) { return std::get<2>(files->at(fd)); }
 
+// In the FS variant a copy, and empty if another thread has closed the descriptor since the caller
+// looked. One definition for both variants: coverage tools merge them by line.
+#if CAPIO_MEM_STREAM
+using CapioFdPath = const std::string &;
+#else
+using CapioFdPath = std::string;
+#endif
+
 /**
  * Get the path of a file descriptor
  * @param fd
  * @return the file descriptor path
  */
+inline CapioFdPath get_capio_fd_path(int fd) {
 #if CAPIO_MEM_STREAM
-inline const std::string &get_capio_fd_path(int fd) { return capio_files_descriptors->at(fd); }
+    return capio_files_descriptors->at(fd);
 #else
-// A copy, and empty if another thread has closed the descriptor since the caller looked
-inline std::string get_capio_fd_path(int fd) {
     CAPIO_DESCRIPTOR_TABLE_LOCK();
     const auto found = capio_files_descriptors->find(fd);
     return found == capio_files_descriptors->end() ? std::string{} : found->second;
-}
 #endif
+}
 
 /**
  * Get the current offset of a file descriptor

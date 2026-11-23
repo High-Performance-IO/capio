@@ -196,7 +196,6 @@ class ConsentRequestCache {
     std::unordered_map<std::string, off64_t> received_consents;
 
   public:
-    [[maybe_unused]]
     void consent_request(const std::filesystem::path &path, const long tid,
                          const std::string &source_func) {
         START_LOG(capio_syscall(SYS_gettid), "call(path=%s, tid=%ld, source=%s)", path.c_str(), tid,

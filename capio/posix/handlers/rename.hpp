@@ -25,10 +25,10 @@ int renameat2_handler(long arg0, long arg1, long arg2, long arg3, long arg4, lon
     const auto new_path_abs =
         new_path.is_absolute() ? new_path : capio_absolute(new_dir_fd_path / new_path);
 
+#if !CAPIO_MEM_STREAM
     // Before the check below, which refuses renaming a file to itself. Here the kernel checks.
-    CAPIO_STORAGE_CALL(
-        , return fs_rename(old_path_abs, new_path_abs, arg0, arg1, arg2, arg3, arg4, tid, result));
-
+    return fs_rename(old_path_abs, new_path_abs, arg0, arg1, arg2, arg3, arg4, tid, result);
+#endif
     if (is_prefix(old_path_abs, new_path_abs)) { // TODO: The check is more complex
         errno   = EINVAL;
         *result = -errno;

@@ -6,7 +6,6 @@
 #include "common/dirent.hpp"
 
 #include "utils/data.hpp"
-#include "utils/fs_listing.hpp"
 
 // TODO: too similar to capio_read, refactoring needed
 inline int getdents_handler_impl(long arg0, long arg1, long arg2, long *result, bool is64bit) {
@@ -15,9 +14,6 @@ inline int getdents_handler_impl(long arg0, long arg1, long arg2, long *result, 
     auto count   = static_cast<off64_t>(arg2);
     START_LOG(syscall_no_intercept(SYS_gettid), "call(fd=%d, dirp=0x%08x, count=%ld, is64bit=%s)",
               fd, buffer, count, is64bit ? "true" : "false");
-
-    CAPIO_STORAGE_CALL(, return fs_getdents(fd, reinterpret_cast<char *>(buffer), count, is64bit,
-                                            syscall_no_intercept(SYS_gettid), result));
 
     if (exists_capio_fd(fd)) {
         LOG("fd=%d, is a capio file descriptor", fd);

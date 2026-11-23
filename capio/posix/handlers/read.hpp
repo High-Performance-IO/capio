@@ -4,7 +4,6 @@
 #if defined(SYS_read) || defined(SYS_readv)
 
 #include "utils/data.hpp"
-#include "utils/fs_waiting.hpp"
 
 inline off64_t capio_read(int fd, void *buffer, off64_t count, long tid) {
     START_LOG(tid, "call(fd=%d, buf=0x%08x, count=%ld)", fd, buffer, count);
@@ -14,12 +13,7 @@ inline off64_t capio_read(int fd, void *buffer, off64_t count, long tid) {
             ERR_EXIT("CAPIO does not support read bigger than SSIZE_MAX yet");
         }
 
-        CAPIO_STORAGE_CALL(
-            { return capio_cached_read(fd, buffer, count); },
-            {
-                fs_wait_for_data(fd, fs_end_of(fs_read_position(fd, nullptr), count), tid);
-                return CAPIO_POSIX_SYSCALL_REQUEST_SKIP;
-            });
+        return capio_cached_read(fd, buffer, count);
     } else {
         return CAPIO_POSIX_SYSCALL_REQUEST_SKIP;
     }
@@ -30,12 +24,6 @@ inline ssize_t capio_readv(int fd, const struct iovec *iov, int iovcnt, long tid
               iov->iov_base, iov->iov_len, iovcnt);
 
     if (exists_capio_fd(fd)) {
-        CAPIO_STORAGE_CALL({}, {
-            fs_wait_for_data(
-                fd, fs_end_of(fs_read_position(fd, nullptr), fs_total_length(iov, iovcnt)), tid);
-            return CAPIO_POSIX_SYSCALL_REQUEST_SKIP;
-        });
-
         LOG("fd %d exists and is a capio fd", fd);
         ssize_t tot_bytes = 0;
         ssize_t res       = 0;

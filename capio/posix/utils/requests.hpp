@@ -22,15 +22,11 @@ class ResponseBuffer : public CircularBuffer<off_t> {
     void read(off_t *response) {
         CircularBuffer<off_t>::read(response);
         if (*response == CAPIO_REPLY_VARIANT_REFUSED) {
-            CAPIO_STORAGE_CALL(
-                constexpr char message[] =
-                    "CAPIO: this process uses libcapio_posix.so (memory), but its workflow uses "
-                    "libcapio_posix_fs.so: the two cannot be mixed in a workflow. Fix "
-                    "LD_PRELOAD.\n",
-                constexpr char message[] =
-                    "CAPIO: this process uses libcapio_posix_fs.so (file system), but its workflow "
-                    "uses libcapio_posix.so: the two cannot be mixed in a workflow. Fix "
-                    "LD_PRELOAD.\n");
+            constexpr char message[] = "CAPIO: this process uses " CAPIO_STORAGE_CALL(
+                "libcapio_posix.so (memory), but its workflow uses libcapio_posix_fs.so",
+                "libcapio_posix_fs.so (file system), but its workflow uses "
+                "libcapio_posix.so") ": the two cannot be mixed in a workflow. Fix "
+                                     "LD_PRELOAD.\n";
             syscall_no_intercept(SYS_write, STDERR_FILENO, message, sizeof(message) - 1);
             syscall_no_intercept(SYS_exit_group, EXIT_FAILURE);
         }
