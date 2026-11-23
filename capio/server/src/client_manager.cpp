@@ -36,8 +36,12 @@ void ClientManager::registerClient(pid_t tid, const std::string &app_name, const
     files_created_by_producer.emplace(tid, std::initializer_list<std::string>{});
     files_created_by_app_name.emplace(app_name, std::initializer_list<std::string>{});
 
-    responses.try_emplace(tid, SHM_COMM_CHAN_NAME_RESP + std::to_string(tid), CAPIO_REQ_BUFF_CNT,
-                          sizeof(off_t), CapioCLEngine::get().getWorkflowName());
+    {
+        const std::unique_lock lock(responses_mutex);
+        responses.try_emplace(tid, SHM_COMM_CHAN_NAME_RESP + std::to_string(tid),
+                              CAPIO_REQ_BUFF_CNT, sizeof(off_t),
+                              CapioCLEngine::get().getWorkflowName());
+    }
 
     DBG(tid, [](const int tid_app, const std::string &app_name_) {
         CALF_PRINT_COLOR(CALF_CLI_LEVEL_INFO, "Registered PID %d with app name %s", tid_app,
@@ -78,8 +82,11 @@ void ClientManager::removeClient(const pid_t tid) {
     files_created_by_producer.erase(tid);
     files_created_by_app_name.erase(app_name);
 
-    if (const auto response_buffer = responses.find(tid); response_buffer != responses.end()) {
-        responses.erase(response_buffer);
+    {
+        const std::unique_lock lock(responses_mutex);
+        if (const auto response_buffer = responses.find(tid); response_buffer != responses.end()) {
+            responses.erase(response_buffer);
+        }
     }
     DBG(tid, [&](const int tid_app, const std::string &app_name) {
         CALF_PRINT_COLOR(CALF_CLI_LEVEL_WARNING, "Removed PID %d with app name %s", tid_app,
@@ -87,9 +94,16 @@ void ClientManager::removeClient(const pid_t tid) {
     }(tid, app_name));
 }
 
-void ClientManager::replyToClient(const pid_t tid, const off64_t offset) {
+bool ClientManager::replyToClient(const pid_t tid, const off64_t offset) {
     START_LOG(gettid(), "call(tid=%d, offset=%ld)", tid, offset);
-    responses.at(tid).write(&offset);
+    const std::shared_lock lock(responses_mutex);
+    const auto response = responses.find(tid);
+    if (response == responses.end()) {
+        LOG("Client %d is gone: reply dropped", tid);
+        return false;
+    }
+    response->second.write(&offset);
+    return true;
 }
 
 void ClientManager::replyToClient(const int tid, const off64_t offset, char *buf,
