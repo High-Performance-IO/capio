@@ -2,6 +2,7 @@
 #define CLIENT_MANAGER_HPP
 
 #include <condition_variable>
+#include <shared_mutex>
 #include <unordered_map>
 #include <unordered_set>
 #include <vector>
@@ -20,6 +21,9 @@ class ClientManager {
      */
     CircularBuffer<char> requests;
     std::unordered_map<int, CircularBuffer<off64_t>> responses;
+    /// @brief Replies (shared) also come from threads other than the request thread, which adds
+    /// and removes clients (unique): a client is removed only once its replies are written.
+    mutable std::shared_mutex responses_mutex;
 
     /// @brief default app name
     const std::string default_app_name = CAPIO_DEFAULT_APP_NAME;
@@ -104,8 +108,9 @@ class ClientManager {
      * Send an offset as a reply to a request to a connected client
      * @param tid
      * @param offset
+     * @return false if the client is gone: the reply is dropped
      */
-    void replyToClient(pid_t tid, off64_t offset);
+    bool replyToClient(pid_t tid, off64_t offset);
 
     /**
      * @brief Add a file that is not yet ready to be consumed by a process to a list of files
