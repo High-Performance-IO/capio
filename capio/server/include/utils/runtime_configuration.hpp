@@ -68,6 +68,8 @@ class RuntimeConfiguration final {
 
   private:
     std::filesystem::path capio_dir;
+    /// @brief Where CAPIO-CL keeps the counters of on_close:N (CAPIO_METADATA_DIR, or CAPIO_DIR)
+    std::filesystem::path metadata_dir;
     bool continue_on_error = false;
 
     long cache_lines           = 0;
