@@ -24,7 +24,7 @@ set(SYSCALL_INTERCEPT_LIB_FOLDER
 #####################################
 # Definitions
 #####################################
-target_compile_definitions(${TARGET_NAME} PRIVATE __CAPIO_POSIX)
+target_compile_definitions(${TARGET_NAME} PRIVATE __CAPIO_POSIX CAPIO_MEM_STREAM=1)
 
 #####################################
 # set CALF logger component name
