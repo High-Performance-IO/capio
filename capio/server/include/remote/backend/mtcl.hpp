@@ -80,6 +80,8 @@ class MTCLBackend : public Backend {
 
     void recv_file(char *shm, long int bytes_expected, const std::string &source) override;
 
+    long int max_file_transfer_size() const override;
+
     void connect_to(const std::string &target_token) override;
 };
 
