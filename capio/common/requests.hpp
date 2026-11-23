@@ -52,6 +52,10 @@ constexpr const char CAPIO_FS_CLOSE_AT_EXEC  = 'P'; // close-on-exec, if the exe
 constexpr const char CAPIO_FS_EXEC_FAILED    = 'A';
 constexpr const char CAPIO_FS_PROCESS_EXIT   = 'E';
 
+/* HOW A CLIENT OF THE FS VARIANT CAME TO WRITE A FILE, IN CAPIO_REQUEST_CREATE */
+constexpr const char CAPIO_FS_WRITER_OPENED    = 'O'; // created it, or opened it for writing
+constexpr const char CAPIO_FS_WRITER_INHERITED = 'I'; // got a writable descriptor at exec
+
 /*REQUESTS FOR SERVER TO SERVER COMMUNICATION*/
 
 constexpr const int CAPIO_SERVER_REQUEST_READ                  = 0;

@@ -176,9 +176,13 @@ class FsStreamingTest : public testing::Test {
         FAIL() << "the server did not start";
     }
 
-    /// @brief Start an app named @p name, or with no CAPIO_APP_NAME if it is empty
+    /**
+     * @brief Start an app named @p name, or with no CAPIO_APP_NAME if it is empty. Its output goes
+     * to @p output if given: opened by this process, which CAPIO does not see, as a shell that is
+     * not preloaded would.
+     */
     App start(const std::string &name, const std::vector<std::string> &operations,
-              const std::string &library = "") {
+              const std::string &library = "", const std::filesystem::path &output = {}) {
         std::vector<std::string> command{setting("CAPIO_FS_APP_PATH", "capio_fs_streaming_app")};
         command.insert(command.end(), operations.begin(), operations.end());
         std::vector<std::string> env{
@@ -188,7 +192,7 @@ class FsStreamingTest : public testing::Test {
         if (!name.empty()) {
             env.push_back("CAPIO_APP_NAME=" + name);
         }
-        App app{0, root / ("app" + std::to_string(n_apps++))};
+        App app{0, output.empty() ? root / ("app" + std::to_string(n_apps++)) : output};
         app.pid = spawn(command, env, app.output, work);
         running.push_back(app.pid);
         return app;

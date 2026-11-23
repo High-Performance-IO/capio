@@ -50,8 +50,9 @@ inline int capio_openat(int dirfd, const std::string_view &pathname, int flags, 
             if (new_fd < 0) {
                 return CAPIO_POSIX_SYSCALL_ERRNO;
             }
-            // Announced once it worked: a failed O_EXCL must not make a producer
-            if (create) {
+            // Who writes it produces it, also without O_CREAT. Announced once it worked: a failed
+            // O_EXCL must not make a producer.
+            if (create || (flags & O_ACCMODE) != O_RDONLY) {
                 create_request_fs(path, tid);
             }
             fs_track(tid, path.native(), new_fd, flags, (flags & O_CLOEXEC) == O_CLOEXEC);

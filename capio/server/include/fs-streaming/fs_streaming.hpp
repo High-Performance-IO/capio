@@ -79,6 +79,9 @@ class FsStreaming final {
     void addProducer(pid_t tid, const std::filesystem::path &path);
     [[nodiscard]] bool isProducer(pid_t tid, const std::filesystem::path &path) const;
 
+    /// @brief Whether some process registered as producer of @p path
+    [[nodiscard]] bool hasProducer(const std::filesystem::path &path) const;
+
     void addOpener(pid_t tid, const std::filesystem::path &path);
 
     /// @brief A descriptor of @p path was closed successfully

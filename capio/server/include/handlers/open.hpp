@@ -1,6 +1,7 @@
 #ifndef CAPIO_SERVER_HANDLERS_OPEN_HPP
 #define CAPIO_SERVER_HANDLERS_OPEN_HPP
 
+#include "common/requests.hpp"
 #include "handlers/fs_request.hpp"
 #include "remote/home_node_service.hpp"
 #include "utils/runtime_configuration.hpp"
@@ -80,13 +81,21 @@ inline void handle_open(int tid, int fd, const std::filesystem::path &path) {
     }
 }
 
-inline void handle_create_fs(const int tid, const std::filesystem::path &path) {
-    if (!CapioCLEngine::get().isExcluded(path)) {
+/**
+ * @p tid writes @p path. A program that got its descriptor at exec (from a posix_spawn file action,
+ * or a shell that is not preloaded) produces it only if no process registered as its producer.
+ */
+inline void handle_create_fs(const int tid, const std::filesystem::path &path, const char how) {
+    const bool has_producer =
+        how == CAPIO_FS_WRITER_INHERITED && FsStreaming::get().hasProducer(path);
+    if (!has_producer && !CapioCLEngine::get().isExcluded(path)) {
         client_manager->registerProducedFile(tid, path);
         FsStreaming::get().addProducer(tid, path);
         FsStreaming::get().addOpener(tid, path);
     }
-    client_manager->replyToClient(tid, 1);
+    if (how != CAPIO_FS_WRITER_INHERITED) {
+        client_manager->replyToClient(tid, 1);
+    }
 }
 
 inline void handle_open_fs(const int tid, const std::filesystem::path &path) {
@@ -111,7 +120,10 @@ void create_handler(const char *const str) {
     int tid, fd, consumed = 0;
     sscanf(str, "%d %d%n", &tid, &fd, &consumed);
     if (fd == -1) {
-        handle_create_fs(tid, fs_request_path(tid, str, consumed));
+        char how  = CAPIO_FS_WRITER_OPENED;
+        int after = 0;
+        sscanf(str + consumed, " %c%n", &how, &after);
+        handle_create_fs(tid, fs_request_path(tid, str, consumed + after), how);
         return;
     }
     char path[PATH_MAX];

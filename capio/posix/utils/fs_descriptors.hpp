@@ -318,8 +318,15 @@ inline void fs_track_inherited(const long tid) {
             continue;
         }
         const long fd_flags = syscall_no_intercept(SYS_fcntl, fd, F_GETFD);
-        if (fd_flags >= 0) { // not the descriptor of the listing itself
-            fs_track(tid, path, fd, 0, (fd_flags & FD_CLOEXEC) != 0);
+        if (fd_flags < 0) {
+            continue; // the descriptor of the listing itself
+        }
+        fs_track(tid, path, fd, 0, (fd_flags & FD_CLOEXEC) != 0);
+        // Opened outside CAPIO (a posix_spawn file action, a shell that is not preloaded): if
+        // nobody registered as its producer, the program that writes it is
+        const long status = syscall_no_intercept(SYS_fcntl, fd, F_GETFL);
+        if (status >= 0 && (status & O_ACCMODE) != O_RDONLY) {
+            create_request_fs(path, tid, CAPIO_FS_WRITER_INHERITED);
         }
     }
     syscall_no_intercept_flag = false;

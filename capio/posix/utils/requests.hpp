@@ -199,9 +199,14 @@ inline off64_t create_request(const int fd, const std::filesystem::path &path, c
     return res;
 }
 
-inline void create_request_fs(const std::filesystem::path &path, const long tid) {
-    START_LOG(capio_syscall(SYS_gettid), "call(path=%s, tid=%ld)", path.c_str(), tid);
-    fs_request(CAPIO_REQUEST_CREATE, tid, "-1 ", path.native());
+/// @brief Tell the server that @p tid writes @p path: one of CAPIO_FS_WRITER_*
+inline void create_request_fs(const std::filesystem::path &path, const long tid,
+                              const char how = CAPIO_FS_WRITER_OPENED) {
+    START_LOG(capio_syscall(SYS_gettid), "call(path=%s, tid=%ld, how=%c)", path.c_str(), tid, how);
+    fs_request(CAPIO_REQUEST_CREATE, tid, std::string("-1 ") + how + " ", path.native());
+    if (how == CAPIO_FS_WRITER_INHERITED) {
+        return; // sent while the program starts, maybe before its server does: no reply
+    }
     off64_t res; // nothing to learn, but a client of the wrong variant stops before it writes
     buff_response->read(&res);
 }

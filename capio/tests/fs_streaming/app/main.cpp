@@ -87,6 +87,7 @@ const std::map<std::string, Operation> &operations() {
         {"create", [](const std::string &a) { return open_as(a, O_CREAT | O_WRONLY | O_TRUNC); }},
         {"excl", [](const std::string &a) { return open_as(a, O_CREAT | O_EXCL | O_WRONLY); }},
         {"append", [](const std::string &a) { return open_as(a, O_WRONLY | O_APPEND); }},
+        {"rewrite", [](const std::string &a) { return open_as(a, O_WRONLY | O_TRUNC); }},
         {"write",
          [](const std::string &a) {
              return write(fd, a.data(), a.size()) == static_cast<ssize_t>(a.size());
@@ -389,6 +390,19 @@ const std::map<std::string, Operation> &operations() {
                  _exit(0);
              }
              return wait_child(pid);
+         }},
+        {"spawn_into", // posix_spawn "printf A", its output opened by a file action
+         [](const std::string &a) {
+             posix_spawn_file_actions_t actions;
+             posix_spawn_file_actions_init(&actions);
+             posix_spawn_file_actions_addopen(&actions, STDOUT_FILENO, a.c_str(),
+                                              O_CREAT | O_WRONLY | O_TRUNC, 0644);
+             pid_t pid;
+             char name[] = "printf", text[] = "A";
+             char *args[]       = {name, text, nullptr};
+             const bool spawned = posix_spawnp(&pid, name, &actions, nullptr, args, environ) == 0;
+             posix_spawn_file_actions_destroy(&actions);
+             return spawned && wait_child(pid);
          }},
         {"spawn",
          [](const std::string &) {

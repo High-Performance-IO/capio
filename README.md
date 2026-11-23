@@ -158,8 +158,10 @@ In the file system variant:
   committed when the shell closes its copy: use `on_close:N` or `on_termination` for such producers. Closes made by the
   kernel (exit, close-on-exec, `dup2`, `close_range`) count only in the process that opened the file. A file whose
   close fails is never committed, and its consumers wait: see the log of the server.
-- **`on_termination`** commits what a thread or process created when that thread or process ends, even if another one
-  still writes to it. A process killed by a signal commits nothing.
+- **`on_termination`** commits what a thread or process writes when that thread or process ends, even if another one
+  still writes to it. It writes what it creates or opens for writing, and what it gets open for writing when it starts
+  (from `posix_spawn` file actions, or a shell outside CAPIO) if no other process writes it. A process killed by a
+  signal commits nothing.
 - **Renames** carry the closes and producers of the file to its new name. Closes are those seen by the local server.
 - **Missing paths** make `open`, `stat` and `access` wait only in the declared consumers of the path, and fail with
   `ENOENT` otherwise. With `--no-config` every process but the producer waits. The children of a directory are

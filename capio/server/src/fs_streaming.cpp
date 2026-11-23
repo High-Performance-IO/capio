@@ -80,6 +80,11 @@ bool FsStreaming::isProducer(const pid_t tid, const std::filesystem::path &path)
     return found != producers.end() && found->second.count(producerName(tid)) != 0;
 }
 
+bool FsStreaming::hasProducer(const std::filesystem::path &path) const {
+    const auto found = producers.find(path);
+    return found != producers.end() && !found->second.empty();
+}
+
 void FsStreaming::addOpener(const pid_t tid, const std::filesystem::path &path) {
     if (const auto thread = threads.find(tid); thread != threads.end()) {
         openers[path].insert(thread->second.process);
