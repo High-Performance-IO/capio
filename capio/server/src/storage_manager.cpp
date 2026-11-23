@@ -347,6 +347,12 @@ void StorageManager::removeFromDirectory(const std::filesystem::path &file_path)
 void StorageManager::updateDirectory(const pid_t tid, const std::filesystem::path &file_path) {
     START_LOG(gettid(), "call(file_path=%s)", file_path.c_str());
     const auto &dir = get_parent_dir_path(file_path);
+    // A directory that exists on the file system without having been created through CAPIO (e.g.
+    // by an application that ran before the server started): register it, and its parents,
+    // instead of failing on the missing entry.
+    if (!tryGet(dir)) {
+        addDirectory(tid, dir);
+    }
     if (CapioFile &c_file = get(dir.c_str()); c_file.isFirstWrite()) {
         c_file.registerFirstWrite();
         home_node_service->setHome(dir);
