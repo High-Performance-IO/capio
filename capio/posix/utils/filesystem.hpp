@@ -302,7 +302,7 @@ std::filesystem::path get_dir_path(int dirfd) {
         return it->second;
     } else {
         char proclnk[128];
-        char dir_pathname[PATH_MAX];
+        char dir_pathname[PATH_MAX + 1]{}; // readlink does not terminate it
         sprintf(proclnk, "/proc/self/fd/%d", dirfd);
         if (syscall_no_intercept(SYS_readlinkat, AT_FDCWD, proclnk, dir_pathname, PATH_MAX) < 0) {
             LOG("failed to readlink\n");

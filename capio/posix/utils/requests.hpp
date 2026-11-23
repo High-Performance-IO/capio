@@ -222,7 +222,7 @@ inline off64_t read_request(const int fd, const off64_t count, const long tid) {
 inline off64_t seek_data_request(const int fd, const off64_t offset, const long tid) {
     START_LOG(capio_syscall(SYS_gettid), "call(fd=%ld, offset=%ld, tid=%ld)", fd, offset, tid);
     char req[CAPIO_REQ_MAX_SIZE];
-    sprintf(req, "%04d %ld %d %zu", CAPIO_REQUEST_SEEK_DATA, tid, fd, offset);
+    sprintf(req, "%04d %ld %d %ld", CAPIO_REQUEST_SEEK_DATA, tid, fd, offset);
     LOG("req=%s", req);
     buf_requests->write(req, CAPIO_REQ_MAX_SIZE);
     off64_t res;
@@ -245,7 +245,7 @@ inline off64_t seek_end_request(const int fd, const long tid) {
 inline off64_t seek_hole_request(const int fd, const off64_t offset, const long tid) {
     START_LOG(capio_syscall(SYS_gettid), "call(fd=%ld, offset=%ld, tid=%ld)", fd, offset, tid);
     char req[CAPIO_REQ_MAX_SIZE];
-    sprintf(req, "%04d %ld %d %zu", CAPIO_REQUEST_SEEK_HOLE, tid, fd, offset);
+    sprintf(req, "%04d %ld %d %ld", CAPIO_REQUEST_SEEK_HOLE, tid, fd, offset);
     LOG("req=%s", req);
     buf_requests->write(req, CAPIO_REQ_MAX_SIZE);
     off64_t res;
@@ -256,7 +256,7 @@ inline off64_t seek_hole_request(const int fd, const off64_t offset, const long 
 inline off64_t seek_request(const int fd, const off64_t offset, const long tid) {
     START_LOG(capio_syscall(SYS_gettid), "call(fd=%ld, offset=%ld, tid=%ld)", fd, offset, tid);
     char req[CAPIO_REQ_MAX_SIZE];
-    sprintf(req, "%04d %ld %d %zu", CAPIO_REQUEST_SEEK, tid, fd, offset);
+    sprintf(req, "%04d %ld %d %ld", CAPIO_REQUEST_SEEK, tid, fd, offset);
     LOG("req=%s", req);
     buf_requests->write(req, CAPIO_REQ_MAX_SIZE);
     off64_t res;

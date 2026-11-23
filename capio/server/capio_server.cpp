@@ -102,7 +102,7 @@ static constexpr std::array<CSHandler_t, CAPIO_NR_REQUESTS> build_request_handle
     while (true) {
         START_LOG(gettid(), "call()");
         int code = client_manager->readNextRequest(str.get());
-        if (code < 0 || code > CAPIO_NR_REQUESTS) {
+        if (code < 0 || code >= CAPIO_NR_REQUESTS) {
             CALF_PRINT_COLOR(CALF_CLI_LEVEL_ERROR, "Received invalid code: %d", code);
 
             ERR_EXIT("Error: received invalid request code");
