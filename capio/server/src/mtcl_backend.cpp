@@ -8,6 +8,7 @@
 #include <cstring>
 #include <mtcl.hpp>
 #include <stdexcept>
+#include <thread>
 
 extern DiscoveryService *discovery_service;
 
@@ -173,6 +174,31 @@ static void discard_message(MTCL::HandleUser &handle) {
     }
 }
 
+void MTCLBackend::progress_sends() {
+    const std::shared_lock connections_lock(open_connections_lock);
+    for (auto &[hostname, connection] : open_connections) {
+        // A failed send is reported again by the next cleanup_completed_sends(), which removes
+        // the connection; removing it here could free the handle being received on.
+        [[maybe_unused]] const bool ok = connection->cleanup_completed_sends();
+    }
+}
+
+bool MTCLBackend::receive_frame(MTCL::HandleUser &handle, void *data, size_t size) {
+    START_LOG(gettid(), "call(size=%zu)", size);
+    MTCL::Request request;
+    if (handle.ireceive(data, size, request) < 0) {
+        return false;
+    }
+    while (!MTCL::test(request)) {
+        if (!continue_execution) {
+            return false;
+        }
+        progress_sends();
+        std::this_thread::yield();
+    }
+    return request.count() == static_cast<ssize_t>(size);
+}
+
 /**
  * @brief Waits for, validates, and decodes the next request from any MTCL peer.
  * @return The decoded request and its source, or empty strings during shutdown.
@@ -215,7 +241,7 @@ RemoteRequest MTCLBackend::read_next_request() {
         }
 
         std::vector<unsigned char> frame(available);
-        if (!receive_message(handle, frame.data(), frame.size())) {
+        if (!receive_frame(handle, frame.data(), frame.size())) {
             LOG("Failed to receive %zu-byte MTCL frame from %s", available,
                 remote_hostname.c_str());
             remove_connection(remote_hostname);
