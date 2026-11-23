@@ -1,7 +1,14 @@
 #ifndef CAPIO_SERVER_HANDLERS_OPEN_HPP
 #define CAPIO_SERVER_HANDLERS_OPEN_HPP
 
+#include <chrono>
+#include <csignal>
+#include <pthread.h>
+#include <thread>
+
+#include "common/requests.hpp"
 #include "remote/home_node_service.hpp"
+#include "utils/common.hpp"
 #include "utils/runtime_configuration.hpp"
 
 extern ClientManager *client_manager;
@@ -79,6 +86,41 @@ inline void handle_open(int tid, int fd, const std::filesystem::path &path) {
     }
 }
 
+inline void handle_create_fs(const int tid, const std::filesystem::path &path,
+                             const bool inherited) {
+    const bool has_producer = inherited && client_manager->hasProducer(path);
+    if (!has_producer && !CapioCLEngine::get().isExcluded(path)) {
+        client_manager->registerProducedFile(tid, path);
+    }
+}
+
+inline void handle_open_fs(const int tid, const std::filesystem::path &path) {
+    if (CapioCLEngine::get().isExcluded(path)) {
+        client_manager->replyToClient(tid, 0);
+        return;
+    }
+    std::error_code error;
+    if (std::filesystem::exists(path, error) || !FsStorageManager::waitsForCreation(tid, path)) {
+        client_manager->replyToClient(tid, 1); // if it is missing, the kernel answers ENOENT
+        return;
+    }
+    // The waiter does not get the termination signals: their handler frees memory and exits, and
+    // run on a thread that holds a lock (malloc's, CAPIO-CL's) it would wait for it forever.
+    // TODO: a thread manager for the threads of the server
+    sigset_t signals, previous;
+    sigemptyset(&signals);
+    for (const int signal : {SIGTERM, SIGINT, SIGQUIT, SIGPIPE}) {
+        sigaddset(&signals, signal);
+    }
+    pthread_sigmask(SIG_BLOCK, &signals, &previous);
+    std::thread t([path, tid] {
+        fs_storage_manager->waitForCreation(path);
+        client_manager->replyToClient(tid, 1);
+    });
+    t.detach();
+    pthread_sigmask(SIG_SETMASK, &previous, nullptr);
+}
+
 void create_handler(const char *const str) {
     int tid, fd;
     char path[PATH_MAX];
@@ -110,6 +152,31 @@ void open_handler(const char *const str) {
         return;
     }
     handle_open(tid, fd, path);
+}
+
+/// @brief create of the FS variant: "tid path", from a client that created it or opened it to write
+void create_fs_handler(const char *const str) {
+    int tid, consumed = 0;
+    if (sscanf(str, "%d%n", &tid, &consumed) == 1) {
+        handle_create_fs(tid, fs_request_path(tid, str, consumed), false);
+    }
+}
+
+/// @brief "tid path": @p tid got a writable descriptor of path at exec. It produces the file only
+/// if nobody else does, so that "prog > out" does not take it from its producer.
+void inherit_fs_handler(const char *const str) {
+    int tid, consumed = 0;
+    if (sscanf(str, "%d%n", &tid, &consumed) == 1) {
+        handle_create_fs(tid, fs_request_path(tid, str, consumed), true);
+    }
+}
+
+/// @brief open of the FS variant: "tid path"
+void open_fs_handler(const char *const str) {
+    int tid, consumed = 0;
+    if (sscanf(str, "%d%n", &tid, &consumed) == 1) {
+        handle_open_fs(tid, fs_request_path(tid, str, consumed));
+    }
 }
 
 #endif // CAPIO_SERVER_HANDLERS_OPEN_HPP

@@ -1,3 +1,4 @@
+#include <algorithm>
 #include <thread>
 
 #include "client-manager/client_manager.hpp"
@@ -80,7 +81,11 @@ void ClientManager::removeClient(const pid_t tid) {
     }
     const std::string &app_name = this->getAppName(tid);
     files_created_by_producer.erase(tid);
-    files_created_by_app_name.erase(app_name);
+    // The app keeps producing while one of its clients is alive
+    if (std::none_of(files_created_by_producer.begin(), files_created_by_producer.end(),
+                     [&](const auto &client) { return getAppName(client.first) == app_name; })) {
+        files_created_by_app_name.erase(app_name);
+    }
 
     {
         const std::unique_lock lock(responses_mutex);
@@ -167,6 +172,11 @@ bool ClientManager::isProducer(const pid_t tid, const std::filesystem::path &pat
     }
 
     return is_producer;
+}
+
+bool ClientManager::hasProducer(const std::filesystem::path &path) const {
+    return std::any_of(files_created_by_app_name.begin(), files_created_by_app_name.end(),
+                       [&](const auto &group) { return group.second.count(path.native()) != 0; });
 }
 
 const std::unordered_set<std::string> &ClientManager::getProducedFiles(const pid_t tid) const {

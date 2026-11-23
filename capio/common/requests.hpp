@@ -26,8 +26,14 @@ constexpr const int CAPIO_REQUEST_UNLINK              = 21;
 constexpr const int CAPIO_REQUEST_WRITE               = 22;
 constexpr const int CAPIO_REQUEST_RMDIR               = 23;
 constexpr const int CAPIO_REQUEST_COPY_FILE_RANGE     = 24;
+constexpr const int CAPIO_REQUEST_CONSENT             = 25;
+constexpr const int CAPIO_REQUEST_READ_FS             = 26;
+constexpr const int CAPIO_REQUEST_CREATE_FS           = 27;
+constexpr const int CAPIO_REQUEST_OPEN_FS             = 28;
+constexpr const int CAPIO_REQUEST_CLOSE_FS            = 29;
+constexpr const int CAPIO_REQUEST_INHERIT_FS          = 30;
 
-constexpr const int CAPIO_NR_REQUESTS = 25;
+constexpr const int CAPIO_NR_REQUESTS = 31;
 
 /*REQUESTS FOR SERVER TO SERVER COMMUNICATION*/
 

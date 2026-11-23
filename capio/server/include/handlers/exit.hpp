@@ -2,9 +2,10 @@
 #define CAPIO_SERVER_HANDLERS_EXIT_HPP
 
 #include "storage/manager.hpp"
+#include "utils/common.hpp"
 extern StorageManager *storage_manager;
 
-inline void handle_exit_group(int tid) {
+void handle_exit_group(int tid) {
     START_LOG(gettid(), "call(tid=%d)", tid);
 
     LOG("retrieving files from writers for process with pid = %d", tid);
@@ -13,10 +14,16 @@ inline void handle_exit_group(int tid) {
 
         LOG("Handling file %s", path.c_str());
         if (CapioCLEngine::get().getCommitRule(path) == capiocl::commitRules::ON_TERMINATION) {
-            // A file the process removed before exiting has nothing left to commit.
             auto c_file_opt = storage_manager->tryGet(path);
             if (!c_file_opt) {
-                LOG("File %s was removed", path.c_str());
+                // The FS variant produces files that are only on the file system. Any other file
+                // missing from storage was removed before exiting and has nothing left to commit.
+                if (std::error_code error; std::filesystem::exists(path, error)) {
+                    LOG("File %s is on the file system. Setting it to complete", path.c_str());
+                    fs_storage_manager->commit(path);
+                } else {
+                    LOG("File %s was removed", path.c_str());
+                }
                 continue;
             }
             CapioFile &c_file = c_file_opt->get();

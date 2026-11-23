@@ -1,13 +1,17 @@
 #ifndef CAPIO_SERVER_HANDLERS_READ_HPP
 #define CAPIO_SERVER_HANDLERS_READ_HPP
 
+#include <chrono>
+#include <csignal>
 #include <mutex>
+#include <pthread.h>
 #include <thread>
 
 #include "remote/backend.hpp"
 #include "remote/requests.hpp"
 
 #include "remote/home_node_service.hpp"
+#include "utils/common.hpp"
 #include "utils/runtime_configuration.hpp"
 
 extern Backend *backend;
@@ -175,6 +179,42 @@ void read_handler(const char *const str) {
     off64_t count;
     sscanf(str, "%d %d %ld", &tid, &fd, &count);
     handle_read(tid, fd, count);
+}
+
+void read_fs_handler(const char *const str) {
+    int tid, fd, consumed = 0;
+    off64_t end_of_read;
+    if (sscanf(str, "%d %d %ld%n", &tid, &fd, &end_of_read, &consumed) != 3) {
+        return;
+    }
+    const std::filesystem::path path = fs_request_path(tid, str, consumed);
+
+    // -1: there will never be anything to wait for, so the client does not ask again
+    if (std::error_code error; std::filesystem::is_directory(path, error) ||
+                               CapioCLEngine::get().isExcluded(path) ||
+                               FsStorageManager::isProducer(tid, path)) {
+        client_manager->replyToClient(tid, -1);
+        return;
+    }
+
+    if (const auto size = FsStorageManager::readable(path, end_of_read)) {
+        client_manager->replyToClient(tid, *size);
+        return;
+    }
+    // The waiter does not get the termination signals: their handler frees memory and exits, and
+    // run on a thread that holds a lock (malloc's, CAPIO-CL's) it would wait for it forever.
+    // TODO: a thread manager for the threads of the server
+    sigset_t signals, previous;
+    sigemptyset(&signals);
+    for (const int signal : {SIGTERM, SIGINT, SIGQUIT, SIGPIPE}) {
+        sigaddset(&signals, signal);
+    }
+    pthread_sigmask(SIG_BLOCK, &signals, &previous);
+    std::thread t([path, tid, end_of_read] {
+        client_manager->replyToClient(tid, fs_storage_manager->waitForData(path, end_of_read));
+    });
+    t.detach();
+    pthread_sigmask(SIG_SETMASK, &previous, nullptr);
 }
 
 #endif // CAPIO_SERVER_HANDLERS_READ_HPP
