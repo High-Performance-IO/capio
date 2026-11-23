@@ -173,17 +173,6 @@ static void discard_message(MTCL::HandleUser &handle) {
     }
 }
 
-/**
- * @brief Receives one whole frame without stalling this server's own sends.
- * @return true only when all expected bytes were received.
- *
- * A blocking receive deadlocks two servers that send each other frames larger than the TCP
- * buffers at the same time. MTCL (built with SINGLE_IO_THREAD) advances a send only from
- * test()/wait() on the calling thread, or from its IO thread for yielded handles, and this
- * handle is not yielded while it is being read. So each listener would wait for the rest of a
- * frame that the other listener can no longer send. Polling the receive and the pending sends
- * of every peer keeps both directions moving (the cycle can span several nodes).
- */
 void MTCLBackend::progress_sends() {
     const std::shared_lock connections_lock(open_connections_lock);
     for (auto &[hostname, connection] : open_connections) {

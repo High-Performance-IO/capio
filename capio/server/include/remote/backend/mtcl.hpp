@@ -62,7 +62,17 @@ class MTCLBackend : public Backend {
     /** Advance pending sends to every peer; failures are left to cleanup_completed_sends(). */
     void progress_sends();
 
-    /** Receive one whole frame while the pending sends of every peer keep progressing. */
+    /**
+     * @brief Receives one whole frame without stalling this server's own sends.
+     * @return true only when all expected bytes were received.
+     *
+     * A blocking receive deadlocks two servers that send each other frames larger than the TCP
+     * buffers at the same time. MTCL (built with SINGLE_IO_THREAD) advances a send only from
+     * test()/wait() on the calling thread, or from its IO thread for yielded handles, and this
+     * handle is not yielded while it is being read. So each listener would wait for the rest of a
+     * frame that the other listener can no longer send. Polling the receive and the pending sends
+     * of every peer keeps both directions moving (the cycle can span several nodes).
+     */
     bool receive_frame(MTCL::HandleUser &handle, void *data, size_t size);
 
     /** Remove a peer so discovery can establish a replacement connection. */
