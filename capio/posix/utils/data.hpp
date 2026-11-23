@@ -17,7 +17,8 @@ inline void initialize_data_queues(const long tid) {
 
 /**
  * Read up to @count bytes of the CAPIO descriptor @fd, at its file offset, through the read cache.
- * The data this thread wrote must reach the server first, so the write cache is flushed.
+ * The data this thread wrote to the same file must reach the server first, so the write cache is
+ * flushed if it holds some: a tool that reads one file while writing another keeps both caches.
  *
  * @param fd
  * @param buffer
@@ -25,7 +26,9 @@ inline void initialize_data_queues(const long tid) {
  * @return the number of bytes read, 0 at the end of the file
  */
 inline off64_t capio_cached_read(const int fd, void *buffer, const off64_t count) {
-    write_cache->flush();
+    if (write_cache->cachesFileOf(fd)) {
+        write_cache->flush();
+    }
     return read_cache->read(fd, buffer, count, false, false);
 }
 
@@ -38,9 +41,7 @@ inline off64_t capio_cached_read(const int fd, void *buffer, const off64_t count
  * @param count
  */
 inline void capio_cached_write(const int fd, const void *buffer, const off64_t count) {
-    if (read_cache->cachesFileOf(fd)) {
-        read_cache->flush();
-    }
+    read_cache->flushFileOf(fd);
     write_cache->write(fd, buffer, count);
 }
 
@@ -53,7 +54,7 @@ inline void capio_cached_write(const int fd, const void *buffer, const off64_t c
  * @param tid
  */
 inline void capio_set_fd_offset(const int fd, const off64_t offset, const long tid) {
-    read_cache->flush();
+    read_cache->flush(fd);
     write_cache->flush();
     set_capio_fd_offset(fd, offset);
     seek_request(fd, offset, tid);
