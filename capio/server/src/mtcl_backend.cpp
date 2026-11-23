@@ -4,6 +4,7 @@
 
 #include <algorithm>
 #include <cstdint>
+#include <cstdlib>
 #include <cstring>
 #include <mtcl.hpp>
 #include <stdexcept>
@@ -398,6 +399,15 @@ void MTCLBackend::remove_connection(const std::string &hostname) {
     open_connections.erase(connection);
 }
 
+std::string make_advertisement_token(const std::string &proto, const std::string &port,
+                                     const std::string &hostname) {
+    const char *host = std::getenv("CAPIO_MTCL_ADVERTISE_HOST");
+    if (host == nullptr || *host == '\0') {
+        return proto + ":" + hostname + ":" + port;
+    }
+    return proto + ":" + host + ":" + port + "|" + hostname;
+}
+
 /**
  * @brief Initializes MTCL and starts listening on the requested protocol and port.
  *
@@ -406,7 +416,7 @@ void MTCLBackend::remove_connection(const std::string &hostname) {
 MTCLBackend::MTCLBackend(const std::string &proto, const std::string &port, const int sleep_time)
     : Backend(HOST_NAME_MAX), thread_sleep_times(sleep_time),
       listen_token(proto + ":0.0.0.0:" + port),
-      advertisement_token(proto + ":" + node_name + ":" + port), own_port(port),
+      advertisement_token(make_advertisement_token(proto, port, node_name)), own_port(port),
       used_protocol(proto) {
     MTCL::Manager::init("server-" + node_name);
     // A server that cannot listen (e.g. the port is taken by another server on this node) must
@@ -508,14 +518,19 @@ void MTCLBackend::recv_file(char *shm, const long int bytes_expected, const std:
  * Only the lexicographically smaller node initiates the connection, preventing both peers from
  * creating duplicate links. A hostname handshake gives the receiver the same map key.
  */
-void MTCLBackend::connect_to(const std::string &target_token) {
-    const auto first_colon = target_token.find(':');
-    const auto last_colon  = target_token.rfind(':');
+void MTCLBackend::connect_to(const std::string &advertised_token) {
+    // "PROTO:host:port", or "PROTO:address:port|hostname" (see make_advertisement_token)
+    const auto bar                 = advertised_token.find('|');
+    const std::string target_token = advertised_token.substr(0, bar);
+    const auto first_colon         = target_token.find(':');
+    const auto last_colon          = target_token.rfind(':');
     if (first_colon == std::string::npos || first_colon == last_colon) {
         return;
     }
     const std::string remote_hostname =
-        target_token.substr(first_colon + 1, last_colon - first_colon - 1);
+        bar != std::string::npos
+            ? advertised_token.substr(bar + 1)
+            : target_token.substr(first_colon + 1, last_colon - first_colon - 1);
     if (remote_hostname.empty() || node_name >= remote_hostname) {
         return;
     }
@@ -548,5 +563,6 @@ void MTCLBackend::connect_to(const std::string &target_token) {
     auto connection = std::make_unique<MTCLConnection>(std::move(handle));
     connection->yield();
     open_connections.emplace(remote_hostname, std::move(connection));
-    CALF_PRINT_COLOR(CALF_CLI_LEVEL_INFO, "Connected to %s", target_token.c_str());
+    CALF_PRINT_COLOR(CALF_CLI_LEVEL_INFO, "Connected to %s (node %s)", target_token.c_str(),
+                     remote_hostname.c_str());
 }
