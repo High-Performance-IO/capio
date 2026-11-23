@@ -47,6 +47,11 @@ inline int capio_openat(int dirfd, const std::string_view &pathname, int flags, 
         if (excl) {
             LOG("excl");
             off64_t return_code = create_exclusive_request(fd, path, tid);
+            if (return_code == CAPIO_POSIX_SYSCALL_REQUEST_SKIP) {
+                // excluded from CAPIO: the file is opened on the file system
+                syscall_no_intercept(SYS_close, fd);
+                return CAPIO_POSIX_SYSCALL_REQUEST_SKIP;
+            }
             if (return_code == 1) {
                 errno = EEXIST;
                 return CAPIO_POSIX_SYSCALL_ERRNO;
@@ -54,6 +59,11 @@ inline int capio_openat(int dirfd, const std::string_view &pathname, int flags, 
         } else if (create) {
             LOG("create");
             off64_t return_code = create_request(fd, path, tid);
+            if (return_code == CAPIO_POSIX_SYSCALL_REQUEST_SKIP) {
+                // excluded from CAPIO: the file is opened on the file system
+                syscall_no_intercept(SYS_close, fd);
+                return CAPIO_POSIX_SYSCALL_REQUEST_SKIP;
+            }
             if (return_code == 1) {
                 errno = ENOENT;
                 return CAPIO_POSIX_SYSCALL_ERRNO;
@@ -61,6 +71,11 @@ inline int capio_openat(int dirfd, const std::string_view &pathname, int flags, 
         } else {
             LOG("!excl && !create");
             off64_t return_code = open_request(fd, path, tid);
+            if (return_code == CAPIO_POSIX_SYSCALL_REQUEST_SKIP) {
+                // excluded from CAPIO: the file is opened on the file system
+                syscall_no_intercept(SYS_close, fd);
+                return CAPIO_POSIX_SYSCALL_REQUEST_SKIP;
+            }
             if (return_code == 1) {
                 syscall_no_intercept(SYS_close, fd);
                 errno = ENOENT;
