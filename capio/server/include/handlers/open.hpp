@@ -44,8 +44,8 @@ inline void handle_create(int tid, int fd, const std::filesystem::path &path) {
     // producer of the file: lookup() blocks this thread, and with it every client of this
     // server, until all of them have answered.
     const bool is_producer = CapioCLEngine::get().isProducer(path, client_manager->getAppName(tid));
-    bool is_creat          = !(home_node_service->getHome(path) ||
-                               (!is_producer && home_node_service->lookup(path)));
+    bool is_creat =
+        !(home_node_service->getHome(path) || (!is_producer && home_node_service->lookup(path)));
     update_file_metadata(path, tid, fd, is_creat, 0);
     client_manager->replyToClient(tid, 0);
 }
