@@ -83,4 +83,16 @@ class MTCLBackend : public Backend {
     void connect_to(const std::string &target_token) override;
 };
 
+/**
+ * @brief Builds the endpoint token this server advertises to its peers.
+ *
+ * Peers connect to the host in the token, and by default that is this node's hostname, which
+ * also identifies the node everywhere else (connection map, file homes). On clusters
+ * where the hostname resolves to a slow management network, CAPIO_MTCL_ADVERTISE_HOST names
+ * the address to connect to instead (e.g. the InfiniBand interface); the hostname then
+ * follows a '|' so that peers still know which node the endpoint belongs to.
+ */
+std::string make_advertisement_token(const std::string &proto, const std::string &port,
+                                     const std::string &hostname);
+
 #endif // MTCL_BACKEND_HPP
