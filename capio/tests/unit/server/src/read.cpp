@@ -21,6 +21,7 @@
 
 #include "handlers/read.hpp"
 #include "handlers/write.hpp"
+#include "remote/handlers/read.hpp"
 
 extern StorageManager *storage_manager;
 extern ClientManager *client_manager;
@@ -165,6 +166,56 @@ TEST_F(StreamingReadTest, waitingReadIsServedByTheWriteThatCompletesIt) {
     produce(8);
     EXPECT_EQ(next_response(std::chrono::seconds(2)), 16);
     EXPECT_TRUE(offset_reaches(16));
+}
+
+namespace {
+
+// Sends at most 4 bytes of file data in one message, and records the messages it sends.
+class SmallMessageBackend : public Backend {
+  public:
+    SmallMessageBackend() : Backend(256) {}
+
+    std::string request;
+    std::string file_data;
+
+    void handshake_servers() override {}
+    RemoteRequest read_next_request() override { return {std::string{}, std::string{}}; }
+    void send_file(const char *message, int message_size, char *data, long int size,
+                   const std::string &) override {
+        request.assign(message, static_cast<size_t>(message_size));
+        file_data.assign(data, static_cast<size_t>(size));
+    }
+    void recv_file(char *, long int, const std::string &) override {}
+    void send_request(const char *, int, const std::string &) override {}
+    void connect_to(const std::string &) override {}
+    long int max_file_transfer_size() const override { return 4; }
+};
+
+} // namespace
+
+/*
+ * A remote read is answered with the rest of the file, which can be more than the backend sends in
+ * one message (MTCL: 4 GiB): the reply must stop there, and the reader asks for the rest.
+ */
+TEST(RemoteReadTest, replyIsCappedAtTheLargestMessageTheBackendCanSend) {
+    SmallMessageBackend small_messages;
+    ASSERT_EQ(backend, nullptr);
+    backend = &small_messages;
+
+    const std::string path = "remote_read_reply_cap.dat";
+    CapioFile &c_file      = storage_manager->add(path, false, 16);
+    c_file.createBuffer(path, false);
+    c_file.insertSector(0, 16);
+
+    serve_remote_read(path, "node-b", 77, 3, 16, 0, true, false);
+
+    EXPECT_EQ(small_messages.file_data.size(), 4)
+        << "the reply carried more file data than the backend can send in one message";
+    // Fields: code, tid, fd, count, nbytes, file size, complete, is_getdents
+    EXPECT_STREQ(small_messages.request.c_str(), "0001 77 3 16 4 16 1 0");
+
+    storage_manager->remove(path);
+    backend = nullptr;
 }
 
 TEST(CapioFileTest, insertSectorWakesThreadsWaitingForData) {
