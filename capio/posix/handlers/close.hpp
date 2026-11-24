@@ -26,16 +26,10 @@ int close_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long ar
         // data reaches the server and when a full disk is reported: the file must not be committed
         // before.
         const std::string path = get_capio_fd_path(fd);
-        struct stat info{};
-        const bool is_dir =
-            syscall_no_intercept(SYS_fstat, fd, &info) == 0 && S_ISDIR(info.st_mode);
-        // Forget it before closing: another thread may get the same number as soon as it is free
-        delete_capio_fd(fd);
+        delete_capio_fd(fd); // before close: another thread may get the same number right after
         *result = syscall_no_intercept(SYS_close, fd);
-        if (*result != -EBADF && !is_dir) {
-            // EINTR: Linux has closed it anyway
-            close_request_fs(path, *result < 0 && *result != -EINTR ? -*result : 0, tid);
-        }
+        // The server does not count a close that failed. EINTR: Linux has closed it anyway
+        close_request_fs(path, *result < 0 && *result != -EINTR ? -*result : 0, tid);
         return CAPIO_POSIX_SYSCALL_SUCCESS;
     })
 }

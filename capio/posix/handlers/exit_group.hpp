@@ -20,10 +20,6 @@
 inline void capio_close_all_fs(const long tid) {
     START_LOG(tid, "call()");
     for (const int fd : get_capio_fds()) {
-        struct stat info{};
-        if (syscall_no_intercept(SYS_fstat, fd, &info) == 0 && S_ISDIR(info.st_mode)) {
-            continue;
-        }
         long error = 0;
         if ((get_capio_fd_flags(fd) & O_ACCMODE) != O_RDONLY) {
             long res = syscall_no_intercept(SYS_dup, fd);
