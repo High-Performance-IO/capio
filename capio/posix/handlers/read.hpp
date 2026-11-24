@@ -4,6 +4,9 @@
 #if defined(SYS_read) || defined(SYS_readv)
 
 #include "utils/data.hpp"
+#if !CAPIO_MEM_STREAM
+#include "utils/fs_waiting.hpp"
+#endif
 
 inline off64_t capio_read(int fd, void *buffer, off64_t count, long tid) {
     START_LOG(tid, "call(fd=%d, buf=0x%08x, count=%ld)", fd, buffer, count);
@@ -64,6 +67,33 @@ int readv_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long ar
 
     return posix_return_value(capio_readv(fd, iov, iovcnt, tid), result);
 }
+
+#if !CAPIO_MEM_STREAM
+/* FS variant: wait until the data is there, then the kernel runs the read */
+
+int read_fs_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg5,
+                    long *result) {
+    const int fd = static_cast<int>(arg0);
+    if (exists_capio_fd(fd)) {
+        fs_wait_for_data(fd, fs_end_of(fs_read_position(fd, nullptr), arg2),
+                         syscall_no_intercept(SYS_gettid));
+    }
+    return CAPIO_POSIX_SYSCALL_SKIP;
+}
+
+int readv_fs_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg5,
+                     long *result) {
+    const int fd = static_cast<int>(arg0);
+    if (exists_capio_fd(fd)) {
+        const auto *iov = reinterpret_cast<const struct iovec *>(arg1);
+        fs_wait_for_data(
+            fd,
+            fs_end_of(fs_read_position(fd, nullptr), fs_total_length(iov, static_cast<int>(arg2))),
+            syscall_no_intercept(SYS_gettid));
+    }
+    return CAPIO_POSIX_SYSCALL_SKIP;
+}
+#endif // !CAPIO_MEM_STREAM
 
 #endif // SYS_read || SYS_readv
 #endif // CAPIO_POSIX_HANDLERS_READ_HPP
