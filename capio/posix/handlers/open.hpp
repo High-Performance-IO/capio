@@ -5,7 +5,6 @@
 
 #include "utils/common.hpp"
 #include "utils/filesystem.hpp"
-#include "utils/fs_descriptors.hpp"
 
 inline int capio_openat(int dirfd, const std::string_view &pathname, int flags, mode_t mode,
                         long tid) {
@@ -55,7 +54,11 @@ inline int capio_openat(int dirfd, const std::string_view &pathname, int flags, 
             if (create || (flags & O_ACCMODE) != O_RDONLY) {
                 create_request_fs(path, tid);
             }
-            fs_track(tid, path.native(), new_fd, flags, (flags & O_CLOEXEC) == O_CLOEXEC);
+            if (exists_capio_fd(new_fd)) { // closed by a call CAPIO does not handle yet
+                delete_capio_fd(new_fd);
+            }
+            add_capio_fd(tid, path, new_fd, 0, CAPIO_DEFAULT_FILE_INITIAL_SIZE, flags & ~O_CLOEXEC,
+                         (flags & O_CLOEXEC) == O_CLOEXEC);
             return new_fd;
         }
 #endif

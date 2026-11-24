@@ -436,7 +436,7 @@ static __attribute__((constructor)) void init() {
         initialize_from_snapshot(fd_shm, tid);
     }
 #else
-    fs_track_inherited(tid);
+    initialize_from_inherited_fds(tid);
 #endif
 
     intercept_hook_point_clone_child  = hook_clone_child;

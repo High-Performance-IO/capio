@@ -8,6 +8,14 @@
 #include "calf/SyscallLogger.h"
 #include "types.hpp"
 
+#if !CAPIO_MEM_STREAM
+#include <filesystem>
+#include <sys/stat.h>
+
+#include "filesystem.hpp"
+#include "requests.hpp"
+#endif
+
 inline int *get_fd_snapshot(long tid) {
     return static_cast<int *>(get_shm_if_exist("capio_snapshot_" + std::to_string(tid)));
 }
@@ -81,5 +89,44 @@ void create_snapshot(long tid) {
     }
     fd_shm[i] = -1;
 }
+
+#if !CAPIO_MEM_STREAM
+/**
+ * FS variant: the descriptors of CAPIO files that a program inherits are real ones, so they are
+ * found in /proc/self/fd instead of in a snapshot. That also finds the ones opened outside CAPIO
+ * (a posix_spawn file action, a shell that is not preloaded): if nobody registered as the
+ * producer of a writable one, the program that writes it is.
+ */
+void initialize_from_inherited_fds(long tid) {
+    START_LOG(tid, "call()");
+    if (std::getenv("CAPIO_DIR") == nullptr) {
+        return;
+    }
+    syscall_no_intercept_flag = true;
+    std::vector<int> open_fds;
+    std::error_code error;
+    for (const auto &entry : std::filesystem::directory_iterator("/proc/self/fd", error)) {
+        open_fds.push_back(std::atoi(entry.path().filename().c_str()));
+    }
+    for (const int fd : open_fds) {
+        struct stat info{};
+        const long fd_flags = syscall_no_intercept(SYS_fcntl, fd, F_GETFD);
+        if (fd_flags < 0 || syscall_no_intercept(SYS_fstat, fd, &info) != 0 || info.st_nlink == 0) {
+            continue; // the descriptor of the listing itself, or a removed file
+        }
+        const auto path = get_dir_path(fd);
+        if (path.empty() || !is_capio_path(path)) {
+            continue;
+        }
+        const auto flags = static_cast<int>(syscall_no_intercept(SYS_fcntl, fd, F_GETFL));
+        add_capio_fd(tid, path, fd, 0, CAPIO_DEFAULT_FILE_INITIAL_SIZE, flags,
+                     (fd_flags & FD_CLOEXEC) != 0);
+        if (!S_ISDIR(info.st_mode) && (flags & O_ACCMODE) != O_RDONLY) {
+            inherit_request_fs(path, tid);
+        }
+    }
+    syscall_no_intercept_flag = false;
+}
+#endif // !CAPIO_MEM_STREAM
 
 #endif // CAPIO_POSIX_UTILS_SNAPSHOT_HPP
