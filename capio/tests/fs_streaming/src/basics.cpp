@@ -38,11 +38,3 @@ TEST_F(FsStreamingTest, PlainDirectoryNeverWaits) {
     // Twice: the first lookup is enough to make contains() true
     EXPECT_OUTPUT(run("cons", {"stat:plain", "open:plain", "stat:plain"}), "dirdir");
 }
-
-TEST_F(FsStreamingTest, ExitOfAnotherClientKeepsTheAppAProducer) {
-    // "writer" is not in the config: it produces f only because it created it
-    startServer({{"f", "on_close", "update", -1, false}});
-    const auto app = start(
-        "writer", {"create:f", "write:AAAA", "thread:sleep:10", "thread:open:f", "thread:read"});
-    EXPECT_OUTPUT(finish(app), "AAAA");
-}

@@ -1,6 +1,6 @@
 /*
  * The application of the FS streaming tests. Its arguments are operations, run in order on a
- * current descriptor, e.g. "create:out" "write:AAAA" "sleep:500" "close". A failed operation
+ * current descriptor, e.g. "create:out" "write:AAAA" "close". A failed operation
  * prints "<operation>=<errno name>" and the next one runs.
  */
 #include <cerrno>
@@ -8,19 +8,12 @@
 #include <cstring>
 #include <functional>
 #include <map>
-#include <set>
 #include <string>
 #include <thread>
 #include <vector>
 
-#include <dirent.h>
 #include <fcntl.h>
-#include <sys/mman.h>
-#include <sys/sendfile.h>
 #include <sys/stat.h>
-#include <sys/syscall.h>
-#include <sys/uio.h>
-#include <sys/wait.h>
 #include <unistd.h>
 
 namespace {
@@ -63,11 +56,6 @@ bool open_as(const std::string &path, const int flags) {
     return fd >= 0;
 }
 
-bool wait_child(const pid_t pid) {
-    int status;
-    return pid > 0 && waitpid(pid, &status, 0) == pid;
-}
-
 using Operation = std::function<bool(const std::string &)>;
 
 const std::map<std::string, Operation> &operations() {
@@ -84,10 +72,6 @@ const std::map<std::string, Operation> &operations() {
         {"read", [](const std::string &) { return read_all(); }},
         {"close", [](const std::string &) { return close(fd) == 0; }},
         {"seek", [](const std::string &a) { return lseek(fd, std::stol(a), SEEK_SET) >= 0; }},
-        {"sleep", [](const std::string &a) { return usleep(std::stoi(a) * 1000) == 0; }},
-        {"chdir", [](const std::string &a) { return chdir(a.c_str()) == 0; }},
-        {"mkdir", [](const std::string &a) { return mkdir(a.c_str(), 0755) == 0; }},
-        {"unlink", [](const std::string &a) { return unlink(a.c_str()) == 0; }},
         {"print",
          [](const std::string &a) {
              print(a);
@@ -102,35 +86,12 @@ const std::map<std::string, Operation> &operations() {
              print(S_ISDIR(info.st_mode) ? "dir" : std::to_string(info.st_size));
              return true;
          }},
-        {"background",
-         [](const std::string &a) {
-             std::thread([a] {
-                 run(a);
-                 sleep(60);
-             }).detach();
-             return true;
-         }},
         {"access", [](const std::string &a) { return ::access(a.c_str(), F_OK) == 0; }},
-        {"seek_end",
-         [](const std::string &) {
-             const off_t end = lseek(fd, 0, SEEK_END);
-             print(std::to_string(end));
-             return end >= 0;
-         }},
         {"thread",
          [](const std::string &a) {
              std::thread thread([&a] { run(a); });
              thread.join();
              return true;
-         }},
-        {"fork",
-         [](const std::string &a) {
-             const pid_t pid = fork();
-             if (pid == 0) {
-                 run(a);
-                 _exit(0);
-             }
-             return wait_child(pid);
          }},
     };
     return table;

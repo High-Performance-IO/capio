@@ -11,7 +11,7 @@ class FsProducerTest : public FsStreamingTest {
         startServer({{"f", "on_termination"}});
     }
 
-    Result consume() { return finish(start("cons", {"open:f", "read"})); }
+    Result consume() { return run("cons", {"open:f", "read"}); }
 };
 
 TEST_F(FsProducerTest, RewriteWithoutCreateCommits) {

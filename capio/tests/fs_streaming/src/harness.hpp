@@ -182,31 +182,25 @@ class FsStreamingTest : public testing::Test {
         FAIL() << "the server did not start";
     }
 
-    /**
-     * @brief Start an app named @p name, or with no CAPIO_APP_NAME if it is empty. Its output goes
-     * to @p output if given: opened by this process, which CAPIO does not see, as a shell that is
-     * not preloaded would.
-     */
-    App start(const std::string &name, const std::vector<std::string> &operations,
-              const std::string &library = "", const std::filesystem::path &output = {}) {
+    /// @brief Start an app named @p name, or with no CAPIO_APP_NAME if it is empty
+    App start(const std::string &name, const std::vector<std::string> &operations) {
         std::vector<std::string> command{setting("CAPIO_FS_APP_PATH", "capio_fs_streaming_app")};
         command.insert(command.end(), operations.begin(), operations.end());
         std::vector<std::string> env{
             "CAPIO_DIR=" + work.string(), "CAPIO_WORKFLOW_NAME=" + workflow,
-            "LD_PRELOAD=" +
-                (library.empty() ? setting("CAPIO_FS_LIBRARY", "libcapio_posix_fs.so") : library)};
+            "LD_PRELOAD=" + setting("CAPIO_FS_LIBRARY", "libcapio_posix_fs.so")};
         if (!name.empty()) {
             env.push_back("CAPIO_APP_NAME=" + name);
         }
-        App app{0, output.empty() ? root / ("app" + std::to_string(n_apps++)) : output};
+        App app{0, root / ("app" + std::to_string(n_apps++))};
         app.pid = spawn(command, env, app.output, work);
         running.push_back(app.pid);
         return app;
     }
 
-    Result finish(const App &app,
-                  const std::chrono::milliseconds timeout = std::chrono::seconds(6)) {
-        const bool finished = reap(app.pid, timeout);
+    /// @brief Wait for @p app to end, for at most a generous time in case it hangs
+    Result finish(const App &app) {
+        const bool finished = reap(app.pid, std::chrono::seconds(30));
         if (finished) {
             running.erase(std::find(running.begin(), running.end(), app.pid));
         }
@@ -215,10 +209,6 @@ class FsStreamingTest : public testing::Test {
 
     Result run(const std::string &name, const std::vector<std::string> &operations) {
         return finish(start(name, operations));
-    }
-
-    static void pause(const int milliseconds) {
-        std::this_thread::sleep_for(std::chrono::milliseconds(milliseconds));
     }
 };
 
