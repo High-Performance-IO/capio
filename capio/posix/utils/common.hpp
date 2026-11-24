@@ -21,11 +21,15 @@ inline off64_t capio_max_rw_count() {
     return max_count;
 }
 
-/// @brief Thrown by a system call on a CAPIO file that the FS variant does not handle yet
+/// @brief Thrown by a system call on a CAPIO file that this variant of the library does not
+/// handle yet. The message names the system call and the variant.
 class CapioUnimplementedException : public std::logic_error {
+    static constexpr const char *variant = MEMORY_MODE("memory variant (libcapio_posix.so)")
+        FS_MODE("file system variant (libcapio_posix_fs.so)");
+
   public:
     explicit CapioUnimplementedException(const std::string &syscall)
-        : std::logic_error(syscall + " is not implemented yet by libcapio_posix_fs.so") {}
+        : std::logic_error(syscall + " is not implemented yet by the " + variant) {}
 };
 
 int posix_return_value(long res, long *result) {
