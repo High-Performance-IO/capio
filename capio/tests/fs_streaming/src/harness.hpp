@@ -77,13 +77,6 @@ class FsStreamingTest : public testing::Test {
             std::cout << "server log:\n" << slurp(root / "server.log") << std::endl;
         }
         std::filesystem::remove_all(root);
-        // What killed clients left in shared memory
-        std::error_code error;
-        for (const auto &entry : std::filesystem::directory_iterator("/dev/shm", error)) {
-            if (entry.path().filename().string().find(workflow) != std::string::npos) {
-                std::filesystem::remove(entry.path(), error);
-            }
-        }
     }
 
     static bool reap(const pid_t pid, const std::chrono::milliseconds timeout) {
@@ -132,6 +125,14 @@ class FsStreamingTest : public testing::Test {
                 waitpid(server, nullptr, 0);
             }
             server = -1;
+        }
+        // What killed clients left in shared memory, and a server built for coverage, which skips
+        // its teardown: the canary among it would stop the next server of the workflow
+        std::error_code error;
+        for (const auto &entry : std::filesystem::directory_iterator("/dev/shm", error)) {
+            if (entry.path().filename().string().find(workflow) != std::string::npos) {
+                std::filesystem::remove(entry.path(), error);
+            }
         }
     }
 
