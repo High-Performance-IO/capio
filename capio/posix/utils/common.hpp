@@ -46,6 +46,10 @@ int posix_return_value(long res, long *result) {
 /**
  * The result of syscall_no_intercept, which is the negated error on failure, in the form the
  * handlers return: -1, with the error in errno.
+ *
+ * TODO: use one convention for the return values of all handlers, with no result value that
+ * doubles as a sentinel (-2 is both CAPIO_POSIX_SYSCALL_REQUEST_SKIP and -ENOENT), and remove this
+ * conversion. See https://github.com/High-Performance-IO/capio/issues/311
  */
 inline long capio_kernel_result(const long result) {
     if (result < 0) {
