@@ -252,7 +252,10 @@ void FileDescriptorTable::renamePath(const std::string &old_path, const std::str
     for (const int fd : entry.mapped()) {
         _descriptors.at(fd).path = new_path;
     }
-    _paths.insert(std::move(entry));
+    // Onto a path with descriptors of its own (a rename over an open file): they join them
+    if (auto inserted = _paths.insert(std::move(entry)); !inserted.inserted) {
+        inserted.position->second.merge(inserted.node.mapped());
+    }
 }
 
 bool FileDescriptorTable::contains(const int fd) const {

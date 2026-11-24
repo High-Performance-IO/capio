@@ -182,6 +182,49 @@ bool ClientManager::hasProducer(const std::filesystem::path &path) const {
                        [&](const auto &group) { return group.second.count(path.native()) != 0; });
 }
 
+namespace {
+/// @brief Whether @p path is @p name or inside the directory @p name
+bool is_at_or_below(const std::string &path, const std::string &name) {
+    return path.compare(0, name.size(), name) == 0 &&
+           (path.size() == name.size() || path[name.size()] == '/');
+}
+} // namespace
+
+std::unordered_set<std::string> ClientManager::renameProducedFiles(const std::string &from,
+                                                                   const std::string &to,
+                                                                   const bool is_directory) {
+    std::unordered_set<std::string> renamed;
+    const auto rename_in = [&](std::unordered_set<std::string> &files) {
+        std::vector<std::string> moved;
+        for (auto file = files.begin(); file != files.end();) {
+            if (is_directory ? is_at_or_below(*file, from) : *file == from) {
+                moved.push_back(to + file->substr(from.size()));
+                file = files.erase(file);
+            } else {
+                ++file;
+            }
+        }
+        files.insert(moved.begin(), moved.end());
+        renamed.insert(moved.begin(), moved.end());
+    };
+    for (auto &[tid, files] : files_created_by_producer) {
+        rename_in(files);
+    }
+    for (auto &[group, files] : files_created_by_app_name) {
+        rename_in(files);
+    }
+    return renamed;
+}
+
+void ClientManager::forgetProducedFile(const std::string &path) {
+    for (auto &[tid, files] : files_created_by_producer) {
+        files.erase(path);
+    }
+    for (auto &[group, files] : files_created_by_app_name) {
+        files.erase(path);
+    }
+}
+
 const std::unordered_set<std::string> &ClientManager::getProducedFiles(const pid_t tid) const {
     START_LOG(gettid(), "call(tid=%ld)", tid);
     return files_created_by_producer[tid];

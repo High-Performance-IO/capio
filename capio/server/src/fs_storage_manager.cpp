@@ -16,6 +16,38 @@
 
 extern ClientManager *client_manager;
 
+namespace {
+
+/// @brief Whether @p path is @p name or inside the directory @p name
+bool is_at_or_below(const std::string &path, const std::string &name) {
+    return path.compare(0, name.size(), name) == 0 &&
+           (path.size() == name.size() || path[name.size()] == '/');
+}
+
+/// @brief Move the entries of @p map at or below @p from to @p to, replacing those that were
+/// there; with @p keep false (the file left CAPIO_DIR) just drop them
+template <typename Map>
+void move_entries(Map &map, const std::string &from, const std::string &to, const bool keep) {
+    Map moved;
+    for (auto entry = map.begin(); entry != map.end();) {
+        if (is_at_or_below(entry->first, from)) {
+            if (keep) {
+                moved.emplace(to + entry->first.substr(from.size()), std::move(entry->second));
+            }
+            entry = map.erase(entry);
+        } else if (keep && is_at_or_below(entry->first, to)) {
+            entry = map.erase(entry); // what the rename replaced
+        } else {
+            ++entry;
+        }
+    }
+    for (auto &[path, value] : moved) {
+        map[path] = std::move(value);
+    }
+}
+
+} // namespace
+
 FsStorageManager::FsStorageManager() {
     CALF_PRINT_COLOR(CALF_CLI_LEVEL_STATUS, "initialization completed.");
 }
@@ -88,7 +120,10 @@ void FsStorageManager::applyOnClose(const std::filesystem::path &path, const lon
     pthread_sigmask(SIG_SETMASK, &previous, nullptr);
 }
 
-void FsStorageManager::countClose(const std::filesystem::path &path) { applyOnClose(path, 1); }
+void FsStorageManager::countClose(const std::filesystem::path &path) {
+    ++_close_counts[path];
+    applyOnClose(path, 1);
+}
 
 void FsStorageManager::closed(const pid_t tid, const std::filesystem::path &path) {
     START_LOG(gettid(), "call(tid=%d, path=%s)", tid, path.c_str());
@@ -150,6 +185,73 @@ void FsStorageManager::closeFailed(const pid_t tid, const std::filesystem::path 
                      "committed and its consumers will wait",
                      path.c_str(), tid, strerror(error));
 }
+
+void FsStorageManager::renameFrom(const pid_t tid, std::string path, const bool in_capio_dir) {
+    _renaming[tid] = {std::move(path), in_capio_dir};
+}
+
+void FsStorageManager::renameTo(const pid_t tid, const std::string &to, const bool to_capio) {
+    const auto half = _renaming.find(tid);
+    if (half == _renaming.end()) {
+        return;
+    }
+    const auto [from, from_capio] = half->second;
+    _renaming.erase(half);
+    START_LOG(gettid(), "call(tid=%d, from=%s, to=%s)", tid, from.c_str(), to.c_str());
+
+    if (!from_capio) {
+        if (!to_capio) {
+            return;
+        }
+        // CAPIO never saw it being written: moving it in is its one close
+        _failed_closes.erase(to);
+        _close_counts.erase(to);
+        client_manager->forgetProducedFile(to);
+        if (!CapioCLEngine::get().isExcluded(to)) {
+            client_manager->registerProducedFile(tid, to);
+            countClose(to);
+        }
+        return;
+    }
+
+    std::error_code error;
+    const bool is_directory = std::filesystem::is_directory(to, error);
+    for (const auto &path : client_manager->renameProducedFiles(from, to, is_directory)) {
+        if (!to_capio) {
+            client_manager->forgetProducedFile(path); // it left CAPIO_DIR
+        }
+    }
+    if (to_capio && !client_manager->hasProducer(to) && !is_directory) {
+        // mv, after the producer ended: the file is committed when mv ends
+        client_manager->registerProducedFile(tid, to);
+    }
+    move_entries(_close_counts, from, to, to_capio);
+    move_entries(_failed_closes, from, to, to_capio);
+    // The descriptors open on the file follow it, or are no longer CAPIO's out of CAPIO_DIR
+    for (auto &[pid, descriptors] : _opened_fd_map) {
+        for (auto descriptor = descriptors.begin(); descriptor != descriptors.end();) {
+            if (!is_at_or_below(descriptor->second, from)) {
+                ++descriptor;
+            } else if (to_capio) {
+                descriptor->second = to + descriptor->second.substr(from.size());
+                ++descriptor;
+            } else {
+                descriptor = descriptors.erase(descriptor);
+            }
+        }
+    }
+    if (!to_capio) {
+        return;
+    }
+    // The rule of each new name, with the history of its file
+    for (const auto &[path, count] : _close_counts) {
+        if (count > 0 && is_at_or_below(path, to)) {
+            applyOnClose(path, count);
+        }
+    }
+}
+
+void FsStorageManager::removeThread(const pid_t tid) { _renaming.erase(tid); }
 
 void FsStorageManager::waitForCreation(const std::filesystem::path &path) const {
     std::error_code error;

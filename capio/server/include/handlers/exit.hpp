@@ -47,6 +47,7 @@ void handle_exit_group(int tid) {
         handle_close(tid, fd);
     }
     client_manager->removeClient(tid);
+    fs_storage_manager->removeThread(tid);
 }
 
 void exit_group_handler(const char *const str) {

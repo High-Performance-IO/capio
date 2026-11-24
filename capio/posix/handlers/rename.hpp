@@ -1,8 +1,15 @@
 #ifndef CAPIO_POSIX_HANDLERS_RENAME_HPP
 #define CAPIO_POSIX_HANDLERS_RENAME_HPP
 
+#include <set>
+
 #include "utils/common.hpp"
 #include "utils/filesystem.hpp"
+#include "utils/requests.hpp"
+
+#ifndef RENAME_EXCHANGE
+#define RENAME_EXCHANGE (1 << 1)
+#endif
 
 int renameat2_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg5,
                       long *result) {
@@ -26,10 +33,40 @@ int renameat2_handler(long arg0, long arg1, long arg2, long arg3, long arg4, lon
         new_path.is_absolute() ? new_path : capio_absolute(new_dir_fd_path / new_path);
 
     FS_MODE({
-        if (is_capio_path(old_path_abs) || is_capio_path(new_path_abs)) {
-            throw CapioUnimplementedException("rename");
+        const bool old_is_capio = is_capio_path(old_path_abs);
+        const bool new_is_capio = is_capio_path(new_path_abs);
+        if (!old_is_capio && !new_is_capio) {
+            return CAPIO_POSIX_SYSCALL_SKIP;
         }
-        return CAPIO_POSIX_SYSCALL_SKIP;
+        // The kernel renames, and checks what the memory variant checks below. Then the
+        // descriptors follow the file, and the server moves what it knows of the file (producers,
+        // closes) to the new name. An exchange moves no file to a new name: it is not announced.
+        *result = syscall_no_intercept(SYS_renameat2, arg0, arg1, arg2, arg3, arg4);
+        if (*result < 0 || old_path_abs == new_path_abs || (arg4 & RENAME_EXCHANGE) != 0) {
+            return CAPIO_POSIX_SYSCALL_SUCCESS;
+        }
+        if (old_is_capio) {
+            // The file, or what is inside the directory
+            const std::string &old_name = old_path_abs.native();
+            std::set<std::string> moved;
+            for (const int fd : fd_table->fds()) {
+                const std::string path = fd_table->path(fd);
+                if (path.compare(0, old_name.size(), old_name) == 0 &&
+                    (path.size() == old_name.size() || path[old_name.size()] == '/')) {
+                    moved.insert(path);
+                }
+            }
+            for (const auto &path : moved) {
+                if (new_is_capio) {
+                    fd_table->renamePath(path,
+                                         new_path_abs.native() + path.substr(old_name.size()));
+                } else {
+                    fd_table->removePath(path);
+                }
+            }
+        }
+        rename_request_fs(old_path_abs, old_is_capio, new_path_abs, new_is_capio, tid);
+        return CAPIO_POSIX_SYSCALL_SUCCESS;
     })
 
     if (is_prefix(old_path_abs, new_path_abs)) { // TODO: The check is more complex

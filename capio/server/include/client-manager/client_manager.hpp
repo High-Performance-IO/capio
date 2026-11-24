@@ -136,6 +136,14 @@ class ClientManager {
     /// @brief Whether any client registered as producer of @p path
     [[nodiscard]] bool hasProducer(const std::filesystem::path &path) const;
 
+    /// @brief Move what clients produce at or below @p from to @p to (rename)
+    /// @return the new names of the files that moved
+    std::unordered_set<std::string> renameProducedFiles(const std::string &from,
+                                                        const std::string &to, bool is_directory);
+
+    /// @brief No client produces @p path any more
+    void forgetProducedFile(const std::string &path);
+
     /**
      * @brief Get the files that a given pid is waiting to be produced
      *

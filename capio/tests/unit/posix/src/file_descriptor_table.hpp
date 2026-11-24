@@ -360,6 +360,20 @@ TEST(FileDescriptorTableTest, RenamingAPathMovesItsDescriptors) {
     EXPECT_TRUE(table.fds().empty());
 }
 
+TEST(FileDescriptorTableTest, RenamingOntoAPathWithDescriptorsKeepsThemAll) {
+    MockSyscalls system_calls;
+    FileDescriptorTable table;
+    table.add(3, "/capio/f", 0, 0, O_WRONLY, false);
+    table.add(4, "/capio/g", 0, 0, O_RDONLY, false);
+    table.renamePath("/capio/f", "/capio/g");
+
+    EXPECT_FALSE(table.containsPath("/capio/f"));
+    EXPECT_EQ(table.path(3), "/capio/g");
+    EXPECT_EQ(table.path(4), "/capio/g");
+    table.removePath("/capio/g"); // finds both through the path
+    EXPECT_TRUE(table.fds().empty());
+}
+
 TEST(FileDescriptorTableTest, RenamingAnUnknownPathDoesNothing) {
     const MockSyscalls system_calls;
     FileDescriptorTable table;
