@@ -6,7 +6,6 @@
 #include "utils/clone.hpp"
 #include "utils/filesystem.hpp"
 #include "utils/snapshot.hpp"
-#include "utils/storage.hpp"
 
 #include "handlers.hpp"
 
@@ -184,6 +183,13 @@ static constexpr long CAPIO_NR_SYSCALLS = 1 + std::max({
                                                   SYS_writev,
 #endif
                                               });
+
+// The handler of the memory or of the FS variant, picked at compile time
+#if CAPIO_MEM_STREAM
+#define CAPIO_STORAGE_CALL(memory_call, fs_call) memory_call
+#else
+#define CAPIO_STORAGE_CALL(memory_call, fs_call) fs_call
+#endif
 
 static constexpr std::array<CPHandler_t, CAPIO_NR_SYSCALLS> build_syscall_table() {
     std::array<CPHandler_t, CAPIO_NR_SYSCALLS> _syscallTable{0};

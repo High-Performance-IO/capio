@@ -40,7 +40,8 @@ int exit_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg
 inline void capio_fs_close_all(const long tid) {
     START_LOG(tid, "call()");
     for (const int fd : get_capio_fds()) {
-        if (is_directory(fd)) {
+        struct stat info{};
+        if (syscall_no_intercept(SYS_fstat, fd, &info) == 0 && S_ISDIR(info.st_mode)) {
             continue;
         }
         long error = 0;

@@ -36,7 +36,8 @@ int close_fs_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long
         return CAPIO_POSIX_SYSCALL_SKIP;
     }
     const std::string path = get_capio_fd_path(fd);
-    const bool is_dir      = is_directory(fd);
+    struct stat info{};
+    const bool is_dir = syscall_no_intercept(SYS_fstat, fd, &info) == 0 && S_ISDIR(info.st_mode);
     // Forget it before closing: another thread may get the same number as soon as it is free
     delete_capio_fd(fd);
     *result = syscall_no_intercept(SYS_close, fd);
