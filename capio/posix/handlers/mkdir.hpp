@@ -34,17 +34,7 @@ inline off64_t capio_mkdirat(int dirfd, const std::string_view &pathname, mode_t
     }
 
     if (is_capio_path(path)) {
-#if !CAPIO_MEM_STREAM
-        {
-            // Announced once it worked: a failed mkdir must not make a producer
-            const auto res = capio_kernel_result(
-                syscall_no_intercept(SYS_mkdirat, dirfd, pathname.data(), mode));
-            if (res == 0) {
-                create_request_fs(path, tid);
-            }
-            return res;
-        }
-#endif
+#if CAPIO_MEM_STREAM
         if (exists_capio_path(path)) {
             errno = EEXIST;
             return CAPIO_POSIX_SYSCALL_ERRNO;
@@ -57,6 +47,15 @@ inline off64_t capio_mkdirat(int dirfd, const std::string_view &pathname, mode_t
             add_capio_path(path);
             return res;
         }
+#else
+        // Announced once it worked: a failed mkdir must not make a producer
+        const auto res =
+            capio_kernel_result(syscall_no_intercept(SYS_mkdirat, dirfd, pathname.data(), mode));
+        if (res == 0) {
+            create_request_fs(path, tid);
+        }
+        return res;
+#endif
     } else {
         return CAPIO_POSIX_SYSCALL_REQUEST_SKIP;
     }
@@ -123,6 +122,9 @@ int mkdirat_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long 
 }
 
 int rmdir_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg5, long *result) {
+#if !CAPIO_MEM_STREAM
+    return CAPIO_POSIX_SYSCALL_SKIP; // not handled by the FS variant yet: the kernel runs it
+#endif
     const std::string_view pathname(reinterpret_cast<const char *>(arg0));
     long tid = syscall_no_intercept(SYS_gettid);
 

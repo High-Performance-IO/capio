@@ -4,7 +4,6 @@
 #include "handlers/access.hpp"
 #include "handlers/chdir.hpp"
 #include "handlers/close.hpp"
-#include "handlers/consent.hpp"
 #include "handlers/copy_file_range.hpp"
 #include "handlers/dup.hpp"
 #include "handlers/execve.hpp"

@@ -40,16 +40,18 @@ inline off64_t capio_faccessat(int dirfd, const std::string_view &pathname, mode
     if (!is_capio_path(path)) {
         return CAPIO_POSIX_SYSCALL_REQUEST_SKIP;
     }
-#if !CAPIO_MEM_STREAM
-    consent_request_cache->consent_request(path, tid, __FUNCTION__);
-    return CAPIO_POSIX_SYSCALL_REQUEST_SKIP;
-#endif
+#if CAPIO_MEM_STREAM
     // The server answers -1 for a CAPIO path it has no location for, and leaves errno to us.
     const off64_t res = access_request(path, tid);
     if (res == CAPIO_POSIX_SYSCALL_ERRNO) {
         errno = ENOENT;
     }
     return res;
+#else
+    // The kernel runs it, once the file is there
+    consent_request_cache->consent_request(path, tid, __FUNCTION__);
+    return CAPIO_POSIX_SYSCALL_REQUEST_SKIP;
+#endif
 }
 
 int access_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg5, long *result) {

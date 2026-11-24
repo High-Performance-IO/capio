@@ -7,6 +7,9 @@
 #include "utils/requests.hpp"
 
 int dup_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg5, long *result) {
+#if !CAPIO_MEM_STREAM
+    return CAPIO_POSIX_SYSCALL_SKIP; // not handled by the FS variant yet: the kernel runs it
+#endif
     long tid = syscall_no_intercept(SYS_gettid);
     int fd   = static_cast<int>(arg0);
 
@@ -29,6 +32,9 @@ int dup_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg5
 
 #ifdef SYS_dup2
 int dup2_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg5, long *result) {
+#if !CAPIO_MEM_STREAM
+    return CAPIO_POSIX_SYSCALL_SKIP; // not handled by the FS variant yet: the kernel runs it
+#endif
     long tid = syscall_no_intercept(SYS_gettid);
     int fd   = static_cast<int>(arg0);
     int fd2  = static_cast<int>(arg1);
@@ -53,6 +59,9 @@ int dup2_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg
 #endif
 
 int dup3_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg5, long *result) {
+#if !CAPIO_MEM_STREAM
+    return CAPIO_POSIX_SYSCALL_SKIP; // not handled by the FS variant yet: the kernel runs it
+#endif
     long tid  = syscall_no_intercept(SYS_gettid);
     int fd    = static_cast<int>(arg0);
     int fd2   = static_cast<int>(arg1);

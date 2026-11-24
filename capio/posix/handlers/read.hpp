@@ -47,13 +47,48 @@ inline ssize_t capio_readv(int fd, const struct iovec *iov, int iovcnt, long tid
     }
 }
 
+#if !CAPIO_MEM_STREAM
+/**
+ * FS variant: block until the bytes up to the file offset + @p count can be read, then the kernel
+ * runs the read. LLONG_MAX, for a count that goes past it, waits for the commit.
+ */
+inline off64_t capio_read_fs(int fd, void *buffer, off64_t count, long tid) {
+    START_LOG(tid, "call(fd=%d, buf=0x%08x, count=%ld)", fd, buffer, count);
+
+    struct stat info{};
+    if (!exists_capio_fd(fd) || (get_capio_fd_flags(fd) & O_ACCMODE) == O_WRONLY ||
+        syscall_no_intercept(SYS_fstat, fd, &info) != 0 || !S_ISREG(info.st_mode)) {
+        // not CAPIO, a writer (fopen(..., "a") seeks to the end), or nothing that streams
+        return CAPIO_POSIX_SYSCALL_REQUEST_SKIP;
+    }
+    const off64_t offset = std::max<long>(syscall_no_intercept(SYS_lseek, fd, 0, SEEK_CUR), 0);
+    read_request_cache->read(fd, count > LLONG_MAX - offset ? LLONG_MAX : offset + count, tid);
+    return CAPIO_POSIX_SYSCALL_REQUEST_SKIP;
+}
+
+inline ssize_t capio_readv_fs(int fd, const struct iovec *iov, int iovcnt, long tid) {
+    START_LOG(tid, "call(fd=%d, iovcnt=%d)", fd, iovcnt);
+
+    off64_t count = 0;
+    for (int i = 0; i < iovcnt; ++i) {
+        const auto length = static_cast<off64_t>(iov[i].iov_len);
+        count             = length > LLONG_MAX - count ? LLONG_MAX : count + length;
+    }
+    return capio_read_fs(fd, nullptr, count, tid);
+}
+#endif // !CAPIO_MEM_STREAM
+
 int read_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg5, long *result) {
     int fd       = static_cast<int>(arg0);
     void *buffer = reinterpret_cast<void *>(arg1);
     auto count   = static_cast<off64_t>(arg2);
     long tid     = syscall_no_intercept(SYS_gettid);
 
+#if CAPIO_MEM_STREAM
     return posix_return_value(capio_read(fd, buffer, count, tid), result);
+#else
+    return posix_return_value(capio_read_fs(fd, buffer, count, tid), result);
+#endif
 }
 
 int readv_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg5, long *result) {
@@ -62,50 +97,12 @@ int readv_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long ar
     auto iovcnt     = static_cast<int>(arg2);
     long tid        = syscall_no_intercept(SYS_gettid);
 
+#if CAPIO_MEM_STREAM
     return posix_return_value(capio_readv(fd, iov, iovcnt, tid), result);
+#else
+    return posix_return_value(capio_readv_fs(fd, iov, iovcnt, tid), result);
+#endif
 }
-
-#if !CAPIO_MEM_STREAM
-/**
- * FS variant: block until the bytes up to the file offset + @p count can be read, then the kernel
- * runs the read. LLONG_MAX, for a count that goes past it, waits for the commit.
- */
-inline void capio_read_fs(int fd, off64_t count, long tid) {
-    START_LOG(tid, "call(fd=%d, count=%ld)", fd, count);
-
-    struct stat info{};
-    if ((get_capio_fd_flags(fd) & O_ACCMODE) == O_WRONLY ||
-        syscall_no_intercept(SYS_fstat, fd, &info) != 0 || !S_ISREG(info.st_mode)) {
-        return; // a writer (fopen(..., "a") seeks to the end), or nothing that streams
-    }
-    const off64_t offset = std::max<long>(syscall_no_intercept(SYS_lseek, fd, 0, SEEK_CUR), 0);
-    read_request_cache->read(fd, count > LLONG_MAX - offset ? LLONG_MAX : offset + count, tid);
-}
-
-int read_fs_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg5,
-                    long *result) {
-    const int fd = static_cast<int>(arg0);
-    if (exists_capio_fd(fd)) {
-        capio_read_fs(fd, static_cast<off64_t>(arg2), syscall_no_intercept(SYS_gettid));
-    }
-    return CAPIO_POSIX_SYSCALL_SKIP;
-}
-
-int readv_fs_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg5,
-                     long *result) {
-    const int fd = static_cast<int>(arg0);
-    if (exists_capio_fd(fd)) {
-        const auto *iov = reinterpret_cast<const struct iovec *>(arg1);
-        off64_t count   = 0;
-        for (int i = 0; i < static_cast<int>(arg2); ++i) {
-            const auto length = static_cast<off64_t>(iov[i].iov_len);
-            count             = length > LLONG_MAX - count ? LLONG_MAX : count + length;
-        }
-        capio_read_fs(fd, count, syscall_no_intercept(SYS_gettid));
-    }
-    return CAPIO_POSIX_SYSCALL_SKIP;
-}
-#endif // !CAPIO_MEM_STREAM
 
 #endif // SYS_read || SYS_readv
 #endif // CAPIO_POSIX_HANDLERS_READ_HPP

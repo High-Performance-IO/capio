@@ -6,6 +6,9 @@
 #include "utils/snapshot.hpp"
 
 int execve_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg5, long *result) {
+#if !CAPIO_MEM_STREAM
+    return CAPIO_POSIX_SYSCALL_SKIP; // not handled by the FS variant yet: the kernel runs it
+#endif
     long tid = syscall_no_intercept(SYS_gettid);
     START_LOG(tid, "call()");
 

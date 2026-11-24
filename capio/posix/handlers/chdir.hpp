@@ -41,19 +41,19 @@ int chdir_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long ar
     }
 
     if (is_capio_path(path)) {
-#if !CAPIO_MEM_STREAM
-        // Real directories: wait for it, then the kernel changes directory as for any other path
+#if CAPIO_MEM_STREAM
+        set_current_dir(path);
+        errno   = 0;
+        *result = 0;
+#else
+        // A real directory: wait for it, then the kernel changes directory as for any other path
         consent_request_cache->consent_request(path, syscall_no_intercept(SYS_gettid),
                                                __FUNCTION__);
         *result = syscall_no_intercept(SYS_chdir, arg0);
         if (*result == 0) {
             set_current_dir(path);
         }
-        return CAPIO_POSIX_SYSCALL_SUCCESS;
 #endif
-        set_current_dir(path);
-        errno   = 0;
-        *result = 0;
         return CAPIO_POSIX_SYSCALL_SUCCESS;
     }
 
@@ -74,11 +74,14 @@ int fchdir_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long a
     const int fd = static_cast<int>(arg0);
     START_LOG(syscall_no_intercept(SYS_gettid), "call(fd=%d)", fd);
 
-    if (CAPIO_MEM_STREAM && exists_capio_fd(fd)) { // FS: a real directory, as below
+#if CAPIO_MEM_STREAM
+    if (exists_capio_fd(fd)) {
         set_current_dir(get_capio_fd_path(fd));
         *result = 0;
         return CAPIO_POSIX_SYSCALL_SUCCESS;
     }
+#endif
+    // FS variant: a CAPIO directory is a real one too
     *result = syscall_no_intercept(SYS_fchdir, fd);
     if (*result == 0) {
         follow_kernel_current_dir();

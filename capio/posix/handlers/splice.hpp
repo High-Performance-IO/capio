@@ -14,6 +14,9 @@
 #include "utils/filesystem.hpp"
 
 inline int capio_refuse_in_kernel_copy(int fd_in, int fd_out, long *result) {
+#if !CAPIO_MEM_STREAM
+    return CAPIO_POSIX_SYSCALL_SKIP; // not handled by the FS variant yet: the kernel runs it
+#endif
     START_LOG(syscall_no_intercept(SYS_gettid), "call(fd_in=%d, fd_out=%d)", fd_in, fd_out);
 
     if (exists_capio_fd(fd_in) || exists_capio_fd(fd_out)) {

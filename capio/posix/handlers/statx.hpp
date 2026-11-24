@@ -88,10 +88,7 @@ inline int capio_statx(int dirfd, const std::string_view &pathname, int flags, i
         }
     }
 
-#if !CAPIO_MEM_STREAM
-    consent_request_cache->consent_request(path, tid, __FUNCTION__);
-    return CAPIO_POSIX_SYSCALL_REQUEST_SKIP;
-#endif
+#if CAPIO_MEM_STREAM
     write_cache->flush();
     auto [file_size, is_dir] = stat_request(path, tid);
     if (file_size == -1) {
@@ -103,6 +100,11 @@ inline int capio_statx(int dirfd, const std::string_view &pathname, int flags, i
     }
     fill_statxbuf(statxbuf, file_size, is_dir, std::hash<std::string>{}(path), mask);
     return CAPIO_POSIX_SYSCALL_SUCCESS;
+#else
+    // The kernel runs it, once the file is there
+    consent_request_cache->consent_request(path, tid, __FUNCTION__);
+    return CAPIO_POSIX_SYSCALL_REQUEST_SKIP;
+#endif
 }
 
 int statx_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg5, long *result) {

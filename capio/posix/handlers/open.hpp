@@ -38,30 +38,7 @@ inline int capio_openat(int dirfd, const std::string_view &pathname, int flags, 
     path = capio_normal_path(path);
 
     if (is_capio_path(path)) {
-#if !CAPIO_MEM_STREAM
-        {
-            const bool create = (flags & O_CREAT) == O_CREAT;
-            if (!create && !open_request_fs(path, tid)) {
-                return CAPIO_POSIX_SYSCALL_REQUEST_SKIP;
-            }
-            const int new_fd = static_cast<int>(capio_kernel_result(
-                syscall_no_intercept(SYS_openat, dirfd, pathname.data(), flags, mode)));
-            if (new_fd < 0) {
-                return CAPIO_POSIX_SYSCALL_ERRNO;
-            }
-            // Who writes it produces it, also without O_CREAT. Announced once it worked: a failed
-            // O_EXCL must not make a producer.
-            if (create || (flags & O_ACCMODE) != O_RDONLY) {
-                create_request_fs(path, tid);
-            }
-            if (exists_capio_fd(new_fd)) { // closed by a call CAPIO does not handle yet
-                delete_capio_fd(new_fd);
-            }
-            add_capio_fd(tid, path, new_fd, 0, CAPIO_DEFAULT_FILE_INITIAL_SIZE, flags & ~O_CLOEXEC,
-                         (flags & O_CLOEXEC) == O_CLOEXEC);
-            return new_fd;
-        }
-#endif
+#if CAPIO_MEM_STREAM
         int fd =
             static_cast<int>(syscall_no_intercept(SYS_openat, AT_FDCWD, "/dev/null", O_RDONLY));
         if (fd == -1) {
@@ -117,6 +94,28 @@ inline int capio_openat(int dirfd, const std::string_view &pathname, int flags, 
             lseek(fd, 0, SEEK_END);
         }
         return fd;
+#else
+        const bool create = (flags & O_CREAT) == O_CREAT;
+        if (!create && !open_request_fs(path, tid)) {
+            return CAPIO_POSIX_SYSCALL_REQUEST_SKIP;
+        }
+        const int new_fd = static_cast<int>(capio_kernel_result(
+            syscall_no_intercept(SYS_openat, dirfd, pathname.data(), flags, mode)));
+        if (new_fd < 0) {
+            return CAPIO_POSIX_SYSCALL_ERRNO;
+        }
+        // Who writes it produces it, also without O_CREAT. Announced once it worked: a failed
+        // O_EXCL must not make a producer.
+        if (create || (flags & O_ACCMODE) != O_RDONLY) {
+            create_request_fs(path, tid);
+        }
+        if (exists_capio_fd(new_fd)) { // closed by a call CAPIO does not handle yet
+            delete_capio_fd(new_fd);
+        }
+        add_capio_fd(tid, path, new_fd, 0, CAPIO_DEFAULT_FILE_INITIAL_SIZE, flags & ~O_CLOEXEC,
+                     (flags & O_CLOEXEC) == O_CLOEXEC);
+        return new_fd;
+#endif
     } else {
         return CAPIO_POSIX_SYSCALL_REQUEST_SKIP;
     }

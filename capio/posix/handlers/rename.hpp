@@ -5,6 +5,9 @@
 
 int renameat2_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg5,
                       long *result) {
+#if !CAPIO_MEM_STREAM
+    return CAPIO_POSIX_SYSCALL_SKIP; // not handled by the FS variant yet: the kernel runs it
+#endif
     const std::filesystem::path old_dir_fd_path = get_dir_path(static_cast<int>(arg0));
     const std::filesystem::path old_path(reinterpret_cast<const char *>(arg1));
     const std::filesystem::path new_dir_fd_path = get_dir_path(static_cast<int>(arg2));
