@@ -429,12 +429,9 @@ static __attribute__((constructor)) void init() {
     init_filesystem();
     initialize_new_thread();
 
-    MEMORY_MODE({
-        if (const int *fd_shm = get_fd_snapshot(tid); fd_shm != nullptr) {
-            initialize_from_snapshot(fd_shm, tid);
-        }
-    })
-    FS_MODE({ initialize_from_inherited_fds(tid); })
+    if (const int *fd_shm = get_fd_snapshot(tid); fd_shm != nullptr) {
+        initialize_from_snapshot(fd_shm, tid);
+    }
 
     intercept_hook_point_clone_child  = hook_clone_child;
     intercept_hook_point_clone_parent = hook_clone_parent;

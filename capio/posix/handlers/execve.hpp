@@ -6,7 +6,6 @@
 #include "utils/snapshot.hpp"
 
 int execve_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg5, long *result) {
-    FS_MODE({ return CAPIO_POSIX_SYSCALL_SKIP; })
     long tid = syscall_no_intercept(SYS_gettid);
     START_LOG(tid, "call()");
 
