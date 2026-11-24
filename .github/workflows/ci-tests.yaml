@@ -235,8 +235,8 @@ jobs:
 
           # Left out: what only holds for files in memory (synthetic sizes of directories, refused
           # splice, sendfile, leases and seals), copies to another file system (EXDEV), and dup,
-          # copy_file_range, chmod and fchmodat on CAPIO files, which the FS variant does not
-          # implement yet.
+          # copy_file_range, chmod, fchmodat, chown and fchownat on CAPIO files, which the FS
+          # variant does not implement yet.
           echo "Run CAPIO syscall Unit tests, FS variant"
           LD_PRELOAD=libcapio_posix_fs.so \
           capio_syscall_unit_tests \

@@ -32,9 +32,6 @@ int fchown_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long a
 }
 
 int chown_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg5, long *result) {
-    FS_MODE({
-        return CAPIO_POSIX_SYSCALL_SKIP; // not handled by the FS variant yet: the kernel runs it
-    })
     long tid = syscall_no_intercept(SYS_gettid);
     return posix_return_value(
         capio_metadata_access("chown", AT_FDCWD, reinterpret_cast<const char *>(arg0), 0, tid),
@@ -43,9 +40,6 @@ int chown_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long ar
 
 int fchownat_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg5,
                      long *result) {
-    FS_MODE({
-        return CAPIO_POSIX_SYSCALL_SKIP; // not handled by the FS variant yet: the kernel runs it
-    })
     long tid = syscall_no_intercept(SYS_gettid);
     return posix_return_value(capio_metadata_access("fchownat", static_cast<int>(arg0),
                                                     reinterpret_cast<const char *>(arg1),
