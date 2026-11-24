@@ -7,6 +7,7 @@
 #include <string>
 #include <unordered_map>
 
+#include "utils/common.hpp"
 #include "utils/requests.hpp"
 
 /**
@@ -84,9 +85,6 @@ inline long capio_fcntl_lock(int fd, int cmd, struct flock *lock) {
 }
 
 int fcntl_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg5, long *result) {
-    FS_MODE({
-        return CAPIO_POSIX_SYSCALL_SKIP; // not handled by the FS variant yet: the kernel runs it
-    })
     auto fd  = static_cast<int>(arg0);
     auto cmd = static_cast<int>(arg1);
     long tid = syscall_no_intercept(SYS_gettid);
@@ -96,6 +94,13 @@ int fcntl_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long ar
     if (!exists_capio_fd(fd)) {
         return CAPIO_POSIX_SYSCALL_SKIP;
     }
+
+    FS_MODE({
+        if (cmd == F_DUPFD || cmd == F_DUPFD_CLOEXEC) {
+            throw CapioUnimplementedException("fcntl(F_DUPFD)");
+        }
+        return CAPIO_POSIX_SYSCALL_SKIP; // a real descriptor: the kernel runs the rest
+    })
 
     switch (cmd) {
     case F_DUPFD:

@@ -5,13 +5,11 @@
 
 #include "common/dirent.hpp"
 
+#include "utils/common.hpp"
 #include "utils/data.hpp"
 
 // TODO: too similar to capio_read, refactoring needed
 inline int getdents_handler_impl(long arg0, long arg1, long arg2, long *result, bool is64bit) {
-    FS_MODE({
-        return CAPIO_POSIX_SYSCALL_SKIP; // not handled by the FS variant yet: the kernel runs it
-    })
     auto fd      = static_cast<int>(arg0);
     auto *buffer = reinterpret_cast<struct linux_dirent64 *>(arg1);
     auto count   = static_cast<off64_t>(arg2);
@@ -20,6 +18,7 @@ inline int getdents_handler_impl(long arg0, long arg1, long arg2, long *result, 
 
     if (exists_capio_fd(fd)) {
         LOG("fd=%d, is a capio file descriptor", fd);
+        FS_MODE({ throw CapioUnimplementedException(is64bit ? "getdents64" : "getdents"); })
 
         if (count >= SSIZE_MAX) {
             ERR_EXIT("src does not support read bigger than SSIZE_MAX yet");
