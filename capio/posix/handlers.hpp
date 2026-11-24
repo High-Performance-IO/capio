@@ -19,6 +19,7 @@
 #include "handlers/ioctl.hpp"
 #include "handlers/lseek.hpp"
 #include "handlers/mkdir.hpp"
+#include "handlers/mmap.hpp"
 #include "handlers/open.hpp"
 #include "handlers/read.hpp"
 #include "handlers/rename.hpp"

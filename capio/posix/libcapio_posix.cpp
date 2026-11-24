@@ -150,6 +150,18 @@ static constexpr long CAPIO_NR_SYSCALLS = 1 + std::max({
 #ifdef SYS_openat
                                                   SYS_openat,
 #endif
+#ifdef SYS_mmap
+                                                  SYS_mmap,
+#endif
+#ifdef SYS_pread64
+                                                  SYS_pread64,
+#endif
+#ifdef SYS_preadv
+                                                  SYS_preadv,
+#endif
+#ifdef SYS_preadv2
+                                                  SYS_preadv2,
+#endif
 #ifdef SYS_read
                                                   SYS_read,
 #endif
@@ -321,6 +333,18 @@ static constexpr std::array<CPHandler_t, CAPIO_NR_SYSCALLS> build_syscall_table(
 #ifdef SYS_openat
     _syscallTable[SYS_openat] = openat_handler;
 #endif
+#ifdef SYS_mmap
+    _syscallTable[SYS_mmap] = mmap_handler;
+#endif
+#ifdef SYS_pread64
+    _syscallTable[SYS_pread64] = pread_handler;
+#endif
+#ifdef SYS_preadv
+    _syscallTable[SYS_preadv] = preadv_handler;
+#endif
+#ifdef SYS_preadv2
+    _syscallTable[SYS_preadv2] = preadv_handler;
+#endif
 #ifdef SYS_read
     _syscallTable[SYS_read] = read_handler;
 #endif
@@ -395,6 +419,14 @@ static int hook(long syscall_number, long arg0, long arg1, long arg2, long arg3,
     if (syscall_no_intercept_flag) {
         return 1;
     }
+
+#ifdef SYS_mmap
+    // An anonymous mmap is never on a CAPIO file. malloc makes them while holding its own lock, so
+    // return before anything that allocates, logging included, or malloc would wait for itself.
+    if (syscall_number == SYS_mmap && (arg3 & MAP_ANONYMOUS) != 0) {
+        return 1;
+    }
+#endif
 
     START_LOG(syscall_no_intercept(SYS_gettid), "call(syscall_number=%ld, syscall_name=%s)",
               syscall_number, sys_num_to_string(syscall_number).c_str());
