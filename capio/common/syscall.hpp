@@ -20,6 +20,19 @@ inline char *syscall_no_intercept_realpath(const char *path, char *resolved) {
 }
 
 #define capio_realpath syscall_no_intercept_realpath
+
+/*
+ * Code of one variant of the library only, as a block: MEMORY_MODE({ ... }) is kept in
+ * libcapio_posix.so, where files are in the memory of the server, FS_MODE({ ... }) in
+ * libcapio_posix_fs.so, where they are on the file system. The other one expands to nothing.
+ */
+#if CAPIO_MEM_STREAM
+#define MEMORY_MODE(...) __VA_ARGS__
+#define FS_MODE(...)
+#else
+#define MEMORY_MODE(...)
+#define FS_MODE(...) __VA_ARGS__
+#endif
 #else
 #define capio_syscall syscall
 #define capio_realpath realpath

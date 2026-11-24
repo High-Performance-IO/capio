@@ -12,7 +12,6 @@
  * with CAPIO
  */
 
-#if !CAPIO_MEM_STREAM
 /**
  * FS variant: at the exit of the process the kernel closes every descriptor, when nothing can
  * announce it. Push the data of each CAPIO descriptor first, with close(dup(fd)) as close does,
@@ -28,8 +27,8 @@ inline void capio_close_all_fs(const long tid) {
         long error = 0;
         if ((get_capio_fd_flags(fd) & O_ACCMODE) != O_RDONLY) {
             long res = syscall_no_intercept(SYS_dup, fd);
-            res      = res >= 0 ? syscall_no_intercept(SYS_close, res)
-                                : syscall_no_intercept(SYS_fdatasync, fd); // no descriptor to dup to
+            res = res >= 0 ? syscall_no_intercept(SYS_close, res)
+                           : syscall_no_intercept(SYS_fdatasync, fd); // no descriptor to dup to
             if (res < 0 && res != -EINTR) {
                 error = -res;
             }
@@ -45,7 +44,6 @@ inline bool capio_is_last_thread_fs() {
     return syscall_no_intercept(SYS_newfstatat, AT_FDCWD, "/proc/self/task", &tasks, 0) == 0 &&
            tasks.st_nlink <= 3;
 }
-#endif // !CAPIO_MEM_STREAM
 
 /// @param whole_process exit_group, or exit of what may be the last thread
 inline void capio_exit(const long tid, const bool whole_process) {
@@ -59,15 +57,16 @@ inline void capio_exit(const long tid, const bool whole_process) {
     }
 
     LOG("Thread %d is a CAPIO thread: clean up", tid);
-#if CAPIO_MEM_STREAM
-    read_cache->flush();
-    write_cache->flush();
-#else
-    // The end of a thread closes nothing: only the last one is the exit of the process
-    if (whole_process || capio_is_last_thread_fs()) {
-        capio_close_all_fs(tid);
-    }
-#endif
+    MEMORY_MODE({
+        read_cache->flush();
+        write_cache->flush();
+    })
+    FS_MODE({
+        // The end of a thread closes nothing: only the last one is the exit of the process
+        if (whole_process || capio_is_last_thread_fs()) {
+            capio_close_all_fs(tid);
+        }
+    })
     exit_group_request(tid);
 }
 

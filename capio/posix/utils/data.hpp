@@ -13,10 +13,10 @@ inline void initialize_data_queues(const long tid) {
         new WriteCache(tid, get_cache_lines(), get_cache_line_size(), get_capio_workflow_name());
     read_cache =
         new ReadCache(tid, get_cache_lines(), get_cache_line_size(), get_capio_workflow_name());
-#if !CAPIO_MEM_STREAM
-    consent_request_cache = new ConsentRequestCache();
-    read_request_cache    = new ReadCacheFS();
-#endif
+    FS_MODE({
+        consent_request_cache = new ConsentRequestCache();
+        read_request_cache    = new ReadCacheFS();
+    })
 }
 
 /**

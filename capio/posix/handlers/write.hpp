@@ -53,9 +53,9 @@ inline off64_t capio_writev(int fd, const struct iovec *iov, int iovcnt, long ti
 }
 
 int write_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg5, long *result) {
-#if !CAPIO_MEM_STREAM
-    return CAPIO_POSIX_SYSCALL_SKIP; // not handled by the FS variant yet: the kernel runs it
-#endif
+    FS_MODE({
+        return CAPIO_POSIX_SYSCALL_SKIP; // not handled by the FS variant yet: the kernel runs it
+    })
     auto fd         = static_cast<int>(arg0);
     const auto *buf = reinterpret_cast<const void *>(arg1);
     auto count      = static_cast<off64_t>(arg2);
@@ -65,9 +65,9 @@ int write_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long ar
 }
 
 int writev_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg5, long *result) {
-#if !CAPIO_MEM_STREAM
-    return CAPIO_POSIX_SYSCALL_SKIP; // not handled by the FS variant yet: the kernel runs it
-#endif
+    FS_MODE({
+        return CAPIO_POSIX_SYSCALL_SKIP; // not handled by the FS variant yet: the kernel runs it
+    })
     auto fd         = static_cast<int>(arg0);
     const auto *iov = reinterpret_cast<const struct iovec *>(arg1);
     auto iovcnt     = static_cast<int>(arg2);

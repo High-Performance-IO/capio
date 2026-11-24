@@ -47,7 +47,6 @@ inline ssize_t capio_readv(int fd, const struct iovec *iov, int iovcnt, long tid
     }
 }
 
-#if !CAPIO_MEM_STREAM
 /**
  * FS variant: block until the bytes up to the file offset + @p count can be read, then the kernel
  * runs the read. LLONG_MAX, for a count that goes past it, waits for the commit.
@@ -76,7 +75,6 @@ inline ssize_t capio_readv_fs(int fd, const struct iovec *iov, int iovcnt, long 
     }
     return capio_read_fs(fd, nullptr, count, tid);
 }
-#endif // !CAPIO_MEM_STREAM
 
 int read_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg5, long *result) {
     int fd       = static_cast<int>(arg0);
@@ -84,11 +82,8 @@ int read_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg
     auto count   = static_cast<off64_t>(arg2);
     long tid     = syscall_no_intercept(SYS_gettid);
 
-#if CAPIO_MEM_STREAM
-    return posix_return_value(capio_read(fd, buffer, count, tid), result);
-#else
-    return posix_return_value(capio_read_fs(fd, buffer, count, tid), result);
-#endif
+    MEMORY_MODE({ return posix_return_value(capio_read(fd, buffer, count, tid), result); })
+    FS_MODE({ return posix_return_value(capio_read_fs(fd, buffer, count, tid), result); })
 }
 
 int readv_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg5, long *result) {
@@ -97,11 +92,8 @@ int readv_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long ar
     auto iovcnt     = static_cast<int>(arg2);
     long tid        = syscall_no_intercept(SYS_gettid);
 
-#if CAPIO_MEM_STREAM
-    return posix_return_value(capio_readv(fd, iov, iovcnt, tid), result);
-#else
-    return posix_return_value(capio_readv_fs(fd, iov, iovcnt, tid), result);
-#endif
+    MEMORY_MODE({ return posix_return_value(capio_readv(fd, iov, iovcnt, tid), result); })
+    FS_MODE({ return posix_return_value(capio_readv_fs(fd, iov, iovcnt, tid), result); })
 }
 
 #endif // SYS_read || SYS_readv

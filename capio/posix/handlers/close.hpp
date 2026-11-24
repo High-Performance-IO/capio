@@ -13,28 +13,31 @@ int close_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long ar
     if (!exists_capio_fd(fd)) {
         return CAPIO_POSIX_SYSCALL_SKIP;
     }
-#if CAPIO_MEM_STREAM
-    write_cache->flush();
-    read_cache->flush();
-    close_request(fd, tid);
-    delete_capio_fd(fd);
-    *result = 0;
-    return CAPIO_POSIX_SYSCALL_SKIP;
-#else
-    // The kernel closes first, then CAPIO announces the close. On NFS, close(2) is when the data
-    // reaches the server and when a full disk is reported: the file must not be committed before.
-    const std::string path = get_capio_fd_path(fd);
-    struct stat info{};
-    const bool is_dir = syscall_no_intercept(SYS_fstat, fd, &info) == 0 && S_ISDIR(info.st_mode);
-    // Forget it before closing: another thread may get the same number as soon as it is free
-    delete_capio_fd(fd);
-    *result = syscall_no_intercept(SYS_close, fd);
-    if (*result != -EBADF && !is_dir) {
-        // EINTR: Linux has closed it anyway
-        close_request_fs(path, *result < 0 && *result != -EINTR ? -*result : 0, tid);
-    }
-    return CAPIO_POSIX_SYSCALL_SUCCESS;
-#endif
+    MEMORY_MODE({
+        write_cache->flush();
+        read_cache->flush();
+        close_request(fd, tid);
+        delete_capio_fd(fd);
+        *result = 0;
+        return CAPIO_POSIX_SYSCALL_SKIP;
+    })
+    FS_MODE({
+        // The kernel closes first, then CAPIO announces the close. On NFS, close(2) is when the
+        // data reaches the server and when a full disk is reported: the file must not be committed
+        // before.
+        const std::string path = get_capio_fd_path(fd);
+        struct stat info{};
+        const bool is_dir =
+            syscall_no_intercept(SYS_fstat, fd, &info) == 0 && S_ISDIR(info.st_mode);
+        // Forget it before closing: another thread may get the same number as soon as it is free
+        delete_capio_fd(fd);
+        *result = syscall_no_intercept(SYS_close, fd);
+        if (*result != -EBADF && !is_dir) {
+            // EINTR: Linux has closed it anyway
+            close_request_fs(path, *result < 0 && *result != -EINTR ? -*result : 0, tid);
+        }
+        return CAPIO_POSIX_SYSCALL_SUCCESS;
+    })
 }
 
 #endif // SYS_close

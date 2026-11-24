@@ -192,7 +192,6 @@ class WriteCache {
     }
 };
 
-#if !CAPIO_MEM_STREAM
 /// @brief FS variant: block until the server lets a call on a path go on, as stat waits in the
 /// memory variant
 class ConsentRequestCache {
@@ -245,13 +244,10 @@ class ReadCacheFS {
 #endif
     }
 };
-#endif // !CAPIO_MEM_STREAM
 
 inline thread_local WriteCache *write_cache;
 inline thread_local ReadCache *read_cache;
-#if !CAPIO_MEM_STREAM
 inline thread_local ConsentRequestCache *consent_request_cache;
 inline thread_local ReadCacheFS *read_request_cache;
-#endif
 
 #endif // CAPIO_SERVER_UTILS_CACHE

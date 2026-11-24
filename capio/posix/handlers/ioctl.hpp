@@ -4,9 +4,9 @@
 #if defined(SYS_ioctl)
 
 int ioctl_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg5, long *result) {
-#if !CAPIO_MEM_STREAM
-    return CAPIO_POSIX_SYSCALL_SKIP; // not handled by the FS variant yet: the kernel runs it
-#endif
+    FS_MODE({
+        return CAPIO_POSIX_SYSCALL_SKIP; // not handled by the FS variant yet: the kernel runs it
+    })
     const auto fd = static_cast<int>(arg0);
     START_LOG(syscall_no_intercept(SYS_gettid), "call(fd=%d, request=%ld)", fd, arg1);
 

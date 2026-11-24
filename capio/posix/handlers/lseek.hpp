@@ -68,9 +68,9 @@ inline off64_t capio_lseek(int fd, off64_t offset, int whence, long tid) {
 }
 
 int lseek_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg5, long *result) {
-#if !CAPIO_MEM_STREAM
-    return CAPIO_POSIX_SYSCALL_SKIP; // not handled by the FS variant yet: the kernel runs it
-#endif
+    FS_MODE({
+        return CAPIO_POSIX_SYSCALL_SKIP; // not handled by the FS variant yet: the kernel runs it
+    })
     int fd      = static_cast<int>(arg0);
     auto offset = static_cast<off64_t>(arg1);
     int whence  = static_cast<int>(arg2);

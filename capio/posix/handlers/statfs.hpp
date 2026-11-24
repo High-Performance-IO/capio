@@ -15,14 +15,15 @@ int fstatfs_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long 
     if (!exists_capio_fd(fd)) {
         return CAPIO_POSIX_SYSCALL_SKIP;
     }
-#if CAPIO_MEM_STREAM
-    *result = static_cast<int>(syscall_no_intercept(SYS_statfs, get_capio_dir().c_str(), buf));
-    return CAPIO_POSIX_SYSCALL_SUCCESS;
-#else
-    // The kernel runs it, once the file is there
-    consent_request_cache->consent_request(get_capio_fd_path(fd), tid, __FUNCTION__);
-    return CAPIO_POSIX_SYSCALL_SKIP;
-#endif
+    MEMORY_MODE({
+        *result = static_cast<int>(syscall_no_intercept(SYS_statfs, get_capio_dir().c_str(), buf));
+        return CAPIO_POSIX_SYSCALL_SUCCESS;
+    })
+    FS_MODE({
+        // The kernel runs it, once the file is there
+        consent_request_cache->consent_request(get_capio_fd_path(fd), tid, __FUNCTION__);
+        return CAPIO_POSIX_SYSCALL_SKIP;
+    })
 }
 
 #endif // SYS_fstatfs

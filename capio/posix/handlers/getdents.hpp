@@ -9,9 +9,9 @@
 
 // TODO: too similar to capio_read, refactoring needed
 inline int getdents_handler_impl(long arg0, long arg1, long arg2, long *result, bool is64bit) {
-#if !CAPIO_MEM_STREAM
-    return CAPIO_POSIX_SYSCALL_SKIP; // not handled by the FS variant yet: the kernel runs it
-#endif
+    FS_MODE({
+        return CAPIO_POSIX_SYSCALL_SKIP; // not handled by the FS variant yet: the kernel runs it
+    })
     auto fd      = static_cast<int>(arg0);
     auto *buffer = reinterpret_cast<struct linux_dirent64 *>(arg1);
     auto count   = static_cast<off64_t>(arg2);

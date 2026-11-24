@@ -8,13 +8,11 @@
 #include "calf/SyscallLogger.h"
 #include "types.hpp"
 
-#if !CAPIO_MEM_STREAM
 #include <filesystem>
 #include <sys/stat.h>
 
 #include "filesystem.hpp"
 #include "requests.hpp"
-#endif
 
 inline int *get_fd_snapshot(long tid) {
     return static_cast<int *>(get_shm_if_exist("capio_snapshot_" + std::to_string(tid)));
@@ -90,7 +88,6 @@ void create_snapshot(long tid) {
     fd_shm[i] = -1;
 }
 
-#if !CAPIO_MEM_STREAM
 /**
  * FS variant: the descriptors of CAPIO files that a program inherits are real ones, so they are
  * found in /proc/self/fd instead of in a snapshot. That also finds the ones opened outside CAPIO
@@ -127,6 +124,5 @@ void initialize_from_inherited_fds(long tid) {
     }
     syscall_no_intercept_flag = false;
 }
-#endif // !CAPIO_MEM_STREAM
 
 #endif // CAPIO_POSIX_UTILS_SNAPSHOT_HPP
