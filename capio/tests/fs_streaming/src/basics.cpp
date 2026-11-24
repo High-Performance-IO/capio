@@ -27,6 +27,13 @@ TEST_F(FsStreamingTest, PathWithSpaces) {
     EXPECT_OUTPUT(run("cons", {"open:a b", "read"}), "AAAA");
 }
 
+TEST_F(FsStreamingTest, PathLongerThanARequest) {
+    const std::string name(240, 'x');
+    startServer({{name}});
+    EXPECT_OUTPUT(run("prod", {"create:" + name, "write:AAAA", "close"}), "");
+    EXPECT_OUTPUT(run("cons", {"open:" + name, "read"}), "AAAA");
+}
+
 TEST_F(FsStreamingTest, CapioDirNeverWaits) {
     startServer({{"f"}});
     EXPECT_OUTPUT(run("cons", {"stat:" + work.string()}), "dir");

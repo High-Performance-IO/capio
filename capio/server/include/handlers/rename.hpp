@@ -56,11 +56,12 @@ void rename_handler(const char *const str) {
 void rename_fs_handler(const char *const str) {
     int tid, old_in, new_in, consumed = 0;
     size_t old_size;
-    if (sscanf(str, "%d %d %d %zu %n", &tid, &old_in, &new_in, &old_size, &consumed) != 4) {
+    if (sscanf(str, "%d %d %d %zu%n", &tid, &old_in, &new_in, &old_size, &consumed) != 4) {
         return;
     }
-    const std::string_view names(str + consumed);
-    START_LOG(gettid(), "call(tid=%d, names=%s)", tid, str + consumed);
+    const std::string text = fs_request_text(tid, str, consumed);
+    const std::string_view names(text);
+    START_LOG(gettid(), "call(tid=%d, names=%s)", tid, text.c_str());
     if (names.size() <= old_size) {
         LOG("The names are cut: the request was too long");
         return;

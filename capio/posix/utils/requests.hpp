@@ -25,7 +25,8 @@ inline void init_client(const long tid) {
 
 /**
  * Send a request of the FS variant: "<code> <tid> <arguments><path>". The path is last, so it may
- * contain spaces.
+ * contain spaces. What does not fit in a request is sent before it, in CAPIO_REQUEST_PATH_PART
+ * requests that the server puts in front of the path.
  *
  * @param code
  * @param tid
@@ -35,8 +36,20 @@ inline void init_client(const long tid) {
 inline void fs_request(const int code, const long tid, const std::string &arguments,
                        const std::string_view path) {
     char req[CAPIO_REQ_MAX_SIZE];
+    const size_t part_header =
+        snprintf(req, sizeof(req), "%04d %ld ", CAPIO_REQUEST_PATH_PART, tid);
+    const size_t header = part_header + arguments.size();
+
+    std::string_view rest = path;
+    while (header + rest.size() >= sizeof(req)) {
+        const auto chunk = rest.substr(0, sizeof(req) - part_header - 1);
+        snprintf(req, sizeof(req), "%04d %ld %.*s", CAPIO_REQUEST_PATH_PART, tid,
+                 static_cast<int>(chunk.size()), chunk.data());
+        buf_requests->write(req, CAPIO_REQ_MAX_SIZE);
+        rest.remove_prefix(chunk.size());
+    }
     snprintf(req, sizeof(req), "%04d %ld %s%.*s", code, tid, arguments.c_str(),
-             static_cast<int>(path.size()), path.data());
+             static_cast<int>(rest.size()), rest.data());
     buf_requests->write(req, CAPIO_REQ_MAX_SIZE);
 }
 
