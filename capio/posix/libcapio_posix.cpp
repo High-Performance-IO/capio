@@ -414,6 +414,24 @@ static int hook(long syscall_number, long arg0, long arg1, long arg2, long arg3,
         return 1;
     }
 
+    // FS variant: a new process becomes a client at its first system call that CAPIO handles, and
+    // a vfork or posix_spawn child never does (see utils/clone.hpp)
+    FS_MODE({
+        if (in_vfork_child()) {
+            return 1;
+        }
+        note_process_creation(syscall_number, arg0);
+        if (process_needs_setup) {
+            if (syscall_number >= CAPIO_NR_SYSCALLS ||
+                syscallTable[syscall_number] == not_handled_handler) {
+                return 1;
+            }
+            process_needs_setup = false;
+            initialize_new_thread();
+            announce_inherited_descriptors_fs();
+        }
+    })
+
     START_LOG(syscall_no_intercept(SYS_gettid), "call(syscall_number=%ld, syscall_name=%s)",
               syscall_number, sys_num_to_string(syscall_number).c_str());
 
@@ -463,8 +481,9 @@ static __attribute__((constructor)) void init() {
     const long tid = syscall_no_intercept(SYS_gettid);
 
     FileDescriptorTable::protectAcrossFork();
-    // After the handlers of the table, so that the child has a free lock
-    FS_MODE({ pthread_atfork(nullptr, nullptr, announce_inherited_descriptors_fs); })
+    if (std::getenv("CAPIO_DIR") != nullptr) {
+        get_capio_dir(); // set it now, before there are threads to race for it
+    }
     init_client(tid);
     init_filesystem(tid); // with the descriptors of the program before an exec, if any
     initialize_new_thread();

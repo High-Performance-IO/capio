@@ -67,7 +67,11 @@ inline bool is_capio_path(const std::filesystem::path &path_to_check) {
 
 /// @brief The CAPIO files of the process. Created by init_filesystem.
 inline FileDescriptorTable *fd_table;
-std::unique_ptr<std::filesystem::path> current_dir;
+/*
+ * Never freed: exit() destroys globals while other threads still make system calls, and their
+ * handlers read the current directory. A chdir leaves the old one behind for the same reason.
+ */
+inline std::filesystem::path *current_dir = nullptr;
 
 /**
  * Get the current directory
@@ -158,7 +162,7 @@ inline long flush_capio_fd(const int fd) {
  * @return
  */
 inline void destroy_filesystem() {
-    current_dir.reset();
+    current_dir = nullptr;
     delete fd_table;
     fd_table = nullptr;
 }
@@ -201,7 +205,7 @@ std::filesystem::path get_dir_path(int dirfd) {
 inline void init_filesystem(const long tid = -1) {
     std::unique_ptr<char[]> buf(new char[PATH_MAX]);
     syscall_no_intercept(SYS_getcwd, buf.get(), PATH_MAX);
-    current_dir = std::make_unique<std::filesystem::path>(buf.get());
+    current_dir = new std::filesystem::path(buf.get());
     fd_table    = tid < 0 ? new FileDescriptorTable() : new FileDescriptorTable(tid);
 }
 
@@ -210,7 +214,7 @@ inline void init_filesystem(const long tid = -1) {
  * @return the current directory
  */
 inline void set_current_dir(const std::filesystem::path &cwd) {
-    current_dir = std::make_unique<std::filesystem::path>(cwd);
+    current_dir = new std::filesystem::path(cwd);
 }
 
 #endif // CAPIO_POSIX_UTILS_FILESYSTEM_HPP

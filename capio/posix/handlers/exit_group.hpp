@@ -44,6 +44,7 @@ inline void capio_exit(const long tid, const bool whole_process) {
     FS_MODE({
         // The end of a thread closes nothing: only the last one is the exit of the process
         if (whole_process || capio_is_last_thread_fs()) {
+            stop_requests_of_other_threads(tid); // which the exit kills
             capio_close_all_fs(tid);
         }
     })

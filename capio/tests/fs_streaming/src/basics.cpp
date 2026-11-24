@@ -21,6 +21,23 @@ TEST_F(FsStreamingTest, ThreadDoesNotHang) {
     EXPECT_OUTPUT(run("prod", {"create:f", "thread:write:AAAA", "close", "print:done"}), "done");
 }
 
+TEST_F(FsStreamingTest, ForkAfterAThreadDoesNotHang) {
+    startServer({{"f"}});
+    EXPECT_OUTPUT(
+        run("prod", {"create:f", "thread:write:A", "fork:write:B", "close", "print:done"}), "done");
+    EXPECT_EQ(slurp(work / "f"), "AB");
+}
+
+TEST_F(FsStreamingTest, SpawnDoesNotBreakTheParent) {
+    startServer({{"f"}});
+    EXPECT_OUTPUT(run("prod", {"spawn", "create:f", "write:A", "close", "open:f", "read"}), "A");
+}
+
+TEST_F(FsStreamingTest, ThreadsCanOpenAndCloseTogether) {
+    startServer({{"f"}});
+    EXPECT_OUTPUT(run("prod", {"pool:400", "print:done"}), "done");
+}
+
 TEST_F(FsStreamingTest, PathWithSpaces) {
     startServer({{"a b"}, {"a"}});
     EXPECT_OUTPUT(run("prod", {"create:a b", "write:AAAA", "close"}), "");

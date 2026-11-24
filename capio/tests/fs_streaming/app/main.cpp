@@ -3,6 +3,7 @@
  * current descriptor, e.g. "create:out" "write:AAAA" "close". A failed operation
  * prints "<operation>=<errno name>" and the next one runs.
  */
+#include <atomic>
 #include <cerrno>
 #include <cstdio>
 #include <cstring>
@@ -15,6 +16,7 @@
 
 #include <dirent.h>
 #include <fcntl.h>
+#include <spawn.h>
 #include <sys/sendfile.h>
 #include <sys/stat.h>
 #include <sys/syscall.h>
@@ -59,6 +61,11 @@ bool read_all() {
 bool open_as(const std::string &path, const int flags) {
     fd = open(path.c_str(), flags, 0644);
     return fd >= 0;
+}
+
+bool wait_child(const pid_t pid) {
+    int status;
+    return pid > 0 && waitpid(pid, &status, 0) == pid;
 }
 
 using Operation = std::function<bool(const std::string &)>;
@@ -246,6 +253,49 @@ const std::map<std::string, Operation> &operations() {
              std::thread thread([&a] { run(a); });
              thread.join();
              return true;
+         }},
+        {"fork",
+         [](const std::string &a) {
+             const pid_t pid = fork();
+             if (pid == 0) {
+                 run(a);
+                 _exit(0);
+             }
+             return wait_child(pid);
+         }},
+        {"spawn",
+         [](const std::string &) {
+             pid_t pid;
+             char name[]  = "true";
+             char *args[] = {name, nullptr};
+             return posix_spawnp(&pid, name, nullptr, nullptr, args, environ) == 0 &&
+                    wait_child(pid);
+         }},
+        {"pool",
+         [](const std::string &a) {
+             const int n_files = std::stoi(a);
+             std::atomic<int> next{0}, good{0};
+             std::vector<std::thread> threads;
+             for (int i = 0; i < 8; ++i) {
+                 threads.emplace_back([&] {
+                     for (int file; (file = next++) < n_files;) {
+                         const auto name  = "pool" + std::to_string(file);
+                         const int out    = ::open(name.c_str(), O_CREAT | O_WRONLY, 0644);
+                         const bool wrote = ::write(out, "x", 1) == 1;
+                         if (::close(out) != 0 || !wrote) {
+                             continue;
+                         }
+                         const int in = ::open(name.c_str(), O_RDONLY);
+                         char byte    = 0;
+                         good += ::read(in, &byte, 1) == 1 && byte == 'x';
+                         ::close(in);
+                     }
+                 });
+             }
+             for (auto &thread : threads) {
+                 thread.join();
+             }
+             return good == n_files;
          }},
     };
     return table;

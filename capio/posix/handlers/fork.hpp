@@ -11,7 +11,8 @@ int fork_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg
     START_LOG(syscall_no_intercept(SYS_gettid), "call(pid=%ld)", pid);
 
     if (pid == 0) { // child
-        initialize_new_thread();
+        MEMORY_MODE({ initialize_new_thread(); })
+        FS_MODE({ defer_new_process(syscall_no_intercept(SYS_gettid)); }) // see utils/clone.hpp
         *result = 0;
     } else {
         *result = pid;

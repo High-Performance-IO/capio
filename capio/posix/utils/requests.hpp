@@ -1,6 +1,8 @@
 #ifndef CAPIO_POSIX_UTILS_REQUESTS_HPP
 #define CAPIO_POSIX_UTILS_REQUESTS_HPP
 
+#include <atomic>
+
 #include "common/requests.hpp"
 
 #include "calf/SyscallLogger.h"
@@ -8,7 +10,53 @@
 #include "filesystem.hpp"
 #include "types.hpp"
 
-inline thread_local CircularBuffer<char> *buf_requests;
+/*
+ * All the clients of a node write to one queue, under a named semaphore. A thread killed in the
+ * middle of a write leaves it taken, and then every client of the workflow waits forever. So before
+ * exit_group and execve, which kill the other threads, the FS variant lets no new write start and
+ * waits for the ones that started. A process killed by a signal is not covered.
+ */
+inline std::atomic<int> requests_being_written{0};
+inline std::atomic<long> thread_ending_process{0};
+
+class RequestBuffer : public CircularBuffer<char> {
+  public:
+    using CircularBuffer<char>::CircularBuffer;
+
+    void write(const char *request, const long num_bytes) {
+        for (;;) {
+            ++requests_being_written;
+            const long ending = thread_ending_process;
+            if (ending == 0 || ending == syscall_no_intercept(SYS_gettid)) {
+                break;
+            }
+            --requests_being_written;
+            while (thread_ending_process != 0) { // until killed, or until execve fails
+                syscall_no_intercept(SYS_sched_yield);
+            }
+        }
+        CircularBuffer<char>::write(request, num_bytes);
+        --requests_being_written;
+    }
+};
+
+/// @brief Called before what kills the other threads
+inline void stop_requests_of_other_threads(const long tid) {
+    long nobody = 0;
+    if (!thread_ending_process.compare_exchange_strong(nobody, tid)) {
+        return;
+    }
+    // Bounded, as the caller may be a signal handler that interrupted a write of its own thread
+    constexpr int MAX_YIELDS = 200000;
+    for (int i = 0; i < MAX_YIELDS && requests_being_written != 0; ++i) {
+        syscall_no_intercept(SYS_sched_yield);
+    }
+}
+
+/// @brief Called if execve failed, and in a new process
+inline void resume_requests() { thread_ending_process = 0; }
+
+inline thread_local RequestBuffer *buf_requests;
 inline thread_local CircularBuffer<off_t> *buff_response;
 
 /**
@@ -19,8 +67,8 @@ inline void init_client(const long tid) {
     buff_response =
         new CircularBuffer<off_t>(SHM_COMM_CHAN_NAME_RESP + std::to_string(tid), CAPIO_REQ_BUFF_CNT,
                                   sizeof(off_t), get_capio_workflow_name());
-    buf_requests = new CircularBuffer<char>(SHM_COMM_CHAN_NAME, CAPIO_REQ_BUFF_CNT,
-                                            CAPIO_REQ_MAX_SIZE, get_capio_workflow_name());
+    buf_requests = new RequestBuffer(SHM_COMM_CHAN_NAME, CAPIO_REQ_BUFF_CNT, CAPIO_REQ_MAX_SIZE,
+                                     get_capio_workflow_name());
 }
 
 /**
