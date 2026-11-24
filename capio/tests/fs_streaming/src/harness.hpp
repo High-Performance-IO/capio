@@ -182,13 +182,16 @@ class FsStreamingTest : public testing::Test {
         FAIL() << "the server did not start";
     }
 
-    /// @brief Start an app named @p name, or with no CAPIO_APP_NAME if it is empty
-    App start(const std::string &name, const std::vector<std::string> &operations) {
+    /// @brief Start an app named @p name, or with no CAPIO_APP_NAME if it is empty, preloading
+    /// @p library if given, else the FS variant
+    App start(const std::string &name, const std::vector<std::string> &operations,
+              const std::string &library = "") {
         std::vector<std::string> command{setting("CAPIO_FS_APP_PATH", "capio_fs_streaming_app")};
         command.insert(command.end(), operations.begin(), operations.end());
         std::vector<std::string> env{
             "CAPIO_DIR=" + work.string(), "CAPIO_WORKFLOW_NAME=" + workflow,
-            "LD_PRELOAD=" + setting("CAPIO_FS_LIBRARY", "libcapio_posix_fs.so")};
+            "LD_PRELOAD=" +
+                (library.empty() ? setting("CAPIO_FS_LIBRARY", "libcapio_posix_fs.so") : library)};
         if (!name.empty()) {
             env.push_back("CAPIO_APP_NAME=" + name);
         }

@@ -8,8 +8,31 @@
 #include "filesystem.hpp"
 #include "types.hpp"
 
+/**
+ * The responses of the server. It refuses clients of the other variant, as the two keep files and
+ * commits in different places and would wait for each other forever. The handshake cannot wait
+ * for an answer, so a refused client learns it at the first request that has one.
+ */
+class ResponseBuffer : public CircularBuffer<off_t> {
+  public:
+    using CircularBuffer<off_t>::CircularBuffer;
+
+    void read(off_t *response) {
+        CircularBuffer<off_t>::read(response);
+        if (*response == CAPIO_REPLY_VARIANT_REFUSED) {
+            constexpr char message[] = "CAPIO: this process uses " MEMORY_MODE(
+                "libcapio_posix.so (memory), but its workflow uses libcapio_posix_fs.so")
+                FS_MODE("libcapio_posix_fs.so (file system), but its workflow uses "
+                        "libcapio_posix.so") ": the two cannot be mixed in a workflow. Fix "
+                                             "LD_PRELOAD.\n";
+            syscall_no_intercept(SYS_write, STDERR_FILENO, message, sizeof(message) - 1);
+            syscall_no_intercept(SYS_exit_group, EXIT_FAILURE);
+        }
+    }
+};
+
 inline thread_local CircularBuffer<char> *buf_requests;
-inline thread_local CircularBuffer<off_t> *buff_response;
+inline thread_local ResponseBuffer *buff_response;
 
 /**
  * Initialize request and response buffers
@@ -17,8 +40,8 @@ inline thread_local CircularBuffer<off_t> *buff_response;
  */
 inline void init_client(const long tid) {
     buff_response =
-        new CircularBuffer<off_t>(SHM_COMM_CHAN_NAME_RESP + std::to_string(tid), CAPIO_REQ_BUFF_CNT,
-                                  sizeof(off_t), get_capio_workflow_name());
+        new ResponseBuffer(SHM_COMM_CHAN_NAME_RESP + std::to_string(tid), CAPIO_REQ_BUFF_CNT,
+                           sizeof(off_t), get_capio_workflow_name());
     buf_requests = new CircularBuffer<char>(SHM_COMM_CHAN_NAME, CAPIO_REQ_BUFF_CNT,
                                             CAPIO_REQ_MAX_SIZE, get_capio_workflow_name());
 }
@@ -141,9 +164,15 @@ inline void create_request_fs(const std::filesystem::path &path, const int fd, c
                               const long tid) {
     START_LOG(capio_syscall(SYS_gettid), "call(path=%s, fd=%d, produced=%d, tid=%ld)", path.c_str(),
               fd, produced, tid);
-    // also sent while the program starts, maybe before its server does: no reply
     path_request(CAPIO_REQUEST_CREATE_FS, tid,
                  std::to_string(fd) + " " + std::to_string(produced) + " ", path.native());
+    // The server answers a new producer, so that a client of the wrong variant stops before it
+    // writes. The other ones get no answer: they are also sent while a program starts, maybe
+    // before its server does.
+    if (produced == CAPIO_FS_PRODUCED) {
+        off64_t res;
+        buff_response->read(&res);
+    }
 }
 
 inline off64_t create_exclusive_request(const int fd, const std::filesystem::path &path,
@@ -191,8 +220,8 @@ inline void handshake_named_request(const long tid, const long pid, const std::s
     START_LOG(capio_syscall(SYS_gettid), "call(tid=%ld, pid=%ld, app_name=%s)", tid, pid,
               app_name.c_str());
     char req[CAPIO_REQ_MAX_SIZE];
-    sprintf(req, "%04d %ld %ld %s %d", CAPIO_REQUEST_HANDSHAKE_NAMED, tid, pid, app_name.c_str(),
-            wait ? 1 : 0);
+    sprintf(req, "%04d %ld %ld %s %d %c", CAPIO_REQUEST_HANDSHAKE_NAMED, tid, pid, app_name.c_str(),
+            wait ? 1 : 0, MEMORY_MODE(CAPIO_VARIANT_MEMORY) FS_MODE(CAPIO_VARIANT_FS));
     LOG("req=%s", req);
     buf_requests->write(req, CAPIO_REQ_MAX_SIZE);
 
