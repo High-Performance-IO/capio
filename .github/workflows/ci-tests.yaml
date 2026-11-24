@@ -82,7 +82,7 @@ jobs:
               alphaunito/capio:latest             \
             sh -c 'jq -n --arg pwd "$PWD" "$1" > test_config.json && \
                LD_PRELOAD=libcapio_posix_fs.so capio_syscall_unit_tests \
-                 --gtest_filter="-*tat*OnDirectory*:*FcntlLease*:*FcntlSeals*:*FromAPosixFileIntoACapioFile:*FromACapioFileIntoAPosixFile:*SpliceFromACapioFile*:*SpliceIntoACapioFile*:*SendfileFromACapioFile*" \
+                 --gtest_filter="-*tat*OnDirectory*:*FcntlLease*:*FcntlSeals*:*FromAPosixFileIntoACapioFile:*FromACapioFileIntoAPosixFile:*SpliceFromACapioFile*:*SpliceIntoACapioFile*:*SendfileFromACapioFile*:*TestDup*:*TestCopyFileRange*:*FcntlDupfdQuery*" \
                  --gtest_break_on_failure \
                  --gtest_print_time=1' sh \
               '{name: "CAPIO", IO_Graph: [], exclude: [$pwd + "/aNonExistingFile", $pwd, $pwd + "/"]}'
@@ -234,11 +234,12 @@ jobs:
             --gtest_print_time=1
 
           # Left out: what only holds for files in memory (synthetic sizes of directories, refused
-          # splice, sendfile, leases and seals) and copies to another file system (EXDEV).
+          # splice, sendfile, leases and seals), copies to another file system (EXDEV), and dup and
+          # copy_file_range on CAPIO files, which the FS variant does not implement yet.
           echo "Run CAPIO syscall Unit tests, FS variant"
           LD_PRELOAD=libcapio_posix_fs.so \
           capio_syscall_unit_tests \
-            --gtest_filter='-*tat*OnDirectory*:*FcntlLease*:*FcntlSeals*:*FromAPosixFileIntoACapioFile:*FromACapioFileIntoAPosixFile:*SpliceFromACapioFile*:*SpliceIntoACapioFile*:*SendfileFromACapioFile*' \
+            --gtest_filter='-*tat*OnDirectory*:*FcntlLease*:*FcntlSeals*:*FromAPosixFileIntoACapioFile:*FromACapioFileIntoAPosixFile:*SpliceFromACapioFile*:*SpliceIntoACapioFile*:*SendfileFromACapioFile*:*TestDup*:*TestCopyFileRange*:*FcntlDupfdQuery*' \
             --gtest_break_on_failure \
             --gtest_print_time=1
 

@@ -2,6 +2,8 @@
 #define CAPIO_FUNCTIONS_H
 #include <cerrno>
 #include <climits>
+#include <stdexcept>
+#include <string>
 #include <sys/auxv.h>
 
 #include "calf/SyscallLogger.h"
@@ -18,6 +20,13 @@ inline off64_t capio_max_rw_count() {
     static const off64_t max_count = INT_MAX & ~(static_cast<off64_t>(getauxval(AT_PAGESZ)) - 1);
     return max_count;
 }
+
+/// @brief Thrown by a system call on a CAPIO file that the FS variant does not handle yet
+class CapioUnimplementedException : public std::logic_error {
+  public:
+    explicit CapioUnimplementedException(const std::string &syscall)
+        : std::logic_error(syscall + " is not implemented yet by libcapio_posix_fs.so") {}
+};
 
 int posix_return_value(long res, long *result) {
     START_LOG(capio_syscall(SYS_gettid), "cal(res=%ld)", res);
