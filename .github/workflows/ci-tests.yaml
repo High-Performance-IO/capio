@@ -233,6 +233,10 @@ jobs:
             --gtest_break_on_failure \
             --gtest_print_time=1
 
+          # A coverage build skips the teardown of the server, which leaves its shared memory, the
+          # canary among it: the next server of the same workflow would refuse to start.
+          rm -f /dev/shm/CAPIO* /dev/shm/sem.CAPIO*
+
           # Left out: what only holds for files in memory (synthetic sizes of directories, refused
           # splice, sendfile, leases and seals), copies to another file system (EXDEV), and dup,
           # fcntl(F_DUPFD), copy_file_range, chmod, fchmodat, chown, fchownat, getdents, rename,
