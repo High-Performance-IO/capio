@@ -47,7 +47,9 @@ TEST_F(FsStreamingTest, WaitingReadersDoNotStallTheServer) {
     for (int i = 0; i < n_waiters; ++i) {
         start("cons", {"open:in" + std::to_string(i), "read"});
     }
-    pause(100);
+    // Let the readers start and block first, so that the bound measures the server and not their
+    // start on a slow runner. A stalled server is still behind by about 5 s after this.
+    pause(1000);
     EXPECT_OUTPUT(finish(start("prod", {"create:other", "close", "open:other", "read"}),
                          std::chrono::milliseconds(3000)),
                   "");
