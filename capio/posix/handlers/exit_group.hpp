@@ -36,13 +36,6 @@ inline bool capio_is_last_thread_fs() {
 inline void capio_exit(const long tid, const bool whole_process) {
     START_LOG(tid, "call(whole_process=%s)", whole_process ? "true" : "false");
 
-    // A thread started before libcapio was initialized (e.g. by the constructor of another
-    // library, as UCX does with its fuse thread) has no caches and no connection to the server.
-    if (write_cache == nullptr || read_cache == nullptr || buf_requests == nullptr) {
-        LOG("Thread %d is not a CAPIO thread: nothing to clean up", tid);
-        return CAPIO_POSIX_SYSCALL_SKIP;
-    }
-
     LOG("Thread %d is a CAPIO thread: clean up", tid);
     MEMORY_MODE({
         read_cache->flush();

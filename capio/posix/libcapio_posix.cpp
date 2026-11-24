@@ -391,6 +391,20 @@ static constexpr std::array<CPHandler_t, CAPIO_NR_SYSCALLS> build_syscall_table(
     return _syscallTable;
 }
 
+static constexpr bool is_exit_syscall(const long syscall_number) {
+#ifdef SYS_exit
+    if (syscall_number == SYS_exit) {
+        return true;
+    }
+#endif
+#ifdef SYS_exit_group
+    if (syscall_number == SYS_exit_group) {
+        return true;
+    }
+#endif
+    return false;
+}
+
 static int hook(long syscall_number, long arg0, long arg1, long arg2, long arg3, long arg4,
                 long arg5, long *result) {
     static constexpr std::array<CPHandler_t, CAPIO_NR_SYSCALLS> syscallTable =
@@ -428,6 +442,23 @@ static int hook(long syscall_number, long arg0, long arg1, long arg2, long arg3,
     if (capio_dir == nullptr) {
         LOG("CAPIO_DIR env var not set. returning control to kernel");
         return 1;
+    }
+
+    // A thread started before libcapio was initialized (e.g. by the constructor of another
+    // library, as UCX does with its fuse thread) never went through the clone hook, so it has
+    // no caches and no connection to the server. Its exit has nothing to clean up; any other
+    // system call initializes it as the constructor does for the main thread (without waiting:
+    // no clone request announced it to the server). The system calls made while initializing it
+    // (malloc's, for instance) go to the kernel.
+    if (buf_requests == nullptr) {
+        static thread_local bool initializing = false;
+        if (initializing || is_exit_syscall(syscall_number)) {
+            return 1;
+        }
+        LOG("Thread not initialized by libcapio: initializing it");
+        initializing = true;
+        initialize_new_thread();
+        initializing = false;
     }
 
     try {
