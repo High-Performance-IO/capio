@@ -11,6 +11,7 @@
 #include "capiocl.hpp"
 #include "capiocl/engine.h"
 #include "client-manager/client_manager.hpp"
+#include "common/dirent.hpp"
 #include "utils/capiocl_adapter.hpp"
 #include "utils/filesystem.hpp"
 #include "utils/runtime_configuration.hpp"
@@ -44,6 +45,7 @@ void move_at_or_below(Map &map, const std::string &from, const std::string &to) 
 } // namespace
 
 FsStorageManager::FsStorageManager() {
+    loadExpectedEntries();
     CALF_PRINT_COLOR(CALF_CLI_LEVEL_STATUS, "initialization completed.");
 }
 
@@ -184,6 +186,7 @@ void FsStorageManager::closeFailed(const pid_t tid, const std::filesystem::path 
 void FsStorageManager::forgetHistory(const std::string &path) {
     erase_at_or_below(_close_counts, path);
     erase_at_or_below(_failed_closes, path);
+    erase_at_or_below(_new_entries, path);
     for (auto &[pid, descriptors] : _opened_fd_map) {
         for (auto descriptor = descriptors.begin(); descriptor != descriptors.end();) {
             descriptor = is_at_or_below(descriptor->second, path) ? descriptors.erase(descriptor)
@@ -196,6 +199,7 @@ void FsStorageManager::forgetHistory(const std::string &path) {
 void FsStorageManager::moveHistory(const std::string &from, const std::string &to) {
     move_at_or_below(_close_counts, from, to);
     move_at_or_below(_failed_closes, from, to);
+    move_at_or_below(_new_entries, from, to);
     for (auto &[pid, descriptors] : _opened_fd_map) {
         for (auto &[fd, path] : descriptors) {
             if (is_at_or_below(path, from)) {
@@ -220,14 +224,24 @@ void FsStorageManager::rename(const pid_t tid, const std::string &from, const bo
     if (!to_capio || CapioCLEngine::get().isExcluded(to)) {
         return;
     }
+    // The new name is a new entry of its directory, and so is everything inside it, if it is a
+    // directory: they count for on_n_files directories
+    noteNewEntry(to);
+    std::error_code error;
+    const bool is_directory = std::filesystem::is_directory(to, error);
+    if (is_directory) {
+        for (std::filesystem::recursive_directory_iterator entry(to, error), end;
+             !error && entry != end; entry.increment(error)) {
+            noteNewEntry(entry->path());
+        }
+    }
     if (!from_capio) {
         // CAPIO never saw this file being written, so count the move into CAPIO_DIR as its close
         client_manager->registerProducedFile(tid, to);
         countClose(to);
         return;
     }
-    std::error_code error;
-    if (!client_manager->hasProducer(to) && !std::filesystem::is_directory(to, error)) {
+    if (!client_manager->hasProducer(to) && !is_directory) {
         // Nobody produces the file any more (e.g. mv after the producer exited): the renaming
         // process becomes its producer, so the file is committed when it exits
         client_manager->registerProducedFile(tid, to);
@@ -237,6 +251,63 @@ void FsStorageManager::rename(const pid_t tid, const std::string &from, const bo
         if (count > 0 && is_at_or_below(path, to)) {
             applyOnClose(path, count);
         }
+    }
+}
+
+void FsStorageManager::loadExpectedEntries() {
+    const auto &engine = CapioCLEngine::get();
+    for (const auto &path : engine.getPaths()) {
+        if (engine.getCommitRule(path) == capiocl::commitRules::ON_N_FILES) {
+            _expected_entries[std::filesystem::path(path).lexically_normal()] =
+                std::max(1L, engine.getDirectoryFileCount(path));
+        }
+    }
+}
+
+long FsStorageManager::expectedEntries(const std::filesystem::path &directory) {
+    if (const auto known = _expected_entries.find(directory); known != _expected_entries.end()) {
+        return known->second;
+    }
+    // From a glob or the dynamic API: as it is at first sight
+    const long expected = std::max(1L, CapioCLEngine::get().getDirectoryFileCount(directory));
+    _expected_entries[directory] = expected;
+    return expected;
+}
+
+long FsStorageManager::countEntries(const std::filesystem::path &directory) {
+    std::error_code error;
+    std::filesystem::directory_iterator entry(directory, error);
+    long count = 0;
+    while (!error && entry != std::filesystem::directory_iterator()) {
+        count += !is_capio_cl_token(entry->path().filename().string());
+        entry.increment(error);
+    }
+    return error ? -1 : count;
+}
+
+bool FsStorageManager::isDirectoryCommitted(const std::filesystem::path &directory,
+                                            const long n_expected) {
+    const auto &engine = CapioCLEngine::get();
+    if (countEntries(directory) >= n_expected) {
+        engine.setCommitted(directory);
+        return true;
+    }
+    return engine.isCommitted(directory);
+}
+
+void FsStorageManager::noteNewEntry(const std::filesystem::path &path) {
+    const auto directory = path.parent_path();
+    if (_committed_directories.count(directory) != 0 ||
+        CapioCLEngine::get().getCommitRule(directory) != capiocl::commitRules::ON_N_FILES) {
+        return;
+    }
+    auto &created = _new_entries[directory];
+    created.insert(path.filename());
+    const long expected = expectedEntries(directory);
+    if (static_cast<long>(created.size()) >= expected && countEntries(directory) >= expected) {
+        commit(directory);
+        _committed_directories.insert(directory);
+        _new_entries.erase(directory);
     }
 }
 
@@ -273,14 +344,19 @@ off64_t FsStorageManager::waitForData(const std::filesystem::path &path,
     }
 }
 
-off64_t FsStorageManager::waitForConsent(const std::filesystem::path &path) const {
+off64_t FsStorageManager::waitForConsent(const std::filesystem::path &path, const bool by_entries,
+                                         const long expected) const {
     for (;;) {
         if (std::error_code error; std::filesystem::exists(path, error)) {
-            // Directories are never committed
-            if (std::filesystem::is_directory(path, error) || !isDeclared(path)) {
+            // Directories are never committed, except on_n_files ones
+            if ((std::filesystem::is_directory(path, error) &&
+                 CapioCLEngine::get().getCommitRule(path) != capiocl::commitRules::ON_N_FILES) ||
+                !isDeclared(path)) {
                 return 0;
             }
-            if (CapioCLEngine::get().isFirable(path) || CapioCLEngine::get().isCommitted(path)) {
+            if (CapioCLEngine::get().isFirable(path) ||
+                (by_entries ? isDirectoryCommitted(path, expected)
+                            : CapioCLEngine::get().isCommitted(path))) {
                 return 1;
             }
         }

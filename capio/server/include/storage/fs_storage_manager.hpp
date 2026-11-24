@@ -16,10 +16,10 @@
  * @brief Manages the files of the file system variant (libcapio_posix_fs.so).
  *
  * Its files stay on the file system, so unlike StorageManager it holds no data: it knows what has
- * happened to each file (closes, failed closes, renames) and applies the CAPIO-CL rules to it. As
- * StorageManager, it knows the descriptors of its clients by number. CAPIO-CL keeps the rules and
- * the commit state; ClientManager keeps who produces what. Used by the request thread only, apart
- * from the static methods.
+ * happened to each file (closes, failed closes, renames, entries of on_n_files directories) and
+ * applies the CAPIO-CL rules to it. As StorageManager, it knows the descriptors of its clients by
+ * number. CAPIO-CL keeps the rules and the commit state; ClientManager keeps who produces what.
+ * Used by the request thread only, apart from the static methods.
  */
 class FsStorageManager {
     /// @brief How many successful closes each file has had. Counted for every file, whatever its
@@ -34,6 +34,13 @@ class FsStorageManager {
      * of StorageManager. By process, as its threads share them, and as an exec keeps them.
      */
     std::unordered_map<pid_t, std::unordered_map<int, std::string>> _opened_fd_map;
+
+    /// @brief on_n_files directory -> N, as it was before lookups could change it
+    std::unordered_map<std::string, long> _expected_entries;
+
+    /// @brief on_n_files directory -> entries created there, until it is committed
+    std::unordered_map<std::string, std::unordered_set<std::string>> _new_entries;
+    std::unordered_set<std::string> _committed_directories;
 
     /// @brief Closes of on_close:N being counted on background threads
     std::atomic<int> _pending_counts{0};
@@ -113,6 +120,30 @@ class FsStorageManager {
     void rename(pid_t tid, const std::string &from, bool from_capio, const std::string &to,
                 bool to_capio);
 
+    /**
+     * @brief Take N of the on_n_files directories from the config.
+     *
+     * CAPIO-CL counts the children it knows of when n_files is omitted, lookups included, and
+     * cannot say that it was omitted. So N is what it reports at startup, and at least 1.
+     */
+    void loadExpectedEntries();
+
+    [[nodiscard]] long expectedEntries(const std::filesystem::path &directory);
+
+    /// @brief The entries of @p directory without "." and ".." and CAPIO-CL tokens, or -1
+    [[nodiscard]] static long countEntries(const std::filesystem::path &directory);
+
+    /// @brief Whether an on_n_files directory is committed, committing it if it has N entries.
+    /// Blocks: for waiter threads only.
+    [[nodiscard]] static bool isDirectoryCommitted(const std::filesystem::path &directory,
+                                                   long n_expected);
+
+    /**
+     * @brief A producer created @p path. Waiters count entries on their own: this commits the
+     * directory also when nobody waits for it, as on_file rules that depend on it need.
+     */
+    void noteNewEntry(const std::filesystem::path &path);
+
     /// @brief Block until @p path exists
     void waitForCreation(const std::filesystem::path &path) const;
 
@@ -125,10 +156,12 @@ class FsStorageManager {
     [[nodiscard]] off64_t waitForData(const std::filesystem::path &path, off64_t end_of_read) const;
 
     /**
-     * @brief Block until @p path exists and, if it is declared, is committed
+     * @brief Block until @p path exists and, if it is declared, is committed (by its entries if @p
+     * by_entries, up to @p expected)
      * @return 1 if that holds from now on, 0 if @p path is not declared
      */
-    [[nodiscard]] off64_t waitForConsent(const std::filesystem::path &path) const;
+    [[nodiscard]] off64_t waitForConsent(const std::filesystem::path &path, bool by_entries,
+                                         long expected) const;
 
     /// @brief Wait, at most @p timeout, for the closes still being counted: a count lost at exit
     /// would leave the file uncommitted for the servers that start later

@@ -40,6 +40,7 @@ inline int capio_dup_onto(const long tid, const int fd, const int fd2, const int
         return CAPIO_POSIX_SYSCALL_SUCCESS;
     }
     if (fd2_is_capio) {
+        FS_MODE({ capio_forget_listing_fs(fd2); })
         fd_table->remove(fd2);
         if (replaced) {
             close_request(fd2, tid, error);

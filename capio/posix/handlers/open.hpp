@@ -3,6 +3,7 @@
 
 #if defined(SYS_creat) || defined(SYS_open) || defined(SYS_openat)
 
+#include "handlers/getdents.hpp"
 #include "utils/common.hpp"
 #include "utils/filesystem.hpp"
 
@@ -108,6 +109,7 @@ inline int capio_openat(int dirfd, const std::string_view &pathname, int flags, 
             // Added before the server is told, in place of what had the number if a call CAPIO
             // does not handle yet closed it: if another thread has just closed what had the number,
             // its close reaches the server first (see FileDescriptorTable)
+            capio_forget_listing_fs(new_fd);
             fd_table->add(new_fd, path, 0, CAPIO_DEFAULT_FILE_INITIAL_SIZE, flags & ~O_CLOEXEC,
                           (flags & O_CLOEXEC) == O_CLOEXEC);
             // Who writes it produces it, also without O_CREAT. Announced once it worked: a failed

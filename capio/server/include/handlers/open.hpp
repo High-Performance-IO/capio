@@ -91,6 +91,7 @@ inline void handle_create_fs(const int tid, const std::filesystem::path &path,
     const bool has_producer = inherited && client_manager->hasProducer(path);
     if (!has_producer && !CapioCLEngine::get().isExcluded(path)) {
         client_manager->registerProducedFile(tid, path);
+        fs_storage_manager->noteNewEntry(path);
     }
 }
 

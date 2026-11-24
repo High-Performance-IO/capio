@@ -1,11 +1,16 @@
 #ifndef CAPIO_GETDENTS_HPP
 #define CAPIO_GETDENTS_HPP
 
+#include <chrono>
+#include <csignal>
+#include <pthread.h>
 #include <thread>
 
+#include "common/requests.hpp"
 #include "remote/backend.hpp"
 #include "remote/home_node_service.hpp"
 #include "remote/requests.hpp"
+#include "utils/common.hpp"
 #include "utils/runtime_configuration.hpp"
 
 extern StorageManager *storage_manager;
@@ -74,6 +79,68 @@ void getdents_handler(const char *const str) {
     off64_t count;
     sscanf(str, "%d %d %ld", &tid, &fd, &count);
     handle_getdents(tid, fd, count);
+}
+
+/// @brief Reply to @p tid once the listing of @p path can go on: new entries, or the commit
+inline void wait_for_fs_entries(const std::filesystem::path path, const pid_t tid,
+                                const off64_t n_seen, const long expected, const bool is_starting) {
+    for (;;) {
+        const long count = FsStorageManager::countEntries(path);
+        if (count < 0 || count >= expected) {
+            // removed, or committed by its entries
+            if (count < 0 || FsStorageManager::isDirectoryCommitted(path, expected)) {
+                client_manager->replyToClient(tid, CAPIO_FS_LIST_COMMITTED);
+                return;
+            }
+        } else if (!is_starting && count != n_seen) {
+            client_manager->replyToClient(tid, CAPIO_FS_LIST_STREAMING);
+            return;
+        } else if (CapioCLEngine::get().isCommitted(path)) {
+            client_manager->replyToClient(tid, CAPIO_FS_LIST_COMMITTED);
+            return;
+        }
+        std::this_thread::sleep_for(std::chrono::milliseconds(100));
+    }
+}
+
+/*
+ * getdents of the FS variant, see posix/utils/fs_listing.hpp: "tid n_seen path". With n_seen -1
+ * the listing starts. Otherwise it found nothing new among n_seen entries, and waits.
+ */
+void list_fs_handler(const char *const str) {
+    int tid, consumed = 0;
+    off64_t n_seen;
+    if (sscanf(str, "%d %ld%n", &tid, &n_seen, &consumed) != 2) {
+        return;
+    }
+    const std::filesystem::path path = fs_request_path(tid, str, consumed);
+    const auto &engine               = CapioCLEngine::get();
+
+    const bool is_starting = n_seen < 0;
+    if (is_starting) {
+        if (engine.getCommitRule(path) != capiocl::commitRules::ON_N_FILES ||
+            engine.isExcluded(path) || FsStorageManager::isProducer(tid, path)) {
+            client_manager->replyToClient(tid, CAPIO_FS_LIST_AS_IS);
+            return;
+        }
+        if (engine.isFirable(path)) {
+            client_manager->replyToClient(tid, CAPIO_FS_LIST_STREAMING);
+            return;
+        }
+    }
+    const long expected = fs_storage_manager->expectedEntries(path);
+    // The waiter does not get the termination signals: their handler frees memory and exits, and
+    // run on a thread that holds a lock (malloc's, CAPIO-CL's) it would wait for it forever.
+    // TODO: a thread manager for the threads of the server
+    sigset_t signals, previous;
+    sigemptyset(&signals);
+    for (const int signal : {SIGTERM, SIGINT, SIGQUIT, SIGPIPE}) {
+        sigaddset(&signals, signal);
+    }
+    pthread_sigmask(SIG_BLOCK, &signals, &previous);
+    std::thread t(wait_for_fs_entries, path, tid, n_seen, expected, is_starting);
+    t.detach();
+    pthread_sigmask(SIG_SETMASK, &previous, nullptr);
 }
 
 #endif // CAPIO_GETDENTS_HPP

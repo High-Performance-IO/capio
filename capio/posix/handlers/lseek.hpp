@@ -3,6 +3,7 @@
 
 #if defined(SYS_lseek)
 
+#include "handlers/getdents.hpp"
 #include "utils/common.hpp"
 #include "utils/data.hpp"
 
@@ -68,6 +69,9 @@ inline off64_t capio_lseek(int fd, off64_t offset, int whence, long tid) {
         }
     })
     FS_MODE({
+        if (long res; capio_seek_listing_fs(fd, offset, whence, res)) {
+            return capio_kernel_result(res); // a directory that CAPIO lists
+        }
         // The end of a file and its data are known only once the producer wrote them, so a reader
         // must wait for them first. The writer knows its own, and the other whence values only
         // move the offset of a real descriptor: the kernel runs them.
