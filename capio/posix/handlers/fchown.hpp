@@ -7,9 +7,8 @@
 #include "utils/metadata.hpp"
 
 int fchown_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg5, long *result) {
-    int fd   = static_cast<int>(arg0);
-    long tid = syscall_no_intercept(SYS_gettid);
-    START_LOG(tid, "call(fd=%d)", fd);
+    int fd = static_cast<int>(arg0);
+    START_LOG(syscall_no_intercept(SYS_gettid), "call(fd=%d)", fd);
 
     if (!exists_capio_fd(fd)) {
         LOG("Syscall refers to file not handled by capio. Skipping it!");
@@ -26,7 +25,8 @@ int fchown_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long a
     })
     FS_MODE({
         // The kernel runs it, once the file is there
-        consent_request_cache->consent_request(get_capio_fd_path(fd), tid, __FUNCTION__);
+        consent_request_cache->consent_request(get_capio_fd_path(fd),
+                                               syscall_no_intercept(SYS_gettid), __FUNCTION__);
         return CAPIO_POSIX_SYSCALL_SKIP;
     })
 }
