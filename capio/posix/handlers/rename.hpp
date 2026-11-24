@@ -1,13 +1,11 @@
 #ifndef CAPIO_POSIX_HANDLERS_RENAME_HPP
 #define CAPIO_POSIX_HANDLERS_RENAME_HPP
 
+#include "utils/common.hpp"
 #include "utils/filesystem.hpp"
 
 int renameat2_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg5,
                       long *result) {
-    FS_MODE({
-        return CAPIO_POSIX_SYSCALL_SKIP; // not handled by the FS variant yet: the kernel runs it
-    })
     const std::filesystem::path old_dir_fd_path = get_dir_path(static_cast<int>(arg0));
     const std::filesystem::path old_path(reinterpret_cast<const char *>(arg1));
     const std::filesystem::path new_dir_fd_path = get_dir_path(static_cast<int>(arg2));
@@ -26,6 +24,13 @@ int renameat2_handler(long arg0, long arg1, long arg2, long arg3, long arg4, lon
 
     const auto new_path_abs =
         new_path.is_absolute() ? new_path : capio_absolute(new_dir_fd_path / new_path);
+
+    FS_MODE({
+        if (is_capio_path(old_path_abs) || is_capio_path(new_path_abs)) {
+            throw CapioUnimplementedException("rename");
+        }
+        return CAPIO_POSIX_SYSCALL_SKIP;
+    })
 
     if (is_prefix(old_path_abs, new_path_abs)) { // TODO: The check is more complex
         errno   = EINVAL;

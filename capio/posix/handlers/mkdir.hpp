@@ -80,6 +80,14 @@ inline off64_t capio_rmdir(const std::string_view &pathname, long tid) {
     }
 
     if (is_capio_path(path)) {
+        FS_MODE({
+            const auto res = capio_kernel_result(
+                syscall_no_intercept(SYS_unlinkat, AT_FDCWD, path.c_str(), AT_REMOVEDIR));
+            if (res == 0 && exists_capio_path(path)) {
+                delete_capio_path(path);
+            }
+            return res;
+        })
         if (!exists_capio_path(path)) {
             LOG("capio_files_path.find == end. errno = "
                 "ENOENT");
@@ -123,9 +131,6 @@ int mkdirat_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long 
 }
 
 int rmdir_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg5, long *result) {
-    FS_MODE({
-        return CAPIO_POSIX_SYSCALL_SKIP; // not handled by the FS variant yet: the kernel runs it
-    })
     const std::string_view pathname(reinterpret_cast<const char *>(arg0));
     long tid = syscall_no_intercept(SYS_gettid);
 
