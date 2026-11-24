@@ -102,6 +102,8 @@ COPY --from=builder                                         \
 
 # Binaries
 COPY --from=builder                                         \
+    "/usr/local/bin/capio_fs_streaming_ap[p]"               \
+    "/usr/local/bin/capio_fs_streaming_test[s]"             \
     "/usr/local/bin/capio_posix_unit_test[s]"               \
     "/usr/local/bin/capio_server"                           \
     "/usr/local/bin/capio_server_unit_test[s]"              \

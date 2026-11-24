@@ -438,6 +438,12 @@ inline int copy_file_range_handler(long arg0, long arg1, long arg2, long arg3, l
     const auto flags  = static_cast<unsigned int>(arg5);
     const long tid    = syscall_no_intercept(SYS_gettid);
 
+    FS_MODE({
+        if (exists_capio_fd(fd_in) || exists_capio_fd(fd_out)) {
+            throw CapioUnimplementedException("copy_file_range");
+        }
+        return CAPIO_POSIX_SYSCALL_SKIP;
+    })
     return posix_return_value(
         capio_copy_file_range(fd_in, off_in, fd_out, off_out, len, flags, tid), result);
 }

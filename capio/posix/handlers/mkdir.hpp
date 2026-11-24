@@ -34,18 +34,29 @@ inline off64_t capio_mkdirat(int dirfd, const std::string_view &pathname, mode_t
     }
 
     if (is_capio_path(path)) {
-        if (exists_capio_path(path)) {
-            errno = EEXIST;
-            return CAPIO_POSIX_SYSCALL_ERRNO;
-        }
-        off64_t res = mkdir_request(path, tid);
-        if (res == 1) {
-            return CAPIO_POSIX_SYSCALL_ERRNO;
-        } else {
-            LOG("Adding %s to capio_files_path", path.c_str());
-            add_capio_path(path);
+        MEMORY_MODE({
+            if (exists_capio_path(path)) {
+                errno = EEXIST;
+                return CAPIO_POSIX_SYSCALL_ERRNO;
+            }
+            off64_t res = mkdir_request(path, tid);
+            if (res == 1) {
+                return CAPIO_POSIX_SYSCALL_ERRNO;
+            } else {
+                LOG("Adding %s to capio_files_path", path.c_str());
+                add_capio_path(path);
+                return res;
+            }
+        })
+        FS_MODE({
+            // Announced once it worked: a failed mkdir must not make a producer
+            const auto res = capio_kernel_result(
+                syscall_no_intercept(SYS_mkdirat, dirfd, pathname.data(), mode));
+            if (res == 0) {
+                create_request_fs(path, tid);
+            }
             return res;
-        }
+        })
     } else {
         return CAPIO_POSIX_SYSCALL_REQUEST_SKIP;
     }
@@ -69,6 +80,14 @@ inline off64_t capio_rmdir(const std::string_view &pathname, long tid) {
     }
 
     if (is_capio_path(path)) {
+        FS_MODE({
+            const auto res = capio_kernel_result(
+                syscall_no_intercept(SYS_unlinkat, AT_FDCWD, path.c_str(), AT_REMOVEDIR));
+            if (res == 0 && exists_capio_path(path)) {
+                delete_capio_path(path);
+            }
+            return res;
+        })
         if (!exists_capio_path(path)) {
             LOG("capio_files_path.find == end. errno = "
                 "ENOENT");

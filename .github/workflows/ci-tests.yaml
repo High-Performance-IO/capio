@@ -72,6 +72,28 @@ jobs:
                  --gtest_break_on_failure \
                  --gtest_print_time=1' sh \
               '{name: "CAPIO", IO_Graph: [], exclude: [$pwd + "/aNonExistingFile", $pwd, $pwd + "/"]}'
+
+          echo "Run CAPIO syscall Unit tests, FS variant"
+          docker run --rm                         \
+              --env CAPIO_DIR=/tmp/capio          \
+              --env CAPIO_LOG_LEVEL=-1            \
+              --workdir /tmp/capio                \
+              --name capio-docker                 \
+              alphaunito/capio:latest             \
+            sh -c 'jq -n --arg pwd "$PWD" "$1" > test_config.json && \
+               LD_PRELOAD=libcapio_posix_fs.so capio_syscall_unit_tests \
+                 --gtest_filter="-*tat*OnDirectory*:*FcntlLease*:*FcntlSeals*:*FromAPosixFileIntoACapioFile:*FromACapioFileIntoAPosixFile:*SpliceFromACapioFile*:*SpliceIntoACapioFile*:*SendfileFromACapioFile*:*TestDup*:*TestCopyFileRange*:*FcntlDupfd*:*TestChmodAndChownByPath*:*TestDirectoryEntriesHaveTheirOwnType*:*TestUnlinkAndRmdirRemoveTheEntry*:*TestRenameMovesTheEntry*:*TestRemoveAllOfANestedDirectory*:*TestDotNamesTheCapioDirectoryAfterChdir*:*TestDirentsOnCapioDir*:*TestDirectoryIsFoundThroughDotAndTrailingSlash*:*TestFileRename*:*TestDirectoryRename*" \
+                 --gtest_break_on_failure \
+                 --gtest_print_time=1' sh \
+              '{name: "CAPIO", IO_Graph: [], exclude: [$pwd + "/aNonExistingFile", $pwd, $pwd + "/"]}'
+
+          echo "Run CAPIO FS streaming tests"
+          docker run --rm                         \
+              --env CAPIO_LOG_LEVEL=-1            \
+              --name capio-docker                 \
+              alphaunito/capio:latest             \
+            capio_fs_streaming_tests              \
+              --gtest_print_time=1
           
   format-check:
     name: "Check ${{ matrix.path }} clang-format conformance"
@@ -181,7 +203,7 @@ jobs:
       - name: "Run tests"
         id: run-tests
         shell: bash
-        timeout-minutes: 5
+        timeout-minutes: 12
         env:
           CAPIO_DIR: ${{ github.workspace }}
           CAPIO_LOG_LEVEL: -1
@@ -209,6 +231,25 @@ jobs:
           LD_PRELOAD=libcapio_posix.so \
           capio_syscall_unit_tests \
             --gtest_break_on_failure \
+            --gtest_print_time=1
+
+          # A coverage build skips the teardown of the server, which leaves its shared memory, the
+          # canary among it: the next server of the same workflow would refuse to start.
+          rm -f /dev/shm/CAPIO* /dev/shm/sem.CAPIO*
+
+          # Left out: what only holds for files in memory (synthetic sizes of directories, refused
+          # splice, sendfile, leases and seals), copies to another file system (EXDEV), and dup,
+          # fcntl(F_DUPFD), copy_file_range, chmod, fchmodat, chown, fchownat, getdents, rename,
+          # and splice and sendfile from CAPIO files, which the FS variant does not implement yet.
+          echo "Run CAPIO syscall Unit tests, FS variant"
+          LD_PRELOAD=libcapio_posix_fs.so \
+          capio_syscall_unit_tests \
+            --gtest_filter='-*tat*OnDirectory*:*FcntlLease*:*FcntlSeals*:*FromAPosixFileIntoACapioFile:*FromACapioFileIntoAPosixFile:*SpliceFromACapioFile*:*SpliceIntoACapioFile*:*SendfileFromACapioFile*:*TestDup*:*TestCopyFileRange*:*FcntlDupfd*:*TestChmodAndChownByPath*:*TestDirectoryEntriesHaveTheirOwnType*:*TestUnlinkAndRmdirRemoveTheEntry*:*TestRenameMovesTheEntry*:*TestRemoveAllOfANestedDirectory*:*TestDotNamesTheCapioDirectoryAfterChdir*:*TestDirentsOnCapioDir*:*TestDirectoryIsFoundThroughDotAndTrailingSlash*:*TestFileRename*:*TestDirectoryRename*' \
+            --gtest_break_on_failure \
+            --gtest_print_time=1
+
+          echo "Run CAPIO FS streaming tests"
+          capio_fs_streaming_tests \
             --gtest_print_time=1
 
       # note: use always() to force log upload also on test failure

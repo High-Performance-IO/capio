@@ -147,6 +147,12 @@ LD_PRELOAD=libcapio_posix.so \
 > the file's producer (the file is in its `output_stream`), the open fails with `ENOENT` instead, since no other step
 > would create the file.
 
+#### Streaming through the file system
+
+`libcapio_posix.so` keeps the files of `CAPIO_DIR` in memory, while `libcapio_posix_fs.so` leaves them on the file
+system and only coordinates who waits for what. Preload one or the other for the whole workflow, as they cannot be
+mixed, and keep the inputs of the workflow outside `CAPIO_DIR`, which is a working directory.
+
 To shut down a server, send it `SIGTERM` or `SIGINT` (e.g. `killall capio_server`). The server releases its resources
 and exits.
 

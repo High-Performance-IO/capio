@@ -1,0 +1,122 @@
+/*
+ * The application of the FS streaming tests. Its arguments are operations, run in order on a
+ * current descriptor, e.g. "create:out" "write:AAAA" "close". A failed operation
+ * prints "<operation>=<errno name>" and the next one runs.
+ */
+#include <cerrno>
+#include <cstdio>
+#include <cstring>
+#include <functional>
+#include <map>
+#include <string>
+#include <thread>
+#include <vector>
+
+#include <fcntl.h>
+#include <sys/stat.h>
+#include <unistd.h>
+
+namespace {
+
+int fd = -1;
+
+void run(const std::string &argument);
+
+void print(const std::string &text) {
+    fputs(text.c_str(), stdout);
+    fflush(stdout);
+}
+
+const char *error_name(const int error) {
+    switch (error) {
+    case EBADF:
+        return "EBADF";
+    case EEXIST:
+        return "EEXIST";
+    case EINVAL:
+        return "EINVAL";
+    case ENOENT:
+        return "ENOENT";
+    default:
+        return strerror(error);
+    }
+}
+
+bool read_all() {
+    char buffer[4096];
+    ssize_t count;
+    while ((count = read(fd, buffer, sizeof(buffer))) > 0) {
+        print(std::string(buffer, count));
+    }
+    return count == 0;
+}
+
+bool open_as(const std::string &path, const int flags) {
+    fd = open(path.c_str(), flags, 0644);
+    return fd >= 0;
+}
+
+using Operation = std::function<bool(const std::string &)>;
+
+const std::map<std::string, Operation> &operations() {
+    static const std::map<std::string, Operation> table = {
+        {"open", [](const std::string &a) { return open_as(a, O_RDONLY); }},
+        {"create", [](const std::string &a) { return open_as(a, O_CREAT | O_WRONLY | O_TRUNC); }},
+        {"excl", [](const std::string &a) { return open_as(a, O_CREAT | O_EXCL | O_WRONLY); }},
+        {"append", [](const std::string &a) { return open_as(a, O_WRONLY | O_APPEND); }},
+        {"rewrite", [](const std::string &a) { return open_as(a, O_WRONLY | O_TRUNC); }},
+        {"write",
+         [](const std::string &a) {
+             return write(fd, a.data(), a.size()) == static_cast<ssize_t>(a.size());
+         }},
+        {"read", [](const std::string &) { return read_all(); }},
+        {"close", [](const std::string &) { return close(fd) == 0; }},
+        {"seek", [](const std::string &a) { return lseek(fd, std::stol(a), SEEK_SET) >= 0; }},
+        {"print",
+         [](const std::string &a) {
+             print(a);
+             return true;
+         }},
+        {"stat",
+         [](const std::string &a) {
+             struct stat info{};
+             if (stat(a.c_str(), &info) != 0) {
+                 return false;
+             }
+             print(S_ISDIR(info.st_mode) ? "dir" : std::to_string(info.st_size));
+             return true;
+         }},
+        {"access", [](const std::string &a) { return ::access(a.c_str(), F_OK) == 0; }},
+        {"thread",
+         [](const std::string &a) {
+             std::thread thread([&a] { run(a); });
+             thread.join();
+             return true;
+         }},
+    };
+    return table;
+}
+
+void run(const std::string &argument) {
+    const auto separator = argument.find(':');
+    const auto name      = argument.substr(0, separator);
+    const auto value =
+        separator == std::string::npos ? std::string{} : argument.substr(separator + 1);
+    const auto found = operations().find(name);
+    if (found == operations().end()) {
+        print("unknown operation " + name);
+        _exit(64);
+    }
+    if (!found->second(value)) {
+        print(name + "=" + error_name(errno));
+    }
+}
+
+} // namespace
+
+int main(int argc, char **argv) {
+    for (int i = 1; i < argc; ++i) {
+        run(argv[i]);
+    }
+    return 0;
+}

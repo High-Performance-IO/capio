@@ -7,6 +7,7 @@
 #include <string>
 #include <unordered_map>
 
+#include "utils/common.hpp"
 #include "utils/requests.hpp"
 
 /**
@@ -93,6 +94,13 @@ int fcntl_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long ar
     if (!exists_capio_fd(fd)) {
         return CAPIO_POSIX_SYSCALL_SKIP;
     }
+
+    FS_MODE({
+        if (cmd == F_DUPFD || cmd == F_DUPFD_CLOEXEC) {
+            throw CapioUnimplementedException("fcntl(F_DUPFD)");
+        }
+        return CAPIO_POSIX_SYSCALL_SKIP; // a real descriptor: the kernel runs the rest
+    })
 
     switch (cmd) {
     case F_DUPFD:

@@ -8,6 +8,12 @@
 #include "calf/SyscallLogger.h"
 #include "types.hpp"
 
+#include <filesystem>
+#include <sys/stat.h>
+
+#include "filesystem.hpp"
+#include "requests.hpp"
+
 inline int *get_fd_snapshot(long tid) {
     return static_cast<int *>(get_shm_if_exist("capio_snapshot_" + std::to_string(tid)));
 }
@@ -25,6 +31,7 @@ void initialize_from_snapshot(const int *fd_shm, long tid) {
     while ((fd = fd_shm[i]) != -1) {
         shm_name = "capio_snapshot_path_" + pid + "_" + std::to_string(fd);
         path_shm = static_cast<char *>(get_shm(shm_name));
+        const std::string path(path_shm); // read before the unmap below
         if (munmap(path_shm, PATH_MAX) == -1) {
             ERR_EXIT("munmap initialize_from_snapshot");
         }
@@ -33,8 +40,19 @@ void initialize_from_snapshot(const int *fd_shm, long tid) {
         }
         shm_name = "capio_snapshot_" + pid + "_" + std::to_string(fd);
         p_shm    = static_cast<off64_t *>(get_shm(shm_name));
-        add_capio_fd(tid, path_shm, fd, p_shm[1], p_shm[2], static_cast<int>(p_shm[3]),
-                     static_cast<bool>(p_shm[4]));
+        // The kernel closed the descriptors with close-on-exec during the execve
+        if (!static_cast<bool>(p_shm[4])) {
+            const auto flags = static_cast<int>(p_shm[3]);
+            add_capio_fd(tid, path, fd, p_shm[1], p_shm[2], flags, false);
+            FS_MODE({
+                // The program after an execve, e.g. the child of a fork, writes the file too
+                struct stat info{};
+                if ((flags & O_ACCMODE) != O_RDONLY &&
+                    syscall_no_intercept(SYS_fstat, fd, &info) == 0 && !S_ISDIR(info.st_mode)) {
+                    inherit_request_fs(path, tid);
+                }
+            })
+        }
         if (munmap(p_shm, 6 * sizeof(off64_t)) == -1) {
             ERR_EXIT("munmap 2 initialize_from_snapshot");
         }

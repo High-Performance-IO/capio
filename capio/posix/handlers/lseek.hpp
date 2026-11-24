@@ -10,7 +10,11 @@
 inline off64_t capio_lseek(int fd, off64_t offset, int whence, long tid) {
     START_LOG(tid, "call(fd=%d, offset=%ld, whence=%d)", fd, offset, whence);
 
-    if (exists_capio_fd(fd)) {
+    if (!exists_capio_fd(fd)) {
+        return CAPIO_POSIX_SYSCALL_REQUEST_SKIP;
+    }
+
+    MEMORY_MODE({
         read_cache->flush();
         write_cache->flush();
         off64_t file_offset = get_capio_fd_offset(fd);
@@ -62,9 +66,17 @@ inline off64_t capio_lseek(int fd, off64_t offset, int whence, long tid) {
             errno = EINVAL;
             return CAPIO_POSIX_SYSCALL_ERRNO;
         }
-    } else {
+    })
+    FS_MODE({
+        // The end of a file and its data are known only once the producer wrote them, so a reader
+        // must wait for them first. The writer knows its own, and the other whence values only
+        // move the offset of a real descriptor: the kernel runs them.
+        const bool to_data = whence == SEEK_END || whence == SEEK_DATA || whence == SEEK_HOLE;
+        if (to_data && (get_capio_fd_flags(fd) & O_ACCMODE) == O_RDONLY) {
+            throw CapioUnimplementedException("lseek of a reader to the end, data or a hole");
+        }
         return CAPIO_POSIX_SYSCALL_REQUEST_SKIP;
-    }
+    })
 }
 
 int lseek_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg5, long *result) {

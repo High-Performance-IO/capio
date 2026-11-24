@@ -1,6 +1,7 @@
 #ifndef CAPIO_POSIX_HANDLERS_RENAME_HPP
 #define CAPIO_POSIX_HANDLERS_RENAME_HPP
 
+#include "utils/common.hpp"
 #include "utils/filesystem.hpp"
 
 int renameat2_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg5,
@@ -23,6 +24,13 @@ int renameat2_handler(long arg0, long arg1, long arg2, long arg3, long arg4, lon
 
     const auto new_path_abs =
         new_path.is_absolute() ? new_path : capio_absolute(new_dir_fd_path / new_path);
+
+    FS_MODE({
+        if (is_capio_path(old_path_abs) || is_capio_path(new_path_abs)) {
+            throw CapioUnimplementedException("rename");
+        }
+        return CAPIO_POSIX_SYSCALL_SKIP;
+    })
 
     if (is_prefix(old_path_abs, new_path_abs)) { // TODO: The check is more complex
         errno   = EINVAL;

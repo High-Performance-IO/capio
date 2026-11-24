@@ -6,6 +6,9 @@
 
 #include "requests.hpp"
 
+#include <fcntl.h>
+#include <sys/stat.h>
+
 class ReadCache {
   private:
     char *_cache;
@@ -189,7 +192,62 @@ class WriteCache {
     }
 };
 
+/// @brief FS variant: block until the server lets a call on a path go on, as stat waits in the
+/// memory variant
+class ConsentRequestCache {
+    std::unordered_set<std::string> received_consents;
+
+  public:
+    void consent_request(const std::filesystem::path &path, const long tid,
+                         const std::string &source_func) {
+        START_LOG(capio_syscall(SYS_gettid), "call(path=%s, tid=%ld, source=%s)", path.c_str(), tid,
+                  source_func.c_str());
+
+        if (received_consents.find(path) != received_consents.end()) {
+            return;
+        }
+        // 0 holds only now: the path may be created or committed later
+        if (consent_to_proceed_request(path, tid, source_func) != 0) {
+#ifdef SYS_statx
+            // NFS may still have the size from before the wait cached
+            struct statx fresh{};
+            capio_syscall(SYS_statx, AT_FDCWD, path.c_str(), AT_STATX_FORCE_SYNC, STATX_SIZE,
+                          &fresh);
+#endif
+            received_consents.emplace(path);
+        }
+    }
+};
+
+/// @brief FS variant: block a read until the server says its bytes are on the file system
+class ReadCacheFS {
+    // path -> bytes known to be readable, -1 for all of them: committed, or nothing to wait for
+    std::unordered_map<std::string, off64_t> available_read_cache;
+
+  public:
+    /// @brief Block until the first @p end_of_read bytes of the file of @p fd can be read
+    void read(const int fd, const off64_t end_of_read, const long tid) {
+        const std::string &path = get_capio_fd_path(fd);
+        START_LOG(capio_syscall(SYS_gettid), "call(path=%s, end_of_read=%ld, tid=%ld)",
+                  path.c_str(), end_of_read, tid);
+
+        const auto known = available_read_cache.find(path);
+        if (known != available_read_cache.end() &&
+            (known->second == -1 || end_of_read <= known->second)) {
+            return;
+        }
+        available_read_cache[path] = read_request_fs(path, end_of_read, tid, fd);
+#ifdef SYS_statx
+        // NFS may still have the old size cached, and would answer end of file
+        struct statx fresh{};
+        capio_syscall(SYS_statx, fd, "", AT_EMPTY_PATH | AT_STATX_FORCE_SYNC, STATX_SIZE, &fresh);
+#endif
+    }
+};
+
 inline thread_local WriteCache *write_cache;
 inline thread_local ReadCache *read_cache;
+inline thread_local ConsentRequestCache *consent_request_cache;
+inline thread_local ReadCacheFS *read_request_cache;
 
 #endif // CAPIO_SERVER_UTILS_CACHE

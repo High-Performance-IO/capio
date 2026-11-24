@@ -1,9 +1,3 @@
-/**
- * Capio log level.
- * if -1, and capio logging is enable everything is logged, otherwise, only
- * logs up to CAPIO_MAX_LOG_LEVEL function calls
- */
-
 #include <array>
 #include <string>
 
@@ -249,7 +243,7 @@ static constexpr std::array<CPHandler_t, CAPIO_NR_SYSCALLS> build_syscall_table(
     _syscallTable[SYS_exit] = exit_handler;
 #endif
 #ifdef SYS_exit_group
-    _syscallTable[SYS_exit_group] = exit_handler;
+    _syscallTable[SYS_exit_group] = exit_group_handler;
 #endif
 #ifdef SYS_faccessat
     _syscallTable[SYS_faccessat] = faccessat_handler;
