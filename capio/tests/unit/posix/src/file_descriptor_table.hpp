@@ -20,6 +20,8 @@
 
 #include <cstdarg>
 #include <filesystem>
+#include <fstream>
+#include <unordered_map>
 
 #include <libsyscall_intercept_hook_point.h>
 #include <sys/syscall.h>
@@ -30,7 +32,8 @@
 namespace {
 
 /**
- * While one is alive, the descriptors that the table closes are recorded instead of closed: see
+ * While one is alive, the descriptors that the table closes are recorded instead of closed, and the
+ * system calls in failing return their error instead of reaching the kernel: see
  * syscall_no_intercept below. The other system calls, and all of them when none is alive, reach the
  * kernel, as the other tests of the client need.
  */
@@ -44,7 +47,8 @@ class MockSyscalls final {
     static inline std::atomic<MockSyscalls *> active{nullptr};
 
     std::vector<int> closed;
-    long result = 0; ///< what close returns
+    long result = 0;                        ///< what close returns
+    std::unordered_map<long, long> failing; ///< system call -> the -errno it returns
 
     MockSyscalls() { active = this; }
     ~MockSyscalls() { active = nullptr; }
@@ -83,6 +87,41 @@ class MockSyscalls final {
 long unusedTid() {
     static long next = 0;
     return 1'000'000'000L + getpid() * 1000L + next++;
+}
+
+std::filesystem::path snapshotFile(const long tid) {
+    return std::string(SHM_SNAPSHOT_PREFIX) + std::to_string(tid);
+}
+
+/// @brief Write @p bytes as the snapshot of @p tid, as an exec of another program could leave it
+void writeSnapshot(const long tid, const std::string &bytes) {
+    std::ofstream(snapshotFile(tid), std::ios::binary) << bytes;
+}
+
+#ifdef CAPIO_COVERAGE
+extern "C" void __gcov_dump(void);
+#endif
+
+/**
+ * @brief fork. With coverage, a direct call of fork is replaced by one that resets the counters of
+ * the child after the fork handlers have run, so that their lines would look never run: calling it
+ * through a pointer keeps them.
+ */
+pid_t forkKeepingCoverage() {
+#ifdef CAPIO_COVERAGE
+    pid_t (*const volatile call)() = fork;
+    return call();
+#else
+    return fork();
+#endif
+}
+
+/// @brief The end of a forked child, which keeps what it has covered
+[[noreturn]] void exitChild(const int status) {
+#ifdef CAPIO_COVERAGE
+    __gcov_dump(); // _exit does not write it
+#endif
+    _exit(status);
 }
 
 } // namespace
@@ -140,8 +179,13 @@ extern "C" long syscall_no_intercept(const long syscall_number, ...) {
     }
     va_end(arguments);
 
-    if (MockSyscalls *mock = MockSyscalls::active; mock != nullptr && syscall_number == SYS_close) {
-        return mock->close(static_cast<int>(arg[0]));
+    if (MockSyscalls *mock = MockSyscalls::active; mock != nullptr) {
+        if (const auto error = mock->failing.find(syscall_number); error != mock->failing.end()) {
+            return error->second;
+        }
+        if (syscall_number == SYS_close) {
+            return mock->close(static_cast<int>(arg[0]));
+        }
     }
     return kernelSyscall(syscall_number, arg[0], arg[1], arg[2], arg[3], arg[4], arg[5]);
 }
@@ -424,10 +468,10 @@ TEST(FileDescriptorTableTest, ForkedChildGetsAFreeTable) {
         std::this_thread::sleep_for(std::chrono::milliseconds(100));
         system_calls.release();
     });
-    const pid_t child = fork(); // waits for the close, which holds the table
+    const pid_t child = forkKeepingCoverage(); // waits for the close, which holds the table
     if (child == 0) {
         table.add(4, "/capio/g", 0, 0, O_WRONLY, false);
-        _exit(table.contains(4) && !table.contains(3) ? 0 : 1);
+        exitChild(table.contains(4) && !table.contains(3) ? 0 : 1);
     }
     closer.join();
     releaser.join();
@@ -529,7 +573,7 @@ TEST(FileDescriptorTableTest, EmptyTableRemovesTheSnapshotOfAFailedExec) {
 // The snapshot is a file of /dev/shm, which the program after the exec removes once read
 TEST(FileDescriptorTableTest, SnapshotIsAFileOfDevShm) {
     const long tid                   = unusedTid();
-    const std::filesystem::path file = std::string(SHM_SNAPSHOT_PREFIX) + std::to_string(tid);
+    const std::filesystem::path file = snapshotFile(tid);
     FileDescriptorTable before;
     before.add(3, "/capio/f", 0, 0, O_WRONLY, false);
     before.createSnapshot(tid);
@@ -538,6 +582,84 @@ TEST(FileDescriptorTableTest, SnapshotIsAFileOfDevShm) {
 
     const FileDescriptorTable after(tid);
     EXPECT_FALSE(std::filesystem::exists(file));
+}
+
+// A snapshot that cannot be made: the next program starts with no CAPIO file
+TEST(FileDescriptorTableTest, SnapshotThatCannotBeCreated) {
+    const long tid = unusedTid();
+    FileDescriptorTable before;
+    before.add(3, "/capio/f", 0, 0, O_WRONLY, false);
+    {
+        MockSyscalls system_calls;
+        system_calls.failing[SYS_openat] = -ENOSPC;
+        before.createSnapshot(tid);
+    }
+    EXPECT_FALSE(std::filesystem::exists(snapshotFile(tid)));
+    EXPECT_TRUE(FileDescriptorTable(tid).fds().empty());
+}
+
+// A snapshot that cannot be made as long as the table: none is left half made
+TEST(FileDescriptorTableTest, SnapshotThatCannotBeSized) {
+    const long tid = unusedTid();
+    FileDescriptorTable before;
+    before.add(3, "/capio/f", 0, 0, O_WRONLY, false);
+    {
+        MockSyscalls system_calls;
+        system_calls.failing[SYS_ftruncate] = -ENOSPC;
+        before.createSnapshot(tid);
+    }
+    EXPECT_FALSE(std::filesystem::exists(snapshotFile(tid)));
+    EXPECT_TRUE(FileDescriptorTable(tid).fds().empty());
+}
+
+TEST(FileDescriptorTableTest, SnapshotThatCannotBeMapped) {
+    const long tid = unusedTid();
+    FileDescriptorTable before;
+    before.add(3, "/capio/f", 0, 0, O_WRONLY, false);
+    {
+        MockSyscalls system_calls;
+        system_calls.failing[SYS_mmap] = -ENOMEM;
+        before.createSnapshot(tid);
+    }
+    EXPECT_FALSE(std::filesystem::exists(snapshotFile(tid)));
+    EXPECT_TRUE(FileDescriptorTable(tid).fds().empty());
+}
+
+// A snapshot that cannot be read: the program starts with no CAPIO file, and the snapshot is gone
+TEST(FileDescriptorTableTest, SnapshotThatCannotBeRead) {
+    for (const long system_call : {SYS_fstat, SYS_mmap}) {
+        const long tid = unusedTid();
+        FileDescriptorTable before;
+        before.add(3, "/capio/f", 0, 0, O_WRONLY, false);
+        before.createSnapshot(tid);
+
+        std::vector<int> fds;
+        {
+            MockSyscalls system_calls;
+            system_calls.failing[system_call] = -EIO;
+            fds                               = FileDescriptorTable(tid).fds();
+        }
+        EXPECT_TRUE(fds.empty()) << system_call;
+        EXPECT_FALSE(std::filesystem::exists(snapshotFile(tid))) << system_call;
+    }
+}
+
+TEST(FileDescriptorTableTest, SnapshotShorterThanItsHeader) {
+    const long tid = unusedTid();
+    writeSnapshot(tid, "x");
+
+    EXPECT_TRUE(FileDescriptorTable(tid).fds().empty());
+    EXPECT_FALSE(std::filesystem::exists(snapshotFile(tid)));
+}
+
+// A header that counts more entries than the file holds: none is read past its end
+TEST(FileDescriptorTableTest, SnapshotShorterThanItsEntries) {
+    const long tid     = unusedTid();
+    const size_t count = 1000;
+    writeSnapshot(tid, std::string(reinterpret_cast<const char *>(&count), sizeof(count)));
+
+    EXPECT_TRUE(FileDescriptorTable(tid).fds().empty());
+    EXPECT_FALSE(std::filesystem::exists(snapshotFile(tid)));
 }
 
 #endif // CAPIO_TEST_UNIT_POSIX_FILE_DESCRIPTOR_TABLE_HPP

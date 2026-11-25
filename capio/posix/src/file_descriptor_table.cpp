@@ -45,7 +45,8 @@ size_t snapshotLength(const size_t count) {
 void *mapSnapshot(const long fd, const size_t length, const int protection) {
     const long address =
         syscall_no_intercept(SYS_mmap, nullptr, length, protection, MAP_SHARED, fd, 0);
-    return address < 0 && address > -4096 ? nullptr : reinterpret_cast<void *>(address);
+    // An address of user space is never negative: a negative result is -errno
+    return address < 0 ? nullptr : reinterpret_cast<void *>(address);
 }
 
 void removeSnapshot(const std::string &path) {
