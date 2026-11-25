@@ -2,8 +2,8 @@
 #define CAPIO_POSIX_UTILS_FILE_DESCRIPTOR_TABLE_HPP
 
 #include <memory>
-#include <mutex>
 #include <optional>
+#include <shared_mutex>
 #include <string>
 #include <unordered_map>
 #include <unordered_set>
@@ -15,10 +15,11 @@
  * @brief The CAPIO files of a process: which descriptors are open on which paths, with their
  * offset, size, flags and close-on-exec. Implemented in src/file_descriptor_table.cpp.
  *
- * The threads of a process share their descriptors, so every method takes the lock of the table:
- * the callers never lock. The lock is recursive, as allocating can make system calls, whose
- * handlers use the table. fork takes it (see protectAcrossFork), so that the child gets a whole
- * table and a free lock.
+ * The threads of a process share their descriptors, so every method takes the lock of the table,
+ * shared to read and exclusive to change it: the callers never lock. The lock is not recursive, so
+ * a method holding it neither calls another one nor makes a system call that CAPIO handles, whose
+ * handler would use the table. fork takes it (see protectAcrossFork), so that the child gets a
+ * whole table and a free lock.
  *
  * The getters of one descriptor (path, offset, ...) throw std::out_of_range if it is not in the
  * table: check with contains first, or use findPath.
@@ -40,7 +41,7 @@ class FileDescriptorTable final {
     std::unordered_map<std::string, std::unordered_set<int>> _paths; ///< path -> its descriptors
 
     /// @brief The lock of the tables: one, as a process has one table of descriptors
-    static std::recursive_mutex &mutex();
+    static std::shared_mutex &mutex();
 
     void _remove(int fd);
 
