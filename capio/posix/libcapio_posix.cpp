@@ -5,7 +5,6 @@
 
 #include "utils/clone.hpp"
 #include "utils/filesystem.hpp"
-#include "utils/snapshot.hpp"
 
 #include "handlers.hpp"
 
@@ -427,12 +426,18 @@ static __attribute__((constructor)) void init() {
 
     FileDescriptorTable::protectAcrossFork();
     init_client(tid);
-    init_filesystem();
+    init_filesystem(tid); // with the descriptors of the program before an exec, if any
     initialize_new_thread();
-
-    if (const int *fd_shm = get_fd_snapshot(tid); fd_shm != nullptr) {
-        initialize_from_snapshot(fd_shm, tid);
-    }
+    FS_MODE({
+        // The program after an exec, e.g. the child of a fork, writes the files it got too
+        for (const int fd : fd_table->fds()) {
+            struct stat info{};
+            if ((fd_table->flags(fd) & O_ACCMODE) != O_RDONLY &&
+                syscall_no_intercept(SYS_fstat, fd, &info) == 0 && !S_ISDIR(info.st_mode)) {
+                inherit_request_fs(fd_table->path(fd), tid);
+            }
+        }
+    })
 
     intercept_hook_point_clone_child  = hook_clone_child;
     intercept_hook_point_clone_parent = hook_clone_parent;

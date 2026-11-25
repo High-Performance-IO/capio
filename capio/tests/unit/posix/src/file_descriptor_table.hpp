@@ -19,11 +19,12 @@
 #include <unistd.h>
 
 #include "utils/file_descriptor_table.hpp"
+#include "utils/system_calls.hpp"
 
 namespace {
 
-// The system calls of the table: records the descriptors it closes, instead of closing them
-class RecordingSystemCalls final {
+// Records the descriptors the table closes, instead of closing them: see SystemCalls::close below
+class MockSystemCalls final {
     std::mutex _mutex;
     std::condition_variable _released;
     bool _blocking = false;
@@ -59,23 +60,46 @@ class RecordingSystemCalls final {
         _blocking = false;
         _released.notify_all();
     }
+
+    /// @brief The mock of the test that is running, with nothing recorded yet
+    static MockSystemCalls &reset() {
+        MockSystemCalls &mock = get();
+        const std::lock_guard lock(mock._mutex);
+        mock.closed.clear();
+        mock.result    = 0;
+        mock._blocking = false;
+        mock._closing  = false;
+        return mock;
+    }
+
+    static MockSystemCalls &get() {
+        static MockSystemCalls mock;
+        return mock;
+    }
 };
 
-using Table = BasicFileDescriptorTable<RecordingSystemCalls>;
+/// @brief A thread id of no thread, so that no other process has its snapshot
+long unusedTid() {
+    static long next = 0;
+    return 1'000'000'000L + getpid() * 1000L + next++;
+}
 
 } // namespace
 
+// The tests do not compile src/system_calls.cpp: these are its methods
+long SystemCalls::close(const int fd) { return MockSystemCalls::get().close(fd); }
+
 TEST(FileDescriptorTableTest, StartsEmpty) {
-    RecordingSystemCalls system_calls;
-    const Table table(system_calls);
+    MockSystemCalls::reset();
+    const FileDescriptorTable table;
     EXPECT_TRUE(table.fds().empty());
     EXPECT_FALSE(table.contains(3));
     EXPECT_FALSE(table.containsPath("/capio/f"));
 }
 
 TEST(FileDescriptorTableTest, AddKnowsTheDescriptorAndItsPath) {
-    RecordingSystemCalls system_calls;
-    Table table(system_calls);
+    MockSystemCalls::reset();
+    FileDescriptorTable table;
     table.add(3, "/capio/f", 10, 100, O_WRONLY, true);
 
     EXPECT_TRUE(table.contains(3));
@@ -89,8 +113,8 @@ TEST(FileDescriptorTableTest, AddKnowsTheDescriptorAndItsPath) {
 }
 
 TEST(FileDescriptorTableTest, SettersChangeOneDescriptor) {
-    RecordingSystemCalls system_calls;
-    Table table(system_calls);
+    MockSystemCalls::reset();
+    FileDescriptorTable table;
     table.add(3, "/capio/f", 0, 0, O_RDONLY, false);
     table.add(4, "/capio/f", 0, 0, O_RDONLY, false);
 
@@ -108,31 +132,31 @@ TEST(FileDescriptorTableTest, SettersChangeOneDescriptor) {
 }
 
 TEST(FileDescriptorTableTest, UnknownDescriptorHasNoPath) {
-    RecordingSystemCalls system_calls;
-    const Table table(system_calls);
+    MockSystemCalls::reset();
+    const FileDescriptorTable table;
     EXPECT_EQ(table.findPath(3), std::nullopt);
     EXPECT_THROW((void) table.path(3), std::out_of_range);
     EXPECT_THROW((void) table.offset(3), std::out_of_range);
 }
 
 TEST(FileDescriptorTableTest, FindPathOfAKnownDescriptor) {
-    RecordingSystemCalls system_calls;
-    Table table(system_calls);
+    MockSystemCalls::reset();
+    FileDescriptorTable table;
     table.add(3, "/capio/f", 0, 0, O_RDONLY, false);
     EXPECT_EQ(table.findPath(3), "/capio/f");
 }
 
 TEST(FileDescriptorTableTest, PathWithoutDescriptors) {
-    RecordingSystemCalls system_calls;
-    Table table(system_calls);
+    MockSystemCalls::reset();
+    FileDescriptorTable table;
     table.addPath("/capio/d");
     EXPECT_TRUE(table.containsPath("/capio/d"));
     EXPECT_TRUE(table.fds().empty());
 }
 
 TEST(FileDescriptorTableTest, CopySharesTheOffsetButNotCloseOnExec) {
-    RecordingSystemCalls system_calls;
-    Table table(system_calls);
+    MockSystemCalls::reset();
+    FileDescriptorTable table;
     table.add(3, "/capio/f", 5, 100, O_WRONLY, false);
     table.dup(3, 4, true);
 
@@ -149,8 +173,8 @@ TEST(FileDescriptorTableTest, CopySharesTheOffsetButNotCloseOnExec) {
 }
 
 TEST(FileDescriptorTableTest, RemovingOneCopyKeepsTheOther) {
-    RecordingSystemCalls system_calls;
-    Table table(system_calls);
+    MockSystemCalls::reset();
+    FileDescriptorTable table;
     table.add(3, "/capio/f", 0, 0, O_RDONLY, false);
     table.dup(3, 4, false);
     table.remove(3);
@@ -162,8 +186,8 @@ TEST(FileDescriptorTableTest, RemovingOneCopyKeepsTheOther) {
 }
 
 TEST(FileDescriptorTableTest, RemovingAnUnknownDescriptorDoesNothing) {
-    RecordingSystemCalls system_calls;
-    Table table(system_calls);
+    MockSystemCalls::reset();
+    FileDescriptorTable table;
     table.add(3, "/capio/f", 0, 0, O_RDONLY, false);
     table.remove(4);
     EXPECT_EQ(table.fds(), std::vector<int>{3});
@@ -171,8 +195,8 @@ TEST(FileDescriptorTableTest, RemovingAnUnknownDescriptorDoesNothing) {
 
 // The number of a descriptor that the kernel closed without CAPIO knowing is given again
 TEST(FileDescriptorTableTest, AddingOntoATakenNumberReplacesIt) {
-    RecordingSystemCalls system_calls;
-    Table table(system_calls);
+    MockSystemCalls::reset();
+    FileDescriptorTable table;
     table.add(3, "/capio/old", 0, 0, O_RDONLY, false);
     table.add(3, "/capio/new", 7, 0, O_WRONLY, false);
 
@@ -184,8 +208,8 @@ TEST(FileDescriptorTableTest, AddingOntoATakenNumberReplacesIt) {
 }
 
 TEST(FileDescriptorTableTest, CopyOntoATakenNumberReplacesIt) {
-    RecordingSystemCalls system_calls;
-    Table table(system_calls);
+    MockSystemCalls::reset();
+    FileDescriptorTable table;
     table.add(3, "/capio/f", 0, 0, O_RDONLY, false);
     table.add(4, "/capio/g", 0, 0, O_RDONLY, false);
     table.dup(3, 4, false);
@@ -197,8 +221,8 @@ TEST(FileDescriptorTableTest, CopyOntoATakenNumberReplacesIt) {
 }
 
 TEST(FileDescriptorTableTest, RemovingAPathRemovesOnlyItsDescriptors) {
-    RecordingSystemCalls system_calls;
-    Table table(system_calls);
+    auto &system_calls = MockSystemCalls::reset();
+    FileDescriptorTable table;
     table.add(3, "/capio/f", 0, 0, O_RDONLY, false);
     table.dup(3, 4, false);
     table.add(5, "/capio/g", 0, 0, O_RDONLY, false);
@@ -212,16 +236,16 @@ TEST(FileDescriptorTableTest, RemovingAPathRemovesOnlyItsDescriptors) {
 }
 
 TEST(FileDescriptorTableTest, RemovingAnUnknownPathDoesNothing) {
-    RecordingSystemCalls system_calls;
-    Table table(system_calls);
+    MockSystemCalls::reset();
+    FileDescriptorTable table;
     table.add(3, "/capio/f", 0, 0, O_RDONLY, false);
     table.removePath("/capio/g");
     EXPECT_TRUE(table.contains(3));
 }
 
 TEST(FileDescriptorTableTest, RenamingAPathMovesItsDescriptors) {
-    RecordingSystemCalls system_calls;
-    Table table(system_calls);
+    MockSystemCalls::reset();
+    FileDescriptorTable table;
     table.add(3, "/capio/old", 0, 0, O_RDONLY, false);
     table.dup(3, 4, false);
     table.renamePath("/capio/old", "/capio/new");
@@ -235,8 +259,8 @@ TEST(FileDescriptorTableTest, RenamingAPathMovesItsDescriptors) {
 }
 
 TEST(FileDescriptorTableTest, RenamingAnUnknownPathDoesNothing) {
-    RecordingSystemCalls system_calls;
-    Table table(system_calls);
+    MockSystemCalls::reset();
+    FileDescriptorTable table;
     table.add(3, "/capio/f", 0, 0, O_RDONLY, false);
     table.renamePath("/capio/g", "/capio/h");
 
@@ -245,8 +269,8 @@ TEST(FileDescriptorTableTest, RenamingAnUnknownPathDoesNothing) {
 }
 
 TEST(FileDescriptorTableTest, CloseClosesInTheKernelAndForgets) {
-    RecordingSystemCalls system_calls;
-    Table table(system_calls);
+    auto &system_calls = MockSystemCalls::reset();
+    FileDescriptorTable table;
     table.add(3, "/capio/f", 0, 0, O_WRONLY, false);
     table.dup(3, 4, false);
 
@@ -258,9 +282,9 @@ TEST(FileDescriptorTableTest, CloseClosesInTheKernelAndForgets) {
 
 // Linux frees the number also when close fails, e.g. with an I/O error on NFS
 TEST(FileDescriptorTableTest, FailedCloseForgetsTooAndReturnsTheError) {
-    RecordingSystemCalls system_calls;
+    auto &system_calls  = MockSystemCalls::reset();
     system_calls.result = -EIO;
-    Table table(system_calls);
+    FileDescriptorTable table;
     table.add(3, "/capio/f", 0, 0, O_WRONLY, false);
 
     EXPECT_EQ(table.close(3), -EIO);
@@ -269,8 +293,8 @@ TEST(FileDescriptorTableTest, FailedCloseForgetsTooAndReturnsTheError) {
 
 // No other thread sees the number in the table while the kernel closes it
 TEST(FileDescriptorTableTest, CloseHoldsTheTableUntilTheKernelHasClosed) {
-    RecordingSystemCalls system_calls;
-    Table table(system_calls);
+    auto &system_calls = MockSystemCalls::reset();
+    FileDescriptorTable table;
     table.add(3, "/capio/f", 0, 0, O_WRONLY, false);
     system_calls.block();
 
@@ -292,8 +316,8 @@ TEST(FileDescriptorTableTest, CloseHoldsTheTableUntilTheKernelHasClosed) {
 }
 
 TEST(FileDescriptorTableTest, ThreadsKeepTheTableConsistent) {
-    RecordingSystemCalls system_calls;
-    Table table(system_calls);
+    auto &system_calls = MockSystemCalls::reset();
+    FileDescriptorTable table;
     constexpr int THREADS = 8, ROUNDS = 1000;
 
     std::vector<std::thread> threads;
@@ -331,9 +355,9 @@ TEST(FileDescriptorTableTest, ThreadsKeepTheTableConsistent) {
 
 // A thread holds the table when another one forks: the child must still be able to use it
 TEST(FileDescriptorTableTest, ForkedChildGetsAFreeTable) {
-    Table::protectAcrossFork();
-    RecordingSystemCalls system_calls;
-    Table table(system_calls);
+    FileDescriptorTable::protectAcrossFork();
+    auto &system_calls = MockSystemCalls::reset();
+    FileDescriptorTable table;
     table.add(3, "/capio/f", 0, 0, O_WRONLY, false);
     system_calls.block();
 
@@ -362,6 +386,93 @@ TEST(FileDescriptorTableTest, ForkedChildGetsAFreeTable) {
         FAIL() << "the child waits for the table";
     }
     EXPECT_TRUE(WIFEXITED(status) && WEXITSTATUS(status) == 0);
+}
+
+TEST(FileDescriptorTableTest, SnapshotRestoresTheDescriptorsKeptByTheExec) {
+    MockSystemCalls::reset();
+    const long tid = unusedTid();
+    FileDescriptorTable before;
+    before.add(3, "/capio/f", 10, 100, O_WRONLY, false);
+    before.add(4, "/capio/g", 20, 200, O_RDONLY, true); // closed by the exec
+    before.addPath("/capio/d");
+    before.createSnapshot(tid);
+
+    const FileDescriptorTable after(tid);
+    EXPECT_EQ(after.fds(), std::vector<int>{3});
+    EXPECT_EQ(after.path(3), "/capio/f");
+    EXPECT_EQ(after.offset(3), 10);
+    EXPECT_EQ(after.size(3), 100);
+    EXPECT_EQ(after.flags(3), O_WRONLY);
+    EXPECT_FALSE(after.cloexec(3));
+    EXPECT_FALSE(after.containsPath("/capio/g"));
+}
+
+TEST(FileDescriptorTableTest, SnapshotKeepsCopiesSharingTheirOffset) {
+    MockSystemCalls::reset();
+    const long tid = unusedTid();
+    FileDescriptorTable before;
+    before.add(3, "/capio/f", 10, 0, O_WRONLY, true);
+    before.dup(3, 4, false);
+    before.dup(3, 5, false);
+    before.add(6, "/capio/f", 0, 0, O_WRONLY, false); // opened again: an offset of its own
+    before.createSnapshot(tid);
+
+    FileDescriptorTable after(tid);
+    auto fds = after.fds();
+    std::sort(fds.begin(), fds.end());
+    EXPECT_EQ(fds, (std::vector<int>{4, 5, 6}));
+    EXPECT_TRUE(after.sharesOffset(4, 5));
+    EXPECT_FALSE(after.sharesOffset(4, 6));
+    after.setOffset(4, 30);
+    EXPECT_EQ(after.offset(5), 30);
+    EXPECT_EQ(after.offset(6), 0);
+}
+
+TEST(FileDescriptorTableTest, SnapshotIsReadOnce) {
+    MockSystemCalls::reset();
+    const long tid = unusedTid();
+    FileDescriptorTable before;
+    before.add(3, "/capio/f", 0, 0, O_WRONLY, false);
+    before.createSnapshot(tid);
+
+    const FileDescriptorTable first(tid);
+    const FileDescriptorTable second(tid);
+    EXPECT_TRUE(first.contains(3));
+    EXPECT_TRUE(second.fds().empty());
+}
+
+TEST(FileDescriptorTableTest, NoSnapshotMeansAnEmptyTable) {
+    MockSystemCalls::reset();
+    const FileDescriptorTable table(unusedTid());
+    EXPECT_TRUE(table.fds().empty());
+}
+
+// An exec that fails leaves its snapshot: the next exec must not restore it
+TEST(FileDescriptorTableTest, SnapshotReplacesTheOneOfAFailedExec) {
+    MockSystemCalls::reset();
+    const long tid = unusedTid();
+    FileDescriptorTable table;
+    table.add(3, "/capio/f", 0, 0, O_WRONLY, false);
+    table.createSnapshot(tid); // the exec fails
+    table.remove(3);
+    table.add(4, "/capio/g", 0, 0, O_WRONLY, false);
+    table.createSnapshot(tid);
+
+    const FileDescriptorTable after(tid);
+    EXPECT_EQ(after.fds(), std::vector<int>{4});
+}
+
+TEST(FileDescriptorTableTest, EmptyTableRemovesTheSnapshotOfAFailedExec) {
+    MockSystemCalls::reset();
+    const long tid = unusedTid();
+    FileDescriptorTable table;
+    table.add(3, "/capio/f", 0, 0, O_WRONLY, false);
+    table.createSnapshot(tid); // the exec fails
+    table.remove(3);
+    table.createSnapshot(tid);
+
+    const FileDescriptorTable after(tid);
+    EXPECT_TRUE(after.fds().empty());
 }
 
 #endif // CAPIO_TEST_UNIT_POSIX_FILE_DESCRIPTOR_TABLE_HPP

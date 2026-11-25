@@ -174,13 +174,15 @@ std::filesystem::path get_dir_path(int dirfd) {
 
 /**
  * Initialize metadata structures
+ * @param tid the thread that started the program: its table is the one it had before an exec, if
+ * the program started with one. -1 for an empty table.
  * @return
  */
-inline void init_filesystem() {
+inline void init_filesystem(const long tid = -1) {
     std::unique_ptr<char[]> buf(new char[PATH_MAX]);
     syscall_no_intercept(SYS_getcwd, buf.get(), PATH_MAX);
     current_dir = std::make_unique<std::filesystem::path>(buf.get());
-    fd_table    = new FileDescriptorTable();
+    fd_table    = tid < 0 ? new FileDescriptorTable() : new FileDescriptorTable(tid);
 }
 
 /**
