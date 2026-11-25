@@ -27,17 +27,17 @@ off64_t capio_unlink_abs(const std::filesystem::path &abs_path, long tid, bool i
         const off64_t res = unlink_request(abs_path, tid);
         if (res == CAPIO_POSIX_SYSCALL_ERRNO) {
             errno = ENOENT;
-        } else if (exists_capio_path(abs_path)) {
+        } else if (fd_table->containsPath(abs_path)) {
             LOG("Removing %s from capio_files_path", abs_path.c_str());
-            delete_capio_path(abs_path);
+            fd_table->removePath(abs_path);
         }
         return res;
     })
     FS_MODE({
         const auto res =
             capio_kernel_result(syscall_no_intercept(SYS_unlinkat, AT_FDCWD, abs_path.c_str(), 0));
-        if (res == 0 && exists_capio_path(abs_path)) {
-            delete_capio_path(abs_path);
+        if (res == 0 && fd_table->containsPath(abs_path)) {
+            fd_table->removePath(abs_path);
         }
         return res;
     })

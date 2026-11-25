@@ -10,14 +10,14 @@
 inline off64_t capio_lseek(int fd, off64_t offset, int whence, long tid) {
     START_LOG(tid, "call(fd=%d, offset=%ld, whence=%d)", fd, offset, whence);
 
-    if (!exists_capio_fd(fd)) {
+    if (!fd_table->contains(fd)) {
         return CAPIO_POSIX_SYSCALL_REQUEST_SKIP;
     }
 
     MEMORY_MODE({
         read_cache->flush();
         write_cache->flush();
-        off64_t file_offset = get_capio_fd_offset(fd);
+        off64_t file_offset = fd_table->offset(fd);
         if (whence == SEEK_SET) {
             LOG("whence %d is SEEK_SET", whence);
             if (offset >= 0) {
@@ -52,13 +52,13 @@ inline off64_t capio_lseek(int fd, off64_t offset, int whence, long tid) {
         } else if (whence == SEEK_DATA) {
             LOG("whence %d is SEEK_DATA", whence);
             off64_t new_offset = seek_data_request(fd, file_offset, tid);
-            set_capio_fd_offset(fd, new_offset);
+            fd_table->setOffset(fd, new_offset);
             LOG("the new offset of file %d is %ld", fd, new_offset);
             return new_offset;
         } else if (whence == SEEK_HOLE) {
             LOG("whence %d is SEEK_HOLE", whence);
             off64_t new_offset = seek_hole_request(fd, file_offset, tid);
-            set_capio_fd_offset(fd, new_offset);
+            fd_table->setOffset(fd, new_offset);
             LOG("the new offset of file %d is %ld", fd, new_offset);
             return new_offset;
         } else {
@@ -72,7 +72,7 @@ inline off64_t capio_lseek(int fd, off64_t offset, int whence, long tid) {
         // must wait for them first. The writer knows its own, and the other whence values only
         // move the offset of a real descriptor: the kernel runs them.
         const bool to_data = whence == SEEK_END || whence == SEEK_DATA || whence == SEEK_HOLE;
-        if (to_data && (get_capio_fd_flags(fd) & O_ACCMODE) == O_RDONLY) {
+        if (to_data && (fd_table->flags(fd) & O_ACCMODE) == O_RDONLY) {
             throw CapioUnimplementedException("lseek of a reader to the end, data or a hole");
         }
         return CAPIO_POSIX_SYSCALL_REQUEST_SKIP;

@@ -425,6 +425,7 @@ static __attribute__((constructor)) void init() {
 
     const long tid = syscall_no_intercept(SYS_gettid);
 
+    FileDescriptorTable::protectAcrossFork();
     init_client(tid);
     init_filesystem();
     initialize_new_thread();

@@ -44,7 +44,7 @@ inline void fill_statbuf(struct stat *statbuf, off_t file_size, bool is_dir, ino
 inline int capio_fstat(int fd, struct stat *statbuf, long tid) {
     START_LOG(tid, "call(fd=%d, statbuf=0x%08x)", fd, statbuf);
 
-    if (exists_capio_fd(fd)) {
+    if (fd_table->contains(fd)) {
         MEMORY_MODE({
             write_cache->flush();
             auto [file_size, is_dir] = fstat_request(fd, tid);
@@ -52,13 +52,12 @@ inline int capio_fstat(int fd, struct stat *statbuf, long tid) {
                 errno = ENOENT;
                 return CAPIO_POSIX_SYSCALL_ERRNO;
             }
-            fill_statbuf(statbuf, file_size, is_dir,
-                         std::hash<std::string>{}(get_capio_fd_path(fd)));
+            fill_statbuf(statbuf, file_size, is_dir, std::hash<std::string>{}(fd_table->path(fd)));
             return CAPIO_POSIX_SYSCALL_SUCCESS;
         })
         FS_MODE({
             // The kernel runs it, once the file is there
-            consent_request_cache->consent_request(get_capio_fd_path(fd), tid, __FUNCTION__);
+            consent_request_cache->consent_request(fd_table->path(fd), tid, __FUNCTION__);
             return CAPIO_POSIX_SYSCALL_REQUEST_SKIP;
         })
     } else {

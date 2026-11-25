@@ -39,7 +39,7 @@ int renameat2_handler(long arg0, long arg1, long arg2, long arg3, long arg4, lon
     }
 
     if (is_capio_path(old_path_abs)) {
-        rename_capio_path(old_path_abs, new_path_abs);
+        fd_table->renamePath(old_path_abs, new_path_abs);
         auto res = rename_request(tid, old_path_abs, new_path_abs);
         *result  = (res < 0 ? -errno : res);
         return CAPIO_POSIX_SYSCALL_SUCCESS;

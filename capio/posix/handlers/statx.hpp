@@ -51,10 +51,10 @@ inline int capio_statx(int dirfd, const std::string_view &pathname, int flags, i
             LOG("dirfd is AT_FDCWD");
             path = get_current_dir();
         } else { // operate on dirfd. in this case dirfd can refer to any type of file
-            if (exists_capio_fd(dirfd)) {
-                path = get_capio_fd_path(dirfd);
+            if (fd_table->contains(dirfd)) {
+                path = fd_table->path(dirfd);
             } else {
-                LOG("returning -2 due to !exists_capio_fd");
+                LOG("returning -2 due to !fd_table->contains");
                 return CAPIO_POSIX_SYSCALL_REQUEST_SKIP;
             }
         }

@@ -12,7 +12,7 @@ int fchmod_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long a
 
     // TODO: Handle mode provided bt arg1
 
-    if (!exists_capio_fd(fd)) {
+    if (!fd_table->contains(fd)) {
         LOG("Syscall refers to file not handled by capio. Skipping it!");
         return CAPIO_POSIX_SYSCALL_SKIP;
     }
@@ -27,8 +27,8 @@ int fchmod_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long a
     })
     FS_MODE({
         // The kernel runs it, once the file is there
-        consent_request_cache->consent_request(get_capio_fd_path(fd),
-                                               syscall_no_intercept(SYS_gettid), __FUNCTION__);
+        consent_request_cache->consent_request(fd_table->path(fd), syscall_no_intercept(SYS_gettid),
+                                               __FUNCTION__);
         return CAPIO_POSIX_SYSCALL_SKIP;
     })
 }

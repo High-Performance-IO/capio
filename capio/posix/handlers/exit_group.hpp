@@ -19,9 +19,9 @@
  */
 inline void capio_close_all_fs(const long tid) {
     START_LOG(tid, "call()");
-    for (const int fd : get_capio_fds()) {
+    for (const int fd : fd_table->fds()) {
         long error = 0;
-        if ((get_capio_fd_flags(fd) & O_ACCMODE) != O_RDONLY) {
+        if ((fd_table->flags(fd) & O_ACCMODE) != O_RDONLY) {
             long res = syscall_no_intercept(SYS_dup, fd);
             res = res >= 0 ? syscall_no_intercept(SYS_close, res)
                            : syscall_no_intercept(SYS_fdatasync, fd); // no descriptor to dup to
@@ -29,7 +29,7 @@ inline void capio_close_all_fs(const long tid) {
                 error = -res;
             }
         }
-        close_request_fs(get_capio_fd_path(fd), error, tid);
+        close_request_fs(fd_table->path(fd), error, tid);
     }
 }
 

@@ -16,7 +16,7 @@ inline int getdents_handler_impl(long arg0, long arg1, long arg2, long *result, 
     START_LOG(syscall_no_intercept(SYS_gettid), "call(fd=%d, dirp=0x%08x, count=%ld, is64bit=%s)",
               fd, buffer, count, is64bit ? "true" : "false");
 
-    if (exists_capio_fd(fd)) {
+    if (fd_table->contains(fd)) {
         LOG("fd=%d, is a capio file descriptor", fd);
         FS_MODE({ throw CapioUnimplementedException(is64bit ? "getdents64" : "getdents"); })
 

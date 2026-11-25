@@ -59,7 +59,7 @@ inline void capio_cached_write(const int fd, const void *buffer, const off64_t c
 inline void capio_set_fd_offset(const int fd, const off64_t offset, const long tid) {
     read_cache->flush();
     write_cache->flush();
-    set_capio_fd_offset(fd, offset);
+    fd_table->setOffset(fd, offset);
     seek_request(fd, offset, tid);
 }
 

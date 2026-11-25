@@ -43,7 +43,7 @@ void initialize_from_snapshot(const int *fd_shm, long tid) {
         // The kernel closed the descriptors with close-on-exec during the execve
         if (!static_cast<bool>(p_shm[4])) {
             const auto flags = static_cast<int>(p_shm[3]);
-            add_capio_fd(tid, path, fd, p_shm[1], p_shm[2], flags, false);
+            fd_table->add(fd, path, p_shm[1], p_shm[2], flags, false);
             FS_MODE({
                 // The program after an execve, e.g. the child of a fork, writes the file too
                 struct stat info{};
@@ -73,7 +73,7 @@ void create_snapshot(long tid) {
     char *path_shm;
 
     std::string pid      = std::to_string(tid);
-    std::vector<int> fds = get_capio_fds();
+    std::vector<int> fds = fd_table->fds();
     if (fds.empty()) {
         return;
     }
@@ -87,14 +87,14 @@ void create_snapshot(long tid) {
         p_shm     = (off64_t *) create_shm("capio_snapshot_" + pid + "_" + std::to_string(fd),
                                            5 * sizeof(off64_t));
         p_shm[0]  = fd;
-        p_shm[1]  = get_capio_fd_offset(fd);
-        p_shm[2]  = get_capio_fd_size(fd);
-        p_shm[3]  = get_capio_fd_flags(fd);
-        p_shm[4]  = get_capio_fd_cloexec(fd);
+        p_shm[1]  = fd_table->offset(fd);
+        p_shm[2]  = fd_table->size(fd);
+        p_shm[3]  = fd_table->flags(fd);
+        p_shm[4]  = fd_table->cloexec(fd);
 
         std::string shm_name = "capio_snapshot_path_" + pid + "_" + std::to_string(fd);
         path_shm             = (char *) create_shm(shm_name, PATH_MAX * sizeof(char));
-        strcpy(path_shm, get_capio_fd_path(fd).c_str());
+        strcpy(path_shm, fd_table->path(fd).c_str());
         ++i;
     }
     fd_shm[i] = -1;

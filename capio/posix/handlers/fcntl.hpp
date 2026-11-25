@@ -36,7 +36,7 @@ inline long capio_fcntl_dupfd(long tid, int fd, int min_fd, bool is_cloexec) {
     if (res < 0) {
         return res;
     }
-    dup_capio_fd(tid, fd, static_cast<int>(res), is_cloexec);
+    fd_table->dup(fd, static_cast<int>(res), is_cloexec);
     dup_request(fd, static_cast<int>(res), tid);
     return res;
 }
@@ -58,7 +58,7 @@ inline long capio_fcntl_lock(int fd, int cmd, struct flock *lock) {
         return -EINVAL;
     }
 #endif
-    const int access = get_capio_fd_flags(fd) & O_ACCMODE;
+    const int access = fd_table->flags(fd) & O_ACCMODE;
     switch (lock->l_type) {
     case F_RDLCK:
         if (!get && access == O_WRONLY) {
@@ -91,7 +91,7 @@ int fcntl_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long ar
 
     START_LOG(tid, "call(fd=%d, cmd=%d, arg=%ld)", fd, cmd, arg2);
 
-    if (!exists_capio_fd(fd)) {
+    if (!fd_table->contains(fd)) {
         return CAPIO_POSIX_SYSCALL_SKIP;
     }
 
@@ -112,20 +112,20 @@ int fcntl_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long ar
         break;
 
     case F_GETFD:
-        *result = get_capio_fd_cloexec(fd) ? FD_CLOEXEC : 0;
+        *result = fd_table->cloexec(fd) ? FD_CLOEXEC : 0;
         break;
 
     case F_SETFD:
-        set_capio_fd_cloexec(fd, (arg2 & FD_CLOEXEC) == FD_CLOEXEC);
+        fd_table->setCloexec(fd, (arg2 & FD_CLOEXEC) == FD_CLOEXEC);
         *result = 0;
         break;
 
     case F_GETFL:
-        *result = get_capio_fd_flags(fd);
+        *result = fd_table->flags(fd);
         break;
 
     case F_SETFL:
-        set_capio_fd_flags(fd, (get_capio_fd_flags(fd) & ~CAPIO_FCNTL_SETFL_MASK) |
+        fd_table->setFlags(fd, (fd_table->flags(fd) & ~CAPIO_FCNTL_SETFL_MASK) |
                                    (static_cast<int>(arg2) & CAPIO_FCNTL_SETFL_MASK));
         *result = 0;
         break;
@@ -173,7 +173,7 @@ int fcntl_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long ar
 
     // Directory notifications: CAPIO sends none, so only removing them succeeds.
     case F_NOTIFY:
-        if ((get_capio_fd_flags(fd) & O_DIRECTORY) != O_DIRECTORY) {
+        if ((fd_table->flags(fd) & O_DIRECTORY) != O_DIRECTORY) {
             *result = -ENOTDIR;
         } else {
             *result = arg2 == 0 ? 0 : -EINVAL;
@@ -185,8 +185,8 @@ int fcntl_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long ar
     // offset.
     case F_DUPFD_QUERY: {
         const auto other = static_cast<int>(arg2);
-        if (exists_capio_fd(other)) {
-            *result = std::get<0>(files->at(fd)) == std::get<0>(files->at(other)) ? 1 : 0;
+        if (fd_table->contains(other)) {
+            *result = fd_table->sharesOffset(fd, other) ? 1 : 0;
         } else if (syscall_no_intercept(SYS_fcntl, other, F_GETFD) < 0) {
             *result = -EBADF;
         } else {
@@ -218,7 +218,7 @@ int fcntl_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long ar
             *result = -EFAULT;
             break;
         }
-        const std::string &path = get_capio_fd_path(fd);
+        const std::string &path = fd_table->path(fd);
         if (cmd == F_GET_RW_HINT) {
             const auto it = capio_rw_hints().find(path);
             *hint         = it == capio_rw_hints().end() ? RWH_WRITE_LIFE_NOT_SET : it->second;

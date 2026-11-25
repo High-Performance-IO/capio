@@ -38,7 +38,7 @@ class ReadCache {
 
         if (_cache_offset != _actual_size) {
             _actual_size = _cache_offset = 0;
-            seek_request(_last_fd, get_capio_fd_offset(_last_fd), _tid);
+            seek_request(_last_fd, fd_table->offset(_last_fd), _tid);
         }
     }
 
@@ -46,7 +46,7 @@ class ReadCache {
     // fd or not
     [[nodiscard]] bool cachesFileOf(const int fd) const {
         return fd == _last_fd ||
-               (exists_capio_fd(_last_fd) && get_capio_fd_path(fd) == get_capio_fd_path(_last_fd));
+               (fd_table->contains(_last_fd) && fd_table->path(fd) == fd_table->path(_last_fd));
     }
 
     inline off64_t read(int fd, void *buffer, off64_t count, bool is_getdents, bool is64bit) {
@@ -60,7 +60,7 @@ class ReadCache {
         }
 
         off64_t remaining_bytes = _actual_size - _cache_offset;
-        off64_t file_offset     = get_capio_fd_offset(fd);
+        off64_t file_offset     = fd_table->offset(fd);
         off64_t bytes_read;
 
         if (is_getdents) {
@@ -115,7 +115,7 @@ class ReadCache {
         }
         LOG("%ld bytes have been read. setting fd offset to %ld", bytes_read,
             file_offset + bytes_read);
-        set_capio_fd_offset(fd, file_offset + bytes_read);
+        fd_table->setOffset(fd, file_offset + bytes_read);
         return bytes_read;
     }
 };
@@ -188,7 +188,7 @@ class WriteCache {
             }
         }
 
-        set_capio_fd_offset(fd, get_capio_fd_offset(fd) + count);
+        fd_table->setOffset(fd, fd_table->offset(fd) + count);
     }
 };
 
@@ -227,7 +227,7 @@ class ReadCacheFS {
   public:
     /// @brief Block until the first @p end_of_read bytes of the file of @p fd can be read
     void read(const int fd, const off64_t end_of_read, const long tid) {
-        const std::string &path = get_capio_fd_path(fd);
+        const std::string &path = fd_table->path(fd);
         START_LOG(capio_syscall(SYS_gettid), "call(path=%s, end_of_read=%ld, tid=%ld)",
                   path.c_str(), end_of_read, tid);
 
