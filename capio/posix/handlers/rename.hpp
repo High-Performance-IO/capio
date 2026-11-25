@@ -1,13 +1,11 @@
 #ifndef CAPIO_POSIX_HANDLERS_RENAME_HPP
 #define CAPIO_POSIX_HANDLERS_RENAME_HPP
 
+#include <cstdio> // RENAME_EXCHANGE
+
 #include "utils/common.hpp"
 #include "utils/filesystem.hpp"
 #include "utils/requests.hpp"
-
-#ifndef RENAME_EXCHANGE
-#define RENAME_EXCHANGE (1 << 1)
-#endif
 
 int renameat2_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg5,
                       long *result) {
