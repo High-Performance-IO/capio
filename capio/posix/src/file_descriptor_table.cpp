@@ -5,6 +5,7 @@
 #include <new>
 
 #include <fcntl.h>
+#include <linux/close_range.h>
 #include <pthread.h>
 #include <sys/mman.h>
 #include <sys/stat.h>
@@ -80,7 +81,8 @@ FileDescriptorTable::FileDescriptorTable(const long tid) {
         for (size_t i = 0; i < header->count; ++i) {
             const SnapshotEntry &entry = entries[i];
             if (entry.cloexec) {
-                continue; // closed by the exec
+                _closed_by_exec.push_back(entry.fd);
+                continue;
             }
             const auto original = restored.find(entry.copy_of);
             if (original != restored.end()) {
@@ -191,10 +193,41 @@ void FileDescriptorTable::remove(const int fd) {
     _remove(fd);
 }
 
-long FileDescriptorTable::close(const int fd) {
+long FileDescriptorTable::close(const int fd, const std::function<void(long result)> &announce) {
     const std::lock_guard lock(mutex());
     _remove(fd);
-    return syscall_no_intercept(SYS_close, fd);
+    const long result = syscall_no_intercept(SYS_close, fd);
+    if (announce) {
+        announce(result);
+    }
+    return result;
+}
+
+long FileDescriptorTable::closeRange(const unsigned first, const unsigned last,
+                                     const unsigned flags,
+                                     const std::function<void(int fd)> &announce) {
+    const std::lock_guard lock(mutex());
+    const long result = syscall_no_intercept(SYS_close_range, first, last, flags);
+    if (result < 0) {
+        return result;
+    }
+    std::vector<int> in_range;
+    for (const auto &[fd, descriptor] : _descriptors) {
+        if (static_cast<unsigned>(fd) >= first && static_cast<unsigned>(fd) <= last) {
+            in_range.push_back(fd);
+        }
+    }
+    for (const int fd : in_range) {
+        if ((flags & CLOSE_RANGE_CLOEXEC) != 0) {
+            _descriptors.at(fd).cloexec = true;
+        } else {
+            _remove(fd);
+            if (announce) {
+                announce(fd);
+            }
+        }
+    }
+    return result;
 }
 
 void FileDescriptorTable::removePath(const std::string &path) {

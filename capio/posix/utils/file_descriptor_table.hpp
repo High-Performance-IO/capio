@@ -1,6 +1,7 @@
 #ifndef CAPIO_POSIX_UTILS_FILE_DESCRIPTOR_TABLE_HPP
 #define CAPIO_POSIX_UTILS_FILE_DESCRIPTOR_TABLE_HPP
 
+#include <functional>
 #include <memory>
 #include <optional>
 #include <shared_mutex>
@@ -21,6 +22,11 @@
  * handler would use the table. fork takes it (see protectAcrossFork), so that the child gets a
  * whole table and a free lock.
  *
+ * The server knows a descriptor by its number, which the kernel gives to another thread once it is
+ * closed. So close and closeRange tell the server while they hold the lock, and add and dup take
+ * it: a thread that gets the number adds it, then tells the server, after the close of what had
+ * the number before.
+ *
  * The getters of one descriptor (path, offset, ...) throw std::out_of_range if it is not in the
  * table: check with contains first, or use findPath.
  *
@@ -39,6 +45,7 @@ class FileDescriptorTable final {
 
     std::unordered_map<int, Descriptor> _descriptors;
     std::unordered_map<std::string, std::unordered_set<int>> _paths; ///< path -> its descriptors
+    std::vector<int> _closed_by_exec; ///< in the snapshot, but closed by the exec (close-on-exec)
 
     /// @brief The lock of the tables: one, as a process has one table of descriptors
     static std::shared_mutex &mutex();
@@ -51,10 +58,14 @@ class FileDescriptorTable final {
     /**
      * @brief The table of the program that thread @p tid has execed: the one in the snapshot that
      * the thread wrote before the exec, without the descriptors that the exec closed
-     * (close-on-exec). The snapshot is removed. Empty if there is none: a program that did not
-     * start with an exec, or whose previous program had no CAPIO file open.
+     * (close-on-exec), which closedByExec lists. The snapshot is removed. Empty if there is none: a
+     * program that did not start with an exec, or whose previous program had no CAPIO file open.
      */
     explicit FileDescriptorTable(long tid);
+
+    /// @brief The descriptors of the snapshot that the exec closed (close-on-exec): see the
+    /// constructor from a snapshot
+    [[nodiscard]] const std::vector<int> &closedByExec() const { return _closed_by_exec; }
 
     /**
      * @brief Write the table to a snapshot for the program that thread @p tid is about to exec. It
@@ -85,11 +96,21 @@ class FileDescriptorTable final {
     /**
      * @brief Close the descriptor @p fd in the kernel and forget it. It is forgotten also if the
      * close fails: Linux frees the number anyway, except for a number that is not open (EBADF).
-     * The lock is held during the close, so that no other thread sees the number in the table once
-     * the kernel can give it to someone else.
+     * @param announce called with what close(2) returned, to tell the server, before another thread
+     * can add the number again. It must not use the table.
      * @return what close(2) returned: 0, or -errno
      */
-    long close(int fd);
+    long close(int fd, const std::function<void(long result)> &announce = {});
+
+    /**
+     * @brief close_range(2) in the kernel, and the same in the table: the descriptors from @p first
+     * to @p last are forgotten, or, with CLOSE_RANGE_CLOEXEC in @p flags, made close-on-exec.
+     * @param announce called with each descriptor forgotten, once the call worked, before another
+     * thread can add it again. It must not use the table.
+     * @return what close_range(2) returned: 0, or -errno
+     */
+    long closeRange(unsigned first, unsigned last, unsigned flags,
+                    const std::function<void(int fd)> &announce = {});
 
     /// @brief Forget @p path and all its descriptors
     void removePath(const std::string &path);

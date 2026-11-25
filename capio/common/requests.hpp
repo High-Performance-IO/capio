@@ -30,10 +30,17 @@ constexpr const int CAPIO_REQUEST_CONSENT             = 25;
 constexpr const int CAPIO_REQUEST_READ_FS             = 26;
 constexpr const int CAPIO_REQUEST_CREATE_FS           = 27;
 constexpr const int CAPIO_REQUEST_OPEN_FS             = 28;
-constexpr const int CAPIO_REQUEST_CLOSE_FS            = 29;
-constexpr const int CAPIO_REQUEST_INHERIT_FS          = 30;
 
-constexpr const int CAPIO_NR_REQUESTS = 31;
+constexpr const int CAPIO_NR_REQUESTS = 29;
+
+/* VARIANT OF THE CLIENT, IN THE HANDSHAKE */
+constexpr const char CAPIO_VARIANT_MEMORY = 'M';
+constexpr const char CAPIO_VARIANT_FS     = 'F';
+
+/* WHETHER A DESCRIPTOR OF CAPIO_REQUEST_CREATE_FS MAKES ITS CLIENT A PRODUCER */
+constexpr const int CAPIO_FS_NOT_PRODUCED            = 0; ///< read-only, or inherited with fork
+constexpr const int CAPIO_FS_PRODUCED                = 1; ///< created, or opened to write
+constexpr const int CAPIO_FS_PRODUCED_IF_NO_PRODUCER = 2; ///< writable, inherited with exec
 
 /*REQUESTS FOR SERVER TO SERVER COMMUNICATION*/
 

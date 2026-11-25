@@ -10,6 +10,7 @@
 #include "calf/StlLogger.h"
 
 #include "common/queue.hpp"
+#include "common/requests.hpp"
 
 /**
  * @brief Class to handle libcapio_posix clients applications
@@ -44,6 +45,13 @@ class ClientManager {
     std::unordered_map<long, ClientDataBuffers> data_buffers;
     std::unordered_map<int, const std::string> app_names;
 
+    /// @brief tid -> the process of the thread, and whether it uses the FS variant
+    struct ClientProcess {
+        pid_t pid;
+        bool fs_variant;
+    };
+    std::unordered_map<pid_t, ClientProcess> processes;
+
     /**
      * Variables to handle the init process after a SYS_clone occurs
      */
@@ -76,10 +84,12 @@ class ClientManager {
      * @param wait: wait flag is used whenever the handshake is called after a SYS_clone occurred.
      * if wait == true, then the server will spawn a thread waiting for the child tid to have its
      * data structures initialized
+     * @param pid the process of @p tid, -1 if not known: @p tid itself
+     * @param variant CAPIO_VARIANT_MEMORY or CAPIO_VARIANT_FS, the library the client uses
      * @return
      */
     void registerClient(pid_t tid, const std::string &app_name = CAPIO_DEFAULT_APP_NAME,
-                        bool wait = false);
+                        bool wait = false, pid_t pid = -1, char variant = CAPIO_VARIANT_MEMORY);
 
     /**
      * Unlok a child tid after the data structures have been allocated
@@ -148,6 +158,12 @@ class ClientManager {
      * @return std::string
      */
     [[nodiscard]] const std::string &getAppName(pid_t tid) const;
+
+    /// @brief The process of thread @p tid, @p tid itself if it is not a client
+    [[nodiscard]] pid_t getPid(pid_t tid) const;
+
+    /// @brief Whether thread @p tid uses the FS variant (libcapio_posix_fs.so)
+    [[nodiscard]] bool usesFsVariant(pid_t tid) const;
 
     /**
      * Get the data queues associated with a give process id

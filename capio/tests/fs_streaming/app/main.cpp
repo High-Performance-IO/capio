@@ -14,11 +14,13 @@
 
 #include <fcntl.h>
 #include <sys/stat.h>
+#include <sys/syscall.h>
+#include <sys/wait.h>
 #include <unistd.h>
 
 namespace {
 
-int fd = -1;
+int fd = -1, previous_fd = -1;
 
 void run(const std::string &argument);
 
@@ -71,6 +73,41 @@ const std::map<std::string, Operation> &operations() {
          }},
         {"read", [](const std::string &) { return read_all(); }},
         {"close", [](const std::string &) { return close(fd) == 0; }},
+        {"close_previous", [](const std::string &) { return close(previous_fd) == 0; }},
+        {"dup",
+         [](const std::string &) {
+             previous_fd = fd;
+             fd          = dup(fd);
+             return fd >= 0;
+         }},
+        {"cloexec", [](const std::string &) { return fcntl(fd, F_SETFD, FD_CLOEXEC) == 0; }},
+        {"fork_close",
+         [](const std::string &) {
+             const pid_t child = fork();
+             if (child == 0) {
+                 _exit(close(fd) == 0 ? 0 : 1);
+             }
+             int status = 0;
+             return child > 0 && waitpid(child, &status, 0) == child && WIFEXITED(status) &&
+                    WEXITSTATUS(status) == 0;
+         }},
+        {"replace",
+         [](const std::string &) {
+             const int null_fd = ::open("/dev/null", O_RDONLY);
+             return dup2(null_fd, fd) == fd && ::close(null_fd) == 0;
+         }},
+        {"close_range",
+         [](const std::string &) { return syscall(SYS_close_range, fd, fd, 0) == 0; }},
+        {"exec",
+         [](const std::string &) {
+             execlp("true", "true", nullptr);
+             return false;
+         }},
+        {"exec_missing",
+         [](const std::string &) {
+             execl("/no/such/program", "program", nullptr);
+             return errno == ENOENT;
+         }},
         {"seek", [](const std::string &a) { return lseek(fd, std::stol(a), SEEK_SET) >= 0; }},
         {"print",
          [](const std::string &a) {

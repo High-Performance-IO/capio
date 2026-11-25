@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <csignal>
+#include <cstring>
 #include <pthread.h>
 #include <thread>
 
@@ -44,12 +45,15 @@ bool FsStorageManager::isDeclared(const std::filesystem::path &path) {
 
 void FsStorageManager::commit(const std::filesystem::path &path) {
     START_LOG(gettid(), "call(path=%s)", path.c_str());
-    CapioCLEngine::get().setCommitted(path);
+    if (_failed_closes.count(path) == 0) {
+        CapioCLEngine::get().setCommitted(path);
+    }
 }
 
 void FsStorageManager::applyOnClose(const std::filesystem::path &path, const long n_closes) {
     const auto &engine = CapioCLEngine::get();
-    if (engine.getCommitRule(path) != capiocl::commitRules::ON_CLOSE) {
+    if (_failed_closes.count(path) != 0 ||
+        engine.getCommitRule(path) != capiocl::commitRules::ON_CLOSE) {
         return;
     }
     if (engine.getCommitCloseCount(path) <= 1) {
@@ -91,6 +95,60 @@ void FsStorageManager::closed(const pid_t tid, const std::filesystem::path &path
     if (!CapioCLEngine::get().isExcluded(path) && isProducer(tid, path)) {
         countClose(path);
     }
+}
+
+void FsStorageManager::addFileToPid(const pid_t pid, const int fd,
+                                    const std::filesystem::path &path) {
+    START_LOG(gettid(), "call(pid=%d, fd=%d, path=%s)", pid, fd, path.c_str());
+    _opened_fd_map[pid][fd] = path;
+}
+
+void FsStorageManager::dup(const pid_t pid, const int old_fd, const int new_fd) {
+    START_LOG(gettid(), "call(pid=%d, old_fd=%d, new_fd=%d)", pid, old_fd, new_fd);
+    if (const auto path = getPath(pid, old_fd); !path.empty() && old_fd != new_fd) {
+        _opened_fd_map[pid][new_fd] = path;
+    }
+}
+
+std::string FsStorageManager::getPath(const pid_t pid, const int fd) const {
+    const auto process = _opened_fd_map.find(pid);
+    if (process == _opened_fd_map.end()) {
+        return {};
+    }
+    const auto descriptor = process->second.find(fd);
+    return descriptor == process->second.end() ? std::string{} : descriptor->second;
+}
+
+void FsStorageManager::closed(const pid_t tid, const pid_t pid, const int fd, const int error) {
+    START_LOG(gettid(), "call(tid=%d, pid=%d, fd=%d, error=%d)", tid, pid, fd, error);
+    const auto process = _opened_fd_map.find(pid);
+    if (process == _opened_fd_map.end()) {
+        return;
+    }
+    const auto descriptor = process->second.find(fd);
+    if (descriptor == process->second.end()) {
+        LOG("Descriptor %d of process %d is not known", fd, pid);
+        return;
+    }
+    const std::filesystem::path path = descriptor->second;
+    process->second.erase(descriptor);
+    if (process->second.empty()) {
+        _opened_fd_map.erase(process);
+    }
+    if (error != 0) {
+        closeFailed(tid, path, error);
+    } else {
+        closed(tid, path);
+    }
+}
+
+void FsStorageManager::closeFailed(const pid_t tid, const std::filesystem::path &path,
+                                   const int error) {
+    _failed_closes[path] = error;
+    CALF_PRINT_COLOR(CALF_CLI_LEVEL_ERROR,
+                     "Closing %s failed in thread %d (%s): data was lost, so the file will not be "
+                     "committed and its consumers will wait",
+                     path.c_str(), tid, strerror(error));
 }
 
 void FsStorageManager::waitForCreation(const std::filesystem::path &path) const {

@@ -60,19 +60,16 @@ inline void clone_request(const long parent_tid, const long child_tid) {
     buf_requests->write(req, CAPIO_REQ_MAX_SIZE);
 }
 
-inline void close_request(const int fd, const long tid) {
-    START_LOG(capio_syscall(SYS_gettid), "call(fd=%ld, tid=%ld)", fd, tid);
+/**
+ * @brief Tell the server that @p tid closed @p fd
+ * @param error FS variant: what the close failed with, 0 if it worked
+ */
+inline void close_request(const int fd, const long tid, const long error = 0) {
+    START_LOG(capio_syscall(SYS_gettid), "call(fd=%ld, tid=%ld, error=%ld)", fd, tid, error);
     char req[CAPIO_REQ_MAX_SIZE];
-    sprintf(req, "%04d %ld %d", CAPIO_REQUEST_CLOSE, tid, fd);
+    sprintf(req, "%04d %ld %d %ld", CAPIO_REQUEST_CLOSE, tid, fd, error);
     LOG("req=%s", req);
     buf_requests->write(req, CAPIO_REQ_MAX_SIZE);
-}
-
-/// @brief Tell the server that @p tid closed @p path: @p error is what the close failed with, or 0
-inline void close_request_fs(const std::filesystem::path &path, const long error, const long tid) {
-    START_LOG(capio_syscall(SYS_gettid), "call(path=%s, error=%ld, tid=%ld)", path.c_str(), error,
-              tid);
-    fs_request(CAPIO_REQUEST_CLOSE_FS, tid, std::to_string(error) + " ", path.native());
 }
 
 inline off64_t rename_request(const long tid, const std::filesystem::path &old_path,
@@ -99,17 +96,18 @@ inline off64_t create_request(const int fd, const std::filesystem::path &path, c
     return res;
 }
 
-/// @brief Tell the server that @p tid writes @p path: it created it, or opened it for writing
-inline void create_request_fs(const std::filesystem::path &path, const long tid) {
-    START_LOG(capio_syscall(SYS_gettid), "call(path=%s, tid=%ld)", path.c_str(), tid);
-    fs_request(CAPIO_REQUEST_CREATE_FS, tid, "", path.native());
-}
-
-/// @brief Tell the server that @p tid got a writable descriptor of @p path at exec
-inline void inherit_request_fs(const std::filesystem::path &path, const long tid) {
-    START_LOG(capio_syscall(SYS_gettid), "call(path=%s, tid=%ld)", path.c_str(), tid);
-    // sent while the program starts, maybe before its server does: no reply
-    fs_request(CAPIO_REQUEST_INHERIT_FS, tid, "", path.native());
+/**
+ * @brief Tell the server that @p tid got the descriptor @p fd of @p path, or created @p path
+ * @param fd -1 if none (mkdir)
+ * @param produced whether that makes @p tid a producer of @p path: a CAPIO_FS_* value
+ */
+inline void create_request_fs(const std::filesystem::path &path, const int fd, const int produced,
+                              const long tid) {
+    START_LOG(capio_syscall(SYS_gettid), "call(path=%s, fd=%d, produced=%d, tid=%ld)", path.c_str(),
+              fd, produced, tid);
+    // also sent while the program starts, maybe before its server does: no reply
+    fs_request(CAPIO_REQUEST_CREATE_FS, tid,
+               std::to_string(fd) + " " + std::to_string(produced) + " ", path.native());
 }
 
 inline off64_t create_exclusive_request(const int fd, const std::filesystem::path &path,
@@ -166,8 +164,8 @@ inline void handshake_named_request(const long tid, const long pid, const std::s
     START_LOG(capio_syscall(SYS_gettid), "call(tid=%ld, pid=%ld, app_name=%s)", tid, pid,
               app_name.c_str());
     char req[CAPIO_REQ_MAX_SIZE];
-    sprintf(req, "%04d %ld %ld %s %d", CAPIO_REQUEST_HANDSHAKE_NAMED, tid, pid, app_name.c_str(),
-            wait ? 1 : 0);
+    sprintf(req, "%04d %ld %ld %s %d %c", CAPIO_REQUEST_HANDSHAKE_NAMED, tid, pid, app_name.c_str(),
+            wait ? 1 : 0, MEMORY_MODE(CAPIO_VARIANT_MEMORY) FS_MODE(CAPIO_VARIANT_FS));
     LOG("req=%s", req);
     buf_requests->write(req, CAPIO_REQ_MAX_SIZE);
 

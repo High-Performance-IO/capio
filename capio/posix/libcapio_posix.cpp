@@ -58,6 +58,9 @@ static constexpr long CAPIO_NR_SYSCALLS = 1 + std::max({
 #ifdef SYS_close
                                                   SYS_close,
 #endif
+#ifdef SYS_close_range
+                                                  SYS_close_range,
+#endif
 #ifdef SYS_copy_file_range
                                                   SYS_copy_file_range,
 #endif
@@ -219,6 +222,9 @@ static constexpr std::array<CPHandler_t, CAPIO_NR_SYSCALLS> build_syscall_table(
 #endif
 #ifdef SYS_close
     _syscallTable[SYS_close] = close_handler;
+#endif
+#ifdef SYS_close_range
+    _syscallTable[SYS_close_range] = close_range_handler;
 #endif
 #ifdef SYS_copy_file_range
     _syscallTable[SYS_copy_file_range] = copy_file_range_handler;
@@ -432,10 +438,17 @@ static __attribute__((constructor)) void init() {
         // The program after an exec, e.g. the child of a fork, writes the files it got too
         for (const int fd : fd_table->fds()) {
             struct stat info{};
-            if ((fd_table->flags(fd) & O_ACCMODE) != O_RDONLY &&
-                syscall_no_intercept(SYS_fstat, fd, &info) == 0 && !S_ISDIR(info.st_mode)) {
-                inherit_request_fs(fd_table->path(fd), tid);
-            }
+            const bool writes = (fd_table->flags(fd) & O_ACCMODE) != O_RDONLY &&
+                                syscall_no_intercept(SYS_fstat, fd, &info) == 0 &&
+                                !S_ISDIR(info.st_mode);
+            create_request_fs(fd_table->path(fd), fd,
+                              writes ? CAPIO_FS_PRODUCED_IF_NO_PRODUCER : CAPIO_FS_NOT_PRODUCED,
+                              tid);
+        }
+        // Counted only now, so that a failed exec closes nothing: the server still has them, as
+        // the process is the same
+        for (const int fd : fd_table->closedByExec()) {
+            close_request(fd, tid);
         }
     })
 

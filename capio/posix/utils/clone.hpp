@@ -29,6 +29,15 @@ inline void initialize_new_thread(const bool wait = false) {
     init_client(tid);
 
     handshake_named_request(tid, pid, capio_app_name, wait);
+    FS_MODE({
+        // The server knows descriptors by process: those a new process got with fork are new to it.
+        // They do not make it a producer, as it does not create them.
+        if (pid == tid) {
+            for (const int fd : fd_table->fds()) {
+                create_request_fs(fd_table->path(fd), fd, CAPIO_FS_NOT_PRODUCED, tid);
+            }
+        }
+    })
     LOG("Starting child thread %d", tid);
 }
 

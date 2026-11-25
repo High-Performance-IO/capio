@@ -13,23 +13,14 @@
  */
 
 /**
- * FS variant: at the exit of the process the kernel closes every descriptor, when nothing can
- * announce it. Push the data of each CAPIO descriptor first, with close(dup(fd)) as close does,
- * then announce its close.
+ * FS variant: at the exit of the process the kernel closes every descriptor, after CAPIO can tell
+ * the server. Each CAPIO descriptor is flushed first, so that its data is on the file system before
+ * the server commits the file, then its close is announced.
  */
 inline void capio_close_all_fs(const long tid) {
     START_LOG(tid, "call()");
     for (const int fd : fd_table->fds()) {
-        long error = 0;
-        if ((fd_table->flags(fd) & O_ACCMODE) != O_RDONLY) {
-            long res = syscall_no_intercept(SYS_dup, fd);
-            res = res >= 0 ? syscall_no_intercept(SYS_close, res)
-                           : syscall_no_intercept(SYS_fdatasync, fd); // no descriptor to dup to
-            if (res < 0 && res != -EINTR) {
-                error = -res;
-            }
-        }
-        close_request_fs(fd_table->path(fd), error, tid);
+        close_request(fd, tid, flush_capio_fd(fd));
     }
 }
 

@@ -105,16 +105,16 @@ inline int capio_openat(int dirfd, const std::string_view &pathname, int flags, 
             if (new_fd < 0) {
                 return CAPIO_POSIX_SYSCALL_ERRNO;
             }
-            // Who writes it produces it, also without O_CREAT. Announced once it worked: a failed
-            // O_EXCL must not make a producer.
-            if (create || (flags & O_ACCMODE) != O_RDONLY) {
-                create_request_fs(path, tid);
-            }
-            if (fd_table->contains(new_fd)) { // closed by a call CAPIO does not handle yet
-                fd_table->remove(new_fd);
-            }
+            // Added before the server is told, in place of what had the number if a call CAPIO
+            // does not handle yet closed it: if another thread has just closed what had the number,
+            // its close reaches the server first (see FileDescriptorTable)
             fd_table->add(new_fd, path, 0, CAPIO_DEFAULT_FILE_INITIAL_SIZE, flags & ~O_CLOEXEC,
                           (flags & O_CLOEXEC) == O_CLOEXEC);
+            // Who writes it produces it, also without O_CREAT. Announced once it worked: a failed
+            // O_EXCL must not make a producer.
+            const bool writes = create || (flags & O_ACCMODE) != O_RDONLY;
+            create_request_fs(path, new_fd, writes ? CAPIO_FS_PRODUCED : CAPIO_FS_NOT_PRODUCED,
+                              tid);
             return new_fd;
         })
     } else {

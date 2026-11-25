@@ -154,20 +154,23 @@ void open_handler(const char *const str) {
     handle_open(tid, fd, path);
 }
 
-/// @brief create of the FS variant: "tid path", from a client that created it or opened it to write
+/**
+ * @brief A descriptor or a file of the FS variant: "tid fd produced path". tid got the descriptor
+ * fd of path, -1 if none (mkdir). produced is a CAPIO_FS_* value: with
+ * CAPIO_FS_PRODUCED_IF_NO_PRODUCER, tid got a writable descriptor at exec, and it produces the
+ * file only if nobody else does, so that "prog > out" does not take it from its producer.
+ */
 void create_fs_handler(const char *const str) {
-    int tid, consumed = 0;
-    if (sscanf(str, "%d%n", &tid, &consumed) == 1) {
-        handle_create_fs(tid, fs_request_path(tid, str, consumed), false);
+    int tid, fd, produced, consumed = 0;
+    if (sscanf(str, "%d %d %d%n", &tid, &fd, &produced, &consumed) != 3) {
+        return;
     }
-}
-
-/// @brief "tid path": @p tid got a writable descriptor of path at exec. It produces the file only
-/// if nobody else does, so that "prog > out" does not take it from its producer.
-void inherit_fs_handler(const char *const str) {
-    int tid, consumed = 0;
-    if (sscanf(str, "%d%n", &tid, &consumed) == 1) {
-        handle_create_fs(tid, fs_request_path(tid, str, consumed), true);
+    const auto path = fs_request_path(tid, str, consumed);
+    if (fd >= 0) {
+        fs_storage_manager->addFileToPid(client_manager->getPid(tid), fd, path);
+    }
+    if (produced != CAPIO_FS_NOT_PRODUCED) {
+        handle_create_fs(tid, path, produced == CAPIO_FS_PRODUCED_IF_NO_PRODUCER);
     }
 }
 

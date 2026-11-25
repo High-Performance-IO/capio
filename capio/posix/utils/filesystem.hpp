@@ -13,6 +13,7 @@
 #include <string_view>
 #include <vector>
 
+#include <fcntl.h>
 #include <sys/stat.h>
 #include <unistd.h>
 
@@ -131,6 +132,34 @@ std::filesystem::path capio_posix_realpath(const std::filesystem::path &pathname
  */
 inline std::filesystem::path capio_absolute(const std::filesystem::path &path) {
     return path.is_absolute() ? capio_normal_path(path) : capio_posix_realpath(path);
+}
+
+/**
+ * FS variant: flush what was written through @p fd to the file system, as close(2) does, without
+ * closing @p fd. For the descriptors that the kernel closes without a close(2) whose result CAPIO
+ * sees: at the exit, under dup2/dup3 and close_range.
+ *
+ * On a network file system such as NFS, close is when the data of a file is sent to the file
+ * server, and when a full disk or a quota is reported. A consumer on another node sees only the
+ * data flushed before it opens the file. So:
+ * - at the exit, CAPIO announces the closes before the kernel makes them: without this flush, the
+ *   server could commit a file whose data is still in the cache of the producer's node;
+ * - under dup2 and close_range the kernel flushes too, before CAPIO announces the close, but it
+ *   drops the error: the flush gets it, so that the server knows that data was lost.
+ *
+ * It closes a copy of @p fd, which flushes like a close of @p fd itself. If no descriptor is free
+ * for the copy, it syncs the data instead, which is slower but flushes too. Nothing to flush for a
+ * read-only descriptor.
+ *
+ * @return the error of the flush, 0 if none
+ */
+inline long flush_capio_fd(const int fd) {
+    if ((fd_table->flags(fd) & O_ACCMODE) == O_RDONLY) {
+        return 0;
+    }
+    long res = syscall_no_intercept(SYS_dup, fd);
+    res = res >= 0 ? syscall_no_intercept(SYS_close, res) : syscall_no_intercept(SYS_fdatasync, fd);
+    return res < 0 && res != -EINTR ? -res : 0; // EINTR: the copy is closed anyway
 }
 
 /**
