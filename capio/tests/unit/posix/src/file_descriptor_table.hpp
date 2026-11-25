@@ -87,8 +87,50 @@ long unusedTid() {
 
 } // namespace
 
-/// The test executable defines it, so its calls, those of the client classes included, come here
-/// instead of to libsyscall_intercept
+namespace {
+
+/*
+ * A system call straight to the kernel, as syscall_no_intercept makes it: libsyscall_intercept
+ * calls syscall_no_intercept itself for every system call of libc it intercepts, so going through
+ * libc again (syscall()) would come back here forever.
+ * @return the result of the call, or -errno
+ */
+long kernelSyscall(const long number, const long a0, const long a1, const long a2, const long a3,
+                   const long a4, const long a5) {
+#if defined(__x86_64__)
+    long result;
+    register long r10 asm("r10") = a3;
+    register long r8 asm("r8")   = a4;
+    register long r9 asm("r9")   = a5;
+    asm volatile("syscall"
+                 : "=a"(result)
+                 : "a"(number), "D"(a0), "S"(a1), "d"(a2), "r"(r10), "r"(r8), "r"(r9)
+                 : "rcx", "r11", "memory");
+    return result;
+#elif defined(__aarch64__)
+    register long x8 asm("x8") = number;
+    register long x0 asm("x0") = a0;
+    register long x1 asm("x1") = a1;
+    register long x2 asm("x2") = a2;
+    register long x3 asm("x3") = a3;
+    register long x4 asm("x4") = a4;
+    register long x5 asm("x5") = a5;
+    asm volatile("svc 0"
+                 : "+r"(x0)
+                 : "r"(x8), "r"(x1), "r"(x2), "r"(x3), "r"(x4), "r"(x5)
+                 : "memory");
+    return x0;
+#else
+#error "kernelSyscall: unsupported architecture"
+#endif
+}
+
+} // namespace
+
+/**
+ * The test executable defines it, so its calls come here instead of to libsyscall_intercept: those
+ * of the classes of the client, and those of libsyscall_intercept itself.
+ */
 extern "C" long syscall_no_intercept(const long syscall_number, ...) {
     va_list arguments;
     va_start(arguments, syscall_number);
@@ -101,8 +143,7 @@ extern "C" long syscall_no_intercept(const long syscall_number, ...) {
     if (MockSyscalls *mock = MockSyscalls::active; mock != nullptr && syscall_number == SYS_close) {
         return mock->close(static_cast<int>(arg[0]));
     }
-    const long result = syscall(syscall_number, arg[0], arg[1], arg[2], arg[3], arg[4], arg[5]);
-    return result == -1 ? -errno : result; // as syscall_no_intercept returns errors
+    return kernelSyscall(syscall_number, arg[0], arg[1], arg[2], arg[3], arg[4], arg[5]);
 }
 
 TEST(FileDescriptorTableTest, StartsEmpty) {
