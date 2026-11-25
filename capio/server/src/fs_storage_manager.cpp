@@ -12,9 +12,36 @@
 #include "capiocl/engine.h"
 #include "client-manager/client_manager.hpp"
 #include "utils/capiocl_adapter.hpp"
+#include "utils/filesystem.hpp"
 #include "utils/runtime_configuration.hpp"
 
 extern ClientManager *client_manager;
+
+namespace {
+
+/// @brief Erase the entries of @p map at or below @p path
+template <typename Map> void erase_at_or_below(Map &map, const std::string &path) {
+    for (auto entry = map.begin(); entry != map.end();) {
+        entry = is_at_or_below(entry->first, path) ? map.erase(entry) : std::next(entry);
+    }
+}
+
+/// @brief Rename the entries of @p map at or inside @p from, so that they are at or inside @p to
+template <typename Map>
+void move_at_or_below(Map &map, const std::string &from, const std::string &to) {
+    Map moved;
+    for (auto entry = map.begin(); entry != map.end();) {
+        if (is_at_or_below(entry->first, from)) {
+            moved.emplace(to + entry->first.substr(from.size()), std::move(entry->second));
+            entry = map.erase(entry);
+        } else {
+            ++entry;
+        }
+    }
+    map.merge(moved);
+}
+
+} // namespace
 
 FsStorageManager::FsStorageManager() {
     CALF_PRINT_COLOR(CALF_CLI_LEVEL_STATUS, "initialization completed.");
@@ -88,7 +115,10 @@ void FsStorageManager::applyOnClose(const std::filesystem::path &path, const lon
     pthread_sigmask(SIG_SETMASK, &previous, nullptr);
 }
 
-void FsStorageManager::countClose(const std::filesystem::path &path) { applyOnClose(path, 1); }
+void FsStorageManager::countClose(const std::filesystem::path &path) {
+    ++_close_counts[path];
+    applyOnClose(path, 1);
+}
 
 void FsStorageManager::closed(const pid_t tid, const std::filesystem::path &path) {
     START_LOG(gettid(), "call(tid=%d, path=%s)", tid, path.c_str());
@@ -149,6 +179,65 @@ void FsStorageManager::closeFailed(const pid_t tid, const std::filesystem::path 
                      "Closing %s failed in thread %d (%s): data was lost, so the file will not be "
                      "committed and its consumers will wait",
                      path.c_str(), tid, strerror(error));
+}
+
+void FsStorageManager::forgetHistory(const std::string &path) {
+    erase_at_or_below(_close_counts, path);
+    erase_at_or_below(_failed_closes, path);
+    for (auto &[pid, descriptors] : _opened_fd_map) {
+        for (auto descriptor = descriptors.begin(); descriptor != descriptors.end();) {
+            descriptor = is_at_or_below(descriptor->second, path) ? descriptors.erase(descriptor)
+                                                                  : std::next(descriptor);
+        }
+    }
+    client_manager->forgetProducedFiles(path);
+}
+
+void FsStorageManager::moveHistory(const std::string &from, const std::string &to) {
+    move_at_or_below(_close_counts, from, to);
+    move_at_or_below(_failed_closes, from, to);
+    for (auto &[pid, descriptors] : _opened_fd_map) {
+        for (auto &[fd, path] : descriptors) {
+            if (is_at_or_below(path, from)) {
+                path = to + path.substr(from.size());
+            }
+        }
+    }
+    client_manager->renameProducedFiles(from, to);
+}
+
+void FsStorageManager::rename(const pid_t tid, const std::string &from, const bool from_capio,
+                              const std::string &to, const bool to_capio) {
+    START_LOG(gettid(), "call(tid=%d, from=%s, to=%s)", tid, from.c_str(), to.c_str());
+    // The rename replaces whatever was at the new name, so forget it. Then move the old name's
+    // history to the new name, or forget it if the file has left CAPIO_DIR.
+    if (to_capio) {
+        forgetHistory(to);
+    }
+    if (from_capio) {
+        to_capio ? moveHistory(from, to) : forgetHistory(from);
+    }
+    if (!to_capio || CapioCLEngine::get().isExcluded(to)) {
+        return;
+    }
+    if (!from_capio) {
+        // CAPIO never saw this file being written, so count the move into CAPIO_DIR as its close
+        client_manager->registerProducedFile(tid, to);
+        countClose(to);
+        return;
+    }
+    std::error_code error;
+    if (!client_manager->hasProducer(to) && !std::filesystem::is_directory(to, error)) {
+        // Nobody produces the file any more (e.g. mv after the producer exited): the renaming
+        // process becomes its producer, so the file is committed when it exits
+        client_manager->registerProducedFile(tid, to);
+    }
+    // Apply the commit rule of each new name, using the closes counted under the old one
+    for (const auto &[path, count] : _close_counts) {
+        if (count > 0 && is_at_or_below(path, to)) {
+            applyOnClose(path, count);
+        }
+    }
 }
 
 void FsStorageManager::waitForCreation(const std::filesystem::path &path) const {

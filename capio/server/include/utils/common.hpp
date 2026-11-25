@@ -3,6 +3,7 @@
 
 #include <iomanip>
 #include <string>
+#include <string_view>
 #include <thread>
 #include <unordered_map>
 
@@ -160,16 +161,20 @@ inline void copy_file_range_data(const CSCopyFileRange_t &copy) {
  * from there to the end.
  */
 
-/// @brief The path of a request of the FS variant, whose arguments end at @p consumed
-inline std::string fs_request_path(const pid_t tid, const char *str, const int consumed) {
-    // %n follows the last number: one space separates it from the path
-    auto path = std::filesystem::path(str[consumed] == ' ' ? str + consumed + 1 : str + consumed)
-                    .lexically_normal()
-                    .string();
+/// @brief Normalize a path sent by an FS client the way the server stores paths: lexically
+/// normal, with no trailing slash
+inline std::string fs_normal_path(const std::string_view sent) {
+    auto path = std::filesystem::path(sent).lexically_normal().string();
     while (path.size() > 1 && path.back() == '/') {
         path.pop_back();
     }
     return path;
+}
+
+/// @brief The path of a request of the FS variant, whose arguments end at @p consumed
+inline std::string fs_request_path(const pid_t tid, const char *str, const int consumed) {
+    // %n follows the last number: one space separates it from the path
+    return fs_normal_path(str[consumed] == ' ' ? str + consumed + 1 : str + consumed);
 }
 
 #endif // CAPIO_SERVER_UTILS_COMMON_HPP

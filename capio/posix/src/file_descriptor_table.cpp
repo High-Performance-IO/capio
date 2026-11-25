@@ -14,6 +14,7 @@
 #include <sys/syscall.h>
 
 #include "common/constants.hpp"
+#include "common/path.hpp"
 
 namespace {
 
@@ -232,27 +233,38 @@ long FileDescriptorTable::closeRange(const unsigned first, const unsigned last,
 
 void FileDescriptorTable::removePath(const std::string &path) {
     const std::lock_guard lock(mutex());
-    const auto found = _paths.find(path);
-    if (found == _paths.end()) {
-        return;
+    for (auto entry = _paths.begin(); entry != _paths.end();) {
+        if (!is_at_or_below(entry->first, path)) {
+            ++entry;
+            continue;
+        }
+        for (const int fd : entry->second) {
+            _descriptors.erase(fd);
+        }
+        entry = _paths.erase(entry);
     }
-    for (const int fd : found->second) {
-        _descriptors.erase(fd);
-    }
-    _paths.erase(found);
 }
 
 void FileDescriptorTable::renamePath(const std::string &old_path, const std::string &new_path) {
     const std::lock_guard lock(mutex());
-    auto entry = _paths.extract(old_path);
-    if (entry.empty()) {
-        return;
+    std::vector<std::string> moving;
+    for (const auto &[path, fds] : _paths) {
+        if (is_at_or_below(path, old_path)) {
+            moving.push_back(path);
+        }
     }
-    entry.key() = new_path;
-    for (const int fd : entry.mapped()) {
-        _descriptors.at(fd).path = new_path;
+    for (const auto &path : moving) {
+        auto entry  = _paths.extract(path);
+        entry.key() = new_path + path.substr(old_path.size());
+        for (const int fd : entry.mapped()) {
+            _descriptors.at(fd).path = entry.key();
+        }
+        // If the new name already has open descriptors (a rename over an open file), keep both
+        // sets under the new name
+        if (auto inserted = _paths.insert(std::move(entry)); !inserted.inserted) {
+            inserted.position->second.merge(inserted.node.mapped());
+        }
     }
-    _paths.insert(std::move(entry));
 }
 
 bool FileDescriptorTable::contains(const int fd) const {

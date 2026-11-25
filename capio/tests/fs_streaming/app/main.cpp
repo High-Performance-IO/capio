@@ -124,6 +124,12 @@ const std::map<std::string, Operation> &operations() {
              return true;
          }},
         {"access", [](const std::string &a) { return ::access(a.c_str(), F_OK) == 0; }},
+        {"mkdir", [](const std::string &a) { return mkdir(a.c_str(), 0755) == 0; }},
+        {"rename",
+         [](const std::string &a) {
+             const auto to = a.find('>');
+             return ::rename(a.substr(0, to).c_str(), a.substr(to + 1).c_str()) == 0;
+         }},
         {"thread",
          [](const std::string &a) {
              std::thread thread([&a] { run(a); });

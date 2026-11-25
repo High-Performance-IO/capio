@@ -34,7 +34,10 @@ x-test-service: &test-service
           forced=1
         fi
         wait "$$server_pid" 2>/dev/null
-        gcovr --root /opt/capio --exclude-throw-branches --exclude capio/tests \
+        # Absolute filters: gcovr 5 reads relative ones from the current directory, /shared, and the
+        # build, with the dependencies it fetched, is inside the root
+        gcovr --root /opt/capio --exclude-throw-branches \
+          --exclude /opt/capio/capio/tests/ --exclude /opt/capio/build/ \
           --gcov-executable gcov --gcov-ignore-parse-errors \
           --xml "/coverage/$${HOSTNAME}.xml" /opt/capio/build
         coverage_status=$$?

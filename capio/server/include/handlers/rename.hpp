@@ -3,6 +3,7 @@
 #include "client-manager/client_manager.hpp"
 #include "remote/home_node_service.hpp"
 #include "storage/manager.hpp"
+#include "utils/common.hpp"
 #include "utils/filesystem.hpp"
 
 extern StorageManager *storage_manager;
@@ -42,6 +43,30 @@ void rename_handler(const char *const str) {
     int tid;
     sscanf(str, "%s %s %d", oldpath, newpath, &tid);
     handle_rename(tid, oldpath, newpath);
+}
+
+/**
+ * @brief A rename done by an FS client, sent after the kernel has done it. Format:
+ * "tid old_in new_in old_size old_pathnew_path", where old_in and new_in are 1 if that name is
+ * inside CAPIO_DIR, and the two names are written back to back, the old one being old_size bytes.
+ *
+ * Everything the server knows about the file moves to the new name, and the new name's commit
+ * rule is applied. This is what makes "write f.tmp, close it, rename it to f" commit f. No reply.
+ */
+void rename_fs_handler(const char *const str) {
+    int tid, old_in, new_in, consumed = 0;
+    size_t old_size;
+    if (sscanf(str, "%d %d %d %zu %n", &tid, &old_in, &new_in, &old_size, &consumed) != 4) {
+        return;
+    }
+    const std::string_view names(str + consumed);
+    START_LOG(gettid(), "call(tid=%d, names=%s)", tid, str + consumed);
+    if (names.size() <= old_size) {
+        LOG("The names are cut: the request was too long");
+        return;
+    }
+    fs_storage_manager->rename(tid, fs_normal_path(names.substr(0, old_size)), old_in != 0,
+                               fs_normal_path(names.substr(old_size)), new_in != 0);
 }
 
 #endif // CAPIO_SERVER_HANDLERS_RENAME_HPP

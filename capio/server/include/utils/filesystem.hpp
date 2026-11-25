@@ -5,6 +5,7 @@
 #include <unistd.h>
 
 #include "calf/StlLogger.h"
+#include "common/path.hpp"
 
 #include "utils/runtime_configuration.hpp"
 

@@ -6,12 +6,10 @@
 #include <unordered_map>
 #include <vector>
 
+#include <linux/close_range.h>
+
 #include "utils/common.hpp"
 #include "utils/requests.hpp"
-
-#ifndef CLOSE_RANGE_CLOEXEC
-#define CLOSE_RANGE_CLOEXEC (1U << 2)
-#endif
 
 int close_range_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg5,
                         long *result) {

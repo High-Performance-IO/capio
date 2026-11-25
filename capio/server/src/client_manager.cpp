@@ -9,6 +9,7 @@
 #include "common/queue.hpp"
 #include "utils/capiocl_adapter.hpp"
 #include "utils/common.hpp"
+#include "utils/filesystem.hpp"
 #include "utils/runtime_configuration.hpp"
 
 ClientManager::ClientDataBuffers::ClientDataBuffers(const std::string &clientToServerName,
@@ -180,6 +181,41 @@ bool ClientManager::isProducer(const pid_t tid, const std::filesystem::path &pat
 bool ClientManager::hasProducer(const std::filesystem::path &path) const {
     return std::any_of(files_created_by_app_name.begin(), files_created_by_app_name.end(),
                        [&](const auto &group) { return group.second.count(path.native()) != 0; });
+}
+
+void ClientManager::renameProducedFiles(const std::string &from, const std::string &to) {
+    const auto rename_in = [&](std::unordered_set<std::string> &files) {
+        std::vector<std::string> moved;
+        for (auto file = files.begin(); file != files.end();) {
+            if (is_at_or_below(*file, from)) {
+                moved.push_back(to + file->substr(from.size()));
+                file = files.erase(file);
+            } else {
+                ++file;
+            }
+        }
+        files.insert(moved.begin(), moved.end());
+    };
+    for (auto &[tid, files] : files_created_by_producer) {
+        rename_in(files);
+    }
+    for (auto &[group, files] : files_created_by_app_name) {
+        rename_in(files);
+    }
+}
+
+void ClientManager::forgetProducedFiles(const std::string &path) {
+    const auto forget_in = [&](std::unordered_set<std::string> &files) {
+        for (auto file = files.begin(); file != files.end();) {
+            file = is_at_or_below(*file, path) ? files.erase(file) : std::next(file);
+        }
+    };
+    for (auto &[tid, files] : files_created_by_producer) {
+        forget_in(files);
+    }
+    for (auto &[group, files] : files_created_by_app_name) {
+        forget_in(files);
+    }
 }
 
 const std::unordered_set<std::string> &ClientManager::getProducedFiles(const pid_t tid) const {

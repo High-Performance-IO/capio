@@ -85,6 +85,19 @@ inline off64_t rename_request(const long tid, const std::filesystem::path &old_p
     return res;
 }
 
+inline void rename_request_fs(const std::filesystem::path &old_path, const bool old_is_capio,
+                              const std::filesystem::path &new_path, const bool new_is_capio,
+                              const long tid) {
+    START_LOG(capio_syscall(SYS_gettid), "call(tid=%ld, old_path=%s, new_path=%s)", tid,
+              old_path.c_str(), new_path.c_str());
+    // Both names go back to back. The length of the old name tells the server where it ends; a
+    // separator would not work, since paths can contain spaces
+    fs_request(CAPIO_REQUEST_RENAME_FS, tid,
+               std::to_string(old_is_capio ? 1 : 0) + " " + std::to_string(new_is_capio ? 1 : 0) +
+                   " " + std::to_string(old_path.native().size()) + " ",
+               old_path.native() + new_path.native());
+}
+
 inline off64_t create_request(const int fd, const std::filesystem::path &path, const long tid) {
     START_LOG(capio_syscall(SYS_gettid), "call(fd=%ld, path=%s, tid=%ld)", fd, path.c_str(), tid);
     char req[CAPIO_REQ_MAX_SIZE];

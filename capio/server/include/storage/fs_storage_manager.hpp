@@ -8,6 +8,7 @@
 #include <string>
 #include <unordered_map>
 #include <unordered_set>
+#include <vector>
 
 #include <sys/types.h>
 
@@ -15,12 +16,16 @@
  * @brief Manages the files of the file system variant (libcapio_posix_fs.so).
  *
  * Its files stay on the file system, so unlike StorageManager it holds no data: it knows what has
- * happened to each file (closes, failed closes) and applies the CAPIO-CL rules to it. As
+ * happened to each file (closes, failed closes, renames) and applies the CAPIO-CL rules to it. As
  * StorageManager, it knows the descriptors of its clients by number. CAPIO-CL keeps the rules and
  * the commit state; ClientManager keeps who produces what. Used by the request thread only, apart
  * from the static methods.
  */
 class FsStorageManager {
+    /// @brief How many successful closes each file has had. Counted for every file, whatever its
+    /// commit rule, because a rename can give the file a name whose rule needs them
+    std::unordered_map<std::string, long> _close_counts;
+
     /// @brief path -> errno of a close that failed: data was lost, never committed by this server
     std::unordered_map<std::string, int> _failed_closes;
 
@@ -37,6 +42,14 @@ class FsStorageManager {
     void applyOnClose(const std::filesystem::path &path, long n_closes);
 
     void countClose(const std::filesystem::path &path);
+
+    /// @brief Forget everything known about @p path and the files inside it: close counts, failed
+    /// closes, open descriptors and producers
+    void forgetHistory(const std::string &path);
+
+    /// @brief Move everything known about @p from and the files inside it to the same names under
+    /// @p to
+    void moveHistory(const std::string &from, const std::string &to);
 
   public:
     FsStorageManager();
@@ -90,6 +103,15 @@ class FsStorageManager {
 
     /// @brief A close of @p path failed, so data was lost
     void closeFailed(pid_t tid, const std::filesystem::path &path, int error);
+
+    /**
+     * @brief @p tid has renamed @p from to @p to. Everything known about the file (or about the
+     * files in the directory) moves to the new name, then the new name's commit rule is applied.
+     * @param from_capio whether @p from is inside CAPIO_DIR
+     * @param to_capio whether @p to is inside CAPIO_DIR
+     */
+    void rename(pid_t tid, const std::string &from, bool from_capio, const std::string &to,
+                bool to_capio);
 
     /// @brief Block until @p path exists
     void waitForCreation(const std::filesystem::path &path) const;
