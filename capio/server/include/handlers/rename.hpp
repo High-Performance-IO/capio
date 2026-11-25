@@ -1,6 +1,7 @@
 #ifndef CAPIO_SERVER_HANDLERS_RENAME_HPP
 #define CAPIO_SERVER_HANDLERS_RENAME_HPP
 #include "client-manager/client_manager.hpp"
+#include "common/constants.hpp"
 #include "remote/home_node_service.hpp"
 #include "storage/manager.hpp"
 #include "utils/common.hpp"
@@ -47,19 +48,28 @@ void rename_handler(const char *const str) {
 
 /**
  * @brief rename of the FS variant, sent once the kernel has renamed, in two requests as both paths
- * may not fit in one: "tid F old_path" (O if outside CAPIO_DIR), then "tid T new_path" (D if
- * outside). What the server knows of the file moves to the new name, whose rule is then applied,
- * so that "write f.tmp, close, rename to f" commits f. No reply.
+ * may not fit in one: "tid side path", first with the old name, then with the new one. side is a
+ * CAPIO_RENAME_* value: which name it is, and whether it is inside CAPIO_DIR. What the server knows
+ * of the file moves to the new name, whose rule is then applied, so that "write f.tmp, close,
+ * rename to f" commits f. No reply.
  */
 void rename_fs_handler(const char *const str) {
     int tid, consumed = 0;
     char side;
     if (sscanf(str, "%d %c%n", &tid, &side, &consumed) == 2) {
         auto path = fs_request_path(tid, str, consumed);
-        if (side == 'F' || side == 'O') {
-            fs_storage_manager->renameFrom(tid, std::move(path), side == 'F');
-        } else {
-            fs_storage_manager->renameTo(tid, path, side == 'T');
+        switch (side) {
+        case CAPIO_RENAME_FROM_CAPIO_DIR:
+        case CAPIO_RENAME_FROM_OUTSIDE:
+            fs_storage_manager->renameFrom(tid, std::move(path),
+                                           side == CAPIO_RENAME_FROM_CAPIO_DIR);
+            break;
+        case CAPIO_RENAME_TO_CAPIO_DIR:
+        case CAPIO_RENAME_TO_OUTSIDE:
+            fs_storage_manager->renameTo(tid, path, side == CAPIO_RENAME_TO_CAPIO_DIR);
+            break;
+        default:
+            break;
         }
     }
 }
