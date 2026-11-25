@@ -27,24 +27,6 @@
  * request thread of the server never waits for a directory.
  */
 class FsDirectoryLister final {
-  public:
-    /// @brief Starts the thread
-    FsDirectoryLister();
-
-    FsDirectoryLister(const FsDirectoryLister &)            = delete;
-    FsDirectoryLister &operator=(const FsDirectoryLister &) = delete;
-
-    /**
-     * @brief Send thread @p tid up to @p count bytes of entries of @p path, from @p offset: now,
-     * or once the directory allows it. It is open as the descriptor @p fd of process @p pid.
-     * @param expected N, if @p path has an on_n_files rule
-     */
-    void list(pid_t tid, pid_t pid, int fd, std::string path, off64_t offset, off64_t count,
-              long expected);
-
-    /// @brief Drop the listing of the descriptor @p fd of process @p pid, which is closed
-    void forget(pid_t pid, int fd);
-
   private:
     /// @brief How a directory is listed
     enum class Mode {
@@ -92,6 +74,24 @@ class FsDirectoryLister final {
 
     /// @brief Whether the on_n_files directory @p path is committed, or no longer exists
     static bool isCommitted(const std::string &path, long expected);
+
+  public:
+    /// @brief Starts the thread
+    FsDirectoryLister();
+
+    FsDirectoryLister(const FsDirectoryLister &)            = delete;
+    FsDirectoryLister &operator=(const FsDirectoryLister &) = delete;
+
+    /**
+     * @brief Send thread @p tid up to @p count bytes of entries of @p path, from @p offset: now,
+     * or once the directory allows it. It is open as the descriptor @p fd of process @p pid.
+     * @param expected N, if @p path has an on_n_files rule
+     */
+    void list(pid_t tid, pid_t pid, int fd, std::string path, off64_t offset, off64_t count,
+              long expected);
+
+    /// @brief Drop the listing of the descriptor @p fd of process @p pid, which is closed
+    void forget(pid_t pid, int fd);
 };
 
 #endif // CAPIO_SERVER_STORAGE_FS_DIRECTORY_LISTER_HPP
