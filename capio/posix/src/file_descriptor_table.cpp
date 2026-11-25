@@ -14,6 +14,7 @@
 #include <sys/syscall.h>
 
 #include "common/constants.hpp"
+#include "common/path.hpp"
 
 namespace {
 
@@ -48,12 +49,6 @@ void *mapSnapshot(const long fd, const size_t length, const int protection) {
         syscall_no_intercept(SYS_mmap, nullptr, length, protection, MAP_SHARED, fd, 0);
     // An address of user space is never negative: a negative result is -errno
     return address < 0 ? nullptr : reinterpret_cast<void *>(address);
-}
-
-/// @brief Whether @p path is @p name or inside the directory @p name
-bool isAtOrBelow(const std::string &path, const std::string &name) {
-    return path.compare(0, name.size(), name) == 0 &&
-           (path.size() == name.size() || path[name.size()] == '/');
 }
 
 void removeSnapshot(const std::string &path) {
@@ -239,7 +234,7 @@ long FileDescriptorTable::closeRange(const unsigned first, const unsigned last,
 void FileDescriptorTable::removePath(const std::string &path) {
     const std::lock_guard lock(mutex());
     for (auto entry = _paths.begin(); entry != _paths.end();) {
-        if (!isAtOrBelow(entry->first, path)) {
+        if (!is_at_or_below(entry->first, path)) {
             ++entry;
             continue;
         }
@@ -254,7 +249,7 @@ void FileDescriptorTable::renamePath(const std::string &old_path, const std::str
     const std::lock_guard lock(mutex());
     std::vector<std::string> moving;
     for (const auto &[path, fds] : _paths) {
-        if (isAtOrBelow(path, old_path)) {
+        if (is_at_or_below(path, old_path)) {
             moving.push_back(path);
         }
     }
