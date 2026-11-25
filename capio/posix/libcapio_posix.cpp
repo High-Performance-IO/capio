@@ -172,6 +172,12 @@ static constexpr long CAPIO_NR_SYSCALLS = 1 + std::max({
 #ifdef SYS_statx
                                                   SYS_statx,
 #endif
+#ifdef SYS_sync_file_range
+                                                  SYS_sync_file_range,
+#endif
+#ifdef SYS_sync_file_range2
+                                                  SYS_sync_file_range2,
+#endif
 #ifdef SYS_unlink
                                                   SYS_unlink,
 #endif
@@ -342,6 +348,12 @@ static constexpr std::array<CPHandler_t, CAPIO_NR_SYSCALLS> build_syscall_table(
 #endif
 #ifdef SYS_statx
     _syscallTable[SYS_statx] = statx_handler;
+#endif
+#ifdef SYS_sync_file_range
+    _syscallTable[SYS_sync_file_range] = sync_file_range_handler;
+#endif
+#ifdef SYS_sync_file_range2
+    _syscallTable[SYS_sync_file_range2] = sync_file_range_handler;
 #endif
 #ifdef SYS_unlink
     _syscallTable[SYS_unlink] = unlink_handler;

@@ -26,6 +26,7 @@
 #include "handlers/stat.hpp"
 #include "handlers/statfs.hpp"
 #include "handlers/statx.hpp"
+#include "handlers/sync_file_range.hpp"
 #include "handlers/unlink.hpp"
 #include "handlers/write.hpp"
 
