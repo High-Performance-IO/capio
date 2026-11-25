@@ -107,7 +107,7 @@ inline long capio_rescan_fs(const int fd, CapioListingFs &listing) {
             const auto *entry = reinterpret_cast<const linux_dirent64 *>(buffer + at);
             at += entry->d_reclen;
             const std::string_view name(entry->d_name);
-            if (is_capio_cl_token(name)) {
+            if (is_forbidden_path(name)) {
                 continue; // CAPIO-CL's commit state, not an entry of the workflow
             }
             n_entries += name != "." && name != "..";

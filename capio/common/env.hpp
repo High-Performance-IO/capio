@@ -9,6 +9,7 @@
 #include <sys/stat.h>
 
 #include "common/constants.hpp"
+#include "common/path.hpp"
 #include "common/syscall.hpp"
 
 #include <calf/StdOutLogger.h>
@@ -18,9 +19,6 @@
 #else
 #include "calf/StlLogger.h"
 #endif
-
-// TODO: remove forward declaration of function by splitting into header and impl. capio/common
-inline bool is_forbidden_path(const std::string_view &path);
 
 inline const std::filesystem::path &get_capio_dir() {
     static std::filesystem::path capio_dir{};

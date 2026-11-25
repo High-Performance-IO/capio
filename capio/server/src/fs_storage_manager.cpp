@@ -11,7 +11,7 @@
 #include "capiocl.hpp"
 #include "capiocl/engine.h"
 #include "client-manager/client_manager.hpp"
-#include "common/dirent.hpp"
+#include "common/path.hpp"
 #include "utils/capiocl_adapter.hpp"
 #include "utils/filesystem.hpp"
 #include "utils/runtime_configuration.hpp"
@@ -279,7 +279,7 @@ long FsStorageManager::countEntries(const std::filesystem::path &directory) {
     std::filesystem::directory_iterator entry(directory, error);
     long count = 0;
     while (!error && entry != std::filesystem::directory_iterator()) {
-        count += !is_capio_cl_token(entry->path().filename().string());
+        count += !is_forbidden_path(entry->path().filename().native());
         entry.increment(error);
     }
     return error ? -1 : count;
