@@ -3,9 +3,8 @@
 #####################################
 set(TARGET_NAME capio_posix_unit_tests)
 set(TARGET_INCLUDE_FOLDER "${PROJECT_SOURCE_DIR}/capio/posix")
-# The classes of the client, but for the system calls they make: the tests mock them
+# The classes of the client
 file(GLOB CAPIO_POSIX_SOURCES CONFIGURE_DEPENDS "${TARGET_INCLUDE_FOLDER}/src/*.cpp")
-list(REMOVE_ITEM CAPIO_POSIX_SOURCES "${TARGET_INCLUDE_FOLDER}/src/system_calls.cpp")
 set(TARGET_SOURCES
         ${CMAKE_CURRENT_SOURCE_DIR}/src/main.cpp
         ${CAPIO_POSIX_SOURCES}

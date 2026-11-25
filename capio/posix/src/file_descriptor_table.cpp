@@ -9,7 +9,8 @@
 #include <sys/stat.h>
 #include <unistd.h>
 
-#include "utils/system_calls.hpp"
+#include <libsyscall_intercept_hook_point.h>
+#include <sys/syscall.h>
 
 namespace {
 
@@ -176,7 +177,7 @@ void FileDescriptorTable::remove(const int fd) {
 long FileDescriptorTable::close(const int fd) {
     const Lock lock;
     _remove(fd);
-    return SystemCalls::close(fd);
+    return syscall_no_intercept(SYS_close, fd);
 }
 
 void FileDescriptorTable::removePath(const std::string &path) {
