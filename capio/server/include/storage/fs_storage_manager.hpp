@@ -8,7 +8,6 @@
 #include <string>
 #include <unordered_map>
 #include <unordered_set>
-#include <utility>
 #include <vector>
 
 #include <sys/types.h>
@@ -34,9 +33,6 @@ class FsStorageManager {
      * of StorageManager. By process, as its threads share them, and as an exec keeps them.
      */
     std::unordered_map<pid_t, std::unordered_map<int, std::string>> _opened_fd_map;
-
-    /// @brief tid -> first half of a rename, and whether it is inside CAPIO_DIR
-    std::unordered_map<pid_t, std::pair<std::string, bool>> _renaming;
 
     /// @brief Closes of on_close:N being counted on background threads
     std::atomic<int> _pending_counts{0};
@@ -99,18 +95,14 @@ class FsStorageManager {
     /// @brief A close of @p path failed, so data was lost
     void closeFailed(pid_t tid, const std::filesystem::path &path, int error);
 
-    /// @brief First half of a rename: the old name, and whether it is inside CAPIO_DIR
-    void renameFrom(pid_t tid, std::string path, bool in_capio_dir);
-
     /**
-     * @brief Second half of a rename, which worked: what is known of the file, or of the files in
-     * the directory, moves to the new name, whose rule is then applied. So do the descriptors open
-     * on them.
+     * @brief @p tid renamed @p from to @p to, which worked: what is known of the file, or of the
+     * files in the directory, moves to the new name, whose rule is then applied. So do the
+     * descriptors open on them. @p from_capio and @p to_capio: whether each name is inside
+     * CAPIO_DIR.
      */
-    void renameTo(pid_t tid, const std::string &path, bool in_capio_dir);
-
-    /// @brief @p tid exited
-    void removeThread(pid_t tid);
+    void rename(pid_t tid, const std::string &from, bool from_capio, const std::string &to,
+                bool to_capio);
 
     /// @brief Block until @p path exists
     void waitForCreation(const std::filesystem::path &path) const;

@@ -1,7 +1,6 @@
 #ifndef CAPIO_POSIX_UTILS_REQUESTS_HPP
 #define CAPIO_POSIX_UTILS_REQUESTS_HPP
 
-#include "common/constants.hpp"
 #include "common/requests.hpp"
 
 #include "calf/SyscallLogger.h"
@@ -91,11 +90,12 @@ inline void rename_request_fs(const std::filesystem::path &old_path, const bool 
                               const long tid) {
     START_LOG(capio_syscall(SYS_gettid), "call(tid=%ld, old_path=%s, new_path=%s)", tid,
               old_path.c_str(), new_path.c_str());
-    // Two requests, as both paths may not fit in one
-    const char from = old_is_capio ? CAPIO_RENAME_FROM_CAPIO_DIR : CAPIO_RENAME_FROM_OUTSIDE;
-    const char to   = new_is_capio ? CAPIO_RENAME_TO_CAPIO_DIR : CAPIO_RENAME_TO_OUTSIDE;
-    fs_request(CAPIO_REQUEST_RENAME_FS, tid, std::string{from, ' '}, old_path.native());
-    fs_request(CAPIO_REQUEST_RENAME_FS, tid, std::string{to, ' '}, new_path.native());
+    // The two names one after the other, the size of the old one telling where it ends: either
+    // may contain spaces
+    fs_request(CAPIO_REQUEST_RENAME_FS, tid,
+               std::to_string(old_is_capio ? 1 : 0) + " " + std::to_string(new_is_capio ? 1 : 0) +
+                   " " + std::to_string(old_path.native().size()) + " ",
+               old_path.native() + new_path.native());
 }
 
 inline off64_t create_request(const int fd, const std::filesystem::path &path, const long tid) {

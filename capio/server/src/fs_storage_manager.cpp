@@ -186,17 +186,8 @@ void FsStorageManager::closeFailed(const pid_t tid, const std::filesystem::path 
                      path.c_str(), tid, strerror(error));
 }
 
-void FsStorageManager::renameFrom(const pid_t tid, std::string path, const bool in_capio_dir) {
-    _renaming[tid] = {std::move(path), in_capio_dir};
-}
-
-void FsStorageManager::renameTo(const pid_t tid, const std::string &to, const bool to_capio) {
-    const auto half = _renaming.find(tid);
-    if (half == _renaming.end()) {
-        return;
-    }
-    const auto [from, from_capio] = half->second;
-    _renaming.erase(half);
+void FsStorageManager::rename(const pid_t tid, const std::string &from, const bool from_capio,
+                              const std::string &to, const bool to_capio) {
     START_LOG(gettid(), "call(tid=%d, from=%s, to=%s)", tid, from.c_str(), to.c_str());
 
     if (!from_capio) {
@@ -250,8 +241,6 @@ void FsStorageManager::renameTo(const pid_t tid, const std::string &to, const bo
         }
     }
 }
-
-void FsStorageManager::removeThread(const pid_t tid) { _renaming.erase(tid); }
 
 void FsStorageManager::waitForCreation(const std::filesystem::path &path) const {
     std::error_code error;

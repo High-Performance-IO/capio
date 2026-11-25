@@ -58,12 +58,6 @@ constexpr int CAPIO_POSIX_SYSCALL_SUCCESS      = 0;
 // Sector end returned when no sector holds data at the requested offset
 constexpr off64_t CAPIO_SECTOR_NOT_FOUND = -1;
 
-// CAPIO_REQUEST_RENAME_FS: which name of the rename a request carries, and where that name is
-constexpr char CAPIO_RENAME_FROM_CAPIO_DIR = 'F'; ///< the old name, inside CAPIO_DIR
-constexpr char CAPIO_RENAME_FROM_OUTSIDE   = 'O'; ///< the old name, outside CAPIO_DIR
-constexpr char CAPIO_RENAME_TO_CAPIO_DIR   = 'T'; ///< the new name, inside CAPIO_DIR
-constexpr char CAPIO_RENAME_TO_OUTSIDE     = 'D'; ///< the new name, outside CAPIO_DIR
-
 // CAPIO common - shared memory constant names
 constexpr char SHM_FIRST_ELEM[]        = "_first_elem_";
 constexpr char SHM_LAST_ELEM[]         = "_last_elem_";
