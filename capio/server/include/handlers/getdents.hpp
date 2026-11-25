@@ -81,13 +81,14 @@ void getdents_handler(const char *const str) {
     handle_getdents(tid, fd, count);
 }
 
-/// @brief Reply to @p tid once the listing of @p path can go on: new entries, or the commit
+/// @brief Wait until the listing of @p path can continue (it has new entries, or it is
+/// committed), then reply to @p tid
 inline void wait_for_fs_entries(const std::filesystem::path path, const pid_t tid,
                                 const off64_t n_seen, const long expected, const bool is_starting) {
     for (;;) {
         const long count = FsStorageManager::countEntries(path);
         if (count < 0 || count >= expected) {
-            // removed, or committed by its entries
+            // The directory was removed, or has its N entries and so is committed
             if (count < 0 || FsStorageManager::isDirectoryCommitted(path, expected)) {
                 client_manager->replyToClient(tid, CAPIO_FS_LIST_COMMITTED);
                 return;
@@ -103,9 +104,10 @@ inline void wait_for_fs_entries(const std::filesystem::path path, const pid_t ti
     }
 }
 
-/*
- * getdents of the FS variant, see posix/utils/fs_listing.hpp: "tid n_seen path". With n_seen -1
- * the listing starts. Otherwise it found nothing new among n_seen entries, and waits.
+/**
+ * @brief A listing request of the FS variant (see posix/handlers/getdents.hpp): "tid n_seen path".
+ * n_seen is -1 when the listing starts. Otherwise the client found nothing new among the n_seen
+ * entries it has, and waits for the reply.
  */
 void list_fs_handler(const char *const str) {
     int tid, consumed = 0;
@@ -129,8 +131,8 @@ void list_fs_handler(const char *const str) {
         }
     }
     const long expected = fs_storage_manager->expectedEntries(path);
-    // The waiter does not get the termination signals: their handler frees memory and exits, and
-    // run on a thread that holds a lock (malloc's, CAPIO-CL's) it would wait for it forever.
+    // Block the termination signals in the waiting thread. Their handler frees memory and exits;
+    // if it ran on a thread holding a lock (malloc's or CAPIO-CL's), it would wait for it forever.
     // TODO: a thread manager for the threads of the server
     sigset_t signals, previous;
     sigemptyset(&signals);

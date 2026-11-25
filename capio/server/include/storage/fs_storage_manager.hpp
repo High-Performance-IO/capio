@@ -35,10 +35,10 @@ class FsStorageManager {
      */
     std::unordered_map<pid_t, std::unordered_map<int, std::string>> _opened_fd_map;
 
-    /// @brief on_n_files directory -> N, as it was before lookups could change it
+    /// @brief N for each on_n_files directory, read before CAPIO-CL's lookups could change it
     std::unordered_map<std::string, long> _expected_entries;
 
-    /// @brief on_n_files directory -> entries created there, until it is committed
+    /// @brief The entries created in each on_n_files directory, until it is committed
     std::unordered_map<std::string, std::unordered_set<std::string>> _new_entries;
     std::unordered_set<std::string> _committed_directories;
 
@@ -121,26 +121,29 @@ class FsStorageManager {
                 bool to_capio);
 
     /**
-     * @brief Take N of the on_n_files directories from the config.
+     * @brief Read N for each on_n_files directory of the config.
      *
-     * CAPIO-CL counts the children it knows of when n_files is omitted, lookups included, and
-     * cannot say that it was omitted. So N is what it reports at startup, and at least 1.
+     * When n_files is omitted, CAPIO-CL uses the number of children it knows about, and every
+     * lookup adds one, so that number grows over time; it also can't tell us n_files was omitted.
+     * So N is the value CAPIO-CL reports at startup, and at least 1.
      */
     void loadExpectedEntries();
 
     [[nodiscard]] long expectedEntries(const std::filesystem::path &directory);
 
-    /// @brief The entries of @p directory without "." and ".." and CAPIO-CL tokens, or -1
+    /// @brief How many entries @p directory has, not counting "." and ".." or CAPIO-CL's token
+    /// files, or -1 if it can't be read
     [[nodiscard]] static long countEntries(const std::filesystem::path &directory);
 
-    /// @brief Whether an on_n_files directory is committed, committing it if it has N entries.
-    /// Blocks: for waiter threads only.
+    /// @brief Whether an on_n_files directory is committed, committing it first if it has its N
+    /// entries. This can block, so only waiting threads may call it.
     [[nodiscard]] static bool isDirectoryCommitted(const std::filesystem::path &directory,
                                                    long n_expected);
 
     /**
-     * @brief A producer created @p path. Waiters count entries on their own: this commits the
-     * directory also when nobody waits for it, as on_file rules that depend on it need.
+     * @brief A producer has created @p path. Counts it as an entry of its directory, so that an
+     * on_n_files directory is committed even when nobody is listing it (rules that depend on the
+     * directory need that commit).
      */
     void noteNewEntry(const std::filesystem::path &path);
 
@@ -156,8 +159,8 @@ class FsStorageManager {
     [[nodiscard]] off64_t waitForData(const std::filesystem::path &path, off64_t end_of_read) const;
 
     /**
-     * @brief Block until @p path exists and, if it is declared, is committed (by its entries if @p
-     * by_entries, up to @p expected)
+     * @brief Block until @p path exists and, if the config declares it, is committed. With
+     * @p by_entries, "committed" means it has @p expected entries.
      * @return 1 if that holds from now on, 0 if @p path is not declared
      */
     [[nodiscard]] off64_t waitForConsent(const std::filesystem::path &path, bool by_entries,

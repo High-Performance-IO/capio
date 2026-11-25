@@ -21,17 +21,19 @@
 #include "utils/requests.hpp"
 
 /*
- * FS variant. Only on_n_files directories make their consumers wait: the others are listed by the
- * kernel. Waiting cannot be left to the kernel, as a descriptor at the end of a directory never
- * sees entries created later. So at the end CAPIO lists the directory again with a new descriptor,
- * serves the names this descriptor has not served yet, and if there are none waits for one or for
- * the commit.
+ * Listing directories in the FS variant.
  *
- * - update: wait for the commit, then list everything.
- * - no_update: list entries as they appear, and end at the commit.
+ * Only directories with an on_n_files rule make a consumer wait; every other directory is listed
+ * by the kernel as usual. The wait can't be left to the kernel: once a directory descriptor has
+ * reached the end, it never sees entries created afterwards. So when a listing runs out, CAPIO
+ * reads the directory again through a fresh descriptor, returns only the names it hasn't returned
+ * yet, and if there are none, asks the server to wait for a new entry or for the commit.
  *
- * It is done at system call level, below readdir, so that scandir, glob and nftw, which call
- * readdir inside glibc, wait as well. The position of an entry (d_off) is its index.
+ * - update mode: wait for the commit, then return every entry.
+ * - no_update mode: return entries as they appear, and end at the commit.
+ *
+ * This is done in getdents, below readdir, so that scandir, glob and nftw (which call readdir from
+ * inside glibc) wait too. The position of an entry (d_off) is its index in the listing.
  */
 struct CapioListingFs {
     struct Entry {
@@ -41,24 +43,26 @@ struct CapioListingFs {
     };
 
     bool is_started = false;
-    bool as_is      = false; ///< Listed by the kernel
-    bool is_final   = false; ///< Committed, and listed since: there will be nothing else
+    bool as_is      = false; ///< No on_n_files rule: the kernel lists this directory
+    bool is_final   = false; ///< Read again after the commit: no entry can be missing
     std::vector<Entry> entries;
     std::unordered_set<std::string> names;
     size_t position = 0;
 };
 
 /**
- * @brief The listings in progress, by descriptor number, until the descriptor is closed. Threads
- * share descriptors, so the map has a lock. A listing is used without holding it, as listing may
- * wait for the server: a listing being used stays alive while its number is forgotten.
+ * @brief The listings in progress, by descriptor number, kept until the descriptor is closed.
+ *
+ * The map has a lock because threads share descriptors. A listing is used without holding the
+ * lock, since getdents may wait for the server; the shared_ptr keeps it alive if another thread
+ * closes the descriptor meanwhile.
  */
 class CapioListingsFs {
     std::mutex _mutex;
     std::unordered_map<int, std::shared_ptr<CapioListingFs>> _listings;
 
   public:
-    /// @brief The listing of @p fd, a new one if it has none
+    /// @brief The listing of @p fd, creating an empty one if there is none
     std::shared_ptr<CapioListingFs> get(const int fd) {
         const std::lock_guard lock(_mutex);
         auto &listing = _listings[fd];
@@ -68,14 +72,14 @@ class CapioListingsFs {
         return listing;
     }
 
-    /// @brief The listing of @p fd, nullptr if it has none
+    /// @brief The listing of @p fd, or nullptr if there is none
     std::shared_ptr<CapioListingFs> find(const int fd) {
         const std::lock_guard lock(_mutex);
         const auto found = _listings.find(fd);
         return found == _listings.end() ? nullptr : found->second;
     }
 
-    /// @brief Forget the listing of @p fd, a number that is closed or reused
+    /// @brief Drop the listing of @p fd, when that descriptor number is closed or reused
     void forget(const int fd) {
         const std::lock_guard lock(_mutex);
         _listings.erase(fd);
@@ -90,9 +94,9 @@ inline CapioListingsFs &capio_listings_fs() {
 inline void capio_forget_listing_fs(const int fd) { capio_listings_fs().forget(fd); }
 
 /**
- * List the directory of @p fd again, adding the entries that are new to @p listing.
+ * Read the directory of @p fd again, and add to @p listing the entries it doesn't have yet.
  *
- * @return the entries in the directory, without "." and "..", or a negated error
+ * @return how many entries the directory has, not counting "." and "..", or -errno
  */
 inline long capio_rescan_fs(const int fd, CapioListingFs &listing) {
     const long scan =
@@ -108,7 +112,7 @@ inline long capio_rescan_fs(const int fd, CapioListingFs &listing) {
             at += entry->d_reclen;
             const std::string_view name(entry->d_name);
             if (is_forbidden_path(name)) {
-                continue; // CAPIO-CL's commit state, not an entry of the workflow
+                continue; // a CAPIO-CL token file, not a file of the workflow
             }
             n_entries += name != "." && name != "..";
             if (listing.names.emplace(name).second) {
@@ -120,14 +124,15 @@ inline long capio_rescan_fs(const int fd, CapioListingFs &listing) {
     return length < 0 ? length : n_entries;
 }
 
-/// @brief Copy the next entries to @p buffer, in the format of getdents or getdents64
+/// @brief Copy the next entries of @p listing into @p buffer, in the format of getdents or
+/// getdents64
 inline long capio_serve_entries_fs(CapioListingFs &listing, char *buffer, const size_t count,
                                    const bool is64bit) {
     size_t used = 0;
     while (listing.position < listing.entries.size()) {
         const auto &entry    = listing.entries[listing.position];
-        // getdents64: ino, off, reclen, type, name. getdents: ino, off, reclen, name, padding,
-        // and the type in the last byte of the record.
+        // Record layout. getdents64: ino, off, reclen, type, name. getdents: ino, off, reclen,
+        // name, padding, and the type in the record's last byte.
         const size_t name_at = is64bit ? offsetof(linux_dirent64, d_name)
                                        : 2 * sizeof(unsigned long) + sizeof(unsigned short);
         const size_t size    = name_at + entry.name.size() + (is64bit ? 1 : 2);
@@ -151,7 +156,7 @@ inline long capio_serve_entries_fs(CapioListingFs &listing, char *buffer, const 
         used += reclen;
         ++listing.position;
     }
-    return used == 0 ? -EINVAL : static_cast<long>(used); // EINVAL: not even one fits
+    return used == 0 ? -EINVAL : static_cast<long>(used); // EINVAL: the buffer can't hold one
 }
 
 inline int capio_getdents_fs(const int fd, char *buffer, const size_t count, const bool is64bit,
@@ -166,9 +171,10 @@ inline int capio_getdents_fs(const int fd, char *buffer, const size_t count, con
     if (!listing.is_started) {
         struct stat info{};
         if (syscall_no_intercept(SYS_fstat, fd, &info) != 0 || !S_ISDIR(info.st_mode)) {
-            return CAPIO_POSIX_SYSCALL_SKIP; // ENOTDIR
+            return CAPIO_POSIX_SYSCALL_SKIP; // not a directory: the kernel returns ENOTDIR
         }
-        const auto how     = list_request_fs(path, -1, tid); // in update, waits for the commit
+        // In update mode, this already waits for the commit
+        const auto how     = list_request_fs(path, -1, tid);
         listing.is_started = true;
         if (how == CAPIO_FS_LIST_AS_IS) {
             listing.as_is = true;
@@ -192,7 +198,8 @@ inline int capio_getdents_fs(const int fd, char *buffer, const size_t count, con
             break;
         }
         if (n_entries >= 0 && list_request_fs(path, n_entries, tid) == CAPIO_FS_LIST_COMMITTED) {
-            n_entries        = capio_rescan_fs(fd, listing); // after the commit: nothing is missed
+            // Read once more after the commit, so that no entry created just before it is missed
+            n_entries        = capio_rescan_fs(fd, listing);
             listing.is_final = true;
         }
         if (n_entries < 0) {
@@ -205,9 +212,10 @@ inline int capio_getdents_fs(const int fd, char *buffer, const size_t count, con
 }
 
 /**
- * FS variant: lseek on a directory that CAPIO lists, which is rewinddir, seekdir and telldir.
+ * FS variant: handle lseek on a directory that CAPIO is listing. This is how glibc implements
+ * rewinddir, seekdir and telldir, which must work on CAPIO's listing rather than the kernel's.
  *
- * @return whether it was one
+ * @return true if @p fd is such a directory, and @p result is set
  */
 inline bool capio_seek_listing_fs(const int fd, const off64_t offset, const int whence,
                                   long &result) {
@@ -217,7 +225,7 @@ inline bool capio_seek_listing_fs(const int fd, const off64_t offset, const int 
     }
     auto &listing = *found;
     if (whence == SEEK_SET && offset == 0) {
-        capio_forget_listing_fs(fd); // rewinddir shows the directory as it is now
+        capio_forget_listing_fs(fd); // rewinddir starts over, from the directory as it is now
         syscall_no_intercept(SYS_lseek, fd, 0, SEEK_SET);
         result = 0;
     } else if (whence == SEEK_SET && offset > 0) {

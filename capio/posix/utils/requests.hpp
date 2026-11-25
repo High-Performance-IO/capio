@@ -361,10 +361,11 @@ inline void write_request(const int fd, const off64_t count, const long tid) {
 }
 
 /**
- * Ask how to list the directory @path.
+ * Ask the server how to list the directory @p path.
  *
- * @param n_seen -1 at the start of a listing, or the entries in the directory when nothing new
- * was found: the server then replies when that changes or the directory is committed
+ * @param n_seen -1 when the listing starts. Otherwise, how many entries the directory had when
+ * the client found nothing new in it: the server replies once that number changes, or once the
+ * directory is committed.
  * @return one of CAPIO_FS_LIST_*
  */
 inline off64_t list_request_fs(const std::filesystem::path &path, const off64_t n_seen,

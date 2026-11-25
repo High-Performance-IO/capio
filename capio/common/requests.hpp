@@ -34,11 +34,11 @@ constexpr const int CAPIO_REQUEST_LIST_FS          = 29;
 
 constexpr const int CAPIO_NR_REQUESTS = 30;
 
-/* REPLIES TO CAPIO_REQUEST_LIST_FS */
-constexpr const int CAPIO_FS_LIST_AS_IS = 0; ///< not an on_n_files directory: the kernel lists it
-constexpr const int CAPIO_FS_LIST_STREAMING = 1; ///< more entries may still appear
+/* REPLIES TO CAPIO_REQUEST_LIST_FS: how the client should list the directory */
+constexpr const int CAPIO_FS_LIST_AS_IS     = 0; ///< no on_n_files rule: let the kernel list it
+constexpr const int CAPIO_FS_LIST_STREAMING = 1; ///< not committed yet: more entries may appear
 constexpr const int CAPIO_FS_LIST_COMMITTED =
-    2; ///< the directory is committed: its entries are final
+    2; ///< committed: the entries there now are all of them
 
 /* WHETHER A DESCRIPTOR OF CAPIO_REQUEST_CREATE_FS MAKES ITS CLIENT A PRODUCER */
 constexpr const int CAPIO_FS_NOT_PRODUCED            = 0; ///< read-only, or inherited with fork

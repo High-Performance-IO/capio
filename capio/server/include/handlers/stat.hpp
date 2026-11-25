@@ -131,7 +131,7 @@ void consent_handler(const char *const str) {
             client_manager->replyToClient(tid, 1);
             return;
         }
-        // Directories are never committed, except on_n_files ones
+        // Directories are never committed, except those with an on_n_files rule
         if ((std::filesystem::is_directory(path, error) &&
              CapioCLEngine::get().getCommitRule(path) != capiocl::commitRules::ON_N_FILES) ||
             !FsStorageManager::isDeclared(path)) {
@@ -146,8 +146,8 @@ void consent_handler(const char *const str) {
     const bool by_entries =
         CapioCLEngine::get().getCommitRule(path) == capiocl::commitRules::ON_N_FILES;
     const long expected = by_entries ? fs_storage_manager->expectedEntries(path) : 0;
-    // The waiter does not get the termination signals: their handler frees memory and exits, and
-    // run on a thread that holds a lock (malloc's, CAPIO-CL's) it would wait for it forever.
+    // Block the termination signals in the waiting thread. Their handler frees memory and exits;
+    // if it ran on a thread holding a lock (malloc's or CAPIO-CL's), it would wait for it forever.
     // TODO: a thread manager for the threads of the server
     sigset_t signals, previous;
     sigemptyset(&signals);

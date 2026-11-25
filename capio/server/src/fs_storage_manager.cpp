@@ -224,8 +224,8 @@ void FsStorageManager::rename(const pid_t tid, const std::string &from, const bo
     if (!to_capio || CapioCLEngine::get().isExcluded(to)) {
         return;
     }
-    // The new name is a new entry of its directory, and so is everything inside it, if it is a
-    // directory: they count for on_n_files directories
+    // The new name is a new entry of its directory, and so is everything inside it if it is a
+    // directory. Count them for on_n_files directories.
     noteNewEntry(to);
     std::error_code error;
     const bool is_directory = std::filesystem::is_directory(to, error);
@@ -268,7 +268,8 @@ long FsStorageManager::expectedEntries(const std::filesystem::path &directory) {
     if (const auto known = _expected_entries.find(directory); known != _expected_entries.end()) {
         return known->second;
     }
-    // From a glob or the dynamic API: as it is at first sight
+    // Not in the config at startup (it matched a glob, or came from the dynamic API): use what
+    // CAPIO-CL reports the first time we ask
     const long expected = std::max(1L, CapioCLEngine::get().getDirectoryFileCount(directory));
     _expected_entries[directory] = expected;
     return expected;
@@ -348,7 +349,7 @@ off64_t FsStorageManager::waitForConsent(const std::filesystem::path &path, cons
                                          const long expected) const {
     for (;;) {
         if (std::error_code error; std::filesystem::exists(path, error)) {
-            // Directories are never committed, except on_n_files ones
+            // Directories are never committed, except those with an on_n_files rule
             if ((std::filesystem::is_directory(path, error) &&
                  CapioCLEngine::get().getCommitRule(path) != capiocl::commitRules::ON_N_FILES) ||
                 !isDeclared(path)) {

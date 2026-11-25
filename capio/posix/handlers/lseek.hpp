@@ -70,7 +70,7 @@ inline off64_t capio_lseek(int fd, off64_t offset, int whence, long tid) {
     })
     FS_MODE({
         if (long res; capio_seek_listing_fs(fd, offset, whence, res)) {
-            return capio_kernel_result(res); // a directory that CAPIO lists
+            return capio_kernel_result(res); // a directory that CAPIO is listing
         }
         // The end of a file and its data are known only once the producer wrote them, so a reader
         // must wait for them first. The writer knows its own, and the other whence values only
