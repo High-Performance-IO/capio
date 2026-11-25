@@ -322,15 +322,9 @@ void FsStorageManager::list(const pid_t tid, const pid_t pid, const int fd, cons
                             const off64_t count) {
     const std::string path = getPath(pid, fd);
     START_LOG(gettid(), "call(tid=%d, fd=%d, path=%s, offset=%ld)", tid, fd, path.c_str(), offset);
-    using Mode         = FsDirectoryLister::Mode;
-    const auto &engine = CapioCLEngine::get();
-    Mode mode          = Mode::AS_IS;
-    if (engine.getCommitRule(path) == capiocl::commitRules::ON_N_FILES &&
-        !engine.isExcluded(path) && !isProducer(tid, path)) {
-        mode = engine.isFirable(path) ? Mode::AS_IT_GROWS : Mode::AFTER_THE_COMMIT;
-    }
-    const long expected = mode == Mode::AS_IS ? 0 : expectedEntries(path);
-    _lister->list({tid, pid, fd, path, offset, count, mode, expected});
+    const bool by_entries =
+        CapioCLEngine::get().getCommitRule(path) == capiocl::commitRules::ON_N_FILES;
+    _lister->list(tid, pid, fd, path, offset, count, by_entries ? expectedEntries(path) : 0);
 }
 
 void FsStorageManager::waitForCreation(const std::filesystem::path &path) const {

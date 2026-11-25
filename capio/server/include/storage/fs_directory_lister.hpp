@@ -28,6 +28,24 @@
  */
 class FsDirectoryLister final {
   public:
+    /// @brief Starts the thread
+    FsDirectoryLister();
+
+    FsDirectoryLister(const FsDirectoryLister &)            = delete;
+    FsDirectoryLister &operator=(const FsDirectoryLister &) = delete;
+
+    /**
+     * @brief Send thread @p tid up to @p count bytes of entries of @p path, from @p offset: now,
+     * or once the directory allows it. It is open as the descriptor @p fd of process @p pid.
+     * @param expected N, if @p path has an on_n_files rule
+     */
+    void list(pid_t tid, pid_t pid, int fd, std::string path, off64_t offset, off64_t count,
+              long expected);
+
+    /// @brief Drop the listing of the descriptor @p fd of process @p pid, which is closed
+    void forget(pid_t pid, int fd);
+
+  private:
     /// @brief How a directory is listed
     enum class Mode {
         AS_IS,           ///< No on_n_files rule, or the client produces it: list what is there now
@@ -45,19 +63,6 @@ class FsDirectoryLister final {
         long expected; ///< N of an on_n_files directory
     };
 
-    /// @brief Starts the thread
-    FsDirectoryLister();
-
-    FsDirectoryLister(const FsDirectoryLister &)            = delete;
-    FsDirectoryLister &operator=(const FsDirectoryLister &) = delete;
-
-    /// @brief Answer @p request, now or once its directory allows it
-    void list(Request request);
-
-    /// @brief Drop the listing of the descriptor @p fd of process @p pid, which is closed
-    void forget(pid_t pid, int fd);
-
-  private:
     using Key = std::pair<pid_t, int>; ///< (pid, fd)
 
     struct Listing {

@@ -11,6 +11,7 @@
 #include <sys/stat.h>
 
 #include "calf/StlLogger.h"
+#include "capiocl.hpp"
 #include "client-manager/client_manager.hpp"
 #include "common/path.hpp"
 #include "storage/fs_storage_manager.hpp"
@@ -35,10 +36,18 @@ FsDirectoryLister::FsDirectoryLister() {
     pthread_sigmask(SIG_SETMASK, &previous, nullptr);
 }
 
-void FsDirectoryLister::list(Request request) {
+void FsDirectoryLister::list(const pid_t tid, const pid_t pid, const int fd, std::string path,
+                             const off64_t offset, const off64_t count, const long expected) {
+    // Decided here, on the request thread: CAPIO-CL and the producers are not for other threads
+    const auto &engine = CapioCLEngine::get();
+    Mode mode          = Mode::AS_IS;
+    if (engine.getCommitRule(path) == capiocl::commitRules::ON_N_FILES &&
+        !engine.isExcluded(path) && !FsStorageManager::isProducer(tid, path)) {
+        mode = engine.isFirable(path) ? Mode::AS_IT_GROWS : Mode::AFTER_THE_COMMIT;
+    }
     {
         const std::lock_guard lock(_mutex);
-        _incoming.push_back(std::move(request));
+        _incoming.push_back({tid, pid, fd, std::move(path), offset, count, mode, expected});
     }
     _wake.notify_one();
 }
