@@ -12,6 +12,24 @@
 #include <pthread.h>
 #include <sys/types.h>
 
+#include "common/syscall.hpp"
+
+/**
+ * @brief The system calls that FileDescriptorTable makes, through syscall_no_intercept. Tests give
+ * the table another class with the same methods instead (see BasicFileDescriptorTable).
+ */
+class SystemCalls final {
+  public:
+    /// @return what close(2) returned: 0, or -errno
+    long close(const int fd) { return syscall_no_intercept(SYS_close, fd); }
+
+    /// @brief The system calls of the kernel
+    static SystemCalls &kernel() {
+        static SystemCalls system_calls;
+        return system_calls;
+    }
+};
+
 /**
  * @brief The CAPIO files of a process: which descriptors are open on which paths, with their
  * offset, size, flags and close-on-exec.
@@ -23,8 +41,11 @@
  *
  * The getters of one descriptor (path, offset, ...) throw std::out_of_range if it is not in the
  * table: check with contains first, or use findPath.
+ *
+ * @tparam Kernel the system calls the table makes: SystemCalls, or a mock of it in the tests. A
+ * template parameter and not a virtual class, so that the table has no virtual calls.
  */
-class FileDescriptorTable {
+template <class Kernel> class BasicFileDescriptorTable final {
     struct Descriptor {
         std::string path;
         std::shared_ptr<off64_t> offset; ///< shared by the copies of a descriptor (dup)
@@ -35,6 +56,7 @@ class FileDescriptorTable {
 
     std::unordered_map<int, Descriptor> _descriptors;
     std::unordered_map<std::string, std::unordered_set<int>> _paths; ///< path -> its descriptors
+    Kernel &_kernel;
 
     static inline pthread_mutex_t _mutex = PTHREAD_RECURSIVE_MUTEX_INITIALIZER_NP;
 
@@ -57,6 +79,8 @@ class FileDescriptorTable {
     }
 
   public:
+    explicit BasicFileDescriptorTable(Kernel &kernel = Kernel::kernel()) : _kernel(kernel) {}
+
     /// @brief Lock the table across fork(): the child gets a free lock, whatever its other threads
     /// were doing. Call once, before there are threads.
     static void protectAcrossFork() {
@@ -95,6 +119,19 @@ class FileDescriptorTable {
     void remove(const int fd) {
         const Lock lock;
         _remove(fd);
+    }
+
+    /**
+     * @brief Close the descriptor @p fd in the kernel and forget it. It is forgotten also if the
+     * close fails: Linux frees the number anyway, except for a number that is not open (EBADF).
+     * The lock is held during the close, so that no other thread sees the number in the table once
+     * the kernel can give it to someone else.
+     * @return what close(2) returned: 0, or -errno
+     */
+    long close(const int fd) {
+        const Lock lock;
+        _remove(fd);
+        return _kernel.close(fd);
     }
 
     /// @brief Forget @p path and all its descriptors
@@ -199,5 +236,8 @@ class FileDescriptorTable {
         _descriptors.at(fd).cloexec = cloexec;
     }
 };
+
+/// @brief The table of the descriptors of the process, which makes real system calls
+using FileDescriptorTable = BasicFileDescriptorTable<SystemCalls>;
 
 #endif // CAPIO_POSIX_UTILS_FILE_DESCRIPTOR_TABLE_HPP
