@@ -12,38 +12,33 @@
 #include "capiocl/engine.h"
 #include "client-manager/client_manager.hpp"
 #include "utils/capiocl_adapter.hpp"
+#include "utils/filesystem.hpp"
 #include "utils/runtime_configuration.hpp"
 
 extern ClientManager *client_manager;
 
 namespace {
 
-/// @brief Whether @p path is @p name or inside the directory @p name
-bool is_at_or_below(const std::string &path, const std::string &name) {
-    return path.compare(0, name.size(), name) == 0 &&
-           (path.size() == name.size() || path[name.size()] == '/');
+/// @brief Erase the entries of @p map at or below @p path
+template <typename Map> void erase_at_or_below(Map &map, const std::string &path) {
+    for (auto entry = map.begin(); entry != map.end();) {
+        entry = is_at_or_below(entry->first, path) ? map.erase(entry) : std::next(entry);
+    }
 }
 
-/// @brief Move the entries of @p map at or below @p from to @p to, replacing those that were
-/// there; with @p keep false (the file left CAPIO_DIR) just drop them
+/// @brief Move the entries of @p map at or below @p from to the same place below @p to
 template <typename Map>
-void move_entries(Map &map, const std::string &from, const std::string &to, const bool keep) {
+void move_at_or_below(Map &map, const std::string &from, const std::string &to) {
     Map moved;
     for (auto entry = map.begin(); entry != map.end();) {
         if (is_at_or_below(entry->first, from)) {
-            if (keep) {
-                moved.emplace(to + entry->first.substr(from.size()), std::move(entry->second));
-            }
+            moved.emplace(to + entry->first.substr(from.size()), std::move(entry->second));
             entry = map.erase(entry);
-        } else if (keep && is_at_or_below(entry->first, to)) {
-            entry = map.erase(entry); // what the rename replaced
         } else {
             ++entry;
         }
     }
-    for (auto &[path, value] : moved) {
-        map[path] = std::move(value);
-    }
+    map.merge(moved);
 }
 
 } // namespace
@@ -186,53 +181,55 @@ void FsStorageManager::closeFailed(const pid_t tid, const std::filesystem::path 
                      path.c_str(), tid, strerror(error));
 }
 
-void FsStorageManager::rename(const pid_t tid, const std::string &from, const bool from_capio,
-                              const std::string &to, const bool to_capio) {
-    START_LOG(gettid(), "call(tid=%d, from=%s, to=%s)", tid, from.c_str(), to.c_str());
-
-    if (!from_capio) {
-        if (!to_capio) {
-            return;
-        }
-        // CAPIO never saw it being written: moving it in is its one close
-        _failed_closes.erase(to);
-        _close_counts.erase(to);
-        client_manager->forgetProducedFile(to);
-        if (!CapioCLEngine::get().isExcluded(to)) {
-            client_manager->registerProducedFile(tid, to);
-            countClose(to);
-        }
-        return;
-    }
-
-    std::error_code error;
-    const bool is_directory = std::filesystem::is_directory(to, error);
-    for (const auto &path : client_manager->renameProducedFiles(from, to, is_directory)) {
-        if (!to_capio) {
-            client_manager->forgetProducedFile(path); // it left CAPIO_DIR
-        }
-    }
-    if (to_capio && !client_manager->hasProducer(to) && !is_directory) {
-        // mv, after the producer ended: the file is committed when mv ends
-        client_manager->registerProducedFile(tid, to);
-    }
-    move_entries(_close_counts, from, to, to_capio);
-    move_entries(_failed_closes, from, to, to_capio);
-    // The descriptors open on the file follow it, or are no longer CAPIO's out of CAPIO_DIR
+void FsStorageManager::forgetHistory(const std::string &path) {
+    erase_at_or_below(_close_counts, path);
+    erase_at_or_below(_failed_closes, path);
     for (auto &[pid, descriptors] : _opened_fd_map) {
         for (auto descriptor = descriptors.begin(); descriptor != descriptors.end();) {
-            if (!is_at_or_below(descriptor->second, from)) {
-                ++descriptor;
-            } else if (to_capio) {
-                descriptor->second = to + descriptor->second.substr(from.size());
-                ++descriptor;
-            } else {
-                descriptor = descriptors.erase(descriptor);
+            descriptor = is_at_or_below(descriptor->second, path) ? descriptors.erase(descriptor)
+                                                                  : std::next(descriptor);
+        }
+    }
+    client_manager->forgetProducedFiles(path);
+}
+
+void FsStorageManager::moveHistory(const std::string &from, const std::string &to) {
+    move_at_or_below(_close_counts, from, to);
+    move_at_or_below(_failed_closes, from, to);
+    for (auto &[pid, descriptors] : _opened_fd_map) {
+        for (auto &[fd, path] : descriptors) {
+            if (is_at_or_below(path, from)) {
+                path = to + path.substr(from.size());
             }
         }
     }
-    if (!to_capio) {
+    client_manager->renameProducedFiles(from, to);
+}
+
+void FsStorageManager::rename(const pid_t tid, const std::string &from, const bool from_capio,
+                              const std::string &to, const bool to_capio) {
+    START_LOG(gettid(), "call(tid=%d, from=%s, to=%s)", tid, from.c_str(), to.c_str());
+    // What was at the new name is replaced. What was at the old one moves to it, or is forgotten
+    // if the file leaves CAPIO_DIR.
+    if (to_capio) {
+        forgetHistory(to);
+    }
+    if (from_capio) {
+        to_capio ? moveHistory(from, to) : forgetHistory(from);
+    }
+    if (!to_capio || CapioCLEngine::get().isExcluded(to)) {
         return;
+    }
+    if (!from_capio) {
+        // CAPIO never saw it being written: moving it in is its one close
+        client_manager->registerProducedFile(tid, to);
+        countClose(to);
+        return;
+    }
+    std::error_code error;
+    if (!client_manager->hasProducer(to) && !std::filesystem::is_directory(to, error)) {
+        // mv, after the producer ended: the file is committed when mv ends
+        client_manager->registerProducedFile(tid, to);
     }
     // The rule of each new name, with the history of its file
     for (const auto &[path, count] : _close_counts) {

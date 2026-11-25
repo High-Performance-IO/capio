@@ -374,6 +374,33 @@ TEST(FileDescriptorTableTest, RenamingOntoAPathWithDescriptorsKeepsThemAll) {
     EXPECT_TRUE(table.fds().empty());
 }
 
+TEST(FileDescriptorTableTest, RenamingADirectoryMovesWhatIsInside) {
+    MockSyscalls system_calls;
+    FileDescriptorTable table;
+    table.addPath("/capio/d");
+    table.add(3, "/capio/d/f", 0, 0, O_WRONLY, false);
+    table.add(4, "/capio/dir", 0, 0, O_WRONLY, false); // not inside /capio/d
+    table.renamePath("/capio/d", "/capio/e");
+
+    EXPECT_TRUE(table.containsPath("/capio/e"));
+    EXPECT_FALSE(table.containsPath("/capio/d"));
+    EXPECT_EQ(table.path(3), "/capio/e/f");
+    EXPECT_EQ(table.path(4), "/capio/dir");
+}
+
+TEST(FileDescriptorTableTest, RemovingADirectoryRemovesWhatIsInside) {
+    MockSyscalls system_calls;
+    FileDescriptorTable table;
+    table.addPath("/capio/d");
+    table.add(3, "/capio/d/f", 0, 0, O_WRONLY, false);
+    table.add(4, "/capio/dir", 0, 0, O_WRONLY, false);
+    table.removePath("/capio/d");
+
+    EXPECT_FALSE(table.containsPath("/capio/d"));
+    EXPECT_FALSE(table.contains(3));
+    EXPECT_EQ(table.fds(), std::vector<int>{4});
+}
+
 TEST(FileDescriptorTableTest, RenamingAnUnknownPathDoesNothing) {
     const MockSyscalls system_calls;
     FileDescriptorTable table;

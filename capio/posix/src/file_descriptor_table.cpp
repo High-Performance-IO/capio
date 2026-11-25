@@ -50,6 +50,12 @@ void *mapSnapshot(const long fd, const size_t length, const int protection) {
     return address < 0 ? nullptr : reinterpret_cast<void *>(address);
 }
 
+/// @brief Whether @p path is @p name or inside the directory @p name
+bool isAtOrBelow(const std::string &path, const std::string &name) {
+    return path.compare(0, name.size(), name) == 0 &&
+           (path.size() == name.size() || path[name.size()] == '/');
+}
+
 void removeSnapshot(const std::string &path) {
     syscall_no_intercept(SYS_unlinkat, AT_FDCWD, path.c_str(), 0);
 }
@@ -232,29 +238,36 @@ long FileDescriptorTable::closeRange(const unsigned first, const unsigned last,
 
 void FileDescriptorTable::removePath(const std::string &path) {
     const std::lock_guard lock(mutex());
-    const auto found = _paths.find(path);
-    if (found == _paths.end()) {
-        return;
+    for (auto entry = _paths.begin(); entry != _paths.end();) {
+        if (!isAtOrBelow(entry->first, path)) {
+            ++entry;
+            continue;
+        }
+        for (const int fd : entry->second) {
+            _descriptors.erase(fd);
+        }
+        entry = _paths.erase(entry);
     }
-    for (const int fd : found->second) {
-        _descriptors.erase(fd);
-    }
-    _paths.erase(found);
 }
 
 void FileDescriptorTable::renamePath(const std::string &old_path, const std::string &new_path) {
     const std::lock_guard lock(mutex());
-    auto entry = _paths.extract(old_path);
-    if (entry.empty()) {
-        return;
+    std::vector<std::string> moving;
+    for (const auto &[path, fds] : _paths) {
+        if (isAtOrBelow(path, old_path)) {
+            moving.push_back(path);
+        }
     }
-    entry.key() = new_path;
-    for (const int fd : entry.mapped()) {
-        _descriptors.at(fd).path = new_path;
-    }
-    // Onto a path with descriptors of its own (a rename over an open file): they join them
-    if (auto inserted = _paths.insert(std::move(entry)); !inserted.inserted) {
-        inserted.position->second.merge(inserted.node.mapped());
+    for (const auto &path : moving) {
+        auto entry  = _paths.extract(path);
+        entry.key() = new_path + path.substr(old_path.size());
+        for (const int fd : entry.mapped()) {
+            _descriptors.at(fd).path = entry.key();
+        }
+        // Onto a path with descriptors of its own (a rename over an open file): they join them
+        if (auto inserted = _paths.insert(std::move(entry)); !inserted.inserted) {
+            inserted.position->second.merge(inserted.node.mapped());
+        }
     }
 }
 

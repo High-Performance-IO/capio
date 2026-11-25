@@ -112,10 +112,11 @@ class FileDescriptorTable final {
     long closeRange(unsigned first, unsigned last, unsigned flags,
                     const std::function<void(int fd)> &announce = {});
 
-    /// @brief Forget @p path and all its descriptors
+    /// @brief Forget @p path, and what is inside it if it is a directory, with their descriptors
     void removePath(const std::string &path);
 
-    /// @brief Rename @p old_path, and the descriptors open on it, to @p new_path
+    /// @brief Rename @p old_path, and what is inside it if it is a directory, to @p new_path, with
+    /// the descriptors open on them
     void renamePath(const std::string &old_path, const std::string &new_path);
 
     [[nodiscard]] bool contains(int fd) const;

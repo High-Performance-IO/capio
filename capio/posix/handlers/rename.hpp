@@ -1,8 +1,6 @@
 #ifndef CAPIO_POSIX_HANDLERS_RENAME_HPP
 #define CAPIO_POSIX_HANDLERS_RENAME_HPP
 
-#include <set>
-
 #include "utils/common.hpp"
 #include "utils/filesystem.hpp"
 #include "utils/requests.hpp"
@@ -10,29 +8,6 @@
 #ifndef RENAME_EXCHANGE
 #define RENAME_EXCHANGE (1 << 1)
 #endif
-
-/**
- * @brief The descriptors of @p old_path, or of what is inside it if it is a directory, follow it to
- * @p new_path. With @p keep false (moved out of CAPIO_DIR) they are forgotten instead.
- */
-inline void capio_rename_descriptors(const std::string &old_path, const std::string &new_path,
-                                     const bool keep) {
-    std::set<std::string> moved;
-    for (const int fd : fd_table->fds()) {
-        const std::string path = fd_table->path(fd);
-        if (path.compare(0, old_path.size(), old_path) == 0 &&
-            (path.size() == old_path.size() || path[old_path.size()] == '/')) {
-            moved.insert(path);
-        }
-    }
-    for (const auto &path : moved) {
-        if (keep) {
-            fd_table->renamePath(path, new_path + path.substr(old_path.size()));
-        } else {
-            fd_table->removePath(path);
-        }
-    }
-}
 
 int renameat2_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg5,
                       long *result) {
@@ -67,7 +42,9 @@ int renameat2_handler(long arg0, long arg1, long arg2, long arg3, long arg4, lon
             return CAPIO_POSIX_SYSCALL_SUCCESS;
         }
         if (old_is_capio) {
-            capio_rename_descriptors(old_path_abs, new_path_abs, new_is_capio);
+            // The descriptors follow the file, or are no longer CAPIO's out of CAPIO_DIR
+            new_is_capio ? fd_table->renamePath(old_path_abs, new_path_abs)
+                         : fd_table->removePath(old_path_abs);
         }
         rename_request_fs(old_path_abs, old_is_capio, new_path_abs, new_is_capio, tid);
         return CAPIO_POSIX_SYSCALL_SUCCESS;
@@ -83,7 +60,7 @@ int renameat2_handler(long arg0, long arg1, long arg2, long arg3, long arg4, lon
 
         if (old_is_capio) {
             // The server keeps the file in memory under its new name, also out of CAPIO_DIR
-            capio_rename_descriptors(old_path_abs, new_path_abs, true);
+            fd_table->renamePath(old_path_abs, new_path_abs);
             auto res = rename_request(tid, old_path_abs, new_path_abs);
             *result  = (res < 0 ? -errno : res);
             return CAPIO_POSIX_SYSCALL_SUCCESS;

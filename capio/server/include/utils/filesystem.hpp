@@ -8,6 +8,12 @@
 
 #include "utils/runtime_configuration.hpp"
 
+/// @brief Whether @p path is @p name or inside the directory @p name
+inline bool is_at_or_below(const std::string &path, const std::string &name) {
+    return path.compare(0, name.size(), name) == 0 &&
+           (path.size() == name.size() || path[name.size()] == '/');
+}
+
 inline std::filesystem::path get_parent_dir_path(const std::filesystem::path &file_path) {
     START_LOG(gettid(), "call(file_path=%s)", file_path.c_str());
     if (file_path == file_path.root_path()) {

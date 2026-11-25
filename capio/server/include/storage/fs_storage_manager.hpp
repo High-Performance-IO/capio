@@ -42,6 +42,12 @@ class FsStorageManager {
 
     void countClose(const std::filesystem::path &path);
 
+    /// @brief Forget what is known of @p path and of what is inside it, descriptors included
+    void forgetHistory(const std::string &path);
+
+    /// @brief What is known of @p from and of what is inside it is now of @p to
+    void moveHistory(const std::string &from, const std::string &to);
+
   public:
     FsStorageManager();
     ~FsStorageManager();
