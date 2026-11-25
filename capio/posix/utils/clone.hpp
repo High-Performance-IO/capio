@@ -16,12 +16,16 @@
 inline void initialize_new_thread(const bool wait = false) {
     SET_CALF_SYSCALL_HANDLER(syscall_no_intercept);
 
+    // Its system calls (the shared memory and the semaphores of the queues) are on no CAPIO file,
+    // and must not reach CAPIO's handlers: in the child of a fork, this runs before the fork
+    // handlers, while the descriptor table is still locked (FileDescriptorTable::protectAcrossFork)
+    const bool flag_was_set   = syscall_no_intercept_flag;
+    syscall_no_intercept_flag = true;
+
     const long tid = syscall_no_intercept(SYS_gettid);
     const long pid = syscall_no_intercept(SYS_getpid);
 
-    syscall_no_intercept_flag = true;
     const auto capio_app_name = get_capio_app_name();
-    syscall_no_intercept_flag = false;
 
     START_LOG(tid, "call(tid=%d, pid=%d, app_name=%s)", tid, pid, capio_app_name);
 
@@ -30,6 +34,7 @@ inline void initialize_new_thread(const bool wait = false) {
 
     handshake_named_request(tid, pid, capio_app_name, wait);
     LOG("Starting child thread %d", tid);
+    syscall_no_intercept_flag = flag_was_set;
 }
 
 /**
