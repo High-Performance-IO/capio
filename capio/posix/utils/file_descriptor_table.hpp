@@ -2,6 +2,7 @@
 #define CAPIO_POSIX_UTILS_FILE_DESCRIPTOR_TABLE_HPP
 
 #include <memory>
+#include <mutex>
 #include <optional>
 #include <string>
 #include <unordered_map>
@@ -37,6 +38,9 @@ class FileDescriptorTable final {
 
     std::unordered_map<int, Descriptor> _descriptors;
     std::unordered_map<std::string, std::unordered_set<int>> _paths; ///< path -> its descriptors
+
+    /// @brief The lock of the tables: one, as a process has one table of descriptors
+    static std::recursive_mutex &mutex();
 
     void _remove(int fd);
 

@@ -2,6 +2,7 @@
 
 #include <climits>
 #include <cstring>
+#include <new>
 
 #include <fcntl.h>
 #include <pthread.h>
@@ -13,16 +14,6 @@
 #include <sys/syscall.h>
 
 namespace {
-
-/// @brief The lock of the tables: one, as a process has one table of descriptors
-pthread_mutex_t table_mutex = PTHREAD_RECURSIVE_MUTEX_INITIALIZER_NP;
-
-struct Lock {
-    Lock() { pthread_mutex_lock(&table_mutex); }
-    ~Lock() { pthread_mutex_unlock(&table_mutex); }
-    Lock(const Lock &)            = delete;
-    Lock &operator=(const Lock &) = delete;
-};
 
 /*
  * The snapshot: one shared memory object, named after the thread that execs, holding the number
@@ -88,7 +79,7 @@ FileDescriptorTable::FileDescriptorTable(const long tid) {
 }
 
 void FileDescriptorTable::createSnapshot(const long tid) const {
-    const Lock lock;
+    const std::lock_guard lock(mutex());
     const auto name = snapshotName(tid);
     if (_descriptors.empty()) {
         shm_unlink(name.c_str()); // one left by an exec that failed
@@ -140,20 +131,28 @@ void FileDescriptorTable::_remove(const int fd) {
     _descriptors.erase(descriptor);
 }
 
+std::recursive_mutex &FileDescriptorTable::mutex() {
+    // Made at its first use: the table is used before the constructors of the library have run
+    static std::recursive_mutex mutex;
+    return mutex;
+}
+
 void FileDescriptorTable::protectAcrossFork() {
-    pthread_atfork([] { pthread_mutex_lock(&table_mutex); },
-                   [] { pthread_mutex_unlock(&table_mutex); },
-                   [] { table_mutex = PTHREAD_RECURSIVE_MUTEX_INITIALIZER_NP; });
+    // The lock is held during the fork, so that the child gets a whole table. The child cannot
+    // unlock it: the lock knows its owner by thread id, which the child has a new one of. So the
+    // child gets a new lock, in the place of the old one.
+    pthread_atfork([] { mutex().lock(); }, [] { mutex().unlock(); },
+                   [] { new (&mutex()) std::recursive_mutex(); });
 }
 
 void FileDescriptorTable::addPath(const std::string &path) {
-    const Lock lock;
+    const std::lock_guard lock(mutex());
     _paths.try_emplace(path);
 }
 
 void FileDescriptorTable::add(const int fd, const std::string &path, const off64_t offset,
                               const off64_t size, const int flags, const bool cloexec) {
-    const Lock lock;
+    const std::lock_guard lock(mutex());
     _remove(fd);
     _paths[path].insert(fd);
     _descriptors.insert_or_assign(
@@ -161,7 +160,7 @@ void FileDescriptorTable::add(const int fd, const std::string &path, const off64
 }
 
 void FileDescriptorTable::dup(const int old_fd, const int new_fd, const bool cloexec) {
-    const Lock lock;
+    const std::lock_guard lock(mutex());
     Descriptor copy = _descriptors.at(old_fd);
     copy.cloexec    = cloexec;
     _remove(new_fd);
@@ -170,18 +169,18 @@ void FileDescriptorTable::dup(const int old_fd, const int new_fd, const bool clo
 }
 
 void FileDescriptorTable::remove(const int fd) {
-    const Lock lock;
+    const std::lock_guard lock(mutex());
     _remove(fd);
 }
 
 long FileDescriptorTable::close(const int fd) {
-    const Lock lock;
+    const std::lock_guard lock(mutex());
     _remove(fd);
     return syscall_no_intercept(SYS_close, fd);
 }
 
 void FileDescriptorTable::removePath(const std::string &path) {
-    const Lock lock;
+    const std::lock_guard lock(mutex());
     const auto found = _paths.find(path);
     if (found == _paths.end()) {
         return;
@@ -193,7 +192,7 @@ void FileDescriptorTable::removePath(const std::string &path) {
 }
 
 void FileDescriptorTable::renamePath(const std::string &old_path, const std::string &new_path) {
-    const Lock lock;
+    const std::lock_guard lock(mutex());
     auto entry = _paths.extract(old_path);
     if (entry.empty()) {
         return;
@@ -206,17 +205,17 @@ void FileDescriptorTable::renamePath(const std::string &old_path, const std::str
 }
 
 bool FileDescriptorTable::contains(const int fd) const {
-    const Lock lock;
+    const std::lock_guard lock(mutex());
     return _descriptors.find(fd) != _descriptors.end();
 }
 
 bool FileDescriptorTable::containsPath(const std::string &path) const {
-    const Lock lock;
+    const std::lock_guard lock(mutex());
     return _paths.find(path) != _paths.end();
 }
 
 std::vector<int> FileDescriptorTable::fds() const {
-    const Lock lock;
+    const std::lock_guard lock(mutex());
     std::vector<int> fds;
     fds.reserve(_descriptors.size());
     for (const auto &[fd, _] : _descriptors) {
@@ -226,52 +225,52 @@ std::vector<int> FileDescriptorTable::fds() const {
 }
 
 std::string FileDescriptorTable::path(const int fd) const {
-    const Lock lock;
+    const std::lock_guard lock(mutex());
     return _descriptors.at(fd).path;
 }
 
 std::optional<std::string> FileDescriptorTable::findPath(const int fd) const {
-    const Lock lock;
+    const std::lock_guard lock(mutex());
     const auto found = _descriptors.find(fd);
     return found == _descriptors.end() ? std::nullopt : std::optional{found->second.path};
 }
 
 off64_t FileDescriptorTable::offset(const int fd) const {
-    const Lock lock;
+    const std::lock_guard lock(mutex());
     return *_descriptors.at(fd).offset;
 }
 
 void FileDescriptorTable::setOffset(const int fd, const off64_t offset) {
-    const Lock lock;
+    const std::lock_guard lock(mutex());
     *_descriptors.at(fd).offset = offset;
 }
 
 bool FileDescriptorTable::sharesOffset(const int fd, const int other) const {
-    const Lock lock;
+    const std::lock_guard lock(mutex());
     return _descriptors.at(fd).offset == _descriptors.at(other).offset;
 }
 
 off64_t FileDescriptorTable::size(const int fd) const {
-    const Lock lock;
+    const std::lock_guard lock(mutex());
     return _descriptors.at(fd).size;
 }
 
 int FileDescriptorTable::flags(const int fd) const {
-    const Lock lock;
+    const std::lock_guard lock(mutex());
     return _descriptors.at(fd).flags;
 }
 
 void FileDescriptorTable::setFlags(const int fd, const int flags) {
-    const Lock lock;
+    const std::lock_guard lock(mutex());
     _descriptors.at(fd).flags = flags;
 }
 
 bool FileDescriptorTable::cloexec(const int fd) const {
-    const Lock lock;
+    const std::lock_guard lock(mutex());
     return _descriptors.at(fd).cloexec;
 }
 
 void FileDescriptorTable::setCloexec(const int fd, const bool cloexec) {
-    const Lock lock;
+    const std::lock_guard lock(mutex());
     _descriptors.at(fd).cloexec = cloexec;
 }
