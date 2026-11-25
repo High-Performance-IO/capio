@@ -22,7 +22,8 @@
  * from the static methods.
  */
 class FsStorageManager {
-    /// @brief path -> successful closes that counted, whatever its rule: a rename carries them
+    /// @brief How many successful closes each file has had. Counted for every file, whatever its
+    /// commit rule, because a rename can give the file a name whose rule needs them
     std::unordered_map<std::string, long> _close_counts;
 
     /// @brief path -> errno of a close that failed: data was lost, never committed by this server
@@ -42,10 +43,12 @@ class FsStorageManager {
 
     void countClose(const std::filesystem::path &path);
 
-    /// @brief Forget what is known of @p path and of what is inside it, descriptors included
+    /// @brief Forget everything known about @p path and the files inside it: close counts, failed
+    /// closes, open descriptors and producers
     void forgetHistory(const std::string &path);
 
-    /// @brief What is known of @p from and of what is inside it is now of @p to
+    /// @brief Move everything known about @p from and the files inside it to the same names under
+    /// @p to
     void moveHistory(const std::string &from, const std::string &to);
 
   public:
@@ -102,10 +105,10 @@ class FsStorageManager {
     void closeFailed(pid_t tid, const std::filesystem::path &path, int error);
 
     /**
-     * @brief @p tid renamed @p from to @p to, which worked: what is known of the file, or of the
-     * files in the directory, moves to the new name, whose rule is then applied. So do the
-     * descriptors open on them. @p from_capio and @p to_capio: whether each name is inside
-     * CAPIO_DIR.
+     * @brief @p tid has renamed @p from to @p to. Everything known about the file (or about the
+     * files in the directory) moves to the new name, then the new name's commit rule is applied.
+     * @param from_capio whether @p from is inside CAPIO_DIR
+     * @param to_capio whether @p to is inside CAPIO_DIR
      */
     void rename(pid_t tid, const std::string &from, bool from_capio, const std::string &to,
                 bool to_capio);

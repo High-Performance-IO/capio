@@ -161,7 +161,8 @@ inline void copy_file_range_data(const CSCopyFileRange_t &copy) {
  * from there to the end.
  */
 
-/// @brief A path sent by the FS variant, as the server keeps it: normal, without a trailing slash
+/// @brief Normalize a path sent by an FS client the way the server stores paths: lexically
+/// normal, with no trailing slash
 inline std::string fs_normal_path(const std::string_view sent) {
     auto path = std::filesystem::path(sent).lexically_normal().string();
     while (path.size() > 1 && path.back() == '/') {

@@ -136,10 +136,10 @@ class ClientManager {
     /// @brief Whether any client registered as producer of @p path
     [[nodiscard]] bool hasProducer(const std::filesystem::path &path) const;
 
-    /// @brief What clients produce at or below @p from is now at or below @p to (rename)
+    /// @brief After a rename: the produced files at or inside @p from are now at or inside @p to
     void renameProducedFiles(const std::string &from, const std::string &to);
 
-    /// @brief No client produces @p path, or what is inside it, any more
+    /// @brief Stop tracking producers for @p path and everything inside it
     void forgetProducedFiles(const std::string &path);
 
     /**

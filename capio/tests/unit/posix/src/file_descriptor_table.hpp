@@ -370,7 +370,7 @@ TEST(FileDescriptorTableTest, RenamingOntoAPathWithDescriptorsKeepsThemAll) {
     EXPECT_FALSE(table.containsPath("/capio/f"));
     EXPECT_EQ(table.path(3), "/capio/g");
     EXPECT_EQ(table.path(4), "/capio/g");
-    table.removePath("/capio/g"); // finds both through the path
+    table.removePath("/capio/g"); // must find both descriptors through the path index
     EXPECT_TRUE(table.fds().empty());
 }
 

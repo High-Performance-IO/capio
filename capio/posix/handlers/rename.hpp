@@ -32,15 +32,16 @@ int renameat2_handler(long arg0, long arg1, long arg2, long arg3, long arg4, lon
     }
 
     FS_MODE({
-        // The kernel renames, and checks what the memory variant checks below. Then the
-        // descriptors follow the file, and the server moves what it knows of the file (producers,
-        // closes) to the new name. An exchange moves no file to a new name: it is not announced.
+        // Let the kernel do the rename and its error checks. If it worked, update our descriptors
+        // and tell the server, which moves what it knows about the file to the new name.
+        // RENAME_EXCHANGE swaps two files without giving either a new name, so the server is not
+        // told.
         *result = syscall_no_intercept(SYS_renameat2, arg0, arg1, arg2, arg3, arg4);
         if (*result < 0 || old_path_abs == new_path_abs || (arg4 & RENAME_EXCHANGE) != 0) {
             return CAPIO_POSIX_SYSCALL_SUCCESS;
         }
         if (old_is_capio) {
-            // The descriptors follow the file, or are no longer CAPIO's out of CAPIO_DIR
+            // Descriptors follow the file. A file moved out of CAPIO_DIR is no longer ours
             new_is_capio ? fd_table->renamePath(old_path_abs, new_path_abs)
                          : fd_table->removePath(old_path_abs);
         }
@@ -57,13 +58,14 @@ int renameat2_handler(long arg0, long arg1, long arg2, long arg3, long arg4, lon
         }
 
         if (old_is_capio) {
-            // The server keeps the file in memory under its new name, also out of CAPIO_DIR
+            // The memory server keeps the file under its new name, even outside CAPIO_DIR, so the
+            // descriptors stay CAPIO's
             fd_table->renamePath(old_path_abs, new_path_abs);
             auto res = rename_request(tid, old_path_abs, new_path_abs);
             *result  = (res < 0 ? -errno : res);
             return CAPIO_POSIX_SYSCALL_SUCCESS;
         }
-        std::filesystem::copy(old_path_abs, new_path_abs); // into CAPIO_DIR
+        std::filesystem::copy(old_path_abs, new_path_abs); // moved into CAPIO_DIR from outside
         *result = -errno;
         return CAPIO_POSIX_SYSCALL_SUCCESS;
     })

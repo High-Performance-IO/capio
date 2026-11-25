@@ -46,11 +46,12 @@ void rename_handler(const char *const str) {
 }
 
 /**
- * @brief rename of the FS variant, sent once the kernel has renamed: "tid old_in new_in old_size
- * old_pathnew_path". old_in and new_in say whether each name is inside CAPIO_DIR; the two names
- * follow one another, the old one being old_size bytes long. What the server knows of the file
- * moves to the new name, whose rule is then applied, so that "write f.tmp, close, rename to f"
- * commits f. No reply.
+ * @brief A rename done by an FS client, sent after the kernel has done it. Format:
+ * "tid old_in new_in old_size old_pathnew_path", where old_in and new_in are 1 if that name is
+ * inside CAPIO_DIR, and the two names are written back to back, the old one being old_size bytes.
+ *
+ * Everything the server knows about the file moves to the new name, and the new name's commit
+ * rule is applied. This is what makes "write f.tmp, close it, rename it to f" commit f. No reply.
  */
 void rename_fs_handler(const char *const str) {
     int tid, old_in, new_in, consumed = 0;

@@ -26,7 +26,7 @@ template <typename Map> void erase_at_or_below(Map &map, const std::string &path
     }
 }
 
-/// @brief Move the entries of @p map at or below @p from to the same place below @p to
+/// @brief Rename the entries of @p map at or inside @p from, so that they are at or inside @p to
 template <typename Map>
 void move_at_or_below(Map &map, const std::string &from, const std::string &to) {
     Map moved;
@@ -209,8 +209,8 @@ void FsStorageManager::moveHistory(const std::string &from, const std::string &t
 void FsStorageManager::rename(const pid_t tid, const std::string &from, const bool from_capio,
                               const std::string &to, const bool to_capio) {
     START_LOG(gettid(), "call(tid=%d, from=%s, to=%s)", tid, from.c_str(), to.c_str());
-    // What was at the new name is replaced. What was at the old one moves to it, or is forgotten
-    // if the file leaves CAPIO_DIR.
+    // The rename replaces whatever was at the new name, so forget it. Then move the old name's
+    // history to the new name, or forget it if the file has left CAPIO_DIR.
     if (to_capio) {
         forgetHistory(to);
     }
@@ -221,17 +221,18 @@ void FsStorageManager::rename(const pid_t tid, const std::string &from, const bo
         return;
     }
     if (!from_capio) {
-        // CAPIO never saw it being written: moving it in is its one close
+        // CAPIO never saw this file being written, so count the move into CAPIO_DIR as its close
         client_manager->registerProducedFile(tid, to);
         countClose(to);
         return;
     }
     std::error_code error;
     if (!client_manager->hasProducer(to) && !std::filesystem::is_directory(to, error)) {
-        // mv, after the producer ended: the file is committed when mv ends
+        // Nobody produces the file any more (e.g. mv after the producer exited): the renaming
+        // process becomes its producer, so the file is committed when it exits
         client_manager->registerProducedFile(tid, to);
     }
-    // The rule of each new name, with the history of its file
+    // Apply the commit rule of each new name, using the closes counted under the old one
     for (const auto &[path, count] : _close_counts) {
         if (count > 0 && is_at_or_below(path, to)) {
             applyOnClose(path, count);
