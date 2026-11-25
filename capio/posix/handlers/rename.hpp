@@ -73,23 +73,25 @@ int renameat2_handler(long arg0, long arg1, long arg2, long arg3, long arg4, lon
         return CAPIO_POSIX_SYSCALL_SUCCESS;
     })
 
-    // TODO: implement handling of FLAGS
-    if (is_prefix(old_path_abs, new_path_abs)) { // TODO: The check is more complex
-        errno   = EINVAL;
+    MEMORY_MODE({
+        // TODO: implement handling of FLAGS
+        if (is_prefix(old_path_abs, new_path_abs)) { // TODO: The check is more complex
+            errno   = EINVAL;
+            *result = -errno;
+            return CAPIO_POSIX_SYSCALL_SUCCESS;
+        }
+
+        if (old_is_capio) {
+            // The server keeps the file in memory under its new name, also out of CAPIO_DIR
+            capio_rename_descriptors(old_path_abs, new_path_abs, true);
+            auto res = rename_request(tid, old_path_abs, new_path_abs);
+            *result  = (res < 0 ? -errno : res);
+            return CAPIO_POSIX_SYSCALL_SUCCESS;
+        }
+        std::filesystem::copy(old_path_abs, new_path_abs); // into CAPIO_DIR
         *result = -errno;
         return CAPIO_POSIX_SYSCALL_SUCCESS;
-    }
-
-    if (old_is_capio) {
-        // The server keeps the file in memory under its new name, also out of CAPIO_DIR
-        capio_rename_descriptors(old_path_abs, new_path_abs, true);
-        auto res = rename_request(tid, old_path_abs, new_path_abs);
-        *result  = (res < 0 ? -errno : res);
-        return CAPIO_POSIX_SYSCALL_SUCCESS;
-    }
-    std::filesystem::copy(old_path_abs, new_path_abs); // into CAPIO_DIR
-    *result = -errno;
-    return CAPIO_POSIX_SYSCALL_SUCCESS;
+    })
 }
 
 int rename_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg5, long *result) {
