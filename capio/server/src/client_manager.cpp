@@ -127,6 +127,19 @@ void ClientManager::replyToClient(const int tid, const off64_t offset, char *buf
     throw std::runtime_error("Err: no such buffer for provided tid");
 }
 
+void ClientManager::replyToClientWithData(const pid_t tid, const off64_t end_offset,
+                                          const char *data, const off64_t size) {
+    START_LOG(gettid(), "call(tid=%d, end_offset=%ld, size=%ld)", tid, end_offset, size);
+    const auto out = data_buffers.find(tid);
+    if (out == data_buffers.end() || !replyToClient(tid, end_offset)) {
+        LOG("Client %d is gone: reply dropped", tid);
+        return;
+    }
+    if (size > 0) {
+        out->second.ServerToClient.write(data, size);
+    }
+}
+
 // NOTE: do not use const reference for path here as the emplace method leaves the original in an
 // invalid state
 void ClientManager::registerProducedFile(const pid_t tid, std::string path) {

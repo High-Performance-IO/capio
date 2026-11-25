@@ -152,6 +152,7 @@ std::string FsStorageManager::getPath(const pid_t pid, const int fd) const {
 }
 
 void FsStorageManager::closed(const pid_t tid, const pid_t pid, const int fd, const int error) {
+    _lister->forget(pid, fd);
     START_LOG(gettid(), "call(tid=%d, pid=%d, fd=%d, error=%d)", tid, pid, fd, error);
     const auto process = _opened_fd_map.find(pid);
     if (process == _opened_fd_map.end()) {
@@ -310,6 +311,20 @@ void FsStorageManager::noteNewEntry(const std::filesystem::path &path) {
         _committed_directories.insert(directory);
         _new_entries.erase(directory);
     }
+}
+
+void FsStorageManager::list(const pid_t tid, const pid_t pid, const int fd, const std::string &path,
+                            const off64_t offset, const off64_t count) {
+    START_LOG(gettid(), "call(tid=%d, fd=%d, path=%s, offset=%ld)", tid, fd, path.c_str(), offset);
+    using Mode         = FsDirectoryLister::Mode;
+    const auto &engine = CapioCLEngine::get();
+    Mode mode          = Mode::AS_IS;
+    if (engine.getCommitRule(path) == capiocl::commitRules::ON_N_FILES &&
+        !engine.isExcluded(path) && !isProducer(tid, path)) {
+        mode = engine.isFirable(path) ? Mode::AS_IT_GROWS : Mode::AFTER_THE_COMMIT;
+    }
+    const long expected = mode == Mode::AS_IS ? 0 : expectedEntries(path);
+    _lister->list({tid, pid, fd, path, offset, count, mode, expected});
 }
 
 void FsStorageManager::waitForCreation(const std::filesystem::path &path) const {

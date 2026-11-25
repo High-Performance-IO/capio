@@ -3,7 +3,6 @@
 
 #if defined(SYS_close)
 
-#include "handlers/getdents.hpp"
 #include "utils/requests.hpp"
 
 int close_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg5, long *result) {
@@ -22,7 +21,6 @@ int close_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long ar
     // data reaches the file server and when a full disk is reported, so the file must not be
     // committed before. The server does not count a close that failed. EINTR: Linux has closed it
     // anyway.
-    FS_MODE({ capio_forget_listing_fs(fd); })
     *result = fd_table->close(fd, [fd, tid](const long res) {
         close_request(fd, tid, res < 0 && res != -EINTR ? -res : 0);
     });

@@ -39,7 +39,6 @@ int close_range_handler(long arg0, long arg1, long arg2, long arg3, long arg4, l
             }
         }
         *result = fd_table->closeRange(first, last, flags, [&errors, tid](const int fd) {
-            capio_forget_listing_fs(fd);
             const auto error = errors.find(fd);
             close_request(fd, tid, error == errors.end() ? 0 : error->second);
         });

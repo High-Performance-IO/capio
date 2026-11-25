@@ -1,12 +1,8 @@
 #ifndef CAPIO_GETDENTS_HPP
 #define CAPIO_GETDENTS_HPP
 
-#include <chrono>
-#include <csignal>
-#include <pthread.h>
 #include <thread>
 
-#include "common/requests.hpp"
 #include "remote/backend.hpp"
 #include "remote/home_node_service.hpp"
 #include "remote/requests.hpp"
@@ -74,75 +70,18 @@ inline void handle_getdents(int tid, int fd, long int count) {
     }
 }
 
+/// @brief "tid fd count offset". A descriptor of the FS variant is known by its process, as for
+/// close; the offset is only for those, as the server keeps the one of the memory variant.
 void getdents_handler(const char *const str) {
     int tid, fd;
-    off64_t count;
-    sscanf(str, "%d %d %ld", &tid, &fd, &count);
-    handle_getdents(tid, fd, count);
-}
-
-/// @brief Wait until the listing of @p path can continue (it has new entries, or it is
-/// committed), then reply to @p tid
-inline void wait_for_fs_entries(const std::filesystem::path path, const pid_t tid,
-                                const off64_t n_seen, const long expected, const bool is_starting) {
-    for (;;) {
-        const long count = FsStorageManager::countEntries(path);
-        if (count < 0 || count >= expected) {
-            // The directory was removed, or has its N entries and so is committed
-            if (count < 0 || FsStorageManager::isDirectoryCommitted(path, expected)) {
-                client_manager->replyToClient(tid, CAPIO_FS_LIST_COMMITTED);
-                return;
-            }
-        } else if (!is_starting && count != n_seen) {
-            client_manager->replyToClient(tid, CAPIO_FS_LIST_STREAMING);
-            return;
-        } else if (CapioCLEngine::get().isCommitted(path)) {
-            client_manager->replyToClient(tid, CAPIO_FS_LIST_COMMITTED);
-            return;
-        }
-        std::this_thread::sleep_for(std::chrono::milliseconds(100));
-    }
-}
-
-/**
- * @brief A listing request of the FS variant (see posix/handlers/getdents.hpp): "tid n_seen path".
- * n_seen is -1 when the listing starts. Otherwise the client found nothing new among the n_seen
- * entries it has, and waits for the reply.
- */
-void list_fs_handler(const char *const str) {
-    int tid, consumed = 0;
-    off64_t n_seen;
-    if (sscanf(str, "%d %ld%n", &tid, &n_seen, &consumed) != 2) {
+    off64_t count, offset = 0;
+    sscanf(str, "%d %d %ld %ld", &tid, &fd, &count, &offset);
+    const pid_t pid = client_manager->getPid(tid);
+    if (const auto path = fs_storage_manager->getPath(pid, fd); !path.empty()) {
+        fs_storage_manager->list(tid, pid, fd, path, offset, count);
         return;
     }
-    const std::filesystem::path path = fs_request_path(tid, str, consumed);
-    const auto &engine               = CapioCLEngine::get();
-
-    const bool is_starting = n_seen < 0;
-    if (is_starting) {
-        if (engine.getCommitRule(path) != capiocl::commitRules::ON_N_FILES ||
-            engine.isExcluded(path) || FsStorageManager::isProducer(tid, path)) {
-            client_manager->replyToClient(tid, CAPIO_FS_LIST_AS_IS);
-            return;
-        }
-        if (engine.isFirable(path)) {
-            client_manager->replyToClient(tid, CAPIO_FS_LIST_STREAMING);
-            return;
-        }
-    }
-    const long expected = fs_storage_manager->expectedEntries(path);
-    // Block the termination signals in the waiting thread. Their handler frees memory and exits;
-    // if it ran on a thread holding a lock (malloc's or CAPIO-CL's), it would wait for it forever.
-    // TODO: a thread manager for the threads of the server
-    sigset_t signals, previous;
-    sigemptyset(&signals);
-    for (const int signal : {SIGTERM, SIGINT, SIGQUIT, SIGPIPE}) {
-        sigaddset(&signals, signal);
-    }
-    pthread_sigmask(SIG_BLOCK, &signals, &previous);
-    std::thread t(wait_for_fs_entries, path, tid, n_seen, expected, is_starting);
-    t.detach();
-    pthread_sigmask(SIG_SETMASK, &previous, nullptr);
+    handle_getdents(tid, fd, count);
 }
 
 #endif // CAPIO_GETDENTS_HPP

@@ -116,6 +116,12 @@ class ClientManager {
     bool replyToClient(pid_t tid, off64_t offset);
 
     /**
+     * @brief Reply @p end_offset to @p tid, then send it the @p size bytes of @p data, as a read
+     * or a getdents is answered. Dropped if the client is gone.
+     */
+    void replyToClientWithData(pid_t tid, off64_t end_offset, const char *data, off64_t size);
+
+    /**
      * @brief Add a file that is not yet ready to be consumed by a process to a list of files
      * waiting to be ready
      *

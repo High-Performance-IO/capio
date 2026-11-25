@@ -3,7 +3,6 @@
 
 #if defined(SYS_lseek)
 
-#include "handlers/getdents.hpp"
 #include "utils/common.hpp"
 #include "utils/data.hpp"
 
@@ -69,8 +68,18 @@ inline off64_t capio_lseek(int fd, off64_t offset, int whence, long tid) {
         }
     })
     FS_MODE({
-        if (long res; capio_seek_listing_fs(fd, offset, whence, res)) {
-            return capio_kernel_result(res); // a directory that CAPIO is listing
+        // A directory is listed through the server (see getdents), which is sent the offset: a
+        // seek, as rewinddir and seekdir make, only moves it. telldir reads it back.
+        if ((fd_table->flags(fd) & O_DIRECTORY) != 0) {
+            const off64_t new_offset = whence == SEEK_SET   ? offset
+                                       : whence == SEEK_CUR ? fd_table->offset(fd) + offset
+                                                            : -1;
+            if (new_offset < 0) {
+                errno = EINVAL;
+                return CAPIO_POSIX_SYSCALL_ERRNO;
+            }
+            fd_table->setOffset(fd, new_offset);
+            return new_offset;
         }
         // The end of a file and its data are known only once the producer wrote them, so a reader
         // must wait for them first. The writer knows its own, and the other whence values only

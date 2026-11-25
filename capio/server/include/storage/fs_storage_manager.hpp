@@ -12,6 +12,8 @@
 
 #include <sys/types.h>
 
+#include "storage/fs_directory_lister.hpp"
+
 /**
  * @brief Manages the files of the file system variant (libcapio_posix_fs.so).
  *
@@ -41,6 +43,9 @@ class FsStorageManager {
     /// @brief The entries created in each on_n_files directory, until it is committed
     std::unordered_map<std::string, std::unordered_set<std::string>> _new_entries;
     std::unordered_set<std::string> _committed_directories;
+
+    /// @brief Answers getdents. Never freed: its thread may outlive this object at shutdown.
+    FsDirectoryLister *_lister = new FsDirectoryLister();
 
     /// @brief Closes of on_close:N being counted on background threads
     std::atomic<int> _pending_counts{0};
@@ -146,6 +151,12 @@ class FsStorageManager {
      * directory need that commit).
      */
     void noteNewEntry(const std::filesystem::path &path);
+
+    /**
+     * @brief Thread @p tid of process @p pid lists its directory descriptor @p fd, of @p path:
+     * send it up to @p count bytes of entries from @p offset, waiting if its rule says so.
+     */
+    void list(pid_t tid, pid_t pid, int fd, const std::string &path, off64_t offset, off64_t count);
 
     /// @brief Block until @p path exists
     void waitForCreation(const std::filesystem::path &path) const;

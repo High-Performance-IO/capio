@@ -155,8 +155,10 @@ inline off64_t getdents_request(const int fd, const off64_t count, bool is64bit,
     START_LOG(capio_syscall(SYS_gettid), "call(fd=%ld, count=%ld, is_64_bit=%s, tid=%ld)", fd,
               count, is64bit ? "true" : "false", tid);
     char req[CAPIO_REQ_MAX_SIZE];
-    sprintf(req, "%04d %ld %d %ld", is64bit ? CAPIO_REQUEST_GETDENTS64 : CAPIO_REQUEST_GETDENTS,
-            tid, fd, count);
+    // The offset is for the FS server, which reads the directory on the file system: the memory
+    // server knows it already
+    sprintf(req, "%04d %ld %d %ld %ld", is64bit ? CAPIO_REQUEST_GETDENTS64 : CAPIO_REQUEST_GETDENTS,
+            tid, fd, count, fd_table->offset(fd));
     LOG("req=%s", req);
     buf_requests->write(req, CAPIO_REQ_MAX_SIZE);
     off64_t res;
@@ -358,24 +360,6 @@ inline void write_request(const int fd, const off64_t count, const long tid) {
     sprintf(req, "%04d %ld %d %ld", CAPIO_REQUEST_WRITE, tid, fd, count);
     LOG("req=%s", req);
     buf_requests->write(req, CAPIO_REQ_MAX_SIZE);
-}
-
-/**
- * Ask the server how to list the directory @p path.
- *
- * @param n_seen -1 when the listing starts. Otherwise, how many entries the directory had when
- * the client found nothing new in it: the server replies once that number changes, or once the
- * directory is committed.
- * @return one of CAPIO_FS_LIST_*
- */
-inline off64_t list_request_fs(const std::filesystem::path &path, const off64_t n_seen,
-                               const long tid) {
-    START_LOG(capio_syscall(SYS_gettid), "call(path=%s, n_seen=%ld, tid=%ld)", path.c_str(), n_seen,
-              tid);
-    fs_request(CAPIO_REQUEST_LIST_FS, tid, std::to_string(n_seen) + " ", path.native());
-    off64_t res;
-    buff_response->read(&res);
-    return res;
 }
 
 inline off64_t consent_to_proceed_request(const std::filesystem::path &path, const long tid,
