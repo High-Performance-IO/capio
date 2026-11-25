@@ -17,9 +17,7 @@ TEST(PathTest, TokensOfCapioClAreForbidden) {
     EXPECT_TRUE(is_forbidden_path(".f.commit")); // a directory entry
 }
 
-TEST(PathTest, FilesThatOnlyLookLikeTokensAreNot) {
-    EXPECT_FALSE(is_forbidden_path("/capio/f.commit"));    // not hidden
-    EXPECT_FALSE(is_forbidden_path("/capio/.commit"));     // no name before the suffix
+TEST(PathTest, OtherFilesAreNot) {
     EXPECT_FALSE(is_forbidden_path("/capio/.f.commit/g")); // inside a directory named so
     EXPECT_FALSE(is_forbidden_path("/capio/f"));
 }

@@ -30,17 +30,14 @@ inline bool is_forbidden_path(const std::string_view path) {
     const auto starts_with = [path](const std::string_view prefix) {
         return path.compare(0, prefix.size(), prefix) == 0;
     };
-    if (std::any_of(CAPIO_FORBIDDEN_PREFIXES.begin(), CAPIO_FORBIDDEN_PREFIXES.end(),
-                    starts_with)) {
-        return true;
-    }
-    const auto slash            = path.rfind('/');
-    const std::string_view name = slash == std::string_view::npos ? path : path.substr(slash + 1);
-    const auto is_token         = [name](const std::string_view suffix) {
-        return name.size() > suffix.size() + 1 && name[0] == '.' &&
-               name.compare(name.size() - suffix.size(), suffix.size(), suffix) == 0;
-    };
-    return std::any_of(CAPIO_CL_TOKEN_SUFFIXES.begin(), CAPIO_CL_TOKEN_SUFFIXES.end(), is_token);
+    const auto ends_with =
+        [path](const std::string_view suffix) { // string_view::ends_with is C++20
+            return path.size() >= suffix.size() &&
+                   path.compare(path.size() - suffix.size(), suffix.size(), suffix) == 0;
+        };
+    return std::any_of(CAPIO_FORBIDDEN_PREFIXES.begin(), CAPIO_FORBIDDEN_PREFIXES.end(),
+                       starts_with) ||
+           std::any_of(CAPIO_CL_TOKEN_SUFFIXES.begin(), CAPIO_CL_TOKEN_SUFFIXES.end(), ends_with);
 }
 
 #endif // CAPIO_COMMON_PATH_HPP
