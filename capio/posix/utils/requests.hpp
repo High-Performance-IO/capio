@@ -164,8 +164,8 @@ inline void handshake_named_request(const long tid, const long pid, const std::s
     START_LOG(capio_syscall(SYS_gettid), "call(tid=%ld, pid=%ld, app_name=%s)", tid, pid,
               app_name.c_str());
     char req[CAPIO_REQ_MAX_SIZE];
-    sprintf(req, "%04d %ld %ld %s %d %c", CAPIO_REQUEST_HANDSHAKE_NAMED, tid, pid, app_name.c_str(),
-            wait ? 1 : 0, MEMORY_MODE(CAPIO_VARIANT_MEMORY) FS_MODE(CAPIO_VARIANT_FS));
+    sprintf(req, "%04d %ld %ld %s %d", CAPIO_REQUEST_HANDSHAKE_NAMED, tid, pid, app_name.c_str(),
+            wait ? 1 : 0);
     LOG("req=%s", req);
     buf_requests->write(req, CAPIO_REQ_MAX_SIZE);
 

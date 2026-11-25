@@ -28,12 +28,9 @@ ClientManager::ClientManager()
 ClientManager::~ClientManager() { CALF_PRINT_COLOR(CALF_CLI_LEVEL_WARNING, "teardown completed."); }
 
 void ClientManager::registerClient(pid_t tid, const std::string &app_name, const bool wait,
-                                   const pid_t pid, const char variant) {
-    START_LOG(gettid(), "call(tid=%ld, app_name=%s, pid=%ld, variant=%c)", tid, app_name.c_str(),
-              pid, variant);
-    // An exec registers the thread again, with the same process and library
-    processes.insert_or_assign(tid,
-                               ClientProcess{pid < 0 ? tid : pid, variant == CAPIO_VARIANT_FS});
+                                   const pid_t pid) {
+    START_LOG(gettid(), "call(tid=%ld, app_name=%s, pid=%ld)", tid, app_name.c_str(), pid);
+    pids.insert_or_assign(tid, pid < 0 ? tid : pid); // an exec registers the thread again
 
     data_buffers.try_emplace(tid, SHM_SPSC_PREFIX_WRITE + std::to_string(tid),
                              SHM_SPSC_PREFIX_READ + std::to_string(tid),
@@ -85,7 +82,7 @@ void ClientManager::removeClient(const pid_t tid) {
         data_buffers.erase(it_resp);
     }
     const std::string &app_name = this->getAppName(tid);
-    processes.erase(tid);
+    pids.erase(tid);
     files_created_by_producer.erase(tid);
     // The app keeps producing while one of its clients is alive
     if (std::none_of(files_created_by_producer.begin(), files_created_by_producer.end(),
@@ -200,13 +197,8 @@ const std::string &ClientManager::getAppName(const pid_t tid) const {
 }
 
 pid_t ClientManager::getPid(const pid_t tid) const {
-    const auto process = processes.find(tid);
-    return process == processes.end() ? tid : process->second.pid;
-}
-
-bool ClientManager::usesFsVariant(const pid_t tid) const {
-    const auto process = processes.find(tid);
-    return process != processes.end() && process->second.fs_variant;
+    const auto pid = pids.find(tid);
+    return pid == pids.end() ? tid : pid->second;
 }
 
 SPSCQueue &ClientManager::getClientToServerDataBuffers(const pid_t tid) {
