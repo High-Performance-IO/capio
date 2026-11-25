@@ -2,7 +2,9 @@
 # Target information
 #####################################
 set(TARGET_INCLUDE_FOLDER ${CMAKE_CURRENT_SOURCE_DIR})
-set(TARGET_SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/libcapio_posix.cpp)
+# The classes of the client: every .cpp file in src/, also for the unit tests
+file(GLOB CAPIO_POSIX_SOURCES CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/src/*.cpp")
+set(TARGET_SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/libcapio_posix.cpp ${CAPIO_POSIX_SOURCES})
 
 #####################################
 # CMake module imports

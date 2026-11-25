@@ -8,7 +8,7 @@
 inline off64_t capio_read(int fd, void *buffer, off64_t count, long tid) {
     START_LOG(tid, "call(fd=%d, buf=0x%08x, count=%ld)", fd, buffer, count);
 
-    if (exists_capio_fd(fd)) {
+    if (fd_table->contains(fd)) {
         if (count >= SSIZE_MAX) {
             ERR_EXIT("CAPIO does not support read bigger than SSIZE_MAX yet");
         }
@@ -23,7 +23,7 @@ inline ssize_t capio_readv(int fd, const struct iovec *iov, int iovcnt, long tid
     START_LOG(tid, "call(fd=%d, iov.iov_base=0x%08x, iov.iov_len=%ld, iovcnt=%d)", fd,
               iov->iov_base, iov->iov_len, iovcnt);
 
-    if (exists_capio_fd(fd)) {
+    if (fd_table->contains(fd)) {
         LOG("fd %d exists and is a capio fd", fd);
         ssize_t tot_bytes = 0;
         ssize_t res       = 0;
@@ -55,7 +55,7 @@ inline off64_t capio_read_fs(int fd, void *buffer, off64_t count, long tid) {
     START_LOG(tid, "call(fd=%d, buf=0x%08x, count=%ld)", fd, buffer, count);
 
     struct stat info{};
-    if (!exists_capio_fd(fd) || (get_capio_fd_flags(fd) & O_ACCMODE) == O_WRONLY ||
+    if (!fd_table->contains(fd) || (fd_table->flags(fd) & O_ACCMODE) == O_WRONLY ||
         syscall_no_intercept(SYS_fstat, fd, &info) != 0 || !S_ISREG(info.st_mode)) {
         // not CAPIO, a writer (fopen(..., "a") seeks to the end), or nothing that streams
         return CAPIO_POSIX_SYSCALL_REQUEST_SKIP;

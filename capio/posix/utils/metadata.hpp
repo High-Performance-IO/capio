@@ -25,7 +25,7 @@ inline off64_t capio_metadata_access(const char *syscall, int dirfd, const char 
     START_LOG(tid, "call(dirfd=%d, pathname=%s, flags=%X)", dirfd, pathname, flags);
 
     if (pathname[0] == '\0' && (flags & AT_EMPTY_PATH)) {
-        if (!exists_capio_fd(dirfd)) {
+        if (!fd_table->contains(dirfd)) {
             return CAPIO_POSIX_SYSCALL_REQUEST_SKIP;
         }
         FS_MODE({ throw CapioUnimplementedException(syscall); })

@@ -34,8 +34,8 @@ class WriteReadCacheTest : public testing::Test {
     // bind the same numbers to other files.
     void TearDown() override {
         for (const int fd : {INPUT_FD, OUTPUT_FD}) {
-            if (exists_capio_fd(fd)) {
-                delete_capio_fd(fd);
+            if (fd_table->contains(fd)) {
+                fd_table->remove(fd);
             }
         }
     }
@@ -54,7 +54,7 @@ class WriteReadCacheTest : public testing::Test {
     static void PrepareReadCacheWithPrefetchedInput(const long tid, const char *input_path) {
         init_client(tid);
         initialize_data_queues(tid);
-        add_capio_fd(tid, input_path, INPUT_FD, 0, 0, O_RDONLY, false);
+        fd_table->add(INPUT_FD, input_path, 0, 0, O_RDONLY, false);
         read_cache->_last_fd      = INPUT_FD;
         read_cache->_cache_offset = 8192;
         read_cache->_actual_size  = 256 * 1024;
@@ -71,7 +71,7 @@ class WriteReadCacheTest : public testing::Test {
 
 TEST_F(WriteReadCacheTest, WriteToAnotherFileKeepsPrefetchedReadData) {
     PrepareReadCacheWithPrefetchedInput(/*tid*/ 11, "/capio/p0_0.dat");
-    add_capio_fd(11, "/capio/p1_0.dat", OUTPUT_FD, 0, 0, O_WRONLY, false);
+    fd_table->add(OUTPUT_FD, "/capio/p1_0.dat", 0, 0, O_WRONLY, false);
 
     const char data[8] = "payload";
     EXPECT_EQ(capio_write(OUTPUT_FD, data, sizeof(data), 11), static_cast<off64_t>(sizeof(data)));
@@ -84,7 +84,7 @@ TEST_F(WriteReadCacheTest, WriteToAnotherFileKeepsPrefetchedReadData) {
 TEST_F(WriteReadCacheTest, WriteToTheCachedFileDropsPrefetchedReadData) {
     PrepareReadCacheWithPrefetchedInput(/*tid*/ 12, "/capio/inout_0.dat");
     // Another descriptor of the same file (as after dup() or a second open()).
-    add_capio_fd(12, "/capio/inout_0.dat", OUTPUT_FD, 0, 0, O_WRONLY, false);
+    fd_table->add(OUTPUT_FD, "/capio/inout_0.dat", 0, 0, O_WRONLY, false);
 
     const char data[8] = "payload";
     EXPECT_EQ(capio_write(OUTPUT_FD, data, sizeof(data), 12), static_cast<off64_t>(sizeof(data)));

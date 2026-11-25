@@ -21,13 +21,13 @@ inline int capio_refuse_in_kernel_copy(const char *syscall, int fd_in, int fd_ou
     START_LOG(syscall_no_intercept(SYS_gettid), "call(fd_in=%d, fd_out=%d)", fd_in, fd_out);
 
     FS_MODE({
-        if (exists_capio_fd(fd_in)) {
+        if (fd_table->contains(fd_in)) {
             throw CapioUnimplementedException(syscall);
         }
         return CAPIO_POSIX_SYSCALL_SKIP;
     })
 
-    if (exists_capio_fd(fd_in) || exists_capio_fd(fd_out)) {
+    if (fd_table->contains(fd_in) || fd_table->contains(fd_out)) {
         *result = -EINVAL;
         return CAPIO_POSIX_SYSCALL_SUCCESS;
     }

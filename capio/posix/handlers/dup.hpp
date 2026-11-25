@@ -13,7 +13,7 @@ int dup_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg5
 
     START_LOG(tid, "call(fd=%d)", fd);
 
-    if (exists_capio_fd(fd)) {
+    if (fd_table->contains(fd)) {
         FS_MODE({ throw CapioUnimplementedException("dup"); })
         int res = open("/dev/null", O_WRONLY);
         if (res == -1) {
@@ -21,7 +21,7 @@ int dup_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg5
             return CAPIO_POSIX_SYSCALL_SUCCESS;
         }
         dup_request(fd, res, tid);
-        dup_capio_fd(tid, fd, res, false);
+        fd_table->dup(fd, res, false);
 
         *result = res;
         return CAPIO_POSIX_SYSCALL_SUCCESS;
@@ -37,7 +37,7 @@ int dup2_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg
 
     START_LOG(tid, "call(fd=%d, fd2=%d)", fd, fd2);
 
-    if (exists_capio_fd(fd)) {
+    if (fd_table->contains(fd)) {
         FS_MODE({ throw CapioUnimplementedException("dup2"); })
         int res = static_cast<int>(syscall_no_intercept(SYS_dup2, fd, fd2));
         if (res == -1) {
@@ -46,7 +46,7 @@ int dup2_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg
         }
         if (fd != res) {
             dup_request(fd, res, tid);
-            dup_capio_fd(tid, fd, res, false);
+            fd_table->dup(fd, res, false);
         }
         *result = res;
         return CAPIO_POSIX_SYSCALL_SUCCESS;
@@ -65,7 +65,7 @@ int dup3_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg
 
     START_LOG(tid, "call(fd=%d, fd2=%d)", fd, fd2);
 
-    if (exists_capio_fd(fd)) {
+    if (fd_table->contains(fd)) {
         FS_MODE({ throw CapioUnimplementedException("dup3"); })
         if (fd == fd2) {
             errno   = EINVAL;
@@ -79,7 +79,7 @@ int dup3_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg
         }
         bool is_cloexec = (flags & O_CLOEXEC) == O_CLOEXEC;
         dup_request(fd, res, tid);
-        dup_capio_fd(tid, fd, res, is_cloexec);
+        fd_table->dup(fd, res, is_cloexec);
 
         *result = res;
         return CAPIO_POSIX_SYSCALL_SUCCESS;

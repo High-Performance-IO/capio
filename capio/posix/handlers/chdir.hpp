@@ -77,8 +77,8 @@ int fchdir_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long a
     START_LOG(syscall_no_intercept(SYS_gettid), "call(fd=%d)", fd);
 
     MEMORY_MODE({
-        if (exists_capio_fd(fd)) {
-            set_current_dir(get_capio_fd_path(fd));
+        if (fd_table->contains(fd)) {
+            set_current_dir(fd_table->path(fd));
             *result = 0;
             return CAPIO_POSIX_SYSCALL_SUCCESS;
         }

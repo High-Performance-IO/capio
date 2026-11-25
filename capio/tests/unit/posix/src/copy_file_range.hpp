@@ -65,8 +65,8 @@ class CopyFileRangeHandlerTest : public testing::Test {
             close(fd);
         }
         for (const int fd : {CAPIO_FD_IN, CAPIO_FD_OUT}) {
-            if (exists_capio_fd(fd)) {
-                delete_capio_fd(fd);
+            if (fd_table->contains(fd)) {
+                fd_table->remove(fd);
             }
         }
         sem_close(requests_available);
@@ -105,7 +105,7 @@ class CopyFileRangeHandlerTest : public testing::Test {
 
     // A descriptor CAPIO handles, at file offset `offset`.
     void capio_fd(const int fd, const char *path, const off64_t offset, const int flags = O_RDWR) {
-        add_capio_fd(tid, path, fd, offset, 0, flags, false);
+        fd_table->add(fd, path, offset, 0, flags, false);
     }
 
     // The replies the server sends to the next requests, in order.
@@ -455,7 +455,7 @@ TEST_F(CopyFileRangeHandlerTest, seekOfACapioEndOnlyWhenTheFileOffsetDiffers) {
     end.position = 9;
     server_replies({9});
     capio_copy_file_range_seek(end, tid);
-    EXPECT_EQ(get_capio_fd_offset(CAPIO_FD_IN), 9);
+    EXPECT_EQ(fd_table->offset(CAPIO_FD_IN), 9);
     ASSERT_EQ(pending_requests(), 1);
     EXPECT_EQ(next_request(), expected_request("%04d %ld %d %zu", CAPIO_REQUEST_SEEK, tid,
                                                static_cast<int>(CAPIO_FD_IN), 9UL));
@@ -510,7 +510,7 @@ TEST_F(CopyFileRangeHandlerTest, finishOfACapioEnd) {
     with.position        = 14;
     capio_copy_file_range_finish(with, 4, tid);
     EXPECT_EQ(offset, 14);
-    EXPECT_EQ(get_capio_fd_offset(CAPIO_FD_IN), 3);
+    EXPECT_EQ(fd_table->offset(CAPIO_FD_IN), 3);
     EXPECT_EQ(pending_requests(), 0);
 
     // without: the file offset moves past the bytes copied, on the client and on the server
@@ -520,7 +520,7 @@ TEST_F(CopyFileRangeHandlerTest, finishOfACapioEnd) {
     without.position = 6;
     server_replies({6});
     capio_copy_file_range_finish(without, 6, tid);
-    EXPECT_EQ(get_capio_fd_offset(CAPIO_FD_OUT), 6);
+    EXPECT_EQ(fd_table->offset(CAPIO_FD_OUT), 6);
     ASSERT_EQ(pending_requests(), 1);
     EXPECT_EQ(next_request(), expected_request("%04d %ld %d %zu", CAPIO_REQUEST_SEEK, tid,
                                                static_cast<int>(CAPIO_FD_OUT), 6UL));

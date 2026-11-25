@@ -3,8 +3,11 @@
 #####################################
 set(TARGET_NAME capio_posix_unit_tests)
 set(TARGET_INCLUDE_FOLDER "${PROJECT_SOURCE_DIR}/capio/posix")
+# The classes of the client
+file(GLOB CAPIO_POSIX_SOURCES CONFIGURE_DEPENDS "${TARGET_INCLUDE_FOLDER}/src/*.cpp")
 set(TARGET_SOURCES
         ${CMAKE_CURRENT_SOURCE_DIR}/src/main.cpp
+        ${CAPIO_POSIX_SOURCES}
 )
 
 #####################################
@@ -61,6 +64,22 @@ target_link_libraries(${TARGET_NAME} PRIVATE rt syscall_intercept GTest::gtest)
 gtest_discover_tests(${TARGET_NAME}
         WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}
 )
+
+#####################################
+# Code coverage
+#####################################
+IF (ENABLE_COVERAGE)
+    IF (CMAKE_BUILD_TYPE STREQUAL "Debug")
+        target_compile_definitions(${TARGET_NAME} PRIVATE CAPIO_COVERAGE)
+        target_compile_options(${TARGET_NAME} PRIVATE --coverage -fprofile-arcs -ftest-coverage)
+        target_link_options(${TARGET_NAME} PRIVATE --coverage -fprofile-arcs -ftest-coverage)
+        IF (CMAKE_C_COMPILER_ID MATCHES "GNU" OR CMAKE_CXX_COMPILER_ID MATCHES "GNU")
+            target_link_libraries(${TARGET_NAME} PRIVATE gcov)
+        ENDIF (CMAKE_C_COMPILER_ID MATCHES "GNU" OR CMAKE_CXX_COMPILER_ID MATCHES "GNU")
+    ELSE (CMAKE_BUILD_TYPE STREQUAL "Debug")
+        message(WARNING "Code coverage is disabled in release mode.")
+    ENDIF (CMAKE_BUILD_TYPE STREQUAL "Debug")
+ENDIF (ENABLE_COVERAGE)
 
 #####################################
 # Install rules

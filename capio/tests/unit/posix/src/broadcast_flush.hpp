@@ -36,7 +36,7 @@ class ReadCacheCloseTest : public testing::Test {
         constexpr int fd = 2;
         init_client(tid);
         initialize_data_queues(tid);
-        add_capio_fd(tid, "/capio/file_0.dat", fd, 0, 0, O_RDONLY, false);
+        fd_table->add(fd, "/capio/file_0.dat", 0, 0, O_RDONLY, false);
         read_cache->_last_fd      = fd;
         read_cache->_cache_offset = 100;
         read_cache->_actual_size  = 0;
@@ -58,7 +58,7 @@ TEST_F(ReadCacheCloseTest, CloseFlushesPendingReadDataBeforeDeletingFd) {
     long result  = 0;
 
     EXPECT_NO_THROW(close_handler(fd, 0, 0, 0, 0, 0, &result));
-    EXPECT_FALSE(exists_capio_fd(fd));
+    EXPECT_FALSE(fd_table->contains(fd));
     EXPECT_FALSE(ReadCacheHasPendingData(*read_cache));
 
     // A later teardown flush is then a no-op on the closed fd.

@@ -10,7 +10,7 @@ int fgetxattr_handler(long arg0, long arg1, long arg2, long arg3, long arg4, lon
     START_LOG(syscall_no_intercept(SYS_gettid), "call(name=%s, value=0x%08x, size=%ld)",
               name.c_str(), reinterpret_cast<void *>(arg2), static_cast<size_t>(arg3));
 
-    if (exists_capio_fd(fd)) {
+    if (fd_table->contains(fd)) {
         if (std::equal(name.begin(), name.end(), "system.posix_acl_access")) {
             errno   = ENODATA;
             *result = -errno;

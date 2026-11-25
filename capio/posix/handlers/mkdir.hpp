@@ -35,7 +35,7 @@ inline off64_t capio_mkdirat(int dirfd, const std::string_view &pathname, mode_t
 
     if (is_capio_path(path)) {
         MEMORY_MODE({
-            if (exists_capio_path(path)) {
+            if (fd_table->containsPath(path)) {
                 errno = EEXIST;
                 return CAPIO_POSIX_SYSCALL_ERRNO;
             }
@@ -44,7 +44,7 @@ inline off64_t capio_mkdirat(int dirfd, const std::string_view &pathname, mode_t
                 return CAPIO_POSIX_SYSCALL_ERRNO;
             } else {
                 LOG("Adding %s to capio_files_path", path.c_str());
-                add_capio_path(path);
+                fd_table->addPath(path);
                 return res;
             }
         })
@@ -83,12 +83,12 @@ inline off64_t capio_rmdir(const std::string_view &pathname, long tid) {
         FS_MODE({
             const auto res = capio_kernel_result(
                 syscall_no_intercept(SYS_unlinkat, AT_FDCWD, path.c_str(), AT_REMOVEDIR));
-            if (res == 0 && exists_capio_path(path)) {
-                delete_capio_path(path);
+            if (res == 0 && fd_table->containsPath(path)) {
+                fd_table->removePath(path);
             }
             return res;
         })
-        if (!exists_capio_path(path)) {
+        if (!fd_table->containsPath(path)) {
             LOG("capio_files_path.find == end. errno = "
                 "ENOENT");
             errno = ENOENT;
@@ -105,7 +105,7 @@ inline off64_t capio_rmdir(const std::string_view &pathname, long tid) {
             errno = ENOENT;
             return CAPIO_POSIX_SYSCALL_ERRNO;
         }
-        delete_capio_path(path);
+        fd_table->removePath(path);
         return CAPIO_POSIX_SYSCALL_SUCCESS;
     } else {
         return CAPIO_POSIX_SYSCALL_REQUEST_SKIP;
