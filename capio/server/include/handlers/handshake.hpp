@@ -3,12 +3,6 @@
 #include "clone.hpp"
 #include "utils/common.hpp"
 
-void handshake_anonymous_handler(const char *const str) {
-    int tid, pid;
-    sscanf(str, "%d %d", &tid, &pid);
-    client_manager->registerClient(tid, CAPIO_DEFAULT_APP_NAME, false, pid);
-}
-
 void handshake_named_handler(const char *const str) {
     int tid, pid, wait;
     char app_name[1024];
