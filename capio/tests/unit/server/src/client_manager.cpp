@@ -82,4 +82,15 @@ TEST(ClientManagerTestEnvironment, registerProducedFileIsIdempotentPerPath) {
     client_manager->removeClient(tid);
 }
 
+TEST(ClientManagerTestEnvironment, threadKnowsItsProcess) {
+    client_manager->registerClient(1240, "app", false, 1239);
+    client_manager->registerClient(1241, "app");
+    EXPECT_EQ(client_manager->getPid(1240), 1239);
+    EXPECT_EQ(client_manager->getPid(1241), 1241);
+
+    client_manager->removeClient(1240);
+    client_manager->removeClient(1241);
+    EXPECT_EQ(client_manager->getPid(1240), 1240);
+}
+
 #endif // CAPIO_CLIENT_MANAGER_HPP

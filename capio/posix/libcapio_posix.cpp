@@ -1,6 +1,8 @@
 #include <array>
 #include <string>
 
+#include <pthread.h>
+
 #include "common/syscall.hpp"
 
 #include "utils/clone.hpp"
@@ -57,6 +59,9 @@ static constexpr long CAPIO_NR_SYSCALLS = 1 + std::max({
 #endif
 #ifdef SYS_close
                                                   SYS_close,
+#endif
+#ifdef SYS_close_range
+                                                  SYS_close_range,
 #endif
 #ifdef SYS_copy_file_range
                                                   SYS_copy_file_range,
@@ -169,6 +174,12 @@ static constexpr long CAPIO_NR_SYSCALLS = 1 + std::max({
 #ifdef SYS_statx
                                                   SYS_statx,
 #endif
+#ifdef SYS_sync_file_range
+                                                  SYS_sync_file_range,
+#endif
+#ifdef SYS_sync_file_range2
+                                                  SYS_sync_file_range2,
+#endif
 #ifdef SYS_unlink
                                                   SYS_unlink,
 #endif
@@ -219,6 +230,9 @@ static constexpr std::array<CPHandler_t, CAPIO_NR_SYSCALLS> build_syscall_table(
 #endif
 #ifdef SYS_close
     _syscallTable[SYS_close] = close_handler;
+#endif
+#ifdef SYS_close_range
+    _syscallTable[SYS_close_range] = close_range_handler;
 #endif
 #ifdef SYS_copy_file_range
     _syscallTable[SYS_copy_file_range] = copy_file_range_handler;
@@ -337,6 +351,12 @@ static constexpr std::array<CPHandler_t, CAPIO_NR_SYSCALLS> build_syscall_table(
 #ifdef SYS_statx
     _syscallTable[SYS_statx] = statx_handler;
 #endif
+#ifdef SYS_sync_file_range
+    _syscallTable[SYS_sync_file_range] = sync_file_range_handler;
+#endif
+#ifdef SYS_sync_file_range2
+    _syscallTable[SYS_sync_file_range2] = sync_file_range_handler;
+#endif
 #ifdef SYS_unlink
     _syscallTable[SYS_unlink] = unlink_handler;
 #endif
@@ -425,6 +445,8 @@ static __attribute__((constructor)) void init() {
     const long tid = syscall_no_intercept(SYS_gettid);
 
     FileDescriptorTable::protectAcrossFork();
+    // After the handlers of the table, so that the child has a free lock
+    FS_MODE({ pthread_atfork(nullptr, nullptr, announce_inherited_descriptors_fs); })
     init_client(tid);
     init_filesystem(tid); // with the descriptors of the program before an exec, if any
     initialize_new_thread();
@@ -432,10 +454,17 @@ static __attribute__((constructor)) void init() {
         // The program after an exec, e.g. the child of a fork, writes the files it got too
         for (const int fd : fd_table->fds()) {
             struct stat info{};
-            if ((fd_table->flags(fd) & O_ACCMODE) != O_RDONLY &&
-                syscall_no_intercept(SYS_fstat, fd, &info) == 0 && !S_ISDIR(info.st_mode)) {
-                inherit_request_fs(fd_table->path(fd), tid);
-            }
+            const bool writes = (fd_table->flags(fd) & O_ACCMODE) != O_RDONLY &&
+                                syscall_no_intercept(SYS_fstat, fd, &info) == 0 &&
+                                !S_ISDIR(info.st_mode);
+            create_request_fs(fd_table->path(fd), fd,
+                              writes ? CAPIO_FS_PRODUCED_IF_NO_PRODUCER : CAPIO_FS_NOT_PRODUCED,
+                              tid);
+        }
+        // Counted only now, so that a failed exec closes nothing: the server still has them, as
+        // the process is the same
+        for (const int fd : fd_table->closedByExec()) {
+            close_request(fd, tid);
         }
     })
 

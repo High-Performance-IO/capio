@@ -14,6 +14,7 @@
 
 #include <cerrno>
 #include <fcntl.h>
+#include <linux/close_range.h>
 #include <signal.h>
 #include <sys/wait.h>
 #include <unistd.h>
@@ -33,7 +34,7 @@ namespace {
 
 /**
  * While one is alive, the descriptors that the table closes are recorded instead of closed, and the
- * system calls in failing return their error instead of reaching the kernel: see
+ * system calls in results return what it says instead of reaching the kernel: see
  * syscall_no_intercept below. The other system calls, and all of them when none is alive, reach the
  * kernel, as the other tests of the client need.
  */
@@ -48,7 +49,7 @@ class MockSyscalls final {
 
     std::vector<int> closed;
     long result = 0;                        ///< what close returns
-    std::unordered_map<long, long> failing; ///< system call -> the -errno it returns
+    std::unordered_map<long, long> results; ///< system call -> what it returns: 0, or -errno
 
     MockSyscalls() { active = this; }
     ~MockSyscalls() { active = nullptr; }
@@ -180,8 +181,8 @@ extern "C" long syscall_no_intercept(const long syscall_number, ...) {
     va_end(arguments);
 
     if (MockSyscalls *mock = MockSyscalls::active; mock != nullptr) {
-        if (const auto error = mock->failing.find(syscall_number); error != mock->failing.end()) {
-            return error->second;
+        if (const auto found = mock->results.find(syscall_number); found != mock->results.end()) {
+            return found->second;
         }
         if (syscall_number == SYS_close) {
             return mock->close(static_cast<int>(arg[0]));
@@ -382,6 +383,93 @@ TEST(FileDescriptorTableTest, CloseClosesInTheKernelAndForgets) {
 }
 
 // Linux frees the number also when close fails, e.g. with an I/O error on NFS
+TEST(FileDescriptorTableTest, CloseAnnouncesWhatTheKernelReturned) {
+    MockSyscalls system_calls;
+    system_calls.result = -EIO;
+    FileDescriptorTable table;
+    table.add(3, "/capio/f", 0, 0, O_WRONLY, false);
+
+    std::vector<long> announced;
+    EXPECT_EQ(table.close(3, [&](const long result) { announced.push_back(result); }), -EIO);
+    EXPECT_EQ(announced, std::vector<long>{-EIO});
+}
+
+// The server knows the descriptor by its number: the close of what had it reaches the server
+// before another thread that gets the number can tell the server
+TEST(FileDescriptorTableTest, CloseAnnouncesBeforeTheNumberIsAddedAgain) {
+    MockSyscalls system_calls;
+    FileDescriptorTable table;
+    table.add(3, "/capio/f", 0, 0, O_WRONLY, false);
+
+    std::atomic<bool> announcing{false}, release{false}, added{false};
+    std::thread closer([&] {
+        table.close(3, [&](long) {
+            announcing = true;
+            while (!release) {
+                std::this_thread::yield();
+            }
+        });
+    });
+    while (!announcing) {
+        std::this_thread::yield();
+    }
+    std::thread adder([&] {
+        table.add(3, "/capio/g", 0, 0, O_WRONLY, false);
+        added = true;
+    });
+    std::this_thread::sleep_for(std::chrono::milliseconds(100));
+    EXPECT_FALSE(added);
+    release = true;
+    closer.join();
+    adder.join();
+    EXPECT_EQ(table.path(3), "/capio/g");
+}
+
+TEST(FileDescriptorTableTest, CloseRangeForgetsAndAnnouncesTheDescriptorsInIt) {
+    MockSyscalls system_calls;
+    system_calls.results[SYS_close_range] = 0;
+    FileDescriptorTable table;
+    table.add(3, "/capio/f", 0, 0, O_WRONLY, false);
+    table.dup(3, 5, false);
+    table.add(7, "/capio/g", 0, 0, O_WRONLY, false);
+
+    std::vector<int> announced;
+    EXPECT_EQ(table.closeRange(3, 6, 0, [&](const int fd) { announced.push_back(fd); }), 0);
+    std::sort(announced.begin(), announced.end());
+    EXPECT_EQ(announced, (std::vector<int>{3, 5}));
+    EXPECT_EQ(table.fds(), std::vector<int>{7});
+    EXPECT_TRUE(system_calls.closed.empty()); // one close_range, no close
+}
+
+TEST(FileDescriptorTableTest, CloseRangeCanOnlyMakeThemCloseOnExec) {
+    MockSyscalls system_calls;
+    system_calls.results[SYS_close_range] = 0;
+    FileDescriptorTable table;
+    table.add(3, "/capio/f", 0, 0, O_WRONLY, false);
+    table.add(7, "/capio/g", 0, 0, O_WRONLY, false);
+
+    std::vector<int> announced;
+    EXPECT_EQ(
+        table.closeRange(0, 5, CLOSE_RANGE_CLOEXEC, [&](const int fd) { announced.push_back(fd); }),
+        0);
+    EXPECT_TRUE(announced.empty());
+    EXPECT_TRUE(table.cloexec(3));
+    EXPECT_FALSE(table.cloexec(7));
+    EXPECT_EQ(table.fds().size(), 2U);
+}
+
+TEST(FileDescriptorTableTest, FailedCloseRangeChangesNothing) {
+    MockSyscalls system_calls;
+    system_calls.results[SYS_close_range] = -EINVAL;
+    FileDescriptorTable table;
+    table.add(3, "/capio/f", 0, 0, O_WRONLY, false);
+
+    bool announced = false;
+    EXPECT_EQ(table.closeRange(0, 5, 0, [&](int) { announced = true; }), -EINVAL);
+    EXPECT_FALSE(announced);
+    EXPECT_TRUE(table.contains(3));
+}
+
 TEST(FileDescriptorTableTest, FailedCloseForgetsTooAndReturnsTheError) {
     MockSyscalls system_calls;
     system_calls.result = -EIO;
@@ -507,6 +595,24 @@ TEST(FileDescriptorTableTest, SnapshotRestoresTheDescriptorsKeptByTheExec) {
     EXPECT_FALSE(after.containsPath("/capio/g"));
 }
 
+// The FS variant tells the server of them once the exec has worked
+TEST(FileDescriptorTableTest, SnapshotListsTheDescriptorsClosedByTheExec) {
+    const long tid = unusedTid();
+    FileDescriptorTable before;
+    before.add(3, "/capio/f", 0, 0, O_WRONLY, false);
+    before.add(4, "/capio/g", 0, 0, O_RDONLY, true);
+    before.dup(4, 6, true);
+    before.createSnapshot(tid);
+
+    const FileDescriptorTable after(tid);
+    auto closed = after.closedByExec();
+    std::sort(closed.begin(), closed.end());
+    EXPECT_EQ(closed, (std::vector<int>{4, 6}));
+    EXPECT_EQ(after.fds(), std::vector<int>{3});
+    EXPECT_TRUE(FileDescriptorTable().closedByExec().empty());
+    EXPECT_TRUE(FileDescriptorTable(unusedTid()).closedByExec().empty());
+}
+
 TEST(FileDescriptorTableTest, SnapshotKeepsCopiesSharingTheirOffset) {
     const long tid = unusedTid();
     FileDescriptorTable before;
@@ -591,7 +697,7 @@ TEST(FileDescriptorTableTest, SnapshotThatCannotBeCreated) {
     before.add(3, "/capio/f", 0, 0, O_WRONLY, false);
     {
         MockSyscalls system_calls;
-        system_calls.failing[SYS_openat] = -ENOSPC;
+        system_calls.results[SYS_openat] = -ENOSPC;
         before.createSnapshot(tid);
     }
     EXPECT_FALSE(std::filesystem::exists(snapshotFile(tid)));
@@ -605,7 +711,7 @@ TEST(FileDescriptorTableTest, SnapshotThatCannotBeSized) {
     before.add(3, "/capio/f", 0, 0, O_WRONLY, false);
     {
         MockSyscalls system_calls;
-        system_calls.failing[SYS_ftruncate] = -ENOSPC;
+        system_calls.results[SYS_ftruncate] = -ENOSPC;
         before.createSnapshot(tid);
     }
     EXPECT_FALSE(std::filesystem::exists(snapshotFile(tid)));
@@ -618,7 +724,7 @@ TEST(FileDescriptorTableTest, SnapshotThatCannotBeMapped) {
     before.add(3, "/capio/f", 0, 0, O_WRONLY, false);
     {
         MockSyscalls system_calls;
-        system_calls.failing[SYS_mmap] = -ENOMEM;
+        system_calls.results[SYS_mmap] = -ENOMEM;
         before.createSnapshot(tid);
     }
     EXPECT_FALSE(std::filesystem::exists(snapshotFile(tid)));
@@ -636,7 +742,7 @@ TEST(FileDescriptorTableTest, SnapshotThatCannotBeRead) {
         std::vector<int> fds;
         {
             MockSyscalls system_calls;
-            system_calls.failing[system_call] = -EIO;
+            system_calls.results[system_call] = -EIO;
             fds                               = FileDescriptorTable(tid).fds();
         }
         EXPECT_TRUE(fds.empty()) << system_call;

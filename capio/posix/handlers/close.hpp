@@ -16,20 +16,15 @@ int close_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long ar
     MEMORY_MODE({
         write_cache->flush();
         read_cache->flush();
-        close_request(fd, tid);
-        *result = fd_table->close(fd);
-        return CAPIO_POSIX_SYSCALL_SUCCESS;
     })
-    FS_MODE({
-        // The kernel closes first, then CAPIO announces the close. On NFS, close(2) is when the
-        // data reaches the server and when a full disk is reported: the file must not be committed
-        // before.
-        const std::string path = fd_table->path(fd);
-        *result                = fd_table->close(fd);
-        // The server does not count a close that failed. EINTR: Linux has closed it anyway
-        close_request_fs(path, *result < 0 && *result != -EINTR ? -*result : 0, tid);
-        return CAPIO_POSIX_SYSCALL_SUCCESS;
-    })
+    // The kernel closes first, then the server is told. FS variant: on NFS, close(2) is when the
+    // data reaches the file server and when a full disk is reported, so the file must not be
+    // committed before. The server does not count a close that failed. EINTR: Linux has closed it
+    // anyway.
+    *result = fd_table->close(fd, [fd, tid](const long res) {
+        close_request(fd, tid, res < 0 && res != -EINTR ? -res : 0);
+    });
+    return CAPIO_POSIX_SYSCALL_SUCCESS;
 }
 
 #endif // SYS_close

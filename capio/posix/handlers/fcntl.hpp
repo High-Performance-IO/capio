@@ -27,7 +27,8 @@ inline std::unordered_map<std::string, uint64_t> &capio_rw_hints() {
 
 /**
  * Duplicate a CAPIO descriptor onto the lowest free descriptor not below @min_fd. A CAPIO
- * descriptor is a real descriptor of /dev/null, so the kernel picks the number.
+ * descriptor is a real descriptor (of /dev/null in the memory variant), so the kernel picks the
+ * number.
  */
 inline long capio_fcntl_dupfd(long tid, int fd, int min_fd, bool is_cloexec) {
     START_LOG(tid, "call(fd=%d, min_fd=%d, is_cloexec=%d)", fd, min_fd, is_cloexec);
@@ -96,10 +97,19 @@ int fcntl_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long ar
     }
 
     FS_MODE({
+        // A real descriptor: the kernel runs it, and CAPIO tracks the copies and close-on-exec
         if (cmd == F_DUPFD || cmd == F_DUPFD_CLOEXEC) {
-            throw CapioUnimplementedException("fcntl(F_DUPFD)");
+            *result = capio_fcntl_dupfd(tid, fd, static_cast<int>(arg2), cmd == F_DUPFD_CLOEXEC);
+            return CAPIO_POSIX_SYSCALL_SUCCESS;
         }
-        return CAPIO_POSIX_SYSCALL_SKIP; // a real descriptor: the kernel runs the rest
+        if (cmd == F_SETFD) {
+            *result = syscall_no_intercept(SYS_fcntl, fd, cmd, arg2);
+            if (*result == 0) {
+                fd_table->setCloexec(fd, (arg2 & FD_CLOEXEC) == FD_CLOEXEC);
+            }
+            return CAPIO_POSIX_SYSCALL_SUCCESS;
+        }
+        return CAPIO_POSIX_SYSCALL_SKIP;
     })
 
     switch (cmd) {

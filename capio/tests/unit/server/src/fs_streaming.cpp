@@ -55,10 +55,76 @@ TEST_F(FsStreamingStateTest, SuccessfulCloseCommits) {
     EXPECT_TRUE(capio_cl_engine->isCommitted("/fs_state/ok"));
 }
 
+TEST_F(FsStreamingStateTest, FailedCloseNeverCommits) {
+    const std::string path = "/fs_state/failed";
+    create(path, capiocl::commitRules::ON_CLOSE);
+    manager->closeFailed(PRODUCER, path, ENOSPC);
+    manager->closed(PRODUCER, path); // a later close that succeeds
+    manager->commit(path);           // and the end of the producer
+    EXPECT_FALSE(capio_cl_engine->isCommitted(path));
+}
+
 TEST_F(FsStreamingStateTest, AnAppProducesUntilItsLastClientExits) {
     addClient(30, "app");
     addClient(31, "app");
     client_manager->registerProducedFile(30, "/fs_state/app_output");
     client_manager->removeClient(30);
     EXPECT_TRUE(client_manager->isProducer(31, "/fs_state/app_output"));
+}
+
+TEST_F(FsStreamingStateTest, CloseOfADescriptorClosesItsFile) {
+    const std::string path = "/fs_state/by_descriptor";
+    create(path, capiocl::commitRules::ON_CLOSE);
+    manager->addFileToPid(PRODUCER, 3, path);
+    manager->closed(PRODUCER, PRODUCER, 3, 0);
+    EXPECT_TRUE(capio_cl_engine->isCommitted(path));
+    EXPECT_EQ(manager->getPath(PRODUCER, 3), "");
+}
+
+TEST_F(FsStreamingStateTest, AnotherThreadClosesADescriptorOfItsProcess) {
+    constexpr pid_t THREAD = PRODUCER + 1;
+    const std::string path = "/fs_state/other_thread";
+    addClient(THREAD, "producer");
+    create(path, capiocl::commitRules::ON_CLOSE);
+    manager->addFileToPid(PRODUCER, 3, path);
+    manager->closed(THREAD, PRODUCER, 3, 0);
+    EXPECT_TRUE(capio_cl_engine->isCommitted(path));
+}
+
+TEST_F(FsStreamingStateTest, CopyOfADescriptorOutlivesTheOriginal) {
+    const std::string path = "/fs_state/copy";
+    manager->addFileToPid(PRODUCER, 3, path);
+    manager->dup(PRODUCER, 3, 4);
+    manager->closed(PRODUCER, PRODUCER, 3, 0);
+    EXPECT_EQ(manager->getPath(PRODUCER, 4), path);
+}
+
+TEST_F(FsStreamingStateTest, ReusedNumberNamesTheNewFile) {
+    manager->addFileToPid(PRODUCER, 3, "/fs_state/first");
+    manager->closed(PRODUCER, PRODUCER, 3, 0);
+    manager->addFileToPid(PRODUCER, 3, "/fs_state/second");
+    EXPECT_EQ(manager->getPath(PRODUCER, 3), "/fs_state/second");
+}
+
+TEST_F(FsStreamingStateTest, ProcessesHaveTheirOwnDescriptors) {
+    manager->addFileToPid(PRODUCER, 3, "/fs_state/parent");
+    manager->addFileToPid(PRODUCER + 1, 3, "/fs_state/child");
+    EXPECT_EQ(manager->getPath(PRODUCER, 3), "/fs_state/parent");
+    EXPECT_EQ(manager->getPath(PRODUCER + 1, 3), "/fs_state/child");
+}
+
+TEST_F(FsStreamingStateTest, FailedCloseOfADescriptorNeverCommits) {
+    const std::string path = "/fs_state/failed_descriptor";
+    create(path, capiocl::commitRules::ON_CLOSE);
+    manager->addFileToPid(PRODUCER, 3, path);
+    manager->closed(PRODUCER, PRODUCER, 3, EIO);
+    manager->commit(path);
+    EXPECT_FALSE(capio_cl_engine->isCommitted(path));
+}
+
+TEST_F(FsStreamingStateTest, CloseOfAnUnknownDescriptorDoesNothing) {
+    const std::string path = "/fs_state/unknown";
+    create(path, capiocl::commitRules::ON_CLOSE);
+    manager->closed(PRODUCER, PRODUCER, 9, 0);
+    EXPECT_FALSE(capio_cl_engine->isCommitted(path));
 }

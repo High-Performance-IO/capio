@@ -33,22 +33,20 @@ inline void handle_close(int tid, int fd) {
     storage_manager->removeFromTid(tid, fd);
 }
 
-/// @brief close of the FS variant: "tid error path", error 0 if the close worked
-void close_fs_handler(const char *const str) {
-    int tid, error, consumed = 0;
-    if (sscanf(str, "%d %d%n", &tid, &error, &consumed) != 2) {
-        return;
-    }
-    const std::filesystem::path path = fs_request_path(tid, str, consumed);
-    if (error == 0) { // a close that failed lost data: it does not count
-        fs_storage_manager->closed(tid, path);
-    }
-}
-
+/**
+ * @brief "tid fd [error]": error is what the close failed with, 0 if it worked (FS variant only).
+ * A descriptor of the FS variant is known by its process, from the CAPIO_REQUEST_CREATE_FS that
+ * only that variant sends: any other one is of the memory variant.
+ */
 void close_handler(const char *str) {
-    int tid, fd;
-    sscanf(str, "%d %d", &tid, &fd);
-    handle_close(tid, fd);
+    int tid, fd, error = 0;
+    sscanf(str, "%d %d %d", &tid, &fd, &error);
+    if (const pid_t pid = client_manager->getPid(tid);
+        !fs_storage_manager->getPath(pid, fd).empty()) {
+        fs_storage_manager->closed(tid, pid, fd, error); // a close that failed lost data
+    } else {
+        handle_close(tid, fd);
+    }
 }
 
 #endif // CAPIO_SERVER_HANDLERS_CLOSE_HPP
