@@ -1,6 +1,8 @@
 #include <array>
 #include <string>
 
+#include <pthread.h>
+
 #include "common/syscall.hpp"
 
 #include "utils/clone.hpp"
@@ -443,6 +445,8 @@ static __attribute__((constructor)) void init() {
     const long tid = syscall_no_intercept(SYS_gettid);
 
     FileDescriptorTable::protectAcrossFork();
+    // After the handlers of the table, so that the child has a free lock
+    FS_MODE({ pthread_atfork(nullptr, nullptr, announce_inherited_descriptors_fs); })
     init_client(tid);
     init_filesystem(tid); // with the descriptors of the program before an exec, if any
     initialize_new_thread();
