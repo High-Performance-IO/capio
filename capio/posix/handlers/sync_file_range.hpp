@@ -13,8 +13,8 @@
  */
 int sync_file_range_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg5,
                             long *result) {
-    const auto fd  = static_cast<int>(arg0);
-    const long tid = syscall_no_intercept(SYS_gettid);
+    [[maybe_unused]] const auto fd  = static_cast<int>(arg0); // memory variant, and the log
+    [[maybe_unused]] const long tid = syscall_no_intercept(SYS_gettid); // the log
     START_LOG(tid, "call(fd=%d)", fd);
 
     MEMORY_MODE({
