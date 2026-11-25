@@ -25,7 +25,7 @@
  * table: check with contains first, or use findPath.
  *
  * execve replaces the memory of the process, table included, but keeps its descriptors. So before
- * an exec the table writes a snapshot of itself to shared memory (createSnapshot), and the program
+ * an exec the table writes a snapshot of itself to /dev/shm (createSnapshot), and the program
  * after it builds its table from that snapshot (FileDescriptorTable(tid)).
  */
 class FileDescriptorTable final {

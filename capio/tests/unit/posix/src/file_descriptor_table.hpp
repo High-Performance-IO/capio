@@ -19,10 +19,12 @@
 #include <unistd.h>
 
 #include <cstdarg>
+#include <filesystem>
 
 #include <libsyscall_intercept_hook_point.h>
 #include <sys/syscall.h>
 
+#include "common/constants.hpp"
 #include "utils/file_descriptor_table.hpp"
 
 namespace {
@@ -403,7 +405,6 @@ TEST(FileDescriptorTableTest, ForkedChildGetsAFreeTable) {
 }
 
 TEST(FileDescriptorTableTest, SnapshotRestoresTheDescriptorsKeptByTheExec) {
-    const MockSyscalls system_calls;
     const long tid = unusedTid();
     FileDescriptorTable before;
     before.add(3, "/capio/f", 10, 100, O_WRONLY, false);
@@ -422,7 +423,6 @@ TEST(FileDescriptorTableTest, SnapshotRestoresTheDescriptorsKeptByTheExec) {
 }
 
 TEST(FileDescriptorTableTest, SnapshotKeepsCopiesSharingTheirOffset) {
-    const MockSyscalls system_calls;
     const long tid = unusedTid();
     FileDescriptorTable before;
     before.add(3, "/capio/f", 10, 0, O_WRONLY, true);
@@ -443,7 +443,6 @@ TEST(FileDescriptorTableTest, SnapshotKeepsCopiesSharingTheirOffset) {
 }
 
 TEST(FileDescriptorTableTest, SnapshotIsReadOnce) {
-    const MockSyscalls system_calls;
     const long tid = unusedTid();
     FileDescriptorTable before;
     before.add(3, "/capio/f", 0, 0, O_WRONLY, false);
@@ -456,14 +455,12 @@ TEST(FileDescriptorTableTest, SnapshotIsReadOnce) {
 }
 
 TEST(FileDescriptorTableTest, NoSnapshotMeansAnEmptyTable) {
-    const MockSyscalls system_calls;
     const FileDescriptorTable table(unusedTid());
     EXPECT_TRUE(table.fds().empty());
 }
 
 // An exec that fails leaves its snapshot: the next exec must not restore it
 TEST(FileDescriptorTableTest, SnapshotReplacesTheOneOfAFailedExec) {
-    const MockSyscalls system_calls;
     const long tid = unusedTid();
     FileDescriptorTable table;
     table.add(3, "/capio/f", 0, 0, O_WRONLY, false);
@@ -477,7 +474,6 @@ TEST(FileDescriptorTableTest, SnapshotReplacesTheOneOfAFailedExec) {
 }
 
 TEST(FileDescriptorTableTest, EmptyTableRemovesTheSnapshotOfAFailedExec) {
-    const MockSyscalls system_calls;
     const long tid = unusedTid();
     FileDescriptorTable table;
     table.add(3, "/capio/f", 0, 0, O_WRONLY, false);
@@ -487,6 +483,20 @@ TEST(FileDescriptorTableTest, EmptyTableRemovesTheSnapshotOfAFailedExec) {
 
     const FileDescriptorTable after(tid);
     EXPECT_TRUE(after.fds().empty());
+}
+
+// The snapshot is a file of /dev/shm, which the program after the exec removes once read
+TEST(FileDescriptorTableTest, SnapshotIsAFileOfDevShm) {
+    const long tid                   = unusedTid();
+    const std::filesystem::path file = std::string(SHM_SNAPSHOT_PREFIX) + std::to_string(tid);
+    FileDescriptorTable before;
+    before.add(3, "/capio/f", 0, 0, O_WRONLY, false);
+    before.createSnapshot(tid);
+    EXPECT_EQ(file.parent_path(), "/dev/shm");
+    EXPECT_TRUE(std::filesystem::exists(file));
+
+    const FileDescriptorTable after(tid);
+    EXPECT_FALSE(std::filesystem::exists(file));
 }
 
 #endif // CAPIO_TEST_UNIT_POSIX_FILE_DESCRIPTOR_TABLE_HPP

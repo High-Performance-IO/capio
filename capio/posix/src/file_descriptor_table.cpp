@@ -3,24 +3,25 @@
 #include <climits>
 #include <cstring>
 #include <new>
-#include <vector>
 
 #include <fcntl.h>
 #include <pthread.h>
 #include <sys/mman.h>
 #include <sys/stat.h>
-#include <unistd.h>
 
 #include <libsyscall_intercept_hook_point.h>
 #include <sys/syscall.h>
 
+#include "common/constants.hpp"
+
 namespace {
 
 /*
- * The snapshot: one shared memory object, named after the thread that execs, holding the number
- * of descriptors, then one entry for each.
+ * The snapshot: a file in /dev/shm, named after the thread that execs, holding the number of
+ * descriptors, then one entry for each. Its system calls go to the kernel through
+ * syscall_no_intercept, as CAPIO would handle them otherwise, and its handlers use the table.
  */
-std::string snapshotName(const long tid) { return "/capio_snapshot_" + std::to_string(tid); }
+std::string snapshotPath(const long tid) { return SHM_SNAPSHOT_PREFIX + std::to_string(tid); }
 
 struct SnapshotEntry {
     int fd;
@@ -40,22 +41,35 @@ size_t snapshotLength(const size_t count) {
     return sizeof(SnapshotHeader) + count * sizeof(SnapshotEntry);
 }
 
+/// @brief mmap of @p length bytes of @p fd, nullptr if it fails
+void *mapSnapshot(const long fd, const size_t length, const int protection) {
+    const long address =
+        syscall_no_intercept(SYS_mmap, nullptr, length, protection, MAP_SHARED, fd, 0);
+    return address < 0 && address > -4096 ? nullptr : reinterpret_cast<void *>(address);
+}
+
+void removeSnapshot(const std::string &path) {
+    syscall_no_intercept(SYS_unlinkat, AT_FDCWD, path.c_str(), 0);
+}
+
 } // namespace
 
 FileDescriptorTable::FileDescriptorTable(const long tid) {
-    const auto name = snapshotName(tid);
-    const int shm   = shm_open(name.c_str(), O_RDONLY, 0);
-    if (shm < 0) {
+    const auto path = snapshotPath(tid);
+    const long file =
+        syscall_no_intercept(SYS_openat, AT_FDCWD, path.c_str(), O_RDONLY | O_CLOEXEC);
+    if (file < 0) {
         return;
     }
-    shm_unlink(name.c_str()); // read once: a later exec writes its own
+    removeSnapshot(path); // read once: a later exec writes its own
     struct stat info{};
-    void *memory = MAP_FAILED;
-    if (fstat(shm, &info) == 0 && static_cast<size_t>(info.st_size) >= sizeof(SnapshotHeader)) {
-        memory = mmap(nullptr, info.st_size, PROT_READ, MAP_SHARED, shm, 0);
+    void *memory = nullptr;
+    if (syscall_no_intercept(SYS_fstat, file, &info) == 0 &&
+        static_cast<size_t>(info.st_size) >= sizeof(SnapshotHeader)) {
+        memory = mapSnapshot(file, info.st_size, PROT_READ);
     }
-    ::close(shm);
-    if (memory == MAP_FAILED) {
+    syscall_no_intercept(SYS_close, file);
+    if (memory == nullptr) {
         return;
     }
     const auto *header  = static_cast<const SnapshotHeader *>(memory);
@@ -76,56 +90,51 @@ FileDescriptorTable::FileDescriptorTable(const long tid) {
             }
         }
     }
-    munmap(memory, info.st_size);
+    syscall_no_intercept(SYS_munmap, memory, info.st_size);
 }
 
 void FileDescriptorTable::createSnapshot(const long tid) const {
-    // Copied under the lock, written without it: writing makes system calls that CAPIO handles,
-    // and their handlers read the table
-    std::vector<SnapshotEntry> entries;
-    {
-        const std::shared_lock lock(mutex());
-        entries.resize(_descriptors.size());
-        size_t i = 0;
-        std::unordered_map<const off64_t *, int> first_with_offset;
-        for (const auto &[fd, descriptor] : _descriptors) {
-            SnapshotEntry &entry = entries[i];
-            entry.fd             = fd;
-            entry.copy_of =
-                first_with_offset.try_emplace(descriptor.offset.get(), static_cast<int>(i))
-                    .first->second;
-            entry.offset  = *descriptor.offset;
-            entry.size    = descriptor.size;
-            entry.flags   = descriptor.flags;
-            entry.cloexec = descriptor.cloexec;
-            strncpy(entry.path, descriptor.path.c_str(), PATH_MAX - 1);
-            entry.path[PATH_MAX - 1] = '\0';
-            ++i;
-        }
-    }
-    const auto name = snapshotName(tid);
-    if (entries.empty()) {
-        shm_unlink(name.c_str()); // one left by an exec that failed
+    const std::shared_lock lock(mutex());
+    const auto path = snapshotPath(tid);
+    if (_descriptors.empty()) {
+        removeSnapshot(path); // one left by an exec that failed
         return;
     }
-    const auto length = snapshotLength(entries.size());
-    const int shm     = shm_open(name.c_str(), O_CREAT | O_RDWR | O_TRUNC, S_IRUSR | S_IWUSR);
-    if (shm < 0) {
+    const auto length = snapshotLength(_descriptors.size());
+    const long file =
+        syscall_no_intercept(SYS_openat, AT_FDCWD, path.c_str(),
+                             O_CREAT | O_RDWR | O_TRUNC | O_CLOEXEC, S_IRUSR | S_IWUSR);
+    if (file < 0) {
         return;
     }
-    void *memory = MAP_FAILED;
-    if (ftruncate(shm, static_cast<off_t>(length)) == 0) {
-        memory = mmap(nullptr, length, PROT_READ | PROT_WRITE, MAP_SHARED, shm, 0);
+    void *memory = nullptr;
+    if (syscall_no_intercept(SYS_ftruncate, file, length) == 0) {
+        memory = mapSnapshot(file, length, PROT_READ | PROT_WRITE);
     }
-    ::close(shm);
-    if (memory == MAP_FAILED) {
-        shm_unlink(name.c_str());
+    syscall_no_intercept(SYS_close, file);
+    if (memory == nullptr) {
+        removeSnapshot(path);
         return;
     }
     auto *header  = static_cast<SnapshotHeader *>(memory);
-    header->count = entries.size();
-    memcpy(header + 1, entries.data(), entries.size() * sizeof(SnapshotEntry));
-    munmap(memory, length);
+    auto *entries = reinterpret_cast<SnapshotEntry *>(header + 1);
+    header->count = _descriptors.size();
+    size_t i      = 0;
+    std::unordered_map<const off64_t *, int> first_with_offset;
+    for (const auto &[fd, descriptor] : _descriptors) {
+        SnapshotEntry &entry = entries[i];
+        entry.fd             = fd;
+        entry.copy_of = first_with_offset.try_emplace(descriptor.offset.get(), static_cast<int>(i))
+                            .first->second;
+        entry.offset  = *descriptor.offset;
+        entry.size    = descriptor.size;
+        entry.flags   = descriptor.flags;
+        entry.cloexec = descriptor.cloexec;
+        strncpy(entry.path, descriptor.path.c_str(), PATH_MAX - 1);
+        entry.path[PATH_MAX - 1] = '\0';
+        ++i;
+    }
+    syscall_no_intercept(SYS_munmap, memory, length);
 }
 
 void FileDescriptorTable::_remove(const int fd) {

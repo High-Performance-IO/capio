@@ -67,6 +67,9 @@ constexpr char SHM_SEM_EMPTY[]         = "_sem_num_empty_";
 constexpr char SHM_SPSC_PREFIX_WRITE[] = "capio_write_tid_";
 constexpr char SHM_SPSC_PREFIX_READ[]  = "capio_read_tid_";
 
+// The snapshot of the descriptors of a thread that execs, followed by its tid
+constexpr char SHM_SNAPSHOT_PREFIX[] = "/dev/shm/capio_snapshot_";
+
 // CAPIO common - shared channel by client and server
 constexpr char SHM_COMM_CHAN_NAME[]      = "request_buffer";
 constexpr char SHM_COMM_CHAN_NAME_RESP[] = "response_buffer_";
