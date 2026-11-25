@@ -70,15 +70,15 @@ inline void handle_getdents(int tid, int fd, long int count) {
     }
 }
 
-/// @brief "tid fd count offset". A descriptor of the FS variant is known by its process, as for
-/// close; the offset is only for those, as the server keeps the one of the memory variant.
+/// @brief "tid fd count offset". The offset is only used for descriptors of the FS variant: the
+/// server tracks the offset of memory ones itself.
 void getdents_handler(const char *const str) {
     int tid, fd;
     off64_t count, offset = 0;
     sscanf(str, "%d %d %ld %ld", &tid, &fd, &count, &offset);
     const pid_t pid = client_manager->getPid(tid);
-    if (const auto path = fs_storage_manager->getPath(pid, fd); !path.empty()) {
-        fs_storage_manager->list(tid, pid, fd, path, offset, count);
+    if (fs_storage_manager->ownsDescriptor(pid, fd)) {
+        fs_storage_manager->list(tid, pid, fd, offset, count);
         return;
     }
     handle_getdents(tid, fd, count);

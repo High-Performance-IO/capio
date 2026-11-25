@@ -104,6 +104,11 @@ class FsStorageManager {
     /// @brief The path of the descriptor @p fd of process @p pid, empty if it has none
     [[nodiscard]] std::string getPath(pid_t pid, int fd) const;
 
+    /// @brief Whether @p fd of process @p pid is a descriptor of the FS variant. The FS variant
+    /// tells the server about its descriptors with CAPIO_REQUEST_CREATE_FS, which the memory
+    /// variant never sends: so this tells which variant a close, dup or getdents is for.
+    [[nodiscard]] bool ownsDescriptor(pid_t pid, int fd) const;
+
     /**
      * @brief Thread @p tid of process @p pid closed its descriptor @p fd
      * @param error what the close failed with, 0 if it worked
@@ -153,10 +158,10 @@ class FsStorageManager {
     void noteNewEntry(const std::filesystem::path &path);
 
     /**
-     * @brief Thread @p tid of process @p pid lists its directory descriptor @p fd, of @p path:
-     * send it up to @p count bytes of entries from @p offset, waiting if its rule says so.
+     * @brief Thread @p tid of process @p pid lists its directory descriptor @p fd: send it up to
+     * @p count bytes of entries from @p offset, waiting if the directory's rule says so.
      */
-    void list(pid_t tid, pid_t pid, int fd, const std::string &path, off64_t offset, off64_t count);
+    void list(pid_t tid, pid_t pid, int fd, off64_t offset, off64_t count);
 
     /// @brief Block until @p path exists
     void waitForCreation(const std::filesystem::path &path) const;

@@ -151,6 +151,11 @@ std::string FsStorageManager::getPath(const pid_t pid, const int fd) const {
     return descriptor == process->second.end() ? std::string{} : descriptor->second;
 }
 
+bool FsStorageManager::ownsDescriptor(const pid_t pid, const int fd) const {
+    const auto process = _opened_fd_map.find(pid);
+    return process != _opened_fd_map.end() && process->second.count(fd) != 0;
+}
+
 void FsStorageManager::closed(const pid_t tid, const pid_t pid, const int fd, const int error) {
     _lister->forget(pid, fd);
     START_LOG(gettid(), "call(tid=%d, pid=%d, fd=%d, error=%d)", tid, pid, fd, error);
@@ -313,8 +318,9 @@ void FsStorageManager::noteNewEntry(const std::filesystem::path &path) {
     }
 }
 
-void FsStorageManager::list(const pid_t tid, const pid_t pid, const int fd, const std::string &path,
-                            const off64_t offset, const off64_t count) {
+void FsStorageManager::list(const pid_t tid, const pid_t pid, const int fd, const off64_t offset,
+                            const off64_t count) {
+    const std::string path = getPath(pid, fd);
     START_LOG(gettid(), "call(tid=%d, fd=%d, path=%s, offset=%ld)", tid, fd, path.c_str(), offset);
     using Mode         = FsDirectoryLister::Mode;
     const auto &engine = CapioCLEngine::get();

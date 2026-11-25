@@ -10,9 +10,8 @@ void dup_handler(const char *const str) {
     if (old_fd == new_fd) {
         return;
     }
-    // As for close: a descriptor of the FS variant is known by its process
     if (const pid_t pid = client_manager->getPid(tid);
-        !fs_storage_manager->getPath(pid, old_fd).empty()) {
+        fs_storage_manager->ownsDescriptor(pid, old_fd)) {
         fs_storage_manager->dup(pid, old_fd, new_fd);
     } else if (!storage_manager->getPath(tid, old_fd).empty()) {
         storage_manager->dup(tid, old_fd, new_fd);
