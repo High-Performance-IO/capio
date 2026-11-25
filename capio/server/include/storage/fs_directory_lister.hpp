@@ -45,18 +45,6 @@ class FsDirectoryLister final {
         long expected; ///< N of an on_n_files directory
     };
 
-    /// @brief Starts the thread
-    FsDirectoryLister();
-
-    FsDirectoryLister(const FsDirectoryLister &)            = delete;
-    FsDirectoryLister &operator=(const FsDirectoryLister &) = delete;
-
-    /// @brief Answer @p request, now or once its directory allows it
-    void list(Request request);
-
-    /// @brief Drop the listing of the descriptor @p fd of process @p pid, which is closed
-    void forget(pid_t pid, int fd);
-
   private:
     using Key = std::pair<pid_t, int>; ///< (pid, fd)
 
@@ -87,6 +75,19 @@ class FsDirectoryLister final {
 
     /// @brief Whether the on_n_files directory @p path is committed, or no longer exists
     static bool isCommitted(const std::string &path, long expected);
+
+  public:
+    /// @brief Starts the thread
+    FsDirectoryLister();
+
+    FsDirectoryLister(const FsDirectoryLister &)            = delete;
+    FsDirectoryLister &operator=(const FsDirectoryLister &) = delete;
+
+    /// @brief Answer @p request, now or once its directory allows it
+    void list(Request request);
+
+    /// @brief Drop the listing of the descriptor @p fd of process @p pid, which is closed
+    void forget(pid_t pid, int fd);
 };
 
 #endif // CAPIO_SERVER_STORAGE_FS_DIRECTORY_LISTER_HPP
