@@ -430,6 +430,21 @@ static int hook(long syscall_number, long arg0, long arg1, long arg2, long arg3,
         return 1;
     }
 
+    // A thread started before libcapio was initialized (e.g. by the constructor of another
+    // library, as UCX does with its fuse thread) never went through the clone hook, so it has no
+    // caches and no connection to the server. Only such a thread gets past this test, once.
+    // Its exit has nothing to clean up. Any other system call sets it up as the constructor does
+    // for the main thread, without waiting: no clone request announced it to the server. While it
+    // is set up, its own system calls (malloc's, for instance) go to the kernel, through
+    // syscall_no_intercept_flag.
+    if (buf_requests == nullptr) {
+        if (syscall_number == SYS_exit || syscall_number == SYS_exit_group) {
+            return 1;
+        }
+        LOG("Thread not initialized by libcapio: initializing it");
+        initialize_new_thread();
+    }
+
     try {
         return syscallTable[syscall_number](arg0, arg1, arg2, arg3, arg4, arg5, result);
     } catch (const std::exception &exception) {
