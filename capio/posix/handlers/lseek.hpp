@@ -3,6 +3,7 @@
 
 #if defined(SYS_lseek)
 
+#include "handlers/read.hpp"
 #include "utils/common.hpp"
 #include "utils/data.hpp"
 
@@ -82,13 +83,23 @@ inline off64_t capio_lseek(int fd, off64_t offset, int whence, long tid) {
             return new_offset;
         }
         // The end of a file and its data are known only once the producer wrote them, so a reader
-        // must wait for them first. The writer knows its own, and the other whence values only
-        // move the offset of a real descriptor: the kernel runs them.
-        const bool to_data = whence == SEEK_END || whence == SEEK_DATA || whence == SEEK_HOLE;
-        if (to_data && (fd_table->flags(fd) & O_ACCMODE) == O_RDONLY) {
-            throw CapioUnimplementedException("lseek of a reader to the end, data or a hole");
+        // waits for them first. The other whence values only move the offset of a real descriptor.
+        const bool looks_for_data = whence == SEEK_DATA || whence == SEEK_HOLE;
+        if (whence == SEEK_END) {
+            capio_wait_for_data_fs(fd, 0, CAPIO_UNTIL_COMMIT_FS, tid);
+        } else if (looks_for_data && offset >= 0) {
+            capio_wait_for_data_fs(fd, offset, 1, tid);
         }
-        return CAPIO_POSIX_SYSCALL_REQUEST_SKIP;
+        if (!looks_for_data) {
+            return CAPIO_POSIX_SYSCALL_REQUEST_SKIP;
+        }
+        long res = syscall_no_intercept(SYS_lseek, fd, offset, whence);
+        if (res == -ENXIO) {
+            // Only a hole so far. Whether data follows is known at the commit.
+            capio_wait_for_data_fs(fd, 0, CAPIO_UNTIL_COMMIT_FS, tid);
+            res = syscall_no_intercept(SYS_lseek, fd, offset, whence);
+        }
+        return capio_kernel_result(res);
     })
 }
 

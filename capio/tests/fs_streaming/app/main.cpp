@@ -15,6 +15,7 @@
 
 #include <dirent.h>
 #include <fcntl.h>
+#include <sys/sendfile.h>
 #include <sys/stat.h>
 #include <sys/syscall.h>
 #include <sys/wait.h>
@@ -110,7 +111,17 @@ const std::map<std::string, Operation> &operations() {
              execl("/no/such/program", "program", nullptr);
              return errno == ENOENT;
          }},
-        {"seek", [](const std::string &a) { return lseek(fd, std::stol(a), SEEK_SET) >= 0; }},
+        {"seek", // "<offset>" from the start, or "end" or "data:<offset>", which print where they
+                 // land
+         [](const std::string &a) {
+             if (a != "end" && a.rfind("data:", 0) != 0) {
+                 return lseek(fd, std::stol(a), SEEK_SET) >= 0;
+             }
+             const off_t at =
+                 a == "end" ? lseek(fd, 0, SEEK_END) : lseek(fd, std::stol(a.substr(5)), SEEK_DATA);
+             print(std::to_string(at));
+             return at >= 0;
+         }},
         {"print",
          [](const std::string &a) {
              print(a);
@@ -131,6 +142,37 @@ const std::map<std::string, Operation> &operations() {
          [](const std::string &a) {
              const auto to = a.find('>');
              return ::rename(a.substr(0, to).c_str(), a.substr(to + 1).c_str()) == 0;
+         }},
+        {"pread",
+         [](const std::string &) {
+             char buffer[8];
+             const ssize_t count = pread(fd, buffer, sizeof(buffer), 0);
+             if (count > 0) {
+                 print(std::string(buffer, count));
+             }
+             return count >= 0;
+         }},
+        {"copy", // "<method>><path>", with copy_file_range, sendfile or splice (through a pipe)
+         [](const std::string &a) {
+             const auto to            = a.find('>');
+             const std::string method = a.substr(0, to);
+             const int out  = ::open(a.substr(to + 1).c_str(), O_CREAT | O_WRONLY | O_TRUNC, 0644);
+             int channel[2] = {-1, -1};
+             if (method == "splice" && pipe(channel) != 0) {
+                 return false;
+             }
+             ssize_t count;
+             do {
+                 if (method == "copy_file_range") {
+                     count = copy_file_range(fd, nullptr, out, nullptr, 1 << 30, 0);
+                 } else if (method == "sendfile") {
+                     count = sendfile(out, fd, nullptr, 1 << 30);
+                 } else if ((count = splice(fd, nullptr, channel[1], nullptr, 4096, 0)) > 0) {
+                     count = splice(channel[0], nullptr, out, nullptr, count, 0);
+                 }
+             } while (count > 0);
+             ::close(out);
+             return count == 0;
          }},
         {"list",
          [](const std::string &a) {

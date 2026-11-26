@@ -40,6 +40,9 @@ inline constexpr auto KERNEL_LISTS_MARKER = [] {
     return marker;
 }();
 
+/// @brief FS variant: the number of bytes to wait for to wait for the commit of a file
+constexpr off64_t CAPIO_UNTIL_COMMIT_FS = LLONG_MAX;
+
 // CAPIO default values for shared memory
 constexpr char CAPIO_DEFAULT_WORKFLOW_NAME[] = "CAPIO";
 constexpr char CAPIO_DEFAULT_APP_NAME[]      = "default_app";

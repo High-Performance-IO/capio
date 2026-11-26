@@ -150,6 +150,15 @@ static constexpr long CAPIO_NR_SYSCALLS = 1 + std::max({
 #ifdef SYS_openat
                                                   SYS_openat,
 #endif
+#ifdef SYS_pread64
+                                                  SYS_pread64,
+#endif
+#ifdef SYS_preadv
+                                                  SYS_preadv,
+#endif
+#ifdef SYS_preadv2
+                                                  SYS_preadv2,
+#endif
 #ifdef SYS_read
                                                   SYS_read,
 #endif
@@ -320,6 +329,15 @@ static constexpr std::array<CPHandler_t, CAPIO_NR_SYSCALLS> build_syscall_table(
 #endif
 #ifdef SYS_openat
     _syscallTable[SYS_openat] = openat_handler;
+#endif
+#ifdef SYS_pread64
+    _syscallTable[SYS_pread64] = pread_handler;
+#endif
+#ifdef SYS_preadv
+    _syscallTable[SYS_preadv] = preadv_handler;
+#endif
+#ifdef SYS_preadv2
+    _syscallTable[SYS_preadv2] = preadv_handler;
 #endif
 #ifdef SYS_read
     _syscallTable[SYS_read] = read_handler;

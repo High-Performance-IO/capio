@@ -8,6 +8,7 @@
 
 #include "common/env.hpp"
 
+#include "handlers/read.hpp"
 #include "utils/common.hpp"
 #include "utils/data.hpp"
 #include "utils/filesystem.hpp"
@@ -437,10 +438,12 @@ inline int copy_file_range_handler(long arg0, long arg1, long arg2, long arg3, l
     const auto len    = static_cast<size_t>(arg4);
     const auto flags  = static_cast<unsigned int>(arg5);
     const long tid    = syscall_no_intercept(SYS_gettid);
+    START_LOG(tid, "call(fd_in=%d, fd_out=%d, len=%zu, flags=%u)", fd_in, fd_out, len, flags);
 
     FS_MODE({
-        if (fd_table->contains(fd_in) || fd_table->contains(fd_out)) {
-            throw CapioUnimplementedException("copy_file_range");
+        // The kernel copies, once there is data. It may copy less, but 0 only at the commit.
+        if (len != 0) {
+            capio_wait_for_data_fs(fd_in, off_in != nullptr ? *off_in : -1, 1, tid);
         }
         return CAPIO_POSIX_SYSCALL_SKIP;
     })
