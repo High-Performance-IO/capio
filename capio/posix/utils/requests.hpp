@@ -373,17 +373,6 @@ inline off64_t consent_to_proceed_request(const std::filesystem::path &path, con
     return res;
 }
 
-/// @brief Who lists the directory @p path: CAPIO_FS_LISTED_BY_KERNEL or CAPIO_FS_LISTED_BY_SERVER.
-/// In update mode the answer comes once the directory is committed.
-inline off64_t list_request_fs(const std::filesystem::path &path, const long tid) {
-    START_LOG(capio_syscall(SYS_gettid), "call(path=%s, tid=%ld)", path.c_str(), tid);
-    fs_request(CAPIO_REQUEST_LIST_FS, tid, "", path.native());
-    off64_t res;
-    buff_response->read(&res);
-    LOG("Response to request is %ld", res);
-    return res;
-}
-
 // return amount of readable bytes
 inline off64_t read_request_fs(const std::filesystem::path &path, const off64_t end_of_read,
                                const long tid, const long fd) {

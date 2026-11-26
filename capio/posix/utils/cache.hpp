@@ -243,36 +243,20 @@ class ReadCacheFS {
         capio_syscall(SYS_statx, fd, "", AT_EMPTY_PATH | AT_STATX_FORCE_SYNC, STATX_SIZE, &fresh);
 #endif
     }
-};
 
-/**
- * @brief FS variant: who lists each CAPIO directory, as the server said. The kernel does, unless
- * the thread consumes an on_n_files directory in no_update mode: the server then returns the
- * entries as they appear. In update mode the server answers once the directory is committed.
- */
-class DirectoryListerCache {
-    std::unordered_map<std::string, bool> listed_by_server;
-
-  public:
-    /// @brief Whether the server lists @p path, asking it the first time
-    bool listedByServer(const std::string &path, const long tid) {
-        if (const auto known = listed_by_server.find(path); known != listed_by_server.end()) {
-            return known->second;
-        }
-        return listed_by_server[path] = list_request_fs(path, tid) == CAPIO_FS_LISTED_BY_SERVER;
+    /// @brief Whether the file of @p fd can be read with nothing to wait for. For a directory: the
+    /// server lets the kernel list it.
+    [[nodiscard]] bool readsAll(const int fd) const {
+        const auto known = available_read_cache.find(fd_table->path(fd));
+        return known != available_read_cache.end() && known->second == -1;
     }
 
-    /// @brief Whether the server is known to list @p path, without asking it
-    [[nodiscard]] bool knownListedByServer(const std::string &path) const {
-        const auto known = listed_by_server.find(path);
-        return known != listed_by_server.end() && known->second;
-    }
+    void setReadsAll(const int fd) { available_read_cache[fd_table->path(fd)] = -1; }
 };
 
 inline thread_local WriteCache *write_cache;
 inline thread_local ReadCache *read_cache;
 inline thread_local ConsentRequestCache *consent_request_cache;
 inline thread_local ReadCacheFS *read_request_cache;
-inline thread_local DirectoryListerCache *directory_lister_cache;
 
 #endif // CAPIO_SERVER_UTILS_CACHE

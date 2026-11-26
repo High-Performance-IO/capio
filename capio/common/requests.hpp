@@ -30,18 +30,13 @@ constexpr const int CAPIO_REQUEST_READ_FS          = 25;
 constexpr const int CAPIO_REQUEST_CREATE_FS        = 26;
 constexpr const int CAPIO_REQUEST_OPEN_FS          = 27;
 constexpr const int CAPIO_REQUEST_RENAME_FS        = 28;
-constexpr const int CAPIO_REQUEST_LIST_FS          = 29;
 
-constexpr const int CAPIO_NR_REQUESTS = 30;
+constexpr const int CAPIO_NR_REQUESTS = 29;
 
 /* WHETHER A DESCRIPTOR OF CAPIO_REQUEST_CREATE_FS MAKES ITS CLIENT A PRODUCER */
 constexpr const int CAPIO_FS_NOT_PRODUCED            = 0; ///< read-only, or inherited with fork
 constexpr const int CAPIO_FS_PRODUCED                = 1; ///< created, or opened to write
 constexpr const int CAPIO_FS_PRODUCED_IF_NO_PRODUCER = 2; ///< writable, inherited with exec
-
-/* WHO LISTS A DIRECTORY OF THE FS VARIANT, AS CAPIO_REQUEST_LIST_FS ANSWERS */
-constexpr const int CAPIO_FS_LISTED_BY_KERNEL = 0;
-constexpr const int CAPIO_FS_LISTED_BY_SERVER = 1; ///< on_n_files in no_update mode, for consumers
 
 /*REQUESTS FOR SERVER TO SERVER COMMUNICATION*/
 

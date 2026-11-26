@@ -16,7 +16,6 @@
 #include "capiocl/engine.h"
 #include "client-manager/client_manager.hpp"
 #include "common/path.hpp"
-#include "common/requests.hpp"
 #include "utils/capiocl_adapter.hpp"
 #include "utils/filesystem.hpp"
 #include "utils/runtime_configuration.hpp"
@@ -65,6 +64,15 @@ template <typename Body> void spawn_without_signals(Body &&body) {
 }
 
 constexpr off64_t RECORD = sizeof(linux_dirent64);
+
+/// @brief Let thread @p tid, which asked for @p count bytes of entries from @p offset, list the
+/// directory in the kernel
+void reply_kernel_lists(const pid_t tid, const off64_t offset, const off64_t count) {
+    const linux_dirent64 marker = kernel_lists_marker();
+    const off64_t size          = count < RECORD ? 0 : RECORD;
+    client_manager->replyToClientWithData(tid, offset + size,
+                                          reinterpret_cast<const char *>(&marker), size);
+}
 
 /// @brief The entries of @p path as linux_dirent64 records, with "." and ".." but without
 /// CAPIO-CL's token files
@@ -366,7 +374,21 @@ void FsStorageManager::list(const pid_t tid, const pid_t pid, const int fd, cons
                             const off64_t count) {
     const std::string path = getPath(pid, fd);
     START_LOG(gettid(), "call(tid=%d, fd=%d, path=%s, offset=%ld)", tid, fd, path.c_str(), offset);
-    const long expected = expectedEntries(path); // CAPIO-CL's count is for the request thread only
+    // Decided here: CAPIO-CL's count of entries and the producers are for the request thread only
+    const auto &engine = CapioCLEngine::get();
+    if (engine.getCommitRule(path) != capiocl::commitRules::ON_N_FILES || engine.isExcluded(path) ||
+        isProducer(tid, path)) {
+        reply_kernel_lists(tid, offset, count);
+        return;
+    }
+    const long expected = expectedEntries(path);
+    if (!engine.isFirable(path)) { // update mode: the kernel lists, once committed
+        spawn_without_signals([this, tid, path, offset, count, expected] {
+            (void) waitForConsent(path, true, expected);
+            reply_kernel_lists(tid, offset, count);
+        });
+        return;
+    }
     const std::pair key{pid, fd};
     if (offset == 0) {
         // A new listing, or rewinddir: list the directory as it is now
@@ -416,22 +438,6 @@ void FsStorageManager::list(const pid_t tid, const pid_t pid, const int fd, cons
             found              = read_directory(path);
         }
     });
-}
-
-void FsStorageManager::chooseLister(const pid_t tid, const std::filesystem::path &path) {
-    START_LOG(gettid(), "call(tid=%d, path=%s)", tid, path.c_str());
-    const auto &engine = CapioCLEngine::get();
-    if (engine.getCommitRule(path) != capiocl::commitRules::ON_N_FILES || engine.isExcluded(path) ||
-        isProducer(tid, path)) {
-        client_manager->replyToClient(tid, CAPIO_FS_LISTED_BY_KERNEL);
-    } else if (engine.isFirable(path)) {
-        client_manager->replyToClient(tid, CAPIO_FS_LISTED_BY_SERVER);
-    } else {
-        spawn_without_signals([this, tid, path, expected = expectedEntries(path)] {
-            (void) waitForConsent(path, true, expected);
-            client_manager->replyToClient(tid, CAPIO_FS_LISTED_BY_KERNEL);
-        });
-    }
 }
 
 void FsStorageManager::waitForCreation(const std::filesystem::path &path) const {

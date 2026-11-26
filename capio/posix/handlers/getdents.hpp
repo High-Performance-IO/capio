@@ -18,11 +18,10 @@ inline int getdents_handler_impl(long arg0, long arg1, long arg2, long *result, 
 
     if (fd_table->contains(fd)) {
         LOG("fd=%d, is a capio file descriptor", fd);
-        // The FS variant leaves the listing to the kernel, once the server allows it, unless the
-        // server returns the entries itself (see DirectoryListerCache)
+        // The FS server lets the kernel list the directory, once it may be listed, unless it
+        // returns the entries itself: for a consumer of an on_n_files directory in no_update mode
         FS_MODE({
-            if (!directory_lister_cache->listedByServer(fd_table->path(fd),
-                                                        syscall_no_intercept(SYS_gettid))) {
+            if (read_request_cache->readsAll(fd)) {
                 return CAPIO_POSIX_SYSCALL_SKIP;
             }
         })
@@ -32,6 +31,13 @@ inline int getdents_handler_impl(long arg0, long arg1, long arg2, long *result, 
         }
         write_cache->flush();
         *result = read_cache->read(fd, buffer, count, true, is64bit);
+        FS_MODE({
+            if (*result == sizeof(linux_dirent64) && is_kernel_lists_marker(*buffer)) {
+                fd_table->setOffset(fd, fd_table->offset(fd) - *result);
+                read_request_cache->setReadsAll(fd);
+                return CAPIO_POSIX_SYSCALL_SKIP;
+            }
+        })
 
         DBG(syscall_no_intercept(SYS_gettid), [](char *buf, off64_t count) {
             START_LOG(syscall_no_intercept(SYS_gettid), "call (count=%ld)", count);

@@ -14,9 +14,8 @@ inline void initialize_data_queues(const long tid) {
     read_cache =
         new ReadCache(tid, get_cache_lines(), get_cache_line_size(), get_capio_workflow_name());
     FS_MODE({
-        consent_request_cache  = new ConsentRequestCache();
-        read_request_cache     = new ReadCacheFS();
-        directory_lister_cache = new DirectoryListerCache();
+        consent_request_cache = new ConsentRequestCache();
+        read_request_cache    = new ReadCacheFS();
     })
 }
 

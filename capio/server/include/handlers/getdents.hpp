@@ -70,9 +70,8 @@ inline void handle_getdents(int tid, int fd, long int count) {
     }
 }
 
-/// @brief "tid fd count offset". The offset is only used for descriptors of the FS variant, which
-/// asks only for on_n_files directories in no_update mode: the server tracks the offset of memory
-/// ones itself.
+/// @brief "tid fd count offset". The offset is only used for descriptors of the FS variant: the
+/// server tracks the offset of memory ones itself.
 void getdents_handler(const char *const str) {
     int tid, fd;
     off64_t count, offset = 0;
@@ -83,15 +82,6 @@ void getdents_handler(const char *const str) {
         return;
     }
     handle_getdents(tid, fd, count);
-}
-
-/// @brief "tid path": who lists the directory, the kernel or the server (FS variant only)
-void list_fs_handler(const char *const str) {
-    int tid, consumed = 0;
-    if (sscanf(str, "%d%n", &tid, &consumed) != 1) {
-        return;
-    }
-    fs_storage_manager->chooseLister(tid, fs_request_path(tid, str, consumed));
 }
 
 #endif // CAPIO_GETDENTS_HPP
