@@ -21,11 +21,18 @@ jobs:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
       - name: "Get CAPIO version"
-        run: echo "CAPIO_VERSION=$(cat CMakeLists.txt | grep "        VERSION" | awk '{print $2}')" >> $GITHUB_ENV
+        run: |
+          VERSION=$(grep "        VERSION" CMakeLists.txt | awk '{print $2}')
+          SUFFIX=$(sed -n 's/^set(CAPIO_VERSION_SUFFIX "\(.*\)")$/\1/p' CMakeLists.txt)
+          echo "CAPIO_VERSION=${VERSION}${SUFFIX}" >> $GITHUB_ENV
+          # A version with a suffix (such as 2.0.0-rc1) is a pre-release
+          echo "CAPIO_PRERELEASE=$([ -n "$SUFFIX" ] && echo true || echo false)" >> $GITHUB_ENV
+      # Only releases get an image: a pre-release stops here
       - name: "Check if Docker image already exists"
+        if: ${{ env.CAPIO_PRERELEASE == 'false' }}
         run: echo "NEW_IMAGE=$(docker buildx imagetools inspect alphaunito/capio:${CAPIO_VERSION} > /dev/null 2>&1; echo $?)" >> $GITHUB_ENV
       - name: "Build Docker image"
-        if: ${{ env.NEW_IMAGE == 1 }}
+        if: ${{ env.CAPIO_PRERELEASE == 'false' && env.NEW_IMAGE == 1 }}
         uses: docker/build-push-action@v7
         with:
           build-args: |
@@ -43,7 +50,12 @@ jobs:
     steps:
       - uses: actions/checkout@v7
       - name: "Get CAPIO version"
-        run: echo "CAPIO_VERSION=$(cat CMakeLists.txt | grep "        VERSION" | awk '{print $2}')" >> $GITHUB_ENV
+        run: |
+          VERSION=$(grep "        VERSION" CMakeLists.txt | awk '{print $2}')
+          SUFFIX=$(sed -n 's/^set(CAPIO_VERSION_SUFFIX "\(.*\)")$/\1/p' CMakeLists.txt)
+          echo "CAPIO_VERSION=${VERSION}${SUFFIX}" >> $GITHUB_ENV
+          # A version with a suffix (such as 2.0.0-rc1) is a pre-release
+          echo "CAPIO_PRERELEASE=$([ -n "$SUFFIX" ] && echo true || echo false)" >> $GITHUB_ENV
       - name: "Check tag existence"
         uses: mukunku/tag-exists-action@v1.7.0
         id: check-tag
@@ -59,4 +71,4 @@ jobs:
           tag_name: ${{ env.CAPIO_VERSION }}
           release_name: ${{ env.CAPIO_VERSION }}
           draft: false
-          prerelease: false
+          prerelease: ${{ env.CAPIO_PRERELEASE == 'true' }}

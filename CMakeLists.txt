@@ -7,8 +7,14 @@ cmake_minimum_required(VERSION 3.15)
 project(capio
         LANGUAGES CXX
         DESCRIPTION "Cross-Application Programmable I/O"
-        VERSION 1.0.0
+        VERSION 2.0.0
 )
+
+# Pre-release suffix of the version, such as "-rc1"; empty for a release. CMake versions are only
+# numbers, so the suffix lives here. A suffix makes release.yml publish a pre-release on GitHub, and
+# no Docker image.
+set(CAPIO_VERSION_SUFFIX "-rc1")
+set(CAPIO_FULL_VERSION "${CMAKE_PROJECT_VERSION}${CAPIO_VERSION_SUFFIX}")
 
 # Set required C++ standard
 set(CMAKE_CXX_STANDARD 17)
@@ -54,7 +60,7 @@ find_package(Threads REQUIRED)
 #####################################
 # Definitions
 #####################################
-add_compile_definitions(CAPIO_VERSION="${CMAKE_PROJECT_VERSION}")
+add_compile_definitions(CAPIO_VERSION="${CAPIO_FULL_VERSION}")
 
 set(CAPIO_LOG_ENABLED FALSE)
 IF (CAPIO_LOG AND CMAKE_BUILD_TYPE STREQUAL "Debug")
