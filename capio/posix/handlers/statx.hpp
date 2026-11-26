@@ -109,14 +109,23 @@ inline int capio_statx(int dirfd, const std::string_view &pathname, int flags, i
 }
 
 int statx_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg5, long *result) {
-    auto dirfd = static_cast<int>(arg0);
-    const std::string_view pathname(reinterpret_cast<const char *>(arg1));
-    auto flags = static_cast<int>(arg2);
-    auto mask  = static_cast<int>(arg3);
-    auto *buf  = reinterpret_cast<struct statx *>(arg4);
-    long tid   = syscall_no_intercept(SYS_gettid);
+    // statx(dirfd, pathname, flags, mask, statxbuf)
+    const auto dirfd = static_cast<int>(arg0);
+    const auto *path = reinterpret_cast<const char *>(arg1);
+    const auto flags = static_cast<int>(arg2);
+    const auto mask  = static_cast<int>(arg3);
+    auto *buf        = reinterpret_cast<struct statx *>(arg4);
+    const long tid   = syscall_no_intercept(SYS_gettid);
+    START_LOG(tid, "call(dirfd=%d, path=%s, flags=%d, mask=%d)", dirfd,
+              path != nullptr ? path : "(null)", flags, mask);
 
-    return posix_return_value(capio_statx(dirfd, pathname, flags, mask, buf, tid), result);
+    // A null path or buffer fails with EFAULT, from the kernel. With AT_EMPTY_PATH a null path is
+    // the empty one (Linux 6.11): the file of dirfd.
+    if ((path == nullptr && (flags & AT_EMPTY_PATH) == 0) || buf == nullptr) {
+        return CAPIO_POSIX_SYSCALL_SKIP;
+    }
+    return posix_return_value(
+        capio_statx(dirfd, path != nullptr ? path : "", flags, mask, buf, tid), result);
 }
 
 #endif // SYS_statx
