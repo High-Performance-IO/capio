@@ -438,6 +438,7 @@ inline int copy_file_range_handler(long arg0, long arg1, long arg2, long arg3, l
     const auto len    = static_cast<size_t>(arg4);
     const auto flags  = static_cast<unsigned int>(arg5);
     const long tid    = syscall_no_intercept(SYS_gettid);
+    START_LOG(tid, "call(fd_in=%d, fd_out=%d, len=%zu, flags=%u)", fd_in, fd_out, len, flags);
 
     FS_MODE({
         // The kernel copies, once there is data. It may copy less, but 0 only at the commit.

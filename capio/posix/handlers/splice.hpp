@@ -41,8 +41,14 @@ inline int capio_in_kernel_copy(int fd_in, const loff_t *off_in, size_t count, i
 #ifdef SYS_splice
 int splice_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg5, long *result) {
     // splice(fd_in, off_in, fd_out, off_out, len, flags)
-    return capio_in_kernel_copy(static_cast<int>(arg0), reinterpret_cast<const loff_t *>(arg1),
-                                static_cast<size_t>(arg4), static_cast<int>(arg2), result);
+    const auto fd_in   = static_cast<int>(arg0);
+    const auto *off_in = reinterpret_cast<const loff_t *>(arg1);
+    const auto fd_out  = static_cast<int>(arg2);
+    const auto len     = static_cast<size_t>(arg4);
+    START_LOG(syscall_no_intercept(SYS_gettid), "call(fd_in=%d, fd_out=%d, len=%zu)", fd_in, fd_out,
+              len);
+
+    return capio_in_kernel_copy(fd_in, off_in, len, fd_out, result);
 }
 #endif
 
@@ -50,8 +56,14 @@ int splice_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long a
 int sendfile_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg5,
                      long *result) {
     // sendfile(out_fd, in_fd, offset, count)
-    return capio_in_kernel_copy(static_cast<int>(arg1), reinterpret_cast<const loff_t *>(arg2),
-                                static_cast<size_t>(arg3), static_cast<int>(arg0), result);
+    const auto out_fd  = static_cast<int>(arg0);
+    const auto in_fd   = static_cast<int>(arg1);
+    const auto *offset = reinterpret_cast<const loff_t *>(arg2);
+    const auto count   = static_cast<size_t>(arg3);
+    START_LOG(syscall_no_intercept(SYS_gettid), "call(out_fd=%d, in_fd=%d, count=%zu)", out_fd,
+              in_fd, count);
+
+    return capio_in_kernel_copy(in_fd, offset, count, out_fd, result);
 }
 #endif
 

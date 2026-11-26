@@ -20,8 +20,6 @@ TEST_P(FsWaitingTest, Pread) { EXPECT_OUTPUT(run("cons", {"open:f", "pread"}), "
 
 TEST_P(FsWaitingTest, Preadv) { EXPECT_OUTPUT(run("cons", {"open:f", "preadv"}), "AAAABBBB"); }
 
-TEST_P(FsWaitingTest, Mmap) { EXPECT_OUTPUT(run("cons", {"open:f", "mmap"}), "AAAABBBB"); }
-
 TEST_P(FsWaitingTest, SeekEnd) { EXPECT_OUTPUT(run("cons", {"open:f", "seek_end"}), "8"); }
 
 TEST_P(FsWaitingTest, SeekData) { EXPECT_OUTPUT(run("cons", {"open:f", "seek_data:4"}), "4"); }

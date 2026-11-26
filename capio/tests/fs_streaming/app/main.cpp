@@ -15,7 +15,6 @@
 
 #include <dirent.h>
 #include <fcntl.h>
-#include <sys/mman.h>
 #include <sys/sendfile.h>
 #include <sys/stat.h>
 #include <sys/syscall.h>
@@ -153,16 +152,6 @@ const std::map<std::string, Operation> &operations() {
                  print(std::string(buffer, count));
              }
              return count >= 0;
-         }},
-        {"mmap",
-         [](const std::string &) {
-             // Without fstat, which would wait on its own in update mode
-             auto *data = static_cast<char *>(mmap(nullptr, 4096, PROT_READ, MAP_PRIVATE, fd, 0));
-             if (data == MAP_FAILED) {
-                 return false;
-             }
-             print(std::string(data, strnlen(data, 4096)));
-             return true;
          }},
         {"seek_end",
          [](const std::string &) {

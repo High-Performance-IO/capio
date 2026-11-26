@@ -56,8 +56,11 @@ inline ssize_t capio_readv(int fd, const struct iovec *iov, int iovcnt, long tid
  *   read, readv, pread, preadv, preadv2   offset + count
  *   copy_file_range, sendfile, splice     offset + 1: their callers loop on short results
  *   SEEK_DATA, SEEK_HOLE                  offset + 1
- *   SEEK_END, mmap, FICLONE               the commit (CAPIO_UNTIL_COMMIT_FS): the end of a stream
- * is not known before, and neither page faults nor clones can stream
+ *   SEEK_END, FICLONE                     the commit (CAPIO_UNTIL_COMMIT_FS): the end of a stream
+ * is not known before, and clones cannot stream
+ *
+ * mmap does not wait: CAPIO and libc map memory with it themselves, so it is not intercepted. A
+ * mapping of a file not committed yet may miss its end.
  *
  * In update mode it is the commit anyway. stat and fstat never wait for data: in no_update they
  * return the current size.
@@ -122,12 +125,18 @@ int readv_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long ar
 
 #ifdef SYS_pread64
 int pread_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg5, long *result) {
+    // pread(fd, buffer, count, offset). The memory variant uses none of them, only the log.
+    [[maybe_unused]] const auto fd     = static_cast<int>(arg0);
+    [[maybe_unused]] const auto count  = static_cast<off64_t>(arg2);
+    [[maybe_unused]] const auto offset = static_cast<off64_t>(arg3);
+    [[maybe_unused]] const long tid    = syscall_no_intercept(SYS_gettid);
+    START_LOG(tid, "call(fd=%d, count=%ld, offset=%ld)", fd, count, offset);
+
     MEMORY_MODE({ return CAPIO_POSIX_SYSCALL_SKIP; })
     FS_MODE({
-        // pread(fd, buffer, count, offset). A negative offset is EINVAL, from the kernel.
-        if (arg3 >= 0) {
-            capio_wait_for_data_fs(static_cast<int>(arg0), arg3, arg2,
-                                   syscall_no_intercept(SYS_gettid));
+        // A negative offset is EINVAL, from the kernel
+        if (offset >= 0) {
+            capio_wait_for_data_fs(fd, offset, count, tid);
         }
         return CAPIO_POSIX_SYSCALL_SKIP;
     })
@@ -136,14 +145,19 @@ int pread_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long ar
 
 #if defined(SYS_preadv) || defined(SYS_preadv2)
 int preadv_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg5, long *result) {
+    // preadv(fd, iov, iovcnt, offset), and preadv2, which takes -1 for the file offset. The memory
+    // variant uses none of them, only the log.
+    [[maybe_unused]] const auto fd     = static_cast<int>(arg0);
+    [[maybe_unused]] const auto *iov   = reinterpret_cast<const struct iovec *>(arg1);
+    [[maybe_unused]] const auto iovcnt = static_cast<int>(arg2);
+    [[maybe_unused]] const auto offset = static_cast<off64_t>(arg3);
+    [[maybe_unused]] const long tid    = syscall_no_intercept(SYS_gettid);
+    START_LOG(tid, "call(fd=%d, iovcnt=%d, offset=%ld)", fd, iovcnt, offset);
+
     MEMORY_MODE({ return CAPIO_POSIX_SYSCALL_SKIP; })
     FS_MODE({
-        // preadv(fd, iov, iovcnt, offset), and preadv2, which takes -1 for the file offset
-        if (arg3 >= -1) {
-            capio_wait_for_data_fs(static_cast<int>(arg0), arg3,
-                                   capio_iov_length(reinterpret_cast<const struct iovec *>(arg1),
-                                                    static_cast<int>(arg2)),
-                                   syscall_no_intercept(SYS_gettid));
+        if (offset >= -1) {
+            capio_wait_for_data_fs(fd, offset, capio_iov_length(iov, iovcnt), tid);
         }
         return CAPIO_POSIX_SYSCALL_SKIP;
     })
