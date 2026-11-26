@@ -88,10 +88,11 @@ long count_entries(const std::filesystem::path &directory) {
 }
 
 /// @brief Whether the on_n_files directory @p directory is committed, committing it first if it
-/// has its @p expected entries, or no longer exists: nothing more will appear in it. This can
-/// block, so only waiting threads may call it.
-bool is_directory_committed(const std::filesystem::path &directory, const long expected) {
-    const long entries = count_entries(directory);
+/// has its N entries, or no longer exists: nothing more will appear in it. This can block, so only
+/// waiting threads may call it.
+bool is_directory_committed(const std::filesystem::path &directory) {
+    const long expected = CapioCLEngine::get().getDirectoryFileCount(directory);
+    const long entries  = count_entries(directory);
     if (entries >= expected) {
         CapioCLEngine::get().setCommitted(directory);
     }
@@ -349,10 +350,6 @@ void FsStorageManager::rename(const pid_t tid, const std::string &from, const bo
     }
 }
 
-long FsStorageManager::expectedEntries(const std::filesystem::path &directory) {
-    return std::max(1L, CapioCLEngine::get().getDirectoryFileCount(directory));
-}
-
 void FsStorageManager::noteNewEntry(const std::filesystem::path &path) {
     const auto directory = path.parent_path();
     if (CapioCLEngine::get().getCommitRule(directory) != capiocl::commitRules::ON_N_FILES) {
@@ -363,7 +360,7 @@ void FsStorageManager::noteNewEntry(const std::filesystem::path &path) {
         return;
     }
     created.names.insert(path.filename());
-    const long expected = expectedEntries(directory);
+    const long expected = CapioCLEngine::get().getDirectoryFileCount(directory);
     if (static_cast<long>(created.names.size()) >= expected &&
         count_entries(directory) >= expected) {
         commit(directory);
@@ -388,21 +385,20 @@ void FsStorageManager::list(const pid_t tid, const pid_t pid, const int fd, cons
         const std::lock_guard lock(_listings_mutex);
         _listings.erase(key);
     }
-    spawn_without_signals([this, tid, key, path, offset, count, expected = expectedEntries(path),
-                           as_it_grows = engine.isFirable(path)] {
-        serveListing(tid, key, path, offset, count, expected, as_it_grows);
-    });
+    spawn_without_signals(
+        [this, tid, key, path, offset, count, as_it_grows = engine.isFirable(path)] {
+            serveListing(tid, key, path, offset, count, as_it_grows);
+        });
 }
 
 void FsStorageManager::serveListing(const pid_t tid, const std::pair<pid_t, int> key,
                                     const std::string &path, const off64_t offset,
-                                    const off64_t count, const long expected,
-                                    const bool as_it_grows) {
+                                    const off64_t count, const bool as_it_grows) {
     for (bool first_pass = true;; first_pass = false) {
         if (!first_pass) {
             std::this_thread::sleep_for(std::chrono::milliseconds(100));
         }
-        const bool committed = is_directory_committed(path, expected);
+        const bool committed = is_directory_committed(path);
         // A committed directory no longer changes: the kernel lists it, unless the server is half
         // way through returning it
         if (committed && (offset == 0 || !as_it_grows)) {
@@ -478,19 +474,17 @@ off64_t FsStorageManager::waitForData(const std::filesystem::path &path,
     }
 }
 
-off64_t FsStorageManager::waitForConsent(const std::filesystem::path &path, const bool by_entries,
-                                         const long expected) const {
+off64_t FsStorageManager::waitForConsent(const std::filesystem::path &path) const {
+    const auto &engine = CapioCLEngine::get();
     for (;;) {
         if (std::error_code error; std::filesystem::exists(path, error)) {
             // Directories are never committed, except those with an on_n_files rule
-            if ((std::filesystem::is_directory(path, error) &&
-                 CapioCLEngine::get().getCommitRule(path) != capiocl::commitRules::ON_N_FILES) ||
-                !isDeclared(path)) {
+            const bool by_entries = engine.getCommitRule(path) == capiocl::commitRules::ON_N_FILES;
+            if ((std::filesystem::is_directory(path, error) && !by_entries) || !isDeclared(path)) {
                 return 0;
             }
-            if (CapioCLEngine::get().isFirable(path) ||
-                (by_entries ? is_directory_committed(path, expected)
-                            : CapioCLEngine::get().isCommitted(path))) {
+            if (engine.isFirable(path) ||
+                (by_entries ? is_directory_committed(path) : engine.isCommitted(path))) {
                 return 1;
             }
         }

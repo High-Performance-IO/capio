@@ -75,7 +75,7 @@ class FsStorageManager {
 
     /// @brief Answer the getdents of thread @p tid, on a thread of its own (see list)
     void serveListing(pid_t tid, std::pair<pid_t, int> key, const std::string &path, off64_t offset,
-                      off64_t count, long expected, bool as_it_grows);
+                      off64_t count, bool as_it_grows);
 
     /// @brief Up to @p count bytes of the entries of @p key from @p offset, after reading @p path
     /// for new ones; none if there is no new entry yet and the directory is not @p committed
@@ -150,10 +150,6 @@ class FsStorageManager {
     void rename(pid_t tid, const std::string &from, bool from_capio, const std::string &to,
                 bool to_capio);
 
-    /// @brief N of the on_n_files directory @p directory, at least 1. The schema requires n_files
-    /// with on_n_files, and once it is set CAPIO-CL no longer changes it.
-    [[nodiscard]] static long expectedEntries(const std::filesystem::path &directory);
-
     /**
      * @brief A producer has created @p path. Counts it as an entry of its directory, so that an
      * on_n_files directory is committed even when nobody is listing it (rules that depend on the
@@ -184,12 +180,11 @@ class FsStorageManager {
     [[nodiscard]] off64_t waitForData(const std::filesystem::path &path, off64_t end_of_read) const;
 
     /**
-     * @brief Block until @p path exists and, if the config declares it, is committed. With
-     * @p by_entries, "committed" means it has @p expected entries.
+     * @brief Block until @p path exists and, if the config declares it, is committed: for an
+     * on_n_files directory, until it has its N entries
      * @return 1 if that holds from now on, 0 if @p path is not declared
      */
-    [[nodiscard]] off64_t waitForConsent(const std::filesystem::path &path, bool by_entries,
-                                         long expected) const;
+    [[nodiscard]] off64_t waitForConsent(const std::filesystem::path &path) const;
 
     /// @brief Wait, at most @p timeout, for the closes still being counted: a count lost at exit
     /// would leave the file uncommitted for the servers that start later

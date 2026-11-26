@@ -143,11 +143,8 @@ void consent_handler(const char *const str) {
             return;
         }
     }
-    const bool by_entries =
-        CapioCLEngine::get().getCommitRule(path) == capiocl::commitRules::ON_N_FILES;
-    const long expected = by_entries ? fs_storage_manager->expectedEntries(path) : 0;
-    // Block the termination signals in the waiting thread. Their handler frees memory and exits;
-    // if it ran on a thread holding a lock (malloc's or CAPIO-CL's), it would wait for it forever.
+    // The waiter does not get the termination signals: their handler frees memory and exits, and
+    // run on a thread that holds a lock (malloc's, CAPIO-CL's) it would wait for it forever.
     // TODO: a thread manager for the threads of the server
     sigset_t signals, previous;
     sigemptyset(&signals);
@@ -155,9 +152,8 @@ void consent_handler(const char *const str) {
         sigaddset(&signals, signal);
     }
     pthread_sigmask(SIG_BLOCK, &signals, &previous);
-    std::thread t([path, tid, by_entries, expected] {
-        client_manager->replyToClient(
-            tid, fs_storage_manager->waitForConsent(path, by_entries, expected));
+    std::thread t([path, tid] {
+        client_manager->replyToClient(tid, fs_storage_manager->waitForConsent(path));
     });
     t.detach();
     pthread_sigmask(SIG_SETMASK, &previous, nullptr);
