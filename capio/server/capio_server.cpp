@@ -88,6 +88,7 @@ static constexpr std::array<CSHandler_t, CAPIO_NR_REQUESTS> build_request_handle
     _request_handlers[CAPIO_REQUEST_CREATE_FS]        = create_fs_handler;
     _request_handlers[CAPIO_REQUEST_OPEN_FS]          = open_fs_handler;
     _request_handlers[CAPIO_REQUEST_RENAME_FS]        = rename_fs_handler;
+    _request_handlers[CAPIO_REQUEST_PATH_PART]        = path_part_handler;
 
     return _request_handlers;
 }

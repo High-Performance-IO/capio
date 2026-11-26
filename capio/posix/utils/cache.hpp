@@ -236,7 +236,7 @@ class ReadCacheFS {
             (known->second == -1 || end_of_read <= known->second)) {
             return;
         }
-        available_read_cache[path] = read_request_fs(path, end_of_read, tid, fd);
+        available_read_cache[path] = read_request_fs(fd, end_of_read, tid);
 #ifdef SYS_statx
         // NFS may still have the old size cached, and would answer end of file
         struct statx fresh{};

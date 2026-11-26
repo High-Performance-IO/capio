@@ -2,14 +2,17 @@
 #define CAPIO_SERVER_HANDLERS_UNLINK_HPP
 #include "client-manager/client_manager.hpp"
 #include "storage/manager.hpp"
+#include "utils/common.hpp"
 
 extern StorageManager *storage_manager;
 extern ClientManager *client_manager;
 
 void unlink_handler(const char *const str) {
-    char path[PATH_MAX];
-    int tid;
-    sscanf(str, "%d %s", &tid, path);
+    int tid, consumed = 0;
+    if (sscanf(str, "%d%n", &tid, &consumed) != 1) {
+        return;
+    }
+    const std::string path = request_text(tid, str, consumed);
     if (CapioCLEngine::get().isExcluded(path)) {
         client_manager->replyToClient(tid, CAPIO_POSIX_SYSCALL_REQUEST_SKIP);
         return;

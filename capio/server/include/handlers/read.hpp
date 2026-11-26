@@ -181,16 +181,20 @@ void read_handler(const char *const str) {
     handle_read(tid, fd, count);
 }
 
+/// @brief "tid fd end_of_read". The client sends only the descriptor: its path is looked up in what
+/// the server recorded when the file was opened.
 void read_fs_handler(const char *const str) {
-    int tid, fd, consumed = 0;
+    int tid, fd;
     off64_t end_of_read;
-    if (sscanf(str, "%d %d %ld%n", &tid, &fd, &end_of_read, &consumed) != 3) {
+    if (sscanf(str, "%d %d %ld", &tid, &fd, &end_of_read) != 3) {
         return;
     }
-    const std::filesystem::path path = fs_request_path(tid, str, consumed);
+    const std::filesystem::path path = fs_storage_manager->getPath(client_manager->getPid(tid), fd);
 
-    // -1: there will never be anything to wait for, so the client does not ask again
-    if (std::error_code error; std::filesystem::is_directory(path, error) ||
+    // Reply -1 when the client will never have to wait for this file, so that it stops asking:
+    // the descriptor is unknown to the server (so it is not a CAPIO file), it is a directory, it is
+    // excluded, or the caller is the one writing it.
+    if (std::error_code error; path.empty() || std::filesystem::is_directory(path, error) ||
                                CapioCLEngine::get().isExcluded(path) ||
                                FsStorageManager::isProducer(tid, path)) {
         client_manager->replyToClient(tid, -1);

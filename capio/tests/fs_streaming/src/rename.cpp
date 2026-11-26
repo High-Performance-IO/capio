@@ -40,3 +40,13 @@ TEST_F(FsStreamingTest, FailedRenameChangesNothing) {
     startServer({{"f"}});
     EXPECT_OUTPUT(run("prod", {"rename:missing>f"}), "rename=ENOENT");
 }
+
+// Both names go in one request, which is longer than one: it is sent in pieces
+TEST_F(FsStreamingTest, RenameBetweenLongNamesCommits) {
+    const std::string name(200, 'x');
+    startServer({{name, "on_termination"}});
+    EXPECT_OUTPUT(run("prod", {"create:" + name + ".tmp", "write:AAAA", "close",
+                               "rename:" + name + ".tmp>" + name}),
+                  "");
+    EXPECT_OUTPUT(run("cons", {"open:" + name, "read"}), "AAAA");
+}

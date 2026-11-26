@@ -37,12 +37,24 @@ void handle_rename(int tid, const std::filesystem::path &oldpath,
     }
 }
 
+/**
+ * @brief Rename of the memory variant: "tid old_size old_pathnew_path".
+ *
+ * The two names are written one after the other with no separator, since a path can contain any
+ * character: the first old_size bytes are the old name, the rest is the new one. As in
+ * rename_fs_handler.
+ */
 void rename_handler(const char *const str) {
-    char oldpath[PATH_MAX];
-    char newpath[PATH_MAX];
-    int tid;
-    sscanf(str, "%s %s %d", oldpath, newpath, &tid);
-    handle_rename(tid, oldpath, newpath);
+    int tid, consumed = 0;
+    size_t old_size;
+    if (sscanf(str, "%d %zu%n", &tid, &old_size, &consumed) != 2) {
+        return;
+    }
+    const std::string names = request_text(tid, str, consumed);
+    if (names.size() <= old_size) {
+        return; // the new name is missing: the request was truncated
+    }
+    handle_rename(tid, names.substr(0, old_size), names.substr(old_size));
 }
 
 /**
@@ -56,11 +68,12 @@ void rename_handler(const char *const str) {
 void rename_fs_handler(const char *const str) {
     int tid, old_in, new_in, consumed = 0;
     size_t old_size;
-    if (sscanf(str, "%d %d %d %zu %n", &tid, &old_in, &new_in, &old_size, &consumed) != 4) {
+    if (sscanf(str, "%d %d %d %zu%n", &tid, &old_in, &new_in, &old_size, &consumed) != 4) {
         return;
     }
-    const std::string_view names(str + consumed);
-    START_LOG(gettid(), "call(tid=%d, names=%s)", tid, str + consumed);
+    const std::string text = request_text(tid, str, consumed);
+    const std::string_view names(text);
+    START_LOG(gettid(), "call(tid=%d, names=%s)", tid, text.c_str());
     if (names.size() <= old_size) {
         LOG("The names are cut: the request was too long");
         return;
