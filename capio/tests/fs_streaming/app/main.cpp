@@ -19,6 +19,7 @@
 #include <sys/stat.h>
 #include <sys/syscall.h>
 #include <sys/wait.h>
+#include <sys/xattr.h>
 #include <unistd.h>
 
 namespace {
@@ -240,6 +241,31 @@ const std::map<std::string, Operation> &operations() {
              }
              free(entries);
              return true;
+         }},
+        {"xattr", // "get:<path>", "lget:<path>" or "fget": the user.note attribute; "flist": the
+                  // user. names of the current descriptor
+         [](const std::string &a) {
+             char buffer[512];
+             const std::string path = a.substr(a.find(':') + 1);
+             ssize_t size;
+             if (a == "flist") {
+                 size = flistxattr(fd, buffer, sizeof(buffer));
+                 for (ssize_t at = 0; at < size;
+                      at += static_cast<ssize_t>(strlen(buffer + at)) + 1) {
+                     if (strncmp(buffer + at, "user.", 5) == 0) {
+                         print(buffer + at);
+                     }
+                 }
+                 return size >= 0;
+             }
+             size = a == "fget" ? fgetxattr(fd, "user.note", buffer, sizeof(buffer))
+                    : a.rfind("lget:", 0) == 0
+                        ? lgetxattr(path.c_str(), "user.note", buffer, sizeof(buffer))
+                        : getxattr(path.c_str(), "user.note", buffer, sizeof(buffer));
+             if (size >= 0) {
+                 print(std::string(buffer, size));
+             }
+             return size >= 0;
          }},
         {"thread",
          [](const std::string &a) {

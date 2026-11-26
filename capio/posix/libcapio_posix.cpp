@@ -30,17 +30,6 @@ static int not_handled_handler(long arg0, long arg1, long arg2, long arg3, long 
     return 1;
 }
 
-/**
- * Handler for syscall handled, but not yet implemented and interrupt
- * syscall_intercept
- */
-static int not_implemented_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg5,
-                                   long *result) {
-    errno   = ENOTSUP;
-    *result = -errno;
-    return 0;
-}
-
 static constexpr long CAPIO_NR_SYSCALLS = 1 + std::max({
 #ifdef SYS_access
                                                   SYS_access,
@@ -280,7 +269,7 @@ static constexpr std::array<CPHandler_t, CAPIO_NR_SYSCALLS> build_syscall_table(
     _syscallTable[SYS_fgetxattr] = fgetxattr_handler;
 #endif
 #ifdef SYS_flistxattr
-    _syscallTable[SYS_flistxattr] = not_implemented_handler;
+    _syscallTable[SYS_flistxattr] = flistxattr_handler;
 #endif
 #ifdef SYS_fork
     _syscallTable[SYS_fork] = fork_handler;
@@ -301,13 +290,13 @@ static constexpr std::array<CPHandler_t, CAPIO_NR_SYSCALLS> build_syscall_table(
     _syscallTable[SYS_getdents64] = getdents64_handler;
 #endif
 #ifdef SYS_getxattr
-    _syscallTable[SYS_getxattr] = not_implemented_handler;
+    _syscallTable[SYS_getxattr] = getxattr_handler;
 #endif
 #ifdef SYS_ioctl
     _syscallTable[SYS_ioctl] = ioctl_handler;
 #endif
 #ifdef SYS_lgetxattr
-    _syscallTable[SYS_lgetxattr] = not_implemented_handler;
+    _syscallTable[SYS_lgetxattr] = lgetxattr_handler;
 #endif
 #ifdef SYS_lseek
     _syscallTable[SYS_lseek] = lseek_handler;
