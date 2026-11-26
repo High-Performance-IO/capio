@@ -172,7 +172,7 @@ class FsStorageManager {
     /**
      * @brief Thread @p tid of process @p pid lists its directory descriptor @p fd.
      *
-     * The kernel lists it (the reply is kernel_lists_marker), except for a consumer of an
+     * The kernel lists it (the reply is KERNEL_LISTS_MARKER), except for a consumer of an
      * on_n_files directory in no_update mode: it is sent up to @p count bytes of entries from
      * @p offset, as linux_dirent64 records, as they appear and until the commit. A consumer in
      * update mode is let list once the directory is committed. Waits run on a thread of their own,

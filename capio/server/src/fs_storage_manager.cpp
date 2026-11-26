@@ -68,10 +68,9 @@ constexpr off64_t RECORD = sizeof(linux_dirent64);
 /// @brief Let thread @p tid, which asked for @p count bytes of entries from @p offset, list the
 /// directory in the kernel
 void reply_kernel_lists(const pid_t tid, const off64_t offset, const off64_t count) {
-    const linux_dirent64 marker = kernel_lists_marker();
-    const off64_t size          = count < RECORD ? 0 : RECORD;
-    client_manager->replyToClientWithData(tid, offset + size,
-                                          reinterpret_cast<const char *>(&marker), size);
+    const off64_t size = count < RECORD ? 0 : RECORD;
+    client_manager->replyToClientWithData(
+        tid, offset + size, reinterpret_cast<const char *>(KERNEL_LISTS_MARKER.data()), size);
 }
 
 /// @brief The entries of @p path as linux_dirent64 records, with "." and ".." but without
