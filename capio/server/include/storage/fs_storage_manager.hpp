@@ -39,9 +39,6 @@ class FsStorageManager {
      */
     std::unordered_map<pid_t, std::unordered_map<int, std::string>> _opened_fd_map;
 
-    /// @brief N for each on_n_files directory, read before CAPIO-CL's lookups could change it
-    std::unordered_map<std::string, long> _expected_entries;
-
     /// @brief The entries that producers created in an on_n_files directory, until it is
     /// committed
     struct NewEntries {
@@ -153,14 +150,9 @@ class FsStorageManager {
     void rename(pid_t tid, const std::string &from, bool from_capio, const std::string &to,
                 bool to_capio);
 
-    /**
-     * @brief N of the on_n_files directory @p directory.
-     *
-     * When n_files is omitted, CAPIO-CL uses the number of children it knows about, and every
-     * lookup adds one, so that number grows over time; it also can't tell us n_files was omitted.
-     * So N is the value CAPIO-CL reports at startup (or the first time we ask), and at least 1.
-     */
-    [[nodiscard]] long expectedEntries(const std::filesystem::path &directory);
+    /// @brief N of the on_n_files directory @p directory, at least 1. The schema requires n_files
+    /// with on_n_files, and once it is set CAPIO-CL no longer changes it.
+    [[nodiscard]] static long expectedEntries(const std::filesystem::path &directory);
 
     /**
      * @brief A producer has created @p path. Counts it as an entry of its directory, so that an

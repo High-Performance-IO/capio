@@ -142,14 +142,6 @@ std::vector<linux_dirent64> read_directory(const std::filesystem::path &path) {
 } // namespace
 
 FsStorageManager::FsStorageManager() {
-    // N of each on_n_files directory of the config, before CAPIO-CL's lookups change it
-    const auto &engine = CapioCLEngine::get();
-    for (const auto &path : engine.getPaths()) {
-        if (engine.getCommitRule(path) == capiocl::commitRules::ON_N_FILES) {
-            _expected_entries[std::filesystem::path(path).lexically_normal()] =
-                std::max(1L, engine.getDirectoryFileCount(path));
-        }
-    }
     CALF_PRINT_COLOR(CALF_CLI_LEVEL_STATUS, "initialization completed.");
 }
 
@@ -358,14 +350,7 @@ void FsStorageManager::rename(const pid_t tid, const std::string &from, const bo
 }
 
 long FsStorageManager::expectedEntries(const std::filesystem::path &directory) {
-    if (const auto known = _expected_entries.find(directory); known != _expected_entries.end()) {
-        return known->second;
-    }
-    // Not in the config at startup (it matched a glob, or came from the dynamic API): use what
-    // CAPIO-CL reports the first time we ask
-    const long expected = std::max(1L, CapioCLEngine::get().getDirectoryFileCount(directory));
-    _expected_entries[directory] = expected;
-    return expected;
+    return std::max(1L, CapioCLEngine::get().getDirectoryFileCount(directory));
 }
 
 void FsStorageManager::noteNewEntry(const std::filesystem::path &path) {
