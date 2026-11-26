@@ -111,7 +111,17 @@ const std::map<std::string, Operation> &operations() {
              execl("/no/such/program", "program", nullptr);
              return errno == ENOENT;
          }},
-        {"seek", [](const std::string &a) { return lseek(fd, std::stol(a), SEEK_SET) >= 0; }},
+        {"seek", // "<offset>" from the start, or "end" or "data:<offset>", which print where they
+                 // land
+         [](const std::string &a) {
+             if (a != "end" && a.rfind("data:", 0) != 0) {
+                 return lseek(fd, std::stol(a), SEEK_SET) >= 0;
+             }
+             const off_t at =
+                 a == "end" ? lseek(fd, 0, SEEK_END) : lseek(fd, std::stol(a.substr(5)), SEEK_DATA);
+             print(std::to_string(at));
+             return at >= 0;
+         }},
         {"print",
          [](const std::string &a) {
              print(a);
@@ -141,13 +151,6 @@ const std::map<std::string, Operation> &operations() {
                  print(std::string(buffer, count));
              }
              return count >= 0;
-         }},
-        {"seek", // "end", or "data:<offset>"
-         [](const std::string &a) {
-             const off_t at =
-                 a == "end" ? lseek(fd, 0, SEEK_END) : lseek(fd, std::stol(a.substr(5)), SEEK_DATA);
-             print(std::to_string(at));
-             return at >= 0;
          }},
         {"copy", // "<method>><path>", with copy_file_range, sendfile or splice (through a pipe)
          [](const std::string &a) {
