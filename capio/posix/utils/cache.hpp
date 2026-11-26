@@ -245,9 +245,34 @@ class ReadCacheFS {
     }
 };
 
+/**
+ * @brief FS variant: who lists each CAPIO directory, as the server said. The kernel does, unless
+ * the thread consumes an on_n_files directory in no_update mode: the server then returns the
+ * entries as they appear. In update mode the server answers once the directory is committed.
+ */
+class DirectoryListerCache {
+    std::unordered_map<std::string, bool> listed_by_server;
+
+  public:
+    /// @brief Whether the server lists @p path, asking it the first time
+    bool listedByServer(const std::string &path, const long tid) {
+        if (const auto known = listed_by_server.find(path); known != listed_by_server.end()) {
+            return known->second;
+        }
+        return listed_by_server[path] = list_request_fs(path, tid) == CAPIO_FS_LISTED_BY_SERVER;
+    }
+
+    /// @brief Whether the server is known to list @p path, without asking it
+    [[nodiscard]] bool knownListedByServer(const std::string &path) const {
+        const auto known = listed_by_server.find(path);
+        return known != listed_by_server.end() && known->second;
+    }
+};
+
 inline thread_local WriteCache *write_cache;
 inline thread_local ReadCache *read_cache;
 inline thread_local ConsentRequestCache *consent_request_cache;
 inline thread_local ReadCacheFS *read_request_cache;
+inline thread_local DirectoryListerCache *directory_lister_cache;
 
 #endif // CAPIO_SERVER_UTILS_CACHE

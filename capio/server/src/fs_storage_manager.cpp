@@ -16,6 +16,7 @@
 #include "capiocl/engine.h"
 #include "client-manager/client_manager.hpp"
 #include "common/path.hpp"
+#include "common/requests.hpp"
 #include "utils/capiocl_adapter.hpp"
 #include "utils/filesystem.hpp"
 #include "utils/runtime_configuration.hpp"
@@ -365,19 +366,14 @@ void FsStorageManager::list(const pid_t tid, const pid_t pid, const int fd, cons
                             const off64_t count) {
     const std::string path = getPath(pid, fd);
     START_LOG(gettid(), "call(tid=%d, fd=%d, path=%s, offset=%ld)", tid, fd, path.c_str(), offset);
-    // Decided here: CAPIO-CL's count of entries and the producers are for the request thread only
-    const auto &engine     = CapioCLEngine::get();
-    const bool waits       = engine.getCommitRule(path) == capiocl::commitRules::ON_N_FILES &&
-                             !engine.isExcluded(path) && !isProducer(tid, path);
-    const bool as_it_grows = waits && engine.isFirable(path); // no_update
-    const long expected    = waits ? expectedEntries(path) : 0;
+    const long expected = expectedEntries(path); // CAPIO-CL's count is for the request thread only
     const std::pair key{pid, fd};
     if (offset == 0) {
         // A new listing, or rewinddir: list the directory as it is now
         const std::lock_guard lock(_listings_mutex);
         _listings.erase(key);
     }
-    spawn_without_signals([this, tid, key, path, offset, count, waits, as_it_grows, expected] {
+    spawn_without_signals([this, tid, key, path, offset, count, expected] {
         const auto first = static_cast<size_t>(offset / RECORD);
         bool committed   = false;
         std::vector<linux_dirent64> found;
@@ -413,14 +409,29 @@ void FsStorageManager::list(const pid_t tid, const pid_t pid, const int fd, cons
                 std::this_thread::sleep_for(std::chrono::milliseconds(100));
             }
             // A removed directory is committed: nothing more will appear in it
-            const long entries = waits ? countEntries(path) : 0;
-            committed          = !waits || entries < 0 ||
+            const long entries = countEntries(path);
+            committed          = entries < 0 ||
                                  (entries >= expected && isDirectoryCommitted(path, expected)) ||
                                  CapioCLEngine::get().isCommitted(path);
-            // In update mode nothing is listed before the commit
-            found = committed || as_it_grows ? read_directory(path) : std::vector<linux_dirent64>{};
+            found              = read_directory(path);
         }
     });
+}
+
+void FsStorageManager::chooseLister(const pid_t tid, const std::filesystem::path &path) {
+    START_LOG(gettid(), "call(tid=%d, path=%s)", tid, path.c_str());
+    const auto &engine = CapioCLEngine::get();
+    if (engine.getCommitRule(path) != capiocl::commitRules::ON_N_FILES || engine.isExcluded(path) ||
+        isProducer(tid, path)) {
+        client_manager->replyToClient(tid, CAPIO_FS_LISTED_BY_KERNEL);
+    } else if (engine.isFirable(path)) {
+        client_manager->replyToClient(tid, CAPIO_FS_LISTED_BY_SERVER);
+    } else {
+        spawn_without_signals([this, tid, path, expected = expectedEntries(path)] {
+            (void) waitForConsent(path, true, expected);
+            client_manager->replyToClient(tid, CAPIO_FS_LISTED_BY_KERNEL);
+        });
+    }
 }
 
 void FsStorageManager::waitForCreation(const std::filesystem::path &path) const {

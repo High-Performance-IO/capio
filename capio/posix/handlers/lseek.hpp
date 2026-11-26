@@ -68,9 +68,10 @@ inline off64_t capio_lseek(int fd, off64_t offset, int whence, long tid) {
         }
     })
     FS_MODE({
-        // A directory is listed through the server (see getdents), which is sent the offset: a
-        // seek, as rewinddir and seekdir make, only moves it. telldir reads it back.
-        if ((fd_table->flags(fd) & O_DIRECTORY) != 0) {
+        // A directory that the server lists (see getdents) is sent the offset: a seek, as
+        // rewinddir and seekdir make, only moves it. telldir reads it back.
+        if ((fd_table->flags(fd) & O_DIRECTORY) != 0 &&
+            directory_lister_cache->knownListedByServer(fd_table->path(fd))) {
             const off64_t new_offset = whence == SEEK_SET   ? offset
                                        : whence == SEEK_CUR ? fd_table->offset(fd) + offset
                                                             : -1;

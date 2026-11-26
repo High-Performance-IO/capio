@@ -170,12 +170,17 @@ class FsStorageManager {
     void noteNewEntry(const std::filesystem::path &path);
 
     /**
-     * @brief Thread @p tid of process @p pid lists its directory descriptor @p fd: send it up to
-     * @p count bytes of entries from @p offset, as linux_dirent64 records.
-     *
-     * Consumers of an on_n_files directory wait: in update mode for the commit, in no_update mode
-     * for each new entry, until the commit. The waiting is done on a thread of its own, which reads
-     * the directory again every 100 ms, so the request thread never waits for a directory.
+     * @brief Tell thread @p tid who lists the directory @p path: the server, for a consumer of an
+     * on_n_files directory in no_update mode, or else the kernel. A consumer in update mode is
+     * answered on a thread of its own, once the directory is committed.
+     */
+    void chooseLister(pid_t tid, const std::filesystem::path &path);
+
+    /**
+     * @brief Thread @p tid of process @p pid lists its directory descriptor @p fd, of an on_n_files
+     * directory in no_update mode: send it up to @p count bytes of entries from @p offset, as
+     * linux_dirent64 records. Answered on a thread of its own, which reads the directory again
+     * every 100 ms until there is a new entry or the directory is committed.
      */
     void list(pid_t tid, pid_t pid, int fd, off64_t offset, off64_t count);
 

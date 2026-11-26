@@ -18,8 +18,14 @@ inline int getdents_handler_impl(long arg0, long arg1, long arg2, long *result, 
 
     if (fd_table->contains(fd)) {
         LOG("fd=%d, is a capio file descriptor", fd);
-        // Both variants list a CAPIO directory through the server. The FS server reads the
-        // directory on the file system, and makes the listing of an on_n_files directory wait.
+        // The FS variant leaves the listing to the kernel, once the server allows it, unless the
+        // server returns the entries itself (see DirectoryListerCache)
+        FS_MODE({
+            if (!directory_lister_cache->listedByServer(fd_table->path(fd),
+                                                        syscall_no_intercept(SYS_gettid))) {
+                return CAPIO_POSIX_SYSCALL_SKIP;
+            }
+        })
 
         if (count >= SSIZE_MAX) {
             ERR_EXIT("src does not support read bigger than SSIZE_MAX yet");
