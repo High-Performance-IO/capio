@@ -8,7 +8,7 @@
 #include "handlers/read.hpp"
 
 int ioctl_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg5, long *result) {
-    const auto fd = static_cast<int>(arg0);
+    [[maybe_unused]] const auto fd = static_cast<int>(arg0); // memory variant, and the log
     [[maybe_unused]] const auto request =
         static_cast<unsigned long>(arg1); // FS variant, and the log
     [[maybe_unused]] const long tid = syscall_no_intercept(SYS_gettid);
@@ -30,12 +30,14 @@ int ioctl_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long ar
         return CAPIO_POSIX_SYSCALL_SKIP;
     })
 
-    if (fd_table->contains(fd)) {
-        errno   = ENOTTY;
-        *result = -errno;
-        return CAPIO_POSIX_SYSCALL_SUCCESS;
-    }
-    return CAPIO_POSIX_SYSCALL_REQUEST_SKIP;
+    MEMORY_MODE({
+        if (fd_table->contains(fd)) {
+            errno   = ENOTTY;
+            *result = -errno;
+            return CAPIO_POSIX_SYSCALL_SUCCESS;
+        }
+        return CAPIO_POSIX_SYSCALL_REQUEST_SKIP;
+    })
 }
 
 #endif // SYS_ioctl

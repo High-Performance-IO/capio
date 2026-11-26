@@ -3,6 +3,8 @@
 
 #if defined(SYS_read) || defined(SYS_readv)
 
+#include "common/constants.hpp"
+
 #include "utils/common.hpp"
 #include "utils/data.hpp"
 
@@ -50,8 +52,11 @@ inline ssize_t capio_readv(int fd, const struct iovec *iov, int iovcnt, long tid
 
 /**
  * FS variant: block until the bytes from @p offset (the file offset if negative) to @p offset +
- * @p count can be read. Then the kernel runs the call that hands them out. Every such call waits
- * for what it needs:
+ * @p count can be read. Then the kernel runs the call that hands them out.
+ *
+ * The data are on the file system, so the posix component reads them itself, through the kernel:
+ * only the wait goes through the server. That is faster, and keeps the server out of the path of
+ * the data. Every such call waits for what it needs:
  *
  *   read, readv, pread, preadv, preadv2   offset + count
  *   copy_file_range, sendfile, splice     offset + 1: their callers loop on short results
@@ -65,8 +70,6 @@ inline ssize_t capio_readv(int fd, const struct iovec *iov, int iovcnt, long tid
  * In update mode it is the commit anyway. stat and fstat never wait for data: in no_update they
  * return the current size.
  */
-constexpr off64_t CAPIO_UNTIL_COMMIT_FS = LLONG_MAX;
-
 inline void capio_wait_for_data_fs(int fd, off64_t offset, off64_t count, long tid) {
     START_LOG(tid, "call(fd=%d, offset=%ld, count=%ld)", fd, offset, count);
 
@@ -125,14 +128,19 @@ int readv_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long ar
 
 #ifdef SYS_pread64
 int pread_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg5, long *result) {
-    // pread(fd, buffer, count, offset). The memory variant uses none of them, only the log.
-    [[maybe_unused]] const auto fd     = static_cast<int>(arg0);
-    [[maybe_unused]] const auto count  = static_cast<off64_t>(arg2);
+    // pread(fd, buffer, count, offset)
+    const auto fd                      = static_cast<int>(arg0);
+    [[maybe_unused]] const auto count  = static_cast<off64_t>(arg2); // FS variant, and the log
     [[maybe_unused]] const auto offset = static_cast<off64_t>(arg3);
     [[maybe_unused]] const long tid    = syscall_no_intercept(SYS_gettid);
     START_LOG(tid, "call(fd=%d, count=%ld, offset=%ld)", fd, count, offset);
 
-    MEMORY_MODE({ return CAPIO_POSIX_SYSCALL_SKIP; })
+    MEMORY_MODE({
+        if (fd_table->contains(fd)) {
+            throw CapioUnimplementedException("pread");
+        }
+        return CAPIO_POSIX_SYSCALL_SKIP;
+    })
     FS_MODE({
         // A negative offset is EINVAL, from the kernel
         if (offset >= 0) {
@@ -145,16 +153,20 @@ int pread_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long ar
 
 #if defined(SYS_preadv) || defined(SYS_preadv2)
 int preadv_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg5, long *result) {
-    // preadv(fd, iov, iovcnt, offset), and preadv2, which takes -1 for the file offset. The memory
-    // variant uses none of them, only the log.
-    [[maybe_unused]] const auto fd     = static_cast<int>(arg0);
-    [[maybe_unused]] const auto *iov   = reinterpret_cast<const struct iovec *>(arg1);
+    // preadv(fd, iov, iovcnt, offset), and preadv2, which takes -1 for the file offset
+    const auto fd                      = static_cast<int>(arg0);
+    [[maybe_unused]] const auto *iov   = reinterpret_cast<const struct iovec *>(arg1); // FS variant
     [[maybe_unused]] const auto iovcnt = static_cast<int>(arg2);
     [[maybe_unused]] const auto offset = static_cast<off64_t>(arg3);
     [[maybe_unused]] const long tid    = syscall_no_intercept(SYS_gettid);
     START_LOG(tid, "call(fd=%d, iovcnt=%d, offset=%ld)", fd, iovcnt, offset);
 
-    MEMORY_MODE({ return CAPIO_POSIX_SYSCALL_SKIP; })
+    MEMORY_MODE({
+        if (fd_table->contains(fd)) {
+            throw CapioUnimplementedException("preadv");
+        }
+        return CAPIO_POSIX_SYSCALL_SKIP;
+    })
     FS_MODE({
         if (offset >= -1) {
             capio_wait_for_data_fs(fd, offset, capio_iov_length(iov, iovcnt), tid);

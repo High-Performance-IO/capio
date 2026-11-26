@@ -31,11 +31,13 @@ inline int capio_in_kernel_copy(int fd_in, const loff_t *off_in, size_t count, i
         return CAPIO_POSIX_SYSCALL_SKIP;
     })
 
-    if (fd_table->contains(fd_in) || fd_table->contains(fd_out)) {
-        *result = -EINVAL;
-        return CAPIO_POSIX_SYSCALL_SUCCESS;
-    }
-    return CAPIO_POSIX_SYSCALL_SKIP;
+    MEMORY_MODE({
+        if (fd_table->contains(fd_in) || fd_table->contains(fd_out)) {
+            *result = -EINVAL;
+            return CAPIO_POSIX_SYSCALL_SUCCESS;
+        }
+        return CAPIO_POSIX_SYSCALL_SKIP;
+    })
 }
 
 #ifdef SYS_splice
