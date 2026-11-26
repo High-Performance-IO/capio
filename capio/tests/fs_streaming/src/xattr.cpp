@@ -11,7 +11,7 @@ TEST_F(FsStreamingTest, AttributesComeFromTheKernelWithoutWaiting) {
         }
     }
     // f is an uncommitted input of cons: an attribute does not depend on its data
-    EXPECT_OUTPUT(run("cons", {"getxattr:../outside", "lgetxattr:../outside", "getxattr:f",
-                               "open:f", "fgetxattr", "flistxattr"}),
+    EXPECT_OUTPUT(run("cons", {"xattr:get:../outside", "xattr:lget:../outside", "xattr:get:f",
+                               "open:f", "xattr:fget", "xattr:flist"}),
                   "hellohellohellohellouser.note");
 }

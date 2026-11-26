@@ -57,14 +57,6 @@ bool read_all() {
     return count == 0;
 }
 
-bool print_bytes(const char *bytes, const ssize_t size) {
-    if (size < 0) {
-        return false;
-    }
-    print(std::string(bytes, size));
-    return true;
-}
-
 bool open_as(const std::string &path, const int flags) {
     fd = open(path.c_str(), flags, 0644);
     return fd >= 0;
@@ -250,31 +242,28 @@ const std::map<std::string, Operation> &operations() {
              free(entries);
              return true;
          }},
-        {"getxattr",
+        {"xattr", // "get:<path>", "lget:<path>" or "fget": the user.note attribute; "flist": the
+                  // user. names of the current descriptor
          [](const std::string &a) {
-             char value[64];
-             const ssize_t size = getxattr(a.c_str(), "user.note", value, sizeof(value));
-             return print_bytes(value, size);
-         }},
-        {"lgetxattr",
-         [](const std::string &a) {
-             char value[64];
-             const ssize_t size = lgetxattr(a.c_str(), "user.note", value, sizeof(value));
-             return print_bytes(value, size);
-         }},
-        {"fgetxattr",
-         [](const std::string &) {
-             char value[64];
-             return print_bytes(value, fgetxattr(fd, "user.note", value, sizeof(value)));
-         }},
-        {"flistxattr",
-         [](const std::string &) {
-             char names[512];
-             const ssize_t size = flistxattr(fd, names, sizeof(names));
-             for (ssize_t at = 0; at < size; at += static_cast<ssize_t>(strlen(names + at)) + 1) {
-                 if (strncmp(names + at, "user.", 5) == 0) {
-                     print(names + at);
+             char buffer[512];
+             const std::string path = a.substr(a.find(':') + 1);
+             ssize_t size;
+             if (a == "flist") {
+                 size = flistxattr(fd, buffer, sizeof(buffer));
+                 for (ssize_t at = 0; at < size;
+                      at += static_cast<ssize_t>(strlen(buffer + at)) + 1) {
+                     if (strncmp(buffer + at, "user.", 5) == 0) {
+                         print(buffer + at);
+                     }
                  }
+                 return size >= 0;
+             }
+             size = a == "fget" ? fgetxattr(fd, "user.note", buffer, sizeof(buffer))
+                    : a.rfind("lget:", 0) == 0
+                        ? lgetxattr(path.c_str(), "user.note", buffer, sizeof(buffer))
+                        : getxattr(path.c_str(), "user.note", buffer, sizeof(buffer));
+             if (size >= 0) {
+                 print(std::string(buffer, size));
              }
              return size >= 0;
          }},
