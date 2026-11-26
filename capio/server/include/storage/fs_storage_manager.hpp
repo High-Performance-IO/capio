@@ -4,6 +4,8 @@
 #include <atomic>
 #include <chrono>
 #include <filesystem>
+#include <map>
+#include <mutex>
 #include <optional>
 #include <string>
 #include <unordered_map>
@@ -12,7 +14,7 @@
 
 #include <sys/types.h>
 
-#include "storage/fs_directory_lister.hpp"
+#include "common/dirent.hpp"
 
 /**
  * @brief Manages the files of the file system variant (libcapio_posix_fs.so).
@@ -21,7 +23,7 @@
  * happened to each file (closes, failed closes, renames, entries of on_n_files directories) and
  * applies the CAPIO-CL rules to it. As StorageManager, it knows the descriptors of its clients by
  * number. CAPIO-CL keeps the rules and the commit state; ClientManager keeps who produces what.
- * Used by the request thread only, apart from the static methods.
+ * Used by the request thread only, apart from the static methods and the listings.
  */
 class FsStorageManager {
     /// @brief How many successful closes each file has had. Counted for every file, whatever its
@@ -44,8 +46,18 @@ class FsStorageManager {
     std::unordered_map<std::string, std::unordered_set<std::string>> _new_entries;
     std::unordered_set<std::string> _committed_directories;
 
-    /// @brief Answers getdents. Never freed: its thread may outlive this object at shutdown.
-    FsDirectoryLister *_lister = new FsDirectoryLister();
+    /// @brief What a directory descriptor has listed so far. It only grows, so the offset of an
+    /// entry never changes while the directory is listed.
+    struct Listing {
+        std::vector<linux_dirent64> entries;
+        std::unordered_set<std::string> names;
+        bool is_complete = false; ///< read after the commit: no entry can be missing
+    };
+
+    /// @brief The listing of each directory descriptor, by (pid, fd). Shared with the threads
+    /// that answer getdents, behind _listings_mutex.
+    std::map<std::pair<pid_t, int>, Listing> _listings;
+    std::mutex _listings_mutex;
 
     /// @brief Closes of on_close:N being counted on background threads
     std::atomic<int> _pending_counts{0};
@@ -159,7 +171,11 @@ class FsStorageManager {
 
     /**
      * @brief Thread @p tid of process @p pid lists its directory descriptor @p fd: send it up to
-     * @p count bytes of entries from @p offset, waiting if the directory's rule says so.
+     * @p count bytes of entries from @p offset, as linux_dirent64 records.
+     *
+     * Consumers of an on_n_files directory wait: in update mode for the commit, in no_update mode
+     * for each new entry, until the commit. The waiting is done on a thread of its own, which reads
+     * the directory again every 100 ms, so the request thread never waits for a directory.
      */
     void list(pid_t tid, pid_t pid, int fd, off64_t offset, off64_t count);
 
