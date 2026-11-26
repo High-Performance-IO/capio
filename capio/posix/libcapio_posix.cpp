@@ -30,17 +30,6 @@ static int not_handled_handler(long arg0, long arg1, long arg2, long arg3, long 
     return 1;
 }
 
-/**
- * Handler for syscall handled, but not yet implemented and interrupt
- * syscall_intercept. No system call uses it at the moment.
- */
-[[maybe_unused]] static int not_implemented_handler(long arg0, long arg1, long arg2, long arg3,
-                                                    long arg4, long arg5, long *result) {
-    errno   = ENOTSUP;
-    *result = -errno;
-    return 0;
-}
-
 static constexpr long CAPIO_NR_SYSCALLS = 1 + std::max({
 #ifdef SYS_access
                                                   SYS_access,
