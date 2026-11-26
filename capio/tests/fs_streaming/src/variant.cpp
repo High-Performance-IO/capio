@@ -15,7 +15,7 @@ TEST_F(FsStreamingTest, FsClientInAMemoryWorkflowIsRefused) {
     const auto first =
         finish(start("cons", {"print:up"}, setting("CAPIO_MEMORY_LIBRARY", "libcapio_posix.so")));
     EXPECT_OUTPUT(first, "up");
-    // A producer is told at its first create, before it writes anything
+    // Told at its handshake, before it does anything
     const auto result = run("prod", {"create:f", "write:A", "print:not refused"});
     EXPECT_TRUE(result.finished);
     EXPECT_NE(result.output.find("cannot be mixed"), std::string::npos) << result.output;

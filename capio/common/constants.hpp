@@ -44,7 +44,7 @@ inline constexpr auto KERNEL_LISTS_MARKER = [] {
 constexpr off64_t CAPIO_UNTIL_COMMIT_FS = LLONG_MAX;
 
 /// @brief What a client prints when the server refuses it, because its workflow uses the other
-/// library (see ResponseBuffer)
+/// library (see handshake_named_request)
 constexpr char CAPIO_REFUSED_MEMORY_CLIENT_MESSAGE[] =
     "CAPIO: this process uses libcapio_posix.so (memory), but its workflow uses "
     "libcapio_posix_fs.so: the two cannot be mixed in a workflow. Fix LD_PRELOAD.\n";

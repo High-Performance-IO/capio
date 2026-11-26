@@ -179,11 +179,6 @@ void create_fs_handler(const char *const str) {
     if (produced != CAPIO_FS_NOT_PRODUCED) {
         handle_create_fs(tid, path, produced == CAPIO_FS_PRODUCED_IF_NO_PRODUCER);
     }
-    if (produced == CAPIO_FS_PRODUCED) {
-        // Only a new producer waits for the answer (see create_request_fs): a refused client
-        // reads CAPIO_REPLY_VARIANT_REFUSED instead, and stops before it writes
-        client_manager->replyToClient(tid, 1);
-    }
 }
 
 /// @brief open of the FS variant: "tid path"

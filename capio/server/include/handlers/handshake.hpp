@@ -5,37 +5,48 @@
 #include "utils/common.hpp"
 
 /**
- * The variant of a workflow, on this node, is that of its first client. The reply waits in the
- * response buffer of a refused client until it reads the answer to a request.
+ * @brief Whether a client of @p variant is refused: the variant of a workflow, on this node, is
+ * that of its first client, and the two variants cannot be mixed yet.
+ * TODO: drop the refusal once the two variants work together in one workflow (#337)
  */
-inline void refuse_other_variant(const pid_t tid, const pid_t pid, const char *app_name,
-                                 const char variant) {
+inline bool refuses_variant(const pid_t pid, const char *app_name, const char variant) {
     static char workflow_variant = 0;
     if (variant == 0) {
-        return;
+        return false;
     }
     if (workflow_variant == 0) {
         workflow_variant = variant;
-        return;
+        return false;
     }
-    if (variant != workflow_variant) {
-        const auto library = [](const char kind) {
-            return kind == CAPIO_VARIANT_FS ? "libcapio_posix_fs.so" : "libcapio_posix.so";
-        };
-        CALF_PRINT_COLOR(CALF_CLI_LEVEL_ERROR,
-                         "Refused process %d (app %s): it uses %s, but this workflow uses %s", pid,
-                         app_name, library(variant), library(workflow_variant));
-        client_manager->replyToClient(tid, CAPIO_REPLY_VARIANT_REFUSED);
+    if (variant == workflow_variant) {
+        return false;
     }
+    const auto library = [](const char kind) {
+        return kind == CAPIO_VARIANT_FS ? "libcapio_posix_fs.so" : "libcapio_posix.so";
+    };
+    CALF_PRINT_COLOR(CALF_CLI_LEVEL_ERROR,
+                     "Refused process %d (app %s): it uses %s, but this workflow uses %s", pid,
+                     app_name, library(variant), library(workflow_variant));
+    return true;
 }
 
+/**
+ * @brief "tid pid app_name wait variant". Every handshake gets one answer: 1, or
+ * CAPIO_REPLY_VARIANT_REFUSED for a client of the other variant. A new thread (wait) is answered
+ * only once its parent's clone request is handled (ClientManager::unlockClonedChild).
+ */
 void handshake_named_handler(const char *const str) {
     int tid, pid, wait;
     char app_name[1024];
     char variant = 0;
     sscanf(str, "%d %d %s %d %c", &tid, &pid, app_name, &wait, &variant);
-    client_manager->registerClient(tid, app_name, static_cast<bool>(wait), pid);
-    refuse_other_variant(tid, pid, app_name, variant);
+    const bool refused = refuses_variant(pid, app_name, variant);
+    client_manager->registerClient(tid, app_name, wait != 0 && !refused, pid);
+    if (refused) {
+        client_manager->replyToClient(tid, CAPIO_REPLY_VARIANT_REFUSED);
+    } else if (wait == 0) {
+        client_manager->replyToClient(tid, 1);
+    }
 }
 
 #endif // CAPIO_SERVER_HANDLERS_HANDSHAKE_HPP

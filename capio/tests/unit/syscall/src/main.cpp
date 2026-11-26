@@ -1,101 +1,11 @@
-#include <cstdlib>
 #include <gtest/gtest.h>
 
-#include <linux/limits.h>
-#include <string_view>
-#include <sys/types.h>
-#include <unistd.h>
-#include <vector>
-
-#include "common/syscall.hpp"
-
-char **build_args() {
-    char **args = (char **) malloc(4 * sizeof(uintptr_t));
-
-    char const *command = std::getenv("CAPIO_SERVER_PATH");
-    if (command == nullptr) {
-        command = "capio_server";
-    }
-
-    char const *path = std::getenv("CONFIG_PATH");
-    if (path == nullptr) {
-        path = "test_config.json";
-    }
-
-    args[0] = strdup(command);
-    args[1] = strdup("-c");
-    args[2] = strdup(path);
-    args[3] = (char *) nullptr;
-
-    return args;
-}
-
-char **build_env(char **envp) {
-    std::vector<int> vars;
-    for (int i = 0; envp[i] != nullptr; i++) {
-        const std::string_view var(envp[i]);
-        const std::string_view key = var.substr(0, var.find('='));
-        if (key != "LD_PRELOAD") {
-            vars.emplace_back(i);
-        }
-    }
-
-    char **cleaned_env = (char **) malloc((vars.size() + 2) * sizeof(uintptr_t));
-    for (size_t i = 0; i < vars.size(); i++) {
-        cleaned_env[i] = strdup(envp[vars[i]]);
-    }
-    cleaned_env[vars.size()]     = strdup("LD_PRELOAD=");
-    cleaned_env[vars.size() + 1] = (char *) nullptr;
-
-    return cleaned_env;
-}
-
-class CapioServerEnvironment : public testing::Environment {
-  private:
-    char **args;
-    char **envp;
-    int server_pid;
-
-  public:
-    explicit CapioServerEnvironment(char **envp)
-        : args(build_args()), envp(build_env(envp)), server_pid(-1) {}
-
-    ~CapioServerEnvironment() override {
-        for (int i = 0; args[i] != nullptr; i++) {
-            free(args[i]);
-        }
-        free(args);
-        for (int i = 0; envp[i] != nullptr; i++) {
-            free(envp[i]);
-        }
-        free(envp);
-    };
-
-    void SetUp() override {
-        if (server_pid < 0) {
-            ASSERT_NE(std::getenv("CAPIO_DIR"), nullptr);
-            ASSERT_GE(server_pid = capio_syscall(SYS_clone, SIGCHLD, 0), 0);
-            if (server_pid == 0) {
-                execvpe(args[0], args, envp);
-                _exit(127);
-            } else {
-                sleep(5);
-            }
-        }
-    }
-
-    void TearDown() override {
-        if (server_pid > 0) {
-            kill(server_pid, SIGTERM);
-            waitpid(server_pid, nullptr, 0);
-            server_pid = -1;
-        }
-    }
-};
-
-int main(int argc, char **argv, char **envp) {
+/*
+ * The tests run preloaded with a CAPIO client library, against a CAPIO server that must already be
+ * running for CAPIO_DIR: every client waits for the answer to its handshake, which happens before
+ * main, so the tests cannot start the server themselves.
+ */
+int main(int argc, char **argv) {
     testing::InitGoogleTest(&argc, argv);
-    testing::AddGlobalTestEnvironment(new CapioServerEnvironment(envp));
-
     return RUN_ALL_TESTS();
 }
