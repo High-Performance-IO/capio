@@ -2,14 +2,17 @@
 #define CAPIO_SERVER_HANDLERS_ACCESS_HPP
 
 #include "remote/home_node_service.hpp"
+#include "utils/common.hpp"
 
 extern ClientManager *client_manager;
 
 void access_handler(const char *const str) {
     START_LOG(gettid(), "call(str=%s)", str);
-    long tid;
-    char path[PATH_MAX];
-    sscanf(str, "%ld %s", &tid, path);
+    int tid, consumed = 0;
+    if (sscanf(str, "%d%n", &tid, &consumed) != 1) {
+        return;
+    }
+    const std::string path = request_text(tid, str, consumed);
 
     if (CapioCLEngine::get().isExcluded(path)) {
         client_manager->replyToClient(tid, CAPIO_POSIX_SYSCALL_REQUEST_SKIP);

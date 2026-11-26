@@ -37,12 +37,18 @@ void handle_rename(int tid, const std::filesystem::path &oldpath,
     }
 }
 
+/// @brief "tid old_size old_pathnew_path": the names back to back, as in rename_fs_handler
 void rename_handler(const char *const str) {
-    char oldpath[PATH_MAX];
-    char newpath[PATH_MAX];
-    int tid;
-    sscanf(str, "%s %s %d", oldpath, newpath, &tid);
-    handle_rename(tid, oldpath, newpath);
+    int tid, consumed = 0;
+    size_t old_size;
+    if (sscanf(str, "%d %zu%n", &tid, &old_size, &consumed) != 2) {
+        return;
+    }
+    const std::string names = request_text(tid, str, consumed);
+    if (names.size() <= old_size) {
+        return; // cut: the request was too long
+    }
+    handle_rename(tid, names.substr(0, old_size), names.substr(old_size));
 }
 
 /**
@@ -59,7 +65,7 @@ void rename_fs_handler(const char *const str) {
     if (sscanf(str, "%d %d %d %zu%n", &tid, &old_in, &new_in, &old_size, &consumed) != 4) {
         return;
     }
-    const std::string text = fs_request_text(tid, str, consumed);
+    const std::string text = request_text(tid, str, consumed);
     const std::string_view names(text);
     START_LOG(gettid(), "call(tid=%d, names=%s)", tid, text.c_str());
     if (names.size() <= old_size) {

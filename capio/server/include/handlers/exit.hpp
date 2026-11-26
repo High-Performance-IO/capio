@@ -47,7 +47,7 @@ void handle_exit_group(int tid) {
         handle_close(tid, fd);
     }
     client_manager->removeClient(tid);
-    fs_path_parts.erase(tid); // the pieces of a request it did not finish
+    path_parts.erase(tid); // the pieces of a request it did not finish
 }
 
 void exit_group_handler(const char *const str) {

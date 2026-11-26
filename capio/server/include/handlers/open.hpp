@@ -123,9 +123,11 @@ inline void handle_open_fs(const int tid, const std::filesystem::path &path) {
 }
 
 void create_handler(const char *const str) {
-    int tid, fd;
-    char path[PATH_MAX];
-    sscanf(str, "%d %d %s", &tid, &fd, path);
+    int tid, fd, consumed = 0;
+    if (sscanf(str, "%d %d%n", &tid, &fd, &consumed) != 2) {
+        return;
+    }
+    const std::string path = request_text(tid, str, consumed);
     if (CapioCLEngine::get().isExcluded(path)) {
         client_manager->replyToClient(tid, CAPIO_POSIX_SYSCALL_REQUEST_SKIP);
         return;
@@ -134,9 +136,11 @@ void create_handler(const char *const str) {
 }
 
 void create_exclusive_handler(const char *const str) {
-    int tid, fd;
-    char path[PATH_MAX];
-    sscanf(str, "%d %d %s", &tid, &fd, path);
+    int tid, fd, consumed = 0;
+    if (sscanf(str, "%d %d%n", &tid, &fd, &consumed) != 2) {
+        return;
+    }
+    const std::string path = request_text(tid, str, consumed);
     if (CapioCLEngine::get().isExcluded(path)) {
         client_manager->replyToClient(tid, CAPIO_POSIX_SYSCALL_REQUEST_SKIP);
         return;
@@ -145,9 +149,11 @@ void create_exclusive_handler(const char *const str) {
 }
 
 void open_handler(const char *const str) {
-    int tid, fd;
-    char path[PATH_MAX];
-    sscanf(str, "%d %d %s", &tid, &fd, path);
+    int tid, fd, consumed = 0;
+    if (sscanf(str, "%d %d%n", &tid, &fd, &consumed) != 2) {
+        return;
+    }
+    const std::string path = request_text(tid, str, consumed);
     if (CapioCLEngine::get().isExcluded(path)) {
         client_manager->replyToClient(tid, CAPIO_POSIX_SYSCALL_REQUEST_SKIP);
         return;

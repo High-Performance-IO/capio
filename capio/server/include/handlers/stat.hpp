@@ -98,9 +98,11 @@ void fstat_handler(const char *const str) {
 }
 
 void stat_handler(const char *const str) {
-    char path[2048];
-    int tid;
-    sscanf(str, "%d %s", &tid, path);
+    int tid, consumed = 0;
+    if (sscanf(str, "%d%n", &tid, &consumed) != 1) {
+        return;
+    }
+    const std::string path = request_text(tid, str, consumed);
     if (CapioCLEngine::get().isExcluded(path)) {
         client_manager->replyToClient(tid, CAPIO_POSIX_SYSCALL_REQUEST_SKIP);
         return;

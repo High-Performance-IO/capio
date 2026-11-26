@@ -3,15 +3,18 @@
 #include "client-manager/client_manager.hpp"
 #include "remote/home_node_service.hpp"
 #include "storage/manager.hpp"
+#include "utils/common.hpp"
 
 extern ClientManager *client_manager;
 extern StorageManager *storage_manager;
 
 void rmdir_handler(const char *const str) {
-    char dir_to_remove[PATH_MAX];
-    int tid;
-    sscanf(str, "%s %d", dir_to_remove, &tid);
-    START_LOG(gettid(), "call(path=%s tid=%d)", dir_to_remove, tid);
+    int tid, consumed = 0;
+    if (sscanf(str, "%d%n", &tid, &consumed) != 1) {
+        return;
+    }
+    const std::string dir_to_remove = request_text(tid, str, consumed);
+    START_LOG(gettid(), "call(path=%s tid=%d)", dir_to_remove.c_str(), tid);
     if (CapioCLEngine::get().isExcluded(dir_to_remove)) {
         client_manager->replyToClient(tid, CAPIO_POSIX_SYSCALL_REQUEST_SKIP);
         return;
