@@ -31,6 +31,7 @@ int ioctl_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long ar
     })
 
     MEMORY_MODE({
+        // TODO: support ioctl on CAPIO files properly (e.g. FIONREAD, FICLONE) instead of ENOTTY
         if (fd_table->contains(fd)) {
             errno   = ENOTTY;
             *result = -errno;
