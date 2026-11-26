@@ -74,6 +74,44 @@ void reply_kernel_lists(const pid_t tid, const off64_t offset, const off64_t cou
         tid, offset + size, reinterpret_cast<const char *>(KERNEL_LISTS_MARKER.data()), size);
 }
 
+/// @brief How many entries @p directory has, not counting "." and ".." or CAPIO-CL's token files,
+/// or -1 if it can't be read
+long count_entries(const std::filesystem::path &directory) {
+    std::error_code error;
+    std::filesystem::directory_iterator entry(directory, error);
+    long count = 0;
+    while (!error && entry != std::filesystem::directory_iterator()) {
+        count += !is_forbidden_path(entry->path().filename().native());
+        entry.increment(error);
+    }
+    return error ? -1 : count;
+}
+
+/// @brief Whether the on_n_files directory @p directory is committed, committing it first if it
+/// has its @p expected entries, or no longer exists: nothing more will appear in it. This can
+/// block, so only waiting threads may call it.
+bool is_directory_committed(const std::filesystem::path &directory, const long expected) {
+    const long entries = count_entries(directory);
+    if (entries >= expected) {
+        CapioCLEngine::get().setCommitted(directory);
+    }
+    return entries < 0 || entries >= expected || CapioCLEngine::get().isCommitted(directory);
+}
+
+/// @brief The records of @p entries from @p offset, at most @p count bytes of them, with their
+/// d_off
+std::vector<linux_dirent64> slice(const std::vector<linux_dirent64> &entries, const off64_t offset,
+                                  const off64_t count) {
+    const auto first = std::min(entries.size(), static_cast<size_t>(offset / RECORD));
+    const auto last =
+        std::min(entries.size(), first + static_cast<size_t>(std::max<off64_t>(count, 0) / RECORD));
+    std::vector<linux_dirent64> records(entries.begin() + first, entries.begin() + last);
+    for (size_t i = 0; i < records.size(); ++i) {
+        records[i].d_off = static_cast<off64_t>(first + i + 1) * RECORD;
+    }
+    return records;
+}
+
 /// @brief The entries of @p path as linux_dirent64 records, with "." and ".." but without
 /// CAPIO-CL's token files
 std::vector<linux_dirent64> read_directory(const std::filesystem::path &path) {
@@ -104,7 +142,14 @@ std::vector<linux_dirent64> read_directory(const std::filesystem::path &path) {
 } // namespace
 
 FsStorageManager::FsStorageManager() {
-    loadExpectedEntries();
+    // N of each on_n_files directory of the config, before CAPIO-CL's lookups change it
+    const auto &engine = CapioCLEngine::get();
+    for (const auto &path : engine.getPaths()) {
+        if (engine.getCommitRule(path) == capiocl::commitRules::ON_N_FILES) {
+            _expected_entries[std::filesystem::path(path).lexically_normal()] =
+                std::max(1L, engine.getDirectoryFileCount(path));
+        }
+    }
     CALF_PRINT_COLOR(CALF_CLI_LEVEL_STATUS, "initialization completed.");
 }
 
@@ -312,16 +357,6 @@ void FsStorageManager::rename(const pid_t tid, const std::string &from, const bo
     }
 }
 
-void FsStorageManager::loadExpectedEntries() {
-    const auto &engine = CapioCLEngine::get();
-    for (const auto &path : engine.getPaths()) {
-        if (engine.getCommitRule(path) == capiocl::commitRules::ON_N_FILES) {
-            _expected_entries[std::filesystem::path(path).lexically_normal()] =
-                std::max(1L, engine.getDirectoryFileCount(path));
-        }
-    }
-}
-
 long FsStorageManager::expectedEntries(const std::filesystem::path &directory) {
     if (const auto known = _expected_entries.find(directory); known != _expected_entries.end()) {
         return known->second;
@@ -333,40 +368,21 @@ long FsStorageManager::expectedEntries(const std::filesystem::path &directory) {
     return expected;
 }
 
-long FsStorageManager::countEntries(const std::filesystem::path &directory) {
-    std::error_code error;
-    std::filesystem::directory_iterator entry(directory, error);
-    long count = 0;
-    while (!error && entry != std::filesystem::directory_iterator()) {
-        count += !is_forbidden_path(entry->path().filename().native());
-        entry.increment(error);
-    }
-    return error ? -1 : count;
-}
-
-bool FsStorageManager::isDirectoryCommitted(const std::filesystem::path &directory,
-                                            const long n_expected) {
-    const auto &engine = CapioCLEngine::get();
-    if (countEntries(directory) >= n_expected) {
-        engine.setCommitted(directory);
-        return true;
-    }
-    return engine.isCommitted(directory);
-}
-
 void FsStorageManager::noteNewEntry(const std::filesystem::path &path) {
     const auto directory = path.parent_path();
-    if (_committed_directories.count(directory) != 0 ||
-        CapioCLEngine::get().getCommitRule(directory) != capiocl::commitRules::ON_N_FILES) {
+    if (CapioCLEngine::get().getCommitRule(directory) != capiocl::commitRules::ON_N_FILES) {
         return;
     }
     auto &created = _new_entries[directory];
-    created.insert(path.filename());
+    if (created.committed) {
+        return;
+    }
+    created.names.insert(path.filename());
     const long expected = expectedEntries(directory);
-    if (static_cast<long>(created.size()) >= expected && countEntries(directory) >= expected) {
+    if (static_cast<long>(created.names.size()) >= expected &&
+        count_entries(directory) >= expected) {
         commit(directory);
-        _committed_directories.insert(directory);
-        _new_entries.erase(directory);
+        created = {{}, true};
     }
 }
 
@@ -381,63 +397,67 @@ void FsStorageManager::list(const pid_t tid, const pid_t pid, const int fd, cons
         reply_kernel_lists(tid, offset, count);
         return;
     }
-    const long expected = expectedEntries(path);
-    if (!engine.isFirable(path)) { // update mode: the kernel lists, once committed
-        spawn_without_signals([this, tid, path, offset, count, expected] {
-            (void) waitForConsent(path, true, expected);
-            reply_kernel_lists(tid, offset, count);
-        });
-        return;
-    }
     const std::pair key{pid, fd};
     if (offset == 0) {
         // A new listing, or rewinddir: list the directory as it is now
         const std::lock_guard lock(_listings_mutex);
         _listings.erase(key);
     }
-    spawn_without_signals([this, tid, key, path, offset, count, expected] {
-        const auto first = static_cast<size_t>(offset / RECORD);
-        bool committed   = false;
-        std::vector<linux_dirent64> found;
-        for (int pass = 0;; ++pass) {
-            {
-                const std::lock_guard lock(_listings_mutex);
-                auto &listing = _listings[key];
-                if (!listing.is_complete) {
-                    for (const auto &record : found) {
-                        if (listing.names.insert(record.d_name).second) {
-                            listing.entries.push_back(record);
-                        }
-                    }
-                    listing.is_complete = committed;
-                }
-                if (first < listing.entries.size() || listing.is_complete) {
-                    const size_t last =
-                        std::min(listing.entries.size(),
-                                 first + static_cast<size_t>(std::max<off64_t>(count, 0) / RECORD));
-                    std::vector<linux_dirent64> records(listing.entries.begin() +
-                                                            std::min(first, last),
-                                                        listing.entries.begin() + last);
-                    for (size_t i = 0; i < records.size(); ++i) {
-                        records[i].d_off = static_cast<off64_t>(first + i + 1) * RECORD;
-                    }
-                    const auto size = static_cast<off64_t>(records.size()) * RECORD;
-                    client_manager->replyToClientWithData(
-                        tid, offset + size, reinterpret_cast<const char *>(records.data()), size);
-                    return;
-                }
-            }
-            if (pass > 0) {
-                std::this_thread::sleep_for(std::chrono::milliseconds(100));
-            }
-            // A removed directory is committed: nothing more will appear in it
-            const long entries = countEntries(path);
-            committed          = entries < 0 ||
-                                 (entries >= expected && isDirectoryCommitted(path, expected)) ||
-                                 CapioCLEngine::get().isCommitted(path);
-            found              = read_directory(path);
-        }
+    spawn_without_signals([this, tid, key, path, offset, count, expected = expectedEntries(path),
+                           as_it_grows = engine.isFirable(path)] {
+        serveListing(tid, key, path, offset, count, expected, as_it_grows);
     });
+}
+
+void FsStorageManager::serveListing(const pid_t tid, const std::pair<pid_t, int> key,
+                                    const std::string &path, const off64_t offset,
+                                    const off64_t count, const long expected,
+                                    const bool as_it_grows) {
+    for (bool first_pass = true;; first_pass = false) {
+        if (!first_pass) {
+            std::this_thread::sleep_for(std::chrono::milliseconds(100));
+        }
+        const bool committed = is_directory_committed(path, expected);
+        // A committed directory no longer changes: the kernel lists it, unless the server is half
+        // way through returning it
+        if (committed && (offset == 0 || !as_it_grows)) {
+            reply_kernel_lists(tid, offset, count);
+            return;
+        }
+        if (!as_it_grows) {
+            continue; // update mode: wait for the commit
+        }
+        if (const auto records = nextEntries(key, path, offset, count, committed)) {
+            const auto size = static_cast<off64_t>(records->size()) * RECORD;
+            client_manager->replyToClientWithData(
+                tid, offset + size, reinterpret_cast<const char *>(records->data()), size);
+            return;
+        }
+    }
+}
+
+std::optional<std::vector<linux_dirent64>>
+FsStorageManager::nextEntries(const std::pair<pid_t, int> key, const std::string &path,
+                              const off64_t offset, const off64_t count, const bool committed) {
+    const auto found = read_directory(path); // before the lock: it may be slow
+    const std::lock_guard lock(_listings_mutex);
+    if (committed && _listings.count(key) == 0) {
+        return std::vector<linux_dirent64>{}; // dropped at its end, after the commit
+    }
+    auto &listing = _listings[key];
+    for (const auto &record : found) {
+        if (listing.names.insert(record.d_name).second) {
+            listing.entries.push_back(record);
+        }
+    }
+    auto records = slice(listing.entries, offset, count);
+    if (records.empty()) {
+        if (!committed) {
+            return std::nullopt; // no new entry yet
+        }
+        _listings.erase(key); // read to the end after the commit: nothing more to keep
+    }
+    return records;
 }
 
 void FsStorageManager::waitForCreation(const std::filesystem::path &path) const {
@@ -484,7 +504,7 @@ off64_t FsStorageManager::waitForConsent(const std::filesystem::path &path, cons
                 return 0;
             }
             if (CapioCLEngine::get().isFirable(path) ||
-                (by_entries ? isDirectoryCommitted(path, expected)
+                (by_entries ? is_directory_committed(path, expected)
                             : CapioCLEngine::get().isCommitted(path))) {
                 return 1;
             }

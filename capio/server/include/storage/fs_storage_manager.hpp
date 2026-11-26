@@ -42,20 +42,21 @@ class FsStorageManager {
     /// @brief N for each on_n_files directory, read before CAPIO-CL's lookups could change it
     std::unordered_map<std::string, long> _expected_entries;
 
-    /// @brief The entries created in each on_n_files directory, until it is committed
-    std::unordered_map<std::string, std::unordered_set<std::string>> _new_entries;
-    std::unordered_set<std::string> _committed_directories;
+    /// @brief The entries that producers created in an on_n_files directory, until it is
+    /// committed
+    struct NewEntries {
+        std::unordered_set<std::string> names;
+        bool committed = false;
+    };
+    std::unordered_map<std::string, NewEntries> _new_entries;
 
-    /// @brief What a directory descriptor has listed so far. It only grows, so the offset of an
-    /// entry never changes while the directory is listed.
+    /// @brief What a descriptor of an on_n_files directory in no_update mode has listed so far,
+    /// by (pid, fd). It only grows, so the offset of an entry never changes, and it is dropped once
+    /// read to the end after the commit. Shared with the threads that answer getdents.
     struct Listing {
         std::vector<linux_dirent64> entries;
         std::unordered_set<std::string> names;
-        bool is_complete = false; ///< read after the commit: no entry can be missing
     };
-
-    /// @brief The listing of each directory descriptor, by (pid, fd). Shared with the threads
-    /// that answer getdents, behind _listings_mutex.
     std::map<std::pair<pid_t, int>, Listing> _listings;
     std::mutex _listings_mutex;
 
@@ -74,6 +75,16 @@ class FsStorageManager {
     /// @brief Move everything known about @p from and the files inside it to the same names under
     /// @p to
     void moveHistory(const std::string &from, const std::string &to);
+
+    /// @brief Answer the getdents of thread @p tid, on a thread of its own (see list)
+    void serveListing(pid_t tid, std::pair<pid_t, int> key, const std::string &path, off64_t offset,
+                      off64_t count, long expected, bool as_it_grows);
+
+    /// @brief Up to @p count bytes of the entries of @p key from @p offset, after reading @p path
+    /// for new ones; none if there is no new entry yet and the directory is not @p committed
+    std::optional<std::vector<linux_dirent64>> nextEntries(std::pair<pid_t, int> key,
+                                                           const std::string &path, off64_t offset,
+                                                           off64_t count, bool committed);
 
   public:
     FsStorageManager();
@@ -143,24 +154,13 @@ class FsStorageManager {
                 bool to_capio);
 
     /**
-     * @brief Read N for each on_n_files directory of the config.
+     * @brief N of the on_n_files directory @p directory.
      *
      * When n_files is omitted, CAPIO-CL uses the number of children it knows about, and every
      * lookup adds one, so that number grows over time; it also can't tell us n_files was omitted.
-     * So N is the value CAPIO-CL reports at startup, and at least 1.
+     * So N is the value CAPIO-CL reports at startup (or the first time we ask), and at least 1.
      */
-    void loadExpectedEntries();
-
     [[nodiscard]] long expectedEntries(const std::filesystem::path &directory);
-
-    /// @brief How many entries @p directory has, not counting "." and ".." or CAPIO-CL's token
-    /// files, or -1 if it can't be read
-    [[nodiscard]] static long countEntries(const std::filesystem::path &directory);
-
-    /// @brief Whether an on_n_files directory is committed, committing it first if it has its N
-    /// entries. This can block, so only waiting threads may call it.
-    [[nodiscard]] static bool isDirectoryCommitted(const std::filesystem::path &directory,
-                                                   long n_expected);
 
     /**
      * @brief A producer has created @p path. Counts it as an entry of its directory, so that an
@@ -173,10 +173,10 @@ class FsStorageManager {
      * @brief Thread @p tid of process @p pid lists its directory descriptor @p fd.
      *
      * The kernel lists it (the reply is KERNEL_LISTS_MARKER), except for a consumer of an
-     * on_n_files directory in no_update mode: it is sent up to @p count bytes of entries from
-     * @p offset, as linux_dirent64 records, as they appear and until the commit. A consumer in
-     * update mode is let list once the directory is committed. Waits run on a thread of their own,
-     * which reads the directory again every 100 ms: the request thread never waits for a directory.
+     * on_n_files directory in no_update mode before the commit: it is sent up to @p count bytes of
+     * entries from @p offset, as linux_dirent64 records, as they appear. A consumer in update mode
+     * is let list once the directory is committed. Waits run on a thread of their own, which reads
+     * the directory again every 100 ms: the request thread never waits for a directory.
      */
     void list(pid_t tid, pid_t pid, int fd, off64_t offset, off64_t count);
 
