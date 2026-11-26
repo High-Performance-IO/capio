@@ -506,9 +506,6 @@ static __attribute__((constructor)) void init() {
     const long tid = syscall_no_intercept(SYS_gettid);
 
     FileDescriptorTable::protectAcrossFork();
-    if (std::getenv("CAPIO_DIR") != nullptr) {
-        get_capio_dir(); // set it now, before there are threads to race for it
-    }
     init_client(tid);
     init_filesystem(tid); // with the descriptors of the program before an exec, if any
     initialize_new_thread();

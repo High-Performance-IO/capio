@@ -11,12 +11,15 @@
 /*
  * Process creation. A new process cannot become a client as soon as it exists:
  *
- * - after fork, glibc still holds the malloc lock in the child, and becoming a client allocates.
- *   The child becomes one at its first system call that CAPIO handles, when the lock is free.
+ * - right after fork, still inside glibc's fork(), the malloc lock and the lock of the descriptor
+ *   table (FileDescriptorTable::protectAcrossFork) are held, and becoming a client allocates: the
+ *   child hung there. It becomes one at its first system call that CAPIO handles, when both are
+ *   free.
  * - after vfork or posix_spawn, the child runs in the memory of its parent, thread-local variables
  *   included, until it execs. It must not become a client at all: it would replace the queues of
  *   its parent. Its system calls go to the kernel, and the program it execs becomes a client.
  */
+
 /// @brief What the hook does for a thread before handling its system calls. Both are 0 outside of
 /// the creation of a process, so the hook tests one variable.
 constexpr unsigned char CAPIO_PROCESS_NEEDS_SETUP  = 1; ///< a forked child, not a client yet
@@ -73,11 +76,6 @@ inline void initialize_new_thread(const bool wait = false) {
 
     START_LOG(tid, "call(tid=%d, pid=%d, app_name=%s)", tid, pid, capio_app_name);
 
-    if (pid == tid) {
-        // A new process has no other threads, whatever its parent was doing
-        requests_being_written = 0;
-        resume_requests();
-    }
     initialize_data_queues(tid);
     init_client(tid);
 

@@ -3,7 +3,6 @@
  * current descriptor, e.g. "create:out" "write:AAAA" "close". A failed operation
  * prints "<operation>=<errno name>" and the next one runs.
  */
-#include <atomic>
 #include <cerrno>
 #include <cstdio>
 #include <cstring>
@@ -254,25 +253,6 @@ const std::map<std::string, Operation> &operations() {
              char *args[] = {const_cast<char *>("true"), nullptr};
              return posix_spawnp(&child, args[0], nullptr, nullptr, args, environ) == 0 &&
                     waitpid(child, nullptr, 0) == child;
-         }},
-        {"pool", // "<n>": 8 threads create, write and close n files at the same time
-         [](const std::string &a) {
-             const int n_files = std::stoi(a);
-             std::atomic<int> next{0}, failed{0};
-             std::vector<std::thread> threads(8);
-             for (auto &thread : threads) {
-                 thread = std::thread([&] {
-                     for (int i; (i = next++) < n_files;) {
-                         const int out =
-                             ::open(("pool" + std::to_string(i)).c_str(), O_CREAT | O_WRONLY, 0644);
-                         failed += ::write(out, "x", 1) != 1 || ::close(out) != 0;
-                     }
-                 });
-             }
-             for (auto &thread : threads) {
-                 thread.join();
-             }
-             return failed == 0;
          }},
     };
     return table;

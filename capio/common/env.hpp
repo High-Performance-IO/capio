@@ -21,8 +21,7 @@
 #endif
 
 inline const std::filesystem::path &get_capio_dir() {
-    // Never destroyed: handlers of other threads need it while exit() destroys static objects
-    static auto &capio_dir = *new std::filesystem::path();
+    static std::filesystem::path capio_dir{};
     START_LOG(capio_syscall(SYS_gettid), "call()");
     // TODO: if CAPIO_DIR is not set, it should be left as null
 
