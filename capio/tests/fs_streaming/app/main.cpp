@@ -8,10 +8,12 @@
 #include <cstring>
 #include <functional>
 #include <map>
+#include <set>
 #include <string>
 #include <thread>
 #include <vector>
 
+#include <dirent.h>
 #include <fcntl.h>
 #include <sys/stat.h>
 #include <sys/syscall.h>
@@ -129,6 +131,73 @@ const std::map<std::string, Operation> &operations() {
          [](const std::string &a) {
              const auto to = a.find('>');
              return ::rename(a.substr(0, to).c_str(), a.substr(to + 1).c_str()) == 0;
+         }},
+        {"list",
+         [](const std::string &a) {
+             DIR *dir = opendir(a.c_str());
+             if (dir == nullptr) {
+                 return false;
+             }
+             std::set<std::string> names;
+             while (const auto *entry = readdir(dir)) {
+                 if (entry->d_name[0] != '.') {
+                     names.insert(entry->d_name);
+                 }
+             }
+             closedir(dir);
+             for (const auto &name : names) {
+                 print(name + ",");
+             }
+             return true;
+         }},
+        {"list_twice",
+         [](const std::string &a) {
+             DIR *dir = opendir(a.c_str());
+             if (dir == nullptr) {
+                 return false;
+             }
+             for (int pass = 0; pass < 2; ++pass) {
+                 int count = 0;
+                 while (const auto *entry = readdir(dir)) {
+                     count += entry->d_name[0] != '.';
+                 }
+                 print(std::to_string(count));
+                 rewinddir(dir);
+             }
+             return closedir(dir) == 0;
+         }},
+        {"list_seek",
+         [](const std::string &a) {
+             DIR *dir = opendir(a.c_str());
+             if (dir == nullptr || readdir(dir) == nullptr) {
+                 return false;
+             }
+             const long position = telldir(dir);
+             const auto *second  = readdir(dir);
+             if (second == nullptr) {
+                 return false;
+             }
+             const std::string expected = second->d_name;
+             seekdir(dir, position);
+             const auto *again = readdir(dir);
+             print(again != nullptr && expected == again->d_name ? "same" : "different");
+             return closedir(dir) == 0;
+         }},
+        {"scandir",
+         [](const std::string &a) {
+             struct dirent **entries;
+             const int count = ::scandir(a.c_str(), &entries, nullptr, alphasort);
+             if (count < 0) {
+                 return false;
+             }
+             for (int i = 0; i < count; ++i) {
+                 if (entries[i]->d_name[0] != '.') {
+                     print(std::string(entries[i]->d_name) + ",");
+                 }
+                 free(entries[i]);
+             }
+             free(entries);
+             return true;
          }},
         {"thread",
          [](const std::string &a) {

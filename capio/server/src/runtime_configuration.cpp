@@ -1,4 +1,5 @@
 #include "utils/runtime_configuration.hpp"
+#include "common/path.hpp"
 
 #include "calf/StdOutLogger.h"
 #include "calf/StlLogger.h"
@@ -20,9 +21,6 @@
 
 namespace {
 
-constexpr std::array CAPIO_DIR_FORBIDDEN_PATHS = {std::string_view{"/proc/"},
-                                                  std::string_view{"/sys/"}};
-
 /// @brief Read a numeric environment variable, falling back to @p default_value when unset
 long long env_number(const char *name, long long default_value) {
     const char *value = std::getenv(name);
@@ -40,10 +38,8 @@ std::filesystem::path resolve_capio_dir() {
         throw std::runtime_error(std::string{"CAPIO_DIR set, but directory "} + value +
                                  " does not exist on filesystem");
     }
-    for (const auto &forbidden_path : CAPIO_DIR_FORBIDDEN_PATHS) {
-        if (capio_dir.native().rfind(forbidden_path, 0) == 0) {
-            throw std::runtime_error("CAPIO_DIR " + capio_dir.string() + " is in forbidden path");
-        }
+    if (is_forbidden_path(capio_dir.native())) {
+        throw std::runtime_error("CAPIO_DIR " + capio_dir.string() + " is in forbidden path");
     }
     return capio_dir;
 }

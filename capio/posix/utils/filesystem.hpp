@@ -19,13 +19,11 @@
 
 #include "calf/SyscallLogger.h"
 #include "common/env.hpp"
+#include "common/path.hpp"
 #include "common/syscall.hpp"
 
 #include "file_descriptor_table.hpp"
 #include "types.hpp"
-
-constexpr std::array CAPIO_DIR_FORBIDDEN_PATHS = {std::string_view{"/proc/"},
-                                                  std::string_view{"/sys/"}};
 
 inline bool in_dir(const std::string &path, const std::string &glob) {
     const size_t res = path.find('/', glob.length() - 1);
@@ -48,13 +46,6 @@ inline bool is_directory(int dirfd) {
 inline bool is_prefix(const std::filesystem::path &path_1, const std::filesystem::path &path_2) {
     const auto relpath = path_2.lexically_relative(path_1);
     return !relpath.empty() && relpath.native().rfind("..", 0) != 0;
-}
-
-inline bool is_forbidden_path(const std::string_view &path) {
-    return std::any_of(CAPIO_DIR_FORBIDDEN_PATHS.cbegin(), CAPIO_DIR_FORBIDDEN_PATHS.cend(),
-                       [&path](const std::string_view &forbidden_path) {
-                           return path.rfind(forbidden_path, 0) == 0;
-                       });
 }
 
 inline bool is_capio_dir(const std::filesystem::path &path_to_check) {

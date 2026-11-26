@@ -7,6 +7,8 @@
 
 #include <sys/types.h>
 
+#include "common/dirent.hpp"
+
 // CAPIO files constants
 constexpr size_t CAPIO_DEFAULT_DIR_INITIAL_SIZE   = 1024L * 1024 * 1024;
 constexpr off64_t CAPIO_DEFAULT_FILE_INITIAL_SIZE = 1024L * 1024 * 1024 * 4;
@@ -26,6 +28,17 @@ constexpr long CAPIO_LOCATION_REQUERY_INTERVAL_DEFAULT_MS = 500;
 constexpr char CAPIO_MCAST_PROTO_FLAG[]           = "mcast";
 constexpr char CAPIO_FS_PROTO_FLAG[]              = "fs";
 constexpr char CAPIO_FS_DEFAULT_TOKEN_DIRECTORY[] = ".capio_tokens/";
+
+/// @brief FS variant: the record that the server sends in place of the entries of a directory, to
+/// let the kernel list it. Every byte is 0xFF, which no entry is.
+/// TODO: marker.fill(0xFF) once CAPIO moves to C++20, where std::array::fill is constexpr
+inline constexpr auto KERNEL_LISTS_MARKER = [] {
+    std::array<unsigned char, sizeof(linux_dirent64)> marker{};
+    for (auto &byte : marker) {
+        byte = 0xFF;
+    }
+    return marker;
+}();
 
 // CAPIO default values for shared memory
 constexpr char CAPIO_DEFAULT_WORKFLOW_NAME[] = "CAPIO";

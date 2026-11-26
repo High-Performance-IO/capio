@@ -4,6 +4,8 @@
 #include <atomic>
 #include <chrono>
 #include <filesystem>
+#include <map>
+#include <mutex>
 #include <optional>
 #include <string>
 #include <unordered_map>
@@ -12,14 +14,16 @@
 
 #include <sys/types.h>
 
+#include "common/dirent.hpp"
+
 /**
  * @brief Manages the files of the file system variant (libcapio_posix_fs.so).
  *
  * Its files stay on the file system, so unlike StorageManager it holds no data: it knows what has
- * happened to each file (closes, failed closes, renames) and applies the CAPIO-CL rules to it. As
- * StorageManager, it knows the descriptors of its clients by number. CAPIO-CL keeps the rules and
- * the commit state; ClientManager keeps who produces what. Used by the request thread only, apart
- * from the static methods.
+ * happened to each file (closes, failed closes, renames, entries of on_n_files directories) and
+ * applies the CAPIO-CL rules to it. As StorageManager, it knows the descriptors of its clients by
+ * number. CAPIO-CL keeps the rules and the commit state; ClientManager keeps who produces what.
+ * Used by the request thread only, apart from the static methods and the listings.
  */
 class FsStorageManager {
     /// @brief How many successful closes each file has had. Counted for every file, whatever its
@@ -34,6 +38,24 @@ class FsStorageManager {
      * of StorageManager. By process, as its threads share them, and as an exec keeps them.
      */
     std::unordered_map<pid_t, std::unordered_map<int, std::string>> _opened_fd_map;
+
+    /// @brief The entries that producers created in an on_n_files directory, until it is
+    /// committed
+    struct NewEntries {
+        std::unordered_set<std::string> names;
+        bool committed = false;
+    };
+    std::unordered_map<std::string, NewEntries> _new_entries;
+
+    /// @brief What a descriptor of an on_n_files directory in no_update mode has listed so far,
+    /// by (pid, fd). It only grows, so the offset of an entry never changes, and it is dropped once
+    /// read to the end after the commit. Shared with the threads that answer getdents.
+    struct Listing {
+        std::vector<linux_dirent64> entries;
+        std::unordered_set<std::string> names;
+    };
+    std::map<std::pair<pid_t, int>, Listing> _listings;
+    std::mutex _listings_mutex;
 
     /// @brief Closes of on_close:N being counted on background threads
     std::atomic<int> _pending_counts{0};
@@ -50,6 +72,16 @@ class FsStorageManager {
     /// @brief Move everything known about @p from and the files inside it to the same names under
     /// @p to
     void moveHistory(const std::string &from, const std::string &to);
+
+    /// @brief Answer the getdents of thread @p tid, on a thread of its own (see list)
+    void serveListing(pid_t tid, std::pair<pid_t, int> key, const std::string &path, off64_t offset,
+                      off64_t count, bool as_it_grows);
+
+    /// @brief Put in @p records up to @p count bytes of the entries of @p key from @p offset, after
+    /// reading @p path for new ones
+    /// @return false if there is no new entry yet and the directory is not @p committed
+    bool nextEntries(std::pair<pid_t, int> key, const std::string &path, off64_t offset,
+                     off64_t count, bool committed, std::vector<linux_dirent64> &records);
 
   public:
     FsStorageManager();
@@ -92,6 +124,11 @@ class FsStorageManager {
     /// @brief The path of the descriptor @p fd of process @p pid, empty if it has none
     [[nodiscard]] std::string getPath(pid_t pid, int fd) const;
 
+    /// @brief Whether @p fd of process @p pid is a descriptor of the FS variant. The FS variant
+    /// tells the server about its descriptors with CAPIO_REQUEST_CREATE_FS, which the memory
+    /// variant never sends: so this tells which variant a close, dup or getdents is for.
+    [[nodiscard]] bool ownsDescriptor(pid_t pid, int fd) const;
+
     /**
      * @brief Thread @p tid of process @p pid closed its descriptor @p fd
      * @param error what the close failed with, 0 if it worked
@@ -113,6 +150,24 @@ class FsStorageManager {
     void rename(pid_t tid, const std::string &from, bool from_capio, const std::string &to,
                 bool to_capio);
 
+    /**
+     * @brief A producer has created @p path. Counts it as an entry of its directory, so that an
+     * on_n_files directory is committed even when nobody is listing it (rules that depend on the
+     * directory need that commit).
+     */
+    void noteNewEntry(const std::filesystem::path &path);
+
+    /**
+     * @brief Thread @p tid of process @p pid lists its directory descriptor @p fd.
+     *
+     * The kernel lists it (the reply is KERNEL_LISTS_MARKER), except for a consumer of an
+     * on_n_files directory in no_update mode before the commit: it is sent up to @p count bytes of
+     * entries from @p offset, as linux_dirent64 records, as they appear. A consumer in update mode
+     * is let list once the directory is committed. Waits run on a thread of their own, which reads
+     * the directory again every 100 ms: the request thread never waits for a directory.
+     */
+    void list(pid_t tid, pid_t pid, int fd, off64_t offset, off64_t count);
+
     /// @brief Block until @p path exists
     void waitForCreation(const std::filesystem::path &path) const;
 
@@ -125,7 +180,8 @@ class FsStorageManager {
     [[nodiscard]] off64_t waitForData(const std::filesystem::path &path, off64_t end_of_read) const;
 
     /**
-     * @brief Block until @p path exists and, if it is declared, is committed
+     * @brief Block until @p path exists and, if the config declares it, is committed: for an
+     * on_n_files directory, until it has its N entries
      * @return 1 if that holds from now on, 0 if @p path is not declared
      */
     [[nodiscard]] off64_t waitForConsent(const std::filesystem::path &path) const;

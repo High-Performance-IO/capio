@@ -6,6 +6,7 @@
 #include "remote/backend.hpp"
 #include "remote/home_node_service.hpp"
 #include "remote/requests.hpp"
+#include "utils/common.hpp"
 #include "utils/runtime_configuration.hpp"
 
 extern StorageManager *storage_manager;
@@ -69,10 +70,17 @@ inline void handle_getdents(int tid, int fd, long int count) {
     }
 }
 
+/// @brief "tid fd count offset". The offset is only used for descriptors of the FS variant: the
+/// server tracks the offset of memory ones itself.
 void getdents_handler(const char *const str) {
     int tid, fd;
-    off64_t count;
-    sscanf(str, "%d %d %ld", &tid, &fd, &count);
+    off64_t count, offset = 0;
+    sscanf(str, "%d %d %ld %ld", &tid, &fd, &count, &offset);
+    const pid_t pid = client_manager->getPid(tid);
+    if (fs_storage_manager->ownsDescriptor(pid, fd)) {
+        fs_storage_manager->list(tid, pid, fd, offset, count);
+        return;
+    }
     handle_getdents(tid, fd, count);
 }
 

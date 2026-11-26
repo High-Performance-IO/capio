@@ -155,8 +155,10 @@ inline off64_t getdents_request(const int fd, const off64_t count, bool is64bit,
     START_LOG(capio_syscall(SYS_gettid), "call(fd=%ld, count=%ld, is_64_bit=%s, tid=%ld)", fd,
               count, is64bit ? "true" : "false", tid);
     char req[CAPIO_REQ_MAX_SIZE];
-    sprintf(req, "%04d %ld %d %ld", is64bit ? CAPIO_REQUEST_GETDENTS64 : CAPIO_REQUEST_GETDENTS,
-            tid, fd, count);
+    // The offset is for the FS server, which reads the directory on the file system: the memory
+    // server knows it already
+    sprintf(req, "%04d %ld %d %ld %ld", is64bit ? CAPIO_REQUEST_GETDENTS64 : CAPIO_REQUEST_GETDENTS,
+            tid, fd, count, fd_table->offset(fd));
     LOG("req=%s", req);
     buf_requests->write(req, CAPIO_REQ_MAX_SIZE);
     off64_t res;

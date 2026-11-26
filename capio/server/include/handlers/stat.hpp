@@ -131,8 +131,10 @@ void consent_handler(const char *const str) {
             client_manager->replyToClient(tid, 1);
             return;
         }
-        // Directories are never committed
-        if (std::filesystem::is_directory(path, error) || !FsStorageManager::isDeclared(path)) {
+        // Directories are never committed, except those with an on_n_files rule
+        if ((std::filesystem::is_directory(path, error) &&
+             CapioCLEngine::get().getCommitRule(path) != capiocl::commitRules::ON_N_FILES) ||
+            !FsStorageManager::isDeclared(path)) {
             client_manager->replyToClient(tid, 0);
             return;
         }

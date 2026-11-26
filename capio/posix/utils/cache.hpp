@@ -243,6 +243,15 @@ class ReadCacheFS {
         capio_syscall(SYS_statx, fd, "", AT_EMPTY_PATH | AT_STATX_FORCE_SYNC, STATX_SIZE, &fresh);
 #endif
     }
+
+    /// @brief Whether the server lets the kernel list the directory of @p fd (see getdents): it is
+    /// kept as a file with nothing to wait for
+    [[nodiscard]] bool isListedByKernel(const int fd) const {
+        const auto known = available_read_cache.find(fd_table->path(fd));
+        return known != available_read_cache.end() && known->second == -1;
+    }
+
+    void setListedByKernel(const int fd) { available_read_cache[fd_table->path(fd)] = -1; }
 };
 
 inline thread_local WriteCache *write_cache;

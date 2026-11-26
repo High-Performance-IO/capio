@@ -91,6 +91,7 @@ inline void handle_create_fs(const int tid, const std::filesystem::path &path,
     const bool has_producer = inherited && client_manager->hasProducer(path);
     if (!has_producer && !CapioCLEngine::get().isExcluded(path)) {
         client_manager->registerProducedFile(tid, path);
+        fs_storage_manager->noteNewEntry(path);
     }
 }
 
@@ -104,8 +105,8 @@ inline void handle_open_fs(const int tid, const std::filesystem::path &path) {
         client_manager->replyToClient(tid, 1); // if it is missing, the kernel answers ENOENT
         return;
     }
-    // The waiter does not get the termination signals: their handler frees memory and exits, and
-    // run on a thread that holds a lock (malloc's, CAPIO-CL's) it would wait for it forever.
+    // Block the termination signals in the waiting thread. Their handler frees memory and exits;
+    // if it ran on a thread holding a lock (malloc's or CAPIO-CL's), it would wait for it forever.
     // TODO: a thread manager for the threads of the server
     sigset_t signals, previous;
     sigemptyset(&signals);
