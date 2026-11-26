@@ -244,14 +244,14 @@ class ReadCacheFS {
 #endif
     }
 
-    /// @brief Whether the file of @p fd can be read with nothing to wait for. For a directory: the
-    /// server lets the kernel list it.
-    [[nodiscard]] bool readsAll(const int fd) const {
+    /// @brief Whether the server lets the kernel list the directory of @p fd (see getdents): it is
+    /// kept as a file with nothing to wait for
+    [[nodiscard]] bool isListedByKernel(const int fd) const {
         const auto known = available_read_cache.find(fd_table->path(fd));
         return known != available_read_cache.end() && known->second == -1;
     }
 
-    void setReadsAll(const int fd) { available_read_cache[fd_table->path(fd)] = -1; }
+    void setListedByKernel(const int fd) { available_read_cache[fd_table->path(fd)] = -1; }
 };
 
 inline thread_local WriteCache *write_cache;

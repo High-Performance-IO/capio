@@ -24,7 +24,7 @@ inline int getdents_handler_impl(long arg0, long arg1, long arg2, long *result, 
         // The FS server lets the kernel list the directory, once it may be listed, unless it
         // returns the entries itself: for a consumer of an on_n_files directory in no_update mode
         FS_MODE({
-            if (read_request_cache->readsAll(fd)) {
+            if (read_request_cache->isListedByKernel(fd)) {
                 return CAPIO_POSIX_SYSCALL_SKIP;
             }
         })
@@ -38,7 +38,7 @@ inline int getdents_handler_impl(long arg0, long arg1, long arg2, long *result, 
             if (*result == sizeof(linux_dirent64) &&
                 memcmp(buffer, KERNEL_LISTS_MARKER.data(), KERNEL_LISTS_MARKER.size()) == 0) {
                 fd_table->setOffset(fd, fd_table->offset(fd) - *result);
-                read_request_cache->setReadsAll(fd);
+                read_request_cache->setListedByKernel(fd);
                 return CAPIO_POSIX_SYSCALL_SKIP;
             }
         })
