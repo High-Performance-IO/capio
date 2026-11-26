@@ -8,67 +8,81 @@ on:
     types:
       - completed
 jobs:
-  docker:
-    name: "Build Docker container"
-    runs-on: ubuntu-22.04
-    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+  version:
+    name: "Get CAPIO version"
+    runs-on: ubuntu-24.04
+    # Only CI runs that passed on a push to master: not a pull request from a branch named master
+    if: ${{ github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push' }}
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      prerelease: ${{ steps.version.outputs.prerelease }}
+      exists: ${{ steps.version.outputs.exists }}
     steps:
+      # The commit CI tested: master may have moved on while CI ran
       - uses: actions/checkout@v7
-      - uses: docker/setup-qemu-action@v4
-      - uses: docker/setup-buildx-action@v4
-      - uses: docker/login-action@v4.8.0
         with:
-          username: ${{ secrets.DOCKERHUB_USERNAME }}
-          password: ${{ secrets.DOCKERHUB_TOKEN }}
-      - name: "Get CAPIO version"
+          ref: ${{ github.event.workflow_run.head_sha }}
+      - name: "Read the version from CMakeLists.txt"
+        id: version
         run: |
           VERSION=$(grep "        VERSION" CMakeLists.txt | awk '{print $2}')
           SUFFIX=$(sed -n 's/^set(CAPIO_VERSION_SUFFIX "\(.*\)")$/\1/p' CMakeLists.txt)
-          echo "CAPIO_VERSION=${VERSION}${SUFFIX}" >> $GITHUB_ENV
+          echo "version=${VERSION}${SUFFIX}" >> "$GITHUB_OUTPUT"
           # A version with a suffix (such as 2.0.0-rc1) is a pre-release
-          echo "CAPIO_PRERELEASE=$([ -n "$SUFFIX" ] && echo true || echo false)" >> $GITHUB_ENV
-      # Only releases get an image: a pre-release stops here
+          echo "prerelease=$([ -n "$SUFFIX" ] && echo true || echo false)" >> "$GITHUB_OUTPUT"
+          # A version is released once: the next pushes to master leave its tag alone
+          if git ls-remote --exit-code --tags origin "refs/tags/${VERSION}${SUFFIX}" > /dev/null; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+          fi
+          echo "CAPIO ${VERSION}${SUFFIX}, pre-release: $([ -n "$SUFFIX" ] && echo yes || echo no)"
+  docker:
+    name: "Build Docker container"
+    runs-on: ubuntu-24.04
+    needs: version
+    # Only releases get an image: a pre-release has none
+    if: ${{ needs.version.outputs.prerelease == 'false' }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+      - uses: docker/setup-qemu-action@v4
+      - uses: docker/setup-buildx-action@v4
       - name: "Check if Docker image already exists"
-        if: ${{ env.CAPIO_PRERELEASE == 'false' }}
-        run: echo "NEW_IMAGE=$(docker buildx imagetools inspect alphaunito/capio:${CAPIO_VERSION} > /dev/null 2>&1; echo $?)" >> $GITHUB_ENV
+        run: echo "NEW_IMAGE=$(docker buildx imagetools inspect alphaunito/capio:${{ needs.version.outputs.version }} > /dev/null 2>&1; echo $?)" >> "$GITHUB_ENV"
+      - uses: docker/login-action@v4.8.0
+        if: ${{ env.NEW_IMAGE == 1 }}
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
       - name: "Build Docker image"
-        if: ${{ env.CAPIO_PRERELEASE == 'false' && env.NEW_IMAGE == 1 }}
+        if: ${{ env.NEW_IMAGE == 1 }}
         uses: docker/build-push-action@v7
         with:
+          # The checked-out commit, not the newest one of master
+          context: .
           build-args: |
             CMAKE_BUILD_TYPE=Release
           push: true
           tags: |
-            alphaunito/capio:${{ env.CAPIO_VERSION }}
+            alphaunito/capio:${{ needs.version.outputs.version }}
             alphaunito/capio:latest
   github:
     name: "Create GitHub Release"
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
+    needs: version
+    if: ${{ needs.version.outputs.exists == 'false' }}
     permissions:
       contents: write
-    if: ${{ github.event.workflow_run.conclusion == 'success' }}
     steps:
-      - uses: actions/checkout@v7
-      - name: "Get CAPIO version"
-        run: |
-          VERSION=$(grep "        VERSION" CMakeLists.txt | awk '{print $2}')
-          SUFFIX=$(sed -n 's/^set(CAPIO_VERSION_SUFFIX "\(.*\)")$/\1/p' CMakeLists.txt)
-          echo "CAPIO_VERSION=${VERSION}${SUFFIX}" >> $GITHUB_ENV
-          # A version with a suffix (such as 2.0.0-rc1) is a pre-release
-          echo "CAPIO_PRERELEASE=$([ -n "$SUFFIX" ] && echo true || echo false)" >> $GITHUB_ENV
-      - name: "Check tag existence"
-        uses: mukunku/tag-exists-action@v1.7.0
-        id: check-tag
-        with:
-          tag: ${{ env.CAPIO_VERSION }}
+      # Tags the commit CI tested. The notes list the pull requests merged since the previous release.
       - name: "Create Release"
-        id: create-release
-        uses: actions/create-release@v1
-        if: ${{ steps.check-tag.outputs.exists == 'false' }}
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ env.CAPIO_VERSION }}
-          release_name: ${{ env.CAPIO_VERSION }}
-          draft: false
-          prerelease: ${{ env.CAPIO_PRERELEASE == 'true' }}
+          tag_name: ${{ needs.version.outputs.version }}
+          name: ${{ needs.version.outputs.version }}
+          target_commitish: ${{ github.event.workflow_run.head_sha }}
+          generate_release_notes: true
+          prerelease: ${{ needs.version.outputs.prerelease == 'true' }}
+          make_latest: ${{ needs.version.outputs.prerelease == 'false' }}
