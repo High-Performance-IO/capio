@@ -24,10 +24,24 @@ inline void init_client(const long tid) {
 }
 
 /**
- * Send a request on a path, of either variant: "<code> <tid> <arguments><path>". Only requests on
- * a path need it: the others name an open descriptor. The path is last, so it may contain spaces,
- * and what does not fit in a request is sent before it, in CAPIO_REQUEST_PATH_PART requests that
- * the server puts in front of the path.
+ * Send a request that carries a path (open, stat, mkdir, rename, ...), in either variant.
+ *
+ * The request is "<code> <tid> <arguments><path>". The path goes last, so the server can read
+ * everything after the arguments as the path, spaces included.
+ *
+ * A request is only CAPIO_REQ_MAX_SIZE (256) bytes long, and a path can be longer. In that case
+ * the beginning of the path is sent first, split into as many CAPIO_REQUEST_PATH_PART requests as
+ * needed, and the request itself carries only the end of the path. The server stores the parts it
+ * receives from each thread and glues them back together when the request arrives. Each part
+ * holds what is left of the 256 bytes after "<code> <tid> ", about 240 bytes. For example, a
+ * 600-byte path for an open becomes three requests:
+ *
+ *   PATH_PART <tid> <first ~244 bytes of the path>
+ *   PATH_PART <tid> <next ~244 bytes>
+ *   OPEN      <tid> <fd> <the last ~112 bytes>
+ *
+ * Requests on an open file do not need this: they send the descriptor, and the server already
+ * knows which path it belongs to.
  *
  * @param code
  * @param tid
@@ -87,7 +101,9 @@ inline off64_t rename_request(const long tid, const std::filesystem::path &old_p
                               const std::filesystem::path &newpath) {
     START_LOG(capio_syscall(SYS_gettid), "call(tid=%ld, old_path=%s, new_path=%s)", tid,
               old_path.c_str(), newpath.c_str());
-    // As in rename_request_fs: the names back to back, after the length of the old one
+    // Both names in one request, written one after the other with no separator (a path can contain
+    // any character). The length of the old name, sent first, tells the server where it ends. As
+    // in rename_request_fs.
     path_request(CAPIO_REQUEST_RENAME, tid, std::to_string(old_path.native().size()) + " ",
                  old_path.native() + newpath.native());
     off64_t res;
@@ -362,8 +378,9 @@ inline off64_t consent_to_proceed_request(const std::filesystem::path &path, con
     return res;
 }
 
-/// @brief How many bytes of the file of @p fd can be read, up to @p end_of_read. The server knows
-/// the descriptor: the request needs no path.
+/// @brief Ask the server how many bytes of the file open as @p fd can be read, up to @p end_of_read
+/// (waiting for them if needed). Only the descriptor is sent: the server learned its path when
+/// the file was opened (CAPIO_REQUEST_CREATE_FS).
 inline off64_t read_request_fs(const int fd, const off64_t end_of_read, const long tid) {
     START_LOG(capio_syscall(SYS_gettid), "call(fd=%d, end_of_read=%ld, tid=%ld)", fd, end_of_read,
               tid);

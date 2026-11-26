@@ -37,7 +37,13 @@ void handle_rename(int tid, const std::filesystem::path &oldpath,
     }
 }
 
-/// @brief "tid old_size old_pathnew_path": the names back to back, as in rename_fs_handler
+/**
+ * @brief Rename of the memory variant: "tid old_size old_pathnew_path".
+ *
+ * The two names are written one after the other with no separator, since a path can contain any
+ * character: the first old_size bytes are the old name, the rest is the new one. As in
+ * rename_fs_handler.
+ */
 void rename_handler(const char *const str) {
     int tid, consumed = 0;
     size_t old_size;
@@ -46,7 +52,7 @@ void rename_handler(const char *const str) {
     }
     const std::string names = request_text(tid, str, consumed);
     if (names.size() <= old_size) {
-        return; // cut: the request was too long
+        return; // the new name is missing: the request was truncated
     }
     handle_rename(tid, names.substr(0, old_size), names.substr(old_size));
 }

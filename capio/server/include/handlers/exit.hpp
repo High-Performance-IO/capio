@@ -47,7 +47,9 @@ void handle_exit_group(int tid) {
         handle_close(tid, fd);
     }
     client_manager->removeClient(tid);
-    path_parts.erase(tid); // the pieces of a request it did not finish
+    // A thread can exit after sending the first parts of a long path but before the request that
+    // completes it: throw those parts away
+    path_parts.erase(tid);
 }
 
 void exit_group_handler(const char *const str) {

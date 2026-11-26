@@ -156,16 +156,25 @@ inline void copy_file_range_data(const CSCopyFileRange_t &copy) {
 }
 
 /*
- * Requests on a path, of both variants, end with the path, which may contain spaces, so the
- * handlers read the arguments before it with sscanf and a final %n, and the path from there to the
- * end (request_text). A path that does not fit in one request comes first in PATH_PART pieces.
- * Requests on an open descriptor name the descriptor instead.
+ * Requests that carry a path, in both variants, put the path last: "<tid> <arguments> <path>".
+ * A handler reads the numbers with sscanf, using %n to learn where they end, and then calls
+ * request_text, which returns everything after that point as the path. This way the path can
+ * contain spaces.
+ *
+ * A path longer than a request is sent in parts (see path_request in the client): first one or
+ * more CAPIO_REQUEST_PATH_PART requests with the beginning of the path, then the request itself
+ * with the end. path_part_handler stores the parts by thread, and request_text puts them back in
+ * front of the end of the path.
+ *
+ * Requests on an open file send the descriptor instead of the path.
  */
 
-/// @brief The pieces of a path that did not fit in one request, by the thread that sends it
+/// @brief For each thread, the beginning of a long path it is sending: the parts received so far,
+/// joined together, waiting for the request that carries the rest
 inline std::unordered_map<pid_t, std::string> path_parts;
 
-/// @brief A piece of the path of the next request of a thread: "tid piece"
+/// @brief CAPIO_REQUEST_PATH_PART, "tid part": the next part of the path of the next request of
+/// that thread. Appended to what was received before; no reply.
 inline void path_part_handler(const char *const str) {
     int tid, consumed = 0;
     if (sscanf(str, "%d%n", &tid, &consumed) == 1 && str[consumed] == ' ') {
@@ -174,8 +183,11 @@ inline void path_part_handler(const char *const str) {
 }
 
 /**
- * @brief What a request on a path has after its arguments, which end at @p consumed, with the
- * pieces that came before it in front: the path, as the client sent it
+ * @brief The path of a request, exactly as the client sent it.
+ *
+ * @param consumed where the arguments of the request end in @p str (from sscanf's %n): the path is
+ * what follows. If thread @p tid sent the beginning of the path in CAPIO_REQUEST_PATH_PART
+ * requests, those parts are put in front of it, and forgotten.
  */
 inline std::string request_text(const pid_t tid, const char *str, const int consumed) {
     std::string text;
@@ -183,7 +195,7 @@ inline std::string request_text(const pid_t tid, const char *str, const int cons
         text = std::move(parts->second);
         path_parts.erase(parts);
     }
-    // %n follows the last number: one space separates it from the path
+    // %n stops right after the last number, so the path starts after one space
     text += str[consumed] == ' ' ? str + consumed + 1 : str + consumed;
     return text;
 }
