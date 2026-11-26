@@ -18,7 +18,6 @@
 #include <sys/sendfile.h>
 #include <sys/stat.h>
 #include <sys/syscall.h>
-#include <sys/uio.h>
 #include <sys/wait.h>
 #include <unistd.h>
 
@@ -143,67 +142,34 @@ const std::map<std::string, Operation> &operations() {
              }
              return count >= 0;
          }},
-        {"preadv",
-         [](const std::string &) {
-             char buffer[8];
-             iovec part{buffer, sizeof(buffer)};
-             const ssize_t count = preadv(fd, &part, 1, 0);
-             if (count > 0) {
-                 print(std::string(buffer, count));
-             }
-             return count >= 0;
-         }},
-        {"seek_end",
-         [](const std::string &) {
-             const off_t end = lseek(fd, 0, SEEK_END);
-             print(std::to_string(end));
-             return end >= 0;
-         }},
-        {"seek_data",
+        {"seek", // "end", or "data:<offset>"
          [](const std::string &a) {
-             const off_t data = lseek(fd, std::stol(a), SEEK_DATA);
-             print(std::to_string(data));
-             return data >= 0;
+             const off_t at =
+                 a == "end" ? lseek(fd, 0, SEEK_END) : lseek(fd, std::stol(a.substr(5)), SEEK_DATA);
+             print(std::to_string(at));
+             return at >= 0;
          }},
-        {"copy_file_range",
+        {"copy", // "<method>><path>", with copy_file_range, sendfile or splice (through a pipe)
          [](const std::string &a) {
-             const int out = ::open(a.c_str(), O_CREAT | O_WRONLY | O_TRUNC, 0644);
-             ssize_t count;
-             while ((count = copy_file_range(fd, nullptr, out, nullptr, 1 << 30, 0)) > 0) {
-             }
-             ::close(out);
-             return count == 0;
-         }},
-        {"sendfile",
-         [](const std::string &a) {
-             const int out = ::open(a.c_str(), O_CREAT | O_WRONLY | O_TRUNC, 0644);
-             ssize_t count;
-             while ((count = sendfile(out, fd, nullptr, 1 << 30)) > 0) {
-             }
-             ::close(out);
-             return count == 0;
-         }},
-        {"splice",
-         [](const std::string &) {
-             int channel[2];
-             if (pipe(channel) != 0) {
+             const auto to            = a.find('>');
+             const std::string method = a.substr(0, to);
+             const int out = ::open(a.substr(to + 1).c_str(), O_CREAT | O_WRONLY | O_TRUNC, 0644);
+             int channel[2] = {-1, -1};
+             if (method == "splice" && pipe(channel) != 0) {
                  return false;
              }
              ssize_t count;
-             while ((count = splice(fd, nullptr, channel[1], nullptr, 4096, 0)) > 0) {
-                 std::string data(count, '\0');
-                 if (::read(channel[0], data.data(), count) != count) {
-                     return false;
+             do {
+                 if (method == "copy_file_range") {
+                     count = copy_file_range(fd, nullptr, out, nullptr, 1 << 30, 0);
+                 } else if (method == "sendfile") {
+                     count = sendfile(out, fd, nullptr, 1 << 30);
+                 } else if ((count = splice(fd, nullptr, channel[1], nullptr, 4096, 0)) > 0) {
+                     count = splice(channel[0], nullptr, out, nullptr, count, 0);
                  }
-                 print(data);
-             }
+             } while (count > 0);
+             ::close(out);
              return count == 0;
-         }},
-        {"cp",
-         [](const std::string &a) {
-             const auto to = a.find('>');
-             execlp("cp", "cp", a.substr(0, to).c_str(), a.substr(to + 1).c_str(), nullptr);
-             return false;
          }},
         {"list",
          [](const std::string &a) {

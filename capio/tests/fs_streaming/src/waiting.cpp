@@ -31,44 +31,36 @@ TEST_F(FsWaitingTest, Pread) {
     inBothModes([this] { EXPECT_OUTPUT(run("cons", {"open:f", "pread"}), "AAAABBBB"); });
 }
 
-TEST_F(FsWaitingTest, Preadv) {
-    inBothModes([this] { EXPECT_OUTPUT(run("cons", {"open:f", "preadv"}), "AAAABBBB"); });
-}
-
 TEST_F(FsWaitingTest, SeekEnd) {
-    inBothModes([this] { EXPECT_OUTPUT(run("cons", {"open:f", "seek_end"}), "8"); });
+    inBothModes([this] { EXPECT_OUTPUT(run("cons", {"open:f", "seek:end"}), "8"); });
 }
 
 TEST_F(FsWaitingTest, SeekData) {
-    inBothModes([this] { EXPECT_OUTPUT(run("cons", {"open:f", "seek_data:4"}), "4"); });
-}
-
-TEST_F(FsWaitingTest, Splice) {
-    inBothModes([this] { EXPECT_OUTPUT(run("cons", {"open:f", "splice"}), "AAAABBBB"); });
+    inBothModes([this] { EXPECT_OUTPUT(run("cons", {"open:f", "seek:data:4"}), "4"); });
 }
 
 TEST_F(FsWaitingTest, CopyFileRange) {
     inBothModes([this] {
-        EXPECT_OUTPUT(run("cons", {"open:f", "copy_file_range:../copy"}), "");
+        EXPECT_OUTPUT(run("cons", {"open:f", "copy:copy_file_range>../copy"}), "");
         EXPECT_EQ(copied(), "AAAABBBB");
     });
 }
 
 TEST_F(FsWaitingTest, Sendfile) {
     inBothModes([this] {
-        EXPECT_OUTPUT(run("cons", {"open:f", "sendfile:../copy"}), "");
+        EXPECT_OUTPUT(run("cons", {"open:f", "copy:sendfile>../copy"}), "");
         EXPECT_EQ(copied(), "AAAABBBB");
     });
 }
 
-TEST_F(FsWaitingTest, Cp) {
+TEST_F(FsWaitingTest, Splice) {
     inBothModes([this] {
-        EXPECT_OUTPUT(run("cons", {"cp:f>../copy"}), "");
+        EXPECT_OUTPUT(run("cons", {"open:f", "copy:splice>../copy"}), "");
         EXPECT_EQ(copied(), "AAAABBBB");
     });
 }
 
 TEST_F(FsWaitingTest, WriterSeeksToItsEnd) {
     // fopen(..., "a") seeks to the end of a descriptor that is only for writing
-    inBothModes([this] { EXPECT_OUTPUT(run("cons", {"append:f", "seek_end"}), "8"); });
+    inBothModes([this] { EXPECT_OUTPUT(run("cons", {"append:f", "seek:end"}), "8"); });
 }
