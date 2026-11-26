@@ -11,8 +11,13 @@
  * attributes"), and any other file goes to the kernel.
  */
 
-/// @brief Memory variant: answer for the CAPIO file @p path, or give any other path to the kernel
-inline int capio_xattr_of_path(const char *path, long *result) {
+#if defined(SYS_getxattr)
+int getxattr_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg5,
+                     long *result) {
+    // getxattr(path, name, value, size)
+    [[maybe_unused]] const auto *path = reinterpret_cast<const char *>(arg0); // memory, log
+    START_LOG(syscall_no_intercept(SYS_gettid), "call(path=%s)", path);
+
     MEMORY_MODE({
         if (is_capio_path(capio_posix_realpath(path))) {
             *result = -ENOTSUP;
@@ -21,26 +26,22 @@ inline int capio_xattr_of_path(const char *path, long *result) {
     })
     return CAPIO_POSIX_SYSCALL_SKIP;
 }
-
-#if defined(SYS_getxattr)
-int getxattr_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg5,
-                     long *result) {
-    // getxattr(path, name, value, size)
-    const auto *path = reinterpret_cast<const char *>(arg0);
-    START_LOG(syscall_no_intercept(SYS_gettid), "call(path=%s)", path);
-
-    return capio_xattr_of_path(path, result);
-}
 #endif
 
 #if defined(SYS_lgetxattr)
 int lgetxattr_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg5,
                       long *result) {
     // lgetxattr(path, name, value, size). CAPIO paths have no symlinks, so as getxattr
-    const auto *path = reinterpret_cast<const char *>(arg0);
+    [[maybe_unused]] const auto *path = reinterpret_cast<const char *>(arg0); // memory, log
     START_LOG(syscall_no_intercept(SYS_gettid), "call(path=%s)", path);
 
-    return capio_xattr_of_path(path, result);
+    MEMORY_MODE({
+        if (is_capio_path(capio_posix_realpath(path))) {
+            *result = -ENOTSUP;
+            return CAPIO_POSIX_SYSCALL_SUCCESS;
+        }
+    })
+    return CAPIO_POSIX_SYSCALL_SKIP;
 }
 #endif
 
