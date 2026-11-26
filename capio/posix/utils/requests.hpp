@@ -1,6 +1,7 @@
 #ifndef CAPIO_POSIX_UTILS_REQUESTS_HPP
 #define CAPIO_POSIX_UTILS_REQUESTS_HPP
 
+#include "common/constants.hpp"
 #include "common/requests.hpp"
 
 #include "calf/SyscallLogger.h"
@@ -141,7 +142,7 @@ inline void create_request_fs(const std::filesystem::path &path, const int fd, c
                               const long tid) {
     START_LOG(capio_syscall(SYS_gettid), "call(path=%s, fd=%d, produced=%d, tid=%ld)", path.c_str(),
               fd, produced, tid);
-    // also sent while the program starts, maybe before its server does: no reply
+    // no reply
     path_request(CAPIO_REQUEST_CREATE_FS, tid,
                  std::to_string(fd) + " " + std::to_string(produced) + " ", path.native());
 }
@@ -191,14 +192,22 @@ inline void handshake_named_request(const long tid, const long pid, const std::s
     START_LOG(capio_syscall(SYS_gettid), "call(tid=%ld, pid=%ld, app_name=%s)", tid, pid,
               app_name.c_str());
     char req[CAPIO_REQ_MAX_SIZE];
-    sprintf(req, "%04d %ld %ld %s %d", CAPIO_REQUEST_HANDSHAKE_NAMED, tid, pid, app_name.c_str(),
-            wait ? 1 : 0);
+    sprintf(req, "%04d %ld %ld %s %d %c", CAPIO_REQUEST_HANDSHAKE_NAMED, tid, pid, app_name.c_str(),
+            wait ? 1 : 0, MEMORY_MODE(CAPIO_VARIANT_MEMORY) FS_MODE(CAPIO_VARIANT_FS));
     LOG("req=%s", req);
     buf_requests->write(req, CAPIO_REQ_MAX_SIZE);
 
-    if (wait) {
-        off64_t res;
-        buff_response->read(&res);
+    // Every handshake waits for the server, so the server must be running before a client starts.
+    // The answer is 1, or CAPIO_REPLY_VARIANT_REFUSED if the workflow uses the other library: the
+    // two cannot be mixed yet.
+    // TODO: drop the refusal once the two variants work together in one workflow (#337)
+    off64_t res;
+    buff_response->read(&res);
+    if (res == CAPIO_REPLY_VARIANT_REFUSED) {
+        const auto &message = MEMORY_MODE(CAPIO_REFUSED_MEMORY_CLIENT_MESSAGE)
+            FS_MODE(CAPIO_REFUSED_FS_CLIENT_MESSAGE);
+        syscall_no_intercept(SYS_write, STDERR_FILENO, message, sizeof(message) - 1);
+        syscall_no_intercept(SYS_exit_group, EXIT_FAILURE);
     }
 }
 

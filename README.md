@@ -151,7 +151,8 @@ LD_PRELOAD=libcapio_posix.so \
 
 `libcapio_posix.so` keeps the files of `CAPIO_DIR` in memory, while `libcapio_posix_fs.so` leaves them on the file
 system and only coordinates who waits for what. Preload one or the other for the whole workflow, as they cannot be
-mixed, and keep the inputs of the workflow outside `CAPIO_DIR`, which is a working directory.
+mixed (the server refuses a process that uses the other one), and keep the inputs of the workflow outside
+`CAPIO_DIR`, which is a working directory.
 
 To shut down a server, send it `SIGTERM` or `SIGINT` (e.g. `killall capio_server`). The server releases its resources
 and exits.

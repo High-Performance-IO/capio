@@ -68,6 +68,7 @@ jobs:
               --name capio-docker                 \
               alphaunito/capio:latest             \
             sh -c 'jq -n --arg pwd "$PWD" "$1" > test_config.json && \
+               { capio_server -c test_config.json & sleep 5; } && \
                LD_PRELOAD=libcapio_posix.so capio_syscall_unit_tests \
                  --gtest_break_on_failure \
                  --gtest_print_time=1' sh \
@@ -81,6 +82,7 @@ jobs:
               --name capio-docker                 \
               alphaunito/capio:latest             \
             sh -c 'jq -n --arg pwd "$PWD" "$1" > test_config.json && \
+               { capio_server -c test_config.json & sleep 5; } && \
                LD_PRELOAD=libcapio_posix_fs.so capio_syscall_unit_tests \
                  --gtest_filter="-*tat*OnDirectory*:*FcntlLease*:*FcntlSeals*:*FromAPosixFileIntoACapioFile:*FromACapioFileIntoAPosixFile:*SpliceFromACapioFile*:*SpliceIntoACapioFile*:*SendfileFromACapioFile*:*TestChmodAndChownByPath*" \
                  --gtest_break_on_failure \
@@ -227,15 +229,27 @@ jobs:
             --gtest_break_on_failure \
             --gtest_print_time=1
           
+          # Every CAPIO client waits for the answer to its handshake: the server runs first
+          capio_server -c "$CONFIG_PATH" &
+          SERVER=$!
+          sleep 5
+
           echo "Run CAPIO syscall Unit tests"
           LD_PRELOAD=libcapio_posix.so \
           capio_syscall_unit_tests \
             --gtest_break_on_failure \
             --gtest_print_time=1
 
+          kill $SERVER
+          wait $SERVER || true
+
           # A coverage build skips the teardown of the server, which leaves its shared memory, the
           # canary among it: the next server of the same workflow would refuse to start.
           rm -f /dev/shm/CAPIO* /dev/shm/sem.CAPIO*
+
+          capio_server -c "$CONFIG_PATH" &
+          SERVER=$!
+          sleep 5
 
           # Left out: what only holds for files in memory (synthetic sizes of directories, refused
           # splice, sendfile, leases and seals), copies to another file system (EXDEV), and chmod,
@@ -247,6 +261,9 @@ jobs:
             --gtest_filter='-*tat*OnDirectory*:*FcntlLease*:*FcntlSeals*:*FromAPosixFileIntoACapioFile:*FromACapioFileIntoAPosixFile:*SpliceFromACapioFile*:*SpliceIntoACapioFile*:*SendfileFromACapioFile*:*TestChmodAndChownByPath*' \
             --gtest_break_on_failure \
             --gtest_print_time=1
+
+          kill $SERVER
+          wait $SERVER || true
 
           echo "Run CAPIO FS streaming tests"
           capio_fs_streaming_tests \

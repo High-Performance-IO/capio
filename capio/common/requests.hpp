@@ -39,6 +39,13 @@ constexpr const int CAPIO_FS_NOT_PRODUCED            = 0; ///< read-only, or inh
 constexpr const int CAPIO_FS_PRODUCED                = 1; ///< created, or opened to write
 constexpr const int CAPIO_FS_PRODUCED_IF_NO_PRODUCER = 2; ///< writable, inherited with exec
 
+/* VARIANT OF THE CLIENT, IN THE HANDSHAKE */
+constexpr const char CAPIO_VARIANT_MEMORY = 'M';
+constexpr const char CAPIO_VARIANT_FS     = 'F';
+
+/* REPLY TO A CLIENT OF ANOTHER VARIANT THAN ITS WORKFLOW'S */
+constexpr const long long CAPIO_REPLY_VARIANT_REFUSED = -0x7ff000000000CA10LL;
+
 /*REQUESTS FOR SERVER TO SERVER COMMUNICATION*/
 
 constexpr const int CAPIO_SERVER_REQUEST_READ                  = 0;
