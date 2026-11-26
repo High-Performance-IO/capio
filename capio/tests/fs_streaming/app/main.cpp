@@ -153,7 +153,7 @@ const std::map<std::string, Operation> &operations() {
          [](const std::string &a) {
              const auto to            = a.find('>');
              const std::string method = a.substr(0, to);
-             const int out = ::open(a.substr(to + 1).c_str(), O_CREAT | O_WRONLY | O_TRUNC, 0644);
+             const int out  = ::open(a.substr(to + 1).c_str(), O_CREAT | O_WRONLY | O_TRUNC, 0644);
              int channel[2] = {-1, -1};
              if (method == "splice" && pipe(channel) != 0) {
                  return false;
