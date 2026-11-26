@@ -48,7 +48,7 @@ TEST_F(FsCloseTest, FailedExecKeepsTheDescriptor) {
 
 TEST_F(FsStreamingTest, CloseInAForkedChildCounts) {
     startServer({{"f", "on_close:2"}});
-    EXPECT_OUTPUT(run("prod", {"create:f", "write:A", "fork_close", "write:B", "close"}), "");
+    EXPECT_OUTPUT(run("prod", {"create:f", "write:A", "fork:close", "write:B", "close"}), "");
     EXPECT_OUTPUT(run("cons", {"open:f", "read"}), "AB");
 }
 

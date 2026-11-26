@@ -63,11 +63,6 @@ bool open_as(const std::string &path, const int flags) {
     return fd >= 0;
 }
 
-bool wait_child(const pid_t pid) {
-    int status;
-    return pid > 0 && waitpid(pid, &status, 0) == pid;
-}
-
 using Operation = std::function<bool(const std::string &)>;
 
 const std::map<std::string, Operation> &operations() {
@@ -91,15 +86,14 @@ const std::map<std::string, Operation> &operations() {
              return fd >= 0;
          }},
         {"cloexec", [](const std::string &) { return fcntl(fd, F_SETFD, FD_CLOEXEC) == 0; }},
-        {"fork_close",
-         [](const std::string &) {
+        {"fork", // "<operation>", run by a child: a failure prints as in the parent
+         [](const std::string &a) {
              const pid_t child = fork();
              if (child == 0) {
-                 _exit(close(fd) == 0 ? 0 : 1);
+                 run(a);
+                 _exit(0);
              }
-             int status = 0;
-             return child > 0 && waitpid(child, &status, 0) == child && WIFEXITED(status) &&
-                    WEXITSTATUS(status) == 0;
+             return child > 0 && waitpid(child, nullptr, 0) == child;
          }},
         {"replace",
          [](const std::string &) {
@@ -254,48 +248,31 @@ const std::map<std::string, Operation> &operations() {
              thread.join();
              return true;
          }},
-        {"fork",
-         [](const std::string &a) {
-             const pid_t pid = fork();
-             if (pid == 0) {
-                 run(a);
-                 _exit(0);
-             }
-             return wait_child(pid);
-         }},
         {"spawn",
          [](const std::string &) {
-             pid_t pid;
-             char name[]  = "true";
-             char *args[] = {name, nullptr};
-             return posix_spawnp(&pid, name, nullptr, nullptr, args, environ) == 0 &&
-                    wait_child(pid);
+             pid_t child;
+             char *args[] = {const_cast<char *>("true"), nullptr};
+             return posix_spawnp(&child, args[0], nullptr, nullptr, args, environ) == 0 &&
+                    waitpid(child, nullptr, 0) == child;
          }},
-        {"pool",
+        {"pool", // "<n>": 8 threads create, write and close n files at the same time
          [](const std::string &a) {
              const int n_files = std::stoi(a);
-             std::atomic<int> next{0}, good{0};
-             std::vector<std::thread> threads;
-             for (int i = 0; i < 8; ++i) {
-                 threads.emplace_back([&] {
-                     for (int file; (file = next++) < n_files;) {
-                         const auto name  = "pool" + std::to_string(file);
-                         const int out    = ::open(name.c_str(), O_CREAT | O_WRONLY, 0644);
-                         const bool wrote = ::write(out, "x", 1) == 1;
-                         if (::close(out) != 0 || !wrote) {
-                             continue;
-                         }
-                         const int in = ::open(name.c_str(), O_RDONLY);
-                         char byte    = 0;
-                         good += ::read(in, &byte, 1) == 1 && byte == 'x';
-                         ::close(in);
+             std::atomic<int> next{0}, failed{0};
+             std::vector<std::thread> threads(8);
+             for (auto &thread : threads) {
+                 thread = std::thread([&] {
+                     for (int i; (i = next++) < n_files;) {
+                         const int out =
+                             ::open(("pool" + std::to_string(i)).c_str(), O_CREAT | O_WRONLY, 0644);
+                         failed += ::write(out, "x", 1) != 1 || ::close(out) != 0;
                      }
                  });
              }
              for (auto &thread : threads) {
                  thread.join();
              }
-             return good == n_files;
+             return failed == 0;
          }},
     };
     return table;

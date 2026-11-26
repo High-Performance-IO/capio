@@ -25,21 +25,20 @@ inline bool in_vfork_child() {
     return vfork_parent_tid != 0 && syscall_no_intercept(SYS_gettid) != vfork_parent_tid;
 }
 
-/// @brief Called in a new process, before it does anything
-inline void defer_new_process(const long tid) {
-    if (vfork_parent_tid != 0 && tid != vfork_parent_tid) {
-        // Either a vfork child, or a fork copy of a thread that had spawned one. Only the latter
-        // owns the variable, but in both cases the parent is another thread.
-        return;
+/**
+ * @brief Called in a new process, before it does anything. A vfork child, or the fork copy of a
+ * thread that had spawned one, has its parent in another thread: it never becomes a client, and
+ * must not touch the flag, which a vfork child shares with its parent.
+ */
+inline void defer_new_process() {
+    if (!in_vfork_child()) {
+        process_needs_setup = true;
     }
-    process_needs_setup = true;
 }
 
 /// @brief Called before a system call, to notice the creation of a process sharing memory
 inline void note_process_creation(const long number, const long arg0) {
-    if (vfork_parent_tid != 0) {
-        vfork_parent_tid = 0; // the parent runs again: the child has execed or exited
-    }
+    vfork_parent_tid = 0; // the parent runs again, if it had a vfork child: it has execed or exited
     unsigned long long flags = 0;
 #ifdef SYS_vfork
     if (number == SYS_vfork) {
@@ -134,7 +133,7 @@ inline void hook_clone_child() {
     const long tid = syscall_no_intercept(SYS_gettid);
     FS_MODE({
         if (pid == tid) {
-            defer_new_process(tid); // see process creation above
+            defer_new_process(); // see process creation above
             return;
         }
     })
