@@ -1,6 +1,7 @@
 #ifndef CAPIO_POSIX_UTILS_REQUESTS_HPP
 #define CAPIO_POSIX_UTILS_REQUESTS_HPP
 
+#include "common/constants.hpp"
 #include "common/requests.hpp"
 
 #include "calf/SyscallLogger.h"
@@ -20,13 +21,8 @@ class ResponseBuffer : public CircularBuffer<off_t> {
     void read(off_t *response) {
         CircularBuffer<off_t>::read(response);
         if (*response == CAPIO_REPLY_VARIANT_REFUSED) {
-            constexpr char message[] =
-                MEMORY_MODE("CAPIO: this process uses libcapio_posix.so (memory), but its "
-                            "workflow uses libcapio_posix_fs.so: the two cannot be mixed in a "
-                            "workflow. Fix LD_PRELOAD.\n")
-                    FS_MODE("CAPIO: this process uses libcapio_posix_fs.so (file system), but "
-                            "its workflow uses libcapio_posix.so: the two cannot be mixed in a "
-                            "workflow. Fix LD_PRELOAD.\n");
+            const auto &message = MEMORY_MODE(CAPIO_REFUSED_MEMORY_CLIENT_MESSAGE)
+                FS_MODE(CAPIO_REFUSED_FS_CLIENT_MESSAGE);
             syscall_no_intercept(SYS_write, STDERR_FILENO, message, sizeof(message) - 1);
             syscall_no_intercept(SYS_exit_group, EXIT_FAILURE);
         }

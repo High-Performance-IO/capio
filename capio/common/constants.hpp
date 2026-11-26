@@ -43,6 +43,15 @@ inline constexpr auto KERNEL_LISTS_MARKER = [] {
 /// @brief FS variant: the number of bytes to wait for to wait for the commit of a file
 constexpr off64_t CAPIO_UNTIL_COMMIT_FS = LLONG_MAX;
 
+/// @brief What a client prints when the server refuses it, because its workflow uses the other
+/// library (see ResponseBuffer)
+constexpr char CAPIO_REFUSED_MEMORY_CLIENT_MESSAGE[] =
+    "CAPIO: this process uses libcapio_posix.so (memory), but its workflow uses "
+    "libcapio_posix_fs.so: the two cannot be mixed in a workflow. Fix LD_PRELOAD.\n";
+constexpr char CAPIO_REFUSED_FS_CLIENT_MESSAGE[] =
+    "CAPIO: this process uses libcapio_posix_fs.so (file system), but its workflow uses "
+    "libcapio_posix.so: the two cannot be mixed in a workflow. Fix LD_PRELOAD.\n";
+
 // CAPIO default values for shared memory
 constexpr char CAPIO_DEFAULT_WORKFLOW_NAME[] = "CAPIO";
 constexpr char CAPIO_DEFAULT_APP_NAME[]      = "default_app";
