@@ -15,6 +15,7 @@
 #include "capiocl.hpp"
 #include "capiocl/engine.h"
 #include "client-manager/client_manager.hpp"
+#include "common/constants.hpp"
 #include "common/path.hpp"
 #include "utils/capiocl_adapter.hpp"
 #include "utils/filesystem.hpp"

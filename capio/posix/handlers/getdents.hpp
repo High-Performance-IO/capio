@@ -3,6 +3,9 @@
 
 #if defined(SYS_getdents) || defined(SYS_getdents64)
 
+#include <cstring>
+
+#include "common/constants.hpp"
 #include "common/dirent.hpp"
 
 #include "utils/common.hpp"
@@ -32,7 +35,8 @@ inline int getdents_handler_impl(long arg0, long arg1, long arg2, long *result, 
         write_cache->flush();
         *result = read_cache->read(fd, buffer, count, true, is64bit);
         FS_MODE({
-            if (*result == sizeof(linux_dirent64) && is_kernel_lists_marker(*buffer)) {
+            if (*result == sizeof(linux_dirent64) &&
+                memcmp(buffer, KERNEL_LISTS_MARKER.data(), KERNEL_LISTS_MARKER.size()) == 0) {
                 fd_table->setOffset(fd, fd_table->offset(fd) - *result);
                 read_request_cache->setReadsAll(fd);
                 return CAPIO_POSIX_SYSCALL_SKIP;
