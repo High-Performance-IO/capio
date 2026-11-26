@@ -9,7 +9,7 @@
 #include "requests.hpp"
 
 /*
- * Process creation in the FS variant. A new process cannot become a client as soon as it exists:
+ * Process creation. A new process cannot become a client as soon as it exists:
  *
  * - after fork, glibc still holds the malloc lock in the child, and becoming a client allocates.
  *   The child becomes one at its first system call that CAPIO handles, when the lock is free.
@@ -69,8 +69,7 @@ inline void initialize_new_thread(const bool wait = false) {
     SET_CALF_SYSCALL_HANDLER(syscall_no_intercept);
 
     // Its system calls (the shared memory and the semaphores of the queues) are on no CAPIO file,
-    // and must not reach CAPIO's handlers: in the memory variant, a forked child runs this before
-    // the fork handlers, while the descriptor table is still locked by the fork
+    // and must not reach CAPIO's handlers
     const bool flag_was_set   = syscall_no_intercept_flag;
     syscall_no_intercept_flag = true;
 
@@ -81,13 +80,11 @@ inline void initialize_new_thread(const bool wait = false) {
 
     START_LOG(tid, "call(tid=%d, pid=%d, app_name=%s)", tid, pid, capio_app_name);
 
-    FS_MODE({
-        if (pid == tid) {
-            // A new process has no other threads, whatever its parent was doing
-            requests_being_written = 0;
-            resume_requests();
-        }
-    })
+    if (pid == tid) {
+        // A new process has no other threads, whatever its parent was doing
+        requests_being_written = 0;
+        resume_requests();
+    }
     initialize_data_queues(tid);
     init_client(tid);
 
@@ -131,13 +128,11 @@ inline void hook_clone_parent(long child_tid) {
 inline void hook_clone_child() {
     const long pid = syscall_no_intercept(SYS_getpid);
     const long tid = syscall_no_intercept(SYS_gettid);
-    FS_MODE({
-        if (pid == tid) {
-            defer_new_process(); // see process creation above
-            return;
-        }
-    })
-    initialize_new_thread(pid != tid);
+    if (pid == tid) {
+        defer_new_process(); // see process creation above
+        return;
+    }
+    initialize_new_thread(true);
 }
 
 #endif // CAPIO_POSIX_UTILS_CLONE_HPP

@@ -10,9 +10,8 @@ int fork_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg
     auto pid = static_cast<pid_t>(syscall_no_intercept(SYS_fork));
     START_LOG(syscall_no_intercept(SYS_gettid), "call(pid=%ld)", pid);
 
-    if (pid == 0) { // child
-        MEMORY_MODE({ initialize_new_thread(); })
-        FS_MODE({ defer_new_process(); }) // see utils/clone.hpp
+    if (pid == 0) {          // child
+        defer_new_process(); // see utils/clone.hpp
         *result = 0;
     } else {
         *result = pid;

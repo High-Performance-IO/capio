@@ -414,23 +414,22 @@ static int hook(long syscall_number, long arg0, long arg1, long arg2, long arg3,
         return 1;
     }
 
-    // FS variant: a new process becomes a client at its first system call that CAPIO handles, and
-    // a vfork or posix_spawn child never does (see utils/clone.hpp)
-    FS_MODE({
-        if (in_vfork_child()) {
+    // A new process becomes a client at its first system call that CAPIO handles, and a vfork or
+    // posix_spawn child never does (see utils/clone.hpp)
+    if (in_vfork_child()) {
+        return 1;
+    }
+    note_process_creation(syscall_number, arg0);
+    if (process_needs_setup) {
+        if (syscall_number >= CAPIO_NR_SYSCALLS ||
+            syscallTable[syscall_number] == not_handled_handler) {
             return 1;
         }
-        note_process_creation(syscall_number, arg0);
-        if (process_needs_setup) {
-            if (syscall_number >= CAPIO_NR_SYSCALLS ||
-                syscallTable[syscall_number] == not_handled_handler) {
-                return 1;
-            }
-            process_needs_setup = false;
-            initialize_new_thread();
-            announce_inherited_descriptors_fs();
-        }
-    })
+        process_needs_setup = false;
+        initialize_new_thread();
+        // The memory server copies the descriptors of the parent at the clone
+        FS_MODE({ announce_inherited_descriptors_fs(); })
+    }
 
     START_LOG(syscall_no_intercept(SYS_gettid), "call(syscall_number=%ld, syscall_name=%s)",
               syscall_number, sys_num_to_string(syscall_number).c_str());

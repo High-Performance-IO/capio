@@ -14,7 +14,7 @@
 /*
  * All the clients of a node write to one queue, under a named semaphore. A thread killed in the
  * middle of a write leaves it taken, and then every client of the workflow waits forever. So before
- * exit_group and execve, which kill the other threads, the FS variant lets no new write start and
+ * exit_group and execve, which kill the other threads, CAPIO lets no new write start and
  * waits for the ones that started. A process killed by a signal is not covered.
  */
 inline std::atomic<int> requests_being_written{0};
@@ -56,10 +56,7 @@ inline void stop_requests_of_other_threads(const long tid) {
 /// @brief Called if execve failed, and in a new process
 inline void resume_requests() { thread_ending_process = 0; }
 
-/// @brief The request queue of a thread. Only the FS variant stops requests, so the memory variant
-/// keeps the plain queue, without the counting.
-using RequestQueue = MEMORY_MODE(CircularBuffer<char>) FS_MODE(RequestBuffer);
-inline thread_local RequestQueue *buf_requests;
+inline thread_local RequestBuffer *buf_requests;
 inline thread_local CircularBuffer<off_t> *buff_response;
 
 /**
@@ -70,8 +67,8 @@ inline void init_client(const long tid) {
     buff_response =
         new CircularBuffer<off_t>(SHM_COMM_CHAN_NAME_RESP + std::to_string(tid), CAPIO_REQ_BUFF_CNT,
                                   sizeof(off_t), get_capio_workflow_name());
-    buf_requests = new RequestQueue(SHM_COMM_CHAN_NAME, CAPIO_REQ_BUFF_CNT, CAPIO_REQ_MAX_SIZE,
-                                    get_capio_workflow_name());
+    buf_requests = new RequestBuffer(SHM_COMM_CHAN_NAME, CAPIO_REQ_BUFF_CNT, CAPIO_REQ_MAX_SIZE,
+                                     get_capio_workflow_name());
 }
 
 /**

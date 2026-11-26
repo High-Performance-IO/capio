@@ -24,15 +24,12 @@ int execve_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long a
     })
     fd_table->createSnapshot(tid);
 
-    MEMORY_MODE({ return CAPIO_POSIX_SYSCALL_SKIP; })
-    FS_MODE({
-        // The exec kills the other threads: a request one of them is writing would be left half
-        // written, and every client of the node would wait for it forever
-        stop_requests_of_other_threads(tid);
-        *result = syscall_no_intercept(SYS_execve, arg0, arg1, arg2);
-        resume_requests(); // it failed: the other threads still run
-        return CAPIO_POSIX_SYSCALL_SUCCESS;
-    })
+    // The exec kills the other threads: a request one of them is writing would be left half
+    // written, and every client of the node would wait for it forever
+    stop_requests_of_other_threads(tid);
+    *result = syscall_no_intercept(SYS_execve, arg0, arg1, arg2);
+    resume_requests(); // it failed: the other threads still run
+    return CAPIO_POSIX_SYSCALL_SUCCESS;
 }
 
 #endif // SYS_execve

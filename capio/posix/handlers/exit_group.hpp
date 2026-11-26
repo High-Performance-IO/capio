@@ -38,6 +38,9 @@ inline void capio_exit(const long tid, const bool whole_process) {
 
     LOG("Thread %d is a CAPIO thread: clean up", tid);
     MEMORY_MODE({
+        if (whole_process) {
+            stop_requests_of_other_threads(tid); // which the exit kills
+        }
         read_cache->flush();
         write_cache->flush();
     })
