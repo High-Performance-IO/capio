@@ -102,8 +102,17 @@ static constexpr long CAPIO_NR_SYSCALLS = 1 + std::max({
 #ifdef SYS_flistxattr
                                                   SYS_flistxattr,
 #endif
+#ifdef SYS_clone
+                                                  SYS_clone,
+#endif
+#ifdef SYS_clone3
+                                                  SYS_clone3,
+#endif
 #ifdef SYS_fork
                                                   SYS_fork,
+#endif
+#ifdef SYS_vfork
+                                                  SYS_vfork,
 #endif
 #ifdef SYS_fstat
                                                   SYS_fstat,
@@ -282,8 +291,17 @@ static constexpr std::array<CPHandler_t, CAPIO_NR_SYSCALLS> build_syscall_table(
 #ifdef SYS_flistxattr
     _syscallTable[SYS_flistxattr] = not_implemented_handler;
 #endif
+#ifdef SYS_clone
+    _syscallTable[SYS_clone] = clone_handler;
+#endif
+#ifdef SYS_clone3
+    _syscallTable[SYS_clone3] = clone3_handler;
+#endif
 #ifdef SYS_fork
     _syscallTable[SYS_fork] = fork_handler;
+#endif
+#ifdef SYS_vfork
+    _syscallTable[SYS_vfork] = vfork_handler;
 #endif
 #ifdef SYS_fstat
     _syscallTable[SYS_fstat] = fstat_handler;
@@ -414,21 +432,29 @@ static int hook(long syscall_number, long arg0, long arg1, long arg2, long arg3,
         return 1;
     }
 
-    // A new process becomes a client at its first system call that CAPIO handles, and a vfork or
-    // posix_spawn child never does (see utils/clone.hpp)
-    if (in_vfork_child()) {
-        return 1;
-    }
-    note_process_creation(syscall_number, arg0);
-    if (process_needs_setup) {
-        if (syscall_number >= CAPIO_NR_SYSCALLS ||
-            syscallTable[syscall_number] == not_handled_handler) {
-            return 1;
+    // Only around the creation of a process: a new process becomes a client at its first system
+    // call that CAPIO handles, and a vfork or posix_spawn child never does (see utils/clone.hpp)
+    if (process_flags != 0) {
+        if ((process_flags & CAPIO_PROCESS_VFORK_PARENT) != 0) {
+            if (syscall_no_intercept(SYS_gettid) != vfork_parent_tid) {
+                return 1; // the child, until it execs
+            }
+            // The parent runs again: the child has execed or exited
+            process_flags &= ~CAPIO_PROCESS_VFORK_PARENT;
         }
-        process_needs_setup = false;
-        initialize_new_thread();
-        // The memory server copies the descriptors of the parent at the clone
-        FS_MODE({ announce_inherited_descriptors_fs(); })
+        if ((process_flags & CAPIO_PROCESS_NEEDS_SETUP) != 0) {
+            if (syscall_number >= CAPIO_NR_SYSCALLS ||
+                syscallTable[syscall_number] == not_handled_handler) {
+                return 1;
+            }
+            // Not at a clone, vfork or fork: fork() makes them holding the malloc lock
+            if (!creates_a_process(syscallTable[syscall_number])) {
+                process_flags &= ~CAPIO_PROCESS_NEEDS_SETUP;
+                initialize_new_thread();
+                // The memory server copies the descriptors of the parent at the clone
+                FS_MODE({ announce_inherited_descriptors_fs(); })
+            }
+        }
     }
 
     START_LOG(syscall_no_intercept(SYS_gettid), "call(syscall_number=%ld, syscall_name=%s)",

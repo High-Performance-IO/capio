@@ -17,44 +17,37 @@
  *   included, until it execs. It must not become a client at all: it would replace the queues of
  *   its parent. Its system calls go to the kernel, and the program it execs becomes a client.
  */
-inline thread_local long vfork_parent_tid    = 0;
-inline thread_local bool process_needs_setup = false;
+/// @brief What the hook does for a thread before handling its system calls. Both are 0 outside of
+/// the creation of a process, so the hook tests one variable.
+constexpr unsigned char CAPIO_PROCESS_NEEDS_SETUP  = 1; ///< a forked child, not a client yet
+constexpr unsigned char CAPIO_PROCESS_VFORK_PARENT = 2; ///< a vfork child may run in its memory
+inline thread_local unsigned char process_flags    = 0;
+inline thread_local long vfork_parent_tid          = 0;
 
 /// @brief Whether the caller is a child running in the memory of its parent, until it execs
 inline bool in_vfork_child() {
-    return vfork_parent_tid != 0 && syscall_no_intercept(SYS_gettid) != vfork_parent_tid;
+    return (process_flags & CAPIO_PROCESS_VFORK_PARENT) != 0 &&
+           syscall_no_intercept(SYS_gettid) != vfork_parent_tid;
 }
 
 /**
- * @brief Called in a new process, before it does anything. A vfork child, or the fork copy of a
- * thread that had spawned one, has its parent in another thread: it never becomes a client, and
- * must not touch the flag, which a vfork child shares with its parent.
+ * @brief Called in a new process, before it does anything. A vfork child has its parent in another
+ * thread: it never becomes a client, and must not touch the state, which it shares with its
+ * parent.
  */
 inline void defer_new_process() {
     if (!in_vfork_child()) {
-        process_needs_setup = true;
+        process_flags = CAPIO_PROCESS_NEEDS_SETUP;
     }
 }
 
-/// @brief Called before a system call, to notice the creation of a process sharing memory
-inline void note_process_creation(const long number, const long arg0) {
-    vfork_parent_tid = 0; // the parent runs again, if it had a vfork child: it has execed or exited
-    unsigned long long flags = 0;
-#ifdef SYS_vfork
-    if (number == SYS_vfork) {
-        flags = CLONE_VM;
-    }
-#endif
-    if (number == SYS_clone) {
-        flags = static_cast<unsigned long>(arg0);
-    }
-#ifdef SYS_clone3
-    if (number == SYS_clone3) {
-        flags = reinterpret_cast<const struct clone_args *>(arg0)->flags;
-    }
-#endif
+/// @brief Called before a clone with @p flags, or a vfork (CLONE_VM): a new process that shares
+/// the memory of this thread runs in it until it execs. It must not allocate: fork() makes its
+/// clone while holding the malloc lock.
+inline void note_clone(const unsigned long long flags) {
     if ((flags & CLONE_VM) != 0 && (flags & CLONE_THREAD) == 0) {
         vfork_parent_tid = syscall_no_intercept(SYS_gettid);
+        process_flags |= CAPIO_PROCESS_VFORK_PARENT;
     }
 }
 
