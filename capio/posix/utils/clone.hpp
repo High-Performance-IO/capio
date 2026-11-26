@@ -82,11 +82,13 @@ inline void initialize_new_thread(const bool wait = false) {
 
     START_LOG(tid, "call(tid=%d, pid=%d, app_name=%s)", tid, pid, capio_app_name);
 
-    if (pid == tid) {
-        // A new process has no other threads, whatever its parent was doing
-        requests_being_written = 0;
-        resume_requests();
-    }
+    FS_MODE({
+        if (pid == tid) {
+            // A new process has no other threads, whatever its parent was doing
+            requests_being_written = 0;
+            resume_requests();
+        }
+    })
     initialize_data_queues(tid);
     init_client(tid);
 

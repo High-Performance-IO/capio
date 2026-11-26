@@ -3,6 +3,7 @@
 
 #include <atomic>
 
+#include "common/constants.hpp"
 #include "common/requests.hpp"
 
 #include "calf/SyscallLogger.h"
@@ -47,8 +48,7 @@ inline void stop_requests_of_other_threads(const long tid) {
         return;
     }
     // Bounded, as the caller may be a signal handler that interrupted a write of its own thread
-    constexpr int MAX_YIELDS = 200000;
-    for (int i = 0; i < MAX_YIELDS && requests_being_written != 0; ++i) {
+    for (long i = 0; i < CAPIO_FS_STOP_REQUESTS_MAX_YIELDS && requests_being_written != 0; ++i) {
         syscall_no_intercept(SYS_sched_yield);
     }
 }
@@ -56,7 +56,10 @@ inline void stop_requests_of_other_threads(const long tid) {
 /// @brief Called if execve failed, and in a new process
 inline void resume_requests() { thread_ending_process = 0; }
 
-inline thread_local RequestBuffer *buf_requests;
+/// @brief The request queue of a thread. Only the FS variant stops requests, so the memory variant
+/// keeps the plain queue, without the counting.
+using RequestQueue = MEMORY_MODE(CircularBuffer<char>) FS_MODE(RequestBuffer);
+inline thread_local RequestQueue *buf_requests;
 inline thread_local CircularBuffer<off_t> *buff_response;
 
 /**
@@ -67,8 +70,8 @@ inline void init_client(const long tid) {
     buff_response =
         new CircularBuffer<off_t>(SHM_COMM_CHAN_NAME_RESP + std::to_string(tid), CAPIO_REQ_BUFF_CNT,
                                   sizeof(off_t), get_capio_workflow_name());
-    buf_requests = new RequestBuffer(SHM_COMM_CHAN_NAME, CAPIO_REQ_BUFF_CNT, CAPIO_REQ_MAX_SIZE,
-                                     get_capio_workflow_name());
+    buf_requests = new RequestQueue(SHM_COMM_CHAN_NAME, CAPIO_REQ_BUFF_CNT, CAPIO_REQ_MAX_SIZE,
+                                    get_capio_workflow_name());
 }
 
 /**

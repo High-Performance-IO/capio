@@ -43,6 +43,10 @@ inline constexpr auto KERNEL_LISTS_MARKER = [] {
 /// @brief FS variant: the number of bytes to wait for to wait for the commit of a file
 constexpr off64_t CAPIO_UNTIL_COMMIT_FS = LLONG_MAX;
 
+/// @brief FS variant: how many times a thread that ends the process yields, at most, for the
+/// requests that other threads are writing (see stop_requests_of_other_threads)
+constexpr long CAPIO_FS_STOP_REQUESTS_MAX_YIELDS = 200000;
+
 // CAPIO default values for shared memory
 constexpr char CAPIO_DEFAULT_WORKFLOW_NAME[] = "CAPIO";
 constexpr char CAPIO_DEFAULT_APP_NAME[]      = "default_app";
