@@ -77,11 +77,11 @@ class FsStorageManager {
     void serveListing(pid_t tid, std::pair<pid_t, int> key, const std::string &path, off64_t offset,
                       off64_t count, bool as_it_grows);
 
-    /// @brief Up to @p count bytes of the entries of @p key from @p offset, after reading @p path
-    /// for new ones; none if there is no new entry yet and the directory is not @p committed
-    std::optional<std::vector<linux_dirent64>> nextEntries(std::pair<pid_t, int> key,
-                                                           const std::string &path, off64_t offset,
-                                                           off64_t count, bool committed);
+    /// @brief Put in @p records up to @p count bytes of the entries of @p key from @p offset, after
+    /// reading @p path for new ones
+    /// @return false if there is no new entry yet and the directory is not @p committed
+    bool nextEntries(std::pair<pid_t, int> key, const std::string &path, off64_t offset,
+                     off64_t count, bool committed, std::vector<linux_dirent64> &records);
 
   public:
     FsStorageManager();

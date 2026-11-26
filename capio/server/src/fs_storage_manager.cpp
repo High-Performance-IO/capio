@@ -408,22 +408,23 @@ void FsStorageManager::serveListing(const pid_t tid, const std::pair<pid_t, int>
         if (!as_it_grows) {
             continue; // update mode: wait for the commit
         }
-        if (const auto records = nextEntries(key, path, offset, count, committed)) {
-            const auto size = static_cast<off64_t>(records->size()) * RECORD;
+        if (std::vector<linux_dirent64> records;
+            nextEntries(key, path, offset, count, committed, records)) {
+            const auto size = static_cast<off64_t>(records.size()) * RECORD;
             client_manager->replyToClientWithData(
-                tid, offset + size, reinterpret_cast<const char *>(records->data()), size);
+                tid, offset + size, reinterpret_cast<const char *>(records.data()), size);
             return;
         }
     }
 }
 
-std::optional<std::vector<linux_dirent64>>
-FsStorageManager::nextEntries(const std::pair<pid_t, int> key, const std::string &path,
-                              const off64_t offset, const off64_t count, const bool committed) {
+bool FsStorageManager::nextEntries(const std::pair<pid_t, int> key, const std::string &path,
+                                   const off64_t offset, const off64_t count, const bool committed,
+                                   std::vector<linux_dirent64> &records) {
     const auto found = read_directory(path); // before the lock: it may be slow
     const std::lock_guard lock(_listings_mutex);
     if (committed && _listings.count(key) == 0) {
-        return std::vector<linux_dirent64>{}; // dropped at its end, after the commit
+        return true; // dropped at its end, after the commit
     }
     auto &listing = _listings[key];
     for (const auto &record : found) {
@@ -431,14 +432,14 @@ FsStorageManager::nextEntries(const std::pair<pid_t, int> key, const std::string
             listing.entries.push_back(record);
         }
     }
-    auto records = slice(listing.entries, offset, count);
+    records = slice(listing.entries, offset, count);
     if (records.empty()) {
         if (!committed) {
-            return std::nullopt; // no new entry yet
+            return false; // no new entry yet
         }
         _listings.erase(key); // read to the end after the commit: nothing more to keep
     }
-    return records;
+    return true;
 }
 
 void FsStorageManager::waitForCreation(const std::filesystem::path &path) const {
