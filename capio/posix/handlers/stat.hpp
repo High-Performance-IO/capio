@@ -164,38 +164,50 @@ int fstat_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long ar
 
 int fstatat_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg5,
                     long *result) {
-    if (arg1 == NULL || arg2 == NULL) {
+    // fstatat(dirfd, pathname, statbuf, flags)
+    const auto dirfd = static_cast<int>(arg0);
+    const auto *path = reinterpret_cast<const char *>(arg1);
+    auto *statbuf    = reinterpret_cast<struct stat *>(arg2);
+    const auto flags = static_cast<int>(arg3);
+    const long tid   = syscall_no_intercept(SYS_gettid);
+    START_LOG(tid, "call(dirfd=%d, path=%s, flags=%d)", dirfd, path != nullptr ? path : "(null)",
+              flags);
+
+    // A null path or buffer fails with EFAULT, from the kernel. With AT_EMPTY_PATH a null path is
+    // the empty one (Linux 6.11): the file of dirfd.
+    if ((path == nullptr && (flags & AT_EMPTY_PATH) == 0) || statbuf == nullptr) {
         return CAPIO_POSIX_SYSCALL_SKIP;
     }
-    auto dirfd = static_cast<int>(arg0);
-    const std::string_view pathname(reinterpret_cast<const char *>(arg1));
-    auto *statbuf = reinterpret_cast<struct stat *>(arg2);
-    auto flags    = static_cast<int>(arg3);
-    long tid      = syscall_no_intercept(SYS_gettid);
-
-    return posix_return_value(capio_fstatat(dirfd, pathname, statbuf, flags, tid), result);
+    return posix_return_value(
+        capio_fstatat(dirfd, path != nullptr ? path : "", statbuf, flags, tid), result);
 }
 
 int lstat_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg5, long *result) {
-    if (arg0 == NULL) {
+    // lstat(pathname, statbuf)
+    const auto *path = reinterpret_cast<const char *>(arg0);
+    auto *buf        = reinterpret_cast<struct stat *>(arg1);
+    const long tid   = syscall_no_intercept(SYS_gettid);
+    START_LOG(tid, "call(path=%s)", path != nullptr ? path : "(null)");
+
+    // A null path or buffer fails with EFAULT, from the kernel
+    if (path == nullptr || buf == nullptr) {
         return CAPIO_POSIX_SYSCALL_SKIP;
     }
-    const std::string_view pathname(reinterpret_cast<const char *>(arg0));
-    auto *buf = reinterpret_cast<struct stat *>(arg1);
-    long tid  = syscall_no_intercept(SYS_gettid);
-
-    return posix_return_value(capio_lstat_wrapper(pathname, buf, tid), result);
+    return posix_return_value(capio_lstat_wrapper(path, buf, tid), result);
 }
 
 int stat_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg5, long *result) {
-    if (arg0 == NULL) {
+    // stat(pathname, statbuf)
+    const auto *path = reinterpret_cast<const char *>(arg0);
+    auto *buf        = reinterpret_cast<struct stat *>(arg1);
+    const long tid   = syscall_no_intercept(SYS_gettid);
+    START_LOG(tid, "call(path=%s)", path != nullptr ? path : "(null)");
+
+    // A null path or buffer fails with EFAULT, from the kernel
+    if (path == nullptr || buf == nullptr) {
         return CAPIO_POSIX_SYSCALL_SKIP;
     }
-    const std::string_view pathname(reinterpret_cast<const char *>(arg0));
-    auto *buf = reinterpret_cast<struct stat *>(arg1);
-    long tid  = syscall_no_intercept(SYS_gettid);
-
-    return posix_return_value(capio_lstat_wrapper(pathname, buf, tid), result);
+    return posix_return_value(capio_lstat_wrapper(path, buf, tid), result);
 }
 
 #endif // SYS_fstat || SYS_lstat || SYS_newfstatat || SYS_stat
