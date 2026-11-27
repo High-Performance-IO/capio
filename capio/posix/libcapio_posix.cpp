@@ -456,12 +456,12 @@ static int hook(long syscall_number, long arg0, long arg1, long arg2, long arg3,
 static __attribute__((constructor)) void init() {
     SET_CALF_SYSCALL_HANDLER(syscall_no_intercept);
 
-    const long tid = syscall_no_intercept(SYS_gettid);
-
     // Without CAPIO_DIR, CAPIO is off: no server, no hooks
     if (get_capio_dir().empty()) {
         return;
     }
+
+    const long tid = syscall_no_intercept(SYS_gettid);
 
     FileDescriptorTable::protectAcrossFork();
     // After the handlers of the table, so that the child has a free lock

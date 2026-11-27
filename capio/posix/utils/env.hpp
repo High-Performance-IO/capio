@@ -15,16 +15,17 @@
 /// no path is CAPIO's, and the library leaves every system call to the kernel.
 inline const std::filesystem::path &get_capio_dir() {
     static const std::filesystem::path capio_dir = [] {
-        START_LOG(capio_syscall(SYS_gettid), "call()");
         const char *value = std::getenv("CAPIO_DIR");
         if (value == nullptr) {
             return std::filesystem::path{};
         }
         const auto buf = std::unique_ptr<char[]>(new char[PATH_MAX]);
         if (capio_realpath(value, buf.get()) == nullptr) {
+            START_LOG(capio_syscall(SYS_gettid), "call()");
             ERR_EXIT("error CAPIO_DIR: directory %s does not exist", value);
         }
         if (is_forbidden_path(buf.get())) {
+            START_LOG(capio_syscall(SYS_gettid), "call()");
             ERR_EXIT("CAPIO_DIR %s is in forbidden path", buf.get());
         }
         return std::filesystem::path(buf.get());
