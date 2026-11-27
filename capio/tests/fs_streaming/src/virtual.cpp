@@ -8,8 +8,8 @@ TEST_F(FsStreamingTest, FirstClientGivesTheDirectory) {
     EXPECT_OUTPUT(run("cons", {"open:f", "read"}), "AB");
     EXPECT_NE(slurp(root / "server.log").find("No -r given"), std::string::npos);
 
-    const auto other = finish(startIn(root / "other", "cons", {"print:not refused"},
-                                      setting("CAPIO_FS_LIBRARY", "libcapio_posix_fs.so")));
+    const auto other = finish(startWithDir(root / "other", "cons", {"print:not refused"},
+                                           setting("CAPIO_FS_LIBRARY", "libcapio_posix_fs.so")));
     EXPECT_TRUE(other.finished);
     EXPECT_NE(other.output.find("Fix CAPIO_DIR"), std::string::npos) << other.output;
     EXPECT_EQ(other.output.find("not refused"), std::string::npos) << other.output;
@@ -17,8 +17,8 @@ TEST_F(FsStreamingTest, FirstClientGivesTheDirectory) {
 
 TEST_F(FsStreamingTest, ClientWithAnotherDirectoryThanTheRootIsRefused) {
     startServer({{"f"}});
-    const auto other = finish(startIn(root / "other", "prod", {"print:not refused"},
-                                      setting("CAPIO_FS_LIBRARY", "libcapio_posix_fs.so")));
+    const auto other = finish(startWithDir(root / "other", "prod", {"print:not refused"},
+                                           setting("CAPIO_FS_LIBRARY", "libcapio_posix_fs.so")));
     EXPECT_TRUE(other.finished);
     EXPECT_NE(other.output.find("Fix CAPIO_DIR"), std::string::npos) << other.output;
     EXPECT_EQ(other.output.find("not refused"), std::string::npos) << other.output;
@@ -31,8 +31,10 @@ TEST_F(FsStreamingTest, MemoryClientsWithDifferentDirectoriesShareFiles) {
     startServer({{"f"}}, false);
     const auto library = setting("CAPIO_MEMORY_LIBRARY", "libcapio_posix.so");
     EXPECT_OUTPUT(
-        finish(startIn(root / "mount_a", "prod", {"create:f", "write:AB", "close"}, library)), "");
-    EXPECT_OUTPUT(finish(startIn(root / "mount_b", "cons", {"open:f", "read"}, library)), "AB");
+        finish(startWithDir(root / "mount_a", "prod", {"create:f", "write:AB", "close"}, library)),
+        "");
+    EXPECT_OUTPUT(finish(startWithDir(root / "mount_b", "cons", {"open:f", "read"}, library)),
+                  "AB");
     // Nothing reached the disk: there is no -r, and no FS client gave a directory
     EXPECT_FALSE(std::filesystem::exists(root / "mount_a" / "f"));
 }

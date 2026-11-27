@@ -211,8 +211,8 @@ class FsStreamingTest : public testing::Test {
 
     /// @brief Start an app named @p name with its own @p capio_dir, created if needed, and in it,
     /// preloading @p library
-    App startIn(const std::filesystem::path &capio_dir, const std::string &name,
-                const std::vector<std::string> &operations, const std::string &library) {
+    App startWithDir(const std::filesystem::path &capio_dir, const std::string &name,
+                     const std::vector<std::string> &operations, const std::string &library) {
         std::filesystem::create_directories(capio_dir);
         std::vector<std::string> command{setting("CAPIO_FS_APP_PATH", "capio_fs_streaming_app")};
         command.insert(command.end(), operations.begin(), operations.end());
