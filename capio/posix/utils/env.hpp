@@ -10,6 +10,7 @@
 #include "common/constants.hpp"
 #include "common/path.hpp"
 #include "common/syscall.hpp"
+#include "utils/tid.hpp"
 
 /**
  * @brief The CAPIO_DIR of this process, read once: the mount point of the virtual file system that
@@ -32,7 +33,7 @@ inline const std::filesystem::path &get_capio_dir() {
             dir = buf.get();
         } else {
             FS_MODE({
-                START_LOG(capio_syscall(SYS_gettid), "call()");
+                START_LOG(capio_tid(), "call()");
                 ERR_EXIT("CAPIO_DIR %s does not exist: file system streaming needs it", value);
             })
             dir = std::filesystem::absolute(value).lexically_normal();
@@ -41,7 +42,7 @@ inline const std::filesystem::path &get_capio_dir() {
             }
         }
         if (is_forbidden_path(dir.c_str())) {
-            START_LOG(capio_syscall(SYS_gettid), "call()");
+            START_LOG(capio_tid(), "call()");
             ERR_EXIT("CAPIO_DIR %s is in forbidden path", dir.c_str());
         }
         return dir;

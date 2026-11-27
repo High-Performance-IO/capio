@@ -25,6 +25,7 @@
 #include "env.hpp"
 #include "file_descriptor_table.hpp"
 #include "types.hpp"
+#include "utils/tid.hpp"
 
 inline bool in_dir(const std::string &path, const std::string &glob) {
     const size_t res = path.find('/', glob.length() - 1);
@@ -32,7 +33,7 @@ inline bool in_dir(const std::string &path, const std::string &glob) {
 }
 
 inline bool is_directory(int dirfd) {
-    START_LOG(capio_syscall(SYS_gettid), "call(dirfd=%d)", dirfd);
+    START_LOG(capio_tid(), "call(dirfd=%d)", dirfd);
 
     struct stat path_stat{};
     int tmp = fstat(dirfd, &path_stat);
@@ -52,7 +53,7 @@ inline bool is_prefix(const std::filesystem::path &path_1, const std::filesystem
 }
 
 inline bool is_capio_dir(const std::filesystem::path &path_to_check) {
-    START_LOG(capio_syscall(SYS_gettid), "call(path_to_check=%s)", path_to_check.c_str());
+    START_LOG(capio_tid(), "call(path_to_check=%s)", path_to_check.c_str());
 
     const auto res = get_capio_dir().compare(path_to_check) == 0;
     LOG("is_capio_dir: %s", res ? "yes" : "no");
@@ -70,7 +71,7 @@ inline std::string capio_virtual_path(const std::filesystem::path &path) {
 }
 
 inline bool is_capio_path(const std::filesystem::path &path_to_check) {
-    START_LOG(capio_syscall(SYS_gettid), "call(path_to_check=%s)", path_to_check.c_str());
+    START_LOG(capio_tid(), "call(path_to_check=%s)", path_to_check.c_str());
 
     // check if path_to_check begins with CAPIO_DIR
     const auto res = is_prefix(get_capio_dir(), path_to_check);
@@ -104,7 +105,7 @@ inline std::filesystem::path capio_normal_path(const std::filesystem::path &path
 }
 
 std::filesystem::path capio_posix_realpath(const std::filesystem::path &pathname) {
-    START_LOG(syscall_no_intercept(SYS_gettid), "call(path=%s)", pathname.c_str());
+    START_LOG(capio_tid(), "call(path=%s)", pathname.c_str());
     // Relative paths start from CAPIO's working directory, which differs from the kernel's after
     // a chdir into a CAPIO directory. CAPIO paths have no symlinks, so they are resolved
     // lexically; the kernel resolves the others.
@@ -182,7 +183,7 @@ inline void destroy_filesystem() {
  * @return the corresponding path
  */
 std::filesystem::path get_dir_path(int dirfd) {
-    START_LOG(syscall_no_intercept(SYS_gettid), "call(dirfd=%d)", dirfd);
+    START_LOG(capio_tid(), "call(dirfd=%d)", dirfd);
 
     if (dirfd == AT_FDCWD) {
         LOG("Returning current CWD");

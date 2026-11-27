@@ -10,15 +10,15 @@
 #include "utils/common.hpp"
 #include "utils/filesystem.hpp"
 #include "utils/requests.hpp"
+#include "utils/tid.hpp"
 
 inline blkcnt_t get_nblocks(off64_t file_size) {
     return (file_size % 4096 == 0) ? (file_size / 512) : (file_size / 512 + 8);
 }
 
 inline void fill_statbuf(struct stat *statbuf, off_t file_size, bool is_dir, ino_t inode) {
-    START_LOG(syscall_no_intercept(SYS_gettid),
-              "call(statbuf=0x%08x, file_size=%ld, is_dir=%s, inode=%ul)", statbuf, file_size,
-              is_dir ? "true" : "false", inode);
+    START_LOG(capio_tid(), "call(statbuf=0x%08x, file_size=%ld, is_dir=%s, inode=%ul)", statbuf,
+              file_size, is_dir ? "true" : "false", inode);
 
     timespec time{1, 1};
     if (is_dir == 1) {
@@ -165,9 +165,8 @@ inline int capio_fstatat(int dirfd, const std::string_view &pathname, struct sta
 int fstat_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg5, long *result) {
     auto fd   = static_cast<int>(arg0);
     auto *buf = reinterpret_cast<struct stat *>(arg1);
-    long tid  = syscall_no_intercept(SYS_gettid);
 
-    return posix_return_value(capio_fstat(fd, buf, tid), result);
+    return posix_return_value(capio_fstat(fd, buf, capio_tid()), result);
 }
 
 int fstatat_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg5,
@@ -177,9 +176,8 @@ int fstatat_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long 
     const auto *path = reinterpret_cast<const char *>(arg1);
     auto *statbuf    = reinterpret_cast<struct stat *>(arg2);
     const auto flags = static_cast<int>(arg3);
-    const long tid   = syscall_no_intercept(SYS_gettid);
-    START_LOG(tid, "call(dirfd=%d, path=%s, flags=%d)", dirfd, path != nullptr ? path : "(null)",
-              flags);
+    START_LOG(capio_tid(), "call(dirfd=%d, path=%s, flags=%d)", dirfd,
+              path != nullptr ? path : "(null)", flags);
 
     // A null path fails with EFAULT, from the kernel. With AT_EMPTY_PATH a null path is the empty
     // one (Linux 6.11): the file of dirfd. A null buffer fails with EFAULT once the file is found.
@@ -187,35 +185,33 @@ int fstatat_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long 
         return CAPIO_POSIX_SYSCALL_SKIP;
     }
     return posix_return_value(
-        capio_fstatat(dirfd, path != nullptr ? path : "", statbuf, flags, tid), result);
+        capio_fstatat(dirfd, path != nullptr ? path : "", statbuf, flags, capio_tid()), result);
 }
 
 int lstat_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg5, long *result) {
     // lstat(pathname, statbuf)
     const auto *path = reinterpret_cast<const char *>(arg0);
     auto *buf        = reinterpret_cast<struct stat *>(arg1);
-    const long tid   = syscall_no_intercept(SYS_gettid);
-    START_LOG(tid, "call(path=%s)", path != nullptr ? path : "(null)");
+    START_LOG(capio_tid(), "call(path=%s)", path != nullptr ? path : "(null)");
 
     // A null path fails with EFAULT, from the kernel, and a null buffer once the file is found
     if (path == nullptr) {
         return CAPIO_POSIX_SYSCALL_SKIP;
     }
-    return posix_return_value(capio_lstat_wrapper(path, buf, tid), result);
+    return posix_return_value(capio_lstat_wrapper(path, buf, capio_tid()), result);
 }
 
 int stat_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg5, long *result) {
     // stat(pathname, statbuf)
     const auto *path = reinterpret_cast<const char *>(arg0);
     auto *buf        = reinterpret_cast<struct stat *>(arg1);
-    const long tid   = syscall_no_intercept(SYS_gettid);
-    START_LOG(tid, "call(path=%s)", path != nullptr ? path : "(null)");
+    START_LOG(capio_tid(), "call(path=%s)", path != nullptr ? path : "(null)");
 
     // A null path fails with EFAULT, from the kernel, and a null buffer once the file is found
     if (path == nullptr) {
         return CAPIO_POSIX_SYSCALL_SKIP;
     }
-    return posix_return_value(capio_lstat_wrapper(path, buf, tid), result);
+    return posix_return_value(capio_lstat_wrapper(path, buf, capio_tid()), result);
 }
 
 #endif // SYS_fstat || SYS_lstat || SYS_newfstatat || SYS_stat

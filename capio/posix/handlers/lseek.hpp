@@ -6,6 +6,7 @@
 #include "handlers/read.hpp"
 #include "utils/common.hpp"
 #include "utils/data.hpp"
+#include "utils/tid.hpp"
 
 /// @brief @p base + @p offset, or -1 if it overflows: Linux fails such a seek with EINVAL, as one
 /// before the start of the file
@@ -122,9 +123,8 @@ int lseek_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long ar
     int fd      = static_cast<int>(arg0);
     auto offset = static_cast<off64_t>(arg1);
     int whence  = static_cast<int>(arg2);
-    long tid    = syscall_no_intercept(SYS_gettid);
 
-    return posix_return_value(capio_lseek(fd, offset, whence, tid), result);
+    return posix_return_value(capio_lseek(fd, offset, whence, capio_tid()), result);
 }
 
 #endif // SYS_lseek

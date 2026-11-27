@@ -13,6 +13,7 @@
 #include "utils/data.hpp"
 #include "utils/filesystem.hpp"
 #include "utils/requests.hpp"
+#include "utils/tid.hpp"
 #include "utils/types.hpp"
 
 /**
@@ -437,18 +438,18 @@ inline int copy_file_range_handler(long arg0, long arg1, long arg2, long arg3, l
     auto *off_out     = reinterpret_cast<loff_t *>(arg3);
     const auto len    = static_cast<size_t>(arg4);
     const auto flags  = static_cast<unsigned int>(arg5);
-    const long tid    = syscall_no_intercept(SYS_gettid);
-    START_LOG(tid, "call(fd_in=%d, fd_out=%d, len=%zu, flags=%u)", fd_in, fd_out, len, flags);
+    START_LOG(capio_tid(), "call(fd_in=%d, fd_out=%d, len=%zu, flags=%u)", fd_in, fd_out, len,
+              flags);
 
     FS_MODE({
         // The kernel copies, once there is data. It may copy less, but 0 only at the commit.
         if (len != 0) {
-            capio_wait_for_data_fs(fd_in, off_in != nullptr ? *off_in : -1, 1, tid);
+            capio_wait_for_data_fs(fd_in, off_in != nullptr ? *off_in : -1, 1, capio_tid());
         }
         return CAPIO_POSIX_SYSCALL_SKIP;
     })
     return posix_return_value(
-        capio_copy_file_range(fd_in, off_in, fd_out, off_out, len, flags, tid), result);
+        capio_copy_file_range(fd_in, off_in, fd_out, off_out, len, flags, capio_tid()), result);
 }
 
 #endif // SYS_copy_file_range

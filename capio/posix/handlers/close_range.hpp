@@ -10,14 +10,14 @@
 
 #include "utils/common.hpp"
 #include "utils/requests.hpp"
+#include "utils/tid.hpp"
 
 int close_range_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg5,
                         long *result) {
     const auto first                  = static_cast<unsigned>(arg0);
     const auto last                   = static_cast<unsigned>(arg1);
     [[maybe_unused]] const auto flags = static_cast<unsigned>(arg2); // FS variant, and the log
-    [[maybe_unused]] const long tid   = syscall_no_intercept(SYS_gettid);
-    START_LOG(tid, "call(first=%u, last=%u, flags=%u)", first, last, flags);
+    START_LOG(capio_tid(), "call(first=%u, last=%u, flags=%u)", first, last, flags);
 
     std::vector<int> affected;
     for (const int fd : fd_table->fds()) {
@@ -38,9 +38,9 @@ int close_range_handler(long arg0, long arg1, long arg2, long arg3, long arg4, l
                 errors.emplace(fd, flush_capio_fd(fd));
             }
         }
-        *result = fd_table->closeRange(first, last, flags, [&errors, tid](const int fd) {
+        *result = fd_table->closeRange(first, last, flags, [&errors](const int fd) {
             const auto error = errors.find(fd);
-            close_request(fd, tid, error == errors.end() ? 0 : error->second);
+            close_request(fd, capio_tid(), error == errors.end() ? 0 : error->second);
         });
         return CAPIO_POSIX_SYSCALL_SUCCESS;
     })

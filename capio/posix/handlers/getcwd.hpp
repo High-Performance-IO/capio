@@ -1,5 +1,6 @@
 #ifndef CAPIO_POSIX_HANDLERS_GETCWD_HPP
 #define CAPIO_POSIX_HANDLERS_GETCWD_HPP
+#include "utils/tid.hpp"
 
 #if defined(SYS_getcwd)
 
@@ -7,7 +8,7 @@ int getcwd_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long a
     FS_MODE({ return CAPIO_POSIX_SYSCALL_SKIP; })
     auto buf  = reinterpret_cast<char *>(arg0);
     auto size = static_cast<size_t>(arg1);
-    START_LOG(syscall_no_intercept(SYS_gettid), "call(buf=0x%08x, size=%ld)", buf, size);
+    START_LOG(capio_tid(), "call(buf=0x%08x, size=%ld)", buf, size);
 
     const std::filesystem::path &cwd = get_current_dir();
 

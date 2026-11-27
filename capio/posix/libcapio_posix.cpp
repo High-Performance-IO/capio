@@ -12,6 +12,7 @@
 
 #ifdef CAPIO_LOG
 #include "syscallnames.h"
+#include "utils/tid.hpp"
 #endif
 
 template <typename T> std::string demangled_name(const T &obj) {
@@ -402,8 +403,8 @@ static int hook(long syscall_number, long arg0, long arg1, long arg2, long arg3,
         return 1;
     }
 
-    START_LOG(syscall_no_intercept(SYS_gettid), "call(syscall_number=%ld, syscall_name=%s)",
-              syscall_number, sys_num_to_string(syscall_number).c_str());
+    START_LOG(capio_tid(), "call(syscall_number=%ld, syscall_name=%s)", syscall_number,
+              sys_num_to_string(syscall_number).c_str());
 
     // If the syscall_number is higher than the maximum
     // syscall captured by CAPIO, simply return
@@ -439,7 +440,7 @@ static int hook(long syscall_number, long arg0, long arg1, long arg2, long arg3,
             << "|  syscall(" << syscall_number << ", arg0:" << arg0 << ", arg1:" << arg1
             << ", arg2:" << arg2 << ", arg3:" << arg3 << ", arg4:" << arg4 << ", arg5: " << arg5
             << ")" << std::endl
-            << "|  TID of offending thread: " << syscall_no_intercept(SYS_gettid) << std::endl
+            << "|  TID of offending thread: " << capio_tid() << std::endl
             << "|  PID of offending thread: " << syscall_no_intercept(SYS_getpid) << std::endl
             << "|  PPID of offending thread: " << syscall_no_intercept(SYS_getppid) << std::endl
             << "|  " << std::endl
@@ -461,13 +462,11 @@ static __attribute__((constructor)) void init() {
         return;
     }
 
-    const long tid = syscall_no_intercept(SYS_gettid);
-
     FileDescriptorTable::protectAcrossFork();
     // After the handlers of the table, so that the child has a free lock
     FS_MODE({ pthread_atfork(nullptr, nullptr, announce_inherited_descriptors_fs); })
-    init_client(tid);
-    init_filesystem(tid); // with the descriptors of the program before an exec, if any
+    init_client(capio_tid());
+    init_filesystem(capio_tid()); // with the descriptors of the program before an exec, if any
     initialize_new_thread();
     FS_MODE({
         // The program after an exec, e.g. the child of a fork, writes the files it got too
@@ -478,12 +477,12 @@ static __attribute__((constructor)) void init() {
                                 !S_ISDIR(info.st_mode);
             create_request_fs(fd_table->path(fd), fd,
                               writes ? CAPIO_FS_PRODUCED_IF_NO_PRODUCER : CAPIO_FS_NOT_PRODUCED,
-                              tid);
+                              capio_tid());
         }
         // Counted only now, so that a failed exec closes nothing: the server still has them, as
         // the process is the same
         for (const int fd : fd_table->closedByExec()) {
-            close_request(fd, tid);
+            close_request(fd, capio_tid());
         }
     })
 

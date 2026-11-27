@@ -6,13 +6,13 @@
 #include <linux/fs.h>
 
 #include "handlers/read.hpp"
+#include "utils/tid.hpp"
 
 int ioctl_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg5, long *result) {
     [[maybe_unused]] const auto fd = static_cast<int>(arg0); // memory variant, and the log
     [[maybe_unused]] const auto request =
         static_cast<unsigned long>(arg1); // FS variant, and the log
-    [[maybe_unused]] const long tid = syscall_no_intercept(SYS_gettid);
-    START_LOG(tid, "call(fd=%d, request=%lu)", fd, request);
+    START_LOG(capio_tid(), "call(fd=%d, request=%lu)", fd, request);
 
     FS_MODE({
         // A real descriptor: the kernel runs it. FICLONE(dest, src) is an instant snapshot of src,
@@ -25,7 +25,7 @@ int ioctl_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long ar
                 static_cast<int>(reinterpret_cast<const struct file_clone_range *>(arg2)->src_fd);
         }
         if (source >= 0) {
-            capio_wait_for_data_fs(source, 0, CAPIO_UNTIL_COMMIT_FS, tid);
+            capio_wait_for_data_fs(source, 0, CAPIO_UNTIL_COMMIT_FS, capio_tid());
         }
         return CAPIO_POSIX_SYSCALL_SKIP;
     })

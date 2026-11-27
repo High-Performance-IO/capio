@@ -9,6 +9,7 @@
 
 #include "utils/common.hpp"
 #include "utils/requests.hpp"
+#include "utils/tid.hpp"
 
 /**
  * The file status flags F_SETFL may change. The access mode and the creation flags stay as open()
@@ -88,9 +89,8 @@ inline long capio_fcntl_lock(int fd, int cmd, struct flock *lock) {
 int fcntl_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg5, long *result) {
     auto fd  = static_cast<int>(arg0);
     auto cmd = static_cast<int>(arg1);
-    long tid = syscall_no_intercept(SYS_gettid);
 
-    START_LOG(tid, "call(fd=%d, cmd=%d, arg=%ld)", fd, cmd, arg2);
+    START_LOG(capio_tid(), "call(fd=%d, cmd=%d, arg=%ld)", fd, cmd, arg2);
 
     if (!fd_table->contains(fd)) {
         return CAPIO_POSIX_SYSCALL_SKIP;
@@ -99,7 +99,8 @@ int fcntl_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long ar
     FS_MODE({
         // A real descriptor: the kernel runs it, and CAPIO tracks the copies and close-on-exec
         if (cmd == F_DUPFD || cmd == F_DUPFD_CLOEXEC) {
-            *result = capio_fcntl_dupfd(tid, fd, static_cast<int>(arg2), cmd == F_DUPFD_CLOEXEC);
+            *result =
+                capio_fcntl_dupfd(capio_tid(), fd, static_cast<int>(arg2), cmd == F_DUPFD_CLOEXEC);
             return CAPIO_POSIX_SYSCALL_SUCCESS;
         }
         if (cmd == F_SETFD) {
@@ -114,11 +115,11 @@ int fcntl_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long ar
 
     switch (cmd) {
     case F_DUPFD:
-        *result = capio_fcntl_dupfd(tid, fd, static_cast<int>(arg2), false);
+        *result = capio_fcntl_dupfd(capio_tid(), fd, static_cast<int>(arg2), false);
         break;
 
     case F_DUPFD_CLOEXEC:
-        *result = capio_fcntl_dupfd(tid, fd, static_cast<int>(arg2), true);
+        *result = capio_fcntl_dupfd(capio_tid(), fd, static_cast<int>(arg2), true);
         break;
 
     case F_GETFD:

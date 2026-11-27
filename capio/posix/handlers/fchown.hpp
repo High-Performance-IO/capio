@@ -5,10 +5,11 @@
 #include "utils/common.hpp"
 #include "utils/filesystem.hpp"
 #include "utils/metadata.hpp"
+#include "utils/tid.hpp"
 
 int fchown_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg5, long *result) {
     int fd = static_cast<int>(arg0);
-    START_LOG(syscall_no_intercept(SYS_gettid), "call(fd=%d)", fd);
+    START_LOG(capio_tid(), "call(fd=%d)", fd);
 
     if (!fd_table->contains(fd)) {
         LOG("Syscall refers to file not handled by capio. Skipping it!");
@@ -25,25 +26,23 @@ int fchown_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long a
     })
     FS_MODE({
         // The kernel runs it, once the file is there
-        consent_request_cache->consent_request(fd_table->path(fd), syscall_no_intercept(SYS_gettid),
-                                               __FUNCTION__);
+        consent_request_cache->consent_request(fd_table->path(fd), capio_tid(), __FUNCTION__);
         return CAPIO_POSIX_SYSCALL_SKIP;
     })
 }
 
 int chown_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg5, long *result) {
-    long tid = syscall_no_intercept(SYS_gettid);
-    return posix_return_value(
-        capio_metadata_access("chown", AT_FDCWD, reinterpret_cast<const char *>(arg0), 0, tid),
-        result);
+    return posix_return_value(capio_metadata_access("chown", AT_FDCWD,
+                                                    reinterpret_cast<const char *>(arg0), 0,
+                                                    capio_tid()),
+                              result);
 }
 
 int fchownat_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg5,
                      long *result) {
-    long tid = syscall_no_intercept(SYS_gettid);
     return posix_return_value(capio_metadata_access("fchownat", static_cast<int>(arg0),
                                                     reinterpret_cast<const char *>(arg1),
-                                                    static_cast<int>(arg4), tid),
+                                                    static_cast<int>(arg4), capio_tid()),
                               result);
 }
 

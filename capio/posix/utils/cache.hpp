@@ -6,6 +6,7 @@
 
 #include "requests.hpp"
 
+#include "utils/tid.hpp"
 #include <fcntl.h>
 #include <sys/stat.h>
 
@@ -18,7 +19,7 @@ class ReadCache {
     SPSCQueue _queue;
 
     inline void _read(void *buffer, off64_t count) {
-        START_LOG(capio_syscall(SYS_gettid), "call(count=%ld)", count);
+        START_LOG(capio_tid(), "call(count=%ld)", count);
 
         if (count > 0) {
             memcpy(buffer, _cache + _cache_offset, count);
@@ -34,7 +35,7 @@ class ReadCache {
           _queue(SHM_SPSC_PREFIX_READ + std::to_string(tid), lines, line_size, workflow_name) {}
 
     inline void flush() {
-        START_LOG(capio_syscall(SYS_gettid), "call()");
+        START_LOG(capio_tid(), "call()");
 
         if (_cache_offset != _actual_size) {
             _actual_size = _cache_offset = 0;
@@ -50,8 +51,8 @@ class ReadCache {
     }
 
     inline off64_t read(int fd, void *buffer, off64_t count, bool is_getdents, bool is64bit) {
-        START_LOG(capio_syscall(SYS_gettid), "call(fd=%d, count=%ld, is_getdents=%s, is64bit=%s)",
-                  fd, count, is_getdents ? "true" : "false", is64bit ? "true" : "false");
+        START_LOG(capio_tid(), "call(fd=%d, count=%ld, is_getdents=%s, is64bit=%s)", fd, count,
+                  is_getdents ? "true" : "false", is64bit ? "true" : "false");
 
         if (_last_fd != fd) {
             LOG("changed fd from %d to %d: flushing", _last_fd, fd);
@@ -129,7 +130,7 @@ class WriteCache {
     SPSCQueue _queue;
 
     inline void _write(off64_t count, const void *buffer) {
-        START_LOG(capio_syscall(SYS_gettid), "call(count=%ld)", count);
+        START_LOG(capio_tid(), "call(count=%ld)", count);
 
         if (count > 0) {
             if (_cache == nullptr) {
@@ -149,7 +150,7 @@ class WriteCache {
           _queue(SHM_SPSC_PREFIX_WRITE + std::to_string(tid), lines, line_size, workflow_name) {}
 
     inline void flush() {
-        START_LOG(capio_syscall(SYS_gettid), "call()");
+        START_LOG(capio_tid(), "call()");
 
         if (_actual_size != 0) {
             write_request(_fd, _actual_size, _tid);
@@ -159,8 +160,7 @@ class WriteCache {
     }
 
     inline void write(int fd, const void *buffer, off64_t count) {
-        START_LOG(capio_syscall(SYS_gettid), "call(fd=%d, buffer=0x%08x, count=%ld)", fd, buffer,
-                  count);
+        START_LOG(capio_tid(), "call(fd=%d, buffer=0x%08x, count=%ld)", fd, buffer, count);
 
         if (_fd != fd) {
             LOG("changed fd from %d to %d: flushing", _fd, fd);
@@ -200,7 +200,7 @@ class ConsentRequestCache {
   public:
     void consent_request(const std::filesystem::path &path, const long tid,
                          const std::string &source_func) {
-        START_LOG(capio_syscall(SYS_gettid), "call(path=%s, tid=%ld, source=%s)", path.c_str(), tid,
+        START_LOG(capio_tid(), "call(path=%s, tid=%ld, source=%s)", path.c_str(), tid,
                   source_func.c_str());
 
         if (received_consents.find(path) != received_consents.end()) {
@@ -228,8 +228,8 @@ class ReadCacheFS {
     /// @brief Block until the first @p end_of_read bytes of the file of @p fd can be read
     void read(const int fd, const off64_t end_of_read, const long tid) {
         const std::string &path = fd_table->path(fd);
-        START_LOG(capio_syscall(SYS_gettid), "call(path=%s, end_of_read=%ld, tid=%ld)",
-                  path.c_str(), end_of_read, tid);
+        START_LOG(capio_tid(), "call(path=%s, end_of_read=%ld, tid=%ld)", path.c_str(), end_of_read,
+                  tid);
 
         const auto known = available_read_cache.find(path);
         if (known != available_read_cache.end() &&
