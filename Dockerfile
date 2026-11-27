@@ -84,12 +84,8 @@ COPY --from=builder                                         \
 
 # Libraries
 COPY --from=builder                                         \
-    "/usr/local/lib/libcapio_posix.so"                      \
-    "/usr/local/lib/libcapio_posix.so.1"                    \
-    "/usr/local/lib/libcapio_posix.so.1.0.0"                \
-    "/usr/local/lib/libcapio_posix_fs.so"                   \
-    "/usr/local/lib/libcapio_posix_fs.so.1"                 \
-    "/usr/local/lib/libcapio_posix_fs.so.1.0.0"             \
+    "/usr/local/lib/libcapio_posix.so*"                     \
+    "/usr/local/lib/libcapio_posix_fs.so*"                  \
     "/usr/local/lib/libgmock.[a]"                           \
     "/usr/local/lib/libgmock_main.[a]"                      \
     "/usr/local/lib/libgtest.[a]"                           \
