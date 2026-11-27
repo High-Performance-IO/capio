@@ -250,8 +250,8 @@ TEST_F(CopyFileRangeTest, copyOfARemoteInputAsksItsNodeForTheData) {
     ASSERT_EQ(test_backend.requests.size(), 1);
     EXPECT_EQ(test_backend.targets[0], REMOTE_NODE);
     char expected[CAPIO_REQ_MAX_SIZE];
-    sprintf(expected, "%04d %s %d %d %d %ld %ld %ld", CAPIO_SERVER_REQUEST_COPY_FILE_RANGE,
-            path_in.c_str(), COPIER_TID, FD_IN, FD_OUT, 2L, 0L, 4L);
+    sprintf(expected, "%04d %d %d %d %ld %ld %ld %s", CAPIO_SERVER_REQUEST_COPY_FILE_RANGE,
+            COPIER_TID, FD_IN, FD_OUT, 2L, 0L, 4L, path_in.c_str());
     EXPECT_EQ(test_backend.requests[0], expected);
 
     // The client waits for the data, and no file offset moved.

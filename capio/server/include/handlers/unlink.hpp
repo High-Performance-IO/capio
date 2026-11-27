@@ -7,7 +7,7 @@
 extern StorageManager *storage_manager;
 extern ClientManager *client_manager;
 
-void unlink_handler(const char *const str) {
+inline void unlink_handler(const char *const str) {
     int tid, consumed = 0;
     if (sscanf(str, "%d%n", &tid, &consumed) != 1) {
         return;

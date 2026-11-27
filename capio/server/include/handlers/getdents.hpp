@@ -70,7 +70,7 @@ inline void handle_getdents(int tid, int fd, long int count) {
 
 /// @brief "tid fd count offset". The offset is only used for descriptors of the FS variant: the
 /// server tracks the offset of memory ones itself.
-void getdents_handler(const char *const str) {
+inline void getdents_handler(const char *const str) {
     int tid, fd;
     off64_t count, offset = 0;
     sscanf(str, "%d %d %ld %ld", &tid, &fd, &count, &offset);

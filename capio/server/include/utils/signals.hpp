@@ -21,7 +21,7 @@ extern "C" void __gcov_dump(void);
 /// Thread running the server teardown, or 0 while no teardown has started.
 inline std::atomic<pid_t> shutdown_thread{0};
 
-void sig_term_handler(int signum, siginfo_t *info, void *ptr) {
+inline void sig_term_handler(int signum, siginfo_t *info, void *ptr) {
     // The teardown below frees the global managers, so it must run exactly once. Signals are
     // delivered to any thread that does not block them: a second SIGTERM (e.g. a launcher and a
     // cleanup script both terminating the server), or a fault in a worker thread using a manager
@@ -73,7 +73,7 @@ void sig_term_handler(int signum, siginfo_t *info, void *ptr) {
     exit(EXIT_SUCCESS);
 }
 
-void setup_signal_handlers() {
+inline void setup_signal_handlers() {
     START_LOG(gettid(), "call()");
     static struct sigaction sigact;
     memset(&sigact, 0, sizeof(sigact));

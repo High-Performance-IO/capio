@@ -21,8 +21,8 @@ extern ClientManager *client_manager;
 extern FsStorageManager *fs_storage_manager;
 extern StorageManager *storage_manager;
 
-void wait_for_dirent_data(off64_t wait_size, int wait_tid, int wait_fd, int wait_count,
-                          CapioFile &wait_c_file);
+inline void wait_for_dirent_data(off64_t wait_size, int wait_tid, int wait_fd, int wait_count,
+                                 CapioFile &wait_c_file);
 
 inline void send_dirent_to_client(int tid, int fd, CapioFile &c_file, off64_t offset,
                                   off64_t count) {

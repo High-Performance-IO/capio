@@ -86,7 +86,7 @@ TEST(RemoteRequestsTest, SerializesStatReply) {
     serve_remote_stat_request("/some/file", 42, 1234, false, "node-b");
 
     ASSERT_EQ(recording_backend.calls.size(), 1);
-    EXPECT_STREQ(recording_backend.calls[0].c_str(), "0003 /some/file 42 1234 0");
+    EXPECT_STREQ(recording_backend.calls[0].c_str(), "0003 42 1234 0 /some/file");
     EXPECT_EQ(recording_backend.calls[0].size(),
               std::strlen(recording_backend.calls[0].c_str()) + 1);
     EXPECT_EQ(recording_backend.targets, (std::vector<std::string>{"node-b"}));

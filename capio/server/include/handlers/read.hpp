@@ -17,7 +17,7 @@
 
 extern Backend *backend;
 
-std::mutex local_read_mutex;
+inline std::mutex local_read_mutex;
 
 extern ClientManager *client_manager;
 extern StorageManager *storage_manager;
@@ -136,7 +136,7 @@ inline void request_remote_read(int tid, int fd, off64_t count, const std::strin
     }
 }
 
-void wait_for_file(const std::filesystem::path &path, int tid, int fd, off64_t count) {
+inline void wait_for_file(const std::filesystem::path &path, int tid, int fd, off64_t count) {
     START_LOG(gettid(), "call(path=%s, tid=%d, fd=%d, count=%ld)", path.c_str(), tid, fd, count);
 
     // check if the file is local or remote
@@ -172,7 +172,7 @@ inline void handle_read(int tid, int fd, off64_t count) {
     }
 }
 
-void read_handler(const char *const str) {
+inline void read_handler(const char *const str) {
     int tid, fd;
     off64_t count;
     sscanf(str, "%d %d %ld", &tid, &fd, &count);
@@ -181,7 +181,7 @@ void read_handler(const char *const str) {
 
 /// @brief "tid fd end_of_read". The client sends only the descriptor: its path is looked up in what
 /// the server recorded when the file was opened.
-void read_fs_handler(const char *const str) {
+inline void read_fs_handler(const char *const str) {
     int tid, fd;
     off64_t end_of_read;
     if (sscanf(str, "%d %d %ld", &tid, &fd, &end_of_read) != 3) {

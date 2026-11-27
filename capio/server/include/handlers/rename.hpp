@@ -9,8 +9,8 @@
 extern StorageManager *storage_manager;
 extern ClientManager *client_manager;
 
-void handle_rename(int tid, const std::filesystem::path &oldpath,
-                   const std::filesystem::path &newpath) {
+inline void handle_rename(int tid, const std::filesystem::path &oldpath,
+                          const std::filesystem::path &newpath) {
     START_LOG(gettid(), "call(tid=%d, oldpath=%s, newpath=%s)", tid, oldpath.c_str(),
               newpath.c_str());
 
@@ -43,7 +43,7 @@ void handle_rename(int tid, const std::filesystem::path &oldpath,
  * it, as a file unlinked while open.
  * TODO: write the file to its new name on the file system (#343)
  */
-void handle_leave(int tid, const std::filesystem::path &oldpath) {
+inline void handle_leave(int tid, const std::filesystem::path &oldpath) {
     START_LOG(gettid(), "call(tid=%d, oldpath=%s)", tid, oldpath.c_str());
     if (!storage_manager->tryGet(oldpath)) {
         client_manager->replyToClient(tid, 1);
@@ -64,7 +64,7 @@ void handle_leave(int tid, const std::filesystem::path &oldpath) {
  * character: the first old_size bytes are the old name, the rest is the new one. As in
  * rename_fs_handler. No new name means the file left CAPIO_DIR.
  */
-void rename_handler(const char *const str) {
+inline void rename_handler(const char *const str) {
     int tid, consumed = 0;
     size_t old_size;
     if (sscanf(str, "%d %zu%n", &tid, &old_size, &consumed) != 2) {
@@ -89,7 +89,7 @@ void rename_handler(const char *const str) {
  * Everything the server knows about the file moves to the new name, and the new name's commit
  * rule is applied. This is what makes "write f.tmp, close it, rename it to f" commit f. No reply.
  */
-void rename_fs_handler(const char *const str) {
+inline void rename_fs_handler(const char *const str) {
     int tid, old_in, new_in, consumed = 0;
     size_t old_size;
     if (sscanf(str, "%d %d %d %zu%n", &tid, &old_in, &new_in, &old_size, &consumed) != 4) {

@@ -6,7 +6,7 @@
 #include "utils/fs_root.hpp"
 extern StorageManager *storage_manager;
 
-void handle_exit_group(int tid) {
+inline void handle_exit_group(int tid) {
     START_LOG(gettid(), "call(tid=%d)", tid);
 
     LOG("retrieving files from writers for process with pid = %d", tid);
@@ -53,7 +53,7 @@ void handle_exit_group(int tid) {
     path_parts.erase(tid);
 }
 
-void exit_group_handler(const char *const str) {
+inline void exit_group_handler(const char *const str) {
     int tid;
     sscanf(str, "%d", &tid);
     handle_exit_group(tid);

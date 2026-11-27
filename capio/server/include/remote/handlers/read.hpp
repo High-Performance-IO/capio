@@ -7,6 +7,7 @@
 #include "remote/backend.hpp"
 #include "remote/requests.hpp"
 #include "storage/manager.hpp"
+#include "utils/common.hpp"
 #include "utils/runtime_configuration.hpp"
 
 extern StorageManager *storage_manager;
@@ -66,8 +67,8 @@ inline void handle_read_reply(int tid, int fd, long count, off64_t file_size, of
     }
 }
 
-void wait_for_data(const std::filesystem::path &path, const std::string &dest, int tid, int fd,
-                   off64_t count, off64_t offset, bool is_getdents) {
+inline void wait_for_data(const std::filesystem::path &path, const std::string &dest, int tid,
+                          int fd, off64_t count, off64_t offset, bool is_getdents) {
     START_LOG(gettid(),
               "call(path=%s, dest=%s, tid=%d, fs=%d, count=%ld, offset=%ld, is_getdents=%s)",
               path.c_str(), dest.c_str(), tid, fd, count, offset, is_getdents ? "true" : "false");
@@ -120,17 +121,20 @@ inline void handle_remote_read_reply(const std::string &source, int tid, int fd,
     handle_read_reply(tid, fd, count, file_size, nbytes, complete, is_getdents);
 }
 
-void remote_read_handler(const RemoteRequest &request) {
-    const std::string &dest = request.get_source();
-    char path[PATH_MAX];
-    int tid, fd, is_getdents;
+/// "<tid> <fd> <count> <offset> <1 if a getdents> <path>"
+inline void remote_read_handler(const RemoteRequest &request) {
+    int tid, fd, is_getdents, path_start = 0;
     off64_t count, offset;
-    sscanf(request.get_content(), "%s %d %d %ld %ld %d", path, &tid, &fd, &count, &offset,
-           &is_getdents);
-    handle_remote_read(path, dest, tid, fd, count, offset, is_getdents);
+    if (sscanf(request.get_content(), "%d %d %ld %ld %d %n", &tid, &fd, &count, &offset,
+               &is_getdents, &path_start) < 5 ||
+        path_start == 0) {
+        return;
+    }
+    handle_remote_read(request.get_content() + path_start, request.get_source(), tid, fd, count,
+                       offset, is_getdents);
 }
 
-void remote_read_reply_handler(const RemoteRequest &request) {
+inline void remote_read_reply_handler(const RemoteRequest &request) {
     const std::string &dest = request.get_source();
     off64_t count, nbytes, file_size;
     int tid, fd, complete, is_getdents;

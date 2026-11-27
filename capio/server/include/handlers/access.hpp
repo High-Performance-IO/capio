@@ -6,7 +6,7 @@
 
 extern ClientManager *client_manager;
 
-void access_handler(const char *const str) {
+inline void access_handler(const char *const str) {
     START_LOG(gettid(), "call(str=%s)", str);
     int tid, consumed = 0;
     if (sscanf(str, "%d%n", &tid, &consumed) != 1) {

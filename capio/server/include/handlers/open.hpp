@@ -123,7 +123,7 @@ inline void handle_open_fs(const int tid, const std::filesystem::path &path) {
     pthread_sigmask(SIG_SETMASK, &previous, nullptr);
 }
 
-void create_handler(const char *const str) {
+inline void create_handler(const char *const str) {
     int tid, fd, consumed = 0;
     if (sscanf(str, "%d %d%n", &tid, &fd, &consumed) != 2) {
         return;
@@ -136,7 +136,7 @@ void create_handler(const char *const str) {
     handle_create(tid, fd, path);
 }
 
-void create_exclusive_handler(const char *const str) {
+inline void create_exclusive_handler(const char *const str) {
     int tid, fd, consumed = 0;
     if (sscanf(str, "%d %d%n", &tid, &fd, &consumed) != 2) {
         return;
@@ -149,7 +149,7 @@ void create_exclusive_handler(const char *const str) {
     handle_create_exclusive(tid, fd, path);
 }
 
-void open_handler(const char *const str) {
+inline void open_handler(const char *const str) {
     int tid, fd, consumed = 0;
     if (sscanf(str, "%d %d%n", &tid, &fd, &consumed) != 2) {
         return;
@@ -168,7 +168,7 @@ void open_handler(const char *const str) {
  * CAPIO_FS_PRODUCED_IF_NO_PRODUCER, tid got a writable descriptor at exec, and it produces the
  * file only if nobody else does, so that "prog > out" does not take it from its producer.
  */
-void create_fs_handler(const char *const str) {
+inline void create_fs_handler(const char *const str) {
     int tid, fd, produced, consumed = 0;
     if (sscanf(str, "%d %d %d%n", &tid, &fd, &produced, &consumed) != 3) {
         return;
@@ -183,7 +183,7 @@ void create_fs_handler(const char *const str) {
 }
 
 /// @brief open of the FS variant: "tid path"
-void open_fs_handler(const char *const str) {
+inline void open_fs_handler(const char *const str) {
     int tid, consumed = 0;
     if (sscanf(str, "%d%n", &tid, &consumed) == 1) {
         handle_open_fs(tid, fs_request_path(tid, str, consumed));

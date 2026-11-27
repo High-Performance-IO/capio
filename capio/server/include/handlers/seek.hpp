@@ -15,7 +15,7 @@ inline void handle_lseek(int tid, int fd, off64_t offset) {
     client_manager->replyToClient(tid, offset);
 }
 
-void handle_seek_data(int tid, int fd, off64_t offset) {
+inline void handle_seek_data(int tid, int fd, off64_t offset) {
     START_LOG(gettid(), "call(tid=%d, fd=%d, offset=%ld)", tid, fd, offset);
 
     CapioFile &c_file = storage_manager->get(tid, fd);
@@ -40,27 +40,27 @@ inline void handle_seek_hole(int tid, int fd, off64_t offset) {
     client_manager->replyToClient(tid, offset);
 }
 
-void lseek_handler(const char *const str) {
+inline void lseek_handler(const char *const str) {
     int tid, fd;
     off64_t offset;
     sscanf(str, "%d %d %ld", &tid, &fd, &offset);
     handle_lseek(tid, fd, offset);
 }
 
-void seek_data_handler(const char *const str) {
+inline void seek_data_handler(const char *const str) {
     int tid, fd;
     off64_t offset;
     sscanf(str, "%d %d %ld", &tid, &fd, &offset);
     handle_seek_data(tid, fd, offset);
 }
 
-void seek_end_handler(const char *const str) {
+inline void seek_end_handler(const char *const str) {
     int tid, fd;
     sscanf(str, "%d %d", &tid, &fd);
     handle_seek_end(tid, fd);
 }
 
-void seek_hole_handler(const char *const str) {
+inline void seek_hole_handler(const char *const str) {
     int tid, fd;
     off64_t offset;
     sscanf(str, "%d %d %ld", &tid, &fd, &offset);

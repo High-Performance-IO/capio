@@ -36,7 +36,7 @@ inline void handle_close(int tid, int fd) {
 /**
  * @brief "tid fd [error]": error is what the close failed with, 0 if it worked (FS variant only)
  */
-void close_handler(const char *str) {
+inline void close_handler(const char *str) {
     int tid, fd, error = 0;
     sscanf(str, "%d %d %d", &tid, &fd, &error);
     if (const pid_t pid = client_manager->getPid(tid);
