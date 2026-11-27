@@ -20,7 +20,9 @@ inline void handle_seek_data(int tid, int fd, off64_t offset) {
 
     CapioFile &c_file = storage_manager->get(tid, fd);
     offset            = c_file.seekData(offset);
-    storage_manager->setFileOffset(tid, fd, offset);
+    if (offset >= 0) { // -1: none, the offset stays
+        storage_manager->setFileOffset(tid, fd, offset);
+    }
     client_manager->replyToClient(tid, offset);
 }
 
@@ -36,7 +38,9 @@ inline void handle_seek_hole(int tid, int fd, off64_t offset) {
 
     CapioFile &c_file = storage_manager->get(tid, fd);
     offset            = c_file.seekHole(offset);
-    storage_manager->setFileOffset(tid, fd, offset);
+    if (offset >= 0) { // -1: none, the offset stays
+        storage_manager->setFileOffset(tid, fd, offset);
+    }
     client_manager->replyToClient(tid, offset);
 }
 

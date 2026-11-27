@@ -58,13 +58,21 @@ inline off64_t capio_lseek(int fd, off64_t offset, int whence, long tid) {
             return new_offset;
         } else if (whence == SEEK_DATA) {
             LOG("whence %d is SEEK_DATA", whence);
-            off64_t new_offset = seek_data_request(fd, file_offset, tid);
+            const off64_t new_offset = seek_data_request(fd, offset, tid);
+            if (new_offset < 0) { // no data at or after offset
+                errno = ENXIO;
+                return CAPIO_POSIX_SYSCALL_ERRNO;
+            }
             fd_table->setOffset(fd, new_offset);
             LOG("the new offset of file %d is %ld", fd, new_offset);
             return new_offset;
         } else if (whence == SEEK_HOLE) {
             LOG("whence %d is SEEK_HOLE", whence);
-            off64_t new_offset = seek_hole_request(fd, file_offset, tid);
+            const off64_t new_offset = seek_hole_request(fd, offset, tid);
+            if (new_offset < 0) { // at or past the end of the file
+                errno = ENXIO;
+                return CAPIO_POSIX_SYSCALL_ERRNO;
+            }
             fd_table->setOffset(fd, new_offset);
             LOG("the new offset of file %d is %ld", fd, new_offset);
             return new_offset;
