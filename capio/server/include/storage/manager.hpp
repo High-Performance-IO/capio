@@ -294,13 +294,6 @@ class StorageManager {
     off64_t addDirectory(pid_t tid, const std::filesystem::path &path);
 
     /**
-     * @brief Registers @p path if it is a directory on the file system that this server does not
-     * have yet, such as CAPIO_DIR: local to this server, as addDirectory does for a directory on
-     * disk. Called on the paths that clients look up, so that the server needs no CAPIO_DIR.
-     */
-    void addExistingDirectory(pid_t tid, const std::filesystem::path &path);
-
-    /**
      * @brief Updates the parent directory to include an entry for a new file/directory.
      *
      * This is called when a new file or directory is created to ensure the parent

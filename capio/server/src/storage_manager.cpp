@@ -13,6 +13,7 @@
 #include "utils/capiocl_adapter.hpp"
 #include "utils/common.hpp"
 #include "utils/filesystem.hpp"
+#include "utils/fs_root.hpp"
 #include "utils/runtime_configuration.hpp"
 #include "utils/shared_mutex.hpp"
 #include "utils/types.hpp"
@@ -195,7 +196,9 @@ CapioFile &StorageManager::add(const std::filesystem::path &path, bool is_dir, s
     std::replace(shm_name.begin(), shm_name.end(), '/', '_');
 
     auto n_file        = CapioCLEngine::get().getDirectoryFileCount(path);
-    auto permanent     = CapioCLEngine::get().isPermanent(path);
+    // A file kept on the file system goes under the real directory of "/": without one (no -r, no
+    // file system streaming client), every file stays in memory
+    auto permanent     = CapioCLEngine::get().isPermanent(path) && FsRoot::known();
     auto n_close_count = CapioCLEngine::get().getCommitCloseCount(path);
 
     if (n_file > 1) {
@@ -322,10 +325,9 @@ off64_t StorageManager::addDirectory(const pid_t tid, const std::filesystem::pat
         if (c_file.isFirstWrite()) {
             c_file.registerFirstWrite();
             // TODO: it works only if there is one prod per file
-            // A directory already on the file system was not created through CAPIO (the memory
-            // variant's mkdir never reaches the disk): CAPIO_DIR, or a directory made before the
-            // workflow. It is local to every server, and the registration of parents stops there.
-            if (std::error_code error; std::filesystem::is_directory(path, error)) {
+            // "/", the CAPIO_DIR of the clients, is local to every server, and the registration of
+            // parents stops there
+            if (path == "/") {
                 home_node_service->learn(path, backend->get_node_name());
             } else {
                 home_node_service->setHome(path);
@@ -338,13 +340,6 @@ off64_t StorageManager::addDirectory(const pid_t tid, const std::filesystem::pat
         return 0;
     }
     return 1;
-}
-
-void StorageManager::addExistingDirectory(const pid_t tid, const std::filesystem::path &path) {
-    START_LOG(tid, "call(path=%s)", path.c_str());
-    if (std::error_code error; !tryGet(path) && std::filesystem::is_directory(path, error)) {
-        addDirectory(tid, path);
-    }
 }
 
 void StorageManager::removeFromDirectory(const std::filesystem::path &file_path) {

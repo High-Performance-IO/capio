@@ -18,6 +18,9 @@ inline std::filesystem::path get_parent_dir_path(const std::filesystem::path &fi
     if (pos == std::string::npos) {
         LOG("invalid file_path in get_parent_dir_path");
     }
+    if (pos == 0) {
+        return file_path.root_path(); // the parent of /f is /
+    }
     return {file_path.native().substr(0, pos)};
 }
 

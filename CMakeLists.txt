@@ -87,7 +87,8 @@ ENDIF ()
 FetchContent_Declare(
         capio_cl
         GIT_REPOSITORY https://github.com/High-Performance-IO/CAPIO-CL.git
-        GIT_TAG v2.0.3
+        # TODO: the release tag of High-Performance-IO/CAPIO-CL#98 (filesystem monitor root)
+        GIT_TAG 356f57cb00f6691b8547a302d377df2c51d77254
 )
 
 FetchContent_Declare(

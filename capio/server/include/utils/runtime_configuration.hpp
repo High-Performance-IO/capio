@@ -67,9 +67,16 @@ class RuntimeConfiguration final {
     /// @brief Create the CAPIO-CL engine described by the configuration
     [[nodiscard]] capiocl::engine::Engine *createCapioClEngine() const;
 
+    /// @brief The real directory of the virtual "/" given with -r, empty if not given
+    [[nodiscard]] const std::filesystem::path &getRoot() const;
+
+    /// @brief Where CAPIO-CL keeps the counters of on_close:N: CAPIO_METADATA_DIR, or @p root
+    [[nodiscard]] std::filesystem::path getMetadataDir(const std::filesystem::path &root) const;
+
   private:
-    /// @brief Where CAPIO-CL keeps the counters of on_close:N (CAPIO_METADATA_DIR, or the working
-    /// directory of the server)
+    /// @brief The real directory of the virtual "/" (-r), empty if not given
+    std::filesystem::path root;
+    /// @brief CAPIO_METADATA_DIR, empty if not set
     std::filesystem::path metadata_dir;
     bool continue_on_error = false;
 
@@ -92,7 +99,6 @@ class RuntimeConfiguration final {
     long location_requery_interval_ms = 0;
 
     std::string capio_cl_config_path;
-    std::string capio_cl_resolve_path;
     bool capio_cl_dynamic_config = false;
     bool store_all_in_memory     = false;
 };

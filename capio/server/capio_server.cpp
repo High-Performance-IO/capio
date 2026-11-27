@@ -100,6 +100,12 @@ static constexpr std::array<CSHandler_t, CAPIO_NR_REQUESTS> build_request_handle
     setup_signal_handlers();
     backend->handshake_servers();
 
+    if (const auto &root = RuntimeConfiguration::get().getRoot(); !root.empty()) {
+        FsRoot::set(root);
+    }
+    // "/" is the CAPIO_DIR of the clients: an empty directory, local to every server
+    storage_manager->addDirectory(getpid(), "/");
+
     internal_server_sem.unlock();
 
     auto str = std::unique_ptr<char[]>(new char[CAPIO_REQ_MAX_SIZE]);

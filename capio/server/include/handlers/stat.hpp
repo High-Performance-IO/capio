@@ -8,6 +8,7 @@
 #include <thread>
 
 #include "remote/backend.hpp"
+#include "utils/fs_root.hpp"
 
 #include "remote/requests.hpp"
 
@@ -45,7 +46,6 @@ void wait_for_file_completion(int tid, const std::filesystem::path &path) {
 inline void reply_stat(int tid, const std::filesystem::path &path) {
     START_LOG(gettid(), "call(tid=%d, path=%s)", tid, path.c_str());
 
-    storage_manager->addExistingDirectory(tid, path);
     auto file_location_opt = home_node_service->getHome(path);
     LOG("File %s is local? %s", path.c_str(), file_location_opt ? "True" : "False");
 
@@ -122,7 +122,7 @@ void consent_handler(const char *const str) {
     const std::filesystem::path path = fs_request_path(tid, str, consumed);
 
     std::error_code error;
-    const bool exists = std::filesystem::exists(path, error);
+    const bool exists = std::filesystem::exists(FsRoot::real(path), error);
     if (!exists && !FsStorageManager::waitsForCreation(tid, path)) {
         client_manager->replyToClient(tid, 0);
         return;
@@ -133,7 +133,7 @@ void consent_handler(const char *const str) {
             return;
         }
         // Directories are never committed, except those with an on_n_files rule
-        if ((std::filesystem::is_directory(path, error) &&
+        if ((std::filesystem::is_directory(FsRoot::real(path), error) &&
              CapioCLEngine::get().getCommitRule(path) != capiocl::commitRules::ON_N_FILES) ||
             !FsStorageManager::isDeclared(path)) {
             client_manager->replyToClient(tid, 0);

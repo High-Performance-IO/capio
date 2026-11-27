@@ -38,11 +38,31 @@ void handle_rename(int tid, const std::filesystem::path &oldpath,
 }
 
 /**
+ * @brief A file renamed out of CAPIO_DIR: its name leaves the server, but the file stays, under a
+ * key that no virtual path can name (they all start with "/"), for the descriptors still open on
+ * it, as a file unlinked while open.
+ * TODO: write the file to its new name on the file system (#343)
+ */
+void handle_leave(int tid, const std::filesystem::path &oldpath) {
+    START_LOG(gettid(), "call(tid=%d, oldpath=%s)", tid, oldpath.c_str());
+    if (!storage_manager->tryGet(oldpath)) {
+        client_manager->replyToClient(tid, 1);
+        return;
+    }
+    static unsigned long left = 0; // the main thread handles every rename
+    storage_manager->rename(oldpath, "left:" + std::to_string(++left));
+    client_manager->removeProducedFile(tid, oldpath);
+    storage_manager->removeFromDirectory(oldpath);
+    home_node_service->remove(oldpath);
+    client_manager->replyToClient(tid, 0);
+}
+
+/**
  * @brief Rename of the memory variant: "tid old_size old_pathnew_path".
  *
  * The two names are written one after the other with no separator, since a path can contain any
  * character: the first old_size bytes are the old name, the rest is the new one. As in
- * rename_fs_handler.
+ * rename_fs_handler. No new name means the file left CAPIO_DIR.
  */
 void rename_handler(const char *const str) {
     int tid, consumed = 0;
@@ -51,8 +71,12 @@ void rename_handler(const char *const str) {
         return;
     }
     const std::string names = request_text(tid, str, consumed);
-    if (names.size() <= old_size) {
-        return; // the new name is missing: the request was truncated
+    if (names.size() < old_size) {
+        return; // the request was truncated
+    }
+    if (names.size() == old_size) {
+        handle_leave(tid, names);
+        return;
     }
     handle_rename(tid, names.substr(0, old_size), names.substr(old_size));
 }
@@ -74,7 +98,7 @@ void rename_fs_handler(const char *const str) {
     const std::string text = request_text(tid, str, consumed);
     const std::string_view names(text);
     START_LOG(gettid(), "call(tid=%d, names=%s)", tid, text.c_str());
-    if (names.size() <= old_size) {
+    if (names.size() < old_size) {
         LOG("The names are cut: the request was too long");
         return;
     }

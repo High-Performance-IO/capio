@@ -41,9 +41,8 @@ RuntimeConfiguration::RuntimeConfiguration(int argc, char **argv) {
 
     args::Group arguments(parser, "Arguments");
     args::HelpFlag help(arguments, "help", "Display this help menu", {'h', "help"});
-    args::ValueFlag<std::string> resolve_prefix(arguments, "resolve-prefix",
-                                                CAPIO_SERVER_ARG_PARSER_RESOLVE_PREFIX_OPT_HELP,
-                                                {'r', "resolve-prefix"});
+    args::ValueFlag<std::string> root_flag(arguments, "directory",
+                                           CAPIO_SERVER_ARG_PARSER_ROOT_OPT_HELP, {'r', "root"});
 
     args::ValueFlag<std::string> config(arguments, "filename",
                                         CAPIO_SERVER_ARG_PARSER_CONFIG_OPT_HELP, {'c', "config"});
@@ -119,8 +118,6 @@ RuntimeConfiguration::RuntimeConfiguration(int argc, char **argv) {
         capio_cl_config_path = args::get(config);
         if (capio_cl_config_path == "dynamic") {
             capio_cl_dynamic_config = true;
-        } else if (resolve_prefix) {
-            capio_cl_resolve_path = args::get(resolve_prefix);
         }
     } else if (!noConfigFile) {
         throw std::runtime_error(
@@ -159,19 +156,27 @@ RuntimeConfiguration::RuntimeConfiguration(int argc, char **argv) {
         }
     }
 
-    // Relative names in the configuration are inside the working directory of the server, unless
-    // -r says otherwise: unresolved, they would never match the absolute paths that clients use
-    const auto working_dir = std::filesystem::current_path();
-    if (!capio_cl_config_path.empty() && !capio_cl_dynamic_config &&
-        capio_cl_resolve_path.empty()) {
-        capio_cl_resolve_path = working_dir;
+    if (root_flag) {
+        std::error_code error;
+        root = std::filesystem::canonical(args::get(root_flag), error);
+        if (error || !std::filesystem::is_directory(root, error)) {
+            throw std::runtime_error("Invalid -r '" + args::get(root_flag) +
+                                     "': it must be an existing directory.");
+        }
     }
     cache_lines          = env_number("CAPIO_CACHE_LINES", CAPIO_CACHE_LINES_DEFAULT);
     cache_line_size      = env_number("CAPIO_CACHE_LINE_SIZE", CAPIO_CACHE_LINE_SIZE_DEFAULT);
     file_initial_size    = env_number("CAPIO_FILE_INIT_SIZE", CAPIO_DEFAULT_FILE_INITIAL_SIZE);
     prefetch_data_size   = env_number("CAPIO_PREFETCH_DATA_SIZE", 0);
     const char *metadata = std::getenv("CAPIO_METADATA_DIR");
-    metadata_dir         = metadata != nullptr ? std::filesystem::path(metadata) : working_dir;
+    metadata_dir         = metadata != nullptr ? std::filesystem::path(metadata) : "";
+}
+
+const std::filesystem::path &RuntimeConfiguration::getRoot() const { return root; }
+
+std::filesystem::path
+RuntimeConfiguration::getMetadataDir(const std::filesystem::path &root) const {
+    return metadata_dir.empty() ? root : metadata_dir;
 }
 
 bool RuntimeConfiguration::getContinueOnError() const { return continue_on_error; }
@@ -217,15 +222,18 @@ bool RuntimeConfiguration::hasConfig() const {
 }
 
 capiocl::engine::Engine *RuntimeConfiguration::createCapioClEngine() const {
-    // Commits travel by multicast, and as tokens next to the files (the file system monitor), which
-    // a server that starts later still finds. Counted on_close keeps its counters in the metadata
-    // directory, which the servers of a workflow must share.
+    // Paths are virtual: "/" is the CAPIO_DIR of the clients. Commits travel by multicast, and,
+    // once the real directory of "/" is known (-r), as tokens next to the files (the file system
+    // monitor), which a server that starts later still finds. Counted on_close keeps its counters
+    // in the metadata directory, which the servers of a workflow must share. Without -r, the file
+    // system monitor starts with the first file system streaming client (see handshake).
     // Not loadDefaults(): it would reset the metadata directory to none. Options that are not in
     // the map take their default where they are read.
     std::unordered_map<std::string, std::string> options{
         {"capiocl.monitor.mcast.enabled", "true"},
-        {"capiocl.monitor.filesystem.enabled", "true"},
-        {"capiocl.monitor.filesystem.metadata_dir", metadata_dir.string()}};
+        {"capiocl.monitor.filesystem.enabled", root.empty() ? "false" : "true"},
+        {"capiocl.monitor.filesystem.root", root.string()},
+        {"capiocl.monitor.filesystem.metadata_dir", getMetadataDir(root).string()}};
 
     capiocl::engine::Engine *engine;
     if (capio_cl_dynamic_config) {
@@ -234,7 +242,7 @@ capiocl::engine::Engine *RuntimeConfiguration::createCapioClEngine() const {
         engine->startApiServer();
     } else if (!capio_cl_config_path.empty()) {
         options["capiocl.config_path"]         = capio_cl_config_path;
-        options["capiocl.resolve_path"]        = capio_cl_resolve_path;
+        options["capiocl.resolve_path"]        = "/"; // a relative name is inside CAPIO_DIR
         options["capiocl.store_all_in_memory"] = store_all_in_memory ? "true" : "false";
         engine                                 = capiocl::parser::Parser::parse(
             capiocl::configuration::CapioClConfiguration(std::move(options)));

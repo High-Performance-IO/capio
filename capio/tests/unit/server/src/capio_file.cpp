@@ -436,4 +436,5 @@ TEST_F(MockBackendTestFixture, TestSimulateDirectoryStreaming) {
 
     storage_manager->remove(stream_directory);
     storage_manager->remove(CAPIO_DIR);
+    storage_manager->remove("/"); // registered as the parent of CAPIO_DIR
 }

@@ -58,10 +58,10 @@ int renameat2_handler(long arg0, long arg1, long arg2, long arg3, long arg4, lon
         }
 
         if (old_is_capio) {
-            // The memory server keeps the file under its new name, even outside CAPIO_DIR, so the
-            // descriptors stay CAPIO's
+            // The descriptors stay CAPIO's: the memory server keeps the file for them, even when it
+            // leaves CAPIO_DIR
             fd_table->renamePath(old_path_abs, new_path_abs);
-            auto res = rename_request(tid, old_path_abs, new_path_abs);
+            auto res = rename_request(tid, old_path_abs, new_path_abs, new_is_capio);
             *result  = (res < 0 ? -errno : res);
             return CAPIO_POSIX_SYSCALL_SUCCESS;
         }

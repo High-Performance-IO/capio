@@ -11,8 +11,15 @@
 #include "common/path.hpp"
 #include "common/syscall.hpp"
 
-/// @brief The canonical CAPIO_DIR of this process, read once. Empty if CAPIO_DIR is not set: then
-/// no path is CAPIO's, and the library leaves every system call to the kernel.
+/**
+ * @brief The CAPIO_DIR of this process, read once: the mount point of the virtual file system that
+ * the server sees, whose "/" it is. Empty if CAPIO_DIR is not set: then no path is CAPIO's, and the
+ * library leaves every system call to the kernel.
+ *
+ * The memory variant does not need the directory to exist: if it does, it is resolved like the
+ * paths the process gets from the kernel, otherwise it is only made absolute. The FS variant keeps
+ * its files there, so the directory must exist.
+ */
 inline const std::filesystem::path &get_capio_dir() {
     static const std::filesystem::path capio_dir = [] {
         const char *value = std::getenv("CAPIO_DIR");
@@ -20,15 +27,24 @@ inline const std::filesystem::path &get_capio_dir() {
             return std::filesystem::path{};
         }
         const auto buf = std::unique_ptr<char[]>(new char[PATH_MAX]);
-        if (capio_realpath(value, buf.get()) == nullptr) {
-            START_LOG(capio_syscall(SYS_gettid), "call()");
-            ERR_EXIT("error CAPIO_DIR: directory %s does not exist", value);
+        std::filesystem::path dir;
+        if (capio_realpath(value, buf.get()) != nullptr) {
+            dir = buf.get();
+        } else {
+            FS_MODE({
+                START_LOG(capio_syscall(SYS_gettid), "call()");
+                ERR_EXIT("CAPIO_DIR %s does not exist: file system streaming needs it", value);
+            })
+            dir = std::filesystem::absolute(value).lexically_normal();
+            if (!dir.has_filename() && dir != dir.root_path()) {
+                dir = dir.parent_path(); // no trailing slash
+            }
         }
-        if (is_forbidden_path(buf.get())) {
+        if (is_forbidden_path(dir.c_str())) {
             START_LOG(capio_syscall(SYS_gettid), "call()");
-            ERR_EXIT("CAPIO_DIR %s is in forbidden path", buf.get());
+            ERR_EXIT("CAPIO_DIR %s is in forbidden path", dir.c_str());
         }
-        return std::filesystem::path(buf.get());
+        return dir;
     }();
     return capio_dir;
 }

@@ -2,11 +2,9 @@
 #define CAPIO_SERVER_HANDLERS_ACCESS_HPP
 
 #include "remote/home_node_service.hpp"
-#include "storage/manager.hpp"
 #include "utils/common.hpp"
 
 extern ClientManager *client_manager;
-extern StorageManager *storage_manager;
 
 void access_handler(const char *const str) {
     START_LOG(gettid(), "call(str=%s)", str);
@@ -21,7 +19,6 @@ void access_handler(const char *const str) {
         return;
     }
 
-    storage_manager->addExistingDirectory(tid, path);
     client_manager->replyToClient(tid, home_node_service->getHome(path) ? 0 : -1);
 }
 

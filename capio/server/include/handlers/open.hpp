@@ -9,6 +9,7 @@
 #include "common/requests.hpp"
 #include "remote/home_node_service.hpp"
 #include "utils/common.hpp"
+#include "utils/fs_root.hpp"
 #include "utils/runtime_configuration.hpp"
 
 extern ClientManager *client_manager;
@@ -71,7 +72,6 @@ inline void handle_create_exclusive(int tid, int fd, const std::filesystem::path
 inline void handle_open(int tid, int fd, const std::filesystem::path &path) {
     START_LOG(gettid(), "call(tid=%d, fd=%d, path_cstr=%s)", tid, fd, path.c_str());
 
-    storage_manager->addExistingDirectory(tid, path);
     // lookup() is last because it may ask the other servers (short circuit evaluation)
     if (home_node_service->getHome(path) || home_node_service->lookup(path)) {
         update_file_metadata(path, tid, fd, false, 0);
@@ -102,7 +102,8 @@ inline void handle_open_fs(const int tid, const std::filesystem::path &path) {
         return;
     }
     std::error_code error;
-    if (std::filesystem::exists(path, error) || !FsStorageManager::waitsForCreation(tid, path)) {
+    if (std::filesystem::exists(FsRoot::real(path), error) ||
+        !FsStorageManager::waitsForCreation(tid, path)) {
         client_manager->replyToClient(tid, 1); // if it is missing, the kernel answers ENOENT
         return;
     }

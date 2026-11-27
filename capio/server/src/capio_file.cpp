@@ -10,6 +10,7 @@
 #include "../include/storage/file_buffer.hpp"
 #include "remote/backend.hpp"
 #include "server/include/utils/common.hpp"
+#include "utils/fs_root.hpp"
 #include "utils/shared_mutex.hpp"
 
 extern Backend *backend;
@@ -99,16 +100,17 @@ void CapioFile::createBuffer(const std::filesystem::path &path, const bool home_
     if (std::visit([](const auto &buf) { return buf.empty(); }, _buffer)) {
         _home_node = home_node;
         if (_permanent && home_node) {
+            const auto real_path = FsRoot::real(path);
             if (_directory) {
-                std::filesystem::create_directory(path);
-                std::filesystem::permissions(path, std::filesystem::perms::owner_all);
+                std::filesystem::create_directory(real_path);
+                std::filesystem::permissions(real_path, std::filesystem::perms::owner_all);
                 _buffer.emplace<HeapBuffer>().allocate(_requested_size);
             } else {
                 LOG("creating mem mapped file");
                 // switch the active backing to the mmap-backed buffer and map the real file
                 auto &mapped = _buffer.emplace<MappedBuffer>();
-                if (!mapped.allocate(path, _requested_size)) {
-                    ERR_EXIT("mmap %s CapioFile constructor", path.c_str());
+                if (!mapped.allocate(real_path, _requested_size)) {
+                    ERR_EXIT("mmap %s CapioFile constructor", real_path.c_str());
                 }
             }
         } else {

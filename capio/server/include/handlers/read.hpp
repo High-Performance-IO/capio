@@ -9,6 +9,7 @@
 
 #include "remote/backend.hpp"
 #include "remote/requests.hpp"
+#include "utils/fs_root.hpp"
 
 #include "remote/home_node_service.hpp"
 #include "utils/common.hpp"
@@ -193,9 +194,9 @@ void read_fs_handler(const char *const str) {
     // Reply -1 when the client will never have to wait for this file, so that it stops asking:
     // the descriptor is unknown to the server (so it is not a CAPIO file), it is a directory, it is
     // excluded, or the caller is the one writing it.
-    if (std::error_code error; path.empty() || std::filesystem::is_directory(path, error) ||
-                               CapioCLEngine::get().isExcluded(path) ||
-                               FsStorageManager::isProducer(tid, path)) {
+    if (std::error_code error;
+        path.empty() || std::filesystem::is_directory(FsRoot::real(path), error) ||
+        CapioCLEngine::get().isExcluded(path) || FsStorageManager::isProducer(tid, path)) {
         client_manager->replyToClient(tid, -1);
         return;
     }

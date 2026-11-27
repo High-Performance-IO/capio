@@ -16,7 +16,7 @@ x-test-service: &test-service
     - -c
     - |
       set -e
-      CAPIO_DIR=/shared capio_server -c /config.json -b mtcl --discovery fs --token-directory /tokens &
+      capio_server -c /config.json -r /shared -b mtcl --discovery fs --token-directory /tokens &
       server_pid=$$!
       cleanup() {
         status=$$?
