@@ -52,8 +52,7 @@ inline bool is_prefix(const std::filesystem::path &path_1, const std::filesystem
 inline bool is_capio_dir(const std::filesystem::path &path_to_check) {
     START_LOG(capio_syscall(SYS_gettid), "call(path_to_check=%s)", path_to_check.c_str());
 
-    const auto &capio_dir = get_capio_dir();
-    const auto res        = !capio_dir.empty() && capio_dir.compare(path_to_check) == 0;
+    const auto res = get_capio_dir().compare(path_to_check) == 0;
     LOG("is_capio_dir: %s", res ? "yes" : "no");
     return res;
 }
@@ -61,9 +60,8 @@ inline bool is_capio_dir(const std::filesystem::path &path_to_check) {
 inline bool is_capio_path(const std::filesystem::path &path_to_check) {
     START_LOG(capio_syscall(SYS_gettid), "call(path_to_check=%s)", path_to_check.c_str());
 
-    // check if path_to_check begins with CAPIO_DIR. Without CAPIO_DIR, no path is CAPIO's
-    const auto &capio_dir = get_capio_dir();
-    const auto res        = !capio_dir.empty() && is_prefix(capio_dir, path_to_check);
+    // check if path_to_check begins with CAPIO_DIR
+    const auto res = is_prefix(get_capio_dir(), path_to_check);
     LOG("is_capio_path: %s", res ? "yes" : "no");
     return res;
 }
