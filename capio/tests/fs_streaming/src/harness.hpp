@@ -96,6 +96,10 @@ class FsStreamingTest : public testing::Test {
         if (pid == 0) {
             for (const auto &entry : env) {
                 const auto equals = entry.find('=');
+                if (equals == std::string::npos) { // a name alone: unset it
+                    unsetenv(entry.c_str());
+                    continue;
+                }
                 setenv(entry.substr(0, equals).c_str(), entry.substr(equals + 1).c_str(), 1);
             }
             unsetenv("OLDPWD");
@@ -136,15 +140,17 @@ class FsStreamingTest : public testing::Test {
         }
     }
 
-    /// @brief Start the server with @p streams, or with --no-config if there are none
-    void startServer(const std::vector<Stream> &streams) {
+    /// @brief Start the server with @p streams, or with --no-config if there are none, streaming
+    /// through work (-r) unless @p with_root is false: then the first app's CAPIO_DIR is used
+    void startServer(const std::vector<Stream> &streams, const bool with_root = true) {
         std::vector<std::string> command{setting("CAPIO_SERVER_PATH", "capio_server")};
         if (streams.empty()) {
             command.emplace_back("--no-config");
         } else {
             std::string outputs, inputs, rules;
             for (const auto &stream : streams) {
-                const auto path  = "\"" + (work / stream.name).string() + "\"";
+                // Virtual: "/" is the apps' CAPIO_DIR, work
+                const auto path = "\"" + (std::filesystem::path("/") / stream.name).string() + "\"";
                 const auto comma = inputs.empty() ? "" : ",";
                 inputs += comma + path;
                 if (stream.produced) {
@@ -168,10 +174,12 @@ class FsStreamingTest : public testing::Test {
             command.emplace_back("-c");
             command.push_back((root / "config.json").string());
         }
-        server =
-            spawn(command,
-                  {"CAPIO_DIR=" + work.string(), "CAPIO_WORKFLOW_NAME=" + workflow, "LD_PRELOAD="},
-                  root / "server.log", root);
+        if (with_root) {
+            command.emplace_back("-r");
+            command.push_back(work.string());
+        }
+        server = spawn(command, {"CAPIO_DIR", "CAPIO_WORKFLOW_NAME=" + workflow, "LD_PRELOAD="},
+                       root / "server.log", root);
         for (int i = 0; i < 1000; ++i) {
             if (slurp(root / "server.log").find("successfully started") != std::string::npos) {
                 std::this_thread::sleep_for(std::chrono::milliseconds(200));
@@ -197,6 +205,22 @@ class FsStreamingTest : public testing::Test {
         }
         App app{0, root / ("app" + std::to_string(n_apps++))};
         app.pid = spawn(command, env, app.output, work);
+        running.push_back(app.pid);
+        return app;
+    }
+
+    /// @brief Start an app named @p name with its own @p capio_dir, created if needed, and in it,
+    /// preloading @p library
+    App startWithDir(const std::filesystem::path &capio_dir, const std::string &name,
+                     const std::vector<std::string> &operations, const std::string &library) {
+        std::filesystem::create_directories(capio_dir);
+        std::vector<std::string> command{setting("CAPIO_FS_APP_PATH", "capio_fs_streaming_app")};
+        command.insert(command.end(), operations.begin(), operations.end());
+        App app{0, root / ("app" + std::to_string(n_apps++))};
+        app.pid = spawn(command,
+                        {"CAPIO_DIR=" + capio_dir.string(), "CAPIO_WORKFLOW_NAME=" + workflow,
+                         "CAPIO_APP_NAME=" + name, "LD_PRELOAD=" + library},
+                        app.output, capio_dir);
         running.push_back(app.pid);
         return app;
     }

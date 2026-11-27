@@ -13,6 +13,7 @@
 #include "utils/capiocl_adapter.hpp"
 #include "utils/common.hpp"
 #include "utils/filesystem.hpp"
+#include "utils/fs_root.hpp"
 #include "utils/runtime_configuration.hpp"
 #include "utils/shared_mutex.hpp"
 #include "utils/types.hpp"
@@ -195,7 +196,9 @@ CapioFile &StorageManager::add(const std::filesystem::path &path, bool is_dir, s
     std::replace(shm_name.begin(), shm_name.end(), '/', '_');
 
     auto n_file        = CapioCLEngine::get().getDirectoryFileCount(path);
-    auto permanent     = CapioCLEngine::get().isPermanent(path);
+    // A file kept on the file system goes under the real directory of "/": without one (no -r, no
+    // file system streaming client), every file stays in memory
+    auto permanent     = CapioCLEngine::get().isPermanent(path) && fs_root().known();
     auto n_close_count = CapioCLEngine::get().getCommitCloseCount(path);
 
     if (n_file > 1) {
@@ -322,7 +325,9 @@ off64_t StorageManager::addDirectory(const pid_t tid, const std::filesystem::pat
         if (c_file.isFirstWrite()) {
             c_file.registerFirstWrite();
             // TODO: it works only if there is one prod per file
-            if (is_capio_dir(path)) {
+            // "/", the CAPIO_DIR of the clients, is local to every server, and the registration of
+            // parents stops there
+            if (path == "/") {
                 home_node_service->learn(path, backend->get_node_name());
             } else {
                 home_node_service->setHome(path);

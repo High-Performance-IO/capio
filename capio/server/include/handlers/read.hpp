@@ -9,6 +9,7 @@
 
 #include "remote/backend.hpp"
 #include "remote/requests.hpp"
+#include "utils/fs_root.hpp"
 
 #include "remote/home_node_service.hpp"
 #include "utils/common.hpp"
@@ -151,9 +152,8 @@ void wait_for_file(const std::filesystem::path &path, int tid, int fd, off64_t c
 inline void handle_read(int tid, int fd, off64_t count) {
     START_LOG(gettid(), "call(tid=%d, fd=%d, count=%ld)", tid, fd, count);
 
-    const std::filesystem::path &path      = storage_manager->getPath(tid, fd);
-    const std::filesystem::path &capio_dir = RuntimeConfiguration::get().getCapioDir();
-    const std::string &app_name            = client_manager->getAppName(tid);
+    const std::filesystem::path &path = storage_manager->getPath(tid, fd);
+    const std::string &app_name       = client_manager->getAppName(tid);
     bool is_prod =
         CapioCLEngine::get().isProducer(path, app_name) || client_manager->isProducer(tid, path);
     auto file_location_opt = home_node_service->getHome(path);
@@ -165,7 +165,7 @@ inline void handle_read(int tid, int fd, off64_t count) {
         // launch a thread that checks when the file is created
         std::thread t(wait_for_file, path, tid, fd, count);
         t.detach();
-    } else if (is_prod || *file_location_opt == backend->get_node_name() || capio_dir == path) {
+    } else if (is_prod || *file_location_opt == backend->get_node_name()) {
         LOG("File is local. handling local read");
         handle_local_read(tid, fd, count, is_prod);
     } else {
@@ -194,9 +194,9 @@ void read_fs_handler(const char *const str) {
     // Reply -1 when the client will never have to wait for this file, so that it stops asking:
     // the descriptor is unknown to the server (so it is not a CAPIO file), it is a directory, it is
     // excluded, or the caller is the one writing it.
-    if (std::error_code error; path.empty() || std::filesystem::is_directory(path, error) ||
-                               CapioCLEngine::get().isExcluded(path) ||
-                               FsStorageManager::isProducer(tid, path)) {
+    if (std::error_code error;
+        path.empty() || std::filesystem::is_directory(fs_root().real(path), error) ||
+        CapioCLEngine::get().isExcluded(path) || FsStorageManager::isProducer(tid, path)) {
         client_manager->replyToClient(tid, -1);
         return;
     }

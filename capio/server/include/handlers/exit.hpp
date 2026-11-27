@@ -3,6 +3,7 @@
 
 #include "storage/manager.hpp"
 #include "utils/common.hpp"
+#include "utils/fs_root.hpp"
 extern StorageManager *storage_manager;
 
 void handle_exit_group(int tid) {
@@ -18,7 +19,7 @@ void handle_exit_group(int tid) {
             if (!c_file_opt) {
                 // The FS variant produces files that are only on the file system. Any other file
                 // missing from storage was removed before exiting and has nothing left to commit.
-                if (std::error_code error; std::filesystem::exists(path, error)) {
+                if (std::error_code error; std::filesystem::exists(fs_root().real(path), error)) {
                     LOG("File %s is on the file system. Setting it to complete", path.c_str());
                     fs_storage_manager->commit(path);
                 } else {

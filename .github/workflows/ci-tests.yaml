@@ -72,7 +72,7 @@ jobs:
                LD_PRELOAD=libcapio_posix.so capio_syscall_unit_tests \
                  --gtest_break_on_failure \
                  --gtest_print_time=1' sh \
-              '{name: "CAPIO", IO_Graph: [], exclude: [$pwd + "/aNonExistingFile", $pwd, $pwd + "/"]}'
+              '{name: "CAPIO", IO_Graph: [], exclude: ["/aNonExistingFile", "/"]}'
 
           echo "Run CAPIO syscall Unit tests, FS variant"
           docker run --rm                         \
@@ -87,7 +87,7 @@ jobs:
                  --gtest_filter="-*tat*OnDirectory*:*FcntlLease*:*FcntlSeals*:*FromAPosixFileIntoACapioFile:*FromACapioFileIntoAPosixFile:*SpliceFromACapioFile*:*SpliceIntoACapioFile*:*SendfileFromACapioFile*:*TestChmodAndChownByPath*" \
                  --gtest_break_on_failure \
                  --gtest_print_time=1' sh \
-              '{name: "CAPIO", IO_Graph: [], exclude: [$pwd + "/aNonExistingFile", $pwd, $pwd + "/"]}'
+              '{name: "CAPIO", IO_Graph: [], exclude: ["/aNonExistingFile", "/"]}'
 
           echo "Run CAPIO FS streaming tests"
           docker run --rm                         \
@@ -212,7 +212,7 @@ jobs:
         run: |
           jq  -n               \
               --arg pwd $(pwd) \
-              '{name: "CAPIO", IO_Graph: [], exclude: [$pwd + "/aNonExistingFile", $pwd, $pwd + "/"]}' \
+              '{name: "CAPIO", IO_Graph: [], exclude: ["/aNonExistingFile", "/"]}' \
           > test_config.json
           
           export CONFIG_PATH=$(realpath test_config.json)

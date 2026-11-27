@@ -384,7 +384,6 @@ static int hook(long syscall_number, long arg0, long arg1, long arg2, long arg3,
                 long arg5, long *result) {
     static constexpr std::array<CPHandler_t, CAPIO_NR_SYSCALLS> syscallTable =
         build_syscall_table();
-    static const char *capio_dir = std::getenv("CAPIO_DIR");
 
 #ifdef SYS_futex
     /**
@@ -409,13 +408,6 @@ static int hook(long syscall_number, long arg0, long arg1, long arg2, long arg3,
     // If the syscall_number is higher than the maximum
     // syscall captured by CAPIO, simply return
     if (syscall_number >= CAPIO_NR_SYSCALLS) {
-        return 1;
-    }
-
-    // If CAPIO_DIR is not set as environment variable,
-    // then capio will not intercept the system calls
-    if (capio_dir == nullptr) {
-        LOG("CAPIO_DIR env var not set. returning control to kernel");
         return 1;
     }
 
@@ -463,6 +455,11 @@ static int hook(long syscall_number, long arg0, long arg1, long arg2, long arg3,
 
 static __attribute__((constructor)) void init() {
     SET_CALF_SYSCALL_HANDLER(syscall_no_intercept);
+
+    // Without CAPIO_DIR, CAPIO is off: no server, no hooks
+    if (get_capio_dir().empty()) {
+        return;
+    }
 
     const long tid = syscall_no_intercept(SYS_gettid);
 

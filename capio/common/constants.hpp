@@ -51,6 +51,11 @@ constexpr char CAPIO_REFUSED_MEMORY_CLIENT_MESSAGE[] =
 constexpr char CAPIO_REFUSED_FS_CLIENT_MESSAGE[] =
     "CAPIO: this process uses libcapio_posix_fs.so (file system), but its workflow uses "
     "libcapio_posix.so: the two cannot be mixed in a workflow. Fix LD_PRELOAD.\n";
+/// @brief What an FS client prints when its CAPIO_DIR is not the directory its server streams
+/// through (-r, or the CAPIO_DIR of the first FS client)
+constexpr char CAPIO_REFUSED_ROOT_CLIENT_MESSAGE[] =
+    "CAPIO: the CAPIO_DIR of this process is not the directory its server streams through (the "
+    "server's -r, or the CAPIO_DIR of its first file system client). Fix CAPIO_DIR.\n";
 
 // CAPIO default values for shared memory
 constexpr char CAPIO_DEFAULT_WORKFLOW_NAME[] = "CAPIO";
@@ -163,9 +168,10 @@ constexpr char CAPIO_SERVER_ARG_PARSER_CONFIG_NCONTINUE_ON_ERROR_HELP[] =
     "fatal termination point. This flag should be used only to debug capio. If this flag is "
     "specified,  and a fatal termination point is reached, the behaviour of capio is undefined and "
     "should not  be taken as valid";
-constexpr char CAPIO_SERVER_ARG_PARSER_RESOLVE_PREFIX_OPT_HELP[] =
-    "Prefix to resolve CAPIO-CL configuration file paths when found to be relative (default: "
-    "CAPIO_DIR)";
+constexpr char CAPIO_SERVER_ARG_PARSER_ROOT_OPT_HELP[] =
+    "Real directory of the virtual / that clients see (their CAPIO_DIR), where file system "
+    "streaming keeps the files and their commit tokens (default: the CAPIO_DIR of the first file "
+    "system streaming client)";
 
 constexpr char CAPIO_SERVER_ARG_PARSER_STORE_ALL_IN_MEMORY_OPT_HELP[] =
     "Flag to set CAPIO and CAPIO-CL to store all files in memory, independently of the "

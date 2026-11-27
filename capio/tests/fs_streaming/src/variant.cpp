@@ -10,6 +10,24 @@ TEST_F(FsStreamingTest, MemoryClientInAnFsWorkflowIsRefused) {
     EXPECT_EQ(result.output.find("not refused"), std::string::npos) << result.output;
 }
 
+// Without CAPIO_DIR, either library passes every system call to the kernel and needs no server
+// (#317): there is none here. The file is on disk even with the memory variant, which would keep a
+// CAPIO file in the server.
+TEST_F(FsStreamingTest, WithoutCapioDirNothingIsIntercepted) {
+    for (const auto &library : {setting("CAPIO_FS_LIBRARY", "libcapio_posix_fs.so"),
+                                setting("CAPIO_MEMORY_LIBRARY", "libcapio_posix.so")}) {
+        SCOPED_TRACE(library);
+        std::filesystem::remove(work / "f");
+        const App app{spawn({setting("CAPIO_FS_APP_PATH", "capio_fs_streaming_app"), "create:f",
+                             "write:AB", "close", "print:done"},
+                            {"CAPIO_DIR", "LD_PRELOAD=" + library}, root / "app", work),
+                      root / "app"};
+        running.push_back(app.pid);
+        EXPECT_OUTPUT(finish(app), "done");
+        EXPECT_EQ(slurp(work / "f"), "AB");
+    }
+}
+
 TEST_F(FsStreamingTest, FsClientInAMemoryWorkflowIsRefused) {
     startServer({{"f"}});
     const auto first =

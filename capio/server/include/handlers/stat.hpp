@@ -8,6 +8,7 @@
 #include <thread>
 
 #include "remote/backend.hpp"
+#include "utils/fs_root.hpp"
 
 #include "remote/requests.hpp"
 
@@ -75,10 +76,8 @@ inline void reply_stat(int tid, const std::filesystem::path &path) {
             ? c_file_opt->get()
             : storage_manager->add(path, false, RuntimeConfiguration::get().getFileInitialSize());
     LOG("Obtained capio file. ready to reply to client");
-    const std::filesystem::path &capio_dir = RuntimeConfiguration::get().getCapioDir();
-    LOG("Obtained capio_dir");
     if (c_file.isCommitted() || *file_location_opt == backend->get_node_name() ||
-        CapioCLEngine::get().isFirable(path) || capio_dir == path) {
+        CapioCLEngine::get().isFirable(path)) {
         LOG("Sending response to client");
         client_manager->replyToClient(tid, c_file.getFileSize());
         client_manager->replyToClient(tid, static_cast<int>(c_file.isDirectory() ? 1 : 0));
@@ -123,7 +122,7 @@ void consent_handler(const char *const str) {
     const std::filesystem::path path = fs_request_path(tid, str, consumed);
 
     std::error_code error;
-    const bool exists = std::filesystem::exists(path, error);
+    const bool exists = std::filesystem::exists(fs_root().real(path), error);
     if (!exists && !FsStorageManager::waitsForCreation(tid, path)) {
         client_manager->replyToClient(tid, 0);
         return;
@@ -134,7 +133,7 @@ void consent_handler(const char *const str) {
             return;
         }
         // Directories are never committed, except those with an on_n_files rule
-        if ((std::filesystem::is_directory(path, error) &&
+        if ((std::filesystem::is_directory(fs_root().real(path), error) &&
              CapioCLEngine::get().getCommitRule(path) != capiocl::commitRules::ON_N_FILES) ||
             !FsStorageManager::isDeclared(path)) {
             client_manager->replyToClient(tid, 0);

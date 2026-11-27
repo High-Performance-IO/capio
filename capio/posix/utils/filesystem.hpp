@@ -22,6 +22,7 @@
 #include "common/path.hpp"
 #include "common/syscall.hpp"
 
+#include "env.hpp"
 #include "file_descriptor_table.hpp"
 #include "types.hpp"
 
@@ -54,6 +55,16 @@ inline bool is_capio_dir(const std::filesystem::path &path_to_check) {
     const auto res = get_capio_dir().compare(path_to_check) == 0;
     LOG("is_capio_dir: %s", res ? "yes" : "no");
     return res;
+}
+
+/**
+ * @brief The name the server knows a CAPIO path by: its place in the virtual file system whose "/"
+ * is CAPIO_DIR, e.g. "/d/f" for CAPIO_DIR/d/f and "/" for CAPIO_DIR. The same file has the same
+ * name on every node, wherever CAPIO_DIR is mounted. @p path must be a normalized CAPIO path.
+ */
+inline std::string capio_virtual_path(const std::filesystem::path &path) {
+    const auto relative = path.lexically_relative(get_capio_dir());
+    return relative == "." ? "/" : "/" + relative.native();
 }
 
 inline bool is_capio_path(const std::filesystem::path &path_to_check) {

@@ -390,7 +390,6 @@ TEST_F(MockBackendTestFixture, TestSimulateDirectoryStreaming) {
     const std::filesystem::path CAPIO_DIR        = "/tmp";
     const std::filesystem::path stream_directory = CAPIO_DIR / "my_streaming_directory";
 
-    setenv("CAPIO_DIR", CAPIO_DIR.c_str(), 1);
     storage_manager->addDirectory(1234, CAPIO_DIR);
     storage_manager->addDirectory(1234, stream_directory);
 
@@ -437,4 +436,5 @@ TEST_F(MockBackendTestFixture, TestSimulateDirectoryStreaming) {
 
     storage_manager->remove(stream_directory);
     storage_manager->remove(CAPIO_DIR);
+    storage_manager->remove("/"); // registered as the parent of CAPIO_DIR
 }

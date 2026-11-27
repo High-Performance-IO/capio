@@ -71,7 +71,7 @@ inline void path_request(const int code, const long tid, const std::string &argu
 
 inline off64_t access_request(const std::filesystem::path &path, const long tid) {
     START_LOG(capio_syscall(SYS_gettid), "call(path=%s, tid=%ld)", path.c_str(), tid);
-    path_request(CAPIO_REQUEST_ACCESS, tid, "", path.native());
+    path_request(CAPIO_REQUEST_ACCESS, tid, "", capio_virtual_path(path));
     off64_t res;
     buff_response->read(&res);
     return res;
@@ -99,14 +99,17 @@ inline void close_request(const int fd, const long tid, const long error = 0) {
 }
 
 inline off64_t rename_request(const long tid, const std::filesystem::path &old_path,
-                              const std::filesystem::path &newpath) {
+                              const std::filesystem::path &newpath, const bool new_is_capio) {
     START_LOG(capio_syscall(SYS_gettid), "call(tid=%ld, old_path=%s, new_path=%s)", tid,
               old_path.c_str(), newpath.c_str());
     // Both names in one request, written one after the other with no separator (a path can contain
     // any character). The length of the old name, sent first, tells the server where it ends. As
-    // in rename_request_fs.
-    path_request(CAPIO_REQUEST_RENAME, tid, std::to_string(old_path.native().size()) + " ",
-                 old_path.native() + newpath.native());
+    // in rename_request_fs. A new name outside CAPIO_DIR is not sent: the file leaves the server.
+    // TODO: write the file to its new name on the file system (#343)
+    const auto old_name = capio_virtual_path(old_path);
+    const auto new_name = new_is_capio ? capio_virtual_path(newpath) : std::string{};
+    path_request(CAPIO_REQUEST_RENAME, tid, std::to_string(old_name.size()) + " ",
+                 old_name + new_name);
     off64_t res;
     buff_response->read(&res);
     return res;
@@ -118,16 +121,19 @@ inline void rename_request_fs(const std::filesystem::path &old_path, const bool 
     START_LOG(capio_syscall(SYS_gettid), "call(tid=%ld, old_path=%s, new_path=%s)", tid,
               old_path.c_str(), new_path.c_str());
     // Both names go back to back. The length of the old name tells the server where it ends; a
-    // separator would not work, since paths can contain spaces
+    // separator would not work, since paths can contain spaces. A name outside CAPIO_DIR is not
+    // sent: the server only needs to know that side is not CAPIO's.
+    const auto old_name = old_is_capio ? capio_virtual_path(old_path) : std::string{};
+    const auto new_name = new_is_capio ? capio_virtual_path(new_path) : std::string{};
     path_request(CAPIO_REQUEST_RENAME_FS, tid,
                  std::to_string(old_is_capio ? 1 : 0) + " " + std::to_string(new_is_capio ? 1 : 0) +
-                     " " + std::to_string(old_path.native().size()) + " ",
-                 old_path.native() + new_path.native());
+                     " " + std::to_string(old_name.size()) + " ",
+                 old_name + new_name);
 }
 
 inline off64_t create_request(const int fd, const std::filesystem::path &path, const long tid) {
     START_LOG(capio_syscall(SYS_gettid), "call(fd=%ld, path=%s, tid=%ld)", fd, path.c_str(), tid);
-    path_request(CAPIO_REQUEST_CREATE, tid, std::to_string(fd) + " ", path.native());
+    path_request(CAPIO_REQUEST_CREATE, tid, std::to_string(fd) + " ", capio_virtual_path(path));
     off64_t res;
     buff_response->read(&res);
     return res;
@@ -144,13 +150,15 @@ inline void create_request_fs(const std::filesystem::path &path, const int fd, c
               fd, produced, tid);
     // no reply
     path_request(CAPIO_REQUEST_CREATE_FS, tid,
-                 std::to_string(fd) + " " + std::to_string(produced) + " ", path.native());
+                 std::to_string(fd) + " " + std::to_string(produced) + " ",
+                 capio_virtual_path(path));
 }
 
 inline off64_t create_exclusive_request(const int fd, const std::filesystem::path &path,
                                         const long tid) {
     START_LOG(capio_syscall(SYS_gettid), "call(fd=%ld, path=%s, tid=%ld)", fd, path.c_str(), tid);
-    path_request(CAPIO_REQUEST_CREATE_EXCLUSIVE, tid, std::to_string(fd) + " ", path.native());
+    path_request(CAPIO_REQUEST_CREATE_EXCLUSIVE, tid, std::to_string(fd) + " ",
+                 capio_virtual_path(path));
     off64_t res;
     buff_response->read(&res);
     return res;
@@ -191,11 +199,13 @@ inline void handshake_named_request(const long tid, const long pid, const std::s
                                     const bool wait = false) {
     START_LOG(capio_syscall(SYS_gettid), "call(tid=%ld, pid=%ld, app_name=%s)", tid, pid,
               app_name.c_str());
-    char req[CAPIO_REQ_MAX_SIZE];
-    sprintf(req, "%04d %ld %ld %s %d %c", CAPIO_REQUEST_HANDSHAKE_NAMED, tid, pid, app_name.c_str(),
-            wait ? 1 : 0, MEMORY_MODE(CAPIO_VARIANT_MEMORY) FS_MODE(CAPIO_VARIANT_FS));
-    LOG("req=%s", req);
-    buf_requests->write(req, CAPIO_REQ_MAX_SIZE);
+    // An FS client also sends its real CAPIO_DIR, where its files are: the directory the server
+    // streams through, if it was started without -r
+    const char variant = MEMORY_MODE(CAPIO_VARIANT_MEMORY) FS_MODE(CAPIO_VARIANT_FS);
+    path_request(CAPIO_REQUEST_HANDSHAKE_NAMED, tid,
+                 std::to_string(pid) + " " + app_name + " " + (wait ? "1" : "0") + " " + variant +
+                     " ",
+                 MEMORY_MODE("") FS_MODE(get_capio_dir().native()));
 
     // Every handshake waits for the server, so the server must be running before a client starts.
     // The answer is 1, or CAPIO_REPLY_VARIANT_REFUSED if the workflow uses the other library: the
@@ -207,6 +217,11 @@ inline void handshake_named_request(const long tid, const long pid, const std::s
         const auto &message = MEMORY_MODE(CAPIO_REFUSED_MEMORY_CLIENT_MESSAGE)
             FS_MODE(CAPIO_REFUSED_FS_CLIENT_MESSAGE);
         syscall_no_intercept(SYS_write, STDERR_FILENO, message, sizeof(message) - 1);
+        syscall_no_intercept(SYS_exit_group, EXIT_FAILURE);
+    }
+    if (res == CAPIO_REPLY_ROOT_REFUSED) {
+        syscall_no_intercept(SYS_write, STDERR_FILENO, CAPIO_REFUSED_ROOT_CLIENT_MESSAGE,
+                             sizeof(CAPIO_REFUSED_ROOT_CLIENT_MESSAGE) - 1);
         syscall_no_intercept(SYS_exit_group, EXIT_FAILURE);
     }
 }
@@ -227,7 +242,7 @@ inline CPStatResponse_t fstat_request(const int fd, const long tid) {
 
 inline off64_t mkdir_request(const std::filesystem::path &path, const long tid) {
     START_LOG(capio_syscall(SYS_gettid), "call(path=%s, tid=%ld)", path.c_str(), tid);
-    path_request(CAPIO_REQUEST_MKDIR, tid, "", path.native());
+    path_request(CAPIO_REQUEST_MKDIR, tid, "", capio_virtual_path(path));
     off64_t res;
     buff_response->read(&res);
     return res;
@@ -235,7 +250,7 @@ inline off64_t mkdir_request(const std::filesystem::path &path, const long tid) 
 
 inline off64_t open_request(const int fd, const std::filesystem::path &path, const long tid) {
     START_LOG(capio_syscall(SYS_gettid), "call(fd=%ld, path=%s, tid=%ld)", fd, path.c_str(), tid);
-    path_request(CAPIO_REQUEST_OPEN, tid, std::to_string(fd) + " ", path.native());
+    path_request(CAPIO_REQUEST_OPEN, tid, std::to_string(fd) + " ", capio_virtual_path(path));
     off64_t res;
     buff_response->read(&res);
     return res;
@@ -274,7 +289,7 @@ inline off64_t copy_file_range_request(const int fd_in, const int fd_out, const 
 
 inline bool open_request_fs(const std::filesystem::path &path, const long tid) {
     START_LOG(capio_syscall(SYS_gettid), "call(path=%s, tid=%ld)", path.c_str(), tid);
-    path_request(CAPIO_REQUEST_OPEN_FS, tid, "", path.native());
+    path_request(CAPIO_REQUEST_OPEN_FS, tid, "", capio_virtual_path(path));
     off64_t res;
     buff_response->read(&res);
     return res != 0;
@@ -339,7 +354,7 @@ inline off64_t seek_request(const int fd, const off64_t offset, const long tid) 
 
 inline CPStatResponse_t stat_request(const std::filesystem::path &path, const long tid) {
     START_LOG(capio_syscall(SYS_gettid), "call(path=%s, tid=%ld)", path.c_str(), tid);
-    path_request(CAPIO_REQUEST_STAT, tid, "", path.native());
+    path_request(CAPIO_REQUEST_STAT, tid, "", capio_virtual_path(path));
     off64_t file_size;
     buff_response->read(&file_size);
     if (file_size == CAPIO_POSIX_SYSCALL_REQUEST_SKIP) {
@@ -354,7 +369,7 @@ inline CPStatResponse_t stat_request(const std::filesystem::path &path, const lo
 
 inline off64_t unlink_request(const std::filesystem::path &path, const long tid) {
     START_LOG(capio_syscall(SYS_gettid), "call(path=%s, tid=%ld)", path.c_str(), tid);
-    path_request(CAPIO_REQUEST_UNLINK, tid, "", path.native());
+    path_request(CAPIO_REQUEST_UNLINK, tid, "", capio_virtual_path(path));
     off64_t res;
     buff_response->read(&res);
     return res;
@@ -362,7 +377,7 @@ inline off64_t unlink_request(const std::filesystem::path &path, const long tid)
 
 inline off64_t rmdir_request(const std::filesystem::path &dir_path, long tid) {
     START_LOG(capio_syscall(SYS_gettid), "call(dir_path=%s, tid=%ld)", dir_path.c_str(), tid);
-    path_request(CAPIO_REQUEST_RMDIR, tid, "", dir_path.native());
+    path_request(CAPIO_REQUEST_RMDIR, tid, "", capio_virtual_path(dir_path));
     off64_t res;
     buff_response->read(&res);
     return res;
@@ -380,7 +395,7 @@ inline off64_t consent_to_proceed_request(const std::filesystem::path &path, con
                                           const std::string &source_func) {
     START_LOG(capio_syscall(SYS_gettid), "call(path=%s, tid=%ld, source_func=%s)", path.c_str(),
               tid, source_func.c_str());
-    path_request(CAPIO_REQUEST_CONSENT, tid, "", path.native());
+    path_request(CAPIO_REQUEST_CONSENT, tid, "", capio_virtual_path(path));
     off64_t res;
     buff_response->read(&res);
     LOG("Obtained from server %ld", res);

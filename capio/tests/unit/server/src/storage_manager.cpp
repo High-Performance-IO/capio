@@ -8,6 +8,7 @@
 #include "remote/home_node_service.hpp"
 #include "storage/manager.hpp"
 #include "utils/capiocl_adapter.hpp"
+#include "utils/filesystem.hpp"
 
 extern StorageManager *storage_manager;
 extern capiocl::engine::Engine *capio_cl_engine;
@@ -126,6 +127,21 @@ TEST_F(StorageManagerTestEnvironment, testNumberOfOpensAfterClone) {
     storage_manager->get("myFile").close();
 
     EXPECT_TRUE(storage_manager->get("myFile").deletable());
+}
+
+TEST_F(StorageManagerTestEnvironment, testVirtualRootIsLocal) {
+    // "/" is the CAPIO_DIR of the clients: local, and where the registration of parents stops
+    storage_manager->addDirectory(1, "/");
+    EXPECT_TRUE(storage_manager->get("/").isDirectory());
+    EXPECT_EQ(home_node_service->getHome("/"), backend->get_node_name());
+
+    EXPECT_EQ(get_parent_dir_path("/f"), "/");
+    EXPECT_EQ(get_parent_dir_path("/d/f"), "/d");
+    EXPECT_EQ(storage_manager->addDirectory(1, "/virtual_sub"), 0);
+    EXPECT_EQ(home_node_service->getHome("/virtual_sub"), backend->get_node_name());
+    EXPECT_TRUE(storage_manager->get("/").isDirectory());
+
+    storage_manager->remove("/virtual_sub");
 }
 
 #endif // CAPIO_STORAGE_MANAGER_TEST_HPP

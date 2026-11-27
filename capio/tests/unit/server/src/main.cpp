@@ -32,7 +32,6 @@ class ServerUnitTestEnvironment : public testing::Environment {
     explicit ServerUnitTestEnvironment() = default;
 
     void SetUp() override {
-        setenv("CAPIO_DIR", "/tmp", 1);
         std::array<char *, 2> argv{const_cast<char *>("capio_server"),
                                    const_cast<char *>("--no-config")};
         RuntimeConfiguration::set(RuntimeConfiguration(argv.size(), argv.data()));

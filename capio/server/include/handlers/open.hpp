@@ -9,6 +9,7 @@
 #include "common/requests.hpp"
 #include "remote/home_node_service.hpp"
 #include "utils/common.hpp"
+#include "utils/fs_root.hpp"
 #include "utils/runtime_configuration.hpp"
 
 extern ClientManager *client_manager;
@@ -101,7 +102,8 @@ inline void handle_open_fs(const int tid, const std::filesystem::path &path) {
         return;
     }
     std::error_code error;
-    if (std::filesystem::exists(path, error) || !FsStorageManager::waitsForCreation(tid, path)) {
+    if (std::filesystem::exists(fs_root().real(path), error) ||
+        !FsStorageManager::waitsForCreation(tid, path)) {
         client_manager->replyToClient(tid, 1); // if it is missing, the kernel answers ENOENT
         return;
     }
