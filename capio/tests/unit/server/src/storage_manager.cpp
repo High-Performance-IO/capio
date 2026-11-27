@@ -128,27 +128,31 @@ TEST_F(StorageManagerTestEnvironment, testNumberOfOpensAfterClone) {
     EXPECT_TRUE(storage_manager->get("myFile").deletable());
 }
 
-TEST_F(StorageManagerTestEnvironment, testRootsOfSeveralClients) {
-    const std::filesystem::path first  = "/capio_root_first";
-    const std::filesystem::path second = "/capio_root_second";
+TEST_F(StorageManagerTestEnvironment, testDirectoryOnDiskIsLocal) {
+    char dir[] = "/tmp/capio_on_disk_XXXXXX";
+    ASSERT_NE(mkdtemp(dir), nullptr);
+    // One level down, so that its parent is not a directory that other tests registered
+    const auto on_disk = std::filesystem::path(dir) / "root";
+    std::filesystem::create_directory(on_disk);
 
-    EXPECT_FALSE(storage_manager->isRoot(first));
-    storage_manager->addRoot(1, first);
-    storage_manager->addRoot(2, second);
-    storage_manager->addRoot(3, first); // another client with the same CAPIO_DIR
+    // Not on disk, not created through CAPIO: nothing to register
+    storage_manager->addExistingDirectory(1, on_disk / "missing");
+    EXPECT_FALSE(storage_manager->tryGet(on_disk / "missing"));
 
-    EXPECT_TRUE(storage_manager->isRoot(first));
-    EXPECT_TRUE(storage_manager->isRoot(second));
-    EXPECT_FALSE(storage_manager->isRoot(first / "sub"));
+    // On disk, like CAPIO_DIR: a directory, local to this server, with no parent registered
+    storage_manager->addExistingDirectory(1, on_disk);
+    EXPECT_TRUE(storage_manager->get(on_disk).isDirectory());
+    EXPECT_EQ(home_node_service->getHome(on_disk), backend->get_node_name());
+    EXPECT_FALSE(storage_manager->tryGet(on_disk.parent_path()));
 
-    // Each root is a directory, local to this server
-    for (const auto &root : {first, second}) {
-        EXPECT_TRUE(storage_manager->get(root).isDirectory());
-        EXPECT_EQ(home_node_service->getHome(root), backend->get_node_name());
-    }
+    // A directory created through CAPIO inside it is registered up to it, and no further
+    EXPECT_EQ(storage_manager->addDirectory(1, on_disk / "sub"), 0);
+    EXPECT_EQ(home_node_service->getHome(on_disk / "sub"), backend->get_node_name());
+    EXPECT_FALSE(storage_manager->tryGet(on_disk.parent_path()));
 
-    storage_manager->remove(first);
-    storage_manager->remove(second);
+    storage_manager->remove(on_disk / "sub");
+    storage_manager->remove(on_disk);
+    std::filesystem::remove_all(dir);
 }
 
 #endif // CAPIO_STORAGE_MANAGER_TEST_HPP

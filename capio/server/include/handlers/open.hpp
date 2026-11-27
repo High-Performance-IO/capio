@@ -71,6 +71,7 @@ inline void handle_create_exclusive(int tid, int fd, const std::filesystem::path
 inline void handle_open(int tid, int fd, const std::filesystem::path &path) {
     START_LOG(gettid(), "call(tid=%d, fd=%d, path_cstr=%s)", tid, fd, path.c_str());
 
+    storage_manager->addExistingDirectory(tid, path);
     // lookup() is last because it may ask the other servers (short circuit evaluation)
     if (home_node_service->getHome(path) || home_node_service->lookup(path)) {
         update_file_metadata(path, tid, fd, false, 0);

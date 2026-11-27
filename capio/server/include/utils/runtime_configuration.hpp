@@ -39,8 +39,6 @@ class RuntimeConfiguration final {
      */
     static const RuntimeConfiguration &get();
 
-    /// @brief Canonical CAPIO_DIR of the server, empty if not set. Clients send their own.
-    [[nodiscard]] const std::filesystem::path &getCapioDir() const;
     [[nodiscard]] bool getContinueOnError() const;
 
     [[nodiscard]] long getCacheLines() const;
@@ -70,9 +68,8 @@ class RuntimeConfiguration final {
     [[nodiscard]] capiocl::engine::Engine *createCapioClEngine() const;
 
   private:
-    std::filesystem::path capio_dir;
-    /// @brief Where CAPIO-CL keeps the counters of on_close:N (CAPIO_METADATA_DIR, or CAPIO_DIR,
-    /// or the working directory)
+    /// @brief Where CAPIO-CL keeps the counters of on_close:N (CAPIO_METADATA_DIR, or the working
+    /// directory of the server)
     std::filesystem::path metadata_dir;
     bool continue_on_error = false;
 

@@ -390,7 +390,7 @@ TEST_F(MockBackendTestFixture, TestSimulateDirectoryStreaming) {
     const std::filesystem::path CAPIO_DIR        = "/tmp";
     const std::filesystem::path stream_directory = CAPIO_DIR / "my_streaming_directory";
 
-    storage_manager->addRoot(1234, CAPIO_DIR);
+    storage_manager->addDirectory(1234, CAPIO_DIR);
     storage_manager->addDirectory(1234, stream_directory);
 
     std::mutex mutex_continue;

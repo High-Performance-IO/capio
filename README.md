@@ -123,10 +123,8 @@ Start one server per node:
 capio_server -c conf.json
 ```
 
-The server does not need `CAPIO_DIR`: each application tells its server its own `CAPIO_DIR`, so the applications of
-one server can each use a different one (e.g. the working directory of each step of a workflow). If `CAPIO_DIR` is set
-for the server, it must be an existing directory, and it is the default of `-r` and of `CAPIO_METADATA_DIR`; otherwise
-the working directory of the server is.
+The server does not use `CAPIO_DIR`: only applications set it, and the applications of one server can each use a
+different one. Relative paths in the configuration file are resolved from the server's working directory (see `-r`).
 
 To start a server without a configuration file, pass `--no-config` instead of `-c`.
 
@@ -168,7 +166,7 @@ and exits.
 |-----------------------------------|-------------------------------------------------------------------------------------|
 | `-c, --config FILE`               | CAPIO-CL configuration file                                                         |
 | `--no-config`                     | Start without a configuration file, using default settings                          |
-| `-r, --resolve-prefix PREFIX`     | Prefix used to resolve relative paths in the configuration file (default: `CAPIO_DIR`, or the working directory) |
+| `-r, --resolve-prefix PREFIX`     | Prefix used to resolve relative paths in the configuration file (default: the server's working directory) |
 | `--mem-only`                      | Store all files in memory, regardless of the configuration file                     |
 | `-b, --backend NAME`              | Communication backend (see below)                                                   |
 | `--backend-options OPTS`          | Backend-specific options (see below)                                                |
@@ -206,7 +204,7 @@ where the hostname resolves to a slow interface (e.g. a management Ethernet netw
 on each server to the address of the interface to use on that node (e.g. its InfiniBand IP):
 
 ```bash
-CAPIO_DIR=your_capiodir CAPIO_MTCL_ADVERTISE_HOST=10.10.0.12 \
+CAPIO_MTCL_ADVERTISE_HOST=10.10.0.12 \
   capio_server -c conf.json --backend mtcl
 ```
 
@@ -223,8 +221,8 @@ token as `<hostname>.capio`; hidden files in the directory are tokens still bein
 
 | Variable                | Description                                                                |
 |-------------------------|----------------------------------------------------------------------------|
-| `CAPIO_DIR`             | CAPIO mount point of an application; optional for the server               |
-| `CAPIO_METADATA_DIR`    | Counters of `on_close:N`, shared by the servers (default: `CAPIO_DIR`, or the working directory) |
+| `CAPIO_DIR`             | CAPIO mount point of an application (not used by the server)               |
+| `CAPIO_METADATA_DIR`    | Counters of `on_close:N`, shared by the servers (default: the server's working directory) |
 | `CAPIO_CACHE_LINES`     | Number of cache lines between application and server (default: 10)         |
 | `CAPIO_CACHE_LINE_SIZE` | Size of a cache line, in bytes (default: 256KB)                            |
 | `CALF_LOG_DIR`          | Directory for log files (default: `./capio_logs`). Needs `CAPIO_LOG`        |

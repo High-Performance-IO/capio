@@ -458,11 +458,8 @@ static __attribute__((constructor)) void init() {
 
     const long tid = syscall_no_intercept(SYS_gettid);
 
-    // Without CAPIO_DIR nothing is CAPIO's: no hook is installed, so every system call goes to the
-    // kernel, and no server is needed. A snapshot left by the exec that started this program is
-    // read, which removes it: the program does not use its CAPIO files.
+    // Without CAPIO_DIR, CAPIO is off: no server, no hooks
     if (get_capio_dir().empty()) {
-        [[maybe_unused]] const FileDescriptorTable snapshot(tid);
         return;
     }
 
@@ -472,8 +469,6 @@ static __attribute__((constructor)) void init() {
     init_client(tid);
     init_filesystem(tid); // with the descriptors of the program before an exec, if any
     initialize_new_thread();
-    // Before any other request of the process, which may be on a path inside it
-    root_request(get_capio_dir(), tid);
     FS_MODE({
         // The program after an exec, e.g. the child of a fork, writes the files it got too
         for (const int fd : fd_table->fds()) {

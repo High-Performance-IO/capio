@@ -322,7 +322,10 @@ off64_t StorageManager::addDirectory(const pid_t tid, const std::filesystem::pat
         if (c_file.isFirstWrite()) {
             c_file.registerFirstWrite();
             // TODO: it works only if there is one prod per file
-            if (isRoot(path)) {
+            // A directory already on the file system was not created through CAPIO (the memory
+            // variant's mkdir never reaches the disk): CAPIO_DIR, or a directory made before the
+            // workflow. It is local to every server, and the registration of parents stops there.
+            if (std::error_code error; std::filesystem::is_directory(path, error)) {
                 home_node_service->learn(path, backend->get_node_name());
             } else {
                 home_node_service->setHome(path);
@@ -337,20 +340,11 @@ off64_t StorageManager::addDirectory(const pid_t tid, const std::filesystem::pat
     return 1;
 }
 
-void StorageManager::addRoot(const pid_t tid, const std::filesystem::path &path) {
+void StorageManager::addExistingDirectory(const pid_t tid, const std::filesystem::path &path) {
     START_LOG(tid, "call(path=%s)", path.c_str());
-    {
-        const std::lock_guard lg(_mutex_roots);
-        if (!_roots.insert(path.native()).second) {
-            return;
-        }
+    if (std::error_code error; !tryGet(path) && std::filesystem::is_directory(path, error)) {
+        addDirectory(tid, path);
     }
-    addDirectory(tid, path);
-}
-
-bool StorageManager::isRoot(const std::filesystem::path &path) const {
-    const std::shared_lock lock(_mutex_roots);
-    return _roots.find(path.native()) != _roots.end();
 }
 
 void StorageManager::removeFromDirectory(const std::filesystem::path &file_path) {

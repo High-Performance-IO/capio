@@ -49,16 +49,4 @@ void handshake_named_handler(const char *const str) {
     }
 }
 
-/**
- * @brief "tid path": the CAPIO_DIR of a client, sent once by each process after its handshake.
- * No reply.
- */
-void root_handler(const char *const str) {
-    int tid, consumed = 0;
-    if (sscanf(str, "%d%n", &tid, &consumed) != 1) {
-        return;
-    }
-    storage_manager->addRoot(tid, request_text(tid, str, consumed));
-}
-
 #endif // CAPIO_SERVER_HANDLERS_HANDSHAKE_HPP

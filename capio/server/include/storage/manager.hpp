@@ -3,7 +3,6 @@
 #include <filesystem>
 #include <mutex>
 #include <optional>
-#include <set>
 
 #include "capio_file.hpp"
 #include "utils/shared_mutex.hpp"
@@ -36,10 +35,6 @@ class StorageManager {
      * absolute file path (as a string).
      */
     std::unordered_map<std::string, CapioFile> _storage;
-
-    /// @brief The CAPIO_DIR of every client of this server (see addRoot), protected by _mutex_roots
-    std::set<std::string> _roots;
-    mutable std::shared_mutex _mutex_roots;
 
     /**
      * @brief Structure representing a single file descriptor entry for a specific thread.
@@ -299,20 +294,11 @@ class StorageManager {
     off64_t addDirectory(pid_t tid, const std::filesystem::path &path);
 
     /**
-     * @brief Adds @p path as a root: the CAPIO_DIR of a client. Each client sends its own
-     * (CAPIO_REQUEST_ROOT), so the clients of one server can have different ones.
-     *
-     * The directory is created, if this server does not have it yet. A root is local on every
-     * server that has it as a root: its home is not announced to the others, and reading it, or
-     * its metadata, never waits for another server.
-     *
-     * @param tid The thread ID performing the operation.
-     * @param path The canonical path of the root.
+     * @brief Registers @p path if it is a directory on the file system that this server does not
+     * have yet, such as CAPIO_DIR: local to this server, as addDirectory does for a directory on
+     * disk. Called on the paths that clients look up, so that the server needs no CAPIO_DIR.
      */
-    void addRoot(pid_t tid, const std::filesystem::path &path);
-
-    /// @brief Whether @p path is a root of this server (see addRoot)
-    [[nodiscard]] bool isRoot(const std::filesystem::path &path) const;
+    void addExistingDirectory(pid_t tid, const std::filesystem::path &path);
 
     /**
      * @brief Updates the parent directory to include an entry for a new file/directory.

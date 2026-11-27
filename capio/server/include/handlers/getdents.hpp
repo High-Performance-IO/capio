@@ -58,8 +58,7 @@ inline void handle_getdents(int tid, int fd, long int count) {
             }
         });
         t.detach();
-    } else if (is_prod || *file_location_opt == backend->get_node_name() ||
-               storage_manager->isRoot(path_to_check)) {
+    } else if (is_prod || *file_location_opt == backend->get_node_name()) {
         CapioFile &c_file = storage_manager->get(path_to_check);
         off64_t offset    = storage_manager->getFileOffset(tid, fd);
         send_dirent_to_client(tid, fd, c_file, offset, count);

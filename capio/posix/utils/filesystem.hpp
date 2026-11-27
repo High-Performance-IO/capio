@@ -22,6 +22,7 @@
 #include "common/path.hpp"
 #include "common/syscall.hpp"
 
+#include "env.hpp"
 #include "file_descriptor_table.hpp"
 #include "types.hpp"
 

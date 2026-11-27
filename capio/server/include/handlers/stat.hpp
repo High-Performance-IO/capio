@@ -45,6 +45,7 @@ void wait_for_file_completion(int tid, const std::filesystem::path &path) {
 inline void reply_stat(int tid, const std::filesystem::path &path) {
     START_LOG(gettid(), "call(tid=%d, path=%s)", tid, path.c_str());
 
+    storage_manager->addExistingDirectory(tid, path);
     auto file_location_opt = home_node_service->getHome(path);
     LOG("File %s is local? %s", path.c_str(), file_location_opt ? "True" : "False");
 
@@ -76,7 +77,7 @@ inline void reply_stat(int tid, const std::filesystem::path &path) {
             : storage_manager->add(path, false, RuntimeConfiguration::get().getFileInitialSize());
     LOG("Obtained capio file. ready to reply to client");
     if (c_file.isCommitted() || *file_location_opt == backend->get_node_name() ||
-        CapioCLEngine::get().isFirable(path) || storage_manager->isRoot(path)) {
+        CapioCLEngine::get().isFirable(path)) {
         LOG("Sending response to client");
         client_manager->replyToClient(tid, c_file.getFileSize());
         client_manager->replyToClient(tid, static_cast<int>(c_file.isDirectory() ? 1 : 0));
