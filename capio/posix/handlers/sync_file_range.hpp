@@ -14,9 +14,8 @@
  */
 int sync_file_range_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg5,
                             long *result) {
-    [[maybe_unused]] const auto fd  = static_cast<int>(arg0); // memory variant, and the log
-    [[maybe_unused]] const long tid = capio_tid();            // the log
-    START_LOG(tid, "call(fd=%d)", fd);
+    [[maybe_unused]] const auto fd = static_cast<int>(arg0); // memory variant, and the log
+    START_LOG(capio_tid(), "call(fd=%d)", fd);
 
     MEMORY_MODE({
         if (fd_table->contains(fd)) {

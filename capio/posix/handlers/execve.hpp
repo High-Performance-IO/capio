@@ -7,8 +7,7 @@
 #include "utils/tid.hpp"
 
 int execve_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg5, long *result) {
-    long tid = capio_tid();
-    START_LOG(tid, "call()");
+    START_LOG(capio_tid(), "call()");
 
     FS_MODE({
         // Nothing is closed before the exec works. The snapshot tells the program after it which
@@ -22,7 +21,7 @@ int execve_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long a
             }
         }
     })
-    fd_table->createSnapshot(tid);
+    fd_table->createSnapshot(capio_tid());
 
     return CAPIO_POSIX_SYSCALL_SKIP;
 }

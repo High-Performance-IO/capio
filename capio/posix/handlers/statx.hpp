@@ -116,8 +116,7 @@ int statx_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long ar
     const auto flags = static_cast<int>(arg2);
     const auto mask  = static_cast<int>(arg3);
     auto *buf        = reinterpret_cast<struct statx *>(arg4);
-    const long tid   = capio_tid();
-    START_LOG(tid, "call(dirfd=%d, path=%s, flags=%d, mask=%d)", dirfd,
+    START_LOG(capio_tid(), "call(dirfd=%d, path=%s, flags=%d, mask=%d)", dirfd,
               path != nullptr ? path : "(null)", flags, mask);
 
     // A null path or buffer fails with EFAULT, from the kernel. With AT_EMPTY_PATH a null path is
@@ -126,7 +125,7 @@ int statx_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long ar
         return CAPIO_POSIX_SYSCALL_SKIP;
     }
     return posix_return_value(
-        capio_statx(dirfd, path != nullptr ? path : "", flags, mask, buf, tid), result);
+        capio_statx(dirfd, path != nullptr ? path : "", flags, mask, buf, capio_tid()), result);
 }
 
 #endif // SYS_statx

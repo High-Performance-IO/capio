@@ -462,13 +462,11 @@ static __attribute__((constructor)) void init() {
         return;
     }
 
-    const long tid = capio_tid();
-
     FileDescriptorTable::protectAcrossFork();
     // After the handlers of the table, so that the child has a free lock
     FS_MODE({ pthread_atfork(nullptr, nullptr, announce_inherited_descriptors_fs); })
-    init_client(tid);
-    init_filesystem(tid); // with the descriptors of the program before an exec, if any
+    init_client(capio_tid());
+    init_filesystem(capio_tid()); // with the descriptors of the program before an exec, if any
     initialize_new_thread();
     FS_MODE({
         // The program after an exec, e.g. the child of a fork, writes the files it got too
@@ -479,12 +477,12 @@ static __attribute__((constructor)) void init() {
                                 !S_ISDIR(info.st_mode);
             create_request_fs(fd_table->path(fd), fd,
                               writes ? CAPIO_FS_PRODUCED_IF_NO_PRODUCER : CAPIO_FS_NOT_PRODUCED,
-                              tid);
+                              capio_tid());
         }
         // Counted only now, so that a failed exec closes nothing: the server still has them, as
         // the process is the same
         for (const int fd : fd_table->closedByExec()) {
-            close_request(fd, tid);
+            close_request(fd, capio_tid());
         }
     })
 

@@ -123,9 +123,8 @@ int lseek_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long ar
     int fd      = static_cast<int>(arg0);
     auto offset = static_cast<off64_t>(arg1);
     int whence  = static_cast<int>(arg2);
-    long tid    = capio_tid();
 
-    return posix_return_value(capio_lseek(fd, offset, whence, tid), result);
+    return posix_return_value(capio_lseek(fd, offset, whence, capio_tid()), result);
 }
 
 #endif // SYS_lseek

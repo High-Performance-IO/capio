@@ -111,20 +111,18 @@ int read_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg
     int fd       = static_cast<int>(arg0);
     void *buffer = reinterpret_cast<void *>(arg1);
     auto count   = static_cast<off64_t>(arg2);
-    long tid     = capio_tid();
 
-    MEMORY_MODE({ return posix_return_value(capio_read(fd, buffer, count, tid), result); })
-    FS_MODE({ return posix_return_value(capio_read_fs(fd, buffer, count, tid), result); })
+    MEMORY_MODE({ return posix_return_value(capio_read(fd, buffer, count, capio_tid()), result); })
+    FS_MODE({ return posix_return_value(capio_read_fs(fd, buffer, count, capio_tid()), result); })
 }
 
 int readv_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg5, long *result) {
     auto fd         = static_cast<int>(arg0);
     const auto *iov = reinterpret_cast<const struct iovec *>(arg1);
     auto iovcnt     = static_cast<int>(arg2);
-    long tid        = capio_tid();
 
-    MEMORY_MODE({ return posix_return_value(capio_readv(fd, iov, iovcnt, tid), result); })
-    FS_MODE({ return posix_return_value(capio_readv_fs(fd, iov, iovcnt, tid), result); })
+    MEMORY_MODE({ return posix_return_value(capio_readv(fd, iov, iovcnt, capio_tid()), result); })
+    FS_MODE({ return posix_return_value(capio_readv_fs(fd, iov, iovcnt, capio_tid()), result); })
 }
 
 #ifdef SYS_pread64
@@ -133,8 +131,7 @@ int pread_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long ar
     const auto fd                      = static_cast<int>(arg0);
     [[maybe_unused]] const auto count  = static_cast<off64_t>(arg2); // FS variant, and the log
     [[maybe_unused]] const auto offset = static_cast<off64_t>(arg3);
-    [[maybe_unused]] const long tid    = capio_tid();
-    START_LOG(tid, "call(fd=%d, count=%ld, offset=%ld)", fd, count, offset);
+    START_LOG(capio_tid(), "call(fd=%d, count=%ld, offset=%ld)", fd, count, offset);
 
     MEMORY_MODE({
         if (fd_table->contains(fd)) {
@@ -145,7 +142,7 @@ int pread_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long ar
     FS_MODE({
         // A negative offset is EINVAL, from the kernel
         if (offset >= 0) {
-            capio_wait_for_data_fs(fd, offset, count, tid);
+            capio_wait_for_data_fs(fd, offset, count, capio_tid());
         }
         return CAPIO_POSIX_SYSCALL_SKIP;
     })
@@ -159,8 +156,7 @@ int preadv_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long a
     [[maybe_unused]] const auto *iov   = reinterpret_cast<const struct iovec *>(arg1); // FS variant
     [[maybe_unused]] const auto iovcnt = static_cast<int>(arg2);
     [[maybe_unused]] const auto offset = static_cast<off64_t>(arg3);
-    [[maybe_unused]] const long tid    = capio_tid();
-    START_LOG(tid, "call(fd=%d, iovcnt=%d, offset=%ld)", fd, iovcnt, offset);
+    START_LOG(capio_tid(), "call(fd=%d, iovcnt=%d, offset=%ld)", fd, iovcnt, offset);
 
     MEMORY_MODE({
         if (fd_table->contains(fd)) {
@@ -170,7 +166,7 @@ int preadv_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long a
     })
     FS_MODE({
         if (offset >= -1) {
-            capio_wait_for_data_fs(fd, offset, capio_iov_length(iov, iovcnt), tid);
+            capio_wait_for_data_fs(fd, offset, capio_iov_length(iov, iovcnt), capio_tid());
         }
         return CAPIO_POSIX_SYSCALL_SKIP;
     })

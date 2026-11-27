@@ -23,18 +23,18 @@ inline void initialize_new_thread(const bool wait = false) {
     const bool flag_was_set   = syscall_no_intercept_flag;
     syscall_no_intercept_flag = true;
 
-    const long tid = capio_reset_tid(); // a new thread, or the child of a fork
+    capio_reset_tid(); // a new thread, or the child of a fork
     const long pid = syscall_no_intercept(SYS_getpid);
 
     const auto capio_app_name = get_capio_app_name();
 
-    START_LOG(tid, "call(tid=%d, pid=%d, app_name=%s)", tid, pid, capio_app_name);
+    START_LOG(capio_tid(), "call(tid=%d, pid=%d, app_name=%s)", capio_tid(), pid, capio_app_name);
 
-    initialize_data_queues(tid);
-    init_client(tid);
+    initialize_data_queues(capio_tid());
+    init_client(capio_tid());
 
-    handshake_named_request(tid, pid, capio_app_name, wait);
-    LOG("Starting child thread %d", tid);
+    handshake_named_request(capio_tid(), pid, capio_app_name, wait);
+    LOG("Starting child thread %d", capio_tid());
     syscall_no_intercept_flag = flag_was_set;
 }
 
@@ -48,10 +48,9 @@ inline void initialize_new_thread(const bool wait = false) {
  * handlers, when the table is still locked by the fork.
  */
 inline void announce_inherited_descriptors_fs() {
-    const long tid = capio_tid();
-    START_LOG(tid, "call()");
+    START_LOG(capio_tid(), "call()");
     for (const int fd : fd_table->fds()) {
-        create_request_fs(fd_table->path(fd), fd, CAPIO_FS_NOT_PRODUCED, tid);
+        create_request_fs(fd_table->path(fd), fd, CAPIO_FS_NOT_PRODUCED, capio_tid());
     }
 }
 
@@ -62,8 +61,7 @@ inline void hook_clone_parent(long child_tid) {
     if (child_tid <= 0) {
         return;
     }
-    const auto tid = capio_tid();
-    clone_request(tid, child_tid);
+    clone_request(capio_tid(), child_tid);
 }
 
 /**
@@ -74,9 +72,7 @@ inline void hook_clone_parent(long child_tid) {
  * server, so waiting for a reply would deadlock.
  */
 inline void hook_clone_child() {
-    const long pid = syscall_no_intercept(SYS_getpid);
-    const long tid = capio_reset_tid();
-    initialize_new_thread(pid != tid);
+    initialize_new_thread(syscall_no_intercept(SYS_getpid) != capio_reset_tid());
 }
 
 #endif // CAPIO_POSIX_UTILS_CLONE_HPP

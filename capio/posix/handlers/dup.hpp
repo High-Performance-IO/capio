@@ -54,10 +54,9 @@ inline int capio_dup_onto(const long tid, const int fd, const int fd2, const int
 }
 
 int dup_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg5, long *result) {
-    long tid = capio_tid();
-    int fd   = static_cast<int>(arg0);
+    int fd = static_cast<int>(arg0);
 
-    START_LOG(tid, "call(fd=%d)", fd);
+    START_LOG(capio_tid(), "call(fd=%d)", fd);
 
     if (fd_table->contains(fd)) {
         int res;
@@ -76,7 +75,7 @@ int dup_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg5
             }
         })
         fd_table->dup(fd, res, false);
-        dup_request(fd, res, tid);
+        dup_request(fd, res, capio_tid());
 
         *result = res;
         return CAPIO_POSIX_SYSCALL_SUCCESS;
@@ -86,14 +85,13 @@ int dup_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg5
 
 #ifdef SYS_dup2
 int dup2_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg5, long *result) {
-    const long tid = capio_tid();
-    return capio_dup_onto(tid, static_cast<int>(arg0), static_cast<int>(arg1), 0, false, result);
+    return capio_dup_onto(capio_tid(), static_cast<int>(arg0), static_cast<int>(arg1), 0, false,
+                          result);
 }
 #endif
 
 int dup3_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg5, long *result) {
-    const long tid = capio_tid();
-    return capio_dup_onto(tid, static_cast<int>(arg0), static_cast<int>(arg1),
+    return capio_dup_onto(capio_tid(), static_cast<int>(arg0), static_cast<int>(arg1),
                           static_cast<int>(arg2), true, result);
 }
 

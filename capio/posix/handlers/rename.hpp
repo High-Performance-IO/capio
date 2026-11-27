@@ -14,11 +14,11 @@ int renameat2_handler(long arg0, long arg1, long arg2, long arg3, long arg4, lon
     const std::filesystem::path old_path(reinterpret_cast<const char *>(arg1));
     const std::filesystem::path new_dir_fd_path = get_dir_path(static_cast<int>(arg2));
     const std::filesystem::path new_path(reinterpret_cast<const char *>(arg3));
-    const long tid = capio_tid();
 
-    START_LOG(
-        tid, "call(old_dir_fd_path=%s, old_path=%s, new_dir_fd_path=%s, newpath=%s, flags=%d)",
-        old_dir_fd_path.c_str(), old_path.c_str(), new_dir_fd_path.c_str(), new_path.c_str(), arg4);
+    START_LOG(capio_tid(),
+              "call(old_dir_fd_path=%s, old_path=%s, new_dir_fd_path=%s, newpath=%s, flags=%d)",
+              old_dir_fd_path.c_str(), old_path.c_str(), new_dir_fd_path.c_str(), new_path.c_str(),
+              arg4);
 
     // Resolve paths relative to path of dir_fd ONLY if input path is not absolute
     const auto old_path_abs =
@@ -46,7 +46,7 @@ int renameat2_handler(long arg0, long arg1, long arg2, long arg3, long arg4, lon
             new_is_capio ? fd_table->renamePath(old_path_abs, new_path_abs)
                          : fd_table->removePath(old_path_abs);
         }
-        rename_request_fs(old_path_abs, old_is_capio, new_path_abs, new_is_capio, tid);
+        rename_request_fs(old_path_abs, old_is_capio, new_path_abs, new_is_capio, capio_tid());
         return CAPIO_POSIX_SYSCALL_SUCCESS;
     })
 
@@ -57,7 +57,7 @@ int renameat2_handler(long arg0, long arg1, long arg2, long arg3, long arg4, lon
             *result = -EINVAL;
             return CAPIO_POSIX_SYSCALL_SUCCESS;
         }
-        const off64_t old_access = old_is_capio ? access_request(old_path_abs, tid) : 0;
+        const off64_t old_access = old_is_capio ? access_request(old_path_abs, capio_tid()) : 0;
         if (old_access == CAPIO_POSIX_SYSCALL_REQUEST_SKIP) { // excluded from CAPIO
             return CAPIO_POSIX_SYSCALL_SKIP;
         }
@@ -71,12 +71,13 @@ int renameat2_handler(long arg0, long arg1, long arg2, long arg3, long arg4, lon
         }
         if (is_prefix(old_path_abs, new_path_abs)) {
             // Into a directory's own subtree, or under a file, which is not a directory
-            const bool old_is_dir = !old_is_capio || stat_request(old_path_abs, tid).second == 1;
-            *result               = old_is_dir ? -EINVAL : -ENOTDIR;
+            const bool old_is_dir =
+                !old_is_capio || stat_request(old_path_abs, capio_tid()).second == 1;
+            *result = old_is_dir ? -EINVAL : -ENOTDIR;
             return CAPIO_POSIX_SYSCALL_SUCCESS;
         }
         if ((arg4 & RENAME_NOREPLACE) != 0 &&
-            (new_is_capio ? access_request(new_path_abs, tid) == 0
+            (new_is_capio ? access_request(new_path_abs, capio_tid()) == 0
                           : syscall_no_intercept(SYS_faccessat, AT_FDCWD, new_path_abs.c_str(),
                                                  F_OK) == 0)) {
             *result = -EEXIST;
@@ -87,7 +88,7 @@ int renameat2_handler(long arg0, long arg1, long arg2, long arg3, long arg4, lon
             // The descriptors stay CAPIO's: the memory server keeps the file for them, even when it
             // leaves CAPIO_DIR
             fd_table->renamePath(old_path_abs, new_path_abs);
-            auto res = rename_request(tid, old_path_abs, new_path_abs, new_is_capio);
+            auto res = rename_request(capio_tid(), old_path_abs, new_path_abs, new_is_capio);
             *result  = (res < 0 ? -errno : res);
             return CAPIO_POSIX_SYSCALL_SUCCESS;
         }

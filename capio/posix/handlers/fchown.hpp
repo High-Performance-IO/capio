@@ -32,18 +32,17 @@ int fchown_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long a
 }
 
 int chown_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg5, long *result) {
-    long tid = capio_tid();
-    return posix_return_value(
-        capio_metadata_access("chown", AT_FDCWD, reinterpret_cast<const char *>(arg0), 0, tid),
-        result);
+    return posix_return_value(capio_metadata_access("chown", AT_FDCWD,
+                                                    reinterpret_cast<const char *>(arg0), 0,
+                                                    capio_tid()),
+                              result);
 }
 
 int fchownat_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg5,
                      long *result) {
-    long tid = capio_tid();
     return posix_return_value(capio_metadata_access("fchownat", static_cast<int>(arg0),
                                                     reinterpret_cast<const char *>(arg1),
-                                                    static_cast<int>(arg4), tid),
+                                                    static_cast<int>(arg4), capio_tid()),
                               result);
 }
 
