@@ -232,8 +232,6 @@ inline CPStatResponse_t fstat_request(const int fd, const long tid) {
     sprintf(req, "%04d %ld %d", CAPIO_REQUEST_FSTAT, tid, fd);
     LOG("req=%s", req);
     buf_requests->write(req, CAPIO_REQ_MAX_SIZE);
-    // Two replies, from one server thread: a client thread has one request at a time, and its own
-    // response queue
     off64_t file_size;
     buff_response->read(&file_size);
     off64_t is_dir;
