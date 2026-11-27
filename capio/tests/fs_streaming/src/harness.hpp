@@ -96,6 +96,10 @@ class FsStreamingTest : public testing::Test {
         if (pid == 0) {
             for (const auto &entry : env) {
                 const auto equals = entry.find('=');
+                if (equals == std::string::npos) { // a name alone: unset it
+                    unsetenv(entry.c_str());
+                    continue;
+                }
                 setenv(entry.substr(0, equals).c_str(), entry.substr(equals + 1).c_str(), 1);
             }
             unsetenv("OLDPWD");

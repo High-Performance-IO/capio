@@ -384,7 +384,6 @@ static int hook(long syscall_number, long arg0, long arg1, long arg2, long arg3,
                 long arg5, long *result) {
     static constexpr std::array<CPHandler_t, CAPIO_NR_SYSCALLS> syscallTable =
         build_syscall_table();
-    static const char *capio_dir = std::getenv("CAPIO_DIR");
 
 #ifdef SYS_futex
     /**
@@ -409,13 +408,6 @@ static int hook(long syscall_number, long arg0, long arg1, long arg2, long arg3,
     // If the syscall_number is higher than the maximum
     // syscall captured by CAPIO, simply return
     if (syscall_number >= CAPIO_NR_SYSCALLS) {
-        return 1;
-    }
-
-    // If CAPIO_DIR is not set as environment variable,
-    // then capio will not intercept the system calls
-    if (capio_dir == nullptr) {
-        LOG("CAPIO_DIR env var not set. returning control to kernel");
         return 1;
     }
 
@@ -466,6 +458,14 @@ static __attribute__((constructor)) void init() {
 
     const long tid = syscall_no_intercept(SYS_gettid);
 
+    // Without CAPIO_DIR nothing is CAPIO's: no hook is installed, so every system call goes to the
+    // kernel, and no server is needed. A snapshot left by the exec that started this program is
+    // read, which removes it: the program does not use its CAPIO files.
+    if (get_capio_dir().empty()) {
+        [[maybe_unused]] const FileDescriptorTable snapshot(tid);
+        return;
+    }
+
     FileDescriptorTable::protectAcrossFork();
     // After the handlers of the table, so that the child has a free lock
     FS_MODE({ pthread_atfork(nullptr, nullptr, announce_inherited_descriptors_fs); })
@@ -473,9 +473,7 @@ static __attribute__((constructor)) void init() {
     init_filesystem(tid); // with the descriptors of the program before an exec, if any
     initialize_new_thread();
     // Before any other request of the process, which may be on a path inside it
-    if (std::getenv("CAPIO_DIR") != nullptr) {
-        root_request(get_capio_dir(), tid);
-    }
+    root_request(get_capio_dir(), tid);
     FS_MODE({
         // The program after an exec, e.g. the child of a fork, writes the files it got too
         for (const int fd : fd_table->fds()) {

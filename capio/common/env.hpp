@@ -20,43 +20,30 @@
 #include "calf/StlLogger.h"
 #endif
 
-inline const std::filesystem::path &get_capio_dir() {
-    static std::filesystem::path capio_dir{};
-    START_LOG(capio_syscall(SYS_gettid), "call()");
-    // TODO: if CAPIO_DIR is not set, it should be left as null
-
-    if (capio_dir.empty()) {
-        const char *val = std::getenv("CAPIO_DIR");
-        auto buf        = std::unique_ptr<char[]>(new char[PATH_MAX]);
-
-        if (val == nullptr) {
-
-#ifndef __CAPIO_POSIX
-            CALF_PRINT_COLOR(CALF_CLI_LEVEL_ERROR, "CAPIO_DIR not provided");
-#endif
-            ERR_EXIT("Fatal:  CAPIO_DIR not provided!");
-
-        } else {
-
-            const char *realpath_res = capio_realpath(val, buf.get());
-            if (realpath_res == nullptr) {
-#ifndef __CAPIO_POSIX
-                CALF_PRINT_COLOR(CALF_CLI_LEVEL_ERROR,
-                                 "Fatal: CAPIO_DIR set, but folder does not exists on filesystem!");
-#endif
-                ERR_EXIT("error CAPIO_DIR: directory %s does not "
-                         "exist. [buf=%s]",
-                         val, buf.get());
-            }
-        }
-        capio_dir = std::filesystem::path(buf.get());
-
-        if (is_forbidden_path(capio_dir.c_str())) {
-            ERR_EXIT("CAPIO_DIR %s is in forbidden path", capio_dir.string().c_str());
-        }
+/**
+ * @brief The canonical path of @p value, the value of CAPIO_DIR. Empty if @p value is null: with
+ * no CAPIO_DIR, no path is CAPIO's.
+ */
+inline std::filesystem::path resolve_capio_dir(const char *value) {
+    START_LOG(capio_syscall(SYS_gettid), "call(value=%s)", value == nullptr ? "(unset)" : value);
+    if (value == nullptr) {
+        return {};
+    }
+    const auto buf = std::unique_ptr<char[]>(new char[PATH_MAX]);
+    if (capio_realpath(value, buf.get()) == nullptr) {
+        ERR_EXIT("error CAPIO_DIR: directory %s does not exist. [buf=%s]", value, buf.get());
+    }
+    std::filesystem::path capio_dir(buf.get());
+    if (is_forbidden_path(capio_dir.c_str())) {
+        ERR_EXIT("CAPIO_DIR %s is in forbidden path", capio_dir.string().c_str());
     }
     LOG("CAPIO_DIR=%s", capio_dir.c_str());
+    return capio_dir;
+}
 
+/// @brief The canonical CAPIO_DIR of this process, read once. Empty if it is not set.
+inline const std::filesystem::path &get_capio_dir() {
+    static const std::filesystem::path capio_dir = resolve_capio_dir(std::getenv("CAPIO_DIR"));
     return capio_dir;
 }
 
