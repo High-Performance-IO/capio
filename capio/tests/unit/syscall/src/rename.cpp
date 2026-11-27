@@ -129,6 +129,13 @@ TEST(SystemCallTest, TestRenameNoReplaceKeepsAnExistingFile) {
 TEST(SystemCallTest, TestRenameExchangeSwapsTwoFiles) {
     write_file("rename_ex1", "AB");
     write_file("rename_ex2", "CD");
+    if (memory_variant()) { // not supported, as on the file systems without it
+        EXPECT_EQ(renameat2(AT_FDCWD, "rename_ex1", AT_FDCWD, "rename_ex2", RENAME_EXCHANGE), -1);
+        EXPECT_EQ(errno, EINVAL);
+        EXPECT_EQ(unlink("rename_ex1"), 0);
+        EXPECT_EQ(unlink("rename_ex2"), 0);
+        return;
+    }
     const int fd = open("rename_ex1", O_RDONLY);
     ASSERT_NE(fd, -1);
 

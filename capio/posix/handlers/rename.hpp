@@ -50,12 +50,9 @@ int renameat2_handler(long arg0, long arg1, long arg2, long arg3, long arg4, lon
     })
 
     MEMORY_MODE({
-        const long flags = arg4;
-        // RENAME_WHITEOUT needs a file system with whiteouts, as overlayfs: Linux refuses it on
-        // the others, as it refuses unknown flags
-        if ((flags & ~(RENAME_NOREPLACE | RENAME_EXCHANGE)) != 0 ||
-            (flags & (RENAME_NOREPLACE | RENAME_EXCHANGE)) ==
-                (RENAME_NOREPLACE | RENAME_EXCHANGE)) {
+        // Only RENAME_NOREPLACE: Linux fails the other flags with EINVAL on the file systems that
+        // lack them
+        if ((arg4 & ~RENAME_NOREPLACE) != 0) {
             *result = -EINVAL;
             return CAPIO_POSIX_SYSCALL_SUCCESS;
         }
@@ -77,36 +74,11 @@ int renameat2_handler(long arg0, long arg1, long arg2, long arg3, long arg4, lon
             *result               = old_is_dir ? -EINVAL : -ENOTDIR;
             return CAPIO_POSIX_SYSCALL_SUCCESS;
         }
-        const bool new_exists =
-            new_is_capio
-                ? access_request(new_path_abs, tid) == 0
-                : syscall_no_intercept(SYS_faccessat, AT_FDCWD, new_path_abs.c_str(), F_OK) == 0;
-        if ((flags & RENAME_NOREPLACE) != 0 && new_exists) {
+        if ((arg4 & RENAME_NOREPLACE) != 0 &&
+            (new_is_capio ? access_request(new_path_abs, tid) == 0
+                          : syscall_no_intercept(SYS_faccessat, AT_FDCWD, new_path_abs.c_str(),
+                                                 F_OK) == 0)) {
             *result = -EEXIST;
-            return CAPIO_POSIX_SYSCALL_SUCCESS;
-        }
-        if ((flags & RENAME_EXCHANGE) != 0) {
-            if (!new_exists) {
-                *result = -ENOENT;
-                return CAPIO_POSIX_SYSCALL_SUCCESS;
-            }
-            if (!old_is_capio || !new_is_capio) { // the kernel has one of them: as across mounts
-                *result = -EXDEV;
-                return CAPIO_POSIX_SYSCALL_SUCCESS;
-            }
-            // Through a third name, so not atomic: a reader may see the old name missing
-            auto parked = old_path_abs;
-            parked += ".capio_exchange." + std::to_string(tid);
-            for (const auto &[from, to] :
-                 {std::pair{old_path_abs, parked}, std::pair{new_path_abs, old_path_abs},
-                  std::pair{parked, new_path_abs}}) {
-                fd_table->renamePath(from, to);
-                if (const auto res = rename_request(tid, from, to, true); res < 0) {
-                    *result = -EIO;
-                    return CAPIO_POSIX_SYSCALL_SUCCESS;
-                }
-            }
-            *result = 0;
             return CAPIO_POSIX_SYSCALL_SUCCESS;
         }
 
