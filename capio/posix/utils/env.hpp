@@ -15,6 +15,7 @@
 /// no path is CAPIO's, and the library leaves every system call to the kernel.
 inline const std::filesystem::path &get_capio_dir() {
     static const std::filesystem::path capio_dir = [] {
+        START_LOG(capio_syscall(SYS_gettid), "call()");
         const char *value = std::getenv("CAPIO_DIR");
         if (value == nullptr) {
             return std::filesystem::path{};
