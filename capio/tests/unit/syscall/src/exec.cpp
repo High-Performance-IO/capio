@@ -61,9 +61,10 @@ TEST(SystemCallTest, TestCloseOnExecDescriptorsAreClosedByExec) {
         if (fd < 0) {
             return 90;
         }
-        // Exits 0 only if fd is not open in the new program
+        // Exits 0 only if fd is not the file in the new program. The number itself may be open
+        // again: the new program's libcapio can reuse it, e.g. for its log
         const std::string command =
-            "{ : >&" + std::to_string(fd) + "; } 2>/dev/null || exit 0; exit 1";
+            "[ /proc/self/fd/" + std::to_string(fd) + " -ef exec_cloexec ] && exit 1; exit 0";
         execlp("bash", "bash", "--norc", "-c", command.c_str(), nullptr);
         return 91;
     });
