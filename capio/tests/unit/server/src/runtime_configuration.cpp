@@ -1,5 +1,6 @@
 #include <gtest/gtest.h>
 
+#include "child.hpp"
 #include "common/constants.hpp"
 #include "utils/runtime_configuration.hpp"
 
@@ -197,4 +198,67 @@ TEST_F(RuntimeConfigurationTest, NamesInTheConfigurationAreVirtual) {
         EXPECT_FALSE(engine->isConsumer(root / "out.dat", "reader"));
     }
     std::filesystem::remove_all(root);
+}
+
+TEST_F(RuntimeConfigurationTest, RejectsInvalidMtclOptions) {
+    for (const auto *options : {"7601@50", ":7601@50", "TCP:@50", "TCP:7601@", "TCP:7601:1@50",
+                                "TCP:7601@50@1", "TCP:0@50", "TCP:70000@50", "TCP:76x@50",
+                                "TCP:7601@0", "TCP:7601@5x", "TCP:99999999999@50"}) {
+        EXPECT_THROW(parse({"capio_server", "--no-config", "--backend", "mtcl", "--backend-options",
+                            options}),
+                     std::runtime_error)
+            << options;
+    }
+    // Only the MTCL backend reads them
+    EXPECT_NO_THROW(
+        parse({"capio_server", "--no-config", "--backend", "mpi", "--backend-options", "x"}));
+}
+
+TEST_F(RuntimeConfigurationTest, ADynamicConfigurationIsAConfiguration) {
+    EXPECT_TRUE(parse({"capio_server", "-c", "dynamic"}).hasConfig());
+    EXPECT_TRUE(parse({"capio_server", "-c", "config.json"}).hasConfig());
+    EXPECT_FALSE(parse({"capio_server", "--no-config"}).hasConfig());
+}
+
+TEST_F(RuntimeConfigurationTest, TheMetadataDirectoryIsTheRootUnlessSet) {
+    unsetenv("CAPIO_METADATA_DIR");
+    EXPECT_EQ(parse({"capio_server", "--no-config"}).getMetadataDir("/root"), "/root");
+    setenv("CAPIO_METADATA_DIR", "/metadata", 1);
+    EXPECT_EQ(parse({"capio_server", "--no-config"}).getMetadataDir("/root"), "/metadata");
+    unsetenv("CAPIO_METADATA_DIR");
+}
+
+/*
+ * initialize() is what the server's main calls: it sets the configuration that get() returns, or
+ * exits. In children, as it changes the global configuration and the logger.
+ */
+TEST_F(RuntimeConfigurationTest, InitializeSetsTheConfigurationOrExits) {
+    EXPECT_EQ(run_in_child([] {
+                  std::vector<std::string> arguments{"capio_server", "--no-config", "--backend",
+                                                     "mpi", "--continue-on-error"};
+                  std::vector<char *> argv;
+                  for (auto &argument : arguments) {
+                      argv.push_back(argument.data());
+                  }
+                  RuntimeConfiguration::initialize(static_cast<int>(argv.size()), argv.data());
+                  EXPECT_EQ(RuntimeConfiguration::get().getBackendName(), "mpi");
+                  EXPECT_TRUE(RuntimeConfiguration::get().getContinueOnError());
+              }),
+              0);
+
+    for (const auto &[arguments, status] : std::vector<std::pair<std::vector<std::string>, int>>{
+             {{"capio_server"}, EXIT_FAILURE},              // no configuration
+             {{"capio_server", "--help"}, EXIT_SUCCESS}}) { // the usage, and nothing else
+        EXPECT_EQ(run_in_child([arguments] {
+                      auto copy = arguments;
+                      std::vector<char *> argv;
+                      for (auto &argument : copy) {
+                          argv.push_back(argument.data());
+                      }
+                      RuntimeConfiguration::initialize(static_cast<int>(argv.size()), argv.data());
+                      _exit(99); // not reached
+                  }),
+                  status)
+            << arguments.back();
+    }
 }

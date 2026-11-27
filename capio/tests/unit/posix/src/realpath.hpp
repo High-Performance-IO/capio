@@ -29,6 +29,27 @@ TEST_F(RealpathPosixTest, TestNormalPathDropsDotsAndTrailingSlashes) {
     EXPECT_EQ(capio_normal_path("/"), "/");
 }
 
+TEST(IsPrefixTest, APathIsInsideItselfAndItsParents) {
+    EXPECT_TRUE(is_prefix("/capio", "/capio"));
+    EXPECT_TRUE(is_prefix("/capio", "/capio/f"));
+    EXPECT_TRUE(is_prefix("/capio", "/capio/d/f"));
+    EXPECT_TRUE(is_prefix("/", "/capio"));
+}
+
+TEST(IsPrefixTest, ALongerNameIsNotInside) {
+    EXPECT_FALSE(is_prefix("/capio", "/capio2"));
+    EXPECT_FALSE(is_prefix("/capio", "/capi"));
+    EXPECT_FALSE(is_prefix("/capio/d", "/capio"));
+    EXPECT_FALSE(is_prefix("/capio", "/other/capio"));
+}
+
+// Only a first component ".." leaves the directory: "..f" is a name like any other
+TEST(IsPrefixTest, NamesStartingWithTwoDotsAreInside) {
+    EXPECT_TRUE(is_prefix("/capio", "/capio/..f"));
+    EXPECT_TRUE(is_prefix("/capio", "/capio/..."));
+    EXPECT_TRUE(is_prefix("/capio", "/capio/d/..f"));
+}
+
 TEST_F(RealpathPosixTest, TestAbsolutePathsInCapioDirWhenPathExists) {
     const std::filesystem::path PATHNAME = get_capio_dir() / "test";
     EXPECT_NE(mkdir(PATHNAME.c_str(), S_IRWXU), -1);

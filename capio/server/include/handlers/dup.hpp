@@ -3,7 +3,7 @@
 
 extern StorageManager *storage_manager;
 
-void dup_handler(const char *const str) {
+inline void dup_handler(const char *const str) {
     int tid, old_fd, new_fd;
     sscanf(str, "%d %d %d", &tid, &old_fd, &new_fd);
     START_LOG(gettid(), "call(tid=%d, old_fd=%d, new_fd=%d)", tid, old_fd, new_fd);

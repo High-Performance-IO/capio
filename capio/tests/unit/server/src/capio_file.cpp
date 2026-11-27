@@ -261,13 +261,16 @@ TEST(ServerTest, TestCapioFileSeekData) {
     CapioFile file;
 
     EXPECT_EQ(file.seekData(100), -1);
-    EXPECT_EQ(file.seekData(0), 0);
+    EXPECT_EQ(file.seekData(0), -1); // an empty file has no data
 
     file.insertSector(0, 1000);
+    EXPECT_EQ(file.seekData(0), 0);
     EXPECT_EQ(file.seekData(100), 100);
+    EXPECT_EQ(file.seekData(1000), -1); // the end of the file
     EXPECT_EQ(file.seekData(2000), -1);
+    EXPECT_EQ(file.seekData(-1), -1);
     file.insertSector(2000, 3000);
-    EXPECT_NE(file.seekData(1500), 1500); // return here the closest offset...
+    EXPECT_EQ(file.seekData(1500), 2000); // the data after the hole
 
     CapioFile file1;
     file1.insertSector(200, 300);
@@ -278,12 +281,15 @@ TEST(ServerTest, TestCapioFileSeekHole) {
     CapioFile file;
 
     EXPECT_EQ(file.seekHole(100), -1);
-    EXPECT_EQ(file.seekHole(0), 0);
+    EXPECT_EQ(file.seekHole(0), -1); // the end of an empty file
     file.insertSector(0, 1000);
+    EXPECT_EQ(file.seekHole(0), 1000); // a sector that starts at the offset
     EXPECT_EQ(file.seekHole(100), 1000);
+    EXPECT_EQ(file.seekHole(1000), -1);
     EXPECT_EQ(file.seekHole(2000), -1);
     file.insertSector(2000, 3000);
-    EXPECT_EQ(file.seekHole(1500), 1500); // return here the closest offset...
+    EXPECT_EQ(file.seekHole(1500), 1500); // in a hole
+    EXPECT_EQ(file.seekHole(2500), 3000);
 
     CapioFile file1;
     file1.insertSector(200, 300);

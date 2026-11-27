@@ -16,7 +16,7 @@ extern Backend *backend;
 // constant required by setsockopt()
 int REUSE_MCAST_SOCKET = 1;
 
-void advertise(const bool *terminate, const unsigned int delay_ms,
+void advertise(const std::atomic_bool *terminate, const unsigned int delay_ms,
                const std::string &advertisement_token, const std::string &adv_addr,
                const unsigned int adv_port) {
     const int advert_sock_fd = socket(AF_INET, SOCK_DGRAM, 0);
@@ -34,7 +34,7 @@ void advertise(const bool *terminate, const unsigned int delay_ms,
     close(advert_sock_fd);
 }
 
-void mcast_thread_discovery_service(const bool *terminate, const std::string &adv_addr,
+void mcast_thread_discovery_service(const std::atomic_bool *terminate, const std::string &adv_addr,
                                     const unsigned int adv_port) {
     START_LOG(gettid(), "call()");
 
@@ -55,7 +55,7 @@ void mcast_thread_discovery_service(const bool *terminate, const std::string &ad
         CALF_PRINT_COLOR(CALF_CLI_LEVEL_ERROR,
                          "Error: unable to bind to multicast socket. Error is: %s",
                          std::strerror(errno));
-        // halt execution and return
+        close(sockfd);
         return;
     }
 
@@ -82,12 +82,14 @@ void MulticastDiscoveryInterface::stop() {
 
     if (mcast_listener_thread != nullptr && mcast_listener_thread->joinable()) {
         mcast_listener_thread->join();
+        delete mcast_listener_thread;
         mcast_listener_thread = nullptr;
         CALF_PRINT_COLOR(CALF_CLI_LEVEL_INFO, "Multicast listener service stopped.");
     }
 
     if (advertisement_thread != nullptr && advertisement_thread->joinable()) {
         advertisement_thread->join();
+        delete advertisement_thread;
         advertisement_thread = nullptr;
         CALF_PRINT_COLOR(CALF_CLI_LEVEL_INFO, "Multicast advertisement service stopped.");
     }

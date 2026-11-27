@@ -24,7 +24,7 @@ extern StorageManager *storage_manager;
 extern ClientManager *client_manager;
 extern Backend *backend;
 
-void wait_for_file_completion(int tid, const std::filesystem::path &path) {
+inline void wait_for_file_completion(int tid, const std::filesystem::path &path) {
     START_LOG(gettid(), "call(tid=%d, path=%s)", tid, path.c_str());
 
     const auto home   = home_node_service->waitForHome(path);
@@ -89,14 +89,14 @@ inline void reply_stat(int tid, const std::filesystem::path &path) {
     }
 }
 
-void fstat_handler(const char *const str) {
+inline void fstat_handler(const char *const str) {
     int tid, fd;
     sscanf(str, "%d %d", &tid, &fd);
 
     reply_stat(tid, storage_manager->getPath(tid, fd));
 }
 
-void stat_handler(const char *const str) {
+inline void stat_handler(const char *const str) {
     int tid, consumed = 0;
     if (sscanf(str, "%d%n", &tid, &consumed) != 1) {
         return;
@@ -114,7 +114,7 @@ void stat_handler(const char *const str) {
  * update mode, for its commit. The reply is 1 if it holds from now on, so that the client can cache
  * it, and 0 if it only holds now (the path is missing, or is not declared).
  */
-void consent_handler(const char *const str) {
+inline void consent_handler(const char *const str) {
     int tid, consumed = 0;
     if (sscanf(str, "%d%n", &tid, &consumed) != 1) {
         return;

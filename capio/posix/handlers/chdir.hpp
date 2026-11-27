@@ -42,9 +42,25 @@ int chdir_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long ar
 
     if (is_capio_path(path)) {
         MEMORY_MODE({
-            set_current_dir(path);
-            errno   = 0;
-            *result = 0;
+            const long tid    = syscall_no_intercept(SYS_gettid);
+            const off64_t res = access_request(path, tid);
+            if (res == CAPIO_POSIX_SYSCALL_REQUEST_SKIP) {
+                // Excluded from CAPIO: the kernel's. By the resolved path, as the kernel stays in
+                // the directory before a chdir into CAPIO_DIR
+                *result = syscall_no_intercept(SYS_chdir, path.c_str());
+                if (*result == 0) {
+                    follow_kernel_current_dir();
+                }
+                return CAPIO_POSIX_SYSCALL_SUCCESS;
+            }
+            if (res < 0) {
+                *result = -ENOENT;
+            } else if (stat_request(path, tid).second != 1) {
+                *result = -ENOTDIR;
+            } else {
+                set_current_dir(path);
+                *result = 0;
+            }
         })
         FS_MODE({
             // A real directory: wait for it, then the kernel changes directory as for any other

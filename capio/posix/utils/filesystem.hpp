@@ -44,9 +44,11 @@ inline bool is_directory(int dirfd) {
     return S_ISDIR(path_stat.st_mode) == 1;
 }
 
+/// @brief Whether @p path_2 is @p path_1 or is inside it
 inline bool is_prefix(const std::filesystem::path &path_1, const std::filesystem::path &path_2) {
     const auto relpath = path_2.lexically_relative(path_1);
-    return !relpath.empty() && relpath.native().rfind("..", 0) != 0;
+    // A first component "..": outside. A name that only starts with "..", as "..f", is inside
+    return !relpath.empty() && *relpath.begin() != "..";
 }
 
 inline bool is_capio_dir(const std::filesystem::path &path_to_check) {

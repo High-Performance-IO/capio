@@ -233,56 +233,35 @@ void CapioFile::open() { ++_n_opens; }
 
 off64_t CapioFile::seekData(off64_t offset) const {
     START_LOG(gettid(), "call(offset=%ld)", offset);
+    // As Linux: the first data at or after offset, or -1 (ENXIO) when there is none
     const shared_lock_guard slg(_mutex_sectors);
-    if (_sectors.empty()) {
-        if (offset == 0) {
-            return 0;
-        } else {
-            return -1;
+    if (offset < 0) {
+        return -1;
+    }
+    for (const auto &[start, end] : _sectors) {
+        if (offset < end) {
+            return std::max(offset, start);
         }
     }
-    auto it = _sectors.upper_bound(std::make_pair(offset, 0));
-    if (it == _sectors.begin()) {
-        return it->first;
-    }
-    --it;
-    if (offset <= it->second) {
-        return offset;
-    } else {
-        ++it;
-        if (it == _sectors.end()) {
-            return -1;
-        } else {
-            return it->first;
-        }
-    }
+    return -1;
 }
 
 off64_t CapioFile::seekHole(off64_t offset) const {
     START_LOG(gettid(), "call(offset=%ld)", offset);
+    // As Linux: the first hole at or after offset, the end of the file being one, or -1 (ENXIO)
+    // at or past the end
     const shared_lock_guard slg(_mutex_sectors);
-    if (_sectors.empty()) {
-        if (offset == 0) {
-            return 0;
-        } else {
-            return -1;
+    if (offset < 0 || _sectors.empty() || offset >= _sectors.rbegin()->second) {
+        return -1;
+    }
+    off64_t hole = offset;
+    for (const auto &[start, end] : _sectors) {
+        if (start > hole) {
+            break;
         }
+        hole = std::max(hole, end);
     }
-    auto it = _sectors.upper_bound(std::make_pair(offset, 0));
-    if (it == _sectors.begin()) {
-        return offset;
-    }
-    --it;
-    if (offset <= it->second) {
-        return it->second;
-    } else {
-        ++it;
-        if (it == _sectors.end()) {
-            return -1;
-        } else {
-            return offset;
-        }
-    }
+    return hole;
 }
 
 void CapioFile::removeFd(int tid, int fd) {

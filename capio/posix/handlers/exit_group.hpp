@@ -6,10 +6,8 @@
 #include "utils/requests.hpp"
 
 /*
- * TODO: adding cleaning of shared memory
- * The process can never interact with the server
- * maybe because is a child process don't need to interact
- * with CAPIO
+ * At an exit, the server removes the shared memory of the thread (its response and data queues).
+ * A client killed by a signal never tells it, so its queues stay until the server exits (#319).
  */
 
 /**

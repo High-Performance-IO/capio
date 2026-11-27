@@ -50,10 +50,35 @@ int renameat2_handler(long arg0, long arg1, long arg2, long arg3, long arg4, lon
     })
 
     MEMORY_MODE({
-        // TODO: implement handling of FLAGS
-        if (is_prefix(old_path_abs, new_path_abs)) { // TODO: The check is more complex
-            errno   = EINVAL;
-            *result = -errno;
+        // Only RENAME_NOREPLACE: Linux fails the other flags with EINVAL on the file systems that
+        // lack them
+        if ((arg4 & ~RENAME_NOREPLACE) != 0) {
+            *result = -EINVAL;
+            return CAPIO_POSIX_SYSCALL_SUCCESS;
+        }
+        const off64_t old_access = old_is_capio ? access_request(old_path_abs, tid) : 0;
+        if (old_access == CAPIO_POSIX_SYSCALL_REQUEST_SKIP) { // excluded from CAPIO
+            return CAPIO_POSIX_SYSCALL_SKIP;
+        }
+        if (old_access != 0) {
+            *result = -ENOENT;
+            return CAPIO_POSIX_SYSCALL_SUCCESS;
+        }
+        if (old_path_abs == new_path_abs) { // a rename of a file to itself does nothing
+            *result = 0;
+            return CAPIO_POSIX_SYSCALL_SUCCESS;
+        }
+        if (is_prefix(old_path_abs, new_path_abs)) {
+            // Into a directory's own subtree, or under a file, which is not a directory
+            const bool old_is_dir = !old_is_capio || stat_request(old_path_abs, tid).second == 1;
+            *result               = old_is_dir ? -EINVAL : -ENOTDIR;
+            return CAPIO_POSIX_SYSCALL_SUCCESS;
+        }
+        if ((arg4 & RENAME_NOREPLACE) != 0 &&
+            (new_is_capio ? access_request(new_path_abs, tid) == 0
+                          : syscall_no_intercept(SYS_faccessat, AT_FDCWD, new_path_abs.c_str(),
+                                                 F_OK) == 0)) {
+            *result = -EEXIST;
             return CAPIO_POSIX_SYSCALL_SUCCESS;
         }
 

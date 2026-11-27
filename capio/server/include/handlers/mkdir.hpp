@@ -8,7 +8,7 @@
 extern ClientManager *client_manager;
 extern StorageManager *storage_manager;
 
-void mkdir_handler(const char *const str) {
+inline void mkdir_handler(const char *const str) {
     int tid, consumed = 0;
     if (sscanf(str, "%d%n", &tid, &consumed) != 1) {
         return;

@@ -7,9 +7,6 @@
  */
 class MulticastDiscoveryInterface : public DiscoveryInterface {
 
-    /// @brief Variable used to signal termination to child threads
-    bool terminate = false;
-
     /// @brief Handle for thread advertising this server instance
     std::thread *advertisement_thread = nullptr;
 

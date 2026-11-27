@@ -232,7 +232,6 @@ inline CPStatResponse_t fstat_request(const int fd, const long tid) {
     sprintf(req, "%04d %ld %d", CAPIO_REQUEST_FSTAT, tid, fd);
     LOG("req=%s", req);
     buf_requests->write(req, CAPIO_REQ_MAX_SIZE);
-    // FIXME: these two reads don't work in multithreading
     off64_t file_size;
     buff_response->read(&file_size);
     off64_t is_dir;

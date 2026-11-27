@@ -75,7 +75,7 @@ inline bool refuses_root(const pid_t pid, const char *app_name,
  * is not the directory the server streams through. A new thread (wait) is answered only once its
  * parent's clone request is handled (ClientManager::unlockClonedChild).
  */
-void handshake_named_handler(const char *const str) {
+inline void handshake_named_handler(const char *const str) {
     int tid, pid, wait, consumed = 0;
     char app_name[1024];
     char variant = 0;

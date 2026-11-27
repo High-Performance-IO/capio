@@ -52,6 +52,10 @@ inline int capio_fstat(int fd, struct stat *statbuf, long tid) {
                 errno = ENOENT;
                 return CAPIO_POSIX_SYSCALL_ERRNO;
             }
+            if (statbuf == nullptr) { // the file is not on disk: the kernel cannot tell
+                errno = EFAULT;
+                return CAPIO_POSIX_SYSCALL_ERRNO;
+            }
             fill_statbuf(statbuf, file_size, is_dir, std::hash<std::string>{}(fd_table->path(fd)));
             return CAPIO_POSIX_SYSCALL_SUCCESS;
         })
@@ -88,6 +92,10 @@ inline int capio_lstat(const std::string_view &pathname, struct stat *statbuf, l
                 return file_size;
             }
 
+            if (statbuf == nullptr) { // the file is not on disk: the kernel cannot tell
+                errno = EFAULT;
+                return CAPIO_POSIX_SYSCALL_ERRNO;
+            }
             fill_statbuf(statbuf, file_size, is_dir, std::hash<std::string>{}(absolute_path));
             return CAPIO_POSIX_SYSCALL_SUCCESS;
         })
@@ -173,9 +181,9 @@ int fstatat_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long 
     START_LOG(tid, "call(dirfd=%d, path=%s, flags=%d)", dirfd, path != nullptr ? path : "(null)",
               flags);
 
-    // A null path or buffer fails with EFAULT, from the kernel. With AT_EMPTY_PATH a null path is
-    // the empty one (Linux 6.11): the file of dirfd.
-    if ((path == nullptr && (flags & AT_EMPTY_PATH) == 0) || statbuf == nullptr) {
+    // A null path fails with EFAULT, from the kernel. With AT_EMPTY_PATH a null path is the empty
+    // one (Linux 6.11): the file of dirfd. A null buffer fails with EFAULT once the file is found.
+    if (path == nullptr && (flags & AT_EMPTY_PATH) == 0) {
         return CAPIO_POSIX_SYSCALL_SKIP;
     }
     return posix_return_value(
@@ -189,8 +197,8 @@ int lstat_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long ar
     const long tid   = syscall_no_intercept(SYS_gettid);
     START_LOG(tid, "call(path=%s)", path != nullptr ? path : "(null)");
 
-    // A null path or buffer fails with EFAULT, from the kernel
-    if (path == nullptr || buf == nullptr) {
+    // A null path fails with EFAULT, from the kernel, and a null buffer once the file is found
+    if (path == nullptr) {
         return CAPIO_POSIX_SYSCALL_SKIP;
     }
     return posix_return_value(capio_lstat_wrapper(path, buf, tid), result);
@@ -203,8 +211,8 @@ int stat_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg
     const long tid   = syscall_no_intercept(SYS_gettid);
     START_LOG(tid, "call(path=%s)", path != nullptr ? path : "(null)");
 
-    // A null path or buffer fails with EFAULT, from the kernel
-    if (path == nullptr || buf == nullptr) {
+    // A null path fails with EFAULT, from the kernel, and a null buffer once the file is found
+    if (path == nullptr) {
         return CAPIO_POSIX_SYSCALL_SKIP;
     }
     return posix_return_value(capio_lstat_wrapper(path, buf, tid), result);
