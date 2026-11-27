@@ -151,9 +151,8 @@ void wait_for_file(const std::filesystem::path &path, int tid, int fd, off64_t c
 inline void handle_read(int tid, int fd, off64_t count) {
     START_LOG(gettid(), "call(tid=%d, fd=%d, count=%ld)", tid, fd, count);
 
-    const std::filesystem::path &path      = storage_manager->getPath(tid, fd);
-    const std::filesystem::path &capio_dir = RuntimeConfiguration::get().getCapioDir();
-    const std::string &app_name            = client_manager->getAppName(tid);
+    const std::filesystem::path &path = storage_manager->getPath(tid, fd);
+    const std::string &app_name       = client_manager->getAppName(tid);
     bool is_prod =
         CapioCLEngine::get().isProducer(path, app_name) || client_manager->isProducer(tid, path);
     auto file_location_opt = home_node_service->getHome(path);
@@ -165,7 +164,8 @@ inline void handle_read(int tid, int fd, off64_t count) {
         // launch a thread that checks when the file is created
         std::thread t(wait_for_file, path, tid, fd, count);
         t.detach();
-    } else if (is_prod || *file_location_opt == backend->get_node_name() || capio_dir == path) {
+    } else if (is_prod || *file_location_opt == backend->get_node_name() ||
+               storage_manager->isRoot(path)) {
         LOG("File is local. handling local read");
         handle_local_read(tid, fd, count, is_prod);
     } else {

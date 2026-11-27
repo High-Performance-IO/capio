@@ -128,4 +128,27 @@ TEST_F(StorageManagerTestEnvironment, testNumberOfOpensAfterClone) {
     EXPECT_TRUE(storage_manager->get("myFile").deletable());
 }
 
+TEST_F(StorageManagerTestEnvironment, testRootsOfSeveralClients) {
+    const std::filesystem::path first  = "/capio_root_first";
+    const std::filesystem::path second = "/capio_root_second";
+
+    EXPECT_FALSE(storage_manager->isRoot(first));
+    storage_manager->addRoot(1, first);
+    storage_manager->addRoot(2, second);
+    storage_manager->addRoot(3, first); // another client with the same CAPIO_DIR
+
+    EXPECT_TRUE(storage_manager->isRoot(first));
+    EXPECT_TRUE(storage_manager->isRoot(second));
+    EXPECT_FALSE(storage_manager->isRoot(first / "sub"));
+
+    // Each root is a directory, local to this server
+    for (const auto &root : {first, second}) {
+        EXPECT_TRUE(storage_manager->get(root).isDirectory());
+        EXPECT_EQ(home_node_service->getHome(root), backend->get_node_name());
+    }
+
+    storage_manager->remove(first);
+    storage_manager->remove(second);
+}
+
 #endif // CAPIO_STORAGE_MANAGER_TEST_HPP

@@ -211,6 +211,15 @@ inline void handshake_named_request(const long tid, const long pid, const std::s
     }
 }
 
+/**
+ * @brief Tell the server the CAPIO_DIR of this process, after its handshake. The server keeps the
+ * roots of all its clients, which can differ. No reply: the requests that follow are handled after.
+ */
+inline void root_request(const std::filesystem::path &capio_dir, const long tid) {
+    START_LOG(capio_syscall(SYS_gettid), "call(capio_dir=%s, tid=%ld)", capio_dir.c_str(), tid);
+    path_request(CAPIO_REQUEST_ROOT, tid, "", capio_dir.native());
+}
+
 inline CPStatResponse_t fstat_request(const int fd, const long tid) {
     START_LOG(capio_syscall(SYS_gettid), "call(fd=%ld, tid=%ld)", fd, tid);
     char req[CAPIO_REQ_MAX_SIZE];

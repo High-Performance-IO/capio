@@ -75,10 +75,8 @@ inline void reply_stat(int tid, const std::filesystem::path &path) {
             ? c_file_opt->get()
             : storage_manager->add(path, false, RuntimeConfiguration::get().getFileInitialSize());
     LOG("Obtained capio file. ready to reply to client");
-    const std::filesystem::path &capio_dir = RuntimeConfiguration::get().getCapioDir();
-    LOG("Obtained capio_dir");
     if (c_file.isCommitted() || *file_location_opt == backend->get_node_name() ||
-        CapioCLEngine::get().isFirable(path) || capio_dir == path) {
+        CapioCLEngine::get().isFirable(path) || storage_manager->isRoot(path)) {
         LOG("Sending response to client");
         client_manager->replyToClient(tid, c_file.getFileSize());
         client_manager->replyToClient(tid, static_cast<int>(c_file.isDirectory() ? 1 : 0));

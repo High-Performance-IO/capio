@@ -151,12 +151,36 @@ TEST_F(RuntimeConfigurationTest, RejectsInvalidConfigurations) {
     EXPECT_THROW(parse({"capio_server", "--no-config", "--location-query-timeout", "soon"}),
                  std::runtime_error);
 
-    unsetenv("CAPIO_DIR");
-    EXPECT_THROW(parse({"capio_server", "--no-config"}), std::runtime_error);
     setenv("CAPIO_DIR", "/does/not/exist", 1);
     EXPECT_THROW(parse({"capio_server", "--no-config"}), std::runtime_error);
     setenv("CAPIO_DIR", "/proc/self", 1);
     EXPECT_THROW(parse({"capio_server", "--no-config"}), std::runtime_error);
+}
+
+TEST_F(RuntimeConfigurationTest, StartsWithoutCapioDir) {
+    unsetenv("CAPIO_DIR");
+    const auto config = parse({"capio_server", "--no-config"});
+    EXPECT_TRUE(config.getCapioDir().empty());
+}
+
+TEST_F(RuntimeConfigurationTest, RelativeNamesAreInWorkingDirectoryWithoutCapioDir) {
+    unsetenv("CAPIO_DIR");
+    char dir[] = "/tmp/capio_no_dir_XXXXXX";
+    ASSERT_NE(mkdtemp(dir), nullptr);
+    const auto root = std::filesystem::canonical(dir);
+    std::ofstream(root / "config.json")
+        << R"({"name": "CAPIO", "IO_Graph": [)"
+        << R"({"name": "writer", "input_stream": [], "output_stream": ["out.dat"],)"
+        << R"( "streaming": [{"name": ["out.dat"], "committed": "on_close"}]}]})";
+
+    const auto previous = std::filesystem::current_path();
+    std::filesystem::current_path(root);
+    const std::unique_ptr<capiocl::engine::Engine> engine(
+        parse({"capio_server", "-c", "config.json"}).createCapioClEngine());
+    std::filesystem::current_path(previous);
+
+    EXPECT_EQ(engine->getCommitRule(root / "out.dat"), capiocl::commitRules::ON_CLOSE);
+    std::filesystem::remove_all(root);
 }
 
 TEST_F(RuntimeConfigurationTest, RelativeNamesAreInsideCapioDirUnlessPrefixed) {

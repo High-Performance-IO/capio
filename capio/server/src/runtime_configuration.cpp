@@ -27,10 +27,11 @@ long long env_number(const char *name, long long default_value) {
     return value == nullptr ? default_value : std::strtoll(value, nullptr, 10);
 }
 
+/// @brief The canonical CAPIO_DIR of the server, or an empty path if it is not set
 std::filesystem::path resolve_capio_dir() {
     const char *value = std::getenv("CAPIO_DIR");
     if (value == nullptr) {
-        throw std::runtime_error("CAPIO_DIR not provided");
+        return {};
     }
     std::error_code error;
     auto capio_dir = std::filesystem::canonical(value, error);
@@ -178,18 +179,22 @@ RuntimeConfiguration::RuntimeConfiguration(int argc, char **argv) {
     }
 
     capio_dir = resolve_capio_dir();
-    // Relative names in the configuration are inside CAPIO_DIR, unless -r says otherwise:
+    // The server does not need CAPIO_DIR: clients send theirs. If set, it is the default for -r
+    // and CAPIO_METADATA_DIR; otherwise the working directory of the server is.
+    const std::filesystem::path default_dir =
+        capio_dir.empty() ? std::filesystem::current_path() : capio_dir;
+    // Relative names in the configuration are inside that directory, unless -r says otherwise:
     // unresolved, they would never match the absolute paths that clients use
     if (!capio_cl_config_path.empty() && !capio_cl_dynamic_config &&
         capio_cl_resolve_path.empty()) {
-        capio_cl_resolve_path = capio_dir;
+        capio_cl_resolve_path = default_dir;
     }
     cache_lines          = env_number("CAPIO_CACHE_LINES", CAPIO_CACHE_LINES_DEFAULT);
     cache_line_size      = env_number("CAPIO_CACHE_LINE_SIZE", CAPIO_CACHE_LINE_SIZE_DEFAULT);
     file_initial_size    = env_number("CAPIO_FILE_INIT_SIZE", CAPIO_DEFAULT_FILE_INITIAL_SIZE);
     prefetch_data_size   = env_number("CAPIO_PREFETCH_DATA_SIZE", 0);
     const char *metadata = std::getenv("CAPIO_METADATA_DIR");
-    metadata_dir         = metadata != nullptr ? std::filesystem::path(metadata) : capio_dir;
+    metadata_dir         = metadata != nullptr ? std::filesystem::path(metadata) : default_dir;
 }
 
 const std::filesystem::path &RuntimeConfiguration::getCapioDir() const { return capio_dir; }
@@ -239,7 +244,8 @@ bool RuntimeConfiguration::hasConfig() const {
 capiocl::engine::Engine *RuntimeConfiguration::createCapioClEngine() const {
     // Commits travel by multicast, and as tokens next to the files (the file system monitor), which
     // a server that starts later still finds. Counted on_close keeps its counters in the metadata
-    // directory, which the servers of a workflow share as they share CAPIO_DIR.
+    // directory, which the servers of a workflow must share (CAPIO_METADATA_DIR, CAPIO_DIR or their
+    // working directory).
     // Not loadDefaults(): it would reset the metadata directory to none. Options that are not in
     // the map take their default where they are read.
     std::unordered_map<std::string, std::string> options{
@@ -323,5 +329,9 @@ void RuntimeConfiguration::initialize(int argc, char **argv) {
         CALF_PRINT_COLOR(CALF_CLI_LEVEL_WARNING, "skipping config file parsing.");
     }
 
-    CALF_PRINT_COLOR(CALF_CLI_LEVEL_INFO, "CAPIO_DIR=%s", config.getCapioDir().c_str());
+    if (config.getCapioDir().empty()) {
+        CALF_PRINT_COLOR(CALF_CLI_LEVEL_INFO, "CAPIO_DIR not set: each client sends its own");
+    } else {
+        CALF_PRINT_COLOR(CALF_CLI_LEVEL_INFO, "CAPIO_DIR=%s", config.getCapioDir().c_str());
+    }
 }

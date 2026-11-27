@@ -322,7 +322,7 @@ off64_t StorageManager::addDirectory(const pid_t tid, const std::filesystem::pat
         if (c_file.isFirstWrite()) {
             c_file.registerFirstWrite();
             // TODO: it works only if there is one prod per file
-            if (is_capio_dir(path)) {
+            if (isRoot(path)) {
                 home_node_service->learn(path, backend->get_node_name());
             } else {
                 home_node_service->setHome(path);
@@ -335,6 +335,22 @@ off64_t StorageManager::addDirectory(const pid_t tid, const std::filesystem::pat
         return 0;
     }
     return 1;
+}
+
+void StorageManager::addRoot(const pid_t tid, const std::filesystem::path &path) {
+    START_LOG(tid, "call(path=%s)", path.c_str());
+    {
+        const std::lock_guard lg(_mutex_roots);
+        if (!_roots.insert(path.native()).second) {
+            return;
+        }
+    }
+    addDirectory(tid, path);
+}
+
+bool StorageManager::isRoot(const std::filesystem::path &path) const {
+    const std::shared_lock lock(_mutex_roots);
+    return _roots.find(path.native()) != _roots.end();
 }
 
 void StorageManager::removeFromDirectory(const std::filesystem::path &file_path) {

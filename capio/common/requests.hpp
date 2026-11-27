@@ -31,8 +31,9 @@ constexpr const int CAPIO_REQUEST_CREATE_FS        = 26;
 constexpr const int CAPIO_REQUEST_OPEN_FS          = 27;
 constexpr const int CAPIO_REQUEST_RENAME_FS        = 28;
 constexpr const int CAPIO_REQUEST_PATH_PART        = 29;
+constexpr const int CAPIO_REQUEST_ROOT             = 30;
 
-constexpr const int CAPIO_NR_REQUESTS = 30;
+constexpr const int CAPIO_NR_REQUESTS = 31;
 
 /* WHETHER A DESCRIPTOR OF CAPIO_REQUEST_CREATE_FS MAKES ITS CLIENT A PRODUCER */
 constexpr const int CAPIO_FS_NOT_PRODUCED            = 0; ///< read-only, or inherited with fork

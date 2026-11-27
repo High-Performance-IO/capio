@@ -117,11 +117,16 @@ Write a CAPIO-CL configuration file to inject streaming into your workflow. Refe
 
 ### 2. Launch the CAPIO servers
 
-Start one server per node. `CAPIO_DIR` is required and must be an existing directory: it is the CAPIO mount point.
+Start one server per node:
 
 ```bash
-CAPIO_DIR=your_capiodir capio_server -c conf.json
+capio_server -c conf.json
 ```
+
+The server does not need `CAPIO_DIR`: each application tells its server its own `CAPIO_DIR`, so the applications of
+one server can each use a different one (e.g. the working directory of each step of a workflow). If `CAPIO_DIR` is set
+for the server, it must be an existing directory, and it is the default of `-r` and of `CAPIO_METADATA_DIR`; otherwise
+the working directory of the server is.
 
 To start a server without a configuration file, pass `--no-config` instead of `-c`.
 
@@ -163,7 +168,7 @@ and exits.
 |-----------------------------------|-------------------------------------------------------------------------------------|
 | `-c, --config FILE`               | CAPIO-CL configuration file                                                         |
 | `--no-config`                     | Start without a configuration file, using default settings                          |
-| `-r, --resolve-prefix PREFIX`     | Prefix used to resolve relative paths in the configuration file (default: `CAPIO_DIR`) |
+| `-r, --resolve-prefix PREFIX`     | Prefix used to resolve relative paths in the configuration file (default: `CAPIO_DIR`, or the working directory) |
 | `--mem-only`                      | Store all files in memory, regardless of the configuration file                     |
 | `-b, --backend NAME`              | Communication backend (see below)                                                   |
 | `--backend-options OPTS`          | Backend-specific options (see below)                                                |
@@ -218,8 +223,8 @@ token as `<hostname>.capio`; hidden files in the directory are tokens still bein
 
 | Variable                | Description                                                                |
 |-------------------------|----------------------------------------------------------------------------|
-| `CAPIO_DIR`             | CAPIO mount point, shared by servers and applications                      |
-| `CAPIO_METADATA_DIR`    | Counters of `on_close:N`, shared by the servers (default: `CAPIO_DIR`)       |
+| `CAPIO_DIR`             | CAPIO mount point of an application; optional for the server               |
+| `CAPIO_METADATA_DIR`    | Counters of `on_close:N`, shared by the servers (default: `CAPIO_DIR`, or the working directory) |
 | `CAPIO_CACHE_LINES`     | Number of cache lines between application and server (default: 10)         |
 | `CAPIO_CACHE_LINE_SIZE` | Size of a cache line, in bytes (default: 256KB)                            |
 | `CALF_LOG_DIR`          | Directory for log files (default: `./capio_logs`). Needs `CAPIO_LOG`        |

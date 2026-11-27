@@ -89,6 +89,7 @@ static constexpr std::array<CSHandler_t, CAPIO_NR_REQUESTS> build_request_handle
     _request_handlers[CAPIO_REQUEST_OPEN_FS]          = open_fs_handler;
     _request_handlers[CAPIO_REQUEST_RENAME_FS]        = rename_fs_handler;
     _request_handlers[CAPIO_REQUEST_PATH_PART]        = path_part_handler;
+    _request_handlers[CAPIO_REQUEST_ROOT]             = root_handler;
 
     return _request_handlers;
 }
@@ -100,7 +101,10 @@ static constexpr std::array<CSHandler_t, CAPIO_NR_REQUESTS> build_request_handle
     setup_signal_handlers();
     backend->handshake_servers();
 
-    storage_manager->addDirectory(getpid(), RuntimeConfiguration::get().getCapioDir());
+    // Clients register their own CAPIO_DIR (CAPIO_REQUEST_ROOT); the server's, if set, is one more
+    if (const auto &capio_dir = RuntimeConfiguration::get().getCapioDir(); !capio_dir.empty()) {
+        storage_manager->addRoot(getpid(), capio_dir);
+    }
 
     internal_server_sem.unlock();
 

@@ -21,14 +21,4 @@ inline std::filesystem::path get_parent_dir_path(const std::filesystem::path &fi
     return {file_path.native().substr(0, pos)};
 }
 
-/// @brief Server counterpart of is_capio_dir() in posix/utils/filesystem.hpp, which reads CAPIO_DIR
-/// from the environment: the server checks against the configured capio.directory instead.
-inline bool is_capio_dir(const std::filesystem::path &path_to_check) {
-    START_LOG(gettid(), "call(path_to_check=%s)", path_to_check.c_str());
-
-    const auto res = RuntimeConfiguration::get().getCapioDir().compare(path_to_check) == 0;
-    LOG("is_capio_dir: %s", res ? "yes" : "no");
-    return res;
-}
-
 #endif // CAPIO_SERVER_UTILS_FILESYSTEM_HPP

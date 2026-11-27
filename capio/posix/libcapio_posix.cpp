@@ -472,6 +472,10 @@ static __attribute__((constructor)) void init() {
     init_client(tid);
     init_filesystem(tid); // with the descriptors of the program before an exec, if any
     initialize_new_thread();
+    // Before any other request of the process, which may be on a path inside it
+    if (std::getenv("CAPIO_DIR") != nullptr) {
+        root_request(get_capio_dir(), tid);
+    }
     FS_MODE({
         // The program after an exec, e.g. the child of a fork, writes the files it got too
         for (const int fd : fd_table->fds()) {
