@@ -79,7 +79,7 @@ void reply_kernel_lists(const pid_t tid, const off64_t offset, const off64_t cou
 /// or -1 if it can't be read
 long count_entries(const std::filesystem::path &directory) {
     std::error_code error;
-    std::filesystem::directory_iterator entry(FsRoot::real(directory), error);
+    std::filesystem::directory_iterator entry(fs_root().real(directory), error);
     long count = 0;
     while (!error && entry != std::filesystem::directory_iterator()) {
         count += !is_forbidden_path(entry->path().filename().native());
@@ -129,7 +129,7 @@ std::vector<linux_dirent64> read_directory(const std::filesystem::path &path) {
         strncpy(record.d_name, name.c_str(), sizeof(record.d_name) - 1);
         records.push_back(record);
     };
-    const auto real_path = FsRoot::real(path);
+    const auto real_path = fs_root().real(path);
     add(".", real_path);
     add("..", real_path / "..");
     std::error_code error;
@@ -326,11 +326,11 @@ void FsStorageManager::rename(const pid_t tid, const std::string &from, const bo
     // directory. Count them for on_n_files directories.
     noteNewEntry(to);
     std::error_code error;
-    const bool is_directory = std::filesystem::is_directory(FsRoot::real(to), error);
+    const bool is_directory = std::filesystem::is_directory(fs_root().real(to), error);
     if (is_directory) {
-        for (std::filesystem::recursive_directory_iterator entry(FsRoot::real(to), error), end;
+        for (std::filesystem::recursive_directory_iterator entry(fs_root().real(to), error), end;
              !error && entry != end; entry.increment(error)) {
-            noteNewEntry(FsRoot::virtualPath(entry->path()));
+            noteNewEntry(fs_root().virtualPath(entry->path()));
         }
     }
     if (!from_capio) {
@@ -446,7 +446,7 @@ bool FsStorageManager::nextEntries(const std::pair<pid_t, int> key, const std::s
 
 void FsStorageManager::waitForCreation(const std::filesystem::path &path) const {
     std::error_code error;
-    while (!std::filesystem::exists(FsRoot::real(path), error)) {
+    while (!std::filesystem::exists(fs_root().real(path), error)) {
         std::this_thread::sleep_for(std::chrono::milliseconds(100));
     }
 }
@@ -457,7 +457,7 @@ std::optional<off64_t> FsStorageManager::readable(const std::filesystem::path &p
         return std::nullopt;
     }
     std::error_code error;
-    const auto size = std::filesystem::file_size(FsRoot::real(path), error);
+    const auto size = std::filesystem::file_size(fs_root().real(path), error);
     if (error || size < static_cast<uintmax_t>(end_of_read)) {
         return std::nullopt;
     }
@@ -480,10 +480,10 @@ off64_t FsStorageManager::waitForData(const std::filesystem::path &path,
 off64_t FsStorageManager::waitForConsent(const std::filesystem::path &path) const {
     const auto &engine = CapioCLEngine::get();
     for (;;) {
-        if (std::error_code error; std::filesystem::exists(FsRoot::real(path), error)) {
+        if (std::error_code error; std::filesystem::exists(fs_root().real(path), error)) {
             // Directories are never committed, except those with an on_n_files rule
             const bool by_entries = engine.getCommitRule(path) == capiocl::commitRules::ON_N_FILES;
-            if ((std::filesystem::is_directory(FsRoot::real(path), error) && !by_entries) ||
+            if ((std::filesystem::is_directory(fs_root().real(path), error) && !by_entries) ||
                 !isDeclared(path)) {
                 return 0;
             }

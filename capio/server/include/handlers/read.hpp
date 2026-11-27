@@ -195,7 +195,7 @@ void read_fs_handler(const char *const str) {
     // the descriptor is unknown to the server (so it is not a CAPIO file), it is a directory, it is
     // excluded, or the caller is the one writing it.
     if (std::error_code error;
-        path.empty() || std::filesystem::is_directory(FsRoot::real(path), error) ||
+        path.empty() || std::filesystem::is_directory(fs_root().real(path), error) ||
         CapioCLEngine::get().isExcluded(path) || FsStorageManager::isProducer(tid, path)) {
         client_manager->replyToClient(tid, -1);
         return;

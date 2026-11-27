@@ -43,14 +43,14 @@ inline bool refuses_variant(const pid_t pid, const char *app_name, const char va
  */
 inline bool refuses_root(const pid_t pid, const char *app_name,
                          const std::filesystem::path &capio_dir) {
-    if (FsRoot::known()) {
-        if (FsRoot::get() == capio_dir) {
+    if (fs_root().known()) {
+        if (fs_root().get() == capio_dir) {
             return false;
         }
         CALF_PRINT_COLOR(CALF_CLI_LEVEL_ERROR,
                          "Refused process %d (app %s): its CAPIO_DIR is %s, but this server "
                          "streams through %s",
-                         pid, app_name, capio_dir.c_str(), FsRoot::get().c_str());
+                         pid, app_name, capio_dir.c_str(), fs_root().get().c_str());
         return true;
     }
     if (std::error_code error; !std::filesystem::is_directory(capio_dir, error)) {
@@ -59,7 +59,7 @@ inline bool refuses_root(const pid_t pid, const char *app_name,
                          pid, app_name, capio_dir.c_str());
         return true;
     }
-    FsRoot::set(capio_dir);
+    fs_root().set(capio_dir);
     CALF_PRINT_COLOR(CALF_CLI_LEVEL_WARNING,
                      "No -r given: streaming through %s, the CAPIO_DIR of process %d (app %s)",
                      capio_dir.c_str(), pid, app_name);

@@ -102,7 +102,7 @@ inline void handle_open_fs(const int tid, const std::filesystem::path &path) {
         return;
     }
     std::error_code error;
-    if (std::filesystem::exists(FsRoot::real(path), error) ||
+    if (std::filesystem::exists(fs_root().real(path), error) ||
         !FsStorageManager::waitsForCreation(tid, path)) {
         client_manager->replyToClient(tid, 1); // if it is missing, the kernel answers ENOENT
         return;

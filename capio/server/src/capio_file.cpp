@@ -100,7 +100,7 @@ void CapioFile::createBuffer(const std::filesystem::path &path, const bool home_
     if (std::visit([](const auto &buf) { return buf.empty(); }, _buffer)) {
         _home_node = home_node;
         if (_permanent && home_node) {
-            const auto real_path = FsRoot::real(path);
+            const auto real_path = fs_root().real(path);
             if (_directory) {
                 std::filesystem::create_directory(real_path);
                 std::filesystem::permissions(real_path, std::filesystem::perms::owner_all);

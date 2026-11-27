@@ -122,7 +122,7 @@ void consent_handler(const char *const str) {
     const std::filesystem::path path = fs_request_path(tid, str, consumed);
 
     std::error_code error;
-    const bool exists = std::filesystem::exists(FsRoot::real(path), error);
+    const bool exists = std::filesystem::exists(fs_root().real(path), error);
     if (!exists && !FsStorageManager::waitsForCreation(tid, path)) {
         client_manager->replyToClient(tid, 0);
         return;
@@ -133,7 +133,7 @@ void consent_handler(const char *const str) {
             return;
         }
         // Directories are never committed, except those with an on_n_files rule
-        if ((std::filesystem::is_directory(FsRoot::real(path), error) &&
+        if ((std::filesystem::is_directory(fs_root().real(path), error) &&
              CapioCLEngine::get().getCommitRule(path) != capiocl::commitRules::ON_N_FILES) ||
             !FsStorageManager::isDeclared(path)) {
             client_manager->replyToClient(tid, 0);
