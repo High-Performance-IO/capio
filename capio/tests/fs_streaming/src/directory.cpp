@@ -64,3 +64,24 @@ TEST_F(FsStreamingTest, ManyEntriesSpanSeveralBuffers) {
     }
     EXPECT_OUTPUT(run("cons", {"list_twice:d"}), "15001500");
 }
+
+/*
+ * A reader that starts before the entries: in no_update mode it gets each one as it appears, in
+ * update mode only once the directory has its N entries.
+ */
+TEST_F(FsStreamingTest, ListingWaitsForTheEntriesOfAGrowingDirectory) {
+    for (const char *mode : {"no_update", "update"}) {
+        startServer({{"d", "on_n_files", mode, 2}});
+        std::filesystem::create_directory(work / "d");
+        const auto consumer = start("cons", {"list:d"});
+        std::this_thread::sleep_for(std::chrono::milliseconds(300));
+        // Not by producer apps: the end of one commits its outputs, d among them
+        std::ofstream(work / "d" / "a") << "a";
+        std::this_thread::sleep_for(std::chrono::milliseconds(300));
+        std::ofstream(work / "d" / "b") << "b";
+        SCOPED_TRACE(mode);
+        EXPECT_OUTPUT(finish(consumer), "a,b,");
+        stopServer();
+        std::filesystem::remove_all(work / "d");
+    }
+}
