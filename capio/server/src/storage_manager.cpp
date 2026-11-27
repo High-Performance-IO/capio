@@ -251,7 +251,9 @@ std::vector<std::filesystem::path> StorageManager::getPaths() const {
     return paths;
 }
 
-void StorageManager::remove(const std::filesystem::path &path) {
+void StorageManager::remove(const std::filesystem::path &name) {
+    // A copy: name may be one of the descriptor table (getPath), which this erases
+    const std::filesystem::path path = name;
     START_LOG(gettid(), "call(path=%s)", path.c_str());
     const CapioFile &c_file = get(path);
 
