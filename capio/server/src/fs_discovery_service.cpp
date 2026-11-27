@@ -12,7 +12,8 @@
 
 extern Backend *backend;
 
-void fs_discovery_service(const std::atomic_bool *terminate, const std::filesystem::path &token_directory_path,
+void fs_discovery_service(const std::atomic_bool *terminate,
+                          const std::filesystem::path &token_directory_path,
                           const unsigned int delay_ms) {
     // local cache to not reload tokens already found
     // TODO: relax this by storing also last modified date, and reload in case changes occurred

@@ -90,7 +90,7 @@ class RawConnection {
         address.sin_port        = htons(static_cast<uint16_t>(std::stoi(port)));
         address.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
         // The server may still be starting
-        const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(10);
+        const auto deadline     = std::chrono::steady_clock::now() + std::chrono::seconds(10);
         do {
             if (fd >= 0) {
                 close(fd);
@@ -127,21 +127,21 @@ TEST(MTCLBackendTest, TwoServersExchangeRequestsAndFiles) {
 
     // The listening server: answers a request with a file, then waits for the last request
     const pid_t listener = start_child([&] {
-            MTCLBackend mtcl_backend("TCP", port, 1000);
-            mtcl_backend.handshake_servers(); // the discovery of the unit tests does nothing
-            EXPECT_EQ(mtcl_backend.max_file_transfer_size(), 4L * 1024 * 1024 * 1024);
+        MTCLBackend mtcl_backend("TCP", port, 1000);
+        mtcl_backend.handshake_servers(); // the discovery of the unit tests does nothing
+        EXPECT_EQ(mtcl_backend.max_file_transfer_size(), 4L * 1024 * 1024 * 1024);
 
-            const RemoteRequest request = mtcl_backend.read_next_request();
-            EXPECT_EQ(request.get_code(), CAPIO_SERVER_REQUEST_STAT);
-            EXPECT_STREQ(request.get_content(), "a request");
-            EXPECT_EQ(request.get_source(), mtcl_backend.get_node_name());
+        const RemoteRequest request = mtcl_backend.read_next_request();
+        EXPECT_EQ(request.get_code(), CAPIO_SERVER_REQUEST_STAT);
+        EXPECT_STREQ(request.get_content(), "a request");
+        EXPECT_EQ(request.get_source(), mtcl_backend.get_node_name());
 
-            char file[] = "0123456789";
-            mtcl_backend.send_file("0001 a file", 11, file, 10, request.get_source());
-            mtcl_backend.send_file("0001 no file", 12, nullptr, 0, request.get_source());
+        char file[] = "0123456789";
+        mtcl_backend.send_file("0001 a file", 11, file, 10, request.get_source());
+        mtcl_backend.send_file("0001 no file", 12, nullptr, 0, request.get_source());
 
-            const RemoteRequest last = mtcl_backend.read_next_request();
-            EXPECT_STREQ(last.get_content(), "the last request");
+        const RemoteRequest last = mtcl_backend.read_next_request();
+        EXPECT_STREQ(last.get_content(), "the last request");
     });
 
     const int connector = run_in_child([&] {
@@ -205,10 +205,8 @@ TEST(MTCLBackendTest, APortInUseIsRefused) {
     ASSERT_EQ(bind(taken, reinterpret_cast<sockaddr *>(&address), sizeof(address)), 0);
     ASSERT_EQ(listen(taken, 1), 0);
 
-    EXPECT_EQ(run_in_child([&] {
-                  EXPECT_THROW(MTCLBackend("TCP", port, 1000), std::runtime_error);
-              }),
-              0);
+    EXPECT_EQ(
+        run_in_child([&] { EXPECT_THROW(MTCLBackend("TCP", port, 1000), std::runtime_error); }), 0);
     close(taken);
 }
 
@@ -220,10 +218,10 @@ TEST(MTCLBackendTest, MalformedHandshakesAndFramesCloseTheirConnection) {
     const std::string port = free_tcp_port();
 
     const pid_t listener = start_child([&] {
-            MTCLBackend mtcl_backend("TCP", port, 1000);
-            const RemoteRequest request = mtcl_backend.read_next_request();
-            EXPECT_STREQ(request.get_content(), "valid");
-            EXPECT_EQ(request.get_source(), "good");
+        MTCLBackend mtcl_backend("TCP", port, 1000);
+        const RemoteRequest request = mtcl_backend.read_next_request();
+        EXPECT_STREQ(request.get_content(), "valid");
+        EXPECT_EQ(request.get_source(), "good");
     });
 
     const int client = run_in_child([&] {
