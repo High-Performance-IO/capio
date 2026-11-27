@@ -1,6 +1,7 @@
 #ifndef CAPIO_SEMS_HPP
 #define CAPIO_SEMS_HPP
 
+#include <cerrno>
 #include <semaphore.h>
 
 #include <utility>
@@ -47,10 +48,11 @@ class NamedSemaphore {
     NamedSemaphore &operator=(const NamedSemaphore &) = delete;
     ~NamedSemaphore() {
         START_LOG(capio_syscall(SYS_gettid), "call()");
-        if (sem_destroy(_sem) != 0) {
-            ERR_EXIT_EXCEPT_CHOICE(false, " destruction of semaphore %s failed", _name.c_str());
+        // A named semaphore is closed, not destroyed: sem_destroy is for unnamed ones
+        if (sem_close(_sem) != 0) {
+            ERR_EXIT_EXCEPT_CHOICE(false, " closing of semaphore %s failed", _name.c_str());
         }
-        LOG(" Destroyed shared semaphore %s", _name.c_str());
+        LOG(" Closed shared semaphore %s", _name.c_str());
         if (sem_unlink(_name.c_str()) != 0) {
             ERR_EXIT_EXCEPT_CHOICE(false, " destruction of semaphore %s failed", _name.c_str());
         }
@@ -60,8 +62,11 @@ class NamedSemaphore {
     inline void lock() {
         START_LOG(capio_syscall(SYS_gettid), "call(name=%s)", _name.c_str());
 
-        if (sem_wait(_sem) == -1) {
-            ERR_EXIT(" unable to acquire %s", _name.c_str());
+        // A signal handler interrupts sem_wait, SA_RESTART or not: wait again
+        while (sem_wait(_sem) == -1) {
+            if (errno != EINTR) {
+                ERR_EXIT(" unable to acquire %s", _name.c_str());
+            }
         }
     }
 
@@ -98,8 +103,11 @@ class Semaphore {
 
     inline void lock() {
         START_LOG(capio_syscall(SYS_gettid), "call()");
-        if (sem_wait(&_sem) == -1) {
-            ERR_EXIT("unable to acquire unnamed semaphore");
+        // A signal handler interrupts sem_wait, SA_RESTART or not: wait again
+        while (sem_wait(&_sem) == -1) {
+            if (errno != EINTR) {
+                ERR_EXIT("unable to acquire unnamed semaphore");
+            }
         }
     }
 

@@ -37,7 +37,7 @@ inline void send_dirent_to_client(int tid, int fd, CapioFile &c_file, off64_t of
     off64_t actual_size = (last_entry - first_entry) * static_cast<off64_t>(sizeof(linux_dirent64));
 
     if (actual_size > 0) {
-        auto dirents = std::unique_ptr<linux_dirent64[]>(new linux_dirent64[actual_size]);
+        auto dirents = std::make_unique<linux_dirent64[]>(last_entry - first_entry);
 
         for (int i = first_entry; i < last_entry; i++) {
             dir_entity = (struct linux_dirent64 *) (incoming + i * sizeof(linux_dirent64));
@@ -52,8 +52,8 @@ inline void send_dirent_to_client(int tid, int fd, CapioFile &c_file, off64_t of
             LOG("DIRENT NAME: %s - TARGET NAME: %s", dir_entity->d_name, current_dirent.d_name);
         }
 
-        client_manager->replyToClient(tid, offset, reinterpret_cast<char *>(dirents.get()) - offset,
-                                      actual_size);
+        client_manager->replyToClientWithData(
+            tid, offset + actual_size, reinterpret_cast<const char *>(dirents.get()), actual_size);
         storage_manager->setFileOffset(tid, fd, offset + actual_size);
         return;
     }
