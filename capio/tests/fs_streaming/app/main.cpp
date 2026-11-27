@@ -15,6 +15,7 @@
 
 #include <dirent.h>
 #include <fcntl.h>
+#include <spawn.h>
 #include <sys/sendfile.h>
 #include <sys/stat.h>
 #include <sys/syscall.h>
@@ -85,15 +86,14 @@ const std::map<std::string, Operation> &operations() {
              return fd >= 0;
          }},
         {"cloexec", [](const std::string &) { return fcntl(fd, F_SETFD, FD_CLOEXEC) == 0; }},
-        {"fork_close",
-         [](const std::string &) {
+        {"fork", // "<operation>", run by a child: a failure prints as in the parent
+         [](const std::string &a) {
              const pid_t child = fork();
              if (child == 0) {
-                 _exit(close(fd) == 0 ? 0 : 1);
+                 run(a);
+                 _exit(0);
              }
-             int status = 0;
-             return child > 0 && waitpid(child, &status, 0) == child && WIFEXITED(status) &&
-                    WEXITSTATUS(status) == 0;
+             return child > 0 && waitpid(child, nullptr, 0) == child;
          }},
         {"replace",
          [](const std::string &) {
@@ -272,6 +272,13 @@ const std::map<std::string, Operation> &operations() {
              std::thread thread([&a] { run(a); });
              thread.join();
              return true;
+         }},
+        {"spawn",
+         [](const std::string &) {
+             pid_t child;
+             char *args[] = {const_cast<char *>("true"), nullptr};
+             return posix_spawnp(&child, args[0], nullptr, nullptr, args, environ) == 0 &&
+                    waitpid(child, nullptr, 0) == child;
          }},
     };
     return table;
