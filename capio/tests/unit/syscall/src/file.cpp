@@ -113,6 +113,13 @@ TEST(SystemCallTest, TestLseekPastTheLargestOffsetFails) {
     struct stat statbuf{};
     EXPECT_EQ(fstat(fd, &statbuf), 0);
     EXPECT_EQ(statbuf.st_size, 10);
+    EXPECT_EQ(lseek(fd, 0, SEEK_END), 10);
+    errno = 0;
+    EXPECT_EQ(lseek(fd, 1LL << 40, SEEK_END), (1LL << 40) + 10) << std::strerror(errno);
+    errno = 0;
+    EXPECT_EQ(lseek(fd, 1LL << 50, SEEK_END), (1LL << 50) + 10) << std::strerror(errno);
+    errno = 0;
+    EXPECT_EQ(lseek(fd, LLONG_MAX - 20, SEEK_END), LLONG_MAX - 10) << std::strerror(errno);
     errno = 0;
     EXPECT_EQ(lseek(fd, LLONG_MAX - 10, SEEK_END), LLONG_MAX) << std::strerror(errno);
     EXPECT_EQ(close(fd), 0);
