@@ -233,7 +233,7 @@ TEST_F(RuntimeConfigurationTest, TheMetadataDirectoryIsTheRootUnlessSet) {
  * exits. In children, as it changes the global configuration and the logger.
  */
 TEST_F(RuntimeConfigurationTest, InitializeSetsTheConfigurationOrExits) {
-    EXPECT_EQ(run_in_child([this] {
+    EXPECT_EQ(run_in_child([] {
                   std::vector<std::string> arguments{"capio_server", "--no-config", "--backend",
                                                      "mpi", "--continue-on-error"};
                   std::vector<char *> argv;

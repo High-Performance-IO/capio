@@ -2,10 +2,12 @@
 
 #include <cerrno>
 #include <climits>
+#include <cstring>
 #include <filesystem>
 #include <memory>
 
 #include <fcntl.h>
+#include <sys/stat.h>
 #include <unistd.h>
 
 TEST(SystemCallTest, TestFileCreateReopenClose) {
@@ -108,7 +110,11 @@ TEST(SystemCallTest, TestLseekPastTheLargestOffsetFails) {
     EXPECT_EQ(lseek(fd, -11, SEEK_END), -1);
     EXPECT_EQ(errno, EINVAL);
     EXPECT_EQ(lseek(fd, 0, SEEK_CUR), 10); // a failed seek leaves the offset where it was
-    EXPECT_EQ(lseek(fd, LLONG_MAX - 10, SEEK_END), LLONG_MAX);
+    struct stat statbuf{};
+    EXPECT_EQ(fstat(fd, &statbuf), 0);
+    EXPECT_EQ(statbuf.st_size, 10);
+    errno = 0;
+    EXPECT_EQ(lseek(fd, LLONG_MAX - 10, SEEK_END), LLONG_MAX) << std::strerror(errno);
     EXPECT_EQ(close(fd), 0);
     EXPECT_EQ(unlink("lseek_overflow"), 0);
 }
