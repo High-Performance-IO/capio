@@ -6,6 +6,7 @@
 #include "common/syscall.hpp"
 #include "utils/common.hpp"
 #include "utils/requests.hpp"
+#include "utils/tid.hpp"
 
 /**
  * dup2 and dup3: make @p fd2 a copy of @p fd. If @p fd2 is open, the kernel closes it first,
@@ -53,7 +54,7 @@ inline int capio_dup_onto(const long tid, const int fd, const int fd2, const int
 }
 
 int dup_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg5, long *result) {
-    long tid = syscall_no_intercept(SYS_gettid);
+    long tid = capio_tid();
     int fd   = static_cast<int>(arg0);
 
     START_LOG(tid, "call(fd=%d)", fd);
@@ -85,13 +86,13 @@ int dup_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg5
 
 #ifdef SYS_dup2
 int dup2_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg5, long *result) {
-    const long tid = syscall_no_intercept(SYS_gettid);
+    const long tid = capio_tid();
     return capio_dup_onto(tid, static_cast<int>(arg0), static_cast<int>(arg1), 0, false, result);
 }
 #endif
 
 int dup3_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg5, long *result) {
-    const long tid = syscall_no_intercept(SYS_gettid);
+    const long tid = capio_tid();
     return capio_dup_onto(tid, static_cast<int>(arg0), static_cast<int>(arg1),
                           static_cast<int>(arg2), true, result);
 }

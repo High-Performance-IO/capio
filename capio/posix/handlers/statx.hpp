@@ -4,11 +4,12 @@
 #if defined(SYS_statx)
 
 #include "utils/common.hpp"
+#include "utils/tid.hpp"
 
 inline void fill_statxbuf(struct statx *statxbuf, off_t file_size, bool is_dir, ino_t inode,
                           int mask) {
-    START_LOG(syscall_no_intercept(SYS_gettid), "call(filesize=%ld, is_dir=%s, inode=%d, mask=%d)",
-              file_size, is_dir ? "true" : "false", mask);
+    START_LOG(capio_tid(), "call(filesize=%ld, is_dir=%s, inode=%d, mask=%d)", file_size,
+              is_dir ? "true" : "false", mask);
 
     statx_timestamp time{1, 1};
     if (is_dir == 1) {
@@ -115,7 +116,7 @@ int statx_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long ar
     const auto flags = static_cast<int>(arg2);
     const auto mask  = static_cast<int>(arg3);
     auto *buf        = reinterpret_cast<struct statx *>(arg4);
-    const long tid   = syscall_no_intercept(SYS_gettid);
+    const long tid   = capio_tid();
     START_LOG(tid, "call(dirfd=%d, path=%s, flags=%d, mask=%d)", dirfd,
               path != nullptr ? path : "(null)", flags, mask);
 

@@ -12,6 +12,7 @@
 
 #ifdef CAPIO_LOG
 #include "syscallnames.h"
+#include "utils/tid.hpp"
 #endif
 
 template <typename T> std::string demangled_name(const T &obj) {
@@ -402,8 +403,8 @@ static int hook(long syscall_number, long arg0, long arg1, long arg2, long arg3,
         return 1;
     }
 
-    START_LOG(syscall_no_intercept(SYS_gettid), "call(syscall_number=%ld, syscall_name=%s)",
-              syscall_number, sys_num_to_string(syscall_number).c_str());
+    START_LOG(capio_tid(), "call(syscall_number=%ld, syscall_name=%s)", syscall_number,
+              sys_num_to_string(syscall_number).c_str());
 
     // If the syscall_number is higher than the maximum
     // syscall captured by CAPIO, simply return
@@ -439,7 +440,7 @@ static int hook(long syscall_number, long arg0, long arg1, long arg2, long arg3,
             << "|  syscall(" << syscall_number << ", arg0:" << arg0 << ", arg1:" << arg1
             << ", arg2:" << arg2 << ", arg3:" << arg3 << ", arg4:" << arg4 << ", arg5: " << arg5
             << ")" << std::endl
-            << "|  TID of offending thread: " << syscall_no_intercept(SYS_gettid) << std::endl
+            << "|  TID of offending thread: " << capio_tid() << std::endl
             << "|  PID of offending thread: " << syscall_no_intercept(SYS_getpid) << std::endl
             << "|  PPID of offending thread: " << syscall_no_intercept(SYS_getppid) << std::endl
             << "|  " << std::endl
@@ -461,7 +462,7 @@ static __attribute__((constructor)) void init() {
         return;
     }
 
-    const long tid = syscall_no_intercept(SYS_gettid);
+    const long tid = capio_tid();
 
     FileDescriptorTable::protectAcrossFork();
     // After the handlers of the table, so that the child has a free lock

@@ -4,6 +4,7 @@
 #if defined(SYS_exit) || defined(SYS_exit_group)
 
 #include "utils/requests.hpp"
+#include "utils/tid.hpp"
 
 /*
  * At an exit, the server removes the shared memory of the thread (its response and data queues).
@@ -49,13 +50,13 @@ inline void capio_exit(const long tid, const bool whole_process) {
 }
 
 int exit_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg5, long *result) {
-    capio_exit(syscall_no_intercept(SYS_gettid), false);
+    capio_exit(capio_tid(), false);
     return CAPIO_POSIX_SYSCALL_SKIP;
 }
 
 int exit_group_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg5,
                        long *result) {
-    capio_exit(syscall_no_intercept(SYS_gettid), true);
+    capio_exit(capio_tid(), true);
     return CAPIO_POSIX_SYSCALL_SKIP;
 }
 

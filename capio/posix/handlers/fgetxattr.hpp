@@ -3,6 +3,7 @@
 
 #include "utils/common.hpp"
 #include "utils/filesystem.hpp"
+#include "utils/tid.hpp"
 
 /*
  * Extended attributes. In the FS variant the files are real, and the kernel answers without
@@ -16,7 +17,7 @@ int getxattr_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long
                      long *result) {
     // getxattr(path, name, value, size)
     [[maybe_unused]] const auto *path = reinterpret_cast<const char *>(arg0); // memory, log
-    START_LOG(syscall_no_intercept(SYS_gettid), "call(path=%s)", path);
+    START_LOG(capio_tid(), "call(path=%s)", path);
 
     MEMORY_MODE({
         if (is_capio_path(capio_posix_realpath(path))) {
@@ -33,7 +34,7 @@ int lgetxattr_handler(long arg0, long arg1, long arg2, long arg3, long arg4, lon
                       long *result) {
     // lgetxattr(path, name, value, size). CAPIO paths have no symlinks, so as getxattr
     [[maybe_unused]] const auto *path = reinterpret_cast<const char *>(arg0); // memory, log
-    START_LOG(syscall_no_intercept(SYS_gettid), "call(path=%s)", path);
+    START_LOG(capio_tid(), "call(path=%s)", path);
 
     MEMORY_MODE({
         if (is_capio_path(capio_posix_realpath(path))) {
@@ -50,7 +51,7 @@ int flistxattr_handler(long arg0, long arg1, long arg2, long arg3, long arg4, lo
                        long *result) {
     // flistxattr(fd, list, size)
     [[maybe_unused]] const auto fd = static_cast<int>(arg0); // memory variant, and the log
-    START_LOG(syscall_no_intercept(SYS_gettid), "call(fd=%d)", fd);
+    START_LOG(capio_tid(), "call(fd=%d)", fd);
 
     MEMORY_MODE({
         if (fd_table->contains(fd)) {
@@ -68,7 +69,7 @@ int fgetxattr_handler(long arg0, long arg1, long arg2, long arg3, long arg4, lon
     // fgetxattr(fd, name, value, size). The memory variant uses them, and the log.
     [[maybe_unused]] const auto fd   = static_cast<int>(arg0);
     [[maybe_unused]] const auto name = std::string_view(reinterpret_cast<const char *>(arg1));
-    START_LOG(syscall_no_intercept(SYS_gettid), "call(fd=%d, name=%s)", fd, name.data());
+    START_LOG(capio_tid(), "call(fd=%d, name=%s)", fd, name.data());
 
     MEMORY_MODE({
         if (fd_table->contains(fd)) {

@@ -13,6 +13,7 @@
 #include "utils/data.hpp"
 #include "utils/filesystem.hpp"
 #include "utils/requests.hpp"
+#include "utils/tid.hpp"
 #include "utils/types.hpp"
 
 /**
@@ -437,7 +438,7 @@ inline int copy_file_range_handler(long arg0, long arg1, long arg2, long arg3, l
     auto *off_out     = reinterpret_cast<loff_t *>(arg3);
     const auto len    = static_cast<size_t>(arg4);
     const auto flags  = static_cast<unsigned int>(arg5);
-    const long tid    = syscall_no_intercept(SYS_gettid);
+    const long tid    = capio_tid();
     START_LOG(tid, "call(fd_in=%d, fd_out=%d, len=%zu, flags=%u)", fd_in, fd_out, len, flags);
 
     FS_MODE({

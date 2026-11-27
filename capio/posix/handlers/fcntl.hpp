@@ -9,6 +9,7 @@
 
 #include "utils/common.hpp"
 #include "utils/requests.hpp"
+#include "utils/tid.hpp"
 
 /**
  * The file status flags F_SETFL may change. The access mode and the creation flags stay as open()
@@ -88,7 +89,7 @@ inline long capio_fcntl_lock(int fd, int cmd, struct flock *lock) {
 int fcntl_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg5, long *result) {
     auto fd  = static_cast<int>(arg0);
     auto cmd = static_cast<int>(arg1);
-    long tid = syscall_no_intercept(SYS_gettid);
+    long tid = capio_tid();
 
     START_LOG(tid, "call(fd=%d, cmd=%d, arg=%ld)", fd, cmd, arg2);
 

@@ -5,6 +5,7 @@
 #include "common/syscall.hpp"
 #include "data.hpp"
 #include "requests.hpp"
+#include "utils/tid.hpp"
 
 /**
  * Initialize the required data structures for the new child thread, and then proceed to execute a
@@ -22,7 +23,7 @@ inline void initialize_new_thread(const bool wait = false) {
     const bool flag_was_set   = syscall_no_intercept_flag;
     syscall_no_intercept_flag = true;
 
-    const long tid = syscall_no_intercept(SYS_gettid);
+    const long tid = capio_reset_tid(); // a new thread, or the child of a fork
     const long pid = syscall_no_intercept(SYS_getpid);
 
     const auto capio_app_name = get_capio_app_name();
@@ -47,7 +48,7 @@ inline void initialize_new_thread(const bool wait = false) {
  * handlers, when the table is still locked by the fork.
  */
 inline void announce_inherited_descriptors_fs() {
-    const long tid = syscall_no_intercept(SYS_gettid);
+    const long tid = capio_tid();
     START_LOG(tid, "call()");
     for (const int fd : fd_table->fds()) {
         create_request_fs(fd_table->path(fd), fd, CAPIO_FS_NOT_PRODUCED, tid);
@@ -61,7 +62,7 @@ inline void hook_clone_parent(long child_tid) {
     if (child_tid <= 0) {
         return;
     }
-    const auto tid = syscall_no_intercept(SYS_gettid);
+    const auto tid = capio_tid();
     clone_request(tid, child_tid);
 }
 
@@ -74,7 +75,7 @@ inline void hook_clone_parent(long child_tid) {
  */
 inline void hook_clone_child() {
     const long pid = syscall_no_intercept(SYS_getpid);
-    const long tid = syscall_no_intercept(SYS_gettid);
+    const long tid = capio_reset_tid();
     initialize_new_thread(pid != tid);
 }
 

@@ -10,14 +10,15 @@
 
 #include "utils/common.hpp"
 #include "utils/data.hpp"
+#include "utils/tid.hpp"
 
 // TODO: too similar to capio_read, refactoring needed
 inline int getdents_handler_impl(long arg0, long arg1, long arg2, long *result, bool is64bit) {
     auto fd      = static_cast<int>(arg0);
     auto *buffer = reinterpret_cast<struct linux_dirent64 *>(arg1);
     auto count   = static_cast<off64_t>(arg2);
-    START_LOG(syscall_no_intercept(SYS_gettid), "call(fd=%d, dirp=0x%08x, count=%ld, is64bit=%s)",
-              fd, buffer, count, is64bit ? "true" : "false");
+    START_LOG(capio_tid(), "call(fd=%d, dirp=0x%08x, count=%ld, is64bit=%s)", fd, buffer, count,
+              is64bit ? "true" : "false");
 
     if (fd_table->contains(fd)) {
         LOG("fd=%d, is a capio file descriptor", fd);
@@ -43,8 +44,8 @@ inline int getdents_handler_impl(long arg0, long arg1, long arg2, long *result, 
             }
         })
 
-        DBG(syscall_no_intercept(SYS_gettid), [](char *buf, off64_t count) {
-            START_LOG(syscall_no_intercept(SYS_gettid), "call (count=%ld)", count);
+        DBG(capio_tid(), [](char *buf, off64_t count) {
+            START_LOG(capio_tid(), "call (count=%ld)", count);
             struct linux_dirent64 *d;
             LOG("%25s %12s %13s %15s   %s", "INODE", "TYPE", "RECORD_LENGTH", "OFFSET", "NAME");
             for (off64_t bpos = 0, i = 0; bpos < count && i < 10; i++) {

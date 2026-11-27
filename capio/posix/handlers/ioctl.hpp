@@ -6,12 +6,13 @@
 #include <linux/fs.h>
 
 #include "handlers/read.hpp"
+#include "utils/tid.hpp"
 
 int ioctl_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg5, long *result) {
     [[maybe_unused]] const auto fd = static_cast<int>(arg0); // memory variant, and the log
     [[maybe_unused]] const auto request =
         static_cast<unsigned long>(arg1); // FS variant, and the log
-    [[maybe_unused]] const long tid = syscall_no_intercept(SYS_gettid);
+    [[maybe_unused]] const long tid = capio_tid();
     START_LOG(tid, "call(fd=%d, request=%lu)", fd, request);
 
     FS_MODE({

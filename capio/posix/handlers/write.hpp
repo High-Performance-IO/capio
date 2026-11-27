@@ -6,6 +6,7 @@
 #include "utils/common.hpp"
 #include "utils/data.hpp"
 #include "utils/requests.hpp"
+#include "utils/tid.hpp"
 
 inline off64_t capio_write(int fd, const void *buffer, off64_t count, long tid) {
     START_LOG(tid, "call(fd=%d, buf=0x%08x, count=%ld)", fd, buffer, count);
@@ -57,7 +58,7 @@ int write_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long ar
     auto fd         = static_cast<int>(arg0);
     const auto *buf = reinterpret_cast<const void *>(arg1);
     auto count      = static_cast<off64_t>(arg2);
-    long tid        = syscall_no_intercept(SYS_gettid);
+    long tid        = capio_tid();
 
     return posix_return_value(capio_write(fd, buf, count, tid), result);
 }
@@ -67,7 +68,7 @@ int writev_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long a
     auto fd         = static_cast<int>(arg0);
     const auto *iov = reinterpret_cast<const struct iovec *>(arg1);
     auto iovcnt     = static_cast<int>(arg2);
-    long tid        = syscall_no_intercept(SYS_gettid);
+    long tid        = capio_tid();
 
     return posix_return_value(capio_writev(fd, iov, iovcnt, tid), result);
 }

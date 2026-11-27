@@ -4,6 +4,7 @@
 #if defined(SYS_chdir) || defined(SYS_fchdir)
 
 #include "utils/filesystem.hpp"
+#include "utils/tid.hpp"
 
 /* CAPIO's working directory, after the kernel changed its own. */
 inline void follow_kernel_current_dir() {
@@ -24,7 +25,7 @@ inline void follow_kernel_current_dir() {
 
 int chdir_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg5, long *result) {
     const std::string_view pathname(reinterpret_cast<const char *>(arg0));
-    START_LOG(syscall_no_intercept(SYS_gettid), "call(path=%s)", pathname.data());
+    START_LOG(capio_tid(), "call(path=%s)", pathname.data());
 
     if (is_forbidden_path(pathname)) {
         LOG("Path %s is forbidden: skip", pathname.data());
@@ -42,7 +43,7 @@ int chdir_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long ar
 
     if (is_capio_path(path)) {
         MEMORY_MODE({
-            const long tid    = syscall_no_intercept(SYS_gettid);
+            const long tid    = capio_tid();
             const off64_t res = access_request(path, tid);
             if (res == CAPIO_POSIX_SYSCALL_REQUEST_SKIP) {
                 // Excluded from CAPIO: the kernel's. By the resolved path, as the kernel stays in
@@ -65,8 +66,7 @@ int chdir_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long ar
         FS_MODE({
             // A real directory: wait for it, then the kernel changes directory as for any other
             // path
-            consent_request_cache->consent_request(path, syscall_no_intercept(SYS_gettid),
-                                                   __FUNCTION__);
+            consent_request_cache->consent_request(path, capio_tid(), __FUNCTION__);
             *result = syscall_no_intercept(SYS_chdir, arg0);
             if (*result == 0) {
                 set_current_dir(path);
@@ -90,7 +90,7 @@ int chdir_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long ar
 
 int fchdir_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg5, long *result) {
     const int fd = static_cast<int>(arg0);
-    START_LOG(syscall_no_intercept(SYS_gettid), "call(fd=%d)", fd);
+    START_LOG(capio_tid(), "call(fd=%d)", fd);
 
     MEMORY_MODE({
         if (fd_table->contains(fd)) {

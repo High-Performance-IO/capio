@@ -7,6 +7,7 @@
 
 #include "utils/common.hpp"
 #include "utils/data.hpp"
+#include "utils/tid.hpp"
 
 inline off64_t capio_read(int fd, void *buffer, off64_t count, long tid) {
     START_LOG(tid, "call(fd=%d, buf=0x%08x, count=%ld)", fd, buffer, count);
@@ -110,7 +111,7 @@ int read_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg
     int fd       = static_cast<int>(arg0);
     void *buffer = reinterpret_cast<void *>(arg1);
     auto count   = static_cast<off64_t>(arg2);
-    long tid     = syscall_no_intercept(SYS_gettid);
+    long tid     = capio_tid();
 
     MEMORY_MODE({ return posix_return_value(capio_read(fd, buffer, count, tid), result); })
     FS_MODE({ return posix_return_value(capio_read_fs(fd, buffer, count, tid), result); })
@@ -120,7 +121,7 @@ int readv_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long ar
     auto fd         = static_cast<int>(arg0);
     const auto *iov = reinterpret_cast<const struct iovec *>(arg1);
     auto iovcnt     = static_cast<int>(arg2);
-    long tid        = syscall_no_intercept(SYS_gettid);
+    long tid        = capio_tid();
 
     MEMORY_MODE({ return posix_return_value(capio_readv(fd, iov, iovcnt, tid), result); })
     FS_MODE({ return posix_return_value(capio_readv_fs(fd, iov, iovcnt, tid), result); })
@@ -132,7 +133,7 @@ int pread_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long ar
     const auto fd                      = static_cast<int>(arg0);
     [[maybe_unused]] const auto count  = static_cast<off64_t>(arg2); // FS variant, and the log
     [[maybe_unused]] const auto offset = static_cast<off64_t>(arg3);
-    [[maybe_unused]] const long tid    = syscall_no_intercept(SYS_gettid);
+    [[maybe_unused]] const long tid    = capio_tid();
     START_LOG(tid, "call(fd=%d, count=%ld, offset=%ld)", fd, count, offset);
 
     MEMORY_MODE({
@@ -158,7 +159,7 @@ int preadv_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long a
     [[maybe_unused]] const auto *iov   = reinterpret_cast<const struct iovec *>(arg1); // FS variant
     [[maybe_unused]] const auto iovcnt = static_cast<int>(arg2);
     [[maybe_unused]] const auto offset = static_cast<off64_t>(arg3);
-    [[maybe_unused]] const long tid    = syscall_no_intercept(SYS_gettid);
+    [[maybe_unused]] const long tid    = capio_tid();
     START_LOG(tid, "call(fd=%d, iovcnt=%d, offset=%ld)", fd, iovcnt, offset);
 
     MEMORY_MODE({

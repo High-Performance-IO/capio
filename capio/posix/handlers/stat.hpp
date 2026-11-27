@@ -10,15 +10,15 @@
 #include "utils/common.hpp"
 #include "utils/filesystem.hpp"
 #include "utils/requests.hpp"
+#include "utils/tid.hpp"
 
 inline blkcnt_t get_nblocks(off64_t file_size) {
     return (file_size % 4096 == 0) ? (file_size / 512) : (file_size / 512 + 8);
 }
 
 inline void fill_statbuf(struct stat *statbuf, off_t file_size, bool is_dir, ino_t inode) {
-    START_LOG(syscall_no_intercept(SYS_gettid),
-              "call(statbuf=0x%08x, file_size=%ld, is_dir=%s, inode=%ul)", statbuf, file_size,
-              is_dir ? "true" : "false", inode);
+    START_LOG(capio_tid(), "call(statbuf=0x%08x, file_size=%ld, is_dir=%s, inode=%ul)", statbuf,
+              file_size, is_dir ? "true" : "false", inode);
 
     timespec time{1, 1};
     if (is_dir == 1) {
@@ -165,7 +165,7 @@ inline int capio_fstatat(int dirfd, const std::string_view &pathname, struct sta
 int fstat_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg5, long *result) {
     auto fd   = static_cast<int>(arg0);
     auto *buf = reinterpret_cast<struct stat *>(arg1);
-    long tid  = syscall_no_intercept(SYS_gettid);
+    long tid  = capio_tid();
 
     return posix_return_value(capio_fstat(fd, buf, tid), result);
 }
@@ -177,7 +177,7 @@ int fstatat_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long 
     const auto *path = reinterpret_cast<const char *>(arg1);
     auto *statbuf    = reinterpret_cast<struct stat *>(arg2);
     const auto flags = static_cast<int>(arg3);
-    const long tid   = syscall_no_intercept(SYS_gettid);
+    const long tid   = capio_tid();
     START_LOG(tid, "call(dirfd=%d, path=%s, flags=%d)", dirfd, path != nullptr ? path : "(null)",
               flags);
 
@@ -194,7 +194,7 @@ int lstat_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long ar
     // lstat(pathname, statbuf)
     const auto *path = reinterpret_cast<const char *>(arg0);
     auto *buf        = reinterpret_cast<struct stat *>(arg1);
-    const long tid   = syscall_no_intercept(SYS_gettid);
+    const long tid   = capio_tid();
     START_LOG(tid, "call(path=%s)", path != nullptr ? path : "(null)");
 
     // A null path fails with EFAULT, from the kernel, and a null buffer once the file is found
@@ -208,7 +208,7 @@ int stat_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg
     // stat(pathname, statbuf)
     const auto *path = reinterpret_cast<const char *>(arg0);
     auto *buf        = reinterpret_cast<struct stat *>(arg1);
-    const long tid   = syscall_no_intercept(SYS_gettid);
+    const long tid   = capio_tid();
     START_LOG(tid, "call(path=%s)", path != nullptr ? path : "(null)");
 
     // A null path fails with EFAULT, from the kernel, and a null buffer once the file is found

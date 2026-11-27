@@ -5,6 +5,7 @@
 
 #include "utils/common.hpp"
 #include "utils/filesystem.hpp"
+#include "utils/tid.hpp"
 
 inline int capio_openat(int dirfd, const std::string_view &pathname, int flags, mode_t mode,
                         long tid) {
@@ -124,7 +125,7 @@ inline int capio_openat(int dirfd, const std::string_view &pathname, int flags, 
 
 int creat_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg5, long *result) {
     const std::string_view pathname(reinterpret_cast<const char *>(arg0));
-    long tid = syscall_no_intercept(SYS_gettid);
+    long tid = capio_tid();
 
     return posix_return_value(capio_openat(AT_FDCWD, pathname, O_CREAT | O_WRONLY | O_TRUNC,
                                            static_cast<mode_t>(arg1), tid),
@@ -135,7 +136,7 @@ int open_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg
     const std::string_view pathname(reinterpret_cast<const char *>(arg0));
     int flags = static_cast<int>(arg1);
     auto mode = static_cast<mode_t>(arg2);
-    long tid  = syscall_no_intercept(SYS_gettid);
+    long tid  = capio_tid();
 
     return posix_return_value(capio_openat(AT_FDCWD, pathname, flags, mode, tid), result);
 }
@@ -145,7 +146,7 @@ int openat_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long a
     const std::string_view pathname(reinterpret_cast<const char *>(arg1));
     int flags = static_cast<int>(arg2);
     auto mode = static_cast<mode_t>(arg3);
-    long tid  = syscall_no_intercept(SYS_gettid);
+    long tid  = capio_tid();
 
     return posix_return_value(capio_openat(dirfd, pathname, flags, mode, tid), result);
 }
