@@ -1,6 +1,7 @@
 #ifndef CAPIO_DISCOVERY_HPP
 #define CAPIO_DISCOVERY_HPP
 
+#include <atomic>
 #include <filesystem>
 #include <string>
 #include <thread>
@@ -18,7 +19,7 @@
 class DiscoveryInterface {
   protected:
     /// @brief Variable used to signal termination to child threads
-    bool terminate = false;
+    std::atomic_bool terminate = false;
     /// @brief Token to be advertised by this server
     std::string advertisement_token;
 
