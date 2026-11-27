@@ -18,7 +18,7 @@ MPIBackend::MPIBackend(int argc, char **argv) : Backend(MPI_MAX_PROCESSOR_NAME) 
     LOG("Does MPI has multithreading support? %s (%d)",
         provided == MPI_THREAD_MULTIPLE ? "yes" : "no", provided);
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
-    LOG("node_rank=%d", &rank);
+    LOG("node_rank=%d", rank);
     if (provided != MPI_THREAD_MULTIPLE) {
         LOG("Error: The threading support level is not MPI_THREAD_MULTIPLE (is %d)", provided);
         MPI_Abort(MPI_COMM_WORLD, EXIT_FAILURE);
@@ -89,7 +89,7 @@ void MPIBackend::send_request(const char *message, int message_len, const std::s
               target.c_str());
     const std::lock_guard lg(send_mutex);
     const auto mpi_target = hostname_to_rank[target];
-    LOG("MPI_rank for target %s is %c", target.c_str(), mpi_target);
+    LOG("MPI_rank for target %s is %d", target.c_str(), mpi_target);
 
     MPI_Send(message, message_len + 1, MPI_CHAR, mpi_target, 0, MPI_COMM_WORLD);
 }
@@ -109,6 +109,9 @@ void MPIBackend::send_file(const char *message, const int message_len, char *shm
 
         LOG("Sending %d bytes to %d with offset from beginning odf k=%ld", elem_to_snd, dest, k);
         MPI_Isend(shm + k, elem_to_snd, MPI_BYTE, dest, 0, MPI_COMM_WORLD, &req);
+        // Completes on its own: the server never waits for it, as that could deadlock two servers
+        // sending each other files
+        MPI_Request_free(&req);
         LOG("Sent chunk of %d bytes", elem_to_snd);
     }
 }
@@ -140,11 +143,7 @@ MPISYNCBackend::MPISYNCBackend(int argc, char *argv[]) : MPIBackend(argc, argv) 
     CALF_PRINT_COLOR(CALF_CLI_LEVEL_STATUS, "initialization completed.");
 }
 
-MPISYNCBackend::~MPISYNCBackend() {
-    START_LOG(gettid(), "Call()");
-    MPI_Finalize();
-    CALF_PRINT_COLOR(CALF_CLI_LEVEL_INFO, "teardown completed.");
-}
+MPISYNCBackend::~MPISYNCBackend() = default; // ~MPIBackend finalizes MPI
 
 RemoteRequest MPISYNCBackend::read_next_request() {
     START_LOG(gettid(), "call()");
