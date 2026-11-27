@@ -46,8 +46,6 @@ inline void handle_pending_read(int tid, int fd, long int process_offset, long i
     // requests, so once the client has its answer it may close fd before the offset is stored.
     storage_manager->setFileOffset(tid, fd, process_offset + bytes_read);
     client_manager->replyToClient(tid, process_offset, c_file.getBuffer(), bytes_read);
-
-    // TODO: check if the file was moved to the disk
 }
 
 inline void handle_local_read(int tid, int fd, off64_t count, bool is_prod) {

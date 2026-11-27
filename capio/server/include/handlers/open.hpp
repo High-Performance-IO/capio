@@ -20,8 +20,7 @@ inline void update_file_metadata(const std::filesystem::path &path, int tid, int
     START_LOG(gettid(), "call(path=%s, client_tid=%d fd=%d, is_creat=%s, offset=%ld)", path.c_str(),
               tid, fd, is_creat ? "true" : "false", offset);
 
-    // TODO: check the size that the user wrote in the configuration file
-    //*caching_info[tid].second += 2;
+    // TODO: an initial size per file, once CAPIO-CL has one (#326)
     auto c_file_opt = storage_manager->tryGet(path);
     CapioFile &c_file =
         (c_file_opt)

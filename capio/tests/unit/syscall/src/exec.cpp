@@ -1,9 +1,15 @@
 #include <gtest/gtest.h>
 
 #include <csignal>
+#include <filesystem>
+#include <string>
 #include <sys/syscall.h>
 #include <sys/wait.h>
+#include <thread>
 #include <unistd.h>
+#include <vector>
+
+#include "helpers.hpp"
 
 /*
  * execve keeps the tid, so the program registers again with the server under the same one. A
@@ -44,4 +50,81 @@ TEST(SystemCallTest, TestChainedExec) {
     }
     ASSERT_TRUE(WIFEXITED(status));
     EXPECT_EQ(WEXITSTATUS(status), 0);
+}
+
+TEST(SystemCallTest, TestCloseOnExecDescriptorsAreClosedByExec) {
+    if (memory_variant()) {
+        GTEST_SKIP() << "#314: the memory variant leaves them open on /dev/null";
+    }
+    const int status = run_in_child([] {
+        const int fd = open("exec_cloexec", O_CREAT | O_WRONLY | O_TRUNC | O_CLOEXEC, 0600);
+        if (fd < 0) {
+            return 90;
+        }
+        // Exits 0 only if fd is not open in the new program
+        const std::string command =
+            "{ : >&" + std::to_string(fd) + "; } 2>/dev/null || exit 0; exit 1";
+        execlp("bash", "bash", "--norc", "-c", command.c_str(), nullptr);
+        return 91;
+    });
+    EXPECT_EQ(status, 0);
+    EXPECT_EQ(unlink("exec_cloexec"), 0);
+}
+
+TEST(SystemCallTest, TestExecFromAnotherThreadKeepsTheDescriptors) {
+    if (memory_variant()) {
+        GTEST_SKIP() << "#314: the snapshot is named after the thread, the new program reads it "
+                        "under the process id";
+    }
+    write_file("exec_thread", "AB");
+    const int status = run_in_child([] {
+        const int fd = open("exec_thread", O_RDONLY);
+        if (fd < 0) {
+            return 90;
+        }
+        std::thread([fd] {
+            const std::string command =
+                "read -r line <&" + std::to_string(fd) + "; [ \"$line\" = AB ]";
+            execlp("bash", "bash", "--norc", "-c", command.c_str(), nullptr);
+            _exit(91);
+        }).join();
+        return 92;
+    });
+    EXPECT_EQ(status, 0);
+    EXPECT_EQ(unlink("exec_thread"), 0);
+}
+
+// The server removes the queues of a client that exits (#319)
+TEST(SystemCallTest, TestAnExitedClientLeavesNoSharedMemory) {
+    constexpr int TIMEOUT_MS = 5000;
+    constexpr int STEP_MS    = 10;
+
+    pid_t child      = 0;
+    const int status = run_in_child(
+        [] {
+            write_file("exec_shm", "AB");
+            return read_file("exec_shm") == "AB" ? 0 : 1;
+        },
+        &child);
+    EXPECT_EQ(status, 0);
+
+    // The queues of a thread end with its id. The server removes them once it reads the exit.
+    const std::string suffix = "_" + std::to_string(child);
+    std::vector<std::string> left;
+    for (int waited = 0; waited < TIMEOUT_MS; waited += STEP_MS) {
+        left.clear();
+        for (const auto &entry : std::filesystem::directory_iterator("/dev/shm")) {
+            const std::string name = entry.path().filename();
+            if (name.size() > suffix.size() &&
+                name.compare(name.size() - suffix.size(), suffix.size(), suffix) == 0) {
+                left.push_back(name);
+            }
+        }
+        if (left.empty()) {
+            break;
+        }
+        usleep(STEP_MS * 1000);
+    }
+    EXPECT_TRUE(left.empty()) << left.front();
+    EXPECT_EQ(unlink("exec_shm"), 0);
 }

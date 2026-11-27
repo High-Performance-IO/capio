@@ -1,6 +1,7 @@
 #include <gtest/gtest.h>
 
 #include <cerrno>
+#include <climits>
 #include <filesystem>
 #include <memory>
 
@@ -92,4 +93,22 @@ TEST(SystemCallTest, TestFileCreateReopenCloseInDifferentDirectoryWithOpenatDirf
     EXPECT_NE(unlinkat(dirfd, PATHNAME, 0), -1);
     EXPECT_NE(close(dirfd), -1);
     EXPECT_NE(faccessat(dirfd, PATHNAME, F_OK, 0), 0);
+}
+
+// An offset past the largest one fails, as one before the start of the file: Linux gives EINVAL
+// for both, not EOVERFLOW (#322)
+TEST(SystemCallTest, TestLseekPastTheLargestOffsetFails) {
+    const int fd = open("lseek_overflow", O_CREAT | O_RDWR | O_TRUNC, S_IRUSR | S_IWUSR);
+    ASSERT_NE(fd, -1);
+    EXPECT_EQ(write(fd, "0123456789", 10), 10);
+    EXPECT_EQ(lseek(fd, LLONG_MAX, SEEK_CUR), -1);
+    EXPECT_EQ(errno, EINVAL);
+    EXPECT_EQ(lseek(fd, LLONG_MAX, SEEK_END), -1);
+    EXPECT_EQ(errno, EINVAL);
+    EXPECT_EQ(lseek(fd, -11, SEEK_END), -1);
+    EXPECT_EQ(errno, EINVAL);
+    EXPECT_EQ(lseek(fd, 0, SEEK_CUR), 10); // a failed seek leaves the offset where it was
+    EXPECT_EQ(lseek(fd, LLONG_MAX - 10, SEEK_END), LLONG_MAX);
+    EXPECT_EQ(close(fd), 0);
+    EXPECT_EQ(unlink("lseek_overflow"), 0);
 }

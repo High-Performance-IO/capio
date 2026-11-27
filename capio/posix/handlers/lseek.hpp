@@ -7,7 +7,13 @@
 #include "utils/common.hpp"
 #include "utils/data.hpp"
 
-// TODO: EOVERFLOW is not addressed
+/// @brief @p base + @p offset, or -1 if it overflows: Linux fails such a seek with EINVAL, as one
+/// before the start of the file
+inline off64_t capio_seek_target(const off64_t base, const off64_t offset) {
+    off64_t target;
+    return __builtin_add_overflow(base, offset, &target) ? -1 : target;
+}
+
 inline off64_t capio_lseek(int fd, off64_t offset, int whence, long tid) {
     START_LOG(tid, "call(fd=%d, offset=%ld, whence=%d)", fd, offset, whence);
 
@@ -31,7 +37,7 @@ inline off64_t capio_lseek(int fd, off64_t offset, int whence, long tid) {
             }
         } else if (whence == SEEK_CUR) {
             LOG("whence %d is SEEK_CUR", whence);
-            off64_t new_offset = file_offset + offset;
+            off64_t new_offset = capio_seek_target(file_offset, offset);
             if (new_offset >= 0) {
                 capio_set_fd_offset(fd, new_offset, tid);
                 LOG("the new offset of file %d is %ld", fd, new_offset);
@@ -42,7 +48,7 @@ inline off64_t capio_lseek(int fd, off64_t offset, int whence, long tid) {
             }
         } else if (whence == SEEK_END) {
             LOG("whence %d is SEEK_END", whence);
-            off64_t new_offset = seek_end_request(fd, tid) + offset;
+            off64_t new_offset = capio_seek_target(seek_end_request(fd, tid), offset);
             if (new_offset < 0) {
                 errno = EINVAL;
                 return CAPIO_POSIX_SYSCALL_ERRNO;
@@ -72,9 +78,10 @@ inline off64_t capio_lseek(int fd, off64_t offset, int whence, long tid) {
         // A directory that the server lists (see getdents) is sent the offset: a seek, as
         // rewinddir and seekdir make, only moves it. telldir reads it back.
         if ((fd_table->flags(fd) & O_DIRECTORY) != 0 && !read_request_cache->isListedByKernel(fd)) {
-            const off64_t new_offset = whence == SEEK_SET   ? offset
-                                       : whence == SEEK_CUR ? fd_table->offset(fd) + offset
-                                                            : -1;
+            const off64_t new_offset = whence == SEEK_SET ? offset
+                                       : whence == SEEK_CUR
+                                           ? capio_seek_target(fd_table->offset(fd), offset)
+                                           : -1;
             if (new_offset < 0) {
                 errno = EINVAL;
                 return CAPIO_POSIX_SYSCALL_ERRNO;
