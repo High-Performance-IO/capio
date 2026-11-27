@@ -10,10 +10,10 @@ project(capio
         VERSION 2.0.0
 )
 
-# Pre-release suffix of the version, such as "-rc1"; empty for a release. CMake versions are only
+# Pre-release suffix of the version; empty for a release. CMake versions are only
 # numbers, so the suffix lives here. A suffix makes release.yml publish a pre-release on GitHub, and
 # no Docker image.
-set(CAPIO_VERSION_SUFFIX "-rc1")
+set(CAPIO_VERSION_SUFFIX "-alpha.1")
 set(CAPIO_FULL_VERSION "${CMAKE_PROJECT_VERSION}${CAPIO_VERSION_SUFFIX}")
 
 # Set required C++ standard
