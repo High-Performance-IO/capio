@@ -11,6 +11,9 @@
 #include "utils/common.hpp"
 #include "utils/requests.hpp"
 #include "utils/tid.hpp"
+#if defined(SYS_io_uring_setup)
+#include "utils/uring.hpp"
+#endif
 
 int close_range_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg5,
                         long *result) {
@@ -26,6 +29,19 @@ int close_range_handler(long arg0, long arg1, long arg2, long arg3, long arg4, l
         }
     }
     if (affected.empty()) { // e.g. before an exec, on descriptors of the program: not CAPIO files
+#if defined(SYS_io_uring_setup)
+        // The rings it closes leave the table (see RingTable)
+        if (const auto rings = ring_table().fdsBetween(first, last);
+            !rings.empty() && (flags & CLOSE_RANGE_CLOEXEC) == 0) {
+            *result = syscall_no_intercept(SYS_close_range, first, last, flags);
+            if (*result == 0) {
+                for (const int ring : rings) {
+                    ring_table().remove(ring);
+                }
+            }
+            return CAPIO_POSIX_SYSCALL_SUCCESS;
+        }
+#endif
         return CAPIO_POSIX_SYSCALL_SKIP;
     }
     MEMORY_MODE({ throw CapioUnimplementedException("close_range"); })

@@ -5,10 +5,19 @@
 
 #include "utils/requests.hpp"
 #include "utils/tid.hpp"
+#if defined(SYS_io_uring_setup)
+#include "utils/uring.hpp"
+#endif
 
 int close_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg5, long *result) {
     int fd = static_cast<int>(arg0);
     START_LOG(capio_tid(), "call(fd=%ld)", fd);
+
+#if defined(SYS_io_uring_setup)
+    if (uring_close(fd, result)) {
+        return CAPIO_POSIX_SYSCALL_SUCCESS;
+    }
+#endif
 
     if (!fd_table->contains(fd)) {
         return CAPIO_POSIX_SYSCALL_SKIP;

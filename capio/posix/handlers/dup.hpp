@@ -7,18 +7,28 @@
 #include "utils/common.hpp"
 #include "utils/requests.hpp"
 #include "utils/tid.hpp"
+#if defined(SYS_io_uring_setup)
+#include "utils/uring.hpp"
+#endif
 
 /**
  * dup2 and dup3: make @p fd2 a copy of @p fd. If @p fd2 is open, the kernel closes it first,
  * without a close(2) that CAPIO sees, and drops the error of that close. So a CAPIO descriptor
- * there is flushed first, as close does, and its close is told to the server once the call worked.
+ * there is flushed first, as close does, and its close is told to the server once the call worked;
+ * a ring there leaves the table of rings.
  */
 inline int capio_dup_onto(const long tid, const int fd, const int fd2, const int flags,
                           const bool is_dup3, long *result) {
     START_LOG(tid, "call(fd=%d, fd2=%d, flags=%X)", fd, fd2, flags);
     const bool fd_is_capio  = fd_table->contains(fd);
     const bool fd2_is_capio = fd_table->contains(fd2);
-    if (fd == fd2 || (!fd_is_capio && !fd2_is_capio)) {
+#if defined(SYS_io_uring_setup)
+    // A ring there is closed too, and leaves the table (see RingTable)
+    const bool fd2_is_ring = fd != fd2 && ring_table().find(fd2) != nullptr;
+#else
+    const bool fd2_is_ring = false;
+#endif
+    if (fd == fd2 || (!fd_is_capio && !fd2_is_capio && !fd2_is_ring)) {
         return CAPIO_POSIX_SYSCALL_SKIP; // fd == fd2: the kernel neither copies nor closes
     }
     bool replaced = false;
@@ -40,6 +50,11 @@ inline int capio_dup_onto(const long tid, const int fd, const int fd2, const int
     if (*result < 0) {
         return CAPIO_POSIX_SYSCALL_SUCCESS;
     }
+#if defined(SYS_io_uring_setup)
+    if (fd2_is_ring) {
+        ring_table().remove(fd2);
+    }
+#endif
     if (fd2_is_capio) {
         fd_table->remove(fd2);
         if (replaced) {
