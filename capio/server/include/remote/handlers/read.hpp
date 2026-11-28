@@ -10,7 +10,7 @@
 #include "utils/common.hpp"
 #include "utils/runtime_configuration.hpp"
 #include "utils/server_state.hpp"
-#include "utils/waiter.hpp"
+#include "utils/thread_manager.hpp"
 
 inline void serve_remote_read(const std::filesystem::path &path, const std::string &dest, int tid,
                               int fd, off64_t count, off64_t offset, bool complete,
@@ -90,7 +90,8 @@ inline void handle_remote_read(const std::filesystem::path &path, const std::str
     if (c_file.isCommitted() || (CapioCLEngine::get().isFirable(path) && data_available)) {
         serve_remote_read(path, source, tid, fd, count, offset, c_file.isCommitted(), is_getdents);
     } else {
-        spawn_waiter(wait_for_data, path, source, tid, fd, count, offset, is_getdents);
+        thread_manager().startWaiter(thread_name("read", path, source, "its data"), wait_for_data,
+                                     path, source, tid, fd, count, offset, is_getdents);
     }
 }
 

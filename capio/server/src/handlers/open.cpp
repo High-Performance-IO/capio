@@ -18,7 +18,7 @@
 #include "utils/common.hpp"
 #include "utils/fs_root.hpp"
 #include "utils/server_state.hpp"
-#include "utils/waiter.hpp"
+#include "utils/thread_manager.hpp"
 
 void update_file_metadata(const std::filesystem::path &path, int tid, int fd, bool is_creat,
                           off64_t offset) {
@@ -82,7 +82,8 @@ void handle_open(int tid, int fd, const std::filesystem::path &path) {
         client_manager->replyToClient(tid, 1);
     } else {
         LOG("File does not exist yet. Halting execution of POSIX client.");
-        spawn_waiter(wait_for_file_creation, path, tid, fd);
+        thread_manager().startWaiter(thread_name("open", path, tid, "its creation"),
+                                     wait_for_file_creation, path, tid, fd);
     }
 }
 
@@ -105,7 +106,7 @@ void handle_open_fs(const int tid, const std::filesystem::path &path) {
         client_manager->replyToClient(tid, 1); // if it is missing, the kernel answers ENOENT
         return;
     }
-    spawn_waiter([path, tid] {
+    thread_manager().startWaiter(thread_name("open", path, tid, "its creation"), [path, tid] {
         fs_storage_manager->waitForCreation(path);
         client_manager->replyToClient(tid, 1);
     });

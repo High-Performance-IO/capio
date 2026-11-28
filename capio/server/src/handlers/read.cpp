@@ -21,7 +21,7 @@
 #include "utils/fs_root.hpp"
 #include "utils/runtime_configuration.hpp"
 #include "utils/server_state.hpp"
-#include "utils/waiter.hpp"
+#include "utils/thread_manager.hpp"
 
 namespace {
 /// @brief One local read at a time: they move the offsets of descriptors
@@ -69,10 +69,11 @@ void handle_local_read(int tid, int fd, off64_t count, bool is_prod) {
     if (!(file_complete || CapioCLEngine::get().isFirable(path))) {
         // wait for file to be completed and then do what is done inside handle pending read
         LOG("Data is not available yet. Starting async thread to wait for file availability");
-        spawn_waiter([&c_file, tid, fd, count, process_offset] {
-            c_file.waitForCommit();
-            handle_pending_read(tid, fd, process_offset, count);
-        });
+        thread_manager().startWaiter(thread_name("read", path, tid, "its commit"),
+                                     [&c_file, tid, fd, count, process_offset] {
+                                         c_file.waitForCommit();
+                                         handle_pending_read(tid, fd, process_offset, count);
+                                     });
         return;
     }
 
@@ -96,10 +97,11 @@ void handle_local_read(int tid, int fd, off64_t count, bool is_prod) {
             "it to client",
             sector_not_found ? "no sector holds data at this offset yet"
                              : "the read goes beyond the end of the available sector");
-        spawn_waiter([&c_file, tid, fd, count, process_offset] {
-            c_file.waitForData(process_offset + count);
-            handle_pending_read(tid, fd, process_offset, count);
-        });
+        thread_manager().startWaiter(thread_name("read", path, tid, "its data"),
+                                     [&c_file, tid, fd, count, process_offset] {
+                                         c_file.waitForData(process_offset + count);
+                                         handle_pending_read(tid, fd, process_offset, count);
+                                     });
         return;
     }
 
@@ -163,7 +165,8 @@ void handle_read(int tid, int fd, off64_t count) {
     if (!file_location_opt && !is_prod) {
         LOG("Starting thread to wait for file creation");
         // launch a thread that checks when the file is created
-        spawn_waiter(wait_for_file, path, tid, fd, count);
+        thread_manager().startWaiter(thread_name("read", path, tid, "its creation"), wait_for_file,
+                                     path, tid, fd, count);
     } else if (is_prod || *file_location_opt == backend->get_node_name()) {
         LOG("File is local. handling local read");
         handle_local_read(tid, fd, count, is_prod);
@@ -202,7 +205,8 @@ void read_fs_handler(const char *const str) {
         client_manager->replyToClient(tid, *size);
         return;
     }
-    spawn_waiter([path, tid, end_of_read] {
-        client_manager->replyToClient(tid, fs_storage_manager->waitForData(path, end_of_read));
-    });
+    thread_manager().startWaiter(
+        thread_name("read", path, tid, "its data"), [path, tid, end_of_read] {
+            client_manager->replyToClient(tid, fs_storage_manager->waitForData(path, end_of_read));
+        });
 }

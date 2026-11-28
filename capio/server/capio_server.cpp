@@ -29,8 +29,8 @@
 #include "remote/discovery.hpp"
 #include "storage/capio_file.hpp"
 #include "utils/common.hpp"
+#include "utils/thread_manager.hpp"
 #include "utils/types.hpp"
-#include "utils/waiter.hpp"
 
 ClientManager *client_manager;
 StorageManager *storage_manager;

@@ -16,7 +16,7 @@
 #include "utils/common.hpp"
 #include "utils/runtime_configuration.hpp"
 #include "utils/server_state.hpp"
-#include "utils/waiter.hpp"
+#include "utils/thread_manager.hpp"
 
 void request_remote_getdents(int tid, int fd, off64_t count, const std::string &home) {
     START_LOG(gettid(), "call(tid=%d, fd=%d, count=%ld, home=%s)", tid, fd, count, home.c_str());
@@ -51,16 +51,18 @@ void handle_getdents(int tid, int fd, long int count) {
     auto file_location_opt = home_node_service->getHome(path_to_check);
 
     if (!file_location_opt && !is_prod) {
-        spawn_waiter([tid, fd, count, path_to_check] {
-            START_LOG(gettid(), "call(tid=%d, fd=%d, count=%ld)", tid, fd, count);
+        thread_manager().startWaiter(
+            thread_name("getdents", path_to_check, tid, "its creation"),
+            [tid, fd, count, path_to_check] {
+                START_LOG(gettid(), "call(tid=%d, fd=%d, count=%ld)", tid, fd, count);
 
-            if (const auto home = home_node_service->waitForHome(path_to_check);
-                home == backend->get_node_name()) {
-                handle_getdents(tid, fd, count);
-            } else {
-                request_remote_getdents(tid, fd, count, home);
-            }
-        });
+                if (const auto home = home_node_service->waitForHome(path_to_check);
+                    home == backend->get_node_name()) {
+                    handle_getdents(tid, fd, count);
+                } else {
+                    request_remote_getdents(tid, fd, count, home);
+                }
+            });
     } else if (is_prod || *file_location_opt == backend->get_node_name()) {
         CapioFile &c_file = storage_manager->get(path_to_check);
         off64_t offset    = storage_manager->getFileOffset(tid, fd);

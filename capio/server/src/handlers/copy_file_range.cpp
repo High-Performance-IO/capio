@@ -15,8 +15,8 @@
 #include "utils/capiocl_adapter.hpp"
 #include "utils/common.hpp"
 #include "utils/server_state.hpp"
+#include "utils/thread_manager.hpp"
 #include "utils/types.hpp"
-#include "utils/waiter.hpp"
 
 void handle_local_copy_file_range(const CSCopyFileRange_t &copy, const bool is_prod) {
     START_LOG(gettid(), "call(tid=%d, path_in=%s, offset_in=%ld, count=%ld, is_prod=%s)", copy.tid,
@@ -37,14 +37,16 @@ void handle_local_copy_file_range(const CSCopyFileRange_t &copy, const bool is_p
     }
     LOG("Waiting on a separate thread for the %s of the input",
         wait_for_commit ? "commit" : "data");
-    spawn_waiter([&c_file_in, copy, wait_for_commit] {
-        if (wait_for_commit) {
-            c_file_in.waitForCommit();
-        } else {
-            c_file_in.waitForData(copy.offset_in + copy.count);
-        }
-        copy_file_range_data(copy);
-    });
+    thread_manager().startWaiter(thread_name("copy_file_range", copy.path_in, copy.tid,
+                                             (wait_for_commit ? "its commit" : "its data")),
+                                 [&c_file_in, copy, wait_for_commit] {
+                                     if (wait_for_commit) {
+                                         c_file_in.waitForCommit();
+                                     } else {
+                                         c_file_in.waitForData(copy.offset_in + copy.count);
+                                     }
+                                     copy_file_range_data(copy);
+                                 });
 }
 
 void handle_copy_file_range(const CSCopyFileRange_t &copy, const bool is_prod,
@@ -72,9 +74,10 @@ void copy_file_range_handler(const char *const str) {
 
     if (!is_prod && !home_node_service->getHome(copy.path_in)) {
         LOG("Waiting on a separate thread for the input to be created");
-        spawn_waiter([copy] {
-            handle_copy_file_range(copy, false, home_node_service->waitForHome(copy.path_in));
-        });
+        thread_manager().startWaiter(
+            thread_name("copy_file_range", copy.path_in, copy.tid, "its creation"), [copy] {
+                handle_copy_file_range(copy, false, home_node_service->waitForHome(copy.path_in));
+            });
         return;
     }
     handle_copy_file_range(copy, is_prod, home_node_service->getHome(copy.path_in));
