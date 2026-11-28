@@ -28,8 +28,11 @@
  * io_uring on a CAPIO ring: CAPIO serves the SQEs of CAPIO files, and forwards every other SQE to
  * a hidden kernel ring, whose CQEs it copies to the CQ of the application (see CapioRing).
  *
- * Memory variant only: in the FS variant the descriptors of CAPIO files are the kernel's, and the
- * kernel serves the ring as it does without CAPIO.
+ * What CAPIO does not implement on a CAPIO file throws CapioUnimplementedException, as the system
+ * calls do: an opcode or an SQE flag it does not serve, a chain that mixes CAPIO and other files,
+ * the registration of a CAPIO file, and in the FS variant every SQE on a CAPIO file. A ring that
+ * never touches a CAPIO file works as without CAPIO, and what the kernel itself may refuse (an
+ * SQPOLL ring, the registration of the ring) is refused as the kernel does.
  */
 
 /// @brief The setup flags that a synchronous execution satisfies: the others give EINVAL
@@ -38,7 +41,7 @@ constexpr unsigned CAPIO_URING_SETUP_FLAGS =
     IORING_SETUP_COOP_TASKRUN | IORING_SETUP_TASKRUN_FLAG | IORING_SETUP_SINGLE_ISSUER |
     IORING_SETUP_DEFER_TASKRUN;
 
-/// @brief The SQE flags that CAPIO honours on the SQEs it serves: the others give EINVAL
+/// @brief The SQE flags that CAPIO honours on the SQEs it serves: see uring_capio_exec
 constexpr uint8_t CAPIO_URING_SQE_FLAGS =
     IOSQE_IO_DRAIN | IOSQE_IO_LINK | IOSQE_IO_HARDLINK | IOSQE_ASYNC | IOSQE_CQE_SKIP_SUCCESS;
 
@@ -232,7 +235,8 @@ inline bool uring_for_capio(const io_uring_sqe *sqe) {
 }
 
 /**
- * @brief Serve @p sqe, an SQE for CAPIO, as the system call it stands for.
+ * @brief Serve @p sqe, an SQE for CAPIO, as the system call it stands for. An opcode or a flag
+ * that CAPIO does not serve, and every SQE in the FS variant, throw CapioUnimplementedException.
  * @param res the res of its CQE
  * @return false if CAPIO leaves it to the kernel ring: its capio_* function skipped it
  */
@@ -240,9 +244,10 @@ inline bool uring_capio_exec(const io_uring_sqe *sqe, long tid, int32_t &res) {
     START_LOG(tid, "call(opcode=%u, fd=%d, user_data=%llu)", sqe->opcode, sqe->fd,
               static_cast<unsigned long long>(sqe->user_data));
 
+    FS_MODE({ throw CapioUnimplementedException("io_uring on a CAPIO file"); })
     if (sqe->flags & ~CAPIO_URING_SQE_FLAGS) {
-        res = -EINVAL;
-        return true;
+        throw CapioUnimplementedException("io_uring with SQE flags " + std::to_string(sqe->flags) +
+                                          " on a CAPIO file");
     }
     const std::string_view path(sqe->addr != 0 ? reinterpret_cast<const char *>(sqe->addr) : "");
     off64_t r    = CAPIO_POSIX_SYSCALL_REQUEST_SKIP;
@@ -302,9 +307,8 @@ inline bool uring_capio_exec(const io_uring_sqe *sqe, long tid, int32_t &res) {
         res = static_cast<int32_t>(handled);
         return true;
     default:
-        LOG("opcode %u is not supported on CAPIO files", sqe->opcode);
-        res = -EINVAL;
-        return true;
+        throw CapioUnimplementedException("io_uring opcode " + std::to_string(sqe->opcode) +
+                                          " on a CAPIO file");
     }
     if (r == CAPIO_POSIX_SYSCALL_REQUEST_SKIP) {
         return false;
@@ -351,7 +355,7 @@ inline const io_uring_sqe *uring_sqe_at(const CapioRing &ring, uint32_t pos) {
 
 /**
  * @brief Run the @p count linked SQEs at @p head, a chain with at least one SQE for CAPIO. A chain
- * that mixes CAPIO and kernel SQEs is not supported: its kernel SQEs fail with EINVAL. A single SQE
+ * that mixes CAPIO and kernel SQEs is not implemented (CapioUnimplementedException). A single SQE
  * that CAPIO skips goes to the kernel ring.
  * @return whether a CQE was posted
  */
@@ -366,11 +370,12 @@ inline bool uring_run_chain(CapioRing &ring, uint32_t head, uint32_t count, long
         } else if (sqe.opcode == IORING_OP_NOP) {
             res = 0; // no side effect: completed here, in chain order
         } else if (!uring_for_capio(&sqe) || !uring_capio_exec(&sqe, tid, res)) {
-            if (count == 1) {
-                uring_kernel_queue(ring, sqe);
-                continue;
+            if (count > 1) {
+                throw CapioUnimplementedException(
+                    "an io_uring chain of CAPIO files and other files");
             }
-            res = -EINVAL;
+            uring_kernel_queue(ring, sqe);
+            continue;
         }
         if (!chain_failed && (sqe.flags & IOSQE_IO_LINK) && uring_breaks_link(&sqe, res)) {
             chain_failed = true;
@@ -496,10 +501,10 @@ inline bool uring_has_capio_fd(uint64_t fds, uint32_t count) {
 }
 
 /**
- * @brief io_uring_register of a CAPIO ring: forwarded to the kernel ring, but CAPIO files cannot be
- * registered, and neither can the ring itself.
+ * @brief io_uring_register of a CAPIO ring: forwarded to the kernel ring. CAPIO files cannot be
+ * registered (CapioUnimplementedException), and neither can the ring itself (EOPNOTSUPP).
  * @return what the kernel returns, CAPIO_POSIX_SYSCALL_REQUEST_SKIP if @p ring_fd is not a CAPIO
- * ring, or CAPIO_POSIX_SYSCALL_ERRNO: EOPNOTSUPP for what CAPIO refuses
+ * ring, or CAPIO_POSIX_SYSCALL_ERRNO: EOPNOTSUPP for the registration of the ring
  */
 inline off64_t capio_io_uring_register(int ring_fd, unsigned opcode, void *arg, unsigned count,
                                        long tid) {
@@ -511,24 +516,25 @@ inline off64_t capio_io_uring_register(int ring_fd, unsigned opcode, void *arg, 
     }
     const std::lock_guard<std::mutex> lock(ring->lock);
 
-    bool refused = opcode & CAPIO_URING_REGISTER_USE_REGISTERED_RING;
+    bool refused     = opcode & CAPIO_URING_REGISTER_USE_REGISTERED_RING;
+    bool capio_files = false;
     switch (opcode) {
     case IORING_REGISTER_FILES:
-        refused = uring_has_capio_fd(reinterpret_cast<uint64_t>(arg), count);
+        capio_files = uring_has_capio_fd(reinterpret_cast<uint64_t>(arg), count);
         break;
     case IORING_REGISTER_FILES2: {
         const auto *reg = static_cast<const io_uring_rsrc_register *>(arg);
-        refused         = reg != nullptr && uring_has_capio_fd(reg->data, reg->nr);
+        capio_files     = reg != nullptr && uring_has_capio_fd(reg->data, reg->nr);
         break;
     }
     case IORING_REGISTER_FILES_UPDATE: {
         const auto *update = static_cast<const io_uring_files_update *>(arg);
-        refused            = update != nullptr && uring_has_capio_fd(update->fds, count);
+        capio_files        = update != nullptr && uring_has_capio_fd(update->fds, count);
         break;
     }
     case IORING_REGISTER_FILES_UPDATE2: {
         const auto *update = static_cast<const io_uring_rsrc_update2 *>(arg);
-        refused            = update != nullptr && uring_has_capio_fd(update->data, update->nr);
+        capio_files        = update != nullptr && uring_has_capio_fd(update->data, update->nr);
         break;
     }
     case IORING_REGISTER_RING_FDS: // enter must receive CAPIO's ring fd
@@ -537,6 +543,9 @@ inline off64_t capio_io_uring_register(int ring_fd, unsigned opcode, void *arg, 
         break;
     default:
         break;
+    }
+    if (capio_files) {
+        throw CapioUnimplementedException("io_uring_register of a CAPIO file");
     }
     if (refused) {
         LOG("register opcode %u refused", opcode);
@@ -561,7 +570,6 @@ inline off64_t capio_io_uring_register(int ring_fd, unsigned opcode, void *arg, 
 #ifdef SYS_io_uring_setup
 int io_uring_setup_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg5,
                            long *result) {
-    FS_MODE({ return CAPIO_POSIX_SYSCALL_SKIP; }) // memory variant only: see the top of the file
     const long tid = capio_tid();
     return posix_return_value(capio_io_uring_setup(static_cast<unsigned>(arg0),
                                                    reinterpret_cast<io_uring_params *>(arg1), tid),
@@ -572,7 +580,6 @@ int io_uring_setup_handler(long arg0, long arg1, long arg2, long arg3, long arg4
 #ifdef SYS_io_uring_enter
 int io_uring_enter_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg5,
                            long *result) {
-    FS_MODE({ return CAPIO_POSIX_SYSCALL_SKIP; }) // memory variant only: see the top of the file
     const long tid = capio_tid();
     const UringWaitArg wait{static_cast<unsigned>(arg3) & IORING_ENTER_EXT_ARG,
                             reinterpret_cast<const void *>(arg4), static_cast<size_t>(arg5)};
@@ -586,7 +593,6 @@ int io_uring_enter_handler(long arg0, long arg1, long arg2, long arg3, long arg4
 #ifdef SYS_io_uring_register
 int io_uring_register_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg5,
                               long *result) {
-    FS_MODE({ return CAPIO_POSIX_SYSCALL_SKIP; }) // memory variant only: see the top of the file
     const long tid = capio_tid();
     return posix_return_value(
         capio_io_uring_register(static_cast<int>(arg0), static_cast<unsigned>(arg1),

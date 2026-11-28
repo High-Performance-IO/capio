@@ -57,6 +57,16 @@ TEST(UringTest, ASetupWithFlagsCapioDoesNotServeIsRefused) {
     EXPECT_EQ(capio_io_uring_setup(4, &params, 1), CAPIO_POSIX_SYSCALL_ERRNO);
 }
 
+TEST(UringTest, WhatCapioDoesNotServeOnItsFilesIsNotImplemented) {
+    io_uring_sqe sqe{};
+    int32_t res = 0;
+    sqe.opcode  = IORING_OP_FADVISE;
+    EXPECT_THROW(uring_capio_exec(&sqe, 1, res), CapioUnimplementedException);
+    sqe.opcode = IORING_OP_NOP;
+    sqe.flags  = IOSQE_BUFFER_SELECT;
+    EXPECT_THROW(uring_capio_exec(&sqe, 1, res), CapioUnimplementedException);
+}
+
 TEST(UringTest, AnErrorOrAShortTransferBreaksAChain) {
     io_uring_sqe sqe{};
     sqe.opcode = IORING_OP_READ;

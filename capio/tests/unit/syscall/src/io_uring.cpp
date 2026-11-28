@@ -5,6 +5,7 @@
 #include <cstdlib>
 #include <cstring>
 #include <filesystem>
+#include <functional>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -132,11 +133,12 @@ class Ring {
     }
 };
 
+/// @brief Whether the tests run with CAPIO's FS variant, which does not implement io_uring on
+/// CAPIO files yet (see TestIoUringOnACapioFileIsNotImplementedInTheFsVariant)
+bool fs_variant() { return !memory_variant() && std::getenv("LD_PRELOAD") != nullptr; }
+
 /// @brief Why the tests of io_uring cannot run here, or empty if they can: @p ring is set up
 std::string unusable(Ring &ring) {
-    if (!memory_variant() && std::getenv("LD_PRELOAD") != nullptr) {
-        return "the FS variant does not intercept io_uring yet";
-    }
     // e.g. in a Docker container with the default seccomp profile
     if (const int error = ring.setup(); error < 0) {
         return "io_uring is not available: " + std::string(std::strerror(-error));
@@ -148,6 +150,26 @@ std::string unusable(Ring &ring) {
     if (const auto reason = unusable(ring); !reason.empty()) {                                     \
         GTEST_SKIP() << reason;                                                                    \
     }
+
+/// @brief For the tests that serve CAPIO files through a ring
+#define SKIP_WITHOUT_IO_URING_ON_CAPIO_FILES(ring)                                                 \
+    if (fs_variant()) {                                                                            \
+        GTEST_SKIP() << "the FS variant does not implement io_uring on CAPIO files yet";           \
+    }                                                                                              \
+    SKIP_WITHOUT_IO_URING(ring)
+
+/// @brief In a child: whether @p body, which uses io_uring on a CAPIO file, ends the process as a
+/// system call CAPIO does not implement does (CapioUnimplementedException)
+bool is_not_implemented(const std::function<void(Ring &)> &body) {
+    return run_in_child([&body] {
+               Ring ring;
+               if (ring.setup() < 0) {
+                   return 3;
+               }
+               body(ring);
+               return 0; // it returned: implemented
+           }) == EXIT_FAILURE;
+}
 
 io_uring_sqe read_or_write(const __u8 opcode, const int fd, const void *buffer, const size_t size,
                            const __u64 offset) {
@@ -180,7 +202,7 @@ TEST(SystemCallTest, TestIoUringWriteIsReadBack) {
     constexpr std::string_view BUFFER = "written through io_uring";
 
     Ring ring;
-    SKIP_WITHOUT_IO_URING(ring)
+    SKIP_WITHOUT_IO_URING_ON_CAPIO_FILES(ring)
     const int fd = open(PATHNAME, O_CREAT | O_RDWR | O_TRUNC, S_IRUSR | S_IWUSR);
     ASSERT_NE(fd, -1);
 
@@ -198,7 +220,7 @@ TEST(SystemCallTest, TestIoUringWriteIsReadBack) {
 TEST(SystemCallTest, TestIoUringReadsWhatWriteWrote) {
     constexpr const char *PATHNAME = "test_io_uring_read.txt";
     Ring ring;
-    SKIP_WITHOUT_IO_URING(ring)
+    SKIP_WITHOUT_IO_URING_ON_CAPIO_FILES(ring)
     write_file(PATHNAME, "written with write");
     const int fd = open(PATHNAME, O_RDONLY);
     ASSERT_NE(fd, -1);
@@ -216,7 +238,7 @@ TEST(SystemCallTest, TestIoUringReadsWhatWriteWrote) {
 TEST(SystemCallTest, TestIoUringVectoredAtTheOffsetOfTheDescriptor) {
     constexpr const char *PATHNAME = "test_io_uring_vectored.txt";
     Ring ring;
-    SKIP_WITHOUT_IO_URING(ring)
+    SKIP_WITHOUT_IO_URING_ON_CAPIO_FILES(ring)
     const int fd = open(PATHNAME, O_CREAT | O_RDWR | O_TRUNC, S_IRUSR | S_IWUSR);
     ASSERT_NE(fd, -1);
 
@@ -239,7 +261,7 @@ TEST(SystemCallTest, TestIoUringVectoredAtTheOffsetOfTheDescriptor) {
 TEST(SystemCallTest, TestIoUringOpensStatsAndClosesACapioFile) {
     constexpr const char *PATHNAME = "test_io_uring_open.txt";
     Ring ring;
-    SKIP_WITHOUT_IO_URING(ring)
+    SKIP_WITHOUT_IO_URING_ON_CAPIO_FILES(ring)
 
     io_uring_sqe open_sqe = on_path(IORING_OP_OPENAT, PATHNAME);
     open_sqe.open_flags   = O_CREAT | O_RDWR | O_TRUNC;
@@ -269,7 +291,7 @@ TEST(SystemCallTest, TestIoUringOpensStatsAndClosesACapioFile) {
 TEST(SystemCallTest, TestIoUringMakesAndRemovesADirectory) {
     constexpr const char *PATHNAME = "test_io_uring_directory";
     Ring ring;
-    SKIP_WITHOUT_IO_URING(ring)
+    SKIP_WITHOUT_IO_URING_ON_CAPIO_FILES(ring)
 
     io_uring_sqe mkdir_sqe = on_path(IORING_OP_MKDIRAT, PATHNAME);
     mkdir_sqe.len          = S_IRWXU; // the mode
@@ -314,53 +336,91 @@ TEST(SystemCallTest, TestIoUringLeavesOtherFilesToTheKernel) {
 }
 
 TEST(SystemCallTest, TestIoUringAFailureCancelsTheRestOfItsChain) {
-    constexpr const char *PATHNAME = "test_io_uring_chain.txt";
     Ring ring;
-    SKIP_WITHOUT_IO_URING(ring)
-    const int fd = open(PATHNAME, O_CREAT | O_RDWR | O_TRUNC, S_IRUSR | S_IWUSR);
-    ASSERT_NE(fd, -1);
+    SKIP_WITHOUT_IO_URING_ON_CAPIO_FILES(ring)
 
-    // An opcode CAPIO does not serve on its files fails, and the SQE linked to it is cancelled
-    io_uring_sqe unsupported{};
-    unsupported.opcode    = IORING_OP_FADVISE;
-    unsupported.fd        = fd;
-    unsupported.flags     = IOSQE_IO_LINK;
-    unsupported.user_data = 1;
+    // The unlink of a CAPIO file that does not exist fails, and the SQE linked to it is cancelled
+    io_uring_sqe missing = on_path(IORING_OP_UNLINKAT, "test_io_uring_missing.txt");
+    missing.flags        = IOSQE_IO_LINK;
+    missing.user_data    = 1;
     io_uring_sqe linked{};
     linked.opcode    = IORING_OP_NOP;
     linked.user_data = 2;
-    ring.push(unsupported);
+    ring.push(missing);
     ring.push(linked);
     EXPECT_EQ(ring.submit(2), 2);
     const auto cqes = ring.reap();
     ASSERT_EQ(cqes.size(), 2);
     EXPECT_EQ(cqes[0].user_data, 1);
-    EXPECT_EQ(cqes[0].res, -EINVAL);
+    EXPECT_EQ(cqes[0].res, -ENOENT);
     EXPECT_EQ(cqes[1].user_data, 2);
     EXPECT_EQ(cqes[1].res, -ECANCELED);
+}
 
-    EXPECT_EQ(close(fd), 0);
+/*
+ * What CAPIO does not implement on a CAPIO file ends the program, as the system calls it does not
+ * implement do: an opcode it does not serve, a chain of CAPIO files and other files, and the
+ * registration of a CAPIO file.
+ */
+TEST(SystemCallTest, TestIoUringWhatIsNotImplementedOnACapioFileEndsTheProgram) {
+    constexpr const char *PATHNAME = "test_io_uring_unimplemented.txt";
+    Ring ring;
+    SKIP_WITHOUT_IO_URING_ON_CAPIO_FILES(ring)
+    write_file(PATHNAME, "data");
+
+    EXPECT_TRUE(is_not_implemented([PATHNAME](Ring &child) {
+        io_uring_sqe fadvise{};
+        fadvise.opcode = IORING_OP_FADVISE;
+        fadvise.fd     = open(PATHNAME, O_RDONLY);
+        child.run(fadvise);
+    }));
+    EXPECT_TRUE(is_not_implemented([PATHNAME](Ring &child) {
+        const int capio = open(PATHNAME, O_RDONLY);
+        const int other = open("/dev/null", O_RDONLY);
+        char buffer[4];
+        io_uring_sqe first = read_or_write(IORING_OP_READ, capio, buffer, 4, 0);
+        first.flags        = IOSQE_IO_LINK;
+        child.push(first);
+        child.push(read_or_write(IORING_OP_READ, other, buffer, 4, 0));
+        child.submit(2);
+    }));
+    EXPECT_TRUE(is_not_implemented([PATHNAME](Ring &child) {
+        const int capio = open(PATHNAME, O_RDONLY);
+        syscall(SYS_io_uring_register, child.fd(), IORING_REGISTER_FILES, &capio, 1);
+    }));
     EXPECT_EQ(unlink(PATHNAME), 0);
 }
 
-TEST(SystemCallTest, TestIoUringRefusesToRegisterACapioFile) {
-    constexpr const char *PATHNAME = "test_io_uring_register.txt";
+TEST(SystemCallTest, TestIoUringOnACapioFileIsNotImplementedInTheFsVariant) {
+    if (!fs_variant()) {
+        GTEST_SKIP() << "the memory variant implements it";
+    }
+    constexpr const char *PATHNAME = "test_io_uring_fs.txt";
     Ring ring;
     SKIP_WITHOUT_IO_URING(ring)
     const int fd = open(PATHNAME, O_CREAT | O_RDWR | O_TRUNC, S_IRUSR | S_IWUSR);
     ASSERT_NE(fd, -1);
+    EXPECT_TRUE(is_not_implemented(
+        [fd](Ring &child) { child.run(read_or_write(IORING_OP_WRITE, fd, "data", 4, 0)); }));
+    EXPECT_EQ(close(fd), 0);
+    EXPECT_EQ(unlink(PATHNAME), 0);
+}
 
-    // The kernel ring would use the placeholder behind it
-    EXPECT_EQ(syscall(SYS_io_uring_register, ring.fd(), IORING_REGISTER_FILES, &fd, 1), -1);
-    EXPECT_EQ(errno, EOPNOTSUPP);
-    // Another file goes to the kernel ring
+TEST(SystemCallTest, TestIoUringRegistersOtherFilesButNotTheRing) {
+    Ring ring;
+    SKIP_WITHOUT_IO_URING(ring)
+    // Another file goes to the kernel ring (a CAPIO file: see the test above)
     const int other = open("/dev/null", O_RDONLY);
     ASSERT_NE(other, -1);
     EXPECT_EQ(syscall(SYS_io_uring_register, ring.fd(), IORING_REGISTER_FILES, &other, 1), 0);
 
+    // io_uring_enter must get the descriptor of the ring CAPIO serves
+    io_uring_rsrc_update update{};
+    update.offset = static_cast<__u32>(-1);
+    update.data   = static_cast<__u64>(ring.fd());
+    EXPECT_EQ(syscall(SYS_io_uring_register, ring.fd(), IORING_REGISTER_RING_FDS, &update, 1), -1);
+    EXPECT_EQ(errno, EOPNOTSUPP);
     EXPECT_EQ(close(other), 0);
-    EXPECT_EQ(close(fd), 0);
-    EXPECT_EQ(unlink(PATHNAME), 0);
 }
 
 TEST(SystemCallTest, TestIoUringRefusesASetupItCannotServe) {
