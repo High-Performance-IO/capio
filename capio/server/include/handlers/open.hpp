@@ -10,7 +10,6 @@
 #include "remote/home_node_service.hpp"
 #include "utils/common.hpp"
 #include "utils/fs_root.hpp"
-#include "utils/runtime_configuration.hpp"
 
 extern ClientManager *client_manager;
 extern StorageManager *storage_manager;
@@ -20,12 +19,8 @@ inline void update_file_metadata(const std::filesystem::path &path, int tid, int
     START_LOG(gettid(), "call(path=%s, client_tid=%d fd=%d, is_creat=%s, offset=%ld)", path.c_str(),
               tid, fd, is_creat ? "true" : "false", offset);
 
-    // TODO: an initial size per file, once CAPIO-CL has one (#326)
-    auto c_file_opt = storage_manager->tryGet(path);
-    CapioFile &c_file =
-        (c_file_opt)
-            ? c_file_opt->get()
-            : storage_manager->add(path, false, RuntimeConfiguration::get().getFileInitialSize());
+    auto c_file_opt   = storage_manager->tryGet(path);
+    CapioFile &c_file = c_file_opt ? c_file_opt->get() : storage_manager->addFile(path);
     storage_manager->addFileToTid(tid, fd, path, offset);
 
     if (c_file.isFirstWrite() && is_creat) {

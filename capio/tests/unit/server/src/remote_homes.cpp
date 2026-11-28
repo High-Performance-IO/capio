@@ -54,7 +54,8 @@ class RemoteHomeTest : public testing::Test {
 
     /// @brief A file open by the client at @p offset, holding @p data as far as this server knows
     CapioFile &open_file(const std::string &data, const off64_t offset, const bool directory) {
-        CapioFile &c_file = storage_manager->add(path, directory, 0);
+        CapioFile &c_file =
+            directory ? storage_manager->addDirectory(path) : storage_manager->addFile(path, 0);
         c_file.createBuffer(path, false);
         if (!data.empty()) {
             c_file.expandBuffer(static_cast<off64_t>(data.size()));

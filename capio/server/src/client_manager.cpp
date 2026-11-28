@@ -266,7 +266,7 @@ int ClientManager::readNextRequest(char *str) {
         strcpy(str, ptr + 1);
     } else {
 
-        CALF_PRINT_COLOR(CALF_CLI_LEVEL_ERROR, "Received invalid request: %s", str);
+        CALF_PRINT_COLOR(CALF_CLI_LEVEL_ERROR, "Received invalid request: %s", req);
         CALF_PRINT_COLOR(CALF_CLI_LEVEL_ERROR, "Code: %d is not mapped to a valid request handler",
                          code);
 

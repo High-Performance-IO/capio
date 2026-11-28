@@ -119,8 +119,8 @@ class CopyFileRangeTest : public testing::Test {
         client_manager->registerClient(PRODUCER_TID, "producer");
         client_manager->registerClient(COPIER_TID, "copier");
         // Skip the first-write bookkeeping (announcing the file location) that a write would do.
-        storage_manager->add(path_in, false, 0).registerFirstWrite();
-        storage_manager->add(path_out, false, 0).registerFirstWrite();
+        storage_manager->addFile(path_in, 0).registerFirstWrite();
+        storage_manager->addFile(path_out, 0).registerFirstWrite();
         storage_manager->addFileToTid(PRODUCER_TID, FD_IN, path_in, 0);
         storage_manager->addFileToTid(COPIER_TID, FD_IN, path_in, 0);
         storage_manager->addFileToTid(COPIER_TID, FD_OUT, path_out, 0);

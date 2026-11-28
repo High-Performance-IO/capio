@@ -53,7 +53,9 @@ class NamedSemaphore {
             ERR_EXIT_EXCEPT_CHOICE(false, " closing of semaphore %s failed", _name.c_str());
         }
         LOG(" Closed shared semaphore %s", _name.c_str());
-        if (sem_unlink(_name.c_str()) != 0) {
+        // Another object of the same name, e.g. a queue attached to the one of the server, may
+        // have unlinked it already: the name is gone either way
+        if (sem_unlink(_name.c_str()) != 0 && errno != ENOENT) {
             ERR_EXIT_EXCEPT_CHOICE(false, " destruction of semaphore %s failed", _name.c_str());
         }
         LOG(" Unlinked shared semaphore %s", _name.c_str());

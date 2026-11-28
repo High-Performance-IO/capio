@@ -38,10 +38,9 @@ class CapioFile {
     std::variant<HeapBuffer, MappedBuffer> _buffer;
     off64_t _requested_size = 0; ///< Init size to allocate on createBuffer()
 
-    // TODO: check if it is possible to move from int to unsigned int
-    std::atomic<int> _n_close            = 0; ///< Current count of close() operations
-    std::atomic<int> _n_opens            = 0; ///< Current count of open() operations
-    std::atomic<int> _n_files            = 0; ///< Count of dirent64 stored (if directory)
+    std::atomic<unsigned int> _n_close   = 0; ///< Current count of close() operations
+    std::atomic<unsigned int> _n_opens   = 0; ///< Current count of open() operations
+    std::atomic<unsigned int> _n_files   = 0; ///< Count of dirent64 stored (if directory)
     const unsigned int _n_files_expected = 0; ///< Target dirent64 count (if directory)
     const unsigned int _n_close_expected = 0; ///< Target close() operations for commitment
 
@@ -85,7 +84,7 @@ class CapioFile {
      * @param n_close_expected Expected number of close calls.
      */
     CapioFile(bool directory, unsigned int n_files_expected, bool permanent, off64_t init_size,
-              int n_close_expected);
+              unsigned int n_close_expected);
 
     /**
      * @brief Standard constructor for files.
@@ -152,7 +151,10 @@ class CapioFile {
     /** @brief Increments the internal open counter. */
     void open();
 
-    /** @brief Increments the _n_close counter, while decrementing the _n_open counter. */
+    /**
+     * @brief Increments the _n_close counter, while decrementing the _n_open counter. The open
+     * counter stops at 0: a descriptor inherited by a clone is closed without having been opened.
+     */
     void close();
 
     /**
@@ -217,7 +219,7 @@ class CapioFile {
      * @brief Increases the count of files contained in this directory.
      * @param count the number to increase the internal counter
      */
-    void incrementDirectoryFileCount(int count = 1);
+    void incrementDirectoryFileCount(unsigned int count = 1);
 
     /**
      * @brief Removes the entry called @p name from this directory's listing.

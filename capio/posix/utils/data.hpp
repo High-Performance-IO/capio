@@ -20,17 +20,26 @@ inline void initialize_data_queues(const long tid) {
 }
 
 /**
- * Read up to @count bytes of the CAPIO descriptor @fd, at its file offset, through the read cache.
- * The data this thread wrote must reach the server first, so the write cache is flushed.
+ * Read up to @count bytes of the CAPIO descriptor @fd, at its file offset, through the read cache:
+ * the data of a file for read, or the entries of a directory for getdents. The data this thread
+ * wrote must reach the server first, so the write cache is flushed.
  *
  * @param fd
  * @param buffer
  * @param count
+ * @param is_getdents whether to read entries of a directory, in whole records
+ * @param is64bit for getdents: whether the records are linux_dirent64 (getdents64)
  * @return the number of bytes read, 0 at the end of the file
  */
-inline off64_t capio_cached_read(const int fd, void *buffer, const off64_t count) {
+inline off64_t capio_cached_read(const int fd, void *buffer, const off64_t count,
+                                 const bool is_getdents = false, const bool is64bit = false) {
+    START_LOG(capio_tid(), "call(fd=%d, count=%ld, is_getdents=%s, is64bit=%s)", fd, count,
+              is_getdents ? "true" : "false", is64bit ? "true" : "false");
+    if (count >= SSIZE_MAX) {
+        ERR_EXIT("CAPIO does not support read bigger than SSIZE_MAX yet");
+    }
     write_cache->flush();
-    return read_cache->read(fd, buffer, count, false, false);
+    return read_cache->read(fd, buffer, count, is_getdents, is64bit);
 }
 
 /**

@@ -2,6 +2,48 @@
 #ifndef CAPIO_DISCOVERY_FS_HPP
 #define CAPIO_DISCOVERY_FS_HPP
 
+#include <ctime>
+#include <filesystem>
+#include <string>
+#include <unordered_map>
+#include <vector>
+
+#include <sys/types.h>
+
+/**
+ * @brief The token files of the other servers that the filesystem discovery has read, so that each
+ * scan reads only the files that are new or changed since the previous one.
+ *
+ * A file is changed when its inode, modification time or size is not the one cached: a server that
+ * restarts on a node publishes a new token (a different address or port) under the same name, by
+ * renaming a new file over the old one. The token of a file that was removed is forgotten.
+ */
+class FsTokenCache {
+    /// @brief What identifies the version of a token file that was read, and the token it held
+    struct Entry {
+        ino_t inode = 0;
+        timespec modified{};
+        off_t size = 0;
+        std::string token;
+    };
+
+    std::unordered_map<std::string, Entry> _entries;
+
+  public:
+    /**
+     * @brief Look at the token files ("<host>.capio", not hidden) in @p directory.
+     * @return The tokens of the files that are new, or that hold a different token than when they
+     * were last read. A file that is still empty is read again at the next scan.
+     */
+    std::vector<std::string> scan(const std::filesystem::path &directory);
+
+    /// @return The token last read from @p token_file, or an empty string if there is none
+    [[nodiscard]] std::string token(const std::filesystem::path &token_file) const;
+
+    /// @return The number of token files known
+    [[nodiscard]] size_t size() const { return _entries.size(); }
+};
+
 /**
  * @brief Discovers CAPIO servers through token files in a shared directory.
  */

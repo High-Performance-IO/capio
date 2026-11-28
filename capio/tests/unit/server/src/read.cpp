@@ -60,7 +60,7 @@ class StreamingReadTest : public testing::Test {
 
         client_manager->registerClient(PRODUCER_TID, "producer");
         client_manager->registerClient(CONSUMER_TID, "consumer");
-        CapioFile &c_file = storage_manager->add(path, false, 0);
+        CapioFile &c_file = storage_manager->addFile(path, 0);
         // The producer created the file: skip the first-write bookkeeping (file location files)
         // that write_handler would otherwise do.
         c_file.registerFirstWrite();
@@ -203,7 +203,7 @@ TEST(RemoteReadTest, replyIsCappedAtTheLargestMessageTheBackendCanSend) {
     backend = &small_messages;
 
     const std::string path = "remote_read_reply_cap.dat";
-    CapioFile &c_file      = storage_manager->add(path, false, 16);
+    CapioFile &c_file      = storage_manager->addFile(path, 16);
     c_file.createBuffer(path, false);
     c_file.insertSector(0, 16);
 
@@ -274,7 +274,7 @@ TEST(RemoteReadReplyTest, offsetIsStoredBeforeTheClientIsAnswered) {
     const std::string path = "remote_read_reply.dat";
 
     client_manager->registerClient(CONSUMER_TID, "consumer");
-    storage_manager->add(path, false, size);
+    storage_manager->addFile(path, size);
     storage_manager->addFileToTid(CONSUMER_TID, FD, path, 0);
 
     // Attach to the consumer's channels, as the POSIX client does. Not deleted: the destructors

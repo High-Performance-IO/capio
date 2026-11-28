@@ -43,7 +43,7 @@ class RemoteHandlersTest : public testing::Test {
 
     /// @brief A file of this node holding @p data
     CapioFile &file_with(const std::string &data, const bool committed) {
-        CapioFile &c_file = storage_manager->add(path, false, 0);
+        CapioFile &c_file = storage_manager->addFile(path, 0);
         c_file.createBuffer(path, true);
         append(c_file, data);
         c_file.setCommitted(committed);
@@ -145,7 +145,7 @@ TEST_F(RemoteHandlersTest, AReadOfAnEmptyCommittedFileSendsNoData) {
 
 TEST_F(RemoteHandlersTest, AReadReplyStoresTheDataAndAnswersTheClient) {
     TestClient client(TID);
-    storage_manager->add(path, false, 0);
+    storage_manager->addFile(path, 0);
     storage_manager->addFileToTid(TID, FD, path, 2);
     recording.incoming_file = "abcdef";
 
@@ -165,7 +165,7 @@ TEST_F(RemoteHandlersTest, AReadReplyStoresTheDataAndAnswersTheClient) {
 
 TEST_F(RemoteHandlersTest, AReadReplyWithFewerBytesThanAskedAnswersWithWhatItHas) {
     TestClient client(TID);
-    storage_manager->add(path, false, 0);
+    storage_manager->addFile(path, 0);
     storage_manager->addFileToTid(TID, FD, path, 0);
     recording.incoming_file = "ab";
 

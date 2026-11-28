@@ -2,6 +2,8 @@
 #define CAPIO_CLIENT_MANAGER_HPP
 #include <gtest/gtest.h>
 
+#include <memory>
+
 #include <client-manager/client_manager.hpp>
 #include <utils/capiocl_adapter.hpp>
 
@@ -24,27 +26,26 @@ TEST(ClientManagerTestEnvironment, testGetNumberOfConnectedClients) {
 }
 
 TEST(ClientManagerTestEnvironment, testFailedRequestCode) {
-
-    // NOTE: there is no need to delete this object as it is only attaching to the shm allocated by
-    // client_manager. Also calling delete on this raises std::terminate as an exception is thrown
-    // in the destructor
-    // TODO: change behaviour of ERR_EXIT to not throw exceptions but only print error and continue
-    const auto request_queue =
-        new CircularBuffer<char>(SHM_COMM_CHAN_NAME, CAPIO_REQ_BUFF_CNT, CAPIO_REQ_MAX_SIZE,
-                                 CapioCLEngine::get().getWorkflowName());
+    // Attached to the request queue of client_manager, as a client is. Its destruction unlinks the
+    // names of the queue, so that the teardown of client_manager finds them gone: that is not an
+    // error, and the memory client_manager has mapped stays usable.
+    auto request_queue = std::make_unique<CircularBuffer<char>>(
+        SHM_COMM_CHAN_NAME, CAPIO_REQ_BUFF_CNT, CAPIO_REQ_MAX_SIZE,
+        CapioCLEngine::get().getWorkflowName());
 
     char req[CAPIO_REQ_MAX_SIZE], new_req[CAPIO_REQ_MAX_SIZE];
     constexpr int TEST_REQ_CODE = 123;
     sprintf(req, "%04d aaaa bbbb cccc", TEST_REQ_CODE);
     request_queue->write(req, CAPIO_REQ_MAX_SIZE);
     const auto return_code = client_manager->readNextRequest(new_req);
-    std::cout << new_req << std::endl;
     EXPECT_EQ(return_code, TEST_REQ_CODE);
+    EXPECT_STREQ(new_req, "aaaa bbbb cccc");
 
     sprintf(req, "abc aaaa bbbb cccc");
     request_queue->write(req, CAPIO_REQ_MAX_SIZE);
 
     EXPECT_EQ(client_manager->readNextRequest(new_req), -1);
+    request_queue.reset();
 }
 
 TEST(ClientManagerTestEnvironment, testAddAndRemoveProducedFiles) {
