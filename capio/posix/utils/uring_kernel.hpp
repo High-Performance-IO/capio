@@ -7,14 +7,17 @@
 
 #include "utils/uring.hpp"
 
-// The hidden kernel ring at run time: SQEs in, CQEs out to the app's CQ, and
-// every wait of a CAPIO ring.
+/*
+ * The hidden kernel ring of a CAPIO ring at run time: the SQEs that are not for CAPIO go in, their
+ * CQEs go out to the CQ of the application, and every wait of the CAPIO ring is a wait in it.
+ */
 
-// user_data of CAPIO's wake-up NOPs: their CQEs never reach the app.
+/// @brief The user_data of the NOPs with which CAPIO wakes the waiters: their CQEs never reach the
+/// application
 constexpr uint64_t CAPIO_URING_WAKE_USER_DATA = 0xCA910C0FFEE00002ULL;
 
-// IORING_SQ_CQ_OVERFLOW while kernel work is in flight: liburing then calls
-// io_uring_enter when its CQ looks empty, and enter collects the kernel CQEs.
+/// @brief Set IORING_SQ_CQ_OVERFLOW while the kernel ring has work in flight: liburing then calls
+/// io_uring_enter when its CQ looks empty, and io_uring_enter collects the CQEs of the kernel.
 inline void uring_update_enter_hint(CapioRing &ring) {
     const KernelRing &k = ring.kernel;
     if (k.inflight > 0 || !ring.overflow.empty() ||
@@ -25,6 +28,8 @@ inline void uring_update_enter_hint(CapioRing &ring) {
     }
 }
 
+/// @brief Move the CQEs that wait in the overflow list, then the ones of the kernel ring, to the CQ
+/// of @p ring
 inline void uring_collect(CapioRing &ring) {
     while (!ring.overflow.empty() && uring_cq_has_space(ring)) {
         const io_uring_cqe cqe = ring.overflow.front();
@@ -48,17 +53,20 @@ inline void uring_collect(CapioRing &ring) {
     uring_update_enter_hint(ring);
 }
 
+/// @brief Submit the SQEs queued in the kernel ring. The ones the kernel refuses complete with its
+/// error.
 inline void uring_kernel_flush(CapioRing &ring) {
     KernelRing &k = ring.kernel;
     for (int tries = 0; k.pending > 0 && tries < 1000; ++tries) {
-        const long r = capio_syscall(SYS_io_uring_enter, k.fd, k.pending, 0, 0, nullptr, 0);
+        const long r = syscall_no_intercept(SYS_io_uring_enter, k.fd, k.pending, 0, 0, nullptr, 0);
         if (r > 0) {
             k.pending -= static_cast<uint32_t>(r);
         } else if (r == -EINTR) {
             continue;
         } else if (r == -EAGAIN || r == -EBUSY) {
             uring_collect(ring);
-            capio_syscall(SYS_io_uring_enter, k.fd, 0, 1, IORING_ENTER_GETEVENTS, nullptr, 0);
+            syscall_no_intercept(SYS_io_uring_enter, k.fd, 0, 1, IORING_ENTER_GETEVENTS, nullptr,
+                                 0);
         } else {
             const int32_t err   = r == 0 ? -EAGAIN : static_cast<int32_t>(r);
             const uint32_t head = __atomic_load_n(k.sq_head, __ATOMIC_ACQUIRE);
@@ -77,7 +85,8 @@ inline void uring_kernel_flush(CapioRing &ring) {
     }
 }
 
-// An SQE with CQE_SKIP_SUCCESS may post no CQE, so it does not count as in flight.
+/// @brief Queue @p sqe in the kernel ring. An SQE with IOSQE_CQE_SKIP_SUCCESS may post no CQE, so
+/// it does not count as in flight.
 inline void uring_kernel_queue(CapioRing &ring, const io_uring_sqe &sqe) {
     KernelRing &k = ring.kernel;
     if (*k.sq_tail - __atomic_load_n(k.sq_head, __ATOMIC_ACQUIRE) == k.sq_entries) {
@@ -94,7 +103,8 @@ inline void uring_kernel_queue(CapioRing &ring, const io_uring_sqe &sqe) {
     }
 }
 
-// Every wait is in the kernel ring; a thread that posts CAPIO CQEs ends it with a NOP.
+/// @brief Wake the threads waiting in the kernel ring of @p ring, with a NOP: every wait is there,
+/// and a thread that posts CQEs of CAPIO ends them so.
 inline void uring_wake_waiters(CapioRing &ring) {
     if (ring.waiters > 0) {
         io_uring_sqe nop{};
@@ -105,24 +115,28 @@ inline void uring_wake_waiters(CapioRing &ring) {
     }
 }
 
+/// @brief The wait of an io_uring_enter: IORING_ENTER_EXT_ARG and its argument
 struct UringWaitArg {
     unsigned flags  = 0;
     const void *arg = nullptr;
     size_t size     = 0;
 };
 
+/// @brief Wait in the kernel ring of @p ring for a CQE, without @p lock. @return what the kernel
+/// returns
 inline long uring_kernel_wait(CapioRing &ring, std::unique_lock<std::mutex> &lock,
                               const UringWaitArg &wait = {}) {
     ++ring.waiters;
     lock.unlock();
-    const long r = capio_syscall(SYS_io_uring_enter, ring.kernel.fd, 0, 1,
-                                 IORING_ENTER_GETEVENTS | wait.flags, wait.arg, wait.size);
+    const long r = syscall_no_intercept(SYS_io_uring_enter, ring.kernel.fd, 0, 1,
+                                        IORING_ENTER_GETEVENTS | wait.flags, wait.arg, wait.size);
     lock.lock();
     --ring.waiters;
     return r;
 }
 
-// CAPIO's SQEs are already complete: IOSQE_IO_DRAIN waits for kernel SQEs only.
+/// @brief IOSQE_IO_DRAIN: wait for the SQEs in flight in the kernel ring. The SQEs of CAPIO are
+/// already complete.
 inline void uring_drain(CapioRing &ring, std::unique_lock<std::mutex> &lock) {
     uring_kernel_flush(ring);
     for (uring_collect(ring); ring.kernel.inflight > 0; uring_collect(ring)) {
@@ -130,11 +144,13 @@ inline void uring_drain(CapioRing &ring, std::unique_lock<std::mutex> &lock) {
     }
 }
 
+/// @brief Wait until the CQ of @p ring has @p min_complete CQEs, or is full. @return 0, or -EINTR
+/// or -ETIME if the wait ended before
 inline long uring_wait(CapioRing &ring, unsigned min_complete, const UringWaitArg &wait,
                        std::unique_lock<std::mutex> &lock) {
     KernelRing &k = ring.kernel;
     if (k.inflight > 0) {
-        capio_syscall(SYS_io_uring_enter, k.fd, 0, 0, IORING_ENTER_GETEVENTS, nullptr, 0);
+        syscall_no_intercept(SYS_io_uring_enter, k.fd, 0, 0, IORING_ENTER_GETEVENTS, nullptr, 0);
     }
     uring_collect(ring);
     while (uring_cq_ready(ring) < min_complete && uring_cq_has_space(ring)) {

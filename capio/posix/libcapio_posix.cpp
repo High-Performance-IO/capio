@@ -489,6 +489,9 @@ static __attribute__((constructor)) void init() {
     }
 
     FileDescriptorTable::protectAcrossFork();
+#if defined(SYS_io_uring_setup)
+    RingTable::protectAcrossFork();
+#endif
     // After the handlers of the table, so that the child has a free lock
     FS_MODE({ pthread_atfork(nullptr, nullptr, announce_inherited_descriptors_fs); })
     init_client(capio_tid());

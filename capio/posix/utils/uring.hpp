@@ -5,6 +5,7 @@
 
 #include <algorithm>
 #include <atomic>
+#include <cstddef>
 #include <cstdint>
 #include <deque>
 #include <linux/io_uring.h>
@@ -12,11 +13,13 @@
 #include <mutex>
 #include <sys/mman.h>
 #include <unordered_map>
+#include <vector>
 
 #include "calf/SyscallLogger.h"
 #include "common/syscall.hpp"
+#include "utils/tid.hpp"
 
-// Setup flags newer than some kernel headers; define them (stable ABI values).
+// Flags that older kernel headers do not define, with their values of the kernel ABI
 #ifndef IORING_SETUP_SUBMIT_ALL
 #define IORING_SETUP_SUBMIT_ALL (1U << 7)
 #endif
@@ -42,7 +45,7 @@
 #define IORING_FEAT_CQE_SKIP (1U << 11)
 #endif
 
-// The hidden kernel ring: it serves every SQE that does not concern CAPIO.
+/// @brief The hidden kernel ring of a CAPIO ring: it serves every SQE that is not for CAPIO
 struct KernelRing {
     int fd              = -1;
     uint32_t features   = 0;
@@ -60,9 +63,15 @@ struct KernelRing {
     uint32_t inflight  = 0; // submitted, final CQE not yet copied to the app
 };
 
-// CAPIO's ring: a memfd that the app maps with the kernel's mmap and CAPIO maps
-// once, MAP_SHARED (a forked child shares it). SQ, CQ and SQEs sit at their
-// io_uring offsets; the file is sparse.
+/**
+ * @brief A ring that CAPIO serves in place of the kernel. Its memory is a memfd, the descriptor of
+ * the ring: the application maps it with the mmap of the kernel, at the io_uring offsets of the SQ,
+ * the CQ and the SQEs, and CAPIO maps it once, MAP_SHARED (a child of fork shares it). The file is
+ * sparse.
+ *
+ * lock serializes the io_uring_enter and io_uring_register of the ring. The ring is freed, with
+ * its kernel ring, by the last std::shared_ptr to it (see RingTable).
+ */
 struct CapioRing {
     uint32_t sq_entries;
     uint32_t cq_entries;
@@ -82,37 +91,44 @@ struct CapioRing {
     io_uring_cqe *cqes = nullptr;
 
     KernelRing kernel;
-    std::deque<io_uring_cqe> overflow;
-    int eventfd        = -1;
-    bool eventfd_async = false;
-    uint32_t waiters   = 0;
+    std::deque<io_uring_cqe> overflow; ///< the CQEs that wait for room in the CQ, in order
+    int eventfd        = -1;           ///< registered with IORING_REGISTER_EVENTFD, or -1
+    bool eventfd_async = false;        ///< registered with IORING_REGISTER_EVENTFD_ASYNC
+    uint32_t waiters   = 0;            ///< threads waiting in the kernel ring
     std::mutex lock;
 
     ~CapioRing();
 };
 
+/// @brief @p n rounded up to a multiple of @p alignment, a power of two
 inline size_t uring_align_up(size_t n, size_t alignment) {
     return (n + alignment - 1) & ~(alignment - 1);
 }
 
+/// @brief Unmap the SQ, the CQ and the SQEs of @p ring
 inline void uring_unmap(CapioRing &ring) {
     if (ring.sq_ring != nullptr) {
-        capio_syscall(SYS_munmap, ring.sq_ring, ring.sq_ring_size);
+        syscall_no_intercept(SYS_munmap, ring.sq_ring, ring.sq_ring_size);
         ring.sq_ring = nullptr;
     }
     if (ring.cq_ring != nullptr) {
-        capio_syscall(SYS_munmap, ring.cq_ring, ring.cq_ring_size);
+        syscall_no_intercept(SYS_munmap, ring.cq_ring, ring.cq_ring_size);
         ring.cq_ring = nullptr;
     }
     if (ring.sqes != nullptr) {
-        capio_syscall(SYS_munmap, ring.sqes, ring.sqes_size);
+        syscall_no_intercept(SYS_munmap, ring.sqes, ring.sqes_size);
         ring.sqes = nullptr;
     }
 }
 
+/**
+ * @brief Lay out @p ring in @p memfd, its memory, and write its offsets to @p params, as
+ * io_uring_setup does.
+ * @return false if the memfd cannot be sized or mapped
+ */
 inline bool uring_layout(CapioRing &ring, io_uring_params *params, int memfd) {
-    START_LOG(capio_syscall(SYS_gettid), "call(sq_entries=%u, cq_entries=%u, memfd=%d)",
-              ring.sq_entries, ring.cq_entries, memfd);
+    START_LOG(capio_tid(), "call(sq_entries=%u, cq_entries=%u, memfd=%d)", ring.sq_entries,
+              ring.cq_entries, memfd);
 
     io_sqring_offsets &sq = params->sq_off;
     io_cqring_offsets &cq = params->cq_off;
@@ -149,13 +165,13 @@ inline bool uring_layout(CapioRing &ring, io_uring_params *params, int memfd) {
     ring.sqes_size = uring_align_up(sizeof(io_uring_sqe) * ring.sq_entries, 4096);
 
     // Raw syscalls: CAPIO's own memory must not go through its hooks.
-    if (capio_syscall(SYS_ftruncate, memfd, IORING_OFF_SQES + ring.sqes_size) < 0) {
+    if (syscall_no_intercept(SYS_ftruncate, memfd, IORING_OFF_SQES + ring.sqes_size) < 0) {
         LOG("ftruncate of ring memfd failed");
         return false;
     }
     auto map = [memfd](size_t size, unsigned long long offset) {
-        const long mem = capio_syscall(SYS_mmap, nullptr, size, PROT_READ | PROT_WRITE, MAP_SHARED,
-                                       memfd, offset);
+        const long mem = syscall_no_intercept(SYS_mmap, nullptr, size, PROT_READ | PROT_WRITE,
+                                              MAP_SHARED, memfd, offset);
         return mem < 0 ? nullptr : reinterpret_cast<void *>(mem);
     };
     ring.sq_ring = map(ring.sq_ring_size, IORING_OFF_SQ_RING);
@@ -195,14 +211,14 @@ inline bool uring_layout(CapioRing &ring, io_uring_params *params, int memfd) {
     return true;
 }
 
+/// @brief Set up the kernel ring of @p ring, with the sizes of @p ring. @return 0, or -errno
 inline long uring_kernel_setup(CapioRing &ring) {
-    START_LOG(capio_syscall(SYS_gettid), "call(sq_entries=%u, cq_entries=%u)", ring.sq_entries,
-              ring.cq_entries);
+    START_LOG(capio_tid(), "call(sq_entries=%u, cq_entries=%u)", ring.sq_entries, ring.cq_entries);
     KernelRing &k = ring.kernel;
     io_uring_params p{};
     p.flags       = IORING_SETUP_CQSIZE;
     p.cq_entries  = ring.cq_entries;
-    const long fd = capio_syscall(SYS_io_uring_setup, ring.sq_entries, &p);
+    const long fd = syscall_no_intercept(SYS_io_uring_setup, ring.sq_entries, &p);
     if (fd < 0) {
         LOG("kernel io_uring_setup failed: %ld", fd);
         return fd;
@@ -218,8 +234,8 @@ inline long uring_kernel_setup(CapioRing &ring) {
         k.sq_size = k.cq_size = std::max(k.sq_size, k.cq_size);
     }
     auto map = [&k](size_t size, unsigned long long offset) {
-        const long mem = capio_syscall(SYS_mmap, nullptr, size, PROT_READ | PROT_WRITE,
-                                       MAP_SHARED | MAP_POPULATE, k.fd, offset);
+        const long mem = syscall_no_intercept(SYS_mmap, nullptr, size, PROT_READ | PROT_WRITE,
+                                              MAP_SHARED | MAP_POPULATE, k.fd, offset);
         return mem < 0 ? nullptr : reinterpret_cast<void *>(mem);
     };
     k.sq_ring = map(k.sq_size, IORING_OFF_SQ_RING);
@@ -242,38 +258,42 @@ inline long uring_kernel_setup(CapioRing &ring) {
     return 0;
 }
 
+/// @brief Unmap and close the kernel ring @p k
 inline void uring_kernel_destroy(KernelRing &k) {
     if (k.cq_ring != nullptr && k.cq_ring != k.sq_ring) {
-        capio_syscall(SYS_munmap, k.cq_ring, k.cq_size);
+        syscall_no_intercept(SYS_munmap, k.cq_ring, k.cq_size);
     }
     if (k.sq_ring != nullptr) {
-        capio_syscall(SYS_munmap, k.sq_ring, k.sq_size);
+        syscall_no_intercept(SYS_munmap, k.sq_ring, k.sq_size);
     }
     if (k.sqes != nullptr) {
-        capio_syscall(SYS_munmap, k.sqes, k.sqes_size);
+        syscall_no_intercept(SYS_munmap, k.sqes, k.sqes_size);
     }
     if (k.fd >= 0) {
-        capio_syscall(SYS_close, k.fd);
+        syscall_no_intercept(SYS_close, k.fd);
     }
     k = KernelRing{};
 }
 
-// The last reference frees the ring, so a close never unmaps it under an io_uring_enter.
+/// The last std::shared_ptr frees the ring, so a close never unmaps it under an io_uring_enter
 inline CapioRing::~CapioRing() {
     uring_unmap(*this);
     uring_kernel_destroy(kernel);
 }
 
+/// @brief The number of CQEs in the CQ of @p ring that the application has not consumed
 inline uint32_t uring_cq_ready(const CapioRing &ring) {
     uint32_t head = __atomic_load_n(ring.cq_head, __ATOMIC_ACQUIRE);
     uint32_t tail = __atomic_load_n(ring.cq_tail, __ATOMIC_ACQUIRE);
     return tail - head;
 }
 
+/// @brief Whether the CQ of @p ring has room for a CQE
 inline bool uring_cq_has_space(const CapioRing &ring) {
     return uring_cq_ready(ring) < *ring.cq_ring_entries;
 }
 
+/// @brief Write a CQE to the CQ of @p ring, which has room for it
 inline void uring_write_cqe(CapioRing &ring, uint64_t user_data, int32_t res, uint32_t flags) {
     uint32_t tail     = *ring.cq_tail;
     io_uring_cqe &cqe = ring.cqes[tail & *ring.cq_mask];
@@ -284,7 +304,8 @@ inline void uring_write_cqe(CapioRing &ring, uint64_t user_data, int32_t res, ui
     __atomic_store_n(ring.cq_tail, tail + 1, __ATOMIC_RELEASE);
 }
 
-// While the CQ is full, CQEs wait in the overflow list, in order, as in the kernel.
+/// @brief Post a CQE to the CQ of @p ring. While the CQ is full, the CQEs wait in the overflow
+/// list, in order, as in the kernel.
 inline void uring_post_cqe(CapioRing &ring, uint64_t user_data, int32_t res, uint32_t flags = 0) {
     if (!ring.overflow.empty() || !uring_cq_has_space(ring)) {
         ring.overflow.push_back(io_uring_cqe{user_data, res, flags});
@@ -293,64 +314,63 @@ inline void uring_post_cqe(CapioRing &ring, uint64_t user_data, int32_t res, uin
     uring_write_cqe(ring, user_data, res, flags);
 }
 
-// Per-process table of rings, keyed by ring fd. close runs for every file, so a
-// process with no ring checks the ring count and never takes the lock.
-inline std::unordered_map<int, std::shared_ptr<CapioRing>> *capio_rings;
-inline std::mutex capio_rings_mutex;
-inline std::atomic<int> capio_ring_count{0};
+/**
+ * @brief The io_uring rings of the process that CAPIO serves (see CapioRing), by the descriptor of
+ * each. Implemented in src/ring_table.cpp; the process has one, ring_table().
+ *
+ * close runs for every descriptor, and most processes have no ring: so the table counts its rings,
+ * and takes no lock while it has none. A ring is held by std::shared_ptr: when a thread closes its
+ * descriptor, an io_uring_enter of another thread keeps using it until it returns, and the last of
+ * them frees it.
+ *
+ * The descriptor of a ring is a memfd, closed by close, close_range, and dup2 or dup3 onto it: each
+ * of them removes the ring from the table. A ring left in the table would take the number when the
+ * kernel gives it to another file, and its close would be the one of the ring.
+ */
+class RingTable final {
+    std::unordered_map<int, std::shared_ptr<CapioRing>> _rings;
+    std::atomic<std::size_t> _count{0}; ///< size of _rings, read without the lock
 
-inline std::shared_ptr<CapioRing> get_capio_ring(int fd) {
-    if (capio_ring_count.load(std::memory_order_acquire) == 0) {
-        return nullptr;
-    }
-    const std::lock_guard<std::mutex> lock(capio_rings_mutex);
-    if (capio_rings == nullptr) {
-        return nullptr;
-    }
-    auto it = capio_rings->find(fd);
-    return it == capio_rings->end() ? nullptr : it->second;
-}
+    /// @brief The lock of the table, made at its first use (see FileDescriptorTable::mutex)
+    static std::mutex &mutex();
 
-// A stale ring left under the same fd number is replaced, not reused.
-inline void add_capio_ring(int fd, std::shared_ptr<CapioRing> ring) {
-    const std::lock_guard<std::mutex> lock(capio_rings_mutex);
-    if (capio_rings == nullptr) {
-        capio_rings = new std::unordered_map<int, std::shared_ptr<CapioRing>>();
-    }
-    if (capio_rings->insert_or_assign(fd, std::move(ring)).second) {
-        capio_ring_count.fetch_add(1, std::memory_order_release);
-    }
-}
+  public:
+    /// @brief The ring of @p fd, or nullptr if @p fd is not the descriptor of a ring
+    [[nodiscard]] std::shared_ptr<CapioRing> find(int fd);
 
-inline bool destroy_capio_ring(int fd) {
-    std::shared_ptr<CapioRing> ring; // released after the table lock
-    const std::lock_guard<std::mutex> lock(capio_rings_mutex);
-    if (capio_rings == nullptr) {
+    /// @brief Add @p ring as the ring of @p fd, in place of any ring left there
+    void add(int fd, std::shared_ptr<CapioRing> ring);
+
+    /// @brief Remove the ring of @p fd. @return whether @p fd was the descriptor of a ring
+    bool remove(int fd);
+
+    /// @brief The descriptors of the rings between @p first and @p last, both included
+    [[nodiscard]] std::vector<int> fdsBetween(unsigned first, unsigned last);
+
+    /**
+     * @brief Keep the table usable across fork(): its lock is held during the fork, so that the
+     * child gets a whole table, and the child gets new locks, of the table and of each ring, in the
+     * place of the ones the other threads of the parent may hold. Call once, before there are
+     * threads.
+     */
+    static void protectAcrossFork();
+};
+
+/// @brief The rings of the process. Never destroyed: a thread may use it while the process exits.
+RingTable &ring_table();
+
+/**
+ * @brief close of @p fd, if it is the descriptor of a ring: the memfd is closed, and the ring
+ * removed from the table.
+ * @return false if @p fd is not the descriptor of a ring, and nothing is done
+ */
+inline bool uring_close(const int fd, long *result) {
+    if (ring_table().find(fd) == nullptr) {
         return false;
     }
-    auto it = capio_rings->find(fd);
-    if (it == capio_rings->end()) {
-        return false;
-    }
-
-    ring = std::move(it->second);
-    capio_rings->erase(it);
-    capio_ring_count.fetch_sub(1, std::memory_order_release);
-    if (capio_rings->empty()) {
-        delete capio_rings;
-        capio_rings = nullptr;
-    }
-    return true;
-}
-
-// Returns false when fd is not a ring.
-inline bool uring_close(int fd, long *result) {
-    if (get_capio_ring(fd) == nullptr) {
-        return false;
-    }
-    *result = capio_syscall(SYS_close, fd); // raw result: already -errno
-    if (*result == 0) {
-        destroy_capio_ring(fd);
+    *result = syscall_no_intercept(SYS_close, fd); // raw result: already -errno
+    if (*result == 0 || *result == -EINTR) {       // EINTR: Linux has closed it anyway
+        ring_table().remove(fd);
     }
     return true;
 }

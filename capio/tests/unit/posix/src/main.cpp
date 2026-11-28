@@ -5,6 +5,7 @@
 #include "file_descriptor_table.hpp"
 #include "path.hpp"
 #include "realpath.hpp"
+#include "uring.hpp"
 #include "write_read_cache.hpp"
 
 int main(int argc, char *argv[]) {
