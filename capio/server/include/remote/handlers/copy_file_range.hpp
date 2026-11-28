@@ -18,8 +18,8 @@
 #include "utils/capiocl_adapter.hpp"
 #include "utils/common.hpp"
 #include "utils/server_state.hpp"
+#include "utils/thread_manager.hpp"
 #include "utils/types.hpp"
-#include "utils/waiter.hpp"
 
 /**
  * On the node of the client: copy from an input stored on another node. The copy of the input
@@ -87,10 +87,11 @@ inline void handle_remote_copy_file_range_data(const std::filesystem::path &path
         return;
     }
     LOG("Waiting on a separate thread for the data of the input");
-    spawn_waiter([&c_file, offset_in, count, serve] {
-        c_file.waitForData(offset_in + count);
-        serve();
-    });
+    thread_manager().startWaiter(thread_name("copy_file_range", path_in, dest, "its data"),
+                                 [&c_file, offset_in, count, serve] {
+                                     c_file.waitForData(offset_in + count);
+                                     serve();
+                                 });
 }
 
 /**

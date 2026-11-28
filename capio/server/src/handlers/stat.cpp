@@ -20,8 +20,8 @@
 #include "utils/common.hpp"
 #include "utils/fs_root.hpp"
 #include "utils/server_state.hpp"
+#include "utils/thread_manager.hpp"
 #include "utils/types.hpp"
-#include "utils/waiter.hpp"
 
 void wait_for_file_completion(int tid, const std::filesystem::path &path) {
     START_LOG(gettid(), "call(tid=%d, path=%s)", tid, path.c_str());
@@ -63,7 +63,9 @@ void reply_stat(int tid, const std::filesystem::path &path) {
             } else {
                 LOG("File found but not ready yet. Starting a thread to wait for file %s",
                     path.c_str());
-                spawn_waiter(wait_for_file_completion, tid, std::filesystem::path(path));
+                thread_manager().startWaiter(thread_name("stat", path, tid, "its commit"),
+                                             wait_for_file_completion, tid,
+                                             std::filesystem::path(path));
             }
             return;
         }
@@ -134,7 +136,7 @@ void consent_handler(const char *const str) {
             return;
         }
     }
-    spawn_waiter([path, tid] {
+    thread_manager().startWaiter(thread_name("stat", path, tid, "its consent"), [path, tid] {
         client_manager->replyToClient(tid, fs_storage_manager->waitForConsent(path));
     });
 }

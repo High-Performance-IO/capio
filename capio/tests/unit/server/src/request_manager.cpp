@@ -2,11 +2,9 @@
 
 #include <algorithm>
 #include <chrono>
-#include <csignal>
 #include <cstdio>
 #include <cstring>
 #include <future>
-#include <pthread.h>
 #include <stdexcept>
 #include <string>
 #include <vector>
@@ -18,7 +16,6 @@
 #include "remote/backend/none.hpp"
 #include "storage/manager.hpp"
 #include "test_backend.hpp"
-#include "utils/waiter.hpp"
 
 extern Backend *backend;
 extern StorageManager *storage_manager;
@@ -107,32 +104,6 @@ TEST_F(ClientRequestDispatchTest, TheBeginningOfALongPathComesInPathParts) {
                                              request(client.tid, "long_path").c_str()));
     EXPECT_EQ(client.reply(), 0);
     EXPECT_TRUE(storage_manager->tryGet("/request_manager_long_path"));
-}
-
-TEST(WaiterTest, AWaiterDoesNotGetTheTerminationSignals) {
-    std::promise<sigset_t> waiter_mask;
-    spawn_waiter([&waiter_mask] {
-        sigset_t mask;
-        pthread_sigmask(SIG_BLOCK, nullptr, &mask);
-        waiter_mask.set_value(mask);
-    });
-    const sigset_t mask = waiter_mask.get_future().get();
-    for (const int signal : {SIGTERM, SIGINT, SIGQUIT, SIGPIPE}) {
-        EXPECT_EQ(sigismember(&mask, signal), 1) << strsignal(signal);
-    }
-
-    // The caller gets them again
-    sigset_t caller;
-    pthread_sigmask(SIG_BLOCK, nullptr, &caller);
-    EXPECT_EQ(sigismember(&caller, SIGTERM), 0);
-}
-
-TEST(WaiterTest, AWaiterGetsItsArguments) {
-    std::promise<int> sum;
-    spawn_waiter(
-        [](std::promise<int> *result, const int a, const int b) { result->set_value(a + b); }, &sum,
-        40, 2);
-    EXPECT_EQ(sum.get_future().get(), 42);
 }
 
 namespace {

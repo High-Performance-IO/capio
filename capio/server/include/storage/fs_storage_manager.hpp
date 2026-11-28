@@ -1,8 +1,6 @@
 #ifndef CAPIO_FS_STORAGE_MANAGER_HPP
 #define CAPIO_FS_STORAGE_MANAGER_HPP
 
-#include <atomic>
-#include <chrono>
 #include <filesystem>
 #include <map>
 #include <mutex>
@@ -56,9 +54,6 @@ class FsStorageManager {
     };
     std::map<std::pair<pid_t, int>, Listing> _listings;
     std::mutex _listings_mutex;
-
-    /// @brief Closes of on_close:N being counted on background threads
-    std::atomic<int> _pending_counts{0};
 
     /// @brief Apply on_close to @p n_closes more closes of @p path. Never blocks.
     void applyOnClose(const std::filesystem::path &path, long n_closes);
@@ -185,10 +180,6 @@ class FsStorageManager {
      * @return 1 if that holds from now on, 0 if @p path is not declared
      */
     [[nodiscard]] off64_t waitForConsent(const std::filesystem::path &path) const;
-
-    /// @brief Wait, at most @p timeout, for the closes still being counted: a count lost at exit
-    /// would leave the file uncommitted for the servers that start later
-    void waitForPendingCounts(std::chrono::milliseconds timeout) const;
 };
 
 #endif // CAPIO_FS_STORAGE_MANAGER_HPP

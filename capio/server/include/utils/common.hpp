@@ -16,8 +16,8 @@
 #include "storage/fs_storage_manager.hpp"
 #include "storage/manager.hpp"
 #include "utils/server_state.hpp"
+#include "utils/thread_manager.hpp"
 #include "utils/types.hpp"
-#include "utils/waiter.hpp"
 
 inline void wait_for_dirent_data(off64_t wait_size, int wait_tid, int wait_fd, int wait_count,
                                  CapioFile &wait_c_file);
@@ -63,8 +63,9 @@ inline void send_dirent_to_client(int tid, int fd, CapioFile &c_file, off64_t of
     if (!c_file.isCommitted() && CapioCLEngine::get().isFirable(path_to_check) &&
         !CapioCLEngine::get().isProducer(path_to_check, client_manager->getAppName(tid))) {
         LOG("File %s has mode no_update and not enough data is available", path_to_check.c_str());
-        spawn_waiter(wait_for_dirent_data, (last_entry + 1) * sizeof(linux_dirent64), tid, fd,
-                     count, std::ref(c_file));
+        thread_manager().startWaiter(
+            thread_name("getdents", path_to_check, tid, "its entries"), wait_for_dirent_data,
+            (last_entry + 1) * sizeof(linux_dirent64), tid, fd, count, std::ref(c_file));
         return;
     }
 

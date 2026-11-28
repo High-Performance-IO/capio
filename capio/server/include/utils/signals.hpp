@@ -14,6 +14,7 @@
 #include "remote/backend.hpp"
 #include "remote/discovery.hpp"
 #include "utils/common.hpp"
+#include "utils/thread_manager.hpp"
 
 #ifdef CAPIO_COVERAGE
 extern "C" void __gcov_dump(void);
@@ -49,8 +50,15 @@ inline void sig_term_handler(int signum, siginfo_t *info, void *ptr) {
         CALF_PRINT_COLOR(CALF_CLI_LEVEL_ERROR, "Segfault detected!");
     }
 
-    if (fs_storage_manager != nullptr) {
-        fs_storage_manager->waitForPendingCounts(std::chrono::seconds(10));
+    // The request being handled finishes first: it uses the managers freed below, and it may
+    // start a thread
+    if (!ClientRequestManager::stop(std::chrono::seconds(5))) {
+        CALF_PRINT_COLOR(CALF_CLI_LEVEL_WARNING, "a request is still being handled");
+    }
+    // No thread starts any more, and the tasks (the closes being counted) finish: the waiters are
+    // only logged, as what they wait for may never come
+    if (!thread_manager().stop(std::chrono::seconds(10))) {
+        CALF_PRINT_COLOR(CALF_CLI_LEVEL_WARNING, "some tasks did not finish");
     }
 
 #ifdef CAPIO_COVERAGE
@@ -58,11 +66,6 @@ inline void sig_term_handler(int signum, siginfo_t *info, void *ptr) {
     __gcov_dump();
     std::_Exit(EXIT_SUCCESS);
 #endif
-
-    // The request being handled finishes first: it uses the managers freed below
-    if (!ClientRequestManager::stop(std::chrono::seconds(5))) {
-        CALF_PRINT_COLOR(CALF_CLI_LEVEL_WARNING, "a request is still being handled");
-    }
 
     // free all the memory used
     discovery_service->stop();

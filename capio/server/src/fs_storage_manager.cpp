@@ -22,7 +22,7 @@
 #include "utils/filesystem.hpp"
 #include "utils/runtime_configuration.hpp"
 #include "utils/server_state.hpp"
-#include "utils/waiter.hpp"
+#include "utils/thread_manager.hpp"
 
 namespace {
 
@@ -176,22 +176,21 @@ void FsStorageManager::applyOnClose(const std::filesystem::path &path, const lon
         commit(path); // what increaseCloseCount does, without asking first
         return;
     }
-    // Counting asks the other nodes, so it runs on its own thread; the server waits for it before
-    // it exits
-    ++_pending_counts;
-    spawn_waiter([this, path, n_closes] {
-        try {
-            for (long i = 0; i < n_closes; ++i) {
-                if (CapioCLEngine::get().increaseCloseCount(path)) {
-                    break;
+    // Counting asks the other nodes, so it runs on its own thread: a task, that the server waits
+    // for before it exits
+    thread_manager().startTask(
+        "count of " + std::to_string(n_closes) + " close(s) of " + path.string(), [path, n_closes] {
+            try {
+                for (long i = 0; i < n_closes; ++i) {
+                    if (CapioCLEngine::get().increaseCloseCount(path)) {
+                        break;
+                    }
                 }
+            } catch (const std::exception &exception) {
+                CALF_PRINT_COLOR(CALF_CLI_LEVEL_ERROR, "Could not count a close of %s: %s",
+                                 path.c_str(), exception.what());
             }
-        } catch (const std::exception &exception) {
-            CALF_PRINT_COLOR(CALF_CLI_LEVEL_ERROR, "Could not count a close of %s: %s",
-                             path.c_str(), exception.what());
-        }
-        --_pending_counts;
-    });
+        });
 }
 
 void FsStorageManager::countClose(const std::filesystem::path &path) {
@@ -375,9 +374,11 @@ void FsStorageManager::list(const pid_t tid, const pid_t pid, const int fd, cons
         const std::lock_guard lock(_listings_mutex);
         _listings.erase(key);
     }
-    spawn_waiter([this, tid, key, path, offset, count, as_it_grows = engine.isFirable(path)] {
-        serveListing(tid, key, path, offset, count, as_it_grows);
-    });
+    thread_manager().startWaiter(
+        thread_name("listing", path, tid, "its entries"),
+        [this, tid, key, path, offset, count, as_it_grows = engine.isFirable(path)] {
+            serveListing(tid, key, path, offset, count, as_it_grows);
+        });
 }
 
 void FsStorageManager::serveListing(const pid_t tid, const std::pair<pid_t, int> key,
@@ -480,12 +481,5 @@ off64_t FsStorageManager::waitForConsent(const std::filesystem::path &path) cons
             }
         }
         std::this_thread::sleep_for(std::chrono::milliseconds(100));
-    }
-}
-
-void FsStorageManager::waitForPendingCounts(const std::chrono::milliseconds timeout) const {
-    const auto deadline = std::chrono::steady_clock::now() + timeout;
-    while (_pending_counts > 0 && std::chrono::steady_clock::now() < deadline) {
-        std::this_thread::sleep_for(std::chrono::milliseconds(10));
     }
 }
