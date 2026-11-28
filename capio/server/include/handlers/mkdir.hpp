@@ -14,7 +14,7 @@ inline void mkdir_handler(const char *const str) {
         return;
     }
     const std::string pathname = request_text(tid, str, consumed);
-    client_manager->replyToClient(tid, storage_manager->addDirectory(tid, pathname));
+    client_manager->replyToClient(tid, storage_manager->createDirectory(tid, pathname));
 }
 
 #endif // CAPIO_SERVER_HANDLERS_MKDIR_HPP

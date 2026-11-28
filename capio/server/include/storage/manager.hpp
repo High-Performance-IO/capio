@@ -104,6 +104,9 @@ class StorageManager {
     void _addNewFdToStorage(pid_t tid, int fd, const std::filesystem::path &path,
                             bool register_open);
 
+    /// @brief What addFile() and addDirectory() share: add a CapioFile, unless @p path has one
+    CapioFile &_add(const std::filesystem::path &path, bool is_dir, size_t init_size);
+
   public:
     /**
      * @brief Constructs a new StorageService instance.
@@ -206,17 +209,44 @@ class StorageManager {
      */
     void rename(const std::filesystem::path &oldpath, const std::filesystem::path &newpath);
 
-    // TODO: Remove parameter is_dir and make an explicit add for file and one for directories
-    // TODO: Rename this method to addFile
     /**
-     * @brief Adds a new CapioFile object to the storage map.
+     * @brief Adds a new CapioFile for a regular file to the storage map, unless @p path already
+     * has one.
      *
      * @param path The path of the file to add.
-     * @param is_dir Flag indicating if the path represents a directory.
-     * @param init_size The initial size of the file buffer (if applicable).
+     * @param init_size The initial size of the file buffer.
      * @return A reference to the newly created or existing CapioFile object.
      */
-    CapioFile &add(const std::filesystem::path &path, bool is_dir, size_t init_size);
+    CapioFile &addFile(const std::filesystem::path &path, size_t init_size);
+
+    /**
+     * @brief Adds a new CapioFile for a regular file to the storage map, unless @p path already
+     * has one, with the initial size of @p path (see initialFileSize()).
+     *
+     * @param path The path of the file to add.
+     * @return A reference to the newly created or existing CapioFile object.
+     */
+    CapioFile &addFile(const std::filesystem::path &path);
+
+    /**
+     * @brief Adds a new CapioFile for a directory to the storage map, unless @p path already has
+     * one. Unlike createDirectory(), it neither writes the "." and ".." entries nor registers the
+     * directory in its parent.
+     *
+     * @param path The path of the directory to add.
+     * @return A reference to the newly created or existing CapioFile object.
+     */
+    CapioFile &addDirectory(const std::filesystem::path &path);
+
+    /**
+     * @brief The initial size of the buffer of the regular file @p path: the one set with
+     * CAPIO_FILE_INIT_SIZE, or CAPIO_DEFAULT_FILE_INITIAL_SIZE. CAPIO-CL has no initial size per
+     * file yet (#326): once it has, it is read here.
+     *
+     * @param path The path of the file.
+     * @return The initial size of the buffer, in bytes.
+     */
+    static size_t initialFileSize(const std::filesystem::path &path);
 
     /**
      * @brief Duplicates an existing file descriptor, similar to the `dup` system call.
@@ -281,17 +311,17 @@ class StorageManager {
     void addFileToTid(pid_t tid, int fd, const std::filesystem::path &path, off64_t offset);
 
     /**
-     * @brief Adds a new directory to the storage service.
+     * @brief Creates a new directory in the storage service.
      *
      * This function handles the special initial setup for directories, including
-     * creating the "." and ".." entries.
+     * creating the "." and ".." entries and the entry in the parent directory.
      *
      * @param tid The thread ID performing the operation.
      * @param path The path of the directory to add.
      * @return `0` if the directory was added/updated, `1` if it already exists and no action was
      * taken.
      */
-    off64_t addDirectory(pid_t tid, const std::filesystem::path &path);
+    off64_t createDirectory(pid_t tid, const std::filesystem::path &path);
 
     /**
      * @brief Updates the parent directory to include an entry for a new file/directory.

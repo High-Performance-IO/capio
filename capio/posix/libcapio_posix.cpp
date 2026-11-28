@@ -403,15 +403,6 @@ static int hook(long syscall_number, long arg0, long arg1, long arg2, long arg3,
         return 1;
     }
 
-    START_LOG(capio_tid(), "call(syscall_number=%ld, syscall_name=%s)", syscall_number,
-              sys_num_to_string(syscall_number).c_str());
-
-    // If the syscall_number is higher than the maximum
-    // syscall captured by CAPIO, simply return
-    if (syscall_number >= CAPIO_NR_SYSCALLS) {
-        return 1;
-    }
-
     // A thread started before libcapio was initialized (e.g. by the constructor of another
     // library, as UCX does with its fuse thread) never went through the clone hook, so it has no
     // caches and no connection to the server. Only such a thread gets past this test, once.
@@ -419,12 +410,29 @@ static int hook(long syscall_number, long arg0, long arg1, long arg2, long arg3,
     // for the main thread, without waiting: no clone request announced it to the server. While it
     // is set up, its own system calls (malloc's, for instance) go to the kernel, through
     // syscall_no_intercept_flag.
-    if (buf_requests == nullptr) {
+    // Before the log of the hook: the logger of a thread issues its system calls through the
+    // handler that initialize_new_thread sets. Until then it uses libc's syscall(), which comes
+    // back here, and logs again, until the stack is gone.
+    const bool set_up_now = buf_requests == nullptr;
+    if (set_up_now) {
         if (syscall_number == SYS_exit || syscall_number == SYS_exit_group) {
             return 1;
         }
-        LOG("Thread not initialized by libcapio: initializing it");
         initialize_new_thread();
+    }
+
+    START_LOG(capio_tid(), "call(syscall_number=%ld, syscall_name=%s)", syscall_number,
+              sys_num_to_string(syscall_number).c_str());
+    DBG(capio_tid(), [&] {
+        if (set_up_now) {
+            LOG("Thread not initialized by libcapio: initialized it");
+        }
+    }());
+
+    // If the syscall_number is higher than the maximum
+    // syscall captured by CAPIO, simply return
+    if (syscall_number >= CAPIO_NR_SYSCALLS) {
+        return 1;
     }
 
     try {

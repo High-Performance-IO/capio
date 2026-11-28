@@ -16,6 +16,7 @@
 
 #include "child.hpp"
 #include "common/env.hpp"
+#include "common/queue.hpp"
 #include "common/semaphore.hpp"
 #include "common/shm.hpp"
 
@@ -101,17 +102,39 @@ TEST(SemaphoreTest, ALockInterruptedByASignalWaitsAgain) {
               0);
 }
 
-TEST(SemaphoreTest, ASemaphoreAlreadyUnlinkedEndsTheProcess) {
-    // Two objects of one name: the second cannot unlink it again, which ends the process
+TEST(SemaphoreTest, ASemaphoreAlreadyUnlinkedIsNotAnError) {
+    // Two objects of one name, as a queue attached to the one of the server: the second finds the
+    // name gone, which is what it was to do (#336). In a child: an error would end the process.
     EXPECT_EQ(run_in_child([] {
                   const std::string name = unique_name("sem");
                   auto *first            = new NamedSemaphore(name, 0);
                   auto *second           = new NamedSemaphore(name, 0);
                   delete first;
-                  delete second; // exits
-                  _exit(0);
+                  delete second;
+                  EXPECT_EQ(sem_open(name.c_str(), 0), SEM_FAILED);
+                  EXPECT_EQ(errno, ENOENT);
               }),
-              EXIT_FAILURE);
+              0);
+}
+
+TEST(QueueTest, AQueueAttachedToAnotherOneIsFreedWithoutEndingTheProcess) {
+    // A client attaches to the queues of the server. Freeing the attached queue unlinks the names,
+    // and the owner, which still has them mapped, keeps working and is then freed too (#336).
+    EXPECT_EQ(run_in_child([] {
+                  // Without the leading '/': the queue prefixes the workflow name to it
+                  const std::string name = unique_name("queue").substr(1);
+                  auto *owner            = new CircularBuffer<char>(name, 4, 8, "test");
+                  auto *attached         = new CircularBuffer<char>(name, 4, 8, "test");
+                  char sent[8]           = "abcdefg";
+                  attached->write(sent);
+                  delete attached;
+
+                  char received[8]{};
+                  owner->read(received);
+                  delete owner;
+                  EXPECT_STREQ(received, "abcdefg");
+              }),
+              0);
 }
 
 TEST(NoLockTest, LocksNothing) {

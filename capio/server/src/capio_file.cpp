@@ -23,7 +23,8 @@ bool CapioFile::compareSectors::operator()(const std::pair<off64_t, off64_t> &lh
 CapioFile::CapioFile() = default;
 
 CapioFile::CapioFile(const bool directory, const unsigned int n_files_expected,
-                     const bool permanent, const off64_t init_size, const int n_close_expected)
+                     const bool permanent, const off64_t init_size,
+                     const unsigned int n_close_expected)
     : _requested_size(init_size), _n_files_expected(n_files_expected + 2),
       _n_close_expected(n_close_expected), _directory(directory), _permanent(permanent) {}
 
@@ -76,11 +77,21 @@ void CapioFile::waitForCommit() const {
     _committed_cv.wait(lock, [this] { return _committed; });
 }
 
+namespace {
+/// @brief Decrement @p counter if it is above 0: these counters never go below zero
+void decrement_if_positive(std::atomic<unsigned int> &counter) {
+    unsigned int value = counter.load();
+    while (value > 0 && !counter.compare_exchange_weak(value, value - 1)) {
+    }
+}
+} // namespace
+
 void CapioFile::close() {
     START_LOG(gettid(), "call()");
     ++_n_close;
-    --_n_opens;
-    LOG("AFTER: _n_close=%d / _n_opens=%d", _n_close.load(), _n_opens.load());
+    // A descriptor inherited by a clone is closed without having been counted as an open
+    decrement_if_positive(_n_opens);
+    LOG("AFTER: _n_close=%u / _n_opens=%u", _n_close.load(), _n_opens.load());
 }
 
 void CapioFile::dump() {
@@ -221,11 +232,9 @@ void CapioFile::insertSector(off64_t new_start, off64_t new_end) {
     _data_avail_cv.notify_all();
 }
 
-bool CapioFile::closed() const {
-    return _n_close_expected == 0 || _n_close == static_cast<int>(_n_close_expected);
-}
+bool CapioFile::closed() const { return _n_close_expected == 0 || _n_close == _n_close_expected; }
 
-bool CapioFile::deletable() const { return _n_opens <= 0; }
+bool CapioFile::deletable() const { return _n_opens == 0; }
 
 bool CapioFile::isDirectory() const { return _directory; }
 
@@ -317,7 +326,7 @@ bool CapioFile::isFirstWrite() const { return this->_first_write; }
 
 void CapioFile::registerFirstWrite() { this->_first_write = false; }
 
-void CapioFile::incrementDirectoryFileCount(const int count) {
+void CapioFile::incrementDirectoryFileCount(const unsigned int count) {
     this->_n_files += count;
     this->_data_avail_cv.notify_all();
 }
@@ -343,7 +352,7 @@ bool CapioFile::removeDirectoryEntry(const std::string &name) {
         if (end - record > 0) {
             _sectors.insert({0, end - record});
         }
-        --_n_files;
+        decrement_if_positive(_n_files);
         LOG("removed entry %s", name.c_str());
         return true;
     }

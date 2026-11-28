@@ -30,7 +30,7 @@ inline void handle_exit_group(int tid) {
             CapioFile &c_file = c_file_opt->get();
             if (c_file.isDirectory()) {
                 LOG("file %s is dir", path.c_str());
-                long int n_committed = c_file.getDirectoryExpectedFileCount();
+                const unsigned int n_committed = c_file.getDirectoryExpectedFileCount();
                 if (n_committed <= c_file.getCurrentDirectoryFileCount()) {
                     LOG("Setting file %s to complete", path.c_str());
                     c_file.setCommitted();

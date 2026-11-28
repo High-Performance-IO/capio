@@ -13,7 +13,6 @@
 #include "remote/requests.hpp"
 
 #include "remote/home_node_service.hpp"
-#include "utils/runtime_configuration.hpp"
 #include "utils/types.hpp"
 
 #include "client-manager/client_manager.hpp"
@@ -70,11 +69,8 @@ inline void reply_stat(int tid, const std::filesystem::path &path) {
             return;
         }
     }
-    auto c_file_opt = storage_manager->tryGet(path);
-    CapioFile &c_file =
-        (c_file_opt)
-            ? c_file_opt->get()
-            : storage_manager->add(path, false, RuntimeConfiguration::get().getFileInitialSize());
+    auto c_file_opt   = storage_manager->tryGet(path);
+    CapioFile &c_file = c_file_opt ? c_file_opt->get() : storage_manager->addFile(path);
     LOG("Obtained capio file. ready to reply to client");
     if (c_file.isCommitted() || *file_location_opt == backend->get_node_name() ||
         CapioCLEngine::get().isFirable(path)) {

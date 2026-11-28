@@ -1,6 +1,7 @@
 #ifndef CAPIO_COMMON_SHM_HPP
 #define CAPIO_COMMON_SHM_HPP
 
+#include <cerrno>
 #include <string>
 #include <utility>
 
@@ -19,8 +20,9 @@
 
 #ifdef __CAPIO_POSIX
 
+// A name already unlinked, e.g. by another queue attached to the same memory, is not an error
 #define SHM_DESTROY_CHECK(source_name)                                                             \
-    if (shm_unlink(source_name) == -1) {                                                           \
+    if (shm_unlink(source_name) == -1 && errno != ENOENT) {                                        \
         ERR_EXIT_EXCEPT_CHOICE(false, "Unable to destroy shared mem: %s", source_name);            \
     };
 
@@ -35,7 +37,7 @@
 
 // NOTE: cannot use CALF_PRINT_COLOR due to this already being a macro !
 #define SHM_DESTROY_CHECK(source_name)                                                             \
-    if (shm_unlink(source_name) == -1) {                                                           \
+    if (shm_unlink(source_name) == -1 && errno != ENOENT) {                                        \
         std::cout << CALF_CLI_LEVEL_WARNING << "Unable to destroy shared mem: '" << source_name    \
                   << "' (" << strerror(errno) << ")" << std::endl;                                 \
     };

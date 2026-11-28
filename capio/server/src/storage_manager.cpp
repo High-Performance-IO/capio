@@ -185,9 +185,24 @@ void StorageManager::rename(const std::filesystem::path &oldpath,
     _storage.insert(std::move(node));
 }
 
-// TODO: Remove parameter is_dir and make an explicit add for file and one for directories
-// TODO: Rename this method to addFile
-CapioFile &StorageManager::add(const std::filesystem::path &path, bool is_dir, size_t init_size) {
+CapioFile &StorageManager::addFile(const std::filesystem::path &path, const size_t init_size) {
+    return _add(path, false, init_size);
+}
+
+CapioFile &StorageManager::addFile(const std::filesystem::path &path) {
+    return _add(path, false, initialFileSize(path));
+}
+
+CapioFile &StorageManager::addDirectory(const std::filesystem::path &path) {
+    return _add(path, true, CAPIO_DEFAULT_DIR_INITIAL_SIZE);
+}
+
+size_t StorageManager::initialFileSize(const std::filesystem::path &path) {
+    START_LOG(gettid(), "call(path=%s)", path.c_str());
+    return RuntimeConfiguration::get().getFileInitialSize();
+}
+
+CapioFile &StorageManager::_add(const std::filesystem::path &path, bool is_dir, size_t init_size) {
 
     START_LOG(gettid(), "call(path=%s, is_dir=%s, init_size=%ld)", path.c_str(),
               is_dir ? "true" : "false", init_size);
@@ -317,13 +332,13 @@ void StorageManager::addFileToTid(const pid_t tid, const int fd, const std::file
     }
 }
 
-off64_t StorageManager::addDirectory(const pid_t tid, const std::filesystem::path &path) {
+off64_t StorageManager::createDirectory(const pid_t tid, const std::filesystem::path &path) {
     START_LOG(tid, "call(path=%s)", path.c_str());
 
     // Whether this server has the directory, not whether some server has it: the other servers
     // announce theirs, and a directory created there is created here too when a client asks.
     if (!tryGet(path)) {
-        CapioFile &c_file = add(path, true, CAPIO_DEFAULT_DIR_INITIAL_SIZE);
+        CapioFile &c_file = addDirectory(path);
         if (c_file.isFirstWrite()) {
             c_file.registerFirstWrite();
             // TODO: it works only if there is one prod per file
@@ -358,7 +373,7 @@ void StorageManager::updateDirectory(const pid_t tid, const std::filesystem::pat
     // by an application that ran before the server started): register it, and its parents,
     // instead of failing on the missing entry.
     if (!tryGet(dir)) {
-        addDirectory(tid, dir);
+        createDirectory(tid, dir);
     }
     if (CapioFile &c_file = get(dir.c_str()); c_file.isFirstWrite()) {
         c_file.registerFirstWrite();

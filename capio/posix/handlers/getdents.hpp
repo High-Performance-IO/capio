@@ -12,7 +12,7 @@
 #include "utils/data.hpp"
 #include "utils/tid.hpp"
 
-// TODO: too similar to capio_read, refactoring needed
+/// getdents reads a CAPIO directory as read reads a file, through capio_cached_read
 inline int getdents_handler_impl(long arg0, long arg1, long arg2, long *result, bool is64bit) {
     auto fd      = static_cast<int>(arg0);
     auto *buffer = reinterpret_cast<struct linux_dirent64 *>(arg1);
@@ -30,11 +30,7 @@ inline int getdents_handler_impl(long arg0, long arg1, long arg2, long *result, 
             }
         })
 
-        if (count >= SSIZE_MAX) {
-            ERR_EXIT("src does not support read bigger than SSIZE_MAX yet");
-        }
-        write_cache->flush();
-        *result = read_cache->read(fd, buffer, count, true, is64bit);
+        *result = capio_cached_read(fd, buffer, count, true, is64bit);
         FS_MODE({
             if (*result == sizeof(linux_dirent64) &&
                 memcmp(buffer, KERNEL_LISTS_MARKER.data(), KERNEL_LISTS_MARKER.size()) == 0) {
