@@ -22,6 +22,7 @@ file(GLOB_RECURSE TARGET_TEST_SOURCE
 # Target definition
 #####################################
 add_executable(${TARGET_NAME} ${TARGET_TEST_SOURCE} ${SERVER_SOURCES})
+capio_enable_sanitizers(${TARGET_NAME})
 
 #####################################
 # Include files and directories

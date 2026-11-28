@@ -1,13 +1,20 @@
-#ifndef CAPIO_SERVER_HANDLERS_CLOSE_HPP
-#define CAPIO_SERVER_HANDLERS_CLOSE_HPP
+#include "handlers.hpp"
 
+#include <cstdio>
+#include <filesystem>
+#include <string>
+#include <unistd.h>
+
+#include "client-manager/client_manager.hpp"
 #include "common/requests.hpp"
-#include "read.hpp"
+#include "remote/home_node_service.hpp"
+#include "storage/fs_storage_manager.hpp"
+#include "storage/manager.hpp"
+#include "utils/capiocl_adapter.hpp"
 #include "utils/common.hpp"
+#include "utils/server_state.hpp"
 
-extern StorageManager *storage_manager;
-
-inline void handle_close(int tid, int fd) {
+void handle_close(int tid, int fd) {
     START_LOG(gettid(), "call(tid=%d, fd=%d)", tid, fd);
 
     const std::filesystem::path path = storage_manager->getPath(tid, fd);
@@ -33,10 +40,7 @@ inline void handle_close(int tid, int fd) {
     storage_manager->removeFromTid(tid, fd);
 }
 
-/**
- * @brief "tid fd [error]": error is what the close failed with, 0 if it worked (FS variant only)
- */
-inline void close_handler(const char *str) {
+void close_handler(const char *str) {
     int tid, fd, error = 0;
     sscanf(str, "%d %d %d", &tid, &fd, &error);
     if (const pid_t pid = client_manager->getPid(tid);
@@ -46,5 +50,3 @@ inline void close_handler(const char *str) {
         handle_close(tid, fd);
     }
 }
-
-#endif // CAPIO_SERVER_HANDLERS_CLOSE_HPP

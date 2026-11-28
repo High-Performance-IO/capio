@@ -75,8 +75,7 @@ TEST(SelectBackendTest, TheConfigurationNamesTheBackend) {
 TEST(RemoteListenerTest, ANoneBackendHasNoListener) {
     NoneBackend none(0, nullptr);
     ScopedTestBackend scoped(&none);
-    Semaphore started(1);
-    capio_remote_listener(started); // returns at once: no other server can send anything
+    capio_remote_listener(); // returns at once: no other server can send anything
 }
 
 TEST(RemoteListenerTest, RequestsGoToTheirHandlersAndInvalidOnesAreIgnored) {
@@ -84,8 +83,7 @@ TEST(RemoteListenerTest, RequestsGoToTheirHandlersAndInvalidOnesAreIgnored) {
     ScopedTestBackend scoped(&scripted);
     scripted.script = {"9999 a code past the last one", "abcd not a code",
                        "0006 /listener/announced"};
-    Semaphore started(1);
-    EXPECT_THROW(capio_remote_listener(started), std::runtime_error);
+    EXPECT_THROW(capio_remote_listener(), std::runtime_error);
     // The announce made the sender the home of the file
     EXPECT_EQ(home_node_service->getHome("/listener/announced"),
               std::optional<std::string>("peer"));

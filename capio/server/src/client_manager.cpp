@@ -11,6 +11,7 @@
 #include "utils/common.hpp"
 #include "utils/filesystem.hpp"
 #include "utils/runtime_configuration.hpp"
+#include "utils/waiter.hpp"
 
 ClientManager::ClientDataBuffers::ClientDataBuffers(const std::string &clientToServerName,
                                                     const std::string &serverToClientName,
@@ -53,7 +54,7 @@ void ClientManager::registerClient(pid_t tid, const std::string &app_name, const
     }(tid, app_name));
 
     if (wait) {
-        std::thread t([&, target_tid = tid]() {
+        spawn_waiter([&, target_tid = tid]() {
             std::unique_lock<std::mutex> lock(mutex_thread_allowed_to_continue);
             cv_thread_allowed_to_continue.wait(lock, [&, target_tid]() {
                 return std::find(thread_allowed_to_continue.begin(),
@@ -65,7 +66,6 @@ void ClientManager::registerClient(pid_t tid, const std::string &app_name, const
                                       thread_allowed_to_continue.end(), target_tid);
             thread_allowed_to_continue.erase(it);
         });
-        t.detach();
     }
 }
 

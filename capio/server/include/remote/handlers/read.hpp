@@ -9,8 +9,8 @@
 #include "storage/manager.hpp"
 #include "utils/common.hpp"
 #include "utils/runtime_configuration.hpp"
-
-extern StorageManager *storage_manager;
+#include "utils/server_state.hpp"
+#include "utils/waiter.hpp"
 
 inline void serve_remote_read(const std::filesystem::path &path, const std::string &dest, int tid,
                               int fd, off64_t count, off64_t offset, bool complete,
@@ -90,8 +90,7 @@ inline void handle_remote_read(const std::filesystem::path &path, const std::str
     if (c_file.isCommitted() || (CapioCLEngine::get().isFirable(path) && data_available)) {
         serve_remote_read(path, source, tid, fd, count, offset, c_file.isCommitted(), is_getdents);
     } else {
-        std::thread t(wait_for_data, path, source, tid, fd, count, offset, is_getdents);
-        t.detach();
+        spawn_waiter(wait_for_data, path, source, tid, fd, count, offset, is_getdents);
     }
 }
 

@@ -1,28 +1,34 @@
-#ifndef CAPIO_SERVER_HANDLERS_READ_HPP
-#define CAPIO_SERVER_HANDLERS_READ_HPP
+#include "handlers.hpp"
 
 #include <chrono>
 #include <csignal>
+#include <cstdio>
+#include <filesystem>
 #include <mutex>
 #include <pthread.h>
+#include <string>
 #include <thread>
+#include <unistd.h>
 
+#include "client-manager/client_manager.hpp"
 #include "remote/backend.hpp"
-#include "remote/requests.hpp"
-#include "utils/fs_root.hpp"
-
 #include "remote/home_node_service.hpp"
+#include "remote/requests.hpp"
+#include "storage/fs_storage_manager.hpp"
+#include "storage/manager.hpp"
+#include "utils/capiocl_adapter.hpp"
 #include "utils/common.hpp"
+#include "utils/fs_root.hpp"
 #include "utils/runtime_configuration.hpp"
+#include "utils/server_state.hpp"
+#include "utils/waiter.hpp"
 
-extern Backend *backend;
+namespace {
+/// @brief One local read at a time: they move the offsets of descriptors
+std::mutex local_read_mutex;
+} // namespace
 
-inline std::mutex local_read_mutex;
-
-extern ClientManager *client_manager;
-extern StorageManager *storage_manager;
-
-inline void handle_pending_read(int tid, int fd, long int process_offset, long int count) {
+void handle_pending_read(int tid, int fd, long int process_offset, long int count) {
     START_LOG(gettid(), "call(tid=%d, fd=%d, process_offset=%ld, count=%ld)", tid, fd,
               process_offset, count);
 
@@ -48,7 +54,7 @@ inline void handle_pending_read(int tid, int fd, long int process_offset, long i
     client_manager->replyToClient(tid, process_offset, c_file.getBuffer(), bytes_read);
 }
 
-inline void handle_local_read(int tid, int fd, off64_t count, bool is_prod) {
+void handle_local_read(int tid, int fd, off64_t count, bool is_prod) {
     START_LOG(gettid(), "call(tid=%d, fd=%d, count=%ld, is_prod=%s)", tid, fd, count,
               is_prod ? "true" : "false");
 
@@ -63,11 +69,10 @@ inline void handle_local_read(int tid, int fd, off64_t count, bool is_prod) {
     if (!(file_complete || CapioCLEngine::get().isFirable(path))) {
         // wait for file to be completed and then do what is done inside handle pending read
         LOG("Data is not available yet. Starting async thread to wait for file availability");
-        std::thread t([&c_file, tid, fd, count, process_offset] {
+        spawn_waiter([&c_file, tid, fd, count, process_offset] {
             c_file.waitForCommit();
             handle_pending_read(tid, fd, process_offset, count);
         });
-        t.detach();
         return;
     }
 
@@ -91,11 +96,10 @@ inline void handle_local_read(int tid, int fd, off64_t count, bool is_prod) {
             "it to client",
             sector_not_found ? "no sector holds data at this offset yet"
                              : "the read goes beyond the end of the available sector");
-        std::thread t([&c_file, tid, fd, count, process_offset] {
+        spawn_waiter([&c_file, tid, fd, count, process_offset] {
             c_file.waitForData(process_offset + count);
             handle_pending_read(tid, fd, process_offset, count);
         });
-        t.detach();
         return;
     }
 
@@ -108,9 +112,7 @@ inline void handle_local_read(int tid, int fd, off64_t count, bool is_prod) {
     storage_manager->setFileOffset(tid, fd, process_offset + read_size);
 }
 
-/// @brief Serve a read of a file whose home is @p home, another server, from what this server has
-/// of it, or ask @p home for the data
-inline void request_remote_read(int tid, int fd, off64_t count, const std::string &home) {
+void request_remote_read(int tid, int fd, off64_t count, const std::string &home) {
     START_LOG(gettid(), "call(tid=%d, fd=%d, count=%ld, home=%s)", tid, fd, count, home.c_str());
 
     const std::filesystem::path &path = storage_manager->getPath(tid, fd);
@@ -136,7 +138,7 @@ inline void request_remote_read(int tid, int fd, off64_t count, const std::strin
     }
 }
 
-inline void wait_for_file(const std::filesystem::path &path, int tid, int fd, off64_t count) {
+void wait_for_file(const std::filesystem::path &path, int tid, int fd, off64_t count) {
     START_LOG(gettid(), "call(path=%s, tid=%d, fd=%d, count=%ld)", path.c_str(), tid, fd, count);
 
     // check if the file is local or remote
@@ -147,7 +149,7 @@ inline void wait_for_file(const std::filesystem::path &path, int tid, int fd, of
     }
 }
 
-inline void handle_read(int tid, int fd, off64_t count) {
+void handle_read(int tid, int fd, off64_t count) {
     START_LOG(gettid(), "call(tid=%d, fd=%d, count=%ld)", tid, fd, count);
 
     const std::filesystem::path &path = storage_manager->getPath(tid, fd);
@@ -161,8 +163,7 @@ inline void handle_read(int tid, int fd, off64_t count) {
     if (!file_location_opt && !is_prod) {
         LOG("Starting thread to wait for file creation");
         // launch a thread that checks when the file is created
-        std::thread t(wait_for_file, path, tid, fd, count);
-        t.detach();
+        spawn_waiter(wait_for_file, path, tid, fd, count);
     } else if (is_prod || *file_location_opt == backend->get_node_name()) {
         LOG("File is local. handling local read");
         handle_local_read(tid, fd, count, is_prod);
@@ -172,16 +173,14 @@ inline void handle_read(int tid, int fd, off64_t count) {
     }
 }
 
-inline void read_handler(const char *const str) {
+void read_handler(const char *const str) {
     int tid, fd;
     off64_t count;
     sscanf(str, "%d %d %ld", &tid, &fd, &count);
     handle_read(tid, fd, count);
 }
 
-/// @brief "tid fd end_of_read". The client sends only the descriptor: its path is looked up in what
-/// the server recorded when the file was opened.
-inline void read_fs_handler(const char *const str) {
+void read_fs_handler(const char *const str) {
     int tid, fd;
     off64_t end_of_read;
     if (sscanf(str, "%d %d %ld", &tid, &fd, &end_of_read) != 3) {
@@ -203,20 +202,7 @@ inline void read_fs_handler(const char *const str) {
         client_manager->replyToClient(tid, *size);
         return;
     }
-    // The waiter does not get the termination signals: their handler frees memory and exits, and
-    // run on a thread that holds a lock (malloc's, CAPIO-CL's) it would wait for it forever.
-    // TODO: a thread manager for the threads of the server
-    sigset_t signals, previous;
-    sigemptyset(&signals);
-    for (const int signal : {SIGTERM, SIGINT, SIGQUIT, SIGPIPE}) {
-        sigaddset(&signals, signal);
-    }
-    pthread_sigmask(SIG_BLOCK, &signals, &previous);
-    std::thread t([path, tid, end_of_read] {
+    spawn_waiter([path, tid, end_of_read] {
         client_manager->replyToClient(tid, fs_storage_manager->waitForData(path, end_of_read));
     });
-    t.detach();
-    pthread_sigmask(SIG_SETMASK, &previous, nullptr);
 }
-
-#endif // CAPIO_SERVER_HANDLERS_READ_HPP

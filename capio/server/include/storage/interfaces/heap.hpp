@@ -1,6 +1,11 @@
 #ifndef CAPIO_HEAP_HPP
 #define CAPIO_HEAP_HPP
 
+#include <algorithm>
+#include <cstring>
+#include <utility>
+#include <vector>
+
 /// @brief Heap allocation strategy: allocates a new[]/delete[] buffer in the process heap.
 struct HeapStorageInterface {
     /**
@@ -27,8 +32,12 @@ struct HeapStorageInterface {
     bool grow(char *&data, off64_t &size, const off64_t new_size,
               const std::vector<std::pair<off64_t, off64_t>> &sectors) {
         char *const nb = new char[new_size];
+        // Only what the old buffer holds: a sector past its end has no data in it to keep
         for (const auto &[lo, hi] : sectors) {
-            memcpy(nb + lo, data + lo, hi - lo);
+            const off64_t end = std::min({hi, size, new_size});
+            if (lo < end) {
+                memcpy(nb + lo, data + lo, end - lo);
+            }
         }
         delete[] data;
         data = nb;

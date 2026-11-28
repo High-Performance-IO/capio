@@ -18,8 +18,7 @@
 #include "utils/capiocl_adapter.hpp"
 #include "utils/common.hpp"
 
-#include "handlers/copy_file_range.hpp"
-#include "handlers/write.hpp"
+#include "handlers.hpp"
 #include "remote/handlers/copy_file_range.hpp"
 
 extern StorageManager *storage_manager;

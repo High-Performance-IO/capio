@@ -2,6 +2,7 @@
 #include "remote/discovery.hpp"
 #include "utils/common.hpp"
 
+#include "utils/server_state.hpp"
 #include <algorithm>
 #include <cstdint>
 #include <cstdlib>
@@ -9,8 +10,6 @@
 #include <mtcl.hpp>
 #include <stdexcept>
 #include <thread>
-
-extern DiscoveryService *discovery_service;
 
 /**
  * MTCL message layout:

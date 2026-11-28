@@ -1,10 +1,19 @@
-#ifndef CAPIO_SERVER_HANDLERS_WRITE_HPP
-#define CAPIO_SERVER_HANDLERS_WRITE_HPP
+#include "handlers.hpp"
 
+#include <cstdio>
+#include <filesystem>
+#include <string>
+#include <unistd.h>
+
+#include "client-manager/client_manager.hpp"
 #include "remote/home_node_service.hpp"
+#include "storage/fs_storage_manager.hpp"
+#include "storage/manager.hpp"
+#include "utils/capiocl_adapter.hpp"
 #include "utils/common.hpp"
+#include "utils/server_state.hpp"
 
-inline void write_handler(const char *const str) {
+void write_handler(const char *const str) {
     std::string request;
     int tid, fd;
     off64_t count;
@@ -28,5 +37,3 @@ inline void write_handler(const char *const str) {
     register_written_data(tid, path, c_file, offset, end_of_write);
     storage_manager->setFileOffset(tid, fd, end_of_write);
 }
-
-#endif // CAPIO_SERVER_HANDLERS_WRITE_HPP

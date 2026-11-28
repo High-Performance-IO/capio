@@ -70,6 +70,23 @@ TEST(HeapStorageInterfaceTest, GrowKeepsData) {
     }
 }
 
+TEST(HeapStorageInterfaceTest, GrowCopiesOnlyWhatTheOldBufferHolds) {
+    // A sector can reach past the end of the buffer (one recorded before its data is stored): the
+    // grow keeps the data the buffer has, and reads nothing beyond it
+    HeapBuf buf;
+    ASSERT_TRUE(buf.allocate(1 * KB));
+    const off64_t old_size = buf.size();
+    for (off64_t i = 0; i < old_size; ++i) {
+        buf.data()[i] = static_cast<char>(i & 0xFF);
+    }
+
+    ASSERT_NE(buf.grow(4 * KB, {{0, 3 * KB}, {2 * KB, 2 * KB + 10}}), nullptr);
+    EXPECT_GE(buf.size(), 4 * KB);
+    for (off64_t i = 0; i < old_size; ++i) {
+        EXPECT_EQ(buf.data()[i], static_cast<char>(i & 0xFF));
+    }
+}
+
 TEST(HeapStorageInterfaceTest, ReleaseIsSafeTwice) {
     HeapBuf buf;
     ASSERT_TRUE(buf.allocate(1 * KB));
