@@ -317,6 +317,122 @@ jobs:
           retention-days: 1
           if-no-files-found: error
 
+  sanitizers:
+    name: "Sanitizers (${{ matrix.sanitizers }})"
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        sanitizers:
+          - "address,undefined"
+    container:
+      image: gcc:16
+    steps:
+      - uses: actions/checkout@v7
+
+      # libopenmpi-dev pulls in Debian's gfortran, whose setup fails without /usr/bin/gfortran:
+      # the gcc image has its compilers in /usr/local/bin (as in unit-tests)
+      - name: "Install gfortran (OpenMPI dependency)"
+        run: |
+          apt update -o Acquire::Check-Valid-Until=false
+          apt install -y gfortran || true
+          update-alternatives --install /usr/bin/gfortran gfortran /usr/bin/gfortran-* 100
+
+      - name: "Install packages"
+        uses: nick-fields/retry@v4
+        with:
+          command: |
+            apt update
+            apt install -y      \
+              openmpi-bin       \
+              libopenmpi-dev    \
+              ninja-build       \
+              cmake             \
+              make              \
+              sudo              \
+              bash              \
+              git               \
+              jq                \
+              pkg-config        \
+              libprotobuf-dev   \
+              protobuf-compiler \
+              build-essential
+          max_attempts: 3
+          retry_wait_seconds: 10
+          timeout_minutes: 10
+
+      # The server and the unit tests are built with the sanitizers. The client libraries are not:
+      # they are preloaded, and a sanitizer runtime must be loaded first. The syscall and FS
+      # streaming tests still run their requests through a sanitized server.
+      - name: "Build with ${{ matrix.sanitizers }}"
+        run: |
+          cmake -DCMAKE_BUILD_TYPE=Debug \
+                -DCAPIO_BUILD_TESTS=ON \
+                -DCAPIO_SANITIZERS=${{ matrix.sanitizers }} \
+                -G Ninja \
+                -B ../build \
+                -S ${GITHUB_WORKSPACE}
+          cmake --build ../build -j $(nproc)
+          cmake --install ../build --prefix /usr/local
+
+      - name: "Run tests"
+        shell: bash
+        timeout-minutes: 15
+        env:
+          CAPIO_DIR: ${{ github.workspace }}
+          CAPIO_LOG_LEVEL: -1
+          # Each sanitized process writes what it finds to sanitizers/report.<pid>, the servers that
+          # run in the background too, whose exit status nobody checks. The per-thread caches of the
+          # clients live as long as the process, so leaks are not reported.
+          ASAN_OPTIONS: "detect_leaks=0:log_path=${{ github.workspace }}/sanitizers/report"
+          UBSAN_OPTIONS: "print_stacktrace=1:log_path=${{ github.workspace }}/sanitizers/report"
+          # Open MPI's memory hooks do not work under AddressSanitizer
+          OMPI_MCA_memory: "^patcher"
+        run: |
+          mkdir -p sanitizers
+          jq  -n               \
+              --arg pwd $(pwd) \
+              '{name: "CAPIO", IO_Graph: [], exclude: ["/aNonExistingFile", "/"]}' \
+          > test_config.json
+          export CONFIG_PATH=$(realpath test_config.json)
+          export LD_LIBRARY_PATH="/usr/local/lib:${LD_LIBRARY_PATH}"
+          status=0
+
+          capio_posix_unit_tests --gtest_print_time=1 || status=1
+          capio_server_unit_tests --gtest_print_time=1 || status=1
+
+          for library in libcapio_posix.so libcapio_posix_fs.so; do
+            filter='*'
+            if [ "$library" = libcapio_posix_fs.so ]; then
+              filter='-*tat*OnDirectory*:*FcntlLease*:*FcntlSeals*:*FromAPosixFileIntoACapioFile:*FromACapioFileIntoAPosixFile:*SpliceFromACapioFile*:*SpliceIntoACapioFile*:*SendfileFromACapioFile*:*TestChmodAndChownByPath*'
+            fi
+            capio_server -c "$CONFIG_PATH" &
+            SERVER=$!
+            sleep 5
+            LD_PRELOAD=$library capio_syscall_unit_tests --gtest_filter="$filter" || status=1
+            kill $SERVER
+            wait $SERVER || true
+            rm -f /dev/shm/CAPIO* /dev/shm/sem.CAPIO*
+          done
+
+          capio_fs_streaming_tests --gtest_print_time=1 || status=1
+
+          if compgen -G "sanitizers/report.*" > /dev/null; then
+            echo "::error::The sanitizers found errors"
+            cat sanitizers/report.*
+            status=1
+          fi
+          exit $status
+
+      - name: "Upload sanitizer reports"
+        if: ${{ failure() }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: sanitizer-reports
+          path: ./sanitizers
+          retention-days: 7
+          if-no-files-found: ignore
+
   memory-allocator-benchmark:
     name: "Benchmark memory allocator"
     runs-on: ubuntu-24.04

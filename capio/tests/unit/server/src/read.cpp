@@ -19,8 +19,7 @@
 #include "storage/manager.hpp"
 #include "utils/capiocl_adapter.hpp"
 
-#include "handlers/read.hpp"
-#include "handlers/write.hpp"
+#include "handlers.hpp"
 #include "remote/handlers/read.hpp"
 
 extern StorageManager *storage_manager;

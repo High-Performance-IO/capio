@@ -10,10 +10,7 @@
 #include "storage/manager.hpp"
 #include "test_backend.hpp"
 
-#include "handlers/getdents.hpp"
-#include "handlers/read.hpp"
-#include "handlers/rename.hpp"
-#include "handlers/stat.hpp"
+#include "handlers.hpp"
 
 extern StorageManager *storage_manager;
 extern HomeNodeService *home_node_service;

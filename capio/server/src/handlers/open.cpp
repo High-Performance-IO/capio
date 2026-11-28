@@ -1,21 +1,27 @@
-#ifndef CAPIO_SERVER_HANDLERS_OPEN_HPP
-#define CAPIO_SERVER_HANDLERS_OPEN_HPP
+#include "handlers.hpp"
 
 #include <chrono>
 #include <csignal>
+#include <cstdio>
+#include <filesystem>
 #include <pthread.h>
+#include <string>
 #include <thread>
+#include <unistd.h>
 
+#include "client-manager/client_manager.hpp"
 #include "common/requests.hpp"
 #include "remote/home_node_service.hpp"
+#include "storage/fs_storage_manager.hpp"
+#include "storage/manager.hpp"
+#include "utils/capiocl_adapter.hpp"
 #include "utils/common.hpp"
 #include "utils/fs_root.hpp"
+#include "utils/server_state.hpp"
+#include "utils/waiter.hpp"
 
-extern ClientManager *client_manager;
-extern StorageManager *storage_manager;
-
-inline void update_file_metadata(const std::filesystem::path &path, int tid, int fd, bool is_creat,
-                                 off64_t offset) {
+void update_file_metadata(const std::filesystem::path &path, int tid, int fd, bool is_creat,
+                          off64_t offset) {
     START_LOG(gettid(), "call(path=%s, client_tid=%d fd=%d, is_creat=%s, offset=%ld)", path.c_str(),
               tid, fd, is_creat ? "true" : "false", offset);
 
@@ -31,7 +37,7 @@ inline void update_file_metadata(const std::filesystem::path &path, int tid, int
     }
 }
 
-inline void wait_for_file_creation(const std::filesystem::path &path, pid_t tid, int fd) {
+void wait_for_file_creation(const std::filesystem::path &path, pid_t tid, int fd) {
     START_LOG(gettid(), "wait_for_file_creation(%s, %ld, %d)", path.c_str(), tid, fd);
     home_node_service->waitForHome(path);
     LOG("File %s exists. Allowing execution of posix client", path.c_str());
@@ -39,7 +45,7 @@ inline void wait_for_file_creation(const std::filesystem::path &path, pid_t tid,
     client_manager->replyToClient(tid, 0);
 }
 
-inline void handle_create(int tid, int fd, const std::filesystem::path &path) {
+void handle_create(int tid, int fd, const std::filesystem::path &path) {
     START_LOG(gettid(), "call(tid=%d, fd=%d, path_cstr=%s)", tid, fd, path.c_str());
 
     // The other servers are asked only when the configuration does not name this client as a
@@ -52,7 +58,7 @@ inline void handle_create(int tid, int fd, const std::filesystem::path &path) {
     client_manager->replyToClient(tid, 0);
 }
 
-inline void handle_create_exclusive(int tid, int fd, const std::filesystem::path &path) {
+void handle_create_exclusive(int tid, int fd, const std::filesystem::path &path) {
     START_LOG(gettid(), "call(tid=%d, fd=%d, path_cstr=%s)", tid, fd, path.c_str());
 
     if (storage_manager->tryGet(path)) {
@@ -63,7 +69,7 @@ inline void handle_create_exclusive(int tid, int fd, const std::filesystem::path
     }
 }
 
-inline void handle_open(int tid, int fd, const std::filesystem::path &path) {
+void handle_open(int tid, int fd, const std::filesystem::path &path) {
     START_LOG(gettid(), "call(tid=%d, fd=%d, path_cstr=%s)", tid, fd, path.c_str());
 
     // lookup() is last because it may ask the other servers (short circuit evaluation)
@@ -76,13 +82,11 @@ inline void handle_open(int tid, int fd, const std::filesystem::path &path) {
         client_manager->replyToClient(tid, 1);
     } else {
         LOG("File does not exist yet. Halting execution of POSIX client.");
-        std::thread t(wait_for_file_creation, path, tid, fd);
-        t.detach();
+        spawn_waiter(wait_for_file_creation, path, tid, fd);
     }
 }
 
-inline void handle_create_fs(const int tid, const std::filesystem::path &path,
-                             const bool inherited) {
+void handle_create_fs(const int tid, const std::filesystem::path &path, const bool inherited) {
     const bool has_producer = inherited && client_manager->hasProducer(path);
     if (!has_producer && !CapioCLEngine::get().isExcluded(path)) {
         client_manager->registerProducedFile(tid, path);
@@ -90,7 +94,7 @@ inline void handle_create_fs(const int tid, const std::filesystem::path &path,
     }
 }
 
-inline void handle_open_fs(const int tid, const std::filesystem::path &path) {
+void handle_open_fs(const int tid, const std::filesystem::path &path) {
     if (CapioCLEngine::get().isExcluded(path)) {
         client_manager->replyToClient(tid, 0);
         return;
@@ -101,24 +105,13 @@ inline void handle_open_fs(const int tid, const std::filesystem::path &path) {
         client_manager->replyToClient(tid, 1); // if it is missing, the kernel answers ENOENT
         return;
     }
-    // Block the termination signals in the waiting thread. Their handler frees memory and exits;
-    // if it ran on a thread holding a lock (malloc's or CAPIO-CL's), it would wait for it forever.
-    // TODO: a thread manager for the threads of the server
-    sigset_t signals, previous;
-    sigemptyset(&signals);
-    for (const int signal : {SIGTERM, SIGINT, SIGQUIT, SIGPIPE}) {
-        sigaddset(&signals, signal);
-    }
-    pthread_sigmask(SIG_BLOCK, &signals, &previous);
-    std::thread t([path, tid] {
+    spawn_waiter([path, tid] {
         fs_storage_manager->waitForCreation(path);
         client_manager->replyToClient(tid, 1);
     });
-    t.detach();
-    pthread_sigmask(SIG_SETMASK, &previous, nullptr);
 }
 
-inline void create_handler(const char *const str) {
+void create_handler(const char *const str) {
     int tid, fd, consumed = 0;
     if (sscanf(str, "%d %d%n", &tid, &fd, &consumed) != 2) {
         return;
@@ -131,7 +124,7 @@ inline void create_handler(const char *const str) {
     handle_create(tid, fd, path);
 }
 
-inline void create_exclusive_handler(const char *const str) {
+void create_exclusive_handler(const char *const str) {
     int tid, fd, consumed = 0;
     if (sscanf(str, "%d %d%n", &tid, &fd, &consumed) != 2) {
         return;
@@ -144,7 +137,7 @@ inline void create_exclusive_handler(const char *const str) {
     handle_create_exclusive(tid, fd, path);
 }
 
-inline void open_handler(const char *const str) {
+void open_handler(const char *const str) {
     int tid, fd, consumed = 0;
     if (sscanf(str, "%d %d%n", &tid, &fd, &consumed) != 2) {
         return;
@@ -157,13 +150,7 @@ inline void open_handler(const char *const str) {
     handle_open(tid, fd, path);
 }
 
-/**
- * @brief A descriptor or a file of the FS variant: "tid fd produced path". tid got the descriptor
- * fd of path, -1 if none (mkdir). produced is a CAPIO_FS_* value: with
- * CAPIO_FS_PRODUCED_IF_NO_PRODUCER, tid got a writable descriptor at exec, and it produces the
- * file only if nobody else does, so that "prog > out" does not take it from its producer.
- */
-inline void create_fs_handler(const char *const str) {
+void create_fs_handler(const char *const str) {
     int tid, fd, produced, consumed = 0;
     if (sscanf(str, "%d %d %d%n", &tid, &fd, &produced, &consumed) != 3) {
         return;
@@ -177,12 +164,9 @@ inline void create_fs_handler(const char *const str) {
     }
 }
 
-/// @brief open of the FS variant: "tid path"
-inline void open_fs_handler(const char *const str) {
+void open_fs_handler(const char *const str) {
     int tid, consumed = 0;
     if (sscanf(str, "%d%n", &tid, &consumed) == 1) {
         handle_open_fs(tid, fs_request_path(tid, str, consumed));
     }
 }
-
-#endif // CAPIO_SERVER_HANDLERS_OPEN_HPP

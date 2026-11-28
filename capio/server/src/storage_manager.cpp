@@ -15,10 +15,9 @@
 #include "utils/filesystem.hpp"
 #include "utils/fs_root.hpp"
 #include "utils/runtime_configuration.hpp"
+#include "utils/server_state.hpp"
 #include "utils/shared_mutex.hpp"
 #include "utils/types.hpp"
-
-extern Backend *backend;
 
 void StorageManager::addDirectoryEntry(const pid_t tid, const std::filesystem::path &file_path,
                                        const std::string &dir, const ManagerDirEntryType type) {

@@ -1,30 +1,24 @@
-#ifndef CAPIO_SERVER_HANDLERS_COPY_FILE_RANGE_HPP
-#define CAPIO_SERVER_HANDLERS_COPY_FILE_RANGE_HPP
+#include "handlers.hpp"
 
+#include <cstdio>
+#include <filesystem>
+#include <string>
 #include <thread>
+#include <unistd.h>
 
 #include "client-manager/client_manager.hpp"
 #include "remote/backend.hpp"
 #include "remote/handlers/copy_file_range.hpp"
 #include "remote/home_node_service.hpp"
+#include "storage/fs_storage_manager.hpp"
 #include "storage/manager.hpp"
 #include "utils/capiocl_adapter.hpp"
 #include "utils/common.hpp"
+#include "utils/server_state.hpp"
 #include "utils/types.hpp"
+#include "utils/waiter.hpp"
 
-extern Backend *backend;
-extern ClientManager *client_manager;
-extern StorageManager *storage_manager;
-
-/**
- * Copy from an input stored on this node. As handle_local_read does for a read, the copy first
- * waits on a separate thread for the commit of the input, or for its data, when they are not
- * available yet.
- *
- * @param copy
- * @param is_prod whether the client is a producer of the input, for which the input is complete
- */
-inline void handle_local_copy_file_range(const CSCopyFileRange_t &copy, const bool is_prod) {
+void handle_local_copy_file_range(const CSCopyFileRange_t &copy, const bool is_prod) {
     START_LOG(gettid(), "call(tid=%d, path_in=%s, offset_in=%ld, count=%ld, is_prod=%s)", copy.tid,
               copy.path_in.c_str(), copy.offset_in, copy.count, is_prod ? "true" : "false");
 
@@ -43,7 +37,7 @@ inline void handle_local_copy_file_range(const CSCopyFileRange_t &copy, const bo
     }
     LOG("Waiting on a separate thread for the %s of the input",
         wait_for_commit ? "commit" : "data");
-    std::thread t([&c_file_in, copy, wait_for_commit] {
+    spawn_waiter([&c_file_in, copy, wait_for_commit] {
         if (wait_for_commit) {
             c_file_in.waitForCommit();
         } else {
@@ -51,18 +45,10 @@ inline void handle_local_copy_file_range(const CSCopyFileRange_t &copy, const bo
         }
         copy_file_range_data(copy);
     });
-    t.detach();
 }
 
-/**
- * Copy from the input wherever it is stored, once its location is known.
- *
- * @param copy
- * @param is_prod whether the client is a producer of the input
- * @param home the input's home node; a producer copies locally and may not have one yet
- */
-inline void handle_copy_file_range(const CSCopyFileRange_t &copy, const bool is_prod,
-                                   const std::optional<std::string> &home) {
+void handle_copy_file_range(const CSCopyFileRange_t &copy, const bool is_prod,
+                            const std::optional<std::string> &home) {
     if (is_prod || home == backend->get_node_name()) {
         handle_local_copy_file_range(copy, is_prod);
     } else {
@@ -70,7 +56,7 @@ inline void handle_copy_file_range(const CSCopyFileRange_t &copy, const bool is_
     }
 }
 
-inline void copy_file_range_handler(const char *const str) {
+void copy_file_range_handler(const char *const str) {
     CSCopyFileRange_t copy{};
     sscanf(str, "%d %d %d %ld %ld %ld", &copy.tid, &copy.fd_in, &copy.fd_out, &copy.offset_in,
            &copy.offset_out, &copy.count);
@@ -86,13 +72,10 @@ inline void copy_file_range_handler(const char *const str) {
 
     if (!is_prod && !home_node_service->getHome(copy.path_in)) {
         LOG("Waiting on a separate thread for the input to be created");
-        std::thread t([copy] {
+        spawn_waiter([copy] {
             handle_copy_file_range(copy, false, home_node_service->waitForHome(copy.path_in));
         });
-        t.detach();
         return;
     }
     handle_copy_file_range(copy, is_prod, home_node_service->getHome(copy.path_in));
 }
-
-#endif // CAPIO_SERVER_HANDLERS_COPY_FILE_RANGE_HPP

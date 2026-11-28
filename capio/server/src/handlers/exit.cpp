@@ -1,12 +1,20 @@
-#ifndef CAPIO_SERVER_HANDLERS_EXIT_HPP
-#define CAPIO_SERVER_HANDLERS_EXIT_HPP
+#include "handlers.hpp"
 
+#include <cstdio>
+#include <filesystem>
+#include <string>
+#include <unistd.h>
+
+#include "client-manager/client_manager.hpp"
+#include "remote/home_node_service.hpp"
+#include "storage/fs_storage_manager.hpp"
 #include "storage/manager.hpp"
+#include "utils/capiocl_adapter.hpp"
 #include "utils/common.hpp"
 #include "utils/fs_root.hpp"
-extern StorageManager *storage_manager;
+#include "utils/server_state.hpp"
 
-inline void handle_exit_group(int tid) {
+void handle_exit_group(int tid) {
     START_LOG(gettid(), "call(tid=%d)", tid);
 
     LOG("retrieving files from writers for process with pid = %d", tid);
@@ -53,10 +61,8 @@ inline void handle_exit_group(int tid) {
     path_parts.erase(tid);
 }
 
-inline void exit_group_handler(const char *const str) {
+void exit_group_handler(const char *const str) {
     int tid;
     sscanf(str, "%d", &tid);
     handle_exit_group(tid);
 }
-
-#endif // CAPIO_SERVER_HANDLERS_EXIT_HPP

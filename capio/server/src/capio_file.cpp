@@ -11,9 +11,8 @@
 #include "remote/backend.hpp"
 #include "server/include/utils/common.hpp"
 #include "utils/fs_root.hpp"
+#include "utils/server_state.hpp"
 #include "utils/shared_mutex.hpp"
-
-extern Backend *backend;
 
 bool CapioFile::compareSectors::operator()(const std::pair<off64_t, off64_t> &lhs,
                                            const std::pair<off64_t, off64_t> &rhs) const {

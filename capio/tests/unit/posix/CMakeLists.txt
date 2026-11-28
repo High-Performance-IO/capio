@@ -14,6 +14,7 @@ set(TARGET_SOURCES
 # Target definition
 #####################################
 add_executable(${TARGET_NAME} ${TARGET_SOURCES})
+capio_enable_sanitizers(${TARGET_NAME})
 
 #####################################
 # External projects

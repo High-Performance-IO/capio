@@ -16,7 +16,8 @@ class FsRoot {
     std::atomic<bool> _set = false;
 
   public:
-    /// @brief Set the root, if it is not set yet. Called by one thread: the server's main loop.
+    /// @brief Set the root, if it is not set yet. Never by two threads at once: by the constructor
+    /// of FsStorageManager, before the threads of the server start, then by the request loop.
     /// @return whether it was set by this call
     bool set(const std::filesystem::path &root) {
         if (_set.load(std::memory_order_acquire)) {

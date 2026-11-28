@@ -21,8 +21,8 @@
 #include "utils/capiocl_adapter.hpp"
 #include "utils/filesystem.hpp"
 #include "utils/runtime_configuration.hpp"
-
-extern ClientManager *client_manager;
+#include "utils/server_state.hpp"
+#include "utils/waiter.hpp"
 
 namespace {
 
@@ -46,23 +46,6 @@ void move_at_or_below(Map &map, const std::string &from, const std::string &to) 
         }
     }
     map.merge(moved);
-}
-
-/**
- * @brief Run @p body on a detached thread that does not get the termination signals: their
- * handler frees memory and exits, and run on a thread that holds a lock (malloc's or CAPIO-CL's)
- * it would wait for it forever.
- * TODO: a thread manager for the threads of the server
- */
-template <typename Body> void spawn_without_signals(Body &&body) {
-    sigset_t signals, previous;
-    sigemptyset(&signals);
-    for (const int signal : {SIGTERM, SIGINT, SIGQUIT, SIGPIPE}) {
-        sigaddset(&signals, signal);
-    }
-    pthread_sigmask(SIG_BLOCK, &signals, &previous);
-    std::thread(std::forward<Body>(body)).detach();
-    pthread_sigmask(SIG_SETMASK, &previous, nullptr);
 }
 
 constexpr off64_t RECORD = sizeof(linux_dirent64);
@@ -145,6 +128,11 @@ std::vector<linux_dirent64> read_directory(const std::filesystem::path &path) {
 } // namespace
 
 FsStorageManager::FsStorageManager() {
+    // The root given with -r. Without it, the CAPIO_DIR of the first client becomes the root (see
+    // handshake_named_handler).
+    if (const auto &root = RuntimeConfiguration::get().getRoot(); !root.empty()) {
+        fs_root().set(root);
+    }
     CALF_PRINT_COLOR(CALF_CLI_LEVEL_STATUS, "initialization completed.");
 }
 
@@ -191,7 +179,7 @@ void FsStorageManager::applyOnClose(const std::filesystem::path &path, const lon
     // Counting asks the other nodes, so it runs on its own thread; the server waits for it before
     // it exits
     ++_pending_counts;
-    spawn_without_signals([this, path, n_closes] {
+    spawn_waiter([this, path, n_closes] {
         try {
             for (long i = 0; i < n_closes; ++i) {
                 if (CapioCLEngine::get().increaseCloseCount(path)) {
@@ -387,10 +375,9 @@ void FsStorageManager::list(const pid_t tid, const pid_t pid, const int fd, cons
         const std::lock_guard lock(_listings_mutex);
         _listings.erase(key);
     }
-    spawn_without_signals(
-        [this, tid, key, path, offset, count, as_it_grows = engine.isFirable(path)] {
-            serveListing(tid, key, path, offset, count, as_it_grows);
-        });
+    spawn_waiter([this, tid, key, path, offset, count, as_it_grows = engine.isFirable(path)] {
+        serveListing(tid, key, path, offset, count, as_it_grows);
+    });
 }
 
 void FsStorageManager::serveListing(const pid_t tid, const std::pair<pid_t, int> key,

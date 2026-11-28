@@ -6,9 +6,8 @@
 #include "remote/backend.hpp"
 #include "remote/requests.hpp"
 #include "storage/manager.hpp"
-
-extern StorageManager *storage_manager;
-extern ClientManager *client_manager;
+#include "utils/server_state.hpp"
+#include "utils/waiter.hpp"
 
 inline void serve_remote_stat(const std::filesystem::path &path, const std::string &dest,
                               int source_tid) {
@@ -47,16 +46,14 @@ inline void handle_remote_stat(int source_tid, const std::filesystem::path &path
             LOG("File is not complete. awaiting completion on different thread. parameters of wait "
                 "are: path=%s, source_tid=%d, dest=%s",
                 path.c_str(), source_tid, dest.c_str());
-            std::thread t(wait_for_completion, path, source_tid, dest);
-            t.detach();
+            spawn_waiter(wait_for_completion, path, source_tid, dest);
         }
     } else {
         LOG("CAPIO file is not in metadata. checking in globs for files to be created");
         LOG("File is in globs. creating capio_file and starting thread awaiting for future "
             "creation of file");
         storage_manager->addFile(path);
-        std::thread t(wait_for_completion, path, source_tid, dest);
-        t.detach();
+        spawn_waiter(wait_for_completion, path, source_tid, dest);
     }
 }
 

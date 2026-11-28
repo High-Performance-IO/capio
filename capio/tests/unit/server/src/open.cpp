@@ -19,7 +19,7 @@
 #include "storage/manager.hpp"
 #include "utils/capiocl_adapter.hpp"
 
-#include "handlers/open.hpp"
+#include "handlers.hpp"
 
 extern StorageManager *storage_manager;
 extern ClientManager *client_manager;

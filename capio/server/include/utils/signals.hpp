@@ -10,6 +10,7 @@
 #include "calf/StdOutLogger.h"
 #include "calf/StlLogger.h"
 
+#include "client-manager/request_manager.hpp"
 #include "remote/backend.hpp"
 #include "remote/discovery.hpp"
 #include "utils/common.hpp"
@@ -57,6 +58,11 @@ inline void sig_term_handler(int signum, siginfo_t *info, void *ptr) {
     __gcov_dump();
     std::_Exit(EXIT_SUCCESS);
 #endif
+
+    // The request being handled finishes first: it uses the managers freed below
+    if (!ClientRequestManager::stop(std::chrono::seconds(5))) {
+        CALF_PRINT_COLOR(CALF_CLI_LEVEL_WARNING, "a request is still being handled");
+    }
 
     // free all the memory used
     discovery_service->stop();

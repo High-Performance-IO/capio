@@ -5,9 +5,7 @@
 #include "remote/home_node_service.hpp"
 #include "storage/manager.hpp"
 #include "utils/runtime_configuration.hpp"
-
-extern StorageManager *storage_manager;
-extern Backend *backend;
+#include "utils/server_state.hpp"
 
 inline void serve_remote_stat_request(const std::filesystem::path &path, int source_tid,
                                       off64_t file_size, bool is_dir, const std::string &dest) {

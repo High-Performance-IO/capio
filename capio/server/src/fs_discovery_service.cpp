@@ -12,8 +12,7 @@
 #include "server/include/remote/discovery.hpp"
 #include "utils/capiocl_adapter.hpp"
 #include "utils/common.hpp"
-
-extern Backend *backend;
+#include "utils/server_state.hpp"
 
 namespace {
 bool same_time(const timespec &lhs, const timespec &rhs) {

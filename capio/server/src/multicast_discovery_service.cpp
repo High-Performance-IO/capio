@@ -10,8 +10,7 @@
 #include "server/include/remote/discovery.hpp"
 #include "utils/capiocl_adapter.hpp"
 #include "utils/common.hpp"
-
-extern Backend *backend;
+#include "utils/server_state.hpp"
 
 // constant required by setsockopt()
 int REUSE_MCAST_SOCKET = 1;

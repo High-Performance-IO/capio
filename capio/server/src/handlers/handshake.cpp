@@ -1,21 +1,27 @@
-#ifndef CAPIO_SERVER_HANDLERS_HANDSHAKE_HPP
-#define CAPIO_SERVER_HANDLERS_HANDSHAKE_HPP
-#include "clone.hpp"
+#include "handlers.hpp"
+
+#include <cstdio>
+#include <filesystem>
+#include <string>
+#include <unistd.h>
+
+#include "capiocl/engine.h"
+#include "client-manager/client_manager.hpp"
 #include "common/requests.hpp"
+#include "remote/home_node_service.hpp"
+#include "storage/fs_storage_manager.hpp"
+#include "storage/manager.hpp"
+#include "utils/capiocl_adapter.hpp"
 #include "utils/common.hpp"
 #include "utils/fs_root.hpp"
 #include "utils/runtime_configuration.hpp"
+#include "utils/server_state.hpp"
 
-#include "capiocl/engine.h"
-
+/// Writable, to start the file system monitor: everything else reads it through
+/// CapioCLEngine::get()
 extern capiocl::engine::Engine *capio_cl_engine;
 
-/**
- * @brief Whether a client of @p variant is refused: the variant of a workflow, on this node, is
- * that of its first client, and the two variants cannot be mixed yet.
- * TODO: drop the refusal once the two variants work together in one workflow (#337)
- */
-inline bool refuses_variant(const pid_t pid, const char *app_name, const char variant) {
+bool refuses_variant(const pid_t pid, const char *app_name, const char variant) {
     static char workflow_variant = 0;
     if (variant == 0) {
         return false;
@@ -36,13 +42,7 @@ inline bool refuses_variant(const pid_t pid, const char *app_name, const char va
     return true;
 }
 
-/**
- * @brief Whether an FS client whose CAPIO_DIR is @p capio_dir is refused. The server streams
- * through one directory, the real one behind the virtual "/": -r, or else the CAPIO_DIR of its
- * first FS client, which then starts the file system monitor there. Any other is refused.
- */
-inline bool refuses_root(const pid_t pid, const char *app_name,
-                         const std::filesystem::path &capio_dir) {
+bool refuses_root(const pid_t pid, const char *app_name, const std::filesystem::path &capio_dir) {
     if (fs_root().known()) {
         if (fs_root().get() == capio_dir) {
             return false;
@@ -68,14 +68,7 @@ inline bool refuses_root(const pid_t pid, const char *app_name,
     return false;
 }
 
-/**
- * @brief "tid pid app_name wait variant capio_dir", where capio_dir is the real CAPIO_DIR of an FS
- * client, empty for a memory one. Every handshake gets one answer: 1, CAPIO_REPLY_VARIANT_REFUSED
- * for a client of the other variant, or CAPIO_REPLY_ROOT_REFUSED for an FS client whose CAPIO_DIR
- * is not the directory the server streams through. A new thread (wait) is answered only once its
- * parent's clone request is handled (ClientManager::unlockClonedChild).
- */
-inline void handshake_named_handler(const char *const str) {
+void handshake_named_handler(const char *const str) {
     int tid, pid, wait, consumed = 0;
     char app_name[1024];
     char variant = 0;
@@ -97,5 +90,3 @@ inline void handshake_named_handler(const char *const str) {
         client_manager->replyToClient(tid, 1);
     }
 }
-
-#endif // CAPIO_SERVER_HANDLERS_HANDSHAKE_HPP

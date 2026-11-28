@@ -60,6 +60,7 @@ sudo cmake --install .
 | `-DCAPIO_BUILD_SERVER=FALSE`               | `TRUE`  | Skip building `capio_server`                                 |
 | `-DCAPIO_BUILD_POSIX=FALSE`                | `TRUE`  | Skip building `libcapio_posix.so`                            |
 | `-DCAPIO_MEMORY_CHECKS=<full\|fast\|none>` | `full`  | How the server checks node memory before allocating buffers |
+| `-DCAPIO_SANITIZERS=address,undefined`     | empty   | Build the server and the unit tests with these sanitizers   |
 
 If a requested file buffer is larger than the memory reported by `CAPIO_MEMORY_CHECKS`, the allocation is capped to
 that memory, and a warning is printed when it is less than 10% of the requested size:

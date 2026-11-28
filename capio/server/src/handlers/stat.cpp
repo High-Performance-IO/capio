@@ -1,29 +1,29 @@
-#ifndef CAPIO_SERVER_HANDLERS_STAT_HPP
-#define CAPIO_SERVER_HANDLERS_STAT_HPP
+#include "handlers.hpp"
 
 #include <chrono>
 #include <csignal>
+#include <cstdio>
+#include <filesystem>
 #include <mutex>
 #include <pthread.h>
+#include <string>
 #include <thread>
-
-#include "remote/backend.hpp"
-#include "utils/fs_root.hpp"
-
-#include "remote/requests.hpp"
-
-#include "remote/home_node_service.hpp"
-#include "utils/types.hpp"
+#include <unistd.h>
 
 #include "client-manager/client_manager.hpp"
+#include "remote/backend.hpp"
+#include "remote/home_node_service.hpp"
+#include "remote/requests.hpp"
+#include "storage/fs_storage_manager.hpp"
 #include "storage/manager.hpp"
+#include "utils/capiocl_adapter.hpp"
 #include "utils/common.hpp"
+#include "utils/fs_root.hpp"
+#include "utils/server_state.hpp"
+#include "utils/types.hpp"
+#include "utils/waiter.hpp"
 
-extern StorageManager *storage_manager;
-extern ClientManager *client_manager;
-extern Backend *backend;
-
-inline void wait_for_file_completion(int tid, const std::filesystem::path &path) {
+void wait_for_file_completion(int tid, const std::filesystem::path &path) {
     START_LOG(gettid(), "call(tid=%d, path=%s)", tid, path.c_str());
 
     const auto home   = home_node_service->waitForHome(path);
@@ -42,7 +42,7 @@ inline void wait_for_file_completion(int tid, const std::filesystem::path &path)
     }
 }
 
-inline void reply_stat(int tid, const std::filesystem::path &path) {
+void reply_stat(int tid, const std::filesystem::path &path) {
     START_LOG(gettid(), "call(tid=%d, path=%s)", tid, path.c_str());
 
     auto file_location_opt = home_node_service->getHome(path);
@@ -63,8 +63,7 @@ inline void reply_stat(int tid, const std::filesystem::path &path) {
             } else {
                 LOG("File found but not ready yet. Starting a thread to wait for file %s",
                     path.c_str());
-                std::thread t(wait_for_file_completion, tid, std::filesystem::path(path));
-                t.detach();
+                spawn_waiter(wait_for_file_completion, tid, std::filesystem::path(path));
             }
             return;
         }
@@ -85,14 +84,14 @@ inline void reply_stat(int tid, const std::filesystem::path &path) {
     }
 }
 
-inline void fstat_handler(const char *const str) {
+void fstat_handler(const char *const str) {
     int tid, fd;
     sscanf(str, "%d %d", &tid, &fd);
 
     reply_stat(tid, storage_manager->getPath(tid, fd));
 }
 
-inline void stat_handler(const char *const str) {
+void stat_handler(const char *const str) {
     int tid, consumed = 0;
     if (sscanf(str, "%d%n", &tid, &consumed) != 1) {
         return;
@@ -105,12 +104,7 @@ inline void stat_handler(const char *const str) {
     reply_stat(tid, path);
 }
 
-/*
- * stat, access, chdir: wait for the path to exist, as open does, and then, for a declared path in
- * update mode, for its commit. The reply is 1 if it holds from now on, so that the client can cache
- * it, and 0 if it only holds now (the path is missing, or is not declared).
- */
-inline void consent_handler(const char *const str) {
+void consent_handler(const char *const str) {
     int tid, consumed = 0;
     if (sscanf(str, "%d%n", &tid, &consumed) != 1) {
         return;
@@ -140,20 +134,7 @@ inline void consent_handler(const char *const str) {
             return;
         }
     }
-    // The waiter does not get the termination signals: their handler frees memory and exits, and
-    // run on a thread that holds a lock (malloc's, CAPIO-CL's) it would wait for it forever.
-    // TODO: a thread manager for the threads of the server
-    sigset_t signals, previous;
-    sigemptyset(&signals);
-    for (const int signal : {SIGTERM, SIGINT, SIGQUIT, SIGPIPE}) {
-        sigaddset(&signals, signal);
-    }
-    pthread_sigmask(SIG_BLOCK, &signals, &previous);
-    std::thread t([path, tid] {
+    spawn_waiter([path, tid] {
         client_manager->replyToClient(tid, fs_storage_manager->waitForConsent(path));
     });
-    t.detach();
-    pthread_sigmask(SIG_SETMASK, &previous, nullptr);
 }
-
-#endif // CAPIO_SERVER_HANDLERS_STAT_HPP
