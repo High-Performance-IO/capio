@@ -8,7 +8,7 @@
 #include <string>
 #include <vector>
 
-#include "constants.hpp"
+#include <sys/types.h>
 
 struct linux_dirent64 {
     ino64_t d_ino;           /* 64-bit inode number */

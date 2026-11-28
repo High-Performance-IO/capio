@@ -17,9 +17,9 @@
 #include "storage/manager.hpp"
 #include "utils/capiocl_adapter.hpp"
 #include "utils/common.hpp"
+#include "utils/server_state.hpp"
 #include "utils/types.hpp"
-
-extern StorageManager *storage_manager;
+#include "utils/waiter.hpp"
 
 /**
  * On the node of the client: copy from an input stored on another node. The copy of the input
@@ -87,11 +87,10 @@ inline void handle_remote_copy_file_range_data(const std::filesystem::path &path
         return;
     }
     LOG("Waiting on a separate thread for the data of the input");
-    std::thread t([&c_file, offset_in, count, serve] {
+    spawn_waiter([&c_file, offset_in, count, serve] {
         c_file.waitForData(offset_in + count);
         serve();
     });
-    t.detach();
 }
 
 /**
@@ -141,14 +140,17 @@ inline void handle_remote_copy_file_range_reply(const std::string &source, const
     copy_file_range_data(copy);
 }
 
+/// "<tid> <fd in> <fd out> <offset in> <offset out> <count> <path in>"
 inline void remote_copy_file_range_handler(const RemoteRequest &request) {
-    char path_in[PATH_MAX];
-    int tid, fd_in, fd_out;
+    int tid, fd_in, fd_out, path_start = 0;
     off64_t offset_in, offset_out, count;
-    sscanf(request.get_content(), "%s %d %d %d %ld %ld %ld", path_in, &tid, &fd_in, &fd_out,
-           &offset_in, &offset_out, &count);
-    handle_remote_copy_file_range_data(path_in, request.get_source(), tid, fd_in, fd_out, offset_in,
-                                       offset_out, count);
+    if (sscanf(request.get_content(), "%d %d %d %ld %ld %ld %n", &tid, &fd_in, &fd_out, &offset_in,
+               &offset_out, &count, &path_start) < 6 ||
+        path_start == 0) {
+        return;
+    }
+    handle_remote_copy_file_range_data(request.get_content() + path_start, request.get_source(),
+                                       tid, fd_in, fd_out, offset_in, offset_out, count);
 }
 
 inline void remote_copy_file_range_reply_handler(const RemoteRequest &request) {

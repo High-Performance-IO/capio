@@ -1,0 +1,77 @@
+#include "handlers.hpp"
+
+#include <cstdio>
+#include <filesystem>
+#include <string>
+#include <unistd.h>
+
+#include "client-manager/client_manager.hpp"
+#include "remote/home_node_service.hpp"
+#include "storage/fs_storage_manager.hpp"
+#include "storage/manager.hpp"
+#include "utils/capiocl_adapter.hpp"
+#include "utils/common.hpp"
+#include "utils/server_state.hpp"
+
+void handle_lseek(int tid, int fd, off64_t offset) {
+    START_LOG(gettid(), "call(tid=%d, fd=%d, offset=%ld)", tid, fd, offset);
+
+    storage_manager->setFileOffset(tid, fd, offset);
+    client_manager->replyToClient(tid, offset);
+}
+
+void handle_seek_data(int tid, int fd, off64_t offset) {
+    START_LOG(gettid(), "call(tid=%d, fd=%d, offset=%ld)", tid, fd, offset);
+
+    CapioFile &c_file = storage_manager->get(tid, fd);
+    offset            = c_file.seekData(offset);
+    if (offset >= 0) { // -1: none, the offset stays
+        storage_manager->setFileOffset(tid, fd, offset);
+    }
+    client_manager->replyToClient(tid, offset);
+}
+
+void handle_seek_end(int tid, int fd) {
+    START_LOG(gettid(), "call(tid=%d, fd=%d)", tid, fd);
+
+    // seek_end here behaves as stat because we want the file size
+    reply_stat(tid, storage_manager->getPath(tid, fd));
+}
+
+void handle_seek_hole(int tid, int fd, off64_t offset) {
+    START_LOG(gettid(), "call(tid=%d, fd=%d, offset=%ld)", tid, fd, offset);
+
+    CapioFile &c_file = storage_manager->get(tid, fd);
+    offset            = c_file.seekHole(offset);
+    if (offset >= 0) { // -1: none, the offset stays
+        storage_manager->setFileOffset(tid, fd, offset);
+    }
+    client_manager->replyToClient(tid, offset);
+}
+
+void lseek_handler(const char *const str) {
+    int tid, fd;
+    off64_t offset;
+    sscanf(str, "%d %d %ld", &tid, &fd, &offset);
+    handle_lseek(tid, fd, offset);
+}
+
+void seek_data_handler(const char *const str) {
+    int tid, fd;
+    off64_t offset;
+    sscanf(str, "%d %d %ld", &tid, &fd, &offset);
+    handle_seek_data(tid, fd, offset);
+}
+
+void seek_end_handler(const char *const str) {
+    int tid, fd;
+    sscanf(str, "%d %d", &tid, &fd);
+    handle_seek_end(tid, fd);
+}
+
+void seek_hole_handler(const char *const str) {
+    int tid, fd;
+    off64_t offset;
+    sscanf(str, "%d %d %ld", &tid, &fd, &offset);
+    handle_seek_hole(tid, fd, offset);
+}

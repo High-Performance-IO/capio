@@ -68,10 +68,34 @@ jobs:
               --name capio-docker                 \
               alphaunito/capio:latest             \
             sh -c 'jq -n --arg pwd "$PWD" "$1" > test_config.json && \
+               { capio_server -c test_config.json & sleep 5; } && \
                LD_PRELOAD=libcapio_posix.so capio_syscall_unit_tests \
                  --gtest_break_on_failure \
                  --gtest_print_time=1' sh \
-              '{name: "CAPIO", IO_Graph: [], exclude: [$pwd + "/aNonExistingFile", $pwd, $pwd + "/"]}'
+              '{name: "CAPIO", IO_Graph: [], exclude: ["/aNonExistingFile", "/"]}'
+
+          echo "Run CAPIO syscall Unit tests, FS variant"
+          docker run --rm                         \
+              --env CAPIO_DIR=/tmp/capio          \
+              --env CAPIO_LOG_LEVEL=-1            \
+              --workdir /tmp/capio                \
+              --name capio-docker                 \
+              alphaunito/capio:latest             \
+            sh -c 'jq -n --arg pwd "$PWD" "$1" > test_config.json && \
+               { capio_server -c test_config.json & sleep 5; } && \
+               LD_PRELOAD=libcapio_posix_fs.so capio_syscall_unit_tests \
+                 --gtest_filter="-*tat*OnDirectory*:*FcntlLease*:*FcntlSeals*:*FromAPosixFileIntoACapioFile:*FromACapioFileIntoAPosixFile:*SpliceFromACapioFile*:*SpliceIntoACapioFile*:*SendfileFromACapioFile*:*TestChmodAndChownByPath*" \
+                 --gtest_break_on_failure \
+                 --gtest_print_time=1' sh \
+              '{name: "CAPIO", IO_Graph: [], exclude: ["/aNonExistingFile", "/"]}'
+
+          echo "Run CAPIO FS streaming tests"
+          docker run --rm                         \
+              --env CAPIO_LOG_LEVEL=-1            \
+              --name capio-docker                 \
+              alphaunito/capio:latest             \
+            capio_fs_streaming_tests              \
+              --gtest_print_time=1
           
   format-check:
     name: "Check ${{ matrix.path }} clang-format conformance"
@@ -181,14 +205,14 @@ jobs:
       - name: "Run tests"
         id: run-tests
         shell: bash
-        timeout-minutes: 5
+        timeout-minutes: 12
         env:
           CAPIO_DIR: ${{ github.workspace }}
           CAPIO_LOG_LEVEL: -1
         run: |
           jq  -n               \
               --arg pwd $(pwd) \
-              '{name: "CAPIO", IO_Graph: [], exclude: [$pwd + "/aNonExistingFile", $pwd, $pwd + "/"]}' \
+              '{name: "CAPIO", IO_Graph: [], exclude: ["/aNonExistingFile", "/"]}' \
           > test_config.json
           
           export CONFIG_PATH=$(realpath test_config.json)
@@ -205,10 +229,44 @@ jobs:
             --gtest_break_on_failure \
             --gtest_print_time=1
           
+          # Every CAPIO client waits for the answer to its handshake: the server runs first
+          capio_server -c "$CONFIG_PATH" &
+          SERVER=$!
+          sleep 5
+
           echo "Run CAPIO syscall Unit tests"
           LD_PRELOAD=libcapio_posix.so \
           capio_syscall_unit_tests \
             --gtest_break_on_failure \
+            --gtest_print_time=1
+
+          kill $SERVER
+          wait $SERVER || true
+
+          # A coverage build skips the teardown of the server, which leaves its shared memory, the
+          # canary among it: the next server of the same workflow would refuse to start.
+          rm -f /dev/shm/CAPIO* /dev/shm/sem.CAPIO*
+
+          capio_server -c "$CONFIG_PATH" &
+          SERVER=$!
+          sleep 5
+
+          # Left out: what only holds for files in memory (synthetic sizes of directories, refused
+          # splice, sendfile, leases and seals), copies to another file system (EXDEV), and chmod,
+          # fchmodat, chown and fchownat of CAPIO files, which the FS variant does not implement
+          # yet.
+          echo "Run CAPIO syscall Unit tests, FS variant"
+          LD_PRELOAD=libcapio_posix_fs.so \
+          capio_syscall_unit_tests \
+            --gtest_filter='-*tat*OnDirectory*:*FcntlLease*:*FcntlSeals*:*FromAPosixFileIntoACapioFile:*FromACapioFileIntoAPosixFile:*SpliceFromACapioFile*:*SpliceIntoACapioFile*:*SendfileFromACapioFile*:*TestChmodAndChownByPath*' \
+            --gtest_break_on_failure \
+            --gtest_print_time=1
+
+          kill $SERVER
+          wait $SERVER || true
+
+          echo "Run CAPIO FS streaming tests"
+          capio_fs_streaming_tests \
             --gtest_print_time=1
 
       # note: use always() to force log upload also on test failure
@@ -258,6 +316,122 @@ jobs:
           path: ./coverage.xml
           retention-days: 1
           if-no-files-found: error
+
+  sanitizers:
+    name: "Sanitizers (${{ matrix.sanitizers }})"
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        sanitizers:
+          - "address,undefined"
+    container:
+      image: gcc:16
+    steps:
+      - uses: actions/checkout@v7
+
+      # libopenmpi-dev pulls in Debian's gfortran, whose setup fails without /usr/bin/gfortran:
+      # the gcc image has its compilers in /usr/local/bin (as in unit-tests)
+      - name: "Install gfortran (OpenMPI dependency)"
+        run: |
+          apt update -o Acquire::Check-Valid-Until=false
+          apt install -y gfortran || true
+          update-alternatives --install /usr/bin/gfortran gfortran /usr/bin/gfortran-* 100
+
+      - name: "Install packages"
+        uses: nick-fields/retry@v4
+        with:
+          command: |
+            apt update
+            apt install -y      \
+              openmpi-bin       \
+              libopenmpi-dev    \
+              ninja-build       \
+              cmake             \
+              make              \
+              sudo              \
+              bash              \
+              git               \
+              jq                \
+              pkg-config        \
+              libprotobuf-dev   \
+              protobuf-compiler \
+              build-essential
+          max_attempts: 3
+          retry_wait_seconds: 10
+          timeout_minutes: 10
+
+      # The server and the unit tests are built with the sanitizers. The client libraries are not:
+      # they are preloaded, and a sanitizer runtime must be loaded first. The syscall and FS
+      # streaming tests still run their requests through a sanitized server.
+      - name: "Build with ${{ matrix.sanitizers }}"
+        run: |
+          cmake -DCMAKE_BUILD_TYPE=Debug \
+                -DCAPIO_BUILD_TESTS=ON \
+                -DCAPIO_SANITIZERS=${{ matrix.sanitizers }} \
+                -G Ninja \
+                -B ../build \
+                -S ${GITHUB_WORKSPACE}
+          cmake --build ../build -j $(nproc)
+          cmake --install ../build --prefix /usr/local
+
+      - name: "Run tests"
+        shell: bash
+        timeout-minutes: 15
+        env:
+          CAPIO_DIR: ${{ github.workspace }}
+          CAPIO_LOG_LEVEL: -1
+          # Each sanitized process writes what it finds to sanitizers/report.<pid>, the servers that
+          # run in the background too, whose exit status nobody checks. The per-thread caches of the
+          # clients live as long as the process, so leaks are not reported.
+          ASAN_OPTIONS: "detect_leaks=0:log_path=${{ github.workspace }}/sanitizers/report"
+          UBSAN_OPTIONS: "print_stacktrace=1:log_path=${{ github.workspace }}/sanitizers/report"
+          # Open MPI's memory hooks do not work under AddressSanitizer
+          OMPI_MCA_memory: "^patcher"
+        run: |
+          mkdir -p sanitizers
+          jq  -n               \
+              --arg pwd $(pwd) \
+              '{name: "CAPIO", IO_Graph: [], exclude: ["/aNonExistingFile", "/"]}' \
+          > test_config.json
+          export CONFIG_PATH=$(realpath test_config.json)
+          export LD_LIBRARY_PATH="/usr/local/lib:${LD_LIBRARY_PATH}"
+          status=0
+
+          capio_posix_unit_tests --gtest_print_time=1 || status=1
+          capio_server_unit_tests --gtest_print_time=1 || status=1
+
+          for library in libcapio_posix.so libcapio_posix_fs.so; do
+            filter='*'
+            if [ "$library" = libcapio_posix_fs.so ]; then
+              filter='-*tat*OnDirectory*:*FcntlLease*:*FcntlSeals*:*FromAPosixFileIntoACapioFile:*FromACapioFileIntoAPosixFile:*SpliceFromACapioFile*:*SpliceIntoACapioFile*:*SendfileFromACapioFile*:*TestChmodAndChownByPath*'
+            fi
+            capio_server -c "$CONFIG_PATH" &
+            SERVER=$!
+            sleep 5
+            LD_PRELOAD=$library capio_syscall_unit_tests --gtest_filter="$filter" || status=1
+            kill $SERVER
+            wait $SERVER || true
+            rm -f /dev/shm/CAPIO* /dev/shm/sem.CAPIO*
+          done
+
+          capio_fs_streaming_tests --gtest_print_time=1 || status=1
+
+          if compgen -G "sanitizers/report.*" > /dev/null; then
+            echo "::error::The sanitizers found errors"
+            cat sanitizers/report.*
+            status=1
+          fi
+          exit $status
+
+      - name: "Upload sanitizer reports"
+        if: ${{ failure() }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: sanitizer-reports
+          path: ./sanitizers
+          retention-days: 7
+          if-no-files-found: ignore
 
   memory-allocator-benchmark:
     name: "Benchmark memory allocator"

@@ -5,6 +5,7 @@
 
 #include "utils/common.hpp"
 #include "utils/filesystem.hpp"
+#include "utils/tid.hpp"
 
 inline off64_t capio_faccessat(int dirfd, const std::string_view &pathname, mode_t mode, int flags,
                                long tid) {
@@ -40,20 +41,26 @@ inline off64_t capio_faccessat(int dirfd, const std::string_view &pathname, mode
     if (!is_capio_path(path)) {
         return CAPIO_POSIX_SYSCALL_REQUEST_SKIP;
     }
-    // The server answers -1 for a CAPIO path it has no location for, and leaves errno to us.
-    const off64_t res = access_request(path, tid);
-    if (res == CAPIO_POSIX_SYSCALL_ERRNO) {
-        errno = ENOENT;
-    }
-    return res;
+    MEMORY_MODE({
+        // The server answers -1 for a CAPIO path it has no location for, and leaves errno to us.
+        const off64_t res = access_request(path, tid);
+        if (res == CAPIO_POSIX_SYSCALL_ERRNO) {
+            errno = ENOENT;
+        }
+        return res;
+    })
+    FS_MODE({
+        // The kernel runs it, once the file is there
+        consent_request_cache->consent_request(path, tid, __FUNCTION__);
+        return CAPIO_POSIX_SYSCALL_REQUEST_SKIP;
+    })
 }
 
 int access_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg5, long *result) {
     const std::string_view pathname(reinterpret_cast<const char *>(arg0));
     auto mode = static_cast<mode_t>(arg1);
-    long tid  = syscall_no_intercept(SYS_gettid);
 
-    return posix_return_value(capio_faccessat(AT_FDCWD, pathname, mode, 0, tid), result);
+    return posix_return_value(capio_faccessat(AT_FDCWD, pathname, mode, 0, capio_tid()), result);
 }
 
 int faccessat_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg5,
@@ -62,9 +69,8 @@ int faccessat_handler(long arg0, long arg1, long arg2, long arg3, long arg4, lon
     const std::string_view pathname(reinterpret_cast<const char *>(arg1));
     auto mode  = static_cast<mode_t>(arg2);
     auto flags = static_cast<int>(arg3);
-    long tid   = syscall_no_intercept(SYS_gettid);
 
-    return posix_return_value(capio_faccessat(dirfd, pathname, mode, flags, tid), result);
+    return posix_return_value(capio_faccessat(dirfd, pathname, mode, flags, capio_tid()), result);
 }
 
 #endif // SYS_access || SYS_faccessat || SYS_faccessat2

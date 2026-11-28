@@ -1,6 +1,7 @@
 #ifndef CAPIO_SERVER_REMOTE_BACKEND_HPP
 #define CAPIO_SERVER_REMOTE_BACKEND_HPP
 #include <charconv>
+#include <limits>
 #include <set>
 #include <string>
 
@@ -87,6 +88,13 @@ class Backend {
      * @param source Identifier of the server that sent the current request
      */
     virtual void recv_file(char *shm, long int bytes_expected, const std::string &source) = 0;
+
+    /**
+     * @brief Largest file payload that send_file() accepts in one message.
+     *
+     * Replies to remote reads are capped at this size; the reader requests the rest.
+     */
+    virtual long int max_file_transfer_size() const { return std::numeric_limits<long int>::max(); }
 
     /**
      *

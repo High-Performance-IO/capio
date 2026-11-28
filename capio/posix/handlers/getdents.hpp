@@ -3,29 +3,45 @@
 
 #if defined(SYS_getdents) || defined(SYS_getdents64)
 
+#include <cstring>
+
+#include "common/constants.hpp"
 #include "common/dirent.hpp"
 
+#include "utils/common.hpp"
 #include "utils/data.hpp"
+#include "utils/tid.hpp"
 
-// TODO: too similar to capio_read, refactoring needed
+/// getdents reads a CAPIO directory as read reads a file, through capio_cached_read
 inline int getdents_handler_impl(long arg0, long arg1, long arg2, long *result, bool is64bit) {
     auto fd      = static_cast<int>(arg0);
     auto *buffer = reinterpret_cast<struct linux_dirent64 *>(arg1);
     auto count   = static_cast<off64_t>(arg2);
-    START_LOG(syscall_no_intercept(SYS_gettid), "call(fd=%d, dirp=0x%08x, count=%ld, is64bit=%s)",
-              fd, buffer, count, is64bit ? "true" : "false");
+    START_LOG(capio_tid(), "call(fd=%d, dirp=0x%08x, count=%ld, is64bit=%s)", fd, buffer, count,
+              is64bit ? "true" : "false");
 
-    if (exists_capio_fd(fd)) {
+    if (fd_table->contains(fd)) {
         LOG("fd=%d, is a capio file descriptor", fd);
+        // The FS server lets the kernel list the directory, once it may be listed, unless it
+        // returns the entries itself: for a consumer of an on_n_files directory in no_update mode
+        FS_MODE({
+            if (read_request_cache->isListedByKernel(fd)) {
+                return CAPIO_POSIX_SYSCALL_SKIP;
+            }
+        })
 
-        if (count >= SSIZE_MAX) {
-            ERR_EXIT("src does not support read bigger than SSIZE_MAX yet");
-        }
-        write_cache->flush();
-        *result = read_cache->read(fd, buffer, count, true, is64bit);
+        *result = capio_cached_read(fd, buffer, count, true, is64bit);
+        FS_MODE({
+            if (*result == sizeof(linux_dirent64) &&
+                memcmp(buffer, KERNEL_LISTS_MARKER.data(), KERNEL_LISTS_MARKER.size()) == 0) {
+                fd_table->setOffset(fd, fd_table->offset(fd) - *result);
+                read_request_cache->setListedByKernel(fd);
+                return CAPIO_POSIX_SYSCALL_SKIP;
+            }
+        })
 
-        DBG(syscall_no_intercept(SYS_gettid), [](char *buf, off64_t count) {
-            START_LOG(syscall_no_intercept(SYS_gettid), "call (count=%ld)", count);
+        DBG(capio_tid(), [](char *buf, off64_t count) {
+            START_LOG(capio_tid(), "call (count=%ld)", count);
             struct linux_dirent64 *d;
             LOG("%25s %12s %13s %15s   %s", "INODE", "TYPE", "RECORD_LENGTH", "OFFSET", "NAME");
             for (off64_t bpos = 0, i = 0; bpos < count && i < 10; i++) {

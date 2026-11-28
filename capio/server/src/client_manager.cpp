@@ -1,3 +1,4 @@
+#include <algorithm>
 #include <thread>
 
 #include "client-manager/client_manager.hpp"
@@ -8,7 +9,9 @@
 #include "common/queue.hpp"
 #include "utils/capiocl_adapter.hpp"
 #include "utils/common.hpp"
+#include "utils/filesystem.hpp"
 #include "utils/runtime_configuration.hpp"
+#include "utils/waiter.hpp"
 
 ClientManager::ClientDataBuffers::ClientDataBuffers(const std::string &clientToServerName,
                                                     const std::string &serverToClientName,
@@ -26,8 +29,10 @@ ClientManager::ClientManager()
 
 ClientManager::~ClientManager() { CALF_PRINT_COLOR(CALF_CLI_LEVEL_WARNING, "teardown completed."); }
 
-void ClientManager::registerClient(pid_t tid, const std::string &app_name, const bool wait) {
-    START_LOG(gettid(), "call(tid=%ld, app_name=%s)", tid, app_name.c_str());
+void ClientManager::registerClient(pid_t tid, const std::string &app_name, const bool wait,
+                                   const pid_t pid) {
+    START_LOG(gettid(), "call(tid=%ld, app_name=%s, pid=%ld)", tid, app_name.c_str(), pid);
+    pids.insert_or_assign(tid, pid < 0 ? tid : pid); // an exec registers the thread again
 
     data_buffers.try_emplace(tid, SHM_SPSC_PREFIX_WRITE + std::to_string(tid),
                              SHM_SPSC_PREFIX_READ + std::to_string(tid),
@@ -36,8 +41,12 @@ void ClientManager::registerClient(pid_t tid, const std::string &app_name, const
     files_created_by_producer.emplace(tid, std::initializer_list<std::string>{});
     files_created_by_app_name.emplace(app_name, std::initializer_list<std::string>{});
 
-    responses.try_emplace(tid, SHM_COMM_CHAN_NAME_RESP + std::to_string(tid), CAPIO_REQ_BUFF_CNT,
-                          sizeof(off_t), CapioCLEngine::get().getWorkflowName());
+    {
+        const std::unique_lock lock(responses_mutex);
+        responses.try_emplace(tid, SHM_COMM_CHAN_NAME_RESP + std::to_string(tid),
+                              CAPIO_REQ_BUFF_CNT, sizeof(off_t),
+                              CapioCLEngine::get().getWorkflowName());
+    }
 
     DBG(tid, [](const int tid_app, const std::string &app_name_) {
         CALF_PRINT_COLOR(CALF_CLI_LEVEL_INFO, "Registered PID %d with app name %s", tid_app,
@@ -45,7 +54,7 @@ void ClientManager::registerClient(pid_t tid, const std::string &app_name, const
     }(tid, app_name));
 
     if (wait) {
-        std::thread t([&, target_tid = tid]() {
+        spawn_waiter([&, target_tid = tid]() {
             std::unique_lock<std::mutex> lock(mutex_thread_allowed_to_continue);
             cv_thread_allowed_to_continue.wait(lock, [&, target_tid]() {
                 return std::find(thread_allowed_to_continue.begin(),
@@ -57,7 +66,6 @@ void ClientManager::registerClient(pid_t tid, const std::string &app_name, const
                                       thread_allowed_to_continue.end(), target_tid);
             thread_allowed_to_continue.erase(it);
         });
-        t.detach();
     }
 }
 
@@ -75,11 +83,19 @@ void ClientManager::removeClient(const pid_t tid) {
         data_buffers.erase(it_resp);
     }
     const std::string &app_name = this->getAppName(tid);
+    pids.erase(tid);
     files_created_by_producer.erase(tid);
-    files_created_by_app_name.erase(app_name);
+    // The app keeps producing while one of its clients is alive
+    if (std::none_of(files_created_by_producer.begin(), files_created_by_producer.end(),
+                     [&](const auto &client) { return getAppName(client.first) == app_name; })) {
+        files_created_by_app_name.erase(app_name);
+    }
 
-    if (const auto response_buffer = responses.find(tid); response_buffer != responses.end()) {
-        responses.erase(response_buffer);
+    {
+        const std::unique_lock lock(responses_mutex);
+        if (const auto response_buffer = responses.find(tid); response_buffer != responses.end()) {
+            responses.erase(response_buffer);
+        }
     }
     DBG(tid, [&](const int tid_app, const std::string &app_name) {
         CALF_PRINT_COLOR(CALF_CLI_LEVEL_WARNING, "Removed PID %d with app name %s", tid_app,
@@ -87,9 +103,16 @@ void ClientManager::removeClient(const pid_t tid) {
     }(tid, app_name));
 }
 
-void ClientManager::replyToClient(const pid_t tid, const off64_t offset) {
+bool ClientManager::replyToClient(const pid_t tid, const off64_t offset) {
     START_LOG(gettid(), "call(tid=%d, offset=%ld)", tid, offset);
-    responses.at(tid).write(&offset);
+    const std::shared_lock lock(responses_mutex);
+    const auto response = responses.find(tid);
+    if (response == responses.end()) {
+        LOG("Client %d is gone: reply dropped", tid);
+        return false;
+    }
+    response->second.write(&offset);
+    return true;
 }
 
 void ClientManager::replyToClient(const int tid, const off64_t offset, char *buf,
@@ -102,6 +125,19 @@ void ClientManager::replyToClient(const int tid, const off64_t offset, char *buf
         return;
     }
     throw std::runtime_error("Err: no such buffer for provided tid");
+}
+
+void ClientManager::replyToClientWithData(const pid_t tid, const off64_t end_offset,
+                                          const char *data, const off64_t size) {
+    START_LOG(gettid(), "call(tid=%d, end_offset=%ld, size=%ld)", tid, end_offset, size);
+    const auto out = data_buffers.find(tid);
+    if (out == data_buffers.end() || !replyToClient(tid, end_offset)) {
+        LOG("Client %d is gone: reply dropped", tid);
+        return;
+    }
+    if (size > 0) {
+        out->second.ServerToClient.write(data, size);
+    }
 }
 
 // NOTE: do not use const reference for path here as the emplace method leaves the original in an
@@ -155,6 +191,46 @@ bool ClientManager::isProducer(const pid_t tid, const std::filesystem::path &pat
     return is_producer;
 }
 
+bool ClientManager::hasProducer(const std::filesystem::path &path) const {
+    return std::any_of(files_created_by_app_name.begin(), files_created_by_app_name.end(),
+                       [&](const auto &group) { return group.second.count(path.native()) != 0; });
+}
+
+void ClientManager::renameProducedFiles(const std::string &from, const std::string &to) {
+    const auto rename_in = [&](std::unordered_set<std::string> &files) {
+        std::vector<std::string> moved;
+        for (auto file = files.begin(); file != files.end();) {
+            if (is_at_or_below(*file, from)) {
+                moved.push_back(to + file->substr(from.size()));
+                file = files.erase(file);
+            } else {
+                ++file;
+            }
+        }
+        files.insert(moved.begin(), moved.end());
+    };
+    for (auto &[tid, files] : files_created_by_producer) {
+        rename_in(files);
+    }
+    for (auto &[group, files] : files_created_by_app_name) {
+        rename_in(files);
+    }
+}
+
+void ClientManager::forgetProducedFiles(const std::string &path) {
+    const auto forget_in = [&](std::unordered_set<std::string> &files) {
+        for (auto file = files.begin(); file != files.end();) {
+            file = is_at_or_below(*file, path) ? files.erase(file) : std::next(file);
+        }
+    };
+    for (auto &[tid, files] : files_created_by_producer) {
+        forget_in(files);
+    }
+    for (auto &[group, files] : files_created_by_app_name) {
+        forget_in(files);
+    }
+}
+
 const std::unordered_set<std::string> &ClientManager::getProducedFiles(const pid_t tid) const {
     START_LOG(gettid(), "call(tid=%ld)", tid);
     return files_created_by_producer[tid];
@@ -167,6 +243,11 @@ const std::string &ClientManager::getAppName(const pid_t tid) const {
     } else {
         return default_app_name;
     }
+}
+
+pid_t ClientManager::getPid(const pid_t tid) const {
+    const auto pid = pids.find(tid);
+    return pid == pids.end() ? tid : pid->second;
 }
 
 SPSCQueue &ClientManager::getClientToServerDataBuffers(const pid_t tid) {
@@ -185,7 +266,7 @@ int ClientManager::readNextRequest(char *str) {
         strcpy(str, ptr + 1);
     } else {
 
-        CALF_PRINT_COLOR(CALF_CLI_LEVEL_ERROR, "Received invalid request: %s", str);
+        CALF_PRINT_COLOR(CALF_CLI_LEVEL_ERROR, "Received invalid request: %s", req);
         CALF_PRINT_COLOR(CALF_CLI_LEVEL_ERROR, "Code: %d is not mapped to a valid request handler",
                          code);
 

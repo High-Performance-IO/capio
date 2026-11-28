@@ -5,6 +5,7 @@
 #include "common/syscall.hpp"
 #include "data.hpp"
 #include "requests.hpp"
+#include "utils/tid.hpp"
 
 /**
  * Initialize the required data structures for the new child thread, and then proceed to execute a
@@ -16,20 +17,41 @@
 inline void initialize_new_thread(const bool wait = false) {
     SET_CALF_SYSCALL_HANDLER(syscall_no_intercept);
 
-    const long tid = syscall_no_intercept(SYS_gettid);
+    // Its system calls (the shared memory and the semaphores of the queues) are on no CAPIO file,
+    // and must not reach CAPIO's handlers: in the child of a fork, this runs before the fork
+    // handlers, while the descriptor table is still locked (FileDescriptorTable::protectAcrossFork)
+    const bool flag_was_set   = syscall_no_intercept_flag;
+    syscall_no_intercept_flag = true;
+
+    capio_reset_tid(); // a new thread, or the child of a fork
     const long pid = syscall_no_intercept(SYS_getpid);
 
-    syscall_no_intercept_flag = true;
     const auto capio_app_name = get_capio_app_name();
-    syscall_no_intercept_flag = false;
 
-    START_LOG(tid, "call(tid=%d, pid=%d, app_name=%s)", tid, pid, capio_app_name);
+    START_LOG(capio_tid(), "call(tid=%d, pid=%d, app_name=%s)", capio_tid(), pid, capio_app_name);
 
-    initialize_data_queues(tid);
-    init_client(tid);
+    initialize_data_queues(capio_tid());
+    init_client(capio_tid());
 
-    handshake_named_request(tid, pid, capio_app_name, wait);
-    LOG("Starting child thread %d", tid);
+    handshake_named_request(capio_tid(), pid, capio_app_name, wait);
+    LOG("Starting child thread %d", capio_tid());
+    syscall_no_intercept_flag = flag_was_set;
+}
+
+/**
+ * FS variant: tell the server the descriptors that a child got with fork, as the server knows them
+ * by process and they are new to it. They do not make the child a producer, as it did not create
+ * them.
+ *
+ * Run by fork in the child, as a handler of pthread_atfork registered after the one of the table
+ * (FileDescriptorTable::protectAcrossFork), and not in hook_clone_child: that hook runs before the
+ * handlers, when the table is still locked by the fork.
+ */
+inline void announce_inherited_descriptors_fs() {
+    START_LOG(capio_tid(), "call()");
+    for (const int fd : fd_table->fds()) {
+        create_request_fs(fd_table->path(fd), fd, CAPIO_FS_NOT_PRODUCED, capio_tid());
+    }
 }
 
 inline void hook_clone_parent(long child_tid) {
@@ -39,8 +61,7 @@ inline void hook_clone_parent(long child_tid) {
     if (child_tid <= 0) {
         return;
     }
-    const auto tid = syscall_no_intercept(SYS_gettid);
-    clone_request(tid, child_tid);
+    clone_request(capio_tid(), child_tid);
 }
 
 /**
@@ -51,9 +72,7 @@ inline void hook_clone_parent(long child_tid) {
  * server, so waiting for a reply would deadlock.
  */
 inline void hook_clone_child() {
-    const long pid = syscall_no_intercept(SYS_getpid);
-    const long tid = syscall_no_intercept(SYS_gettid);
-    initialize_new_thread(pid != tid);
+    initialize_new_thread(syscall_no_intercept(SYS_getpid) != capio_reset_tid());
 }
 
 #endif // CAPIO_POSIX_UTILS_CLONE_HPP

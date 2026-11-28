@@ -2,13 +2,14 @@
 #include "remote/discovery.hpp"
 #include "utils/common.hpp"
 
+#include "utils/server_state.hpp"
 #include <algorithm>
 #include <cstdint>
+#include <cstdlib>
 #include <cstring>
 #include <mtcl.hpp>
 #include <stdexcept>
-
-extern DiscoveryService *discovery_service;
+#include <thread>
 
 /**
  * MTCL message layout:
@@ -172,6 +173,31 @@ static void discard_message(MTCL::HandleUser &handle) {
     }
 }
 
+void MTCLBackend::progress_sends() {
+    const std::shared_lock connections_lock(open_connections_lock);
+    for (auto &[hostname, connection] : open_connections) {
+        // A failed send is reported again by the next cleanup_completed_sends(), which removes
+        // the connection; removing it here could free the handle being received on.
+        [[maybe_unused]] const bool ok = connection->cleanup_completed_sends();
+    }
+}
+
+bool MTCLBackend::receive_frame(MTCL::HandleUser &handle, void *data, size_t size) {
+    START_LOG(gettid(), "call(size=%zu)", size);
+    MTCL::Request request;
+    if (handle.ireceive(data, size, request) < 0) {
+        return false;
+    }
+    while (!MTCL::test(request)) {
+        if (!continue_execution) {
+            return false;
+        }
+        progress_sends();
+        std::this_thread::yield();
+    }
+    return request.count() == static_cast<ssize_t>(size);
+}
+
 /**
  * @brief Waits for, validates, and decodes the next request from any MTCL peer.
  * @return The decoded request and its source, or empty strings during shutdown.
@@ -214,7 +240,7 @@ RemoteRequest MTCLBackend::read_next_request() {
         }
 
         std::vector<unsigned char> frame(available);
-        if (!receive_message(handle, frame.data(), frame.size())) {
+        if (!receive_frame(handle, frame.data(), frame.size())) {
             LOG("Failed to receive %zu-byte MTCL frame from %s", available,
                 remote_hostname.c_str());
             remove_connection(remote_hostname);
@@ -398,6 +424,15 @@ void MTCLBackend::remove_connection(const std::string &hostname) {
     open_connections.erase(connection);
 }
 
+std::string make_advertisement_token(const std::string &proto, const std::string &port,
+                                     const std::string &hostname) {
+    const char *host = std::getenv("CAPIO_MTCL_ADVERTISE_HOST");
+    if (host == nullptr || *host == '\0') {
+        return proto + ":" + hostname + ":" + port;
+    }
+    return proto + ":" + host + ":" + port + "|" + hostname;
+}
+
 /**
  * @brief Initializes MTCL and starts listening on the requested protocol and port.
  *
@@ -406,10 +441,17 @@ void MTCLBackend::remove_connection(const std::string &hostname) {
 MTCLBackend::MTCLBackend(const std::string &proto, const std::string &port, const int sleep_time)
     : Backend(HOST_NAME_MAX), thread_sleep_times(sleep_time),
       listen_token(proto + ":0.0.0.0:" + port),
-      advertisement_token(proto + ":" + node_name + ":" + port), own_port(port),
+      advertisement_token(make_advertisement_token(proto, port, node_name)), own_port(port),
       used_protocol(proto) {
     MTCL::Manager::init("server-" + node_name);
-    MTCL::Manager::listen(listen_token);
+    // A server that cannot listen (e.g. the port is taken by another server on this node) must
+    // not run: peers would connect to whichever process owns the port.
+    if (MTCL::Manager::listen(listen_token) < 0) {
+        const int error = errno;
+        MTCL::Manager::finalize();
+        throw std::runtime_error("MTCL backend cannot listen on " + listen_token + ": " +
+                                 std::strerror(error));
+    }
     CALF_PRINT_COLOR(CALF_CLI_LEVEL_INFO, "MTCL backend listening on %s", listen_token.c_str());
 }
 
@@ -477,6 +519,11 @@ void MTCLBackend::send_file(const char *message, const int message_len, char *sh
                static_cast<size_t>(nbytes), target);
 }
 
+/** @brief One MTCL message carries at most MTCL_MAX_FILE_TRANSFER_SIZE bytes of file data. */
+long int MTCLBackend::max_file_transfer_size() const {
+    return static_cast<long int>(MTCL_MAX_FILE_TRANSFER_SIZE);
+}
+
 /**
  * @brief Copies the file retained by read_next_request() into the caller's destination.
  *
@@ -501,14 +548,19 @@ void MTCLBackend::recv_file(char *shm, const long int bytes_expected, const std:
  * Only the lexicographically smaller node initiates the connection, preventing both peers from
  * creating duplicate links. A hostname handshake gives the receiver the same map key.
  */
-void MTCLBackend::connect_to(const std::string &target_token) {
-    const auto first_colon = target_token.find(':');
-    const auto last_colon  = target_token.rfind(':');
+void MTCLBackend::connect_to(const std::string &advertised_token) {
+    // "PROTO:host:port", or "PROTO:address:port|hostname" (see make_advertisement_token)
+    const auto bar                 = advertised_token.find('|');
+    const std::string target_token = advertised_token.substr(0, bar);
+    const auto first_colon         = target_token.find(':');
+    const auto last_colon          = target_token.rfind(':');
     if (first_colon == std::string::npos || first_colon == last_colon) {
         return;
     }
     const std::string remote_hostname =
-        target_token.substr(first_colon + 1, last_colon - first_colon - 1);
+        bar != std::string::npos
+            ? advertised_token.substr(bar + 1)
+            : target_token.substr(first_colon + 1, last_colon - first_colon - 1);
     if (remote_hostname.empty() || node_name >= remote_hostname) {
         return;
     }
@@ -541,5 +593,6 @@ void MTCLBackend::connect_to(const std::string &target_token) {
     auto connection = std::make_unique<MTCLConnection>(std::move(handle));
     connection->yield();
     open_connections.emplace(remote_hostname, std::move(connection));
-    CALF_PRINT_COLOR(CALF_CLI_LEVEL_INFO, "Connected to %s", target_token.c_str());
+    CALF_PRINT_COLOR(CALF_CLI_LEVEL_INFO, "Connected to %s (node %s)", target_token.c_str(),
+                     remote_hostname.c_str());
 }

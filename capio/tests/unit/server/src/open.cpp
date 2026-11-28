@@ -3,10 +3,12 @@
 #include <gtest/gtest.h>
 
 #include <chrono>
+#include <mutex>
 #include <optional>
 #include <semaphore.h>
 #include <string>
 #include <thread>
+#include <vector>
 
 #include "capiocl.hpp"
 #include "capiocl/engine.h"
@@ -17,12 +19,42 @@
 #include "storage/manager.hpp"
 #include "utils/capiocl_adapter.hpp"
 
-#include "handlers/open.hpp"
+#include "handlers.hpp"
 
 extern StorageManager *storage_manager;
 extern ClientManager *client_manager;
 extern capiocl::engine::Engine *capio_cl_engine;
 extern Backend *backend;
+extern HomeNodeService *home_node_service;
+
+namespace {
+
+// Two other servers whose requests are recorded and never answered.
+class SilentPeersBackend : public Backend {
+    std::mutex _mutex;
+    std::vector<std::string> _sent;
+
+  public:
+    SilentPeersBackend() : Backend(256) {}
+
+    const std::set<std::string> get_nodes() override { return {node_name, "peer-a", "peer-b"}; }
+    void handshake_servers() override {}
+    RemoteRequest read_next_request() override { return {std::string{}, std::string{}}; }
+    void send_file(const char *, int, char *, long int, const std::string &) override {}
+    void recv_file(char *, long int, const std::string &) override {}
+    void connect_to(const std::string &) override {}
+    void send_request(const char *message, int, const std::string &) override {
+        const std::lock_guard lg(_mutex);
+        _sent.emplace_back(message);
+    }
+
+    std::vector<std::string> sent() {
+        const std::lock_guard lg(_mutex);
+        return _sent;
+    }
+};
+
+} // namespace
 
 /*
  * A producer opens, without creating it, a file it has not created yet. CFITSIO does so before it
@@ -98,6 +130,26 @@ TEST_F(ProducerOpenTest, producerOpeningAFileItHasNotCreatedGetsEnoent) {
     EXPECT_EQ(next_response(std::chrono::seconds(2)), 1)
         << "a producer's open of a file it has not created waited for the file instead of failing";
     EXPECT_FALSE(storage_manager->tryGet(path)) << "the failed open created the file";
+}
+
+TEST_F(ProducerOpenTest, producerCreatingItsFileDoesNotAskTheOtherServers) {
+    // The other servers never answer: asking them would hold this server's request thread, and
+    // with it every client of this server, until the location query times out.
+    SilentPeersBackend peers;
+    backend = &peers;
+    HomeNodeService service{std::chrono::milliseconds(500), std::chrono::milliseconds(500)};
+    HomeNodeService *global_service = home_node_service;
+    home_node_service               = &service;
+
+    handle_create(PRODUCER_TID, FD, path);
+
+    home_node_service = global_service;
+    EXPECT_EQ(next_response(std::chrono::seconds(2)), 0);
+    for (const auto &message : peers.sent()) {
+        EXPECT_NE(std::stoi(message.substr(0, 4)), CAPIO_SERVER_REQUEST_LOCATION_QUERY)
+            << "the declared producer of a file asked the other servers where it is: " << message;
+    }
+    storage_manager->remove(path);
 }
 
 #endif // CAPIO_SERVER_OPEN_TEST_HPP

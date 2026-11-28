@@ -126,3 +126,42 @@ TEST(SystemCallTest, TestDotNamesTheCapioDirectoryAfterChdir) {
     EXPECT_EQ(unlink("listing_cwd/inside"), 0);
     EXPECT_EQ(rmdir("listing_cwd"), 0);
 }
+
+// Only a first component ".." leaves CAPIO_DIR: "..name" is a name inside it
+TEST(SystemCallTest, TestNamesStartingWithTwoDotsAreInCapioDir) {
+    EXPECT_EQ(mkdir("listing_dots", S_IRWXU), 0);
+    create_file("listing_dots/..hidden");
+    create_file("listing_dots/plain");
+    const auto entries = list_directory("listing_dots");
+    EXPECT_EQ(entries.size(), 2);
+    EXPECT_EQ(entries.count("..hidden"), 1);
+    EXPECT_EQ(entries.count("plain"), 1);
+    EXPECT_EQ(unlink("listing_dots/..hidden"), 0);
+    EXPECT_EQ(unlink("listing_dots/plain"), 0);
+    EXPECT_EQ(rmdir("listing_dots"), 0);
+}
+
+// CAPIO paths are found lexically, so one reached through a symlink goes to the kernel (#324).
+// Disabled: in the memory variant, the file is then not in CAPIO, and the open waits for it.
+TEST(SystemCallTest, DISABLED_TestCapioDirReachedThroughASymlink) {
+    char outside[] = "/tmp/capio_link_XXXXXX";
+    ASSERT_NE(mkdtemp(outside), nullptr);
+    const std::string link = std::string(outside) + "/link";
+    ASSERT_EQ(symlink(std::filesystem::current_path().c_str(), link.c_str()), 0);
+    create_file((link + "/listing_via_link").c_str());
+    EXPECT_EQ(list_directory(".").count("listing_via_link"), 1);
+    EXPECT_EQ(unlink("listing_via_link"), 0);
+    EXPECT_EQ(unlink(link.c_str()), 0);
+    EXPECT_EQ(rmdir(outside), 0);
+}
+
+// chmod of a CAPIO file changes nothing in the memory variant, and the FS variant does not
+// implement it (#320)
+TEST(SystemCallTest, DISABLED_TestChmodIsReportedByStat) {
+    create_file("listing_chmod");
+    EXPECT_EQ(chmod("listing_chmod", S_IRUSR | S_IWUSR | S_IRGRP), 0);
+    struct stat info{};
+    EXPECT_EQ(stat("listing_chmod", &info), 0);
+    EXPECT_EQ(info.st_mode & 07777, S_IRUSR | S_IWUSR | S_IRGRP);
+    EXPECT_EQ(unlink("listing_chmod"), 0);
+}

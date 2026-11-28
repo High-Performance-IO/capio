@@ -5,8 +5,7 @@
 #include "remote/discovery.hpp"
 #include "utils/capiocl_adapter.hpp"
 #include "utils/common.hpp"
-
-extern Backend *backend;
+#include "utils/server_state.hpp"
 
 DiscoveryService::DiscoveryService(std::unique_ptr<DiscoveryInterface> discovery_backend)
     : shm_canary(std::make_unique<CapioShmCanary>(CapioCLEngine::get().getWorkflowName())),

@@ -10,9 +10,9 @@
 #include "../include/storage/file_buffer.hpp"
 #include "remote/backend.hpp"
 #include "server/include/utils/common.hpp"
+#include "utils/fs_root.hpp"
+#include "utils/server_state.hpp"
 #include "utils/shared_mutex.hpp"
-
-extern Backend *backend;
 
 bool CapioFile::compareSectors::operator()(const std::pair<off64_t, off64_t> &lhs,
                                            const std::pair<off64_t, off64_t> &rhs) const {
@@ -22,7 +22,8 @@ bool CapioFile::compareSectors::operator()(const std::pair<off64_t, off64_t> &lh
 CapioFile::CapioFile() = default;
 
 CapioFile::CapioFile(const bool directory, const unsigned int n_files_expected,
-                     const bool permanent, const off64_t init_size, const int n_close_expected)
+                     const bool permanent, const off64_t init_size,
+                     const unsigned int n_close_expected)
     : _requested_size(init_size), _n_files_expected(n_files_expected + 2),
       _n_close_expected(n_close_expected), _directory(directory), _permanent(permanent) {}
 
@@ -75,11 +76,21 @@ void CapioFile::waitForCommit() const {
     _committed_cv.wait(lock, [this] { return _committed; });
 }
 
+namespace {
+/// @brief Decrement @p counter if it is above 0: these counters never go below zero
+void decrement_if_positive(std::atomic<unsigned int> &counter) {
+    unsigned int value = counter.load();
+    while (value > 0 && !counter.compare_exchange_weak(value, value - 1)) {
+    }
+}
+} // namespace
+
 void CapioFile::close() {
     START_LOG(gettid(), "call()");
     ++_n_close;
-    --_n_opens;
-    LOG("AFTER: _n_close=%d / _n_opens=%d", _n_close.load(), _n_opens.load());
+    // A descriptor inherited by a clone is closed without having been counted as an open
+    decrement_if_positive(_n_opens);
+    LOG("AFTER: _n_close=%u / _n_opens=%u", _n_close.load(), _n_opens.load());
 }
 
 void CapioFile::dump() {
@@ -99,16 +110,17 @@ void CapioFile::createBuffer(const std::filesystem::path &path, const bool home_
     if (std::visit([](const auto &buf) { return buf.empty(); }, _buffer)) {
         _home_node = home_node;
         if (_permanent && home_node) {
+            const auto real_path = fs_root().real(path);
             if (_directory) {
-                std::filesystem::create_directory(path);
-                std::filesystem::permissions(path, std::filesystem::perms::owner_all);
+                std::filesystem::create_directory(real_path);
+                std::filesystem::permissions(real_path, std::filesystem::perms::owner_all);
                 _buffer.emplace<HeapBuffer>().allocate(_requested_size);
             } else {
                 LOG("creating mem mapped file");
                 // switch the active backing to the mmap-backed buffer and map the real file
                 auto &mapped = _buffer.emplace<MappedBuffer>();
-                if (!mapped.allocate(path, _requested_size)) {
-                    ERR_EXIT("mmap %s CapioFile constructor", path.c_str());
+                if (!mapped.allocate(real_path, _requested_size)) {
+                    ERR_EXIT("mmap %s CapioFile constructor", real_path.c_str());
                 }
             }
         } else {
@@ -219,11 +231,9 @@ void CapioFile::insertSector(off64_t new_start, off64_t new_end) {
     _data_avail_cv.notify_all();
 }
 
-bool CapioFile::closed() const {
-    return _n_close_expected == 0 || _n_close == static_cast<int>(_n_close_expected);
-}
+bool CapioFile::closed() const { return _n_close_expected == 0 || _n_close == _n_close_expected; }
 
-bool CapioFile::deletable() const { return _n_opens <= 0; }
+bool CapioFile::deletable() const { return _n_opens == 0; }
 
 bool CapioFile::isDirectory() const { return _directory; }
 
@@ -231,56 +241,35 @@ void CapioFile::open() { ++_n_opens; }
 
 off64_t CapioFile::seekData(off64_t offset) const {
     START_LOG(gettid(), "call(offset=%ld)", offset);
+    // As Linux: the first data at or after offset, or -1 (ENXIO) when there is none
     const shared_lock_guard slg(_mutex_sectors);
-    if (_sectors.empty()) {
-        if (offset == 0) {
-            return 0;
-        } else {
-            return -1;
+    if (offset < 0) {
+        return -1;
+    }
+    for (const auto &[start, end] : _sectors) {
+        if (offset < end) {
+            return std::max(offset, start);
         }
     }
-    auto it = _sectors.upper_bound(std::make_pair(offset, 0));
-    if (it == _sectors.begin()) {
-        return it->first;
-    }
-    --it;
-    if (offset <= it->second) {
-        return offset;
-    } else {
-        ++it;
-        if (it == _sectors.end()) {
-            return -1;
-        } else {
-            return it->first;
-        }
-    }
+    return -1;
 }
 
 off64_t CapioFile::seekHole(off64_t offset) const {
     START_LOG(gettid(), "call(offset=%ld)", offset);
+    // As Linux: the first hole at or after offset, the end of the file being one, or -1 (ENXIO)
+    // at or past the end
     const shared_lock_guard slg(_mutex_sectors);
-    if (_sectors.empty()) {
-        if (offset == 0) {
-            return 0;
-        } else {
-            return -1;
+    if (offset < 0 || _sectors.empty() || offset >= _sectors.rbegin()->second) {
+        return -1;
+    }
+    off64_t hole = offset;
+    for (const auto &[start, end] : _sectors) {
+        if (start > hole) {
+            break;
         }
+        hole = std::max(hole, end);
     }
-    auto it = _sectors.upper_bound(std::make_pair(offset, 0));
-    if (it == _sectors.begin()) {
-        return offset;
-    }
-    --it;
-    if (offset <= it->second) {
-        return it->second;
-    } else {
-        ++it;
-        if (it == _sectors.end()) {
-            return -1;
-        } else {
-            return offset;
-        }
-    }
+    return hole;
 }
 
 void CapioFile::removeFd(int tid, int fd) {
@@ -336,7 +325,7 @@ bool CapioFile::isFirstWrite() const { return this->_first_write; }
 
 void CapioFile::registerFirstWrite() { this->_first_write = false; }
 
-void CapioFile::incrementDirectoryFileCount(const int count) {
+void CapioFile::incrementDirectoryFileCount(const unsigned int count) {
     this->_n_files += count;
     this->_data_avail_cv.notify_all();
 }
@@ -362,7 +351,7 @@ bool CapioFile::removeDirectoryEntry(const std::string &name) {
         if (end - record > 0) {
             _sectors.insert({0, end - record});
         }
-        --_n_files;
+        decrement_if_positive(_n_files);
         LOG("removed entry %s", name.c_str());
         return true;
     }

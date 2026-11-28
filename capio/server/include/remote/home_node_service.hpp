@@ -12,9 +12,8 @@
 
 #include "calf/StlLogger.h"
 #include "remote/backend.hpp"
+#include "utils/server_state.hpp"
 #include "utils/types.hpp"
-
-extern Backend *backend;
 
 /**
  * @brief Knows which server holds each CAPIO file: its home node.
@@ -178,7 +177,5 @@ class HomeNodeService {
      */
     void receiveAnswer(long query_id, bool holds, const std::string &source);
 };
-
-extern HomeNodeService *home_node_service;
 
 #endif // CAPIO_SERVER_REMOTE_HOME_NODE_SERVICE_HPP

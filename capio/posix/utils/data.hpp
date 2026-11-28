@@ -13,20 +13,33 @@ inline void initialize_data_queues(const long tid) {
         new WriteCache(tid, get_cache_lines(), get_cache_line_size(), get_capio_workflow_name());
     read_cache =
         new ReadCache(tid, get_cache_lines(), get_cache_line_size(), get_capio_workflow_name());
+    FS_MODE({
+        consent_request_cache = new ConsentRequestCache();
+        read_request_cache    = new ReadCacheFS();
+    })
 }
 
 /**
- * Read up to @count bytes of the CAPIO descriptor @fd, at its file offset, through the read cache.
- * The data this thread wrote must reach the server first, so the write cache is flushed.
+ * Read up to @count bytes of the CAPIO descriptor @fd, at its file offset, through the read cache:
+ * the data of a file for read, or the entries of a directory for getdents. The data this thread
+ * wrote must reach the server first, so the write cache is flushed.
  *
  * @param fd
  * @param buffer
  * @param count
+ * @param is_getdents whether to read entries of a directory, in whole records
+ * @param is64bit for getdents: whether the records are linux_dirent64 (getdents64)
  * @return the number of bytes read, 0 at the end of the file
  */
-inline off64_t capio_cached_read(const int fd, void *buffer, const off64_t count) {
+inline off64_t capio_cached_read(const int fd, void *buffer, const off64_t count,
+                                 const bool is_getdents = false, const bool is64bit = false) {
+    START_LOG(capio_tid(), "call(fd=%d, count=%ld, is_getdents=%s, is64bit=%s)", fd, count,
+              is_getdents ? "true" : "false", is64bit ? "true" : "false");
+    if (count >= SSIZE_MAX) {
+        ERR_EXIT("CAPIO does not support read bigger than SSIZE_MAX yet");
+    }
     write_cache->flush();
-    return read_cache->read(fd, buffer, count, false, false);
+    return read_cache->read(fd, buffer, count, is_getdents, is64bit);
 }
 
 /**
@@ -55,7 +68,7 @@ inline void capio_cached_write(const int fd, const void *buffer, const off64_t c
 inline void capio_set_fd_offset(const int fd, const off64_t offset, const long tid) {
     read_cache->flush();
     write_cache->flush();
-    set_capio_fd_offset(fd, offset);
+    fd_table->setOffset(fd, offset);
     seek_request(fd, offset, tid);
 }
 

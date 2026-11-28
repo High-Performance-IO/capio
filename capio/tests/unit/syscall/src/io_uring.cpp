@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <cerrno>
+#include <cstdlib>
 #include <cstring>
 #include <string_view>
 
@@ -10,6 +11,8 @@
 #include <sys/mman.h>
 #include <sys/syscall.h>
 #include <unistd.h>
+
+#include "helpers.hpp"
 
 namespace {
 
@@ -99,6 +102,9 @@ TEST(SystemCallTest, TestIoUringWriteIsReadBack) {
     constexpr const char *PATHNAME    = "test_io_uring_file.txt";
     constexpr std::string_view BUFFER = "written through io_uring";
 
+    if (!memory_variant() && std::getenv("LD_PRELOAD") != nullptr) {
+        GTEST_SKIP() << "the FS variant does not intercept io_uring yet";
+    }
     Ring ring;
     if (!ring.setup()) {
         GTEST_SKIP() << "io_uring is not available: " << std::strerror(errno);

@@ -19,8 +19,8 @@
 #include "storage/manager.hpp"
 #include "utils/capiocl_adapter.hpp"
 
-#include "handlers/read.hpp"
-#include "handlers/write.hpp"
+#include "handlers.hpp"
+#include "remote/handlers/read.hpp"
 
 extern StorageManager *storage_manager;
 extern ClientManager *client_manager;
@@ -59,7 +59,7 @@ class StreamingReadTest : public testing::Test {
 
         client_manager->registerClient(PRODUCER_TID, "producer");
         client_manager->registerClient(CONSUMER_TID, "consumer");
-        CapioFile &c_file = storage_manager->add(path, false, 0);
+        CapioFile &c_file = storage_manager->addFile(path, 0);
         // The producer created the file: skip the first-write bookkeeping (file location files)
         // that write_handler would otherwise do.
         c_file.registerFirstWrite();
@@ -167,6 +167,56 @@ TEST_F(StreamingReadTest, waitingReadIsServedByTheWriteThatCompletesIt) {
     EXPECT_TRUE(offset_reaches(16));
 }
 
+namespace {
+
+// Sends at most 4 bytes of file data in one message, and records the messages it sends.
+class SmallMessageBackend : public Backend {
+  public:
+    SmallMessageBackend() : Backend(256) {}
+
+    std::string request;
+    std::string file_data;
+
+    void handshake_servers() override {}
+    RemoteRequest read_next_request() override { return {std::string{}, std::string{}}; }
+    void send_file(const char *message, int message_size, char *data, long int size,
+                   const std::string &) override {
+        request.assign(message, static_cast<size_t>(message_size));
+        file_data.assign(data, static_cast<size_t>(size));
+    }
+    void recv_file(char *, long int, const std::string &) override {}
+    void send_request(const char *, int, const std::string &) override {}
+    void connect_to(const std::string &) override {}
+    long int max_file_transfer_size() const override { return 4; }
+};
+
+} // namespace
+
+/*
+ * A remote read is answered with the rest of the file, which can be more than the backend sends in
+ * one message (MTCL: 4 GiB): the reply must stop there, and the reader asks for the rest.
+ */
+TEST(RemoteReadTest, replyIsCappedAtTheLargestMessageTheBackendCanSend) {
+    SmallMessageBackend small_messages;
+    ASSERT_EQ(backend, nullptr);
+    backend = &small_messages;
+
+    const std::string path = "remote_read_reply_cap.dat";
+    CapioFile &c_file      = storage_manager->addFile(path, 16);
+    c_file.createBuffer(path, false);
+    c_file.insertSector(0, 16);
+
+    serve_remote_read(path, "node-b", 77, 3, 16, 0, true, false);
+
+    EXPECT_EQ(small_messages.file_data.size(), 4)
+        << "the reply carried more file data than the backend can send in one message";
+    // Fields: code, tid, fd, count, nbytes, file size, complete, is_getdents
+    EXPECT_STREQ(small_messages.request.c_str(), "0001 77 3 16 4 16 1 0");
+
+    storage_manager->remove(path);
+    backend = nullptr;
+}
+
 TEST(CapioFileTest, insertSectorWakesThreadsWaitingForData) {
     CapioFile c_file;
     c_file.insertSector(0, 8);
@@ -200,6 +250,57 @@ TEST_F(StreamingReadTest, readOfFileCommittedWithoutDataReturnsEndOfFile) {
     // The producer closed the file without writing: the read ends at offset 0 (end of file).
     EXPECT_EQ(next_response(std::chrono::seconds(2)), 0);
     EXPECT_EQ(storage_manager->getFileOffset(CONSUMER_TID, FD), 0);
+}
+
+/*
+ * The reply to a remote read is handled on the remote listener thread, not on the one that serves
+ * the client requests. Once the client has its answer it may close the file descriptor, so the
+ * new offset must be stored before the answer is sent: stored after it, it can find no descriptor
+ * and the server crashes.
+ */
+TEST(RemoteReadReplyTest, offsetIsStoredBeforeTheClientIsAnswered) {
+    constexpr pid_t CONSUMER_TID = 4545;
+    constexpr int FD             = 3;
+
+    NoneBackend test_backend{0, nullptr};
+    ASSERT_EQ(backend, nullptr);
+    backend = &test_backend;
+
+    // More data than the queue to the client holds: the reply cannot finish before the client
+    // reads the data, so the client looks at the offset while the server is still replying.
+    const auto &config     = RuntimeConfiguration::get();
+    const off64_t size     = (config.getCacheLines() + 1) * config.getCacheLineSize();
+    const std::string path = "remote_read_reply.dat";
+
+    client_manager->registerClient(CONSUMER_TID, "consumer");
+    storage_manager->addFile(path, size);
+    storage_manager->addFileToTid(CONSUMER_TID, FD, path, 0);
+
+    // Attach to the consumer's channels, as the POSIX client does. Not deleted: the destructors
+    // would unlink the shared memory still owned by client_manager.
+    const auto &workflow_name = CapioCLEngine::get().getWorkflowName();
+    const std::string channel = SHM_COMM_CHAN_NAME_RESP + std::to_string(CONSUMER_TID);
+    auto *responses =
+        new CircularBuffer<off_t>(channel, CAPIO_REQ_BUFF_CNT, sizeof(off_t), workflow_name);
+    auto *data = new SPSCQueue(SHM_SPSC_PREFIX_READ + std::to_string(CONSUMER_TID),
+                               config.getCacheLines(), config.getCacheLineSize(), workflow_name);
+
+    std::thread listener(
+        [&] { handle_read_reply(CONSUMER_TID, FD, size, size, size, true, false); });
+
+    off_t reply;
+    responses->read(&reply);
+    EXPECT_EQ(reply, size);
+    EXPECT_EQ(storage_manager->getFileOffset(CONSUMER_TID, FD), size)
+        << "the client was answered before the offset of its file descriptor was stored";
+
+    std::vector<char> received(size);
+    data->read(received.data(), size);
+    listener.join();
+
+    storage_manager->remove(path);
+    client_manager->removeClient(CONSUMER_TID);
+    backend = nullptr;
 }
 
 #endif // CAPIO_SERVER_READ_TEST_HPP

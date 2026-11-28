@@ -10,15 +10,15 @@
 #include "utils/common.hpp"
 #include "utils/filesystem.hpp"
 #include "utils/requests.hpp"
+#include "utils/tid.hpp"
 
 inline blkcnt_t get_nblocks(off64_t file_size) {
     return (file_size % 4096 == 0) ? (file_size / 512) : (file_size / 512 + 8);
 }
 
 inline void fill_statbuf(struct stat *statbuf, off_t file_size, bool is_dir, ino_t inode) {
-    START_LOG(syscall_no_intercept(SYS_gettid),
-              "call(statbuf=0x%08x, file_size=%ld, is_dir=%s, inode=%ul)", statbuf, file_size,
-              is_dir ? "true" : "false", inode);
+    START_LOG(capio_tid(), "call(statbuf=0x%08x, file_size=%ld, is_dir=%s, inode=%ul)", statbuf,
+              file_size, is_dir ? "true" : "false", inode);
 
     timespec time{1, 1};
     if (is_dir == 1) {
@@ -44,15 +44,26 @@ inline void fill_statbuf(struct stat *statbuf, off_t file_size, bool is_dir, ino
 inline int capio_fstat(int fd, struct stat *statbuf, long tid) {
     START_LOG(tid, "call(fd=%d, statbuf=0x%08x)", fd, statbuf);
 
-    if (exists_capio_fd(fd)) {
-        write_cache->flush();
-        auto [file_size, is_dir] = fstat_request(fd, tid);
-        if (file_size == -1) {
-            errno = ENOENT;
-            return CAPIO_POSIX_SYSCALL_ERRNO;
-        }
-        fill_statbuf(statbuf, file_size, is_dir, std::hash<std::string>{}(get_capio_fd_path(fd)));
-        return CAPIO_POSIX_SYSCALL_SUCCESS;
+    if (fd_table->contains(fd)) {
+        MEMORY_MODE({
+            write_cache->flush();
+            auto [file_size, is_dir] = fstat_request(fd, tid);
+            if (file_size == -1) {
+                errno = ENOENT;
+                return CAPIO_POSIX_SYSCALL_ERRNO;
+            }
+            if (statbuf == nullptr) { // the file is not on disk: the kernel cannot tell
+                errno = EFAULT;
+                return CAPIO_POSIX_SYSCALL_ERRNO;
+            }
+            fill_statbuf(statbuf, file_size, is_dir, std::hash<std::string>{}(fd_table->path(fd)));
+            return CAPIO_POSIX_SYSCALL_SUCCESS;
+        })
+        FS_MODE({
+            // The kernel runs it, once the file is there
+            consent_request_cache->consent_request(fd_table->path(fd), tid, __FUNCTION__);
+            return CAPIO_POSIX_SYSCALL_REQUEST_SKIP;
+        })
     } else {
         return CAPIO_POSIX_SYSCALL_REQUEST_SKIP;
     }
@@ -68,20 +79,31 @@ inline int capio_lstat(const std::string_view &pathname, struct stat *statbuf, l
 
     const std::filesystem::path absolute_path(pathname);
     if (is_capio_path(absolute_path)) {
-        write_cache->flush();
-        auto [file_size, is_dir] = stat_request(absolute_path, tid);
-        if (file_size == -1) {
-            errno = ENOENT;
-            return CAPIO_POSIX_SYSCALL_ERRNO;
-        }
+        MEMORY_MODE({
+            write_cache->flush();
+            auto [file_size, is_dir] = stat_request(absolute_path, tid);
+            if (file_size == -1) {
+                errno = ENOENT;
+                return CAPIO_POSIX_SYSCALL_ERRNO;
+            }
 
-        if (file_size == CAPIO_POSIX_SYSCALL_REQUEST_SKIP) {
-            // return file to not be handled as most likely is excluded
-            return file_size;
-        }
+            if (file_size == CAPIO_POSIX_SYSCALL_REQUEST_SKIP) {
+                // return file to not be handled as most likely is excluded
+                return file_size;
+            }
 
-        fill_statbuf(statbuf, file_size, is_dir, std::hash<std::string>{}(absolute_path));
-        return CAPIO_POSIX_SYSCALL_SUCCESS;
+            if (statbuf == nullptr) { // the file is not on disk: the kernel cannot tell
+                errno = EFAULT;
+                return CAPIO_POSIX_SYSCALL_ERRNO;
+            }
+            fill_statbuf(statbuf, file_size, is_dir, std::hash<std::string>{}(absolute_path));
+            return CAPIO_POSIX_SYSCALL_SUCCESS;
+        })
+        FS_MODE({
+            // The kernel runs it, once the file is there
+            consent_request_cache->consent_request(absolute_path, tid, __FUNCTION__);
+            return CAPIO_POSIX_SYSCALL_REQUEST_SKIP;
+        })
     }
     return CAPIO_POSIX_SYSCALL_REQUEST_SKIP;
 }
@@ -143,36 +165,53 @@ inline int capio_fstatat(int dirfd, const std::string_view &pathname, struct sta
 int fstat_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg5, long *result) {
     auto fd   = static_cast<int>(arg0);
     auto *buf = reinterpret_cast<struct stat *>(arg1);
-    long tid  = syscall_no_intercept(SYS_gettid);
 
-    return posix_return_value(capio_fstat(fd, buf, tid), result);
+    return posix_return_value(capio_fstat(fd, buf, capio_tid()), result);
 }
 
 int fstatat_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg5,
                     long *result) {
-    auto dirfd = static_cast<int>(arg0);
-    const std::string_view pathname(reinterpret_cast<const char *>(arg1));
-    auto *statbuf = reinterpret_cast<struct stat *>(arg2);
-    auto flags    = static_cast<int>(arg3);
-    long tid      = syscall_no_intercept(SYS_gettid);
+    // fstatat(dirfd, pathname, statbuf, flags)
+    const auto dirfd = static_cast<int>(arg0);
+    const auto *path = reinterpret_cast<const char *>(arg1);
+    auto *statbuf    = reinterpret_cast<struct stat *>(arg2);
+    const auto flags = static_cast<int>(arg3);
+    START_LOG(capio_tid(), "call(dirfd=%d, path=%s, flags=%d)", dirfd,
+              path != nullptr ? path : "(null)", flags);
 
-    return posix_return_value(capio_fstatat(dirfd, pathname, statbuf, flags, tid), result);
+    // A null path fails with EFAULT, from the kernel. With AT_EMPTY_PATH a null path is the empty
+    // one (Linux 6.11): the file of dirfd. A null buffer fails with EFAULT once the file is found.
+    if (path == nullptr && (flags & AT_EMPTY_PATH) == 0) {
+        return CAPIO_POSIX_SYSCALL_SKIP;
+    }
+    return posix_return_value(
+        capio_fstatat(dirfd, path != nullptr ? path : "", statbuf, flags, capio_tid()), result);
 }
 
 int lstat_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg5, long *result) {
-    const std::string_view pathname(reinterpret_cast<const char *>(arg0));
-    auto *buf = reinterpret_cast<struct stat *>(arg1);
-    long tid  = syscall_no_intercept(SYS_gettid);
+    // lstat(pathname, statbuf)
+    const auto *path = reinterpret_cast<const char *>(arg0);
+    auto *buf        = reinterpret_cast<struct stat *>(arg1);
+    START_LOG(capio_tid(), "call(path=%s)", path != nullptr ? path : "(null)");
 
-    return posix_return_value(capio_lstat_wrapper(pathname, buf, tid), result);
+    // A null path fails with EFAULT, from the kernel, and a null buffer once the file is found
+    if (path == nullptr) {
+        return CAPIO_POSIX_SYSCALL_SKIP;
+    }
+    return posix_return_value(capio_lstat_wrapper(path, buf, capio_tid()), result);
 }
 
 int stat_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg5, long *result) {
-    const std::string_view pathname(reinterpret_cast<const char *>(arg0));
-    auto *buf = reinterpret_cast<struct stat *>(arg1);
-    long tid  = syscall_no_intercept(SYS_gettid);
+    // stat(pathname, statbuf)
+    const auto *path = reinterpret_cast<const char *>(arg0);
+    auto *buf        = reinterpret_cast<struct stat *>(arg1);
+    START_LOG(capio_tid(), "call(path=%s)", path != nullptr ? path : "(null)");
 
-    return posix_return_value(capio_lstat_wrapper(pathname, buf, tid), result);
+    // A null path fails with EFAULT, from the kernel, and a null buffer once the file is found
+    if (path == nullptr) {
+        return CAPIO_POSIX_SYSCALL_SKIP;
+    }
+    return posix_return_value(capio_lstat_wrapper(path, buf, capio_tid()), result);
 }
 
 #endif // SYS_fstat || SYS_lstat || SYS_newfstatat || SYS_stat

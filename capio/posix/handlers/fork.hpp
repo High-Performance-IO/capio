@@ -5,10 +5,14 @@
 
 #include "utils/clone.hpp"
 #include "utils/requests.hpp"
+#include "utils/tid.hpp"
 
 int fork_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg5, long *result) {
     auto pid = static_cast<pid_t>(syscall_no_intercept(SYS_fork));
-    START_LOG(syscall_no_intercept(SYS_gettid), "call(pid=%ld)", pid);
+    if (pid == 0) {
+        capio_reset_tid(); // the child has the id of its parent until here
+    }
+    START_LOG(capio_tid(), "call(pid=%ld)", pid);
 
     if (pid == 0) { // child
         initialize_new_thread();

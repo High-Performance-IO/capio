@@ -13,17 +13,19 @@
 #include <string_view>
 #include <vector>
 
+#include <fcntl.h>
 #include <sys/stat.h>
 #include <unistd.h>
 
 #include "calf/SyscallLogger.h"
 #include "common/env.hpp"
+#include "common/path.hpp"
 #include "common/syscall.hpp"
 
+#include "env.hpp"
+#include "file_descriptor_table.hpp"
 #include "types.hpp"
-
-constexpr std::array CAPIO_DIR_FORBIDDEN_PATHS = {std::string_view{"/proc/"},
-                                                  std::string_view{"/sys/"}};
+#include "utils/tid.hpp"
 
 inline bool in_dir(const std::string &path, const std::string &glob) {
     const size_t res = path.find('/', glob.length() - 1);
@@ -31,7 +33,7 @@ inline bool in_dir(const std::string &path, const std::string &glob) {
 }
 
 inline bool is_directory(int dirfd) {
-    START_LOG(capio_syscall(SYS_gettid), "call(dirfd=%d)", dirfd);
+    START_LOG(capio_tid(), "call(dirfd=%d)", dirfd);
 
     struct stat path_stat{};
     int tmp = fstat(dirfd, &path_stat);
@@ -43,28 +45,33 @@ inline bool is_directory(int dirfd) {
     return S_ISDIR(path_stat.st_mode) == 1;
 }
 
+/// @brief Whether @p path_2 is @p path_1 or is inside it
 inline bool is_prefix(const std::filesystem::path &path_1, const std::filesystem::path &path_2) {
     const auto relpath = path_2.lexically_relative(path_1);
-    return !relpath.empty() && relpath.native().rfind("..", 0) != 0;
-}
-
-inline bool is_forbidden_path(const std::string_view &path) {
-    return std::any_of(CAPIO_DIR_FORBIDDEN_PATHS.cbegin(), CAPIO_DIR_FORBIDDEN_PATHS.cend(),
-                       [&path](const std::string_view &forbidden_path) {
-                           return path.rfind(forbidden_path, 0) == 0;
-                       });
+    // A first component "..": outside. A name that only starts with "..", as "..f", is inside
+    return !relpath.empty() && *relpath.begin() != "..";
 }
 
 inline bool is_capio_dir(const std::filesystem::path &path_to_check) {
-    START_LOG(capio_syscall(SYS_gettid), "call(path_to_check=%s)", path_to_check.c_str());
+    START_LOG(capio_tid(), "call(path_to_check=%s)", path_to_check.c_str());
 
     const auto res = get_capio_dir().compare(path_to_check) == 0;
     LOG("is_capio_dir: %s", res ? "yes" : "no");
     return res;
 }
 
+/**
+ * @brief The name the server knows a CAPIO path by: its place in the virtual file system whose "/"
+ * is CAPIO_DIR, e.g. "/d/f" for CAPIO_DIR/d/f and "/" for CAPIO_DIR. The same file has the same
+ * name on every node, wherever CAPIO_DIR is mounted. @p path must be a normalized CAPIO path.
+ */
+inline std::string capio_virtual_path(const std::filesystem::path &path) {
+    const auto relative = path.lexically_relative(get_capio_dir());
+    return relative == "." ? "/" : "/" + relative.native();
+}
+
 inline bool is_capio_path(const std::filesystem::path &path_to_check) {
-    START_LOG(capio_syscall(SYS_gettid), "call(path_to_check=%s)", path_to_check.c_str());
+    START_LOG(capio_tid(), "call(path_to_check=%s)", path_to_check.c_str());
 
     // check if path_to_check begins with CAPIO_DIR
     const auto res = is_prefix(get_capio_dir(), path_to_check);
@@ -72,49 +79,15 @@ inline bool is_capio_path(const std::filesystem::path &path_to_check) {
     return res;
 }
 
-CPFileDescriptors_t *capio_files_descriptors;
-CPFilesPaths_t *capio_files_paths;
+/// @brief The CAPIO files of the process. Created by init_filesystem.
+inline FileDescriptorTable *fd_table;
 std::unique_ptr<std::filesystem::path> current_dir;
-CPFiles_t *files;
-
-/**
- * Set the CLOEXEC property of a file descriptor in metadata structures
- * @param fd
- * @param is_cloexec
- * @return
- */
-inline void set_capio_fd_cloexec(int fd, bool is_cloexec) {
-    std::get<3>(files->at(fd)) = is_cloexec;
-}
 
 /**
  * Get the current directory
  * @return the current directory
  */
 inline const std::filesystem::path &get_current_dir() { return *current_dir; }
-
-/**
- * Add a path to metadata structures
- * @param path
- * @return
- */
-inline void add_capio_path(const std::string &path) {
-    capio_files_paths->emplace(path, std::unordered_set<int>{});
-}
-
-/**
- * Add a file descriptor to metadata structures
- * @param path
- * @param fd
- * @return
- */
-inline void add_capio_fd(long tid, const std::string &path, int fd, off64_t offset,
-                         off64_t init_size, int flags, bool is_cloexec) {
-    add_capio_path(path);
-    capio_files_paths->at(path).insert(fd);
-    capio_files_descriptors->insert({fd, path});
-    files->insert({fd, {std::make_shared<off64_t>(offset), init_size, flags, is_cloexec}});
-}
 
 /**
  * Compute the absolute path for @path.  The form in which CAPIO registers a path: "d/.", "d/" and
@@ -132,7 +105,7 @@ inline std::filesystem::path capio_normal_path(const std::filesystem::path &path
 }
 
 std::filesystem::path capio_posix_realpath(const std::filesystem::path &pathname) {
-    START_LOG(syscall_no_intercept(SYS_gettid), "call(path=%s)", pathname.c_str());
+    START_LOG(capio_tid(), "call(path=%s)", pathname.c_str());
     // Relative paths start from CAPIO's working directory, which differs from the kernel's after
     // a chdir into a CAPIO directory. CAPIO paths have no symlinks, so they are resolved
     // lexically; the kernel resolves the others.
@@ -167,28 +140,31 @@ inline std::filesystem::path capio_absolute(const std::filesystem::path &path) {
 }
 
 /**
- * Delete a file descriptor from metadata structures
- * @param fd
- * @return
+ * FS variant: flush what was written through @p fd to the file system, as close(2) does, without
+ * closing @p fd. For the descriptors that the kernel closes without a close(2) whose result CAPIO
+ * sees: at the exit, under dup2/dup3 and close_range.
+ *
+ * On a network file system such as NFS, close is when the data of a file is sent to the file
+ * server, and when a full disk or a quota is reported. A consumer on another node sees only the
+ * data flushed before it opens the file. So:
+ * - at the exit, CAPIO announces the closes before the kernel makes them: without this flush, the
+ *   server could commit a file whose data is still in the cache of the producer's node;
+ * - under dup2 and close_range the kernel flushes too, before CAPIO announces the close, but it
+ *   drops the error: the flush gets it, so that the server knows that data was lost.
+ *
+ * It closes a copy of @p fd, which flushes like a close of @p fd itself. If no descriptor is free
+ * for the copy, it syncs the data instead, which is slower but flushes too. Nothing to flush for a
+ * read-only descriptor.
+ *
+ * @return the error of the flush, 0 if none
  */
-inline void delete_capio_fd(int fd) {
-    auto &path = capio_files_descriptors->at(fd);
-    capio_files_paths->at(path).erase(fd);
-    capio_files_descriptors->erase(fd);
-    files->erase(fd);
-}
-
-/**
- * Delete a file or folder from metadata structures
- * @param path
- * @return
- */
-inline void delete_capio_path(const std::string &path) {
-    auto it = capio_files_paths->at(path).begin();
-    while (it != capio_files_paths->at(path).end()) {
-        delete_capio_fd(*it++);
+inline long flush_capio_fd(const int fd) {
+    if ((fd_table->flags(fd) & O_ACCMODE) == O_RDONLY) {
+        return 0;
     }
-    capio_files_paths->erase(path);
+    long res = syscall_no_intercept(SYS_dup, fd);
+    res = res >= 0 ? syscall_no_intercept(SYS_close, res) : syscall_no_intercept(SYS_fdatasync, fd);
+    return res < 0 && res != -EINTR ? -res : 0; // EINTR: the copy is closed anyway
 }
 
 /**
@@ -197,90 +173,8 @@ inline void delete_capio_path(const std::string &path) {
  */
 inline void destroy_filesystem() {
     current_dir.reset();
-    delete capio_files_descriptors;
-    delete capio_files_paths;
-    delete files;
-}
-
-/**
- * Clone a file descriptor in metadata structures
- * @param oldfd
- * @param newfd
- * @return
- */
-inline void dup_capio_fd(long tid, int oldfd, int newfd, bool is_cloexec) {
-    const std::string &path = capio_files_descriptors->at(oldfd);
-    capio_files_paths->at(path).insert(newfd);
-    files->insert({newfd, files->at(oldfd)});
-    set_capio_fd_cloexec(newfd, is_cloexec);
-    capio_files_descriptors->insert({newfd, capio_files_descriptors->at(oldfd)});
-}
-
-/**
- * Check if a file descriptor exists in metadata structures
- * @param fd
- * @return if the file descriptor exists
- */
-inline bool exists_capio_fd(int fd) {
-    START_LOG(capio_syscall(SYS_gettid), "call(fd=%d)", fd);
-    return files->find(fd) != files->end();
-}
-
-/**
- * Check if a path exists in metadata structures
- * @param path
- * @return if the path exists
- */
-inline bool exists_capio_path(const std::string &path) {
-    return capio_files_paths->find(path) != capio_files_paths->end();
-}
-
-/**
- * Get the CLOEXEC property of a file descriptor in metadata structures
- * @param fd
- * @return the CLOEXEC property
- */
-inline bool get_capio_fd_cloexec(int fd) { return std::get<3>(files->at(fd)); }
-
-/**
- * Get the active flags of a file descriptor in metadata structures
- * @param fd
- * @return the active flags
- */
-inline int get_capio_fd_flags(int fd) { return std::get<2>(files->at(fd)); }
-
-/**
- * Get the path of a file descriptor
- * @param fd
- * @return the file descriptor path
- */
-inline const std::string &get_capio_fd_path(int fd) { return capio_files_descriptors->at(fd); }
-
-/**
- * Get the current offset of a file descriptor
- * @param fd
- * @return the current offset
- */
-inline off64_t get_capio_fd_offset(int fd) { return *std::get<0>(files->at(fd)); }
-
-/**
- * Get the actual size of a file descriptor
- * @param fd
- * @return the actual size of the file
- */
-inline off64_t get_capio_fd_size(int fd) { return std::get<1>(files->at(fd)); }
-
-/**
- * Get all the file descriptors stored in metadata structures
- * @return a vector of file descriptors
- */
-inline std::vector<int> get_capio_fds() {
-    std::vector<int> fds;
-    fds.reserve(files->size());
-    for (auto &file : *files) {
-        fds.push_back(file.first);
-    }
-    return fds;
+    delete fd_table;
+    fd_table = nullptr;
 }
 
 /**
@@ -289,20 +183,19 @@ inline std::vector<int> get_capio_fds() {
  * @return the corresponding path
  */
 std::filesystem::path get_dir_path(int dirfd) {
-    START_LOG(syscall_no_intercept(SYS_gettid), "call(dirfd=%d)", dirfd);
+    START_LOG(capio_tid(), "call(dirfd=%d)", dirfd);
 
     if (dirfd == AT_FDCWD) {
         LOG("Returning current CWD");
         return get_current_dir();
     }
 
-    auto it = capio_files_descriptors->find(dirfd);
-    if (it != capio_files_descriptors->end()) {
-        LOG("dirfd %d points to path %s", dirfd, it->second.c_str());
-        return it->second;
+    if (const auto path = fd_table->findPath(dirfd)) {
+        LOG("dirfd %d points to path %s", dirfd, path->c_str());
+        return *path;
     } else {
         char proclnk[128];
-        char dir_pathname[PATH_MAX];
+        char dir_pathname[PATH_MAX + 1]{}; // readlink does not terminate it
         sprintf(proclnk, "/proc/self/fd/%d", dirfd);
         if (syscall_no_intercept(SYS_readlinkat, AT_FDCWD, proclnk, dir_pathname, PATH_MAX) < 0) {
             LOG("failed to readlink\n");
@@ -315,46 +208,16 @@ std::filesystem::path get_dir_path(int dirfd) {
 
 /**
  * Initialize metadata structures
+ * @param tid the thread that started the program: its table is the one it had before an exec, if
+ * the program started with one. -1 for an empty table.
  * @return
  */
-inline void init_filesystem() {
+inline void init_filesystem(const long tid = -1) {
     std::unique_ptr<char[]> buf(new char[PATH_MAX]);
     syscall_no_intercept(SYS_getcwd, buf.get(), PATH_MAX);
-    current_dir             = std::make_unique<std::filesystem::path>(buf.get());
-    capio_files_descriptors = new CPFileDescriptors_t();
-    capio_files_paths       = new CPFilesPaths_t();
-    files                   = new CPFiles_t();
+    current_dir = std::make_unique<std::filesystem::path>(buf.get());
+    fd_table    = tid < 0 ? new FileDescriptorTable() : new FileDescriptorTable(tid);
 }
-
-/**
- * Rename a file or folder in metadata structures
- * @param path
- * @return
- */
-inline void rename_capio_path(const std::string &oldpath, const std::string &newpath) {
-    auto entry  = capio_files_paths->extract(oldpath);
-    entry.key() = newpath;
-    capio_files_paths->insert(std::move(entry));
-    for (auto fd : capio_files_paths->at(newpath)) {
-        capio_files_descriptors->at(fd).assign(newpath);
-    }
-}
-
-/**
- * Modify the active flags of a file descriptor in metadata structures
- * @param fd
- * @param flags
- * @return
- */
-inline void set_capio_fd_flags(int fd, int flags) { std::get<2>(files->at(fd)) = flags; }
-
-/**
- * Set the offset of a file descriptor in metadata structures
- * @param fd
- * @param offset
- * @return
- */
-inline void set_capio_fd_offset(int fd, off64_t offset) { *std::get<0>(files->at(fd)) = offset; }
 
 /**
  * Change the current directory

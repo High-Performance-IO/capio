@@ -7,6 +7,8 @@
 
 #include <sys/types.h>
 
+#include "common/dirent.hpp"
+
 // CAPIO files constants
 constexpr size_t CAPIO_DEFAULT_DIR_INITIAL_SIZE   = 1024L * 1024 * 1024;
 constexpr off64_t CAPIO_DEFAULT_FILE_INITIAL_SIZE = 1024L * 1024 * 1024 * 4;
@@ -26,6 +28,34 @@ constexpr long CAPIO_LOCATION_REQUERY_INTERVAL_DEFAULT_MS = 500;
 constexpr char CAPIO_MCAST_PROTO_FLAG[]           = "mcast";
 constexpr char CAPIO_FS_PROTO_FLAG[]              = "fs";
 constexpr char CAPIO_FS_DEFAULT_TOKEN_DIRECTORY[] = ".capio_tokens/";
+
+/// @brief FS variant: the record that the server sends in place of the entries of a directory, to
+/// let the kernel list it. Every byte is 0xFF, which no entry is.
+/// TODO: marker.fill(0xFF) once CAPIO moves to C++20, where std::array::fill is constexpr
+inline constexpr auto KERNEL_LISTS_MARKER = [] {
+    std::array<unsigned char, sizeof(linux_dirent64)> marker{};
+    for (auto &byte : marker) {
+        byte = 0xFF;
+    }
+    return marker;
+}();
+
+/// @brief FS variant: the number of bytes to wait for to wait for the commit of a file
+constexpr off64_t CAPIO_UNTIL_COMMIT_FS = LLONG_MAX;
+
+/// @brief What a client prints when the server refuses it, because its workflow uses the other
+/// library (see handshake_named_request)
+constexpr char CAPIO_REFUSED_MEMORY_CLIENT_MESSAGE[] =
+    "CAPIO: this process uses libcapio_posix.so (memory), but its workflow uses "
+    "libcapio_posix_fs.so: the two cannot be mixed in a workflow. Fix LD_PRELOAD.\n";
+constexpr char CAPIO_REFUSED_FS_CLIENT_MESSAGE[] =
+    "CAPIO: this process uses libcapio_posix_fs.so (file system), but its workflow uses "
+    "libcapio_posix.so: the two cannot be mixed in a workflow. Fix LD_PRELOAD.\n";
+/// @brief What an FS client prints when its CAPIO_DIR is not the directory its server streams
+/// through (-r, or the CAPIO_DIR of the first FS client)
+constexpr char CAPIO_REFUSED_ROOT_CLIENT_MESSAGE[] =
+    "CAPIO: the CAPIO_DIR of this process is not the directory its server streams through (the "
+    "server's -r, or the CAPIO_DIR of its first file system client). Fix CAPIO_DIR.\n";
 
 // CAPIO default values for shared memory
 constexpr char CAPIO_DEFAULT_WORKFLOW_NAME[] = "CAPIO";
@@ -66,6 +96,9 @@ constexpr char SHM_SEM_ELEMS[]         = "_sem_num_elems_";
 constexpr char SHM_SEM_EMPTY[]         = "_sem_num_empty_";
 constexpr char SHM_SPSC_PREFIX_WRITE[] = "capio_write_tid_";
 constexpr char SHM_SPSC_PREFIX_READ[]  = "capio_read_tid_";
+
+// The snapshot of the descriptors of a thread that execs, followed by its tid
+constexpr char SHM_SNAPSHOT_PREFIX[] = "/dev/shm/capio_snapshot_";
 
 // CAPIO common - shared channel by client and server
 constexpr char SHM_COMM_CHAN_NAME[]      = "request_buffer";
@@ -135,8 +168,10 @@ constexpr char CAPIO_SERVER_ARG_PARSER_CONFIG_NCONTINUE_ON_ERROR_HELP[] =
     "fatal termination point. This flag should be used only to debug capio. If this flag is "
     "specified,  and a fatal termination point is reached, the behaviour of capio is undefined and "
     "should not  be taken as valid";
-constexpr char CAPIO_SERVER_ARG_PARSER_RESOLVE_PREFIX_OPT_HELP[] =
-    "Prefix to resolve CAPIO-CL configuration file paths when found to be relative";
+constexpr char CAPIO_SERVER_ARG_PARSER_ROOT_OPT_HELP[] =
+    "Real directory of the virtual / that clients see (their CAPIO_DIR), where file system "
+    "streaming keeps the files and their commit tokens (default: the CAPIO_DIR of the first file "
+    "system streaming client)";
 
 constexpr char CAPIO_SERVER_ARG_PARSER_STORE_ALL_IN_MEMORY_OPT_HELP[] =
     "Flag to set CAPIO and CAPIO-CL to store all files in memory, independently of the "

@@ -59,6 +59,22 @@ class MTCLBackend : public Backend {
     /** Release completed sends and remove connections whose sends failed. */
     void cleanup_completed_sends();
 
+    /** Advance pending sends to every peer; failures are left to cleanup_completed_sends(). */
+    void progress_sends();
+
+    /**
+     * @brief Receives one whole frame without stalling this server's own sends.
+     * @return true only when all expected bytes were received.
+     *
+     * A blocking receive deadlocks two servers that send each other frames larger than the TCP
+     * buffers at the same time. MTCL (built with SINGLE_IO_THREAD) advances a send only from
+     * test()/wait() on the calling thread, or from its IO thread for yielded handles, and this
+     * handle is not yielded while it is being read. So each listener would wait for the rest of a
+     * frame that the other listener can no longer send. Polling the receive and the pending sends
+     * of every peer keeps both directions moving (the cycle can span several nodes).
+     */
+    bool receive_frame(MTCL::HandleUser &handle, void *data, size_t size);
+
     /** Remove a peer so discovery can establish a replacement connection. */
     void remove_connection(const std::string &hostname);
 
@@ -80,7 +96,21 @@ class MTCLBackend : public Backend {
 
     void recv_file(char *shm, long int bytes_expected, const std::string &source) override;
 
+    long int max_file_transfer_size() const override;
+
     void connect_to(const std::string &target_token) override;
 };
+
+/**
+ * @brief Builds the endpoint token this server advertises to its peers.
+ *
+ * Peers connect to the host in the token, and by default that is this node's hostname, which
+ * also identifies the node everywhere else (connection map, file homes). On clusters
+ * where the hostname resolves to a slow management network, CAPIO_MTCL_ADVERTISE_HOST names
+ * the address to connect to instead (e.g. the InfiniBand interface); the hostname then
+ * follows a '|' so that peers still know which node the endpoint belongs to.
+ */
+std::string make_advertisement_token(const std::string &proto, const std::string &port,
+                                     const std::string &hostname);
 
 #endif // MTCL_BACKEND_HPP

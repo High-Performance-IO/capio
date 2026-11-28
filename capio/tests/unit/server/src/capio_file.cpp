@@ -257,17 +257,49 @@ TEST(ServerTest, TestCloseCapioFile) {
     EXPECT_TRUE(file1.closed());
 }
 
+TEST(ServerTest, TestCloseWithoutOpenKeepsTheOpensAtZero) {
+    // A descriptor inherited by a clone is closed without having been counted as an open: the
+    // count of opens stays at zero, and the next open makes the file not deletable (#330)
+    CapioFile file(false, false, 0, 2);
+    EXPECT_TRUE(file.deletable());
+    file.close();
+    EXPECT_TRUE(file.deletable());
+    EXPECT_FALSE(file.closed());
+    file.open();
+    EXPECT_FALSE(file.deletable());
+    file.close();
+    EXPECT_TRUE(file.deletable());
+    EXPECT_TRUE(file.closed());
+    file.close(); // past the expected closes: no longer the expected count
+    EXPECT_FALSE(file.closed());
+}
+
+TEST(ServerTest, TestDirectoryEntryCount) {
+    CapioFile directory(true, 3, false, CAPIO_DEFAULT_DIR_INITIAL_SIZE, 0);
+    EXPECT_EQ(directory.getDirectoryExpectedFileCount(), 3U + 2U); // with "." and ".."
+    EXPECT_EQ(directory.getCurrentDirectoryFileCount(), 0U);
+    directory.incrementDirectoryFileCount();
+    directory.incrementDirectoryFileCount(4);
+    EXPECT_EQ(directory.getCurrentDirectoryFileCount(), 5U);
+    // Nothing listed: no entry is removed, and the count does not change
+    EXPECT_FALSE(directory.removeDirectoryEntry("missing"));
+    EXPECT_EQ(directory.getCurrentDirectoryFileCount(), 5U);
+}
+
 TEST(ServerTest, TestCapioFileSeekData) {
     CapioFile file;
 
     EXPECT_EQ(file.seekData(100), -1);
-    EXPECT_EQ(file.seekData(0), 0);
+    EXPECT_EQ(file.seekData(0), -1); // an empty file has no data
 
     file.insertSector(0, 1000);
+    EXPECT_EQ(file.seekData(0), 0);
     EXPECT_EQ(file.seekData(100), 100);
+    EXPECT_EQ(file.seekData(1000), -1); // the end of the file
     EXPECT_EQ(file.seekData(2000), -1);
+    EXPECT_EQ(file.seekData(-1), -1);
     file.insertSector(2000, 3000);
-    EXPECT_NE(file.seekData(1500), 1500); // return here the closest offset...
+    EXPECT_EQ(file.seekData(1500), 2000); // the data after the hole
 
     CapioFile file1;
     file1.insertSector(200, 300);
@@ -278,12 +310,15 @@ TEST(ServerTest, TestCapioFileSeekHole) {
     CapioFile file;
 
     EXPECT_EQ(file.seekHole(100), -1);
-    EXPECT_EQ(file.seekHole(0), 0);
+    EXPECT_EQ(file.seekHole(0), -1); // the end of an empty file
     file.insertSector(0, 1000);
+    EXPECT_EQ(file.seekHole(0), 1000); // a sector that starts at the offset
     EXPECT_EQ(file.seekHole(100), 1000);
+    EXPECT_EQ(file.seekHole(1000), -1);
     EXPECT_EQ(file.seekHole(2000), -1);
     file.insertSector(2000, 3000);
-    EXPECT_EQ(file.seekHole(1500), 1500); // return here the closest offset...
+    EXPECT_EQ(file.seekHole(1500), 1500); // in a hole
+    EXPECT_EQ(file.seekHole(2500), 3000);
 
     CapioFile file1;
     file1.insertSector(200, 300);
@@ -390,9 +425,8 @@ TEST_F(MockBackendTestFixture, TestSimulateDirectoryStreaming) {
     const std::filesystem::path CAPIO_DIR        = "/tmp";
     const std::filesystem::path stream_directory = CAPIO_DIR / "my_streaming_directory";
 
-    setenv("CAPIO_DIR", CAPIO_DIR.c_str(), 1);
-    storage_manager->addDirectory(1234, CAPIO_DIR);
-    storage_manager->addDirectory(1234, stream_directory);
+    storage_manager->createDirectory(1234, CAPIO_DIR);
+    storage_manager->createDirectory(1234, stream_directory);
 
     std::mutex mutex_continue;
 
@@ -437,4 +471,5 @@ TEST_F(MockBackendTestFixture, TestSimulateDirectoryStreaming) {
 
     storage_manager->remove(stream_directory);
     storage_manager->remove(CAPIO_DIR);
+    storage_manager->remove("/"); // registered as the parent of CAPIO_DIR
 }

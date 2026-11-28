@@ -7,9 +7,10 @@
 #include "remote/backend.hpp"
 #include "remote/requests.hpp"
 #include "storage/manager.hpp"
+#include "utils/common.hpp"
 #include "utils/runtime_configuration.hpp"
-
-extern StorageManager *storage_manager;
+#include "utils/server_state.hpp"
+#include "utils/waiter.hpp"
 
 inline void serve_remote_read(const std::filesystem::path &path, const std::string &dest, int tid,
                               int fd, off64_t count, off64_t offset, bool complete,
@@ -20,8 +21,11 @@ inline void serve_remote_read(const std::filesystem::path &path, const std::stri
               path.c_str(), dest.c_str(), tid, fd, count, offset, complete ? "true" : "false",
               is_getdents ? "true" : "false");
 
-    CapioFile &c_file       = storage_manager->get(path);
-    const long int nbytes   = remote_reply_size(c_file, offset);
+    CapioFile &c_file = storage_manager->get(path);
+    // The backend cannot send more in one message (MTCL: 4 GiB); without this cap a
+    // larger reply threw in send_file and the server died, leaving the reader waiting.
+    const long int nbytes =
+        std::min<long int>(remote_reply_size(c_file, offset), backend->max_file_transfer_size());
     const off64_t file_size = c_file.getStoredSize();
 
     serve_remote_read_request(tid, fd, count, nbytes, file_size, complete, is_getdents, dest,
@@ -56,13 +60,15 @@ inline void handle_read_reply(int tid, int fd, long count, off64_t file_size, of
     if (is_getdents) {
         send_dirent_to_client(tid, fd, c_file, offset, bytes_read);
     } else {
-        client_manager->replyToClient(tid, offset, c_file.getBuffer(), bytes_read);
+        // The offset is set before the reply: this runs on the remote listener thread, so once
+        // the client has its answer it may close fd before the offset is stored.
         storage_manager->setFileOffset(tid, fd, offset + bytes_read);
+        client_manager->replyToClient(tid, offset, c_file.getBuffer(), bytes_read);
     }
 }
 
-void wait_for_data(const std::filesystem::path &path, const std::string &dest, int tid, int fd,
-                   off64_t count, off64_t offset, bool is_getdents) {
+inline void wait_for_data(const std::filesystem::path &path, const std::string &dest, int tid,
+                          int fd, off64_t count, off64_t offset, bool is_getdents) {
     START_LOG(gettid(),
               "call(path=%s, dest=%s, tid=%d, fs=%d, count=%ld, offset=%ld, is_getdents=%s)",
               path.c_str(), dest.c_str(), tid, fd, count, offset, is_getdents ? "true" : "false");
@@ -84,8 +90,7 @@ inline void handle_remote_read(const std::filesystem::path &path, const std::str
     if (c_file.isCommitted() || (CapioCLEngine::get().isFirable(path) && data_available)) {
         serve_remote_read(path, source, tid, fd, count, offset, c_file.isCommitted(), is_getdents);
     } else {
-        std::thread t(wait_for_data, path, source, tid, fd, count, offset, is_getdents);
-        t.detach();
+        spawn_waiter(wait_for_data, path, source, tid, fd, count, offset, is_getdents);
     }
 }
 
@@ -115,17 +120,20 @@ inline void handle_remote_read_reply(const std::string &source, int tid, int fd,
     handle_read_reply(tid, fd, count, file_size, nbytes, complete, is_getdents);
 }
 
-void remote_read_handler(const RemoteRequest &request) {
-    const std::string &dest = request.get_source();
-    char path[PATH_MAX];
-    int tid, fd, is_getdents;
+/// "<tid> <fd> <count> <offset> <1 if a getdents> <path>"
+inline void remote_read_handler(const RemoteRequest &request) {
+    int tid, fd, is_getdents, path_start = 0;
     off64_t count, offset;
-    sscanf(request.get_content(), "%s %d %d %ld %ld %d", path, &tid, &fd, &count, &offset,
-           &is_getdents);
-    handle_remote_read(path, dest, tid, fd, count, offset, is_getdents);
+    if (sscanf(request.get_content(), "%d %d %ld %ld %d %n", &tid, &fd, &count, &offset,
+               &is_getdents, &path_start) < 5 ||
+        path_start == 0) {
+        return;
+    }
+    handle_remote_read(request.get_content() + path_start, request.get_source(), tid, fd, count,
+                       offset, is_getdents);
 }
 
-void remote_read_reply_handler(const RemoteRequest &request) {
+inline void remote_read_reply_handler(const RemoteRequest &request) {
     const std::string &dest = request.get_source();
     off64_t count, nbytes, file_size;
     int tid, fd, complete, is_getdents;

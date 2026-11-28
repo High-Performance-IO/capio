@@ -3,7 +3,9 @@
 
 #include <iomanip>
 #include <string>
+#include <string_view>
 #include <thread>
+#include <unordered_map>
 
 #include "calf/StlLogger.h"
 #include "capiocl_adapter.hpp"
@@ -11,14 +13,14 @@
 #include "common/dirent.hpp"
 #include "remote/home_node_service.hpp"
 #include "storage/capio_file.hpp"
+#include "storage/fs_storage_manager.hpp"
 #include "storage/manager.hpp"
+#include "utils/server_state.hpp"
 #include "utils/types.hpp"
+#include "utils/waiter.hpp"
 
-extern ClientManager *client_manager;
-extern StorageManager *storage_manager;
-
-void wait_for_dirent_data(off64_t wait_size, int wait_tid, int wait_fd, int wait_count,
-                          CapioFile &wait_c_file);
+inline void wait_for_dirent_data(off64_t wait_size, int wait_tid, int wait_fd, int wait_count,
+                                 CapioFile &wait_c_file);
 
 inline void send_dirent_to_client(int tid, int fd, CapioFile &c_file, off64_t offset,
                                   off64_t count) {
@@ -33,7 +35,7 @@ inline void send_dirent_to_client(int tid, int fd, CapioFile &c_file, off64_t of
     off64_t actual_size = (last_entry - first_entry) * static_cast<off64_t>(sizeof(linux_dirent64));
 
     if (actual_size > 0) {
-        auto dirents = std::unique_ptr<linux_dirent64[]>(new linux_dirent64[actual_size]);
+        auto dirents = std::make_unique<linux_dirent64[]>(last_entry - first_entry);
 
         for (int i = first_entry; i < last_entry; i++) {
             dir_entity = (struct linux_dirent64 *) (incoming + i * sizeof(linux_dirent64));
@@ -48,8 +50,8 @@ inline void send_dirent_to_client(int tid, int fd, CapioFile &c_file, off64_t of
             LOG("DIRENT NAME: %s - TARGET NAME: %s", dir_entity->d_name, current_dirent.d_name);
         }
 
-        client_manager->replyToClient(tid, offset, reinterpret_cast<char *>(dirents.get()) - offset,
-                                      actual_size);
+        client_manager->replyToClientWithData(
+            tid, offset + actual_size, reinterpret_cast<const char *>(dirents.get()), actual_size);
         storage_manager->setFileOffset(tid, fd, offset + actual_size);
         return;
     }
@@ -61,9 +63,8 @@ inline void send_dirent_to_client(int tid, int fd, CapioFile &c_file, off64_t of
     if (!c_file.isCommitted() && CapioCLEngine::get().isFirable(path_to_check) &&
         !CapioCLEngine::get().isProducer(path_to_check, client_manager->getAppName(tid))) {
         LOG("File %s has mode no_update and not enough data is available", path_to_check.c_str());
-        std::thread t(wait_for_dirent_data, (last_entry + 1) * sizeof(linux_dirent64), tid, fd,
-                      count, std::ref(c_file));
-        t.detach();
+        spawn_waiter(wait_for_dirent_data, (last_entry + 1) * sizeof(linux_dirent64), tid, fd,
+                     count, std::ref(c_file));
         return;
     }
 
@@ -149,6 +150,66 @@ inline void copy_file_range_data(const CSCopyFileRange_t &copy) {
     }
     LOG("copied %ld bytes", bytes_copied);
     client_manager->replyToClient(copy.tid, bytes_copied);
+}
+
+/*
+ * Requests that carry a path, in both variants, put the path last: "<tid> <arguments> <path>".
+ * A handler reads the numbers with sscanf, using %n to learn where they end, and then calls
+ * request_text, which returns everything after that point as the path. This way the path can
+ * contain spaces.
+ *
+ * A path longer than a request is sent in parts (see path_request in the client): first one or
+ * more CAPIO_REQUEST_PATH_PART requests with the beginning of the path, then the request itself
+ * with the end. path_part_handler stores the parts by thread, and request_text puts them back in
+ * front of the end of the path.
+ *
+ * Requests on an open file send the descriptor instead of the path.
+ */
+
+/// @brief For each thread, the beginning of a long path it is sending: the parts received so far,
+/// joined together, waiting for the request that carries the rest
+inline std::unordered_map<pid_t, std::string> path_parts;
+
+/// @brief CAPIO_REQUEST_PATH_PART, "tid part": the next part of the path of the next request of
+/// that thread. Appended to what was received before; no reply.
+inline void path_part_handler(const char *const str) {
+    int tid, consumed = 0;
+    if (sscanf(str, "%d%n", &tid, &consumed) == 1 && str[consumed] == ' ') {
+        path_parts[tid] += str + consumed + 1;
+    }
+}
+
+/**
+ * @brief The path of a request, exactly as the client sent it.
+ *
+ * @param consumed where the arguments of the request end in @p str (from sscanf's %n): the path is
+ * what follows. If thread @p tid sent the beginning of the path in CAPIO_REQUEST_PATH_PART
+ * requests, those parts are put in front of it, and forgotten.
+ */
+inline std::string request_text(const pid_t tid, const char *str, const int consumed) {
+    std::string text;
+    if (const auto parts = path_parts.find(tid); parts != path_parts.end()) {
+        text = std::move(parts->second);
+        path_parts.erase(parts);
+    }
+    // %n stops right after the last number, so the path starts after one space
+    text += str[consumed] == ' ' ? str + consumed + 1 : str + consumed;
+    return text;
+}
+
+/// @brief Normalize a path sent by an FS client the way the server stores paths: lexically
+/// normal, with no trailing slash
+inline std::string fs_normal_path(const std::string_view sent) {
+    auto path = std::filesystem::path(sent).lexically_normal().string();
+    while (path.size() > 1 && path.back() == '/') {
+        path.pop_back();
+    }
+    return path;
+}
+
+/// @brief The path of a request of the FS variant, whose arguments end at @p consumed
+inline std::string fs_request_path(const pid_t tid, const char *str, const int consumed) {
+    return fs_normal_path(request_text(tid, str, consumed));
 }
 
 #endif // CAPIO_SERVER_UTILS_COMMON_HPP

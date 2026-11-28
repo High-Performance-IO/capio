@@ -1,22 +1,18 @@
-/**
- * Capio log level.
- * if -1, and capio logging is enable everything is logged, otherwise, only
- * logs up to CAPIO_MAX_LOG_LEVEL function calls
- */
-
 #include <array>
 #include <string>
+
+#include <pthread.h>
 
 #include "common/syscall.hpp"
 
 #include "utils/clone.hpp"
 #include "utils/filesystem.hpp"
-#include "utils/snapshot.hpp"
 
 #include "handlers.hpp"
 
 #ifdef CAPIO_LOG
 #include "syscallnames.h"
+#include "utils/tid.hpp"
 #endif
 
 template <typename T> std::string demangled_name(const T &obj) {
@@ -33,17 +29,6 @@ template <typename T> std::string demangled_name(const T &obj) {
 static int not_handled_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg5,
                                long *result) {
     return 1;
-}
-
-/**
- * Handler for syscall handled, but not yet implemented and interrupt
- * syscall_intercept
- */
-static int not_implemented_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg5,
-                                   long *result) {
-    errno   = ENOTSUP;
-    *result = -errno;
-    return 0;
 }
 
 static constexpr long CAPIO_NR_SYSCALLS = 1 + std::max({
@@ -64,6 +49,9 @@ static constexpr long CAPIO_NR_SYSCALLS = 1 + std::max({
 #endif
 #ifdef SYS_close
                                                   SYS_close,
+#endif
+#ifdef SYS_close_range
+                                                  SYS_close_range,
 #endif
 #ifdef SYS_copy_file_range
                                                   SYS_copy_file_range,
@@ -161,6 +149,15 @@ static constexpr long CAPIO_NR_SYSCALLS = 1 + std::max({
 #ifdef SYS_openat
                                                   SYS_openat,
 #endif
+#ifdef SYS_pread64
+                                                  SYS_pread64,
+#endif
+#ifdef SYS_preadv
+                                                  SYS_preadv,
+#endif
+#ifdef SYS_preadv2
+                                                  SYS_preadv2,
+#endif
 #ifdef SYS_read
                                                   SYS_read,
 #endif
@@ -184,6 +181,12 @@ static constexpr long CAPIO_NR_SYSCALLS = 1 + std::max({
 #endif
 #ifdef SYS_statx
                                                   SYS_statx,
+#endif
+#ifdef SYS_sync_file_range
+                                                  SYS_sync_file_range,
+#endif
+#ifdef SYS_sync_file_range2
+                                                  SYS_sync_file_range2,
 #endif
 #ifdef SYS_unlink
                                                   SYS_unlink,
@@ -236,6 +239,9 @@ static constexpr std::array<CPHandler_t, CAPIO_NR_SYSCALLS> build_syscall_table(
 #ifdef SYS_close
     _syscallTable[SYS_close] = close_handler;
 #endif
+#ifdef SYS_close_range
+    _syscallTable[SYS_close_range] = close_range_handler;
+#endif
 #ifdef SYS_copy_file_range
     _syscallTable[SYS_copy_file_range] = copy_file_range_handler;
 #endif
@@ -258,7 +264,7 @@ static constexpr std::array<CPHandler_t, CAPIO_NR_SYSCALLS> build_syscall_table(
     _syscallTable[SYS_exit] = exit_handler;
 #endif
 #ifdef SYS_exit_group
-    _syscallTable[SYS_exit_group] = exit_handler;
+    _syscallTable[SYS_exit_group] = exit_group_handler;
 #endif
 #ifdef SYS_faccessat
     _syscallTable[SYS_faccessat] = faccessat_handler;
@@ -273,7 +279,7 @@ static constexpr std::array<CPHandler_t, CAPIO_NR_SYSCALLS> build_syscall_table(
     _syscallTable[SYS_fgetxattr] = fgetxattr_handler;
 #endif
 #ifdef SYS_flistxattr
-    _syscallTable[SYS_flistxattr] = not_implemented_handler;
+    _syscallTable[SYS_flistxattr] = flistxattr_handler;
 #endif
 #ifdef SYS_fork
     _syscallTable[SYS_fork] = fork_handler;
@@ -294,7 +300,7 @@ static constexpr std::array<CPHandler_t, CAPIO_NR_SYSCALLS> build_syscall_table(
     _syscallTable[SYS_getdents64] = getdents64_handler;
 #endif
 #ifdef SYS_getxattr
-    _syscallTable[SYS_getxattr] = not_implemented_handler;
+    _syscallTable[SYS_getxattr] = getxattr_handler;
 #endif
 #ifdef SYS_io_uring_enter
     _syscallTable[SYS_io_uring_enter] = io_uring_enter_handler;
@@ -309,7 +315,7 @@ static constexpr std::array<CPHandler_t, CAPIO_NR_SYSCALLS> build_syscall_table(
     _syscallTable[SYS_ioctl] = ioctl_handler;
 #endif
 #ifdef SYS_lgetxattr
-    _syscallTable[SYS_lgetxattr] = not_implemented_handler;
+    _syscallTable[SYS_lgetxattr] = lgetxattr_handler;
 #endif
 #ifdef SYS_lseek
     _syscallTable[SYS_lseek] = lseek_handler;
@@ -331,6 +337,15 @@ static constexpr std::array<CPHandler_t, CAPIO_NR_SYSCALLS> build_syscall_table(
 #endif
 #ifdef SYS_openat
     _syscallTable[SYS_openat] = openat_handler;
+#endif
+#ifdef SYS_pread64
+    _syscallTable[SYS_pread64] = pread_handler;
+#endif
+#ifdef SYS_preadv
+    _syscallTable[SYS_preadv] = preadv_handler;
+#endif
+#ifdef SYS_preadv2
+    _syscallTable[SYS_preadv2] = preadv_handler;
 #endif
 #ifdef SYS_read
     _syscallTable[SYS_read] = read_handler;
@@ -362,6 +377,12 @@ static constexpr std::array<CPHandler_t, CAPIO_NR_SYSCALLS> build_syscall_table(
 #ifdef SYS_statx
     _syscallTable[SYS_statx] = statx_handler;
 #endif
+#ifdef SYS_sync_file_range
+    _syscallTable[SYS_sync_file_range] = sync_file_range_handler;
+#endif
+#ifdef SYS_sync_file_range2
+    _syscallTable[SYS_sync_file_range2] = sync_file_range_handler;
+#endif
 #ifdef SYS_unlink
     _syscallTable[SYS_unlink] = unlink_handler;
 #endif
@@ -382,7 +403,6 @@ static int hook(long syscall_number, long arg0, long arg1, long arg2, long arg3,
                 long arg5, long *result) {
     static constexpr std::array<CPHandler_t, CAPIO_NR_SYSCALLS> syscallTable =
         build_syscall_table();
-    static const char *capio_dir = std::getenv("CAPIO_DIR");
 
 #ifdef SYS_futex
     /**
@@ -401,19 +421,35 @@ static int hook(long syscall_number, long arg0, long arg1, long arg2, long arg3,
         return 1;
     }
 
-    START_LOG(syscall_no_intercept(SYS_gettid), "call(syscall_number=%ld, syscall_name=%s)",
-              syscall_number, sys_num_to_string(syscall_number).c_str());
+    // A thread started before libcapio was initialized (e.g. by the constructor of another
+    // library, as UCX does with its fuse thread) never went through the clone hook, so it has no
+    // caches and no connection to the server. Only such a thread gets past this test, once.
+    // Its exit has nothing to clean up. Any other system call sets it up as the constructor does
+    // for the main thread, without waiting: no clone request announced it to the server. While it
+    // is set up, its own system calls (malloc's, for instance) go to the kernel, through
+    // syscall_no_intercept_flag.
+    // Before the log of the hook: the logger of a thread issues its system calls through the
+    // handler that initialize_new_thread sets. Until then it uses libc's syscall(), which comes
+    // back here, and logs again, until the stack is gone.
+    const bool set_up_now = buf_requests == nullptr;
+    if (set_up_now) {
+        if (syscall_number == SYS_exit || syscall_number == SYS_exit_group) {
+            return 1;
+        }
+        initialize_new_thread();
+    }
+
+    START_LOG(capio_tid(), "call(syscall_number=%ld, syscall_name=%s)", syscall_number,
+              sys_num_to_string(syscall_number).c_str());
+    DBG(capio_tid(), [&] {
+        if (set_up_now) {
+            LOG("Thread not initialized by libcapio: initialized it");
+        }
+    }());
 
     // If the syscall_number is higher than the maximum
     // syscall captured by CAPIO, simply return
     if (syscall_number >= CAPIO_NR_SYSCALLS) {
-        return 1;
-    }
-
-    // If CAPIO_DIR is not set as environment variable,
-    // then capio will not intercept the system calls
-    if (capio_dir == nullptr) {
-        LOG("CAPIO_DIR env var not set. returning control to kernel");
         return 1;
     }
 
@@ -430,7 +466,7 @@ static int hook(long syscall_number, long arg0, long arg1, long arg2, long arg3,
             << "|  syscall(" << syscall_number << ", arg0:" << arg0 << ", arg1:" << arg1
             << ", arg2:" << arg2 << ", arg3:" << arg3 << ", arg4:" << arg4 << ", arg5: " << arg5
             << ")" << std::endl
-            << "|  TID of offending thread: " << syscall_no_intercept(SYS_gettid) << std::endl
+            << "|  TID of offending thread: " << capio_tid() << std::endl
             << "|  PID of offending thread: " << syscall_no_intercept(SYS_getpid) << std::endl
             << "|  PPID of offending thread: " << syscall_no_intercept(SYS_getppid) << std::endl
             << "|  " << std::endl
@@ -447,15 +483,34 @@ static int hook(long syscall_number, long arg0, long arg1, long arg2, long arg3,
 static __attribute__((constructor)) void init() {
     SET_CALF_SYSCALL_HANDLER(syscall_no_intercept);
 
-    const long tid = syscall_no_intercept(SYS_gettid);
-
-    init_client(tid);
-    init_filesystem();
-    initialize_new_thread();
-
-    if (const int *fd_shm = get_fd_snapshot(tid); fd_shm != nullptr) {
-        initialize_from_snapshot(fd_shm, tid);
+    // Without CAPIO_DIR, CAPIO is off: no server, no hooks
+    if (get_capio_dir().empty()) {
+        return;
     }
+
+    FileDescriptorTable::protectAcrossFork();
+    // After the handlers of the table, so that the child has a free lock
+    FS_MODE({ pthread_atfork(nullptr, nullptr, announce_inherited_descriptors_fs); })
+    init_client(capio_tid());
+    init_filesystem(capio_tid()); // with the descriptors of the program before an exec, if any
+    initialize_new_thread();
+    FS_MODE({
+        // The program after an exec, e.g. the child of a fork, writes the files it got too
+        for (const int fd : fd_table->fds()) {
+            struct stat info{};
+            const bool writes = (fd_table->flags(fd) & O_ACCMODE) != O_RDONLY &&
+                                syscall_no_intercept(SYS_fstat, fd, &info) == 0 &&
+                                !S_ISDIR(info.st_mode);
+            create_request_fs(fd_table->path(fd), fd,
+                              writes ? CAPIO_FS_PRODUCED_IF_NO_PRODUCER : CAPIO_FS_NOT_PRODUCED,
+                              capio_tid());
+        }
+        // Counted only now, so that a failed exec closes nothing: the server still has them, as
+        // the process is the same
+        for (const int fd : fd_table->closedByExec()) {
+            close_request(fd, capio_tid());
+        }
+    })
 
     intercept_hook_point_clone_child  = hook_clone_child;
     intercept_hook_point_clone_parent = hook_clone_parent;

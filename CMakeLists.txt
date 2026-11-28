@@ -34,6 +34,9 @@ set(CAPIO_MEMORY_CHECKS "full" CACHE STRING
         "Memory checks for CapioFile buffers: full (MemAvailable from /proc/meminfo), fast (free memory via sysconf), none")
 set_property(CACHE CAPIO_MEMORY_CHECKS PROPERTY STRINGS full fast none)
 
+set(CAPIO_SANITIZERS "" CACHE STRING
+        "Sanitizers for the server and the unit tests, as -fsanitize takes them (e.g. address,undefined). The client libraries are left out: they are preloaded, and a sanitizer runtime must be loaded first")
+
 #####################################
 # CMake module imports
 #####################################
@@ -70,6 +73,19 @@ ELSEIF (CAPIO_LOG)
     message(WARNING "CAPIO logger is only available in Debug builds; logging is disabled")
 ENDIF ()
 
+# capio_enable_sanitizers(target): build and link target with CAPIO_SANITIZERS, if any. Any error
+# they find ends the program, so that a test that finds one fails.
+function(capio_enable_sanitizers target)
+    IF (CAPIO_SANITIZERS)
+        target_compile_options(${target} PRIVATE
+                -fsanitize=${CAPIO_SANITIZERS} -fno-sanitize-recover=all -fno-omit-frame-pointer)
+        target_link_options(${target} PRIVATE -fsanitize=${CAPIO_SANITIZERS})
+    ENDIF ()
+endfunction()
+IF (CAPIO_SANITIZERS)
+    message(STATUS "Sanitizers for the server and the unit tests: ${CAPIO_SANITIZERS}")
+ENDIF ()
+
 #####################################
 # Include files and directories
 #####################################
@@ -87,7 +103,7 @@ ENDIF ()
 FetchContent_Declare(
         capio_cl
         GIT_REPOSITORY https://github.com/High-Performance-IO/CAPIO-CL.git
-        GIT_TAG v2.0.3
+        GIT_TAG v2.1.0
 )
 
 FetchContent_Declare(

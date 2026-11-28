@@ -10,6 +10,7 @@
 
 #include "utils/common.hpp"
 #include "utils/filesystem.hpp"
+#include "utils/tid.hpp"
 #include "utils/uring_kernel.hpp"
 
 #include "close.hpp"
@@ -147,7 +148,7 @@ inline int32_t uring_capio_rw(const io_uring_sqe *sqe, const iovec *iov, int iov
         return transfer();
     }
 
-    off64_t saved = get_capio_fd_offset(sqe->fd);
+    off64_t saved = fd_table->offset(sqe->fd);
     if (capio_lseek(sqe->fd, static_cast<off64_t>(sqe->off), SEEK_SET, tid) < 0) {
         return -errno;
     }
@@ -194,15 +195,15 @@ inline bool uring_for_capio(const io_uring_sqe *sqe) {
     case IORING_OP_STATX:
     case IORING_OP_UNLINKAT:
     case IORING_OP_MKDIRAT:
-        return exists_capio_fd(sqe->fd) || uring_is_capio_at(sqe->fd, sqe->addr);
+        return fd_table->contains(sqe->fd) || uring_is_capio_at(sqe->fd, sqe->addr);
     case IORING_OP_RENAMEAT:
         return uring_is_capio_at(sqe->fd, sqe->addr) ||
                uring_is_capio_at(static_cast<int>(sqe->len), sqe->addr2);
     case IORING_OP_SPLICE:
     case IORING_OP_TEE:
-        return exists_capio_fd(sqe->fd) || exists_capio_fd(sqe->splice_fd_in);
+        return fd_table->contains(sqe->fd) || fd_table->contains(sqe->splice_fd_in);
     default:
-        return sqe->fd >= 0 && exists_capio_fd(sqe->fd);
+        return sqe->fd >= 0 && fd_table->contains(sqe->fd);
     }
 }
 
@@ -237,13 +238,15 @@ inline bool uring_capio_exec(const io_uring_sqe *sqe, long tid, int32_t &res) {
         res = uring_rw(sqe, true, true, tid);
         return true;
     case IORING_OP_OPENAT:
-        r = capio_openat(sqe->fd, path, static_cast<int>(sqe->open_flags), tid);
+        r = capio_openat(sqe->fd, path, static_cast<int>(sqe->open_flags),
+                         static_cast<mode_t>(sqe->len), tid);
         break;
-    case IORING_OP_OPENAT2:
-        r = capio_openat(sqe->fd, path,
-                         static_cast<int>(reinterpret_cast<const open_how *>(sqe->addr2)->flags),
-                         tid);
+    case IORING_OP_OPENAT2: {
+        const auto *how = reinterpret_cast<const open_how *>(sqe->addr2);
+        r               = capio_openat(sqe->fd, path, static_cast<int>(how->flags),
+                                       static_cast<mode_t>(how->mode), tid);
         break;
+    }
     case IORING_OP_STATX:
         r = capio_statx(sqe->fd, path, static_cast<int>(sqe->statx_flags),
                         static_cast<int>(sqe->len), reinterpret_cast<struct statx *>(sqe->addr2),
@@ -437,7 +440,7 @@ inline off64_t capio_io_uring_enter(int ring_fd, unsigned to_submit, unsigned mi
 inline bool uring_has_capio_fd(uint64_t fds, uint32_t count) {
     const auto *fd = reinterpret_cast<const int *>(fds);
     for (uint32_t i = 0; fd != nullptr && i < count; ++i) {
-        if (fd[i] >= 0 && exists_capio_fd(fd[i])) {
+        if (fd[i] >= 0 && fd_table->contains(fd[i])) {
             return true;
         }
     }
@@ -504,7 +507,10 @@ inline off64_t capio_io_uring_register(int ring_fd, unsigned opcode, void *arg, 
 #ifdef SYS_io_uring_setup
 int io_uring_setup_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg5,
                            long *result) {
-    long tid = syscall_no_intercept(SYS_gettid);
+    // The FS variant does not intercept io_uring yet: its descriptors are the kernel's, and the
+    // kernel serves the ring as it does without CAPIO
+    FS_MODE({ return CAPIO_POSIX_SYSCALL_SKIP; })
+    const long tid = capio_tid();
     return posix_return_value(capio_io_uring_setup(static_cast<unsigned>(arg0),
                                                    reinterpret_cast<io_uring_params *>(arg1), tid),
                               result);
@@ -514,7 +520,10 @@ int io_uring_setup_handler(long arg0, long arg1, long arg2, long arg3, long arg4
 #ifdef SYS_io_uring_enter
 int io_uring_enter_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg5,
                            long *result) {
-    long tid = syscall_no_intercept(SYS_gettid);
+    // The FS variant does not intercept io_uring yet: its descriptors are the kernel's, and the
+    // kernel serves the ring as it does without CAPIO
+    FS_MODE({ return CAPIO_POSIX_SYSCALL_SKIP; })
+    const long tid = capio_tid();
     const UringWaitArg wait{static_cast<unsigned>(arg3) & IORING_ENTER_EXT_ARG,
                             reinterpret_cast<const void *>(arg4), static_cast<size_t>(arg5)};
     return posix_return_value(
@@ -527,7 +536,10 @@ int io_uring_enter_handler(long arg0, long arg1, long arg2, long arg3, long arg4
 #ifdef SYS_io_uring_register
 int io_uring_register_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg5,
                               long *result) {
-    long tid = syscall_no_intercept(SYS_gettid);
+    // The FS variant does not intercept io_uring yet: its descriptors are the kernel's, and the
+    // kernel serves the ring as it does without CAPIO
+    FS_MODE({ return CAPIO_POSIX_SYSCALL_SKIP; })
+    const long tid = capio_tid();
     return posix_return_value(
         capio_io_uring_register(static_cast<int>(arg0), static_cast<unsigned>(arg1),
                                 reinterpret_cast<void *>(arg2), static_cast<unsigned>(arg3), tid),

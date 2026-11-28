@@ -6,9 +6,8 @@
 #include "remote/backend.hpp"
 #include "remote/requests.hpp"
 #include "storage/manager.hpp"
-
-extern StorageManager *storage_manager;
-extern ClientManager *client_manager;
+#include "utils/server_state.hpp"
+#include "utils/waiter.hpp"
 
 inline void serve_remote_stat(const std::filesystem::path &path, const std::string &dest,
                               int source_tid) {
@@ -21,8 +20,8 @@ inline void serve_remote_stat(const std::filesystem::path &path, const std::stri
     serve_remote_stat_request(path, source_tid, file_size, is_dir, dest);
 }
 
-void wait_for_completion(const std::filesystem::path &path, int source_tid,
-                         const std::string &dest) {
+inline void wait_for_completion(const std::filesystem::path &path, int source_tid,
+                                const std::string &dest) {
     START_LOG(gettid(), "call(path=%s, source_tid=%d, dest=%s)", path.c_str(), source_tid,
               dest.c_str());
 
@@ -47,16 +46,14 @@ inline void handle_remote_stat(int source_tid, const std::filesystem::path &path
             LOG("File is not complete. awaiting completion on different thread. parameters of wait "
                 "are: path=%s, source_tid=%d, dest=%s",
                 path.c_str(), source_tid, dest.c_str());
-            std::thread t(wait_for_completion, path, source_tid, dest);
-            t.detach();
+            spawn_waiter(wait_for_completion, path, source_tid, dest);
         }
     } else {
         LOG("CAPIO file is not in metadata. checking in globs for files to be created");
         LOG("File is in globs. creating capio_file and starting thread awaiting for future "
             "creation of file");
-        storage_manager->add(path, false, CAPIO_DEFAULT_FILE_INITIAL_SIZE);
-        std::thread t(wait_for_completion, path, source_tid, dest);
-        t.detach();
+        storage_manager->addFile(path);
+        spawn_waiter(wait_for_completion, path, source_tid, dest);
     }
 }
 
@@ -69,19 +66,24 @@ inline void handle_remote_stat_reply(const std::filesystem::path &path, int sour
     client_manager->replyToClient(source_tid, static_cast<off64_t>(dir));
 }
 
-void remote_stat_handler(const RemoteRequest &request) {
-    char path[PATH_MAX], dest[HOST_NAME_MAX];
-    int tid;
-    sscanf(request.get_content(), "%d %s %s", &tid, dest, path);
-    handle_remote_stat(tid, path, dest);
+/// "<tid> <path>"
+inline void remote_stat_handler(const RemoteRequest &request) {
+    int tid, path_start = 0;
+    if (sscanf(request.get_content(), "%d %n", &tid, &path_start) < 1 || path_start == 0) {
+        return;
+    }
+    handle_remote_stat(tid, request.get_content() + path_start, request.get_source());
 }
 
-void remote_stat_reply_handler(const RemoteRequest &request) {
-    char path[PATH_MAX];
+/// "<tid> <size> <1 if a directory> <path>"
+inline void remote_stat_reply_handler(const RemoteRequest &request) {
     off64_t size;
-    int dir, source_tid;
-    sscanf(request.get_content(), "%s %d %ld %d", path, &source_tid, &size, &dir);
-    handle_remote_stat_reply(path, source_tid, size, dir);
+    int dir, source_tid, path_start = 0;
+    if (sscanf(request.get_content(), "%d %ld %d %n", &source_tid, &size, &dir, &path_start) < 3 ||
+        path_start == 0) {
+        return;
+    }
+    handle_remote_stat_reply(request.get_content() + path_start, source_tid, size, dir);
 }
 
 #endif // CAPIO_SERVER_REMOTE_HANDLERS_STAT_HPP

@@ -91,11 +91,9 @@ inline Backend *select_backend(int argc, char *argv[]) {
     return new NoneBackend(argc, argv);
 }
 
-inline void capio_remote_listener(Semaphore &internal_server_sem) {
+inline void capio_remote_listener() {
     static const std::array<CComsHandler_t, CAPIO_SERVER_NR_REQUEST> server_request_handlers =
         build_server_request_handlers_table();
-
-    internal_server_sem.lock();
 
     if (typeid(*backend) == typeid(NoneBackend)) {
 

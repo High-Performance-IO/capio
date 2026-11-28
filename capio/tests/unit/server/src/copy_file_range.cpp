@@ -18,8 +18,7 @@
 #include "utils/capiocl_adapter.hpp"
 #include "utils/common.hpp"
 
-#include "handlers/copy_file_range.hpp"
-#include "handlers/write.hpp"
+#include "handlers.hpp"
 #include "remote/handlers/copy_file_range.hpp"
 
 extern StorageManager *storage_manager;
@@ -119,8 +118,8 @@ class CopyFileRangeTest : public testing::Test {
         client_manager->registerClient(PRODUCER_TID, "producer");
         client_manager->registerClient(COPIER_TID, "copier");
         // Skip the first-write bookkeeping (announcing the file location) that a write would do.
-        storage_manager->add(path_in, false, 0).registerFirstWrite();
-        storage_manager->add(path_out, false, 0).registerFirstWrite();
+        storage_manager->addFile(path_in, 0).registerFirstWrite();
+        storage_manager->addFile(path_out, 0).registerFirstWrite();
         storage_manager->addFileToTid(PRODUCER_TID, FD_IN, path_in, 0);
         storage_manager->addFileToTid(COPIER_TID, FD_IN, path_in, 0);
         storage_manager->addFileToTid(COPIER_TID, FD_OUT, path_out, 0);
@@ -250,8 +249,8 @@ TEST_F(CopyFileRangeTest, copyOfARemoteInputAsksItsNodeForTheData) {
     ASSERT_EQ(test_backend.requests.size(), 1);
     EXPECT_EQ(test_backend.targets[0], REMOTE_NODE);
     char expected[CAPIO_REQ_MAX_SIZE];
-    sprintf(expected, "%04d %s %d %d %d %ld %ld %ld", CAPIO_SERVER_REQUEST_COPY_FILE_RANGE,
-            path_in.c_str(), COPIER_TID, FD_IN, FD_OUT, 2L, 0L, 4L);
+    sprintf(expected, "%04d %d %d %d %ld %ld %ld %s", CAPIO_SERVER_REQUEST_COPY_FILE_RANGE,
+            COPIER_TID, FD_IN, FD_OUT, 2L, 0L, 4L, path_in.c_str());
     EXPECT_EQ(test_backend.requests[0], expected);
 
     // The client waits for the data, and no file offset moved.

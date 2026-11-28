@@ -1,11 +1,14 @@
 #include <gtest/gtest.h>
 
+#include "child.hpp"
 #include "common/constants.hpp"
 #include "utils/runtime_configuration.hpp"
 
 #include <cstdlib>
 #include <filesystem>
+#include <fstream>
 #include <map>
+#include <memory>
 #include <optional>
 #include <string>
 #include <vector>
@@ -15,18 +18,20 @@ namespace {
 class RuntimeConfigurationTest : public testing::Test {
   protected:
     std::map<std::string, std::optional<std::string>> saved_environment;
+    std::filesystem::path working_dir;
 
     void SetUp() override {
-        for (const auto env : {"CAPIO_DIR", "CAPIO_CACHE_LINES", "CAPIO_CACHE_LINE_SIZE",
-                               "CAPIO_FILE_INIT_SIZE", "CAPIO_PREFETCH_DATA_SIZE"}) {
+        for (const auto env : {"CAPIO_CACHE_LINES", "CAPIO_CACHE_LINE_SIZE", "CAPIO_FILE_INIT_SIZE",
+                               "CAPIO_PREFETCH_DATA_SIZE"}) {
             const char *value      = std::getenv(env);
             saved_environment[env] = value ? std::optional<std::string>{value} : std::nullopt;
             unsetenv(env);
         }
-        setenv("CAPIO_DIR", "/tmp", 1);
+        working_dir = std::filesystem::current_path();
     }
 
     void TearDown() override {
+        std::filesystem::current_path(working_dir);
         for (const auto &[env, value] : saved_environment) {
             value ? setenv(env.c_str(), value->c_str(), 1) : unsetenv(env.c_str());
         }
@@ -47,7 +52,7 @@ class RuntimeConfigurationTest : public testing::Test {
 TEST_F(RuntimeConfigurationTest, UsesDefaultsWithNoConfig) {
     const auto config = parse({"capio_server", "--no-config"});
 
-    EXPECT_EQ(config.getCapioDir(), std::filesystem::canonical("/tmp"));
+    EXPECT_TRUE(config.getRoot().empty());
     EXPECT_FALSE(config.getContinueOnError());
     EXPECT_EQ(config.getDiscoveryType(), CAPIO_MCAST_PROTO_FLAG);
     EXPECT_EQ(config.getMulticastDiscoveryAddress(), CAPIO_MCAST_ADV_DEFAULT_ADDR);
@@ -107,6 +112,48 @@ TEST_F(RuntimeConfigurationTest, CreatesCapioClEngineWithoutConfigFile) {
     delete engine;
 }
 
+TEST_F(RuntimeConfigurationTest, CreatedEnginesCountClosesAndLeaveTokensUnderTheRoot) {
+    char dir[] = "/tmp/capio_close_count_XXXXXX";
+    ASSERT_NE(mkdtemp(dir), nullptr);
+    const auto root = std::filesystem::canonical(dir);
+    std::ofstream(root / "config.json") << R"({"name": "CAPIO", "IO_Graph": []})";
+
+    const std::vector<std::vector<std::string>> servers = {
+        {"capio_server", "--no-config", "-r", root.string()},
+        {"capio_server", "-c", (root / "config.json").string(), "-r", root.string()}};
+    for (size_t i = 0; i < servers.size(); ++i) {
+        const auto config = parse(servers[i]);
+        EXPECT_EQ(config.getRoot(), root);
+        const std::unique_ptr<capiocl::engine::Engine> engine(config.createCapioClEngine());
+        // A virtual path: "/" is the clients' CAPIO_DIR, whose real directory is the root
+        const std::filesystem::path file = "/file" + std::to_string(i);
+        engine->setCommitRule(file, capiocl::commitRules::ON_CLOSE);
+        engine->setCommitedCloseNumber(file, 2);
+
+        EXPECT_FALSE(engine->increaseCloseCount(file));
+        EXPECT_TRUE(engine->increaseCloseCount(file));
+        // Found by servers that start later; the counters are under the root, the default
+        EXPECT_TRUE(std::filesystem::exists(root / (".file" + std::to_string(i) + ".commit")));
+        EXPECT_TRUE(std::filesystem::is_directory(root / "capiocl" / "close-counts"));
+    }
+    std::filesystem::remove_all(root);
+}
+
+TEST_F(RuntimeConfigurationTest, WithoutRootNoTokensAreWritten) {
+    char dir[] = "/tmp/capio_no_root_XXXXXX";
+    ASSERT_NE(mkdtemp(dir), nullptr);
+    const auto working_dir = std::filesystem::canonical(dir);
+    std::filesystem::current_path(working_dir);
+
+    const auto config = parse({"capio_server", "--no-config"});
+    EXPECT_TRUE(config.getRoot().empty());
+    const std::unique_ptr<capiocl::engine::Engine> engine(config.createCapioClEngine());
+    engine->setCommitted("/f");
+    EXPECT_TRUE(engine->isCommitted("/f")); // by multicast
+    EXPECT_TRUE(std::filesystem::is_empty(working_dir));
+    std::filesystem::remove_all(working_dir);
+}
+
 TEST_F(RuntimeConfigurationTest, RejectsInvalidConfigurations) {
     EXPECT_THROW(parse({"capio_server"}), std::runtime_error);
     EXPECT_THROW(parse({"capio_server", "--no-config", "--unknown"}), std::runtime_error);
@@ -123,11 +170,95 @@ TEST_F(RuntimeConfigurationTest, RejectsInvalidConfigurations) {
                  std::runtime_error);
     EXPECT_THROW(parse({"capio_server", "--no-config", "--location-query-timeout", "soon"}),
                  std::runtime_error);
+    EXPECT_THROW(parse({"capio_server", "--no-config", "-r", "/does/not/exist"}),
+                 std::runtime_error);
+    EXPECT_THROW(parse({"capio_server", "--no-config", "-r", "/proc/self/status"}),
+                 std::runtime_error);
+}
 
-    unsetenv("CAPIO_DIR");
-    EXPECT_THROW(parse({"capio_server", "--no-config"}), std::runtime_error);
-    setenv("CAPIO_DIR", "/does/not/exist", 1);
-    EXPECT_THROW(parse({"capio_server", "--no-config"}), std::runtime_error);
-    setenv("CAPIO_DIR", "/proc/self", 1);
-    EXPECT_THROW(parse({"capio_server", "--no-config"}), std::runtime_error);
+TEST_F(RuntimeConfigurationTest, NamesInTheConfigurationAreVirtual) {
+    char dir[] = "/tmp/capio_relative_XXXXXX";
+    ASSERT_NE(mkdtemp(dir), nullptr);
+    const auto root = std::filesystem::canonical(dir);
+    std::ofstream(root / "config.json")
+        << R"({"name": "CAPIO", "IO_Graph": [)"
+        << R"({"name": "writer", "input_stream": [], "output_stream": ["out.dat", "/d/abs.dat"],)"
+        << R"( "streaming": [{"name": ["out.dat"], "committed": "on_close"}]},)"
+        << R"({"name": "reader", "input_stream": ["out.dat"], "output_stream": []}]})";
+
+    // Wherever the server runs and whatever -r says, a name is a path inside CAPIO_DIR
+    for (const auto &extra : std::vector<std::vector<std::string>>{{}, {"-r", root.string()}}) {
+        std::vector<std::string> arguments{"capio_server", "-c", (root / "config.json").string()};
+        arguments.insert(arguments.end(), extra.begin(), extra.end());
+        const std::unique_ptr<capiocl::engine::Engine> engine(
+            parse(arguments).createCapioClEngine());
+        EXPECT_EQ(engine->getCommitRule("/out.dat"), capiocl::commitRules::ON_CLOSE);
+        EXPECT_TRUE(engine->isConsumer("/out.dat", "reader"));
+        EXPECT_TRUE(engine->isProducer("/d/abs.dat", "writer"));
+        EXPECT_FALSE(engine->isConsumer(root / "out.dat", "reader"));
+    }
+    std::filesystem::remove_all(root);
+}
+
+TEST_F(RuntimeConfigurationTest, RejectsInvalidMtclOptions) {
+    for (const auto *options : {"7601@50", ":7601@50", "TCP:@50", "TCP:7601@", "TCP:7601:1@50",
+                                "TCP:7601@50@1", "TCP:0@50", "TCP:70000@50", "TCP:76x@50",
+                                "TCP:7601@0", "TCP:7601@5x", "TCP:99999999999@50"}) {
+        EXPECT_THROW(parse({"capio_server", "--no-config", "--backend", "mtcl", "--backend-options",
+                            options}),
+                     std::runtime_error)
+            << options;
+    }
+    // Only the MTCL backend reads them
+    EXPECT_NO_THROW(
+        parse({"capio_server", "--no-config", "--backend", "mpi", "--backend-options", "x"}));
+}
+
+TEST_F(RuntimeConfigurationTest, ADynamicConfigurationIsAConfiguration) {
+    EXPECT_TRUE(parse({"capio_server", "-c", "dynamic"}).hasConfig());
+    EXPECT_TRUE(parse({"capio_server", "-c", "config.json"}).hasConfig());
+    EXPECT_FALSE(parse({"capio_server", "--no-config"}).hasConfig());
+}
+
+TEST_F(RuntimeConfigurationTest, TheMetadataDirectoryIsTheRootUnlessSet) {
+    unsetenv("CAPIO_METADATA_DIR");
+    EXPECT_EQ(parse({"capio_server", "--no-config"}).getMetadataDir("/root"), "/root");
+    setenv("CAPIO_METADATA_DIR", "/metadata", 1);
+    EXPECT_EQ(parse({"capio_server", "--no-config"}).getMetadataDir("/root"), "/metadata");
+    unsetenv("CAPIO_METADATA_DIR");
+}
+
+/*
+ * initialize() is what the server's main calls: it sets the configuration that get() returns, or
+ * exits. In children, as it changes the global configuration and the logger.
+ */
+TEST_F(RuntimeConfigurationTest, InitializeSetsTheConfigurationOrExits) {
+    EXPECT_EQ(run_in_child([] {
+                  std::vector<std::string> arguments{"capio_server", "--no-config", "--backend",
+                                                     "mpi", "--continue-on-error"};
+                  std::vector<char *> argv;
+                  for (auto &argument : arguments) {
+                      argv.push_back(argument.data());
+                  }
+                  RuntimeConfiguration::initialize(static_cast<int>(argv.size()), argv.data());
+                  EXPECT_EQ(RuntimeConfiguration::get().getBackendName(), "mpi");
+                  EXPECT_TRUE(RuntimeConfiguration::get().getContinueOnError());
+              }),
+              0);
+
+    for (const auto &[arguments, status] : std::vector<std::pair<std::vector<std::string>, int>>{
+             {{"capio_server"}, EXIT_FAILURE},              // no configuration
+             {{"capio_server", "--help"}, EXIT_SUCCESS}}) { // the usage, and nothing else
+        EXPECT_EQ(run_in_child([arguments] {
+                      auto copy = arguments;
+                      std::vector<char *> argv;
+                      for (auto &argument : copy) {
+                          argv.push_back(argument.data());
+                      }
+                      RuntimeConfiguration::initialize(static_cast<int>(argv.size()), argv.data());
+                      _exit(99); // not reached
+                  }),
+                  status)
+            << arguments.back();
+    }
 }

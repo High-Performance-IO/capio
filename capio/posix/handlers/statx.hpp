@@ -4,11 +4,12 @@
 #if defined(SYS_statx)
 
 #include "utils/common.hpp"
+#include "utils/tid.hpp"
 
 inline void fill_statxbuf(struct statx *statxbuf, off_t file_size, bool is_dir, ino_t inode,
                           int mask) {
-    START_LOG(syscall_no_intercept(SYS_gettid), "call(filesize=%ld, is_dir=%s, inode=%d, mask=%d)",
-              file_size, is_dir ? "true" : "false", mask);
+    START_LOG(capio_tid(), "call(filesize=%ld, is_dir=%s, inode=%d, mask=%d)", file_size,
+              is_dir ? "true" : "false", mask);
 
     statx_timestamp time{1, 1};
     if (is_dir == 1) {
@@ -51,10 +52,10 @@ inline int capio_statx(int dirfd, const std::string_view &pathname, int flags, i
             LOG("dirfd is AT_FDCWD");
             path = get_current_dir();
         } else { // operate on dirfd. in this case dirfd can refer to any type of file
-            if (exists_capio_fd(dirfd)) {
-                path = get_capio_fd_path(dirfd);
+            if (fd_table->contains(dirfd)) {
+                path = fd_table->path(dirfd);
             } else {
-                LOG("returning -2 due to !exists_capio_fd");
+                LOG("returning -2 due to !fd_table->contains");
                 return CAPIO_POSIX_SYSCALL_REQUEST_SKIP;
             }
         }
@@ -88,28 +89,43 @@ inline int capio_statx(int dirfd, const std::string_view &pathname, int flags, i
         }
     }
 
-    write_cache->flush();
-    auto [file_size, is_dir] = stat_request(path, tid);
-    if (file_size == -1) {
-        errno = ENOENT;
-        return CAPIO_POSIX_SYSCALL_ERRNO;
-    }
-    if (file_size == CAPIO_POSIX_SYSCALL_REQUEST_SKIP) {
+    MEMORY_MODE({
+        write_cache->flush();
+        auto [file_size, is_dir] = stat_request(path, tid);
+        if (file_size == -1) {
+            errno = ENOENT;
+            return CAPIO_POSIX_SYSCALL_ERRNO;
+        }
+        if (file_size == CAPIO_POSIX_SYSCALL_REQUEST_SKIP) {
+            return CAPIO_POSIX_SYSCALL_REQUEST_SKIP;
+        }
+        fill_statxbuf(statxbuf, file_size, is_dir, std::hash<std::string>{}(path), mask);
+        return CAPIO_POSIX_SYSCALL_SUCCESS;
+    })
+    FS_MODE({
+        // The kernel runs it, once the file is there
+        consent_request_cache->consent_request(path, tid, __FUNCTION__);
         return CAPIO_POSIX_SYSCALL_REQUEST_SKIP;
-    }
-    fill_statxbuf(statxbuf, file_size, is_dir, std::hash<std::string>{}(path), mask);
-    return CAPIO_POSIX_SYSCALL_SUCCESS;
+    })
 }
 
 int statx_handler(long arg0, long arg1, long arg2, long arg3, long arg4, long arg5, long *result) {
-    auto dirfd = static_cast<int>(arg0);
-    const std::string_view pathname(reinterpret_cast<const char *>(arg1));
-    auto flags = static_cast<int>(arg2);
-    auto mask  = static_cast<int>(arg3);
-    auto *buf  = reinterpret_cast<struct statx *>(arg4);
-    long tid   = syscall_no_intercept(SYS_gettid);
+    // statx(dirfd, pathname, flags, mask, statxbuf)
+    const auto dirfd = static_cast<int>(arg0);
+    const auto *path = reinterpret_cast<const char *>(arg1);
+    const auto flags = static_cast<int>(arg2);
+    const auto mask  = static_cast<int>(arg3);
+    auto *buf        = reinterpret_cast<struct statx *>(arg4);
+    START_LOG(capio_tid(), "call(dirfd=%d, path=%s, flags=%d, mask=%d)", dirfd,
+              path != nullptr ? path : "(null)", flags, mask);
 
-    return posix_return_value(capio_statx(dirfd, pathname, flags, mask, buf, tid), result);
+    // A null path or buffer fails with EFAULT, from the kernel. With AT_EMPTY_PATH a null path is
+    // the empty one (Linux 6.11): the file of dirfd.
+    if ((path == nullptr && (flags & AT_EMPTY_PATH) == 0) || buf == nullptr) {
+        return CAPIO_POSIX_SYSCALL_SKIP;
+    }
+    return posix_return_value(
+        capio_statx(dirfd, path != nullptr ? path : "", flags, mask, buf, capio_tid()), result);
 }
 
 #endif // SYS_statx

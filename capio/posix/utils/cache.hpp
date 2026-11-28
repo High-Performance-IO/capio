@@ -6,6 +6,10 @@
 
 #include "requests.hpp"
 
+#include "utils/tid.hpp"
+#include <fcntl.h>
+#include <sys/stat.h>
+
 class ReadCache {
   private:
     char *_cache;
@@ -15,7 +19,7 @@ class ReadCache {
     SPSCQueue _queue;
 
     inline void _read(void *buffer, off64_t count) {
-        START_LOG(capio_syscall(SYS_gettid), "call(count=%ld)", count);
+        START_LOG(capio_tid(), "call(count=%ld)", count);
 
         if (count > 0) {
             memcpy(buffer, _cache + _cache_offset, count);
@@ -31,11 +35,11 @@ class ReadCache {
           _queue(SHM_SPSC_PREFIX_READ + std::to_string(tid), lines, line_size, workflow_name) {}
 
     inline void flush() {
-        START_LOG(capio_syscall(SYS_gettid), "call()");
+        START_LOG(capio_tid(), "call()");
 
         if (_cache_offset != _actual_size) {
             _actual_size = _cache_offset = 0;
-            seek_request(_last_fd, get_capio_fd_offset(_last_fd), _tid);
+            seek_request(_last_fd, fd_table->offset(_last_fd), _tid);
         }
     }
 
@@ -43,12 +47,12 @@ class ReadCache {
     // fd or not
     [[nodiscard]] bool cachesFileOf(const int fd) const {
         return fd == _last_fd ||
-               (exists_capio_fd(_last_fd) && get_capio_fd_path(fd) == get_capio_fd_path(_last_fd));
+               (fd_table->contains(_last_fd) && fd_table->path(fd) == fd_table->path(_last_fd));
     }
 
     inline off64_t read(int fd, void *buffer, off64_t count, bool is_getdents, bool is64bit) {
-        START_LOG(capio_syscall(SYS_gettid), "call(fd=%d, count=%ld, is_getdents=%s, is64bit=%s)",
-                  fd, count, is_getdents ? "true" : "false", is64bit ? "true" : "false");
+        START_LOG(capio_tid(), "call(fd=%d, count=%ld, is_getdents=%s, is64bit=%s)", fd, count,
+                  is_getdents ? "true" : "false", is64bit ? "true" : "false");
 
         if (_last_fd != fd) {
             LOG("changed fd from %d to %d: flushing", _last_fd, fd);
@@ -57,7 +61,7 @@ class ReadCache {
         }
 
         off64_t remaining_bytes = _actual_size - _cache_offset;
-        off64_t file_offset     = get_capio_fd_offset(fd);
+        off64_t file_offset     = fd_table->offset(fd);
         off64_t bytes_read;
 
         if (is_getdents) {
@@ -112,7 +116,7 @@ class ReadCache {
         }
         LOG("%ld bytes have been read. setting fd offset to %ld", bytes_read,
             file_offset + bytes_read);
-        set_capio_fd_offset(fd, file_offset + bytes_read);
+        fd_table->setOffset(fd, file_offset + bytes_read);
         return bytes_read;
     }
 };
@@ -126,7 +130,7 @@ class WriteCache {
     SPSCQueue _queue;
 
     inline void _write(off64_t count, const void *buffer) {
-        START_LOG(capio_syscall(SYS_gettid), "call(count=%ld)", count);
+        START_LOG(capio_tid(), "call(count=%ld)", count);
 
         if (count > 0) {
             if (_cache == nullptr) {
@@ -146,7 +150,7 @@ class WriteCache {
           _queue(SHM_SPSC_PREFIX_WRITE + std::to_string(tid), lines, line_size, workflow_name) {}
 
     inline void flush() {
-        START_LOG(capio_syscall(SYS_gettid), "call()");
+        START_LOG(capio_tid(), "call()");
 
         if (_actual_size != 0) {
             write_request(_fd, _actual_size, _tid);
@@ -156,8 +160,7 @@ class WriteCache {
     }
 
     inline void write(int fd, const void *buffer, off64_t count) {
-        START_LOG(capio_syscall(SYS_gettid), "call(fd=%d, buffer=0x%08x, count=%ld)", fd, buffer,
-                  count);
+        START_LOG(capio_tid(), "call(fd=%d, buffer=0x%08x, count=%ld)", fd, buffer, count);
 
         if (_fd != fd) {
             LOG("changed fd from %d to %d: flushing", _fd, fd);
@@ -185,11 +188,75 @@ class WriteCache {
             }
         }
 
-        set_capio_fd_offset(fd, get_capio_fd_offset(fd) + count);
+        fd_table->setOffset(fd, fd_table->offset(fd) + count);
     }
+};
+
+/// @brief FS variant: block until the server lets a call on a path go on, as stat waits in the
+/// memory variant
+class ConsentRequestCache {
+    std::unordered_set<std::string> received_consents;
+
+  public:
+    void consent_request(const std::filesystem::path &path, const long tid,
+                         const std::string &source_func) {
+        START_LOG(capio_tid(), "call(path=%s, tid=%ld, source=%s)", path.c_str(), tid,
+                  source_func.c_str());
+
+        if (received_consents.find(path) != received_consents.end()) {
+            return;
+        }
+        // 0 holds only now: the path may be created or committed later
+        if (consent_to_proceed_request(path, tid, source_func) != 0) {
+#ifdef SYS_statx
+            // NFS may still have the size from before the wait cached
+            struct statx fresh{};
+            capio_syscall(SYS_statx, AT_FDCWD, path.c_str(), AT_STATX_FORCE_SYNC, STATX_SIZE,
+                          &fresh);
+#endif
+            received_consents.emplace(path);
+        }
+    }
+};
+
+/// @brief FS variant: block a read until the server says its bytes are on the file system
+class ReadCacheFS {
+    // path -> bytes known to be readable, -1 for all of them: committed, or nothing to wait for
+    std::unordered_map<std::string, off64_t> available_read_cache;
+
+  public:
+    /// @brief Block until the first @p end_of_read bytes of the file of @p fd can be read
+    void read(const int fd, const off64_t end_of_read, const long tid) {
+        const std::string &path = fd_table->path(fd);
+        START_LOG(capio_tid(), "call(path=%s, end_of_read=%ld, tid=%ld)", path.c_str(), end_of_read,
+                  tid);
+
+        const auto known = available_read_cache.find(path);
+        if (known != available_read_cache.end() &&
+            (known->second == -1 || end_of_read <= known->second)) {
+            return;
+        }
+        available_read_cache[path] = read_request_fs(fd, end_of_read, tid);
+#ifdef SYS_statx
+        // NFS may still have the old size cached, and would answer end of file
+        struct statx fresh{};
+        capio_syscall(SYS_statx, fd, "", AT_EMPTY_PATH | AT_STATX_FORCE_SYNC, STATX_SIZE, &fresh);
+#endif
+    }
+
+    /// @brief Whether the server lets the kernel list the directory of @p fd (see getdents): it is
+    /// kept as a file with nothing to wait for
+    [[nodiscard]] bool isListedByKernel(const int fd) const {
+        const auto known = available_read_cache.find(fd_table->path(fd));
+        return known != available_read_cache.end() && known->second == -1;
+    }
+
+    void setListedByKernel(const int fd) { available_read_cache[fd_table->path(fd)] = -1; }
 };
 
 inline thread_local WriteCache *write_cache;
 inline thread_local ReadCache *read_cache;
+inline thread_local ConsentRequestCache *consent_request_cache;
+inline thread_local ReadCacheFS *read_request_cache;
 
 #endif // CAPIO_SERVER_UTILS_CACHE

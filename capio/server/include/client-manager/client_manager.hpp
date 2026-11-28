@@ -2,6 +2,7 @@
 #define CLIENT_MANAGER_HPP
 
 #include <condition_variable>
+#include <shared_mutex>
 #include <unordered_map>
 #include <unordered_set>
 #include <vector>
@@ -20,6 +21,9 @@ class ClientManager {
      */
     CircularBuffer<char> requests;
     std::unordered_map<int, CircularBuffer<off64_t>> responses;
+    /// @brief Replies (shared) also come from threads other than the request thread, which adds
+    /// and removes clients (unique): a client is removed only once its replies are written.
+    mutable std::shared_mutex responses_mutex;
 
     /// @brief default app name
     const std::string default_app_name = CAPIO_DEFAULT_APP_NAME;
@@ -39,6 +43,8 @@ class ClientManager {
 
     std::unordered_map<long, ClientDataBuffers> data_buffers;
     std::unordered_map<int, const std::string> app_names;
+
+    std::unordered_map<pid_t, pid_t> pids; ///< tid -> the process of the thread
 
     /**
      * Variables to handle the init process after a SYS_clone occurs
@@ -72,10 +78,11 @@ class ClientManager {
      * @param wait: wait flag is used whenever the handshake is called after a SYS_clone occurred.
      * if wait == true, then the server will spawn a thread waiting for the child tid to have its
      * data structures initialized
+     * @param pid the process of @p tid, -1 if not known: @p tid itself
      * @return
      */
     void registerClient(pid_t tid, const std::string &app_name = CAPIO_DEFAULT_APP_NAME,
-                        bool wait = false);
+                        bool wait = false, pid_t pid = -1);
 
     /**
      * Unlok a child tid after the data structures have been allocated
@@ -104,8 +111,15 @@ class ClientManager {
      * Send an offset as a reply to a request to a connected client
      * @param tid
      * @param offset
+     * @return false if the client is gone: the reply is dropped
      */
-    void replyToClient(pid_t tid, off64_t offset);
+    bool replyToClient(pid_t tid, off64_t offset);
+
+    /**
+     * @brief Reply @p end_offset to @p tid, then send it the @p size bytes of @p data, as a read
+     * or a getdents is answered. Dropped if the client is gone.
+     */
+    void replyToClientWithData(pid_t tid, off64_t end_offset, const char *data, off64_t size);
 
     /**
      * @brief Add a file that is not yet ready to be consumed by a process to a list of files
@@ -125,6 +139,15 @@ class ClientManager {
 
     [[nodiscard]] bool isProducer(pid_t tid, const std::filesystem::path &path) const;
 
+    /// @brief Whether any client registered as producer of @p path
+    [[nodiscard]] bool hasProducer(const std::filesystem::path &path) const;
+
+    /// @brief After a rename: the produced files at or inside @p from are now at or inside @p to
+    void renameProducedFiles(const std::string &from, const std::string &to);
+
+    /// @brief Stop tracking producers for @p path and everything inside it
+    void forgetProducedFiles(const std::string &path);
+
     /**
      * @brief Get the files that a given pid is waiting to be produced
      *
@@ -140,6 +163,9 @@ class ClientManager {
      * @return std::string
      */
     [[nodiscard]] const std::string &getAppName(pid_t tid) const;
+
+    /// @brief The process of thread @p tid, @p tid itself if it is not a client
+    [[nodiscard]] pid_t getPid(pid_t tid) const;
 
     /**
      * Get the data queues associated with a give process id

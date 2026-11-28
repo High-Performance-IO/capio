@@ -13,11 +13,11 @@
 #include "utils/capiocl_adapter.hpp"
 #include "utils/common.hpp"
 #include "utils/filesystem.hpp"
+#include "utils/fs_root.hpp"
 #include "utils/runtime_configuration.hpp"
+#include "utils/server_state.hpp"
 #include "utils/shared_mutex.hpp"
 #include "utils/types.hpp"
-
-extern Backend *backend;
 
 void StorageManager::addDirectoryEntry(const pid_t tid, const std::filesystem::path &file_path,
                                        const std::string &dir, const ManagerDirEntryType type) {
@@ -184,9 +184,24 @@ void StorageManager::rename(const std::filesystem::path &oldpath,
     _storage.insert(std::move(node));
 }
 
-// TODO: Remove parameter is_dir and make an explicit add for file and one for directories
-// TODO: Rename this method to addFile
-CapioFile &StorageManager::add(const std::filesystem::path &path, bool is_dir, size_t init_size) {
+CapioFile &StorageManager::addFile(const std::filesystem::path &path, const size_t init_size) {
+    return _add(path, false, init_size);
+}
+
+CapioFile &StorageManager::addFile(const std::filesystem::path &path) {
+    return _add(path, false, initialFileSize(path));
+}
+
+CapioFile &StorageManager::addDirectory(const std::filesystem::path &path) {
+    return _add(path, true, CAPIO_DEFAULT_DIR_INITIAL_SIZE);
+}
+
+size_t StorageManager::initialFileSize(const std::filesystem::path &path) {
+    START_LOG(gettid(), "call(path=%s)", path.c_str());
+    return RuntimeConfiguration::get().getFileInitialSize();
+}
+
+CapioFile &StorageManager::_add(const std::filesystem::path &path, bool is_dir, size_t init_size) {
 
     START_LOG(gettid(), "call(path=%s, is_dir=%s, init_size=%ld)", path.c_str(),
               is_dir ? "true" : "false", init_size);
@@ -195,7 +210,9 @@ CapioFile &StorageManager::add(const std::filesystem::path &path, bool is_dir, s
     std::replace(shm_name.begin(), shm_name.end(), '/', '_');
 
     auto n_file        = CapioCLEngine::get().getDirectoryFileCount(path);
-    auto permanent     = CapioCLEngine::get().isPermanent(path);
+    // A file kept on the file system goes under the real directory of "/": without one (no -r, no
+    // file system streaming client), every file stays in memory
+    auto permanent     = CapioCLEngine::get().isPermanent(path) && fs_root().known();
     auto n_close_count = CapioCLEngine::get().getCommitCloseCount(path);
 
     if (n_file > 1) {
@@ -248,7 +265,9 @@ std::vector<std::filesystem::path> StorageManager::getPaths() const {
     return paths;
 }
 
-void StorageManager::remove(const std::filesystem::path &path) {
+void StorageManager::remove(const std::filesystem::path &name) {
+    // A copy: name may be one of the descriptor table (getPath), which this erases
+    const std::filesystem::path path = name;
     START_LOG(gettid(), "call(path=%s)", path.c_str());
     const CapioFile &c_file = get(path);
 
@@ -312,17 +331,19 @@ void StorageManager::addFileToTid(const pid_t tid, const int fd, const std::file
     }
 }
 
-off64_t StorageManager::addDirectory(const pid_t tid, const std::filesystem::path &path) {
+off64_t StorageManager::createDirectory(const pid_t tid, const std::filesystem::path &path) {
     START_LOG(tid, "call(path=%s)", path.c_str());
 
     // Whether this server has the directory, not whether some server has it: the other servers
     // announce theirs, and a directory created there is created here too when a client asks.
     if (!tryGet(path)) {
-        CapioFile &c_file = add(path, true, CAPIO_DEFAULT_DIR_INITIAL_SIZE);
+        CapioFile &c_file = addDirectory(path);
         if (c_file.isFirstWrite()) {
             c_file.registerFirstWrite();
             // TODO: it works only if there is one prod per file
-            if (is_capio_dir(path)) {
+            // "/", the CAPIO_DIR of the clients, is local to every server, and the registration of
+            // parents stops there
+            if (path == "/") {
                 home_node_service->learn(path, backend->get_node_name());
             } else {
                 home_node_service->setHome(path);
@@ -347,6 +368,12 @@ void StorageManager::removeFromDirectory(const std::filesystem::path &file_path)
 void StorageManager::updateDirectory(const pid_t tid, const std::filesystem::path &file_path) {
     START_LOG(gettid(), "call(file_path=%s)", file_path.c_str());
     const auto &dir = get_parent_dir_path(file_path);
+    // A directory that exists on the file system without having been created through CAPIO (e.g.
+    // by an application that ran before the server started): register it, and its parents,
+    // instead of failing on the missing entry.
+    if (!tryGet(dir)) {
+        createDirectory(tid, dir);
+    }
     if (CapioFile &c_file = get(dir.c_str()); c_file.isFirstWrite()) {
         c_file.registerFirstWrite();
         home_node_service->setHome(dir);

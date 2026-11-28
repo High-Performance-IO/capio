@@ -8,10 +8,12 @@
 
 #include "common/env.hpp"
 
+#include "handlers/read.hpp"
 #include "utils/common.hpp"
 #include "utils/data.hpp"
 #include "utils/filesystem.hpp"
 #include "utils/requests.hpp"
+#include "utils/tid.hpp"
 #include "utils/types.hpp"
 
 /**
@@ -31,21 +33,21 @@ inline CPCopyFileRangeEnd_t capio_copy_file_range_end(const int fd, loff_t *offs
     CPCopyFileRangeEnd_t end;
     end.fd       = fd;
     end.offset   = offset;
-    end.is_capio = exists_capio_fd(fd);
+    end.is_capio = fd_table->contains(fd);
 
     if (end.is_capio) {
         // the file size must count the data still in the write cache
         write_cache->flush();
         auto [file_size, is_dir] = fstat_request(fd, tid);
         end.is_open              = true;
-        end.flags                = get_capio_fd_flags(fd);
+        end.flags                = fd_table->flags(fd);
         end.is_dir               = is_dir;
         end.is_regular           = !is_dir;
         end.size                 = file_size < 0 ? 0 : file_size;
 
         // the CAPIO caches hold offsets the server does not know yet: this is the offset the
         // application sees
-        end.saved_fd_offset = get_capio_fd_offset(fd);
+        end.saved_fd_offset = fd_table->offset(fd);
         end.position        = offset != nullptr ? *offset : end.saved_fd_offset;
         LOG("fd %d is a capio fd: flags=%d, is_dir=%s, size=%ld, position=%ld", fd, end.flags,
             end.is_dir ? "true" : "false", end.size, end.position);
@@ -78,7 +80,7 @@ inline CPCopyFileRangeEnd_t capio_copy_file_range_end(const int fd, loff_t *offs
  * @param tid
  */
 inline void capio_copy_file_range_seek(const CPCopyFileRangeEnd_t &end, const long tid) {
-    if (get_capio_fd_offset(end.fd) != end.position) {
+    if (fd_table->offset(end.fd) != end.position) {
         capio_set_fd_offset(end.fd, end.position, tid);
     }
 }
@@ -311,7 +313,7 @@ inline off64_t capio_copy_file_range(const int fd_in, loff_t *off_in, const int 
     START_LOG(tid, "call(fd_in=%d, off_in=0x%08x, fd_out=%d, off_out=0x%08x, len=%ld, flags=%u)",
               fd_in, off_in, fd_out, off_out, len, flags);
 
-    if (!exists_capio_fd(fd_in) && !exists_capio_fd(fd_out)) {
+    if (!fd_table->contains(fd_in) && !fd_table->contains(fd_out)) {
         LOG("neither fd_in nor fd_out is a capio fd. skipping");
         return CAPIO_POSIX_SYSCALL_REQUEST_SKIP;
     }
@@ -387,8 +389,8 @@ inline off64_t capio_copy_file_range(const int fd_in, loff_t *off_in, const int 
     // when the copy starts counts: the size is not used to shorten the copy, because a CAPIO file
     // may still be growing, and reading it waits for its data.
     // Only two CAPIO descriptors can name the same file: a path is handled either by CAPIO or by
-    // the kernel. Both checks are also needed because get_capio_fd_path() throws on a kernel fd.
-    if (in.is_capio && out.is_capio && get_capio_fd_path(in.fd) == get_capio_fd_path(out.fd)) {
+    // the kernel. Both checks are also needed because fd_table->path() throws on a kernel fd.
+    if (in.is_capio && out.is_capio && fd_table->path(in.fd) == fd_table->path(out.fd)) {
 
         const auto overlap_count = static_cast<off64_t>(
             in.position >= in.size ? 0 : std::min<uint64_t>(len, in.size - in.position));
@@ -436,10 +438,18 @@ inline int copy_file_range_handler(long arg0, long arg1, long arg2, long arg3, l
     auto *off_out     = reinterpret_cast<loff_t *>(arg3);
     const auto len    = static_cast<size_t>(arg4);
     const auto flags  = static_cast<unsigned int>(arg5);
-    const long tid    = syscall_no_intercept(SYS_gettid);
+    START_LOG(capio_tid(), "call(fd_in=%d, fd_out=%d, len=%zu, flags=%u)", fd_in, fd_out, len,
+              flags);
 
+    FS_MODE({
+        // The kernel copies, once there is data. It may copy less, but 0 only at the commit.
+        if (len != 0) {
+            capio_wait_for_data_fs(fd_in, off_in != nullptr ? *off_in : -1, 1, capio_tid());
+        }
+        return CAPIO_POSIX_SYSCALL_SKIP;
+    })
     return posix_return_value(
-        capio_copy_file_range(fd_in, off_in, fd_out, off_out, len, flags, tid), result);
+        capio_copy_file_range(fd_in, off_in, fd_out, off_out, len, flags, capio_tid()), result);
 }
 
 #endif // SYS_copy_file_range

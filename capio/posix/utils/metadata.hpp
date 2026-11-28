@@ -14,16 +14,22 @@
  * owners, so these calls change nothing: they only resolve the path and send an access request.
  * The result is 0 for a CAPIO path the server has a location for, -1 with ENOENT for a CAPIO
  * path it has none for, and CAPIO_POSIX_SYSCALL_REQUEST_SKIP, which gives the call to the kernel,
- * for any other path. With AT_EMPTY_PATH and an empty path, the target is dirfd itself.
+ * for any other path. With AT_EMPTY_PATH and an empty path, the target is dirfd itself. The FS
+ * variant does not handle them yet: on a CAPIO path it throws, naming @p syscall.
  *
  * TODO: keep the mode and owner of CAPIO files, so that these calls change them and stat reports
  * them.
  */
-inline off64_t capio_metadata_access(int dirfd, const char *pathname, int flags, long tid) {
+inline off64_t capio_metadata_access(const char *syscall, int dirfd, const char *pathname,
+                                     int flags, long tid) {
     START_LOG(tid, "call(dirfd=%d, pathname=%s, flags=%X)", dirfd, pathname, flags);
 
     if (pathname[0] == '\0' && (flags & AT_EMPTY_PATH)) {
-        return exists_capio_fd(dirfd) ? 0 : CAPIO_POSIX_SYSCALL_REQUEST_SKIP;
+        if (!fd_table->contains(dirfd)) {
+            return CAPIO_POSIX_SYSCALL_REQUEST_SKIP;
+        }
+        FS_MODE({ throw CapioUnimplementedException(syscall); })
+        return 0;
     }
     if (is_forbidden_path(pathname)) {
         LOG("Path %s is forbidden: skip", pathname);
@@ -47,6 +53,7 @@ inline off64_t capio_metadata_access(int dirfd, const char *pathname, int flags,
     if (path.empty() || !is_capio_path(path)) {
         return CAPIO_POSIX_SYSCALL_REQUEST_SKIP;
     }
+    FS_MODE({ throw CapioUnimplementedException(syscall); })
 
     const off64_t res = access_request(path, tid);
     if (res == CAPIO_POSIX_SYSCALL_REQUEST_SKIP) {
